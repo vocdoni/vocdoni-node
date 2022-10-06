@@ -13,24 +13,156 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 )
 
-const TimeBetweenBlocks = 6 * time.Second
+const (
+	TimeBetweenBlocks = 6 * time.Second
+	waitTimeout       = 3 * TimeBetweenBlocks
+	pollInterval      = TimeBetweenBlocks / 6
+)
 
 func (c *Client) WaitUntilBlock(block uint32) {
 	log.Infof("waiting for block %d...", block)
+	poll := time.NewTicker(pollInterval)
+	defer poll.Stop()
+	for {
+		<-poll.C
+		cb, err := c.GetCurrentBlock()
+		if err != nil {
+			log.Error(err)
+			continue
+		}
+		if cb >= block {
+			return
+		}
+		log.Debugf("current block: %d", cb)
+	}
+}
+
+func (c *Client) WaitUntilNBlocks(n uint32) {
 	for {
 		cb, err := c.GetCurrentBlock()
 		if err != nil {
 			log.Error(err)
-			time.Sleep(TimeBetweenBlocks)
+			time.Sleep(pollInterval)
 			continue
 		}
-		if cb >= block {
-			break
+		c.WaitUntilBlock(cb + n)
+		return
+	}
+}
+
+func (c *Client) WaitUntilNextBlock() {
+	c.WaitUntilNBlocks(1)
+}
+
+func (c *Client) WaitUntilTxMined(txhash types.HexBytes) error {
+	log.Infof("waiting for tx %x...", txhash)
+	timeout := time.After(waitTimeout)
+	poll := time.NewTicker(pollInterval)
+	defer poll.Stop()
+	for {
+		select {
+		case <-poll.C:
+			tx, err := c.GetTxByHash(txhash)
+			if err == nil {
+				log.Infof("found tx %x in block %d", txhash, tx.BlockHeight)
+				return nil
+			}
+		case <-timeout:
+			return fmt.Errorf("WaitUntilTxMined(%x) timed out after %s", txhash, waitTimeout)
 		}
-		time.Sleep(TimeBetweenBlocks)
-		log.Infof("remaining blocks: %d", block-cb)
+	}
+}
+
+func (c *Client) WaitUntilProcessAvailable(pid []byte) (proc *indexertypes.Process, err error) {
+	log.Infof("waiting for process %x to be registered...", pid)
+	timeout := time.After(waitTimeout)
+	poll := time.NewTicker(pollInterval)
+	defer poll.Stop()
+	for {
+		select {
+		case <-poll.C:
+			proc, err = c.GetProcessInfo(pid)
+			if err == nil {
+				log.Infof("found process %x", pid)
+				return proc, nil
+			}
+		case <-timeout:
+			return nil, fmt.Errorf("WaitUntilProcessAvailable(%x) timed out after %s (%w)",
+				pid, waitTimeout, err)
+		}
+	}
+}
+
+func (c *Client) WaitUntilProcessReady(pid []byte) (proc *indexertypes.Process, err error) {
+	log.Infof("waiting for the process %x to start...", pid)
+	proc, err = c.WaitUntilProcessAvailable(pid)
+	if err != nil {
+		return nil, err
+	}
+	c.WaitUntilBlock(proc.StartBlock)
+	return proc, nil
+}
+
+func (c *Client) WaitUntilEnvelopeHeight(pid []byte, height uint32, waitTimeout time.Duration,
+) error {
+	log.Infof("waiting for %d votes to be validated in process %x...", height, pid)
+	timeout := time.After(waitTimeout)
+	poll := time.NewTicker(pollInterval)
+	var lasth uint32
+	for {
+		select {
+		case <-poll.C:
+			h, err := c.GetEnvelopeHeight(pid)
+			if err != nil {
+				log.Warnf("error getting envelope height: %v", err)
+				continue
+			}
+			if h >= height {
+				return nil
+			}
+			if h > lasth {
+				log.Infof("process %x envelope height: %d (want %d)", pid, h, height)
+				lasth = h
+			}
+		case <-timeout:
+			return fmt.Errorf("waiting for envelope height took longer than %s", waitTimeout)
+		}
+	}
+}
+
+func (c *Client) WaitUntilProcessKeys(pid, eid []byte,
+) (keys []string, keyIndexes []uint32, err error) {
+	log.Infof("waiting for keys from process %x...", pid)
+	timeout := time.After(waitTimeout)
+	poll := time.NewTicker(pollInterval)
+	for {
+		select {
+		case <-poll.C:
+			pk, err := c.GetKeys(pid, eid)
+			if err != nil || pk == nil {
+				log.Errorf("WaitUntilProcessKeys(%x): %v", pid, err)
+				continue
+			}
+			keys = nil
+			keyIndexes = nil
+			for _, k := range pk.pub {
+				if len(k.Key) > 0 {
+					keys = append(keys, k.Key)
+					keyIndexes = append(keyIndexes, uint32(k.Idx))
+				}
+			}
+			if len(keys) > 0 {
+				log.Infof("process %x got encryption keys!", pid)
+				return keys, keyIndexes, nil
+			}
+			log.Infof("waiting... process keys still empty: %v", pk)
+		case <-timeout:
+			return nil, nil, fmt.Errorf("waiting for keys from process %x took longer than %s",
+				pid, waitTimeout)
+		}
 	}
 }
 
