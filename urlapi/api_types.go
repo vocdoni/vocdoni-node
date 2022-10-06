@@ -53,6 +53,27 @@ type ElectionCensus struct {
 	CensusURL              string         `json:"censusURL"`
 }
 
+type ElectionCreate struct {
+	TxPayload   []byte         `json:"txPayload,omitempty"`
+	Metadata    []byte         `json:"metadata,omitempty"`
+	TxHash      types.HexBytes `json:"txHash"`
+	ElectionID  types.HexBytes `json:"electionID"`
+	MetadataURL string         `json:"metadataURL"`
+}
+
+type ElectionDescription struct {
+	Title        LanguageString        `json:"title,omitempty"`
+	Description  LanguageString        `json:"description,omitempty"`
+	Header       string                `json:"header,omitempty"`
+	StreamURI    string                `json:"streamUri,omitempty"`
+	StartDate    time.Time             `json:"startDate,omitempty"`
+	EndDate      time.Time             `json:"endDate,omitempty"`
+	VoteType     VoteType              `json:"voteType,omitempty"`
+	ElectionType ElectionType          `json:"electionType,omitempty"`
+	Questions    []Question            `json:"questions,omitempty"`
+	Census       CensusTypeDescription `json:"census,omitempty"`
+}
+
 type Result struct {
 	Title []string `json:"title,omitempty"`
 	Value []string `json:"value"`
@@ -73,19 +94,6 @@ type Vote struct {
 	VoteNumber           *uint32        `json:"number,omitempty"`
 	ElectionID           types.HexBytes `json:"electionID,omitempty"`
 	VoterID              types.HexBytes `json:"voterID,omitempty"`
-}
-
-type ElectionDescription struct {
-	Title        LanguageString        `json:"title,omitempty"`
-	Description  LanguageString        `json:"description,omitempty"`
-	Header       string                `json:"header,omitempty"`
-	StreamURI    string                `json:"streamUri,omitempty"`
-	StartDate    time.Time             `json:"startDate,omitempty"`
-	EndDate      time.Time             `json:"endDate,omitempty"`
-	VoteType     VoteType              `json:"voteType,omitempty"`
-	ElectionType ElectionType          `json:"electionType,omitempty"`
-	Questions    []Question            `json:"questions,omitempty"`
-	Census       CensusTypeDescription `json:"census,omitempty"`
 }
 
 type CensusTypeDescription struct {

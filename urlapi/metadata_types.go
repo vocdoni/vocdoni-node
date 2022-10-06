@@ -22,7 +22,6 @@ type ProcessMedia struct {
 }
 
 // ElectionResultsDetails describes how a process results should be displayed and aggregated
-// Remove?
 type ElectionResultsDetails struct {
 	Aggregation string `json:"aggregation"`
 	Display     string `json:"display"`

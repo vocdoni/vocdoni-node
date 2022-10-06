@@ -1,10 +1,12 @@
 package urlapi
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/httprouter"
@@ -51,7 +53,6 @@ func (u *URLAPI) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-
 	if err := u.api.RegisterMethod(
 		"/election/{electionID}",
 		"GET",
@@ -60,7 +61,6 @@ func (u *URLAPI) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-
 	if err := u.api.RegisterMethod(
 		"/election/count/{organizationID}",
 		"GET",
@@ -69,7 +69,6 @@ func (u *URLAPI) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-
 	if err := u.api.RegisterMethod(
 		"/election/{electionID}/keys",
 		"GET",
@@ -78,12 +77,19 @@ func (u *URLAPI) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-
 	if err := u.api.RegisterMethod(
 		"/election/{electionID}/votes",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		u.electionVotesHandler,
+	); err != nil {
+		return err
+	}
+	if err := u.api.RegisterMethod(
+		"/election/create",
+		"POST",
+		bearerstdapi.MethodAccessTypePublic,
+		u.electionCreateHandler,
 	); err != nil {
 		return err
 	}
@@ -284,4 +290,55 @@ func (u *URLAPI) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 func (u *URLAPI) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	// TODO
 	return nil
+}
+
+// POST election/create
+// creates a new election
+func (u *URLAPI) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	req := &ElectionCreate{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return err
+	}
+	// if election metadata defined, check the format
+	if req.Metadata != nil {
+		metadata := ElectionMetadata{}
+		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
+			return fmt.Errorf("wrong metadata format: %w", err)
+		}
+	}
+	// send the transaction
+	res, err := u.vocapp.SendTx(req.TxPayload)
+	if err != nil {
+		return err
+	}
+	if res == nil {
+		return fmt.Errorf("no reply from vochain")
+	}
+	if res.Code != 0 {
+		return fmt.Errorf("%s", string(res.Data))
+	}
+
+	resp := &ElectionCreate{
+		TxHash:     res.Hash.Bytes(),
+		ElectionID: res.Data.Bytes(),
+	}
+
+	// if metadata, add it to the storage
+	if req.Metadata != nil {
+		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+		cid, err := u.storage.Publish(sctx, req.Metadata)
+		if err != nil {
+			log.Errorf("could not publish to storage: %v", err)
+		} else {
+			resp.MetadataURL = u.storage.URIprefix() + cid
+		}
+	}
+
+	var data []byte
+	if data, err = json.Marshal(resp); err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+
 }
