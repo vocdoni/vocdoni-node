@@ -39,10 +39,7 @@ func BenchmarkNewProcess(b *testing.B) {
 func benchmarkIndexTx(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc, err := NewScrutinizer(b.TempDir(), app, true)
-	if err != nil {
-		b.Fatal(err)
-	}
+	sc := newTestScrutinizer(b, app, true)
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -55,7 +52,7 @@ func benchmarkIndexTx(b *testing.B) {
 	}); err != nil {
 		b.Fatal(err)
 	}
-	err = sc.newEmptyProcess(pid)
+	err := sc.newEmptyProcess(pid)
 	qt.Assert(b, err, qt.IsNil)
 
 	s := new(ethereum.SignKeys)
@@ -83,17 +80,14 @@ func benchmarkFetchTx(b *testing.B) {
 	numTxs := 1000
 	app := vochain.TestBaseApplication(b)
 
-	sc, err := NewScrutinizer(b.TempDir(), app, true)
-	if err != nil {
-		b.Fatal(err)
-	}
+	sc := newTestScrutinizer(b, app, true)
 
 	for i := 0; i < b.N; i++ {
 		sc.Rollback()
 		for j := 0; j < numTxs; j++ {
 			sc.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
 		}
-		err = sc.Commit(uint32(i))
+		err := sc.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
 
 		time.Sleep(time.Second * 2)
@@ -118,10 +112,7 @@ func benchmarkFetchTx(b *testing.B) {
 func benchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc, err := NewScrutinizer(b.TempDir(), app, true)
-	if err != nil {
-		b.Fatal(err)
-	}
+	sc := newTestScrutinizer(b, app, true)
 	startTime := time.Now()
 	numProcesses := b.N
 	entityID := util.RandomBytes(20)
@@ -140,7 +131,7 @@ func benchmarkNewProcess(b *testing.B) {
 		}); err != nil {
 			b.Fatal(err)
 		}
-		err = sc.newEmptyProcess(pid)
+		err := sc.newEmptyProcess(pid)
 		qt.Assert(b, err, qt.IsNil)
 
 	}

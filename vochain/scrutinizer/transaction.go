@@ -2,6 +2,7 @@ package scrutinizer
 
 import (
 	"fmt"
+	"sync/atomic"
 
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
@@ -50,8 +51,12 @@ func (s *Scrutinizer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 // indexNewTxs indexes the txs pending in the newTxPool and updates the transaction count
 // this function should only be called within Commit(), on a new block.
 func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
+	defer atomic.AddInt64(&s.liveGoroutines, -1)
 	if len(txList) == 0 {
 		return
+	}
+	if s.cancelCtx.Err() != nil {
+		return // closing
 	}
 	s.txIndexLock.Lock()
 	defer s.txIndexLock.Unlock()
@@ -61,6 +66,9 @@ func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
 		return
 	}
 	for i, tx := range txList {
+		if s.cancelCtx.Err() != nil {
+			return // closing
+		}
 		// Add confirmed txs to transaction count
 		tx.Index = txCount.Count + uint64(i) + 1 // Start indexing at 1
 		if err := s.db.Insert(tx.Index, tx); err != nil {

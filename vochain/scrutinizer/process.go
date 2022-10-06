@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/go-cmp/cmp"
@@ -363,10 +364,17 @@ func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 
 // compute results if the current heigh has scheduled ending processes
 func (s *Scrutinizer) computePendingProcesses(height uint32) {
+	defer atomic.AddInt64(&s.liveGoroutines, -1)
 	// We wait a random number of blocks (between 0 and 5) in order to decrease the collision risk
 	// between several Oracles.
 	targetHeight := s.App.Height() + uint32(util.RandomInt(0, 5))
-	for s.App.Height() < targetHeight {
+	for !s.skipTargetHeightSleeps {
+		if s.cancelCtx.Err() != nil {
+			return // closing
+		}
+		if s.App.Height() >= targetHeight {
+			break
+		}
 		time.Sleep(5 * time.Second)
 	}
 	if enableBadgerhold {
