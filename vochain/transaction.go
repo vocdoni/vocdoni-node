@@ -528,6 +528,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if ve.Proof == nil {
 			return nil, voterID.Nil(), fmt.Errorf("proof not found on transaction")
 		}
+		if ve.Proof.Payload == nil {
+			return nil, voterID.Nil(), fmt.Errorf("invalid proof payload provided")
+		}
 
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
