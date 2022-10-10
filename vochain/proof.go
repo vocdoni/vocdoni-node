@@ -52,6 +52,9 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 	default:
 		return false, nil, fmt.Errorf("census origin not compatible")
 	}
+	if process == nil || proof == nil {
+		return false, nil, fmt.Errorf("nil process or proof: %v / %v", process, proof)
+	}
 	valid, weight, err := verifyProof(process, proof,
 		process.CensusOrigin, process.CensusRoot, process.ProcessId,
 		pubKey, addr)
@@ -111,6 +114,9 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	key := addr.Bytes()
 
 	p := proof.GetCa()
+	if p == nil {
+		return false, nil, fmt.Errorf("invalid CA proof")
+	}
 	if !bytes.Equal(p.Bundle.Address, key) {
 		return false, nil, fmt.Errorf(
 			"CSP bundle address and key do not match: %x != %x", key, p.Bundle.Address)
