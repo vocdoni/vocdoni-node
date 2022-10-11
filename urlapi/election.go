@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -79,6 +80,14 @@ func (u *URLAPI) enableElectionHandlers() error {
 	}
 	if err := u.api.RegisterMethod(
 		"/election/{electionID}/votes",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		u.electionVotesHandler,
+	); err != nil {
+		return err
+	}
+	if err := u.api.RegisterMethod(
+		"/election/{electionID}/votes/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		u.electionVotesHandler,
@@ -285,11 +294,40 @@ func (u *URLAPI) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// election/<electionID>/votes
+// election/<electionID>/votes/<page>
 // returns the list of voteIDs for an election (paginated)
 func (u *URLAPI) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	// TODO
-	return nil
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	if err != nil || electionID == nil {
+		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
+	}
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return fmt.Errorf("cannot parse page number")
+		}
+	}
+	page = page * MaxPageSize
+
+	votesRaw, err := u.scrutinizer.GetEnvelopes(electionID, MaxPageSize, page, "")
+	if err != nil {
+		return err
+	}
+	votes := []Vote{}
+	for _, v := range votesRaw {
+		votes = append(votes, Vote{
+			VoteID:      v.Nullifier,
+			VoterID:     v.VoterID,
+			TxHash:      v.TxHash,
+			BlockHeight: v.Height,
+		})
+	}
+	data, err := json.Marshal(votes)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
 // POST election/create
@@ -321,6 +359,12 @@ func (u *URLAPI) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	resp := &ElectionCreate{
 		TxHash:     res.Hash.Bytes(),
 		ElectionID: res.Data.Bytes(),
+	}
+
+	// check the electionID returned by Vochain is actually valid
+	pid := vochain.ProcessID{}
+	if err := pid.Unmarshal(resp.ElectionID); err != nil {
+		return fmt.Errorf("received election id after executing transaction is not valid")
 	}
 
 	// if metadata, add it to the storage

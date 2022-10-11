@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -187,23 +186,28 @@ func (u *URLAPI) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return err
 	}
-	var weight *big.Int
+	ref, err := u.loadCensus(censusID, &token)
+	if err != nil {
+		return err
+	}
+	var weight *types.BigInt
 	if w := ctx.URLParam("weight"); w != "" {
+		if ref.Indexed {
+			return fmt.Errorf("indexed census cannot use weight")
+		}
 		weight, err = censusWeightParse(w)
 		if err != nil {
 			return err
 		}
-	}
-	ref, err := u.loadCensus(censusID, &token)
-	if err != nil {
-		return err
+	} else if !ref.Indexed {
+		weight.SetUint64(1)
 	}
 	keyHash, err := ref.tree.Hash(key)
 	if err != nil {
 		return err
 	}
 	if weight != nil {
-		if err := ref.tree.Add(keyHash, ref.tree.BigIntToBytes(weight)); err != nil {
+		if err := ref.tree.Add(keyHash, ref.tree.BigIntToBytes(weight.ToInt())); err != nil {
 			return fmt.Errorf("cannot add key and value to tree: %w", err)
 		}
 		log.Debugf("added key %x with weight %s to census %x", key, weight, censusID)

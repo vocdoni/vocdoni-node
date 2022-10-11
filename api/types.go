@@ -179,7 +179,7 @@ type APIresponse struct {
 	EncryptionPrivKeys   []Key                            `json:"encryptionPrivKeys,omitempty"`
 	EncryptionPublicKeys []Key                            `json:"encryptionPubKeys,omitempty"`
 	EntityID             string                           `json:"entityId,omitempty"`
-	EntityIDs            *[]string                        `json:"entityIds,omitempty"`
+	EntityIDs            []types.HexBytes                 `json:"entityIds,omitempty"`
 	Envelope             *indexertypes.EnvelopePackage    `json:"envelope,omitempty"`
 	Envelopes            []*indexertypes.EnvelopeMetadata `json:"envelopes,omitempty"`
 	Files                []byte                           `json:"files,omitempty"`

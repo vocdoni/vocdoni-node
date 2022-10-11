@@ -292,19 +292,19 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 // EntityList returns the list of entities indexed by the scrutinizer
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
-func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []string {
+func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []types.HexBytes {
 	if !enableBadgerhold {
 		// TODO(sqlite): reimplement
 		return nil
 	}
-	entities := []string{} // TODO: return []types.HexBytes
+	entities := []types.HexBytes{}
 	if err := s.db.ForEach(
 		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
 			SortBy("CreationTime", "ID").
 			Skip(from).
 			Limit(max),
 		func(e *indexertypes.Entity) error {
-			entities = append(entities, fmt.Sprintf("%x", e.ID))
+			entities = append(entities, e.ID)
 			return nil
 		}); err != nil {
 		log.Warnf("error listing entities: %v", err)

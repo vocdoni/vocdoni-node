@@ -8,6 +8,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/rpcapi"
+	"go.vocdoni.io/dvote/types"
 )
 
 var (
@@ -43,7 +44,7 @@ func entityList(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf(resp.Message)
 	}
 
-	entities := append([]string{}, *resp.EntityIDs...)
+	entities := append([]types.HexBytes{}, resp.EntityIDs...)
 	if len(entities) == rpcapi.MaxListSize {
 		for i, count := 1, len(entities); count > 0 && i < MaxListIterations; i++ {
 			req.From = i * rpcapi.MaxListSize
@@ -51,14 +52,14 @@ func entityList(cmd *cobra.Command, args []string) error {
 			if err != nil {
 				return err
 			}
-			entities = append(entities, *resp.EntityIDs...)
-			count = len(*resp.EntityIDs)
+			entities = append(entities, resp.EntityIDs...)
+			count = len(resp.EntityIDs)
 		}
 	}
 
 	buffer := new(bytes.Buffer)
 	for _, ent := range entities {
-		buffer.WriteString(ent + "\n")
+		buffer.WriteString(fmt.Sprintf("%x\n", ent))
 	}
 	fmt.Print(buffer.String())
 	return err

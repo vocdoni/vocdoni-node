@@ -1,7 +1,6 @@
 package urlapi
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -81,15 +80,13 @@ func (u *URLAPI) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata
 	}
 	page = page * MaxPageSize
 	organization := &Organization{}
+
 	list := u.scrutinizer.EntityList(MaxPageSize, page, "")
-	for _, orgIDstr := range list {
-		orgList := &OrganizationList{}
-		orgList.OrganizationID, err = hex.DecodeString(orgIDstr)
-		if err != nil {
-			panic(err)
-		}
-		orgList.ElectionCount = u.scrutinizer.ProcessCount(orgList.OrganizationID)
-		organization.Organizations = append(organization.Organizations, orgList)
+	for _, orgID := range list {
+		organization.Organizations = append(organization.Organizations, &OrganizationList{
+			OrganizationID: orgID,
+			ElectionCount:  u.scrutinizer.ProcessCount(orgID),
+		})
 	}
 
 	var data []byte

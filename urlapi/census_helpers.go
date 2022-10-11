@@ -6,13 +6,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math/big"
 	"sync"
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -42,10 +42,10 @@ func censusKeyParse(key string) ([]byte, error) {
 	return hex.DecodeString(key)
 }
 
-func censusWeightParse(w string) (*big.Int, error) {
-	weight, ok := new(big.Int).SetString(w, 10)
-	if !ok {
-		return nil, fmt.Errorf("cannot parse weight")
+func censusWeightParse(w string) (*types.BigInt, error) {
+	weight, err := new(types.BigInt).SetString(w)
+	if err != nil {
+		return nil, err
 	}
 	return weight, nil
 }

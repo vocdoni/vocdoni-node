@@ -109,9 +109,6 @@ func (u *URLAPI) EnableHandlers(handlers ...string) error {
 			}
 			u.enableAccountHandlers()
 		case CensusHandler:
-			if u.storage == nil {
-				return fmt.Errorf("missing modules attached for enabling census handler")
-			}
 			u.enableCensusHandlers()
 		default:
 			return fmt.Errorf("handler unknown %s", h)
