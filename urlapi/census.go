@@ -200,7 +200,7 @@ func (u *URLAPI) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 			return err
 		}
 	} else if !ref.Indexed {
-		weight.SetUint64(1)
+		weight = new(types.BigInt).SetUint64(1)
 	}
 	keyHash, err := ref.tree.Hash(key)
 	if err != nil {
