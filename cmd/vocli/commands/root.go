@@ -13,8 +13,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
-	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/log"
+	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/vochain"
 	"google.golang.org/protobuf/proto"
 )

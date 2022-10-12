@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	client "go.vocdoni.io/dvote/rpcclient"
 	api "go.vocdoni.io/dvote/rpctypes"
 )
 

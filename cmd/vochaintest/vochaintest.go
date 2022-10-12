@@ -20,10 +20,10 @@ import (
 	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	"go.vocdoni.io/dvote/client"
 	vocli "go.vocdoni.io/dvote/cmd/vocli/commands"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
