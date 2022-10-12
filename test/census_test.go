@@ -54,7 +54,7 @@ var censusWeight = flag.Int("censusWeight", 20, "weight of each census entry")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
-func TestCensus(t *testing.T) {
+func TestCensusRPC(t *testing.T) {
 	t.Parallel()
 
 	var server testcommon.DvoteAPIServer

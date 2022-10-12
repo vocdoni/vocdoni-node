@@ -183,7 +183,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		return nil, err
 	}
 	appState.Treasurer = tb
-	appStateBytes, err := tmjson.Marshal(appState)
+	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}

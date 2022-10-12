@@ -83,17 +83,17 @@ type QueryData struct {
 // ________________________ TRANSACTION COSTS __________________________
 // TransactionCosts describes how much each operation should cost
 type TransactionCosts struct {
-	SetProcessStatus        uint64 `json:"Tx_SetProcessStatus"`
-	SetProcessCensus        uint64 `json:"Tx_SetProcessCensus"`
-	SetProcessResults       uint64 `json:"Tx_SetProcessResults"`
-	SetProcessQuestionIndex uint64 `json:"Tx_SetProcessQuestionIndex"`
-	RegisterKey             uint64 `json:"Tx_RegisterKey"`
-	NewProcess              uint64 `json:"Tx_NewProcess"`
-	SendTokens              uint64 `json:"Tx_SendTokens"`
-	SetAccountInfo          uint64 `json:"Tx_SetAccountInfo"`
-	AddDelegateForAccount   uint64 `json:"Tx_AddDelegateForAccount"`
-	DelDelegateForAccount   uint64 `json:"Tx_DelDelegateForAccount"`
-	CollectFaucet           uint64 `json:"Tx_CollectFaucet"`
+	SetProcessStatus        uint32 `json:"Tx_SetProcessStatus"`
+	SetProcessCensus        uint32 `json:"Tx_SetProcessCensus"`
+	SetProcessResults       uint32 `json:"Tx_SetProcessResults"`
+	SetProcessQuestionIndex uint32 `json:"Tx_SetProcessQuestionIndex"`
+	RegisterKey             uint32 `json:"Tx_RegisterKey"`
+	NewProcess              uint32 `json:"Tx_NewProcess"`
+	SendTokens              uint32 `json:"Tx_SendTokens"`
+	SetAccountInfo          uint32 `json:"Tx_SetAccountInfo"`
+	AddDelegateForAccount   uint32 `json:"Tx_AddDelegateForAccount"`
+	DelDelegateForAccount   uint32 `json:"Tx_DelDelegateForAccount"`
+	CollectFaucet           uint32 `json:"Tx_CollectFaucet"`
 }
 
 // AsMap returns the contents of TransactionCosts as a map. Its purpose
