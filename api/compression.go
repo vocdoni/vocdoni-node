@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"time"

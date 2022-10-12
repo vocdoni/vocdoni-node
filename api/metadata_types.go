@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 // ElectionMetadata contains the process metadata fields as stored on ipfs
 type ElectionMetadata struct {

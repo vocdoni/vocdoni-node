@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"encoding/json"
@@ -14,12 +14,12 @@ const (
 	AccountHandler = "account"
 )
 
-func (u *URLAPI) enableAccountHandlers() error {
-	if err := u.api.RegisterMethod(
+func (a *API) enableAccountHandlers() error {
+	if err := a.endpoint.RegisterMethod(
 		"/account/{address}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.accountHandler,
+		a.accountHandler,
 	); err != nil {
 		return err
 	}
@@ -28,12 +28,12 @@ func (u *URLAPI) enableAccountHandlers() error {
 
 // /account/{address}
 // get the account information
-func (u *URLAPI) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return fmt.Errorf("address malformed")
 	}
 	addr := common.HexToAddress(ctx.URLParam("address"))
-	acc, err := u.vocapp.State.GetAccount(addr, true)
+	acc, err := a.vocapp.State.GetAccount(addr, true)
 	if err != nil || acc == nil {
 		return fmt.Errorf("account %s does not exist", addr.Hex())
 	}

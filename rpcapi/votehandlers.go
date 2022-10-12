@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	api "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"

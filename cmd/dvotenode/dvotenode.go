@@ -18,6 +18,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	urlapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -34,7 +35,6 @@ import (
 	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/urlapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -647,7 +647,7 @@ func main() {
 		}
 		if globalCfg.API.URL {
 			log.Info("enabling URL API")
-			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v2", globalCfg.DataDir)
+			uAPI, err := urlapi.NewAPI(&httpRouter, "/v2", globalCfg.DataDir)
 			if err != nil {
 				log.Fatal(err)
 			}

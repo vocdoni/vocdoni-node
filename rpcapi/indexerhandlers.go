@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	tmtypes "github.com/tendermint/tendermint/types"
-	"go.vocdoni.io/dvote/api"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"

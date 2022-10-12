@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"go.vocdoni.io/dvote/api"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/util"
 )
 

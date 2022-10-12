@@ -210,7 +210,7 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	if err != nil {
 		tb.Fatal(err)
 	}
-	fmt.Printf("=> %s\n", genBytes)
+
 	// creating node
 	cfg.LogLevel = "error"
 	cfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))

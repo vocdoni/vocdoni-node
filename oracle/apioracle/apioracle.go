@@ -9,12 +9,12 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
-	"go.vocdoni.io/dvote/api"
 	chain "go.vocdoni.io/dvote/ethereum"
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/rpcapi"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/proto/build/go/models"
 )
 

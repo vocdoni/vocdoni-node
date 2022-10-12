@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"bytes"
@@ -17,10 +17,10 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func (u *URLAPI) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
+func (a *API) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 	processes := []*ElectionSummary{}
 	for _, p := range pids {
-		procInfo, err := u.scrutinizer.ProcessInfo(p)
+		procInfo, err := a.scrutinizer.ProcessInfo(p)
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch election info: %w", err)
 		}
@@ -28,13 +28,13 @@ func (u *URLAPI) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, erro
 			ElectionID: procInfo.ID,
 			Status:     models.ProcessStatus_name[procInfo.Status],
 			StartDate:  procInfo.CreationTime,
-			EndDate:    u.vocinfo.HeightTime(int64(procInfo.EndBlock)),
+			EndDate:    a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
 		})
 	}
 	return processes, nil
 }
 
-func (u *URLAPI) formatElectionType(et *models.EnvelopeType) string {
+func (a *API) formatElectionType(et *models.EnvelopeType) string {
 	ptype := strings.Builder{}
 
 	if et.Anonymous {

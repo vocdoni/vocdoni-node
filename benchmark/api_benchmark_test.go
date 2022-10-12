@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 

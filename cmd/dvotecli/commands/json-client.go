@@ -13,10 +13,10 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
-	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 )
 
 var jsonClientCmd = &cobra.Command{

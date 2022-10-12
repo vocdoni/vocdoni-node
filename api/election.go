@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"context"
@@ -21,84 +21,84 @@ import (
 
 const ElectionHandler = "election"
 
-func (u *URLAPI) enableElectionHandlers() error {
-	if err := u.api.RegisterMethod(
+func (a *API) enableElectionHandlers() error {
+	if err := a.endpoint.RegisterMethod(
 		"/election/list/{organizationID}/status/{status}/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionListHandler,
+		a.electionListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/list/{organizationID}/status/{status}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionListHandler,
+		a.electionListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/list/{organizationID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionListHandler,
+		a.electionListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/list/{organizationID}/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionListHandler,
+		a.electionListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/{electionID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionHandler,
+		a.electionHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/count/{organizationID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionCountHandler,
+		a.electionCountHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/{electionID}/keys",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionKeysHandler,
+		a.electionKeysHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/{electionID}/votes",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionVotesHandler,
+		a.electionVotesHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/{electionID}/votes/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionVotesHandler,
+		a.electionVotesHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/election/create",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
-		u.electionCreateHandler,
+		a.electionCreateHandler,
 	); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func (u *URLAPI) enableElectionHandlers() error {
 
 // /election/<organizationID>/list/<status>
 // list the elections of an organization.
-func (u *URLAPI) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
@@ -126,27 +126,27 @@ func (u *URLAPI) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 	var pids [][]byte
 	switch ctx.URLParam("status") {
 	case "active":
-		pids, err = u.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "READY", false)
+		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "READY", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 	case "paused":
-		pids, err = u.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "PAUSED", false)
+		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "PAUSED", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 	case "ended":
-		pids, err = u.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "RESULTS", false)
+		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "RESULTS", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
-		pids2, err := u.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "ENDED", false)
+		pids2, err := a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "ENDED", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 		pids = append(pids, pids2...)
 	case "":
-		pids, err = u.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "", false)
+		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
@@ -154,7 +154,7 @@ func (u *URLAPI) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 		return fmt.Errorf("missing status parameter or unknown")
 	}
 
-	elections, err := u.getProcessSummaryList(pids...)
+	elections, err := a.getProcessSummaryList(pids...)
 	if err != nil {
 		return err
 	}
@@ -173,16 +173,16 @@ func (u *URLAPI) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 
 // /election/electionID/<electionID>
 // get election information
-func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
 		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
 	}
-	proc, err := u.scrutinizer.ProcessInfo(electionID)
+	proc, err := a.scrutinizer.ProcessInfo(electionID)
 	if err != nil {
 		return fmt.Errorf("cannot fetch electionID %x: %w", electionID, err)
 	}
-	count, err := u.scrutinizer.GetEnvelopeHeight(electionID)
+	count, err := a.scrutinizer.GetEnvelopeHeight(electionID)
 	if err != nil {
 		return fmt.Errorf("cannot get envelope height: %w", err)
 	}
@@ -191,9 +191,9 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		ElectionSummary: ElectionSummary{
 			ElectionID:   electionID,
 			Status:       models.ProcessStatus_name[proc.Status],
-			Type:         u.formatElectionType(proc.Envelope),
-			StartDate:    u.vocinfo.HeightTime(int64(proc.StartBlock)),
-			EndDate:      u.vocinfo.HeightTime(int64(proc.EndBlock)),
+			Type:         a.formatElectionType(proc.Envelope),
+			StartDate:    a.vocinfo.HeightTime(int64(proc.StartBlock)),
+			EndDate:      a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults: proc.FinalResults,
 			VoteCount:    count,
 		},
@@ -211,10 +211,10 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
-	election.Type = u.formatElectionType(proc.Envelope)
+	election.Type = a.formatElectionType(proc.Envelope)
 
 	if proc.HaveResults {
-		results, err := u.scrutinizer.GetResults(electionID)
+		results, err := a.scrutinizer.GetResults(electionID)
 		if err != nil {
 			return fmt.Errorf("cannot get envelope height: %w", err)
 		}
@@ -231,12 +231,12 @@ func (u *URLAPI) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 }
 
 // /election/count/<organizationID>
-func (u *URLAPI) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
 	}
-	acc, err := u.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
+	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
 	if acc == nil {
 		return fmt.Errorf("organization not found")
 	}
@@ -256,13 +256,13 @@ func (u *URLAPI) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 
 // /election/<electionID>/keys
 // returns the list of public/private encryption keys
-func (u *URLAPI) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
 	}
 
-	process, err := u.vocapp.State.Process(electionID, true)
+	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
 		return fmt.Errorf("cannot get election keys: %w", err)
 	}
@@ -296,7 +296,7 @@ func (u *URLAPI) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 
 // election/<electionID>/votes/<page>
 // returns the list of voteIDs for an election (paginated)
-func (u *URLAPI) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
@@ -310,7 +310,7 @@ func (u *URLAPI) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	}
 	page = page * MaxPageSize
 
-	votesRaw, err := u.scrutinizer.GetEnvelopes(electionID, MaxPageSize, page, "")
+	votesRaw, err := a.scrutinizer.GetEnvelopes(electionID, MaxPageSize, page, "")
 	if err != nil {
 		return err
 	}
@@ -332,7 +332,7 @@ func (u *URLAPI) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 
 // POST election/create
 // creates a new election
-func (u *URLAPI) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	req := &ElectionCreate{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
@@ -345,7 +345,7 @@ func (u *URLAPI) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 		}
 	}
 	// send the transaction
-	res, err := u.vocapp.SendTx(req.TxPayload)
+	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
 		return err
 	}
@@ -371,11 +371,11 @@ func (u *URLAPI) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	if req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
-		cid, err := u.storage.Publish(sctx, req.Metadata)
+		cid, err := a.storage.Publish(sctx, req.Metadata)
 		if err != nil {
 			log.Errorf("could not publish to storage: %v", err)
 		} else {
-			resp.MetadataURL = u.storage.URIprefix() + cid
+			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
 	}
 

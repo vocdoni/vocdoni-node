@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"context"
@@ -29,36 +29,36 @@ const (
 	privateKeyHashPrefix              = "vocdoniPrivateKey"
 )
 
-func (u *URLAPI) enableWalletHandlers() error {
-	if err := u.api.RegisterMethod(
+func (a *API) enableWalletHandlers() error {
+	if err := a.endpoint.RegisterMethod(
 		"/wallet/add/{privateKey}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.walletAddHandler,
+		a.walletAddHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/wallet/bootstrap",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.walletCreateHandler,
+		a.walletCreateHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/wallet/transfer/{dstAddress}/{amount}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.walletTransferHandler,
+		a.walletTransferHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/wallet/election",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
-		u.walletElectionHandler,
+		a.walletElectionHandler,
 	); err != nil {
 		return err
 	}
@@ -66,7 +66,7 @@ func (u *URLAPI) enableWalletHandlers() error {
 	return nil
 }
 
-func (u *URLAPI) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
+func (a *API) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	token, err := uuid.Parse(authToken)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing bearer token")
@@ -75,7 +75,7 @@ func (u *URLAPI) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	// generate the index from the token hash
 	index := ethereum.HashRaw(token[:])
 	// using the index, get the encrypted private key
-	privKeyEncrypted, err := u.db.ReadTx().Get(append([]byte(walletDBprefixEncryptedPrivateKey), index...))
+	privKeyEncrypted, err := a.db.ReadTx().Get(append([]byte(walletDBprefixEncryptedPrivateKey), index...))
 	if err != nil {
 		return nil, fmt.Errorf("wallet not found")
 	}
@@ -95,9 +95,9 @@ func (u *URLAPI) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	return &wallet, wallet.AddHexKey(fmt.Sprintf("%x", privKey))
 }
 
-func (u *URLAPI) walletCheckKeyExists(privKey []byte) error {
+func (a *API) walletCheckKeyExists(privKey []byte) error {
 	privKeyHash := ethereum.HashRaw(privKey)
-	_, err := u.db.ReadTx().Get(append([]byte(walletDBprefixPrivateKeyHash), privKeyHash...))
+	_, err := a.db.ReadTx().Get(append([]byte(walletDBprefixPrivateKeyHash), privKeyHash...))
 	if err == db.ErrKeyNotFound {
 		return nil
 	}
@@ -107,9 +107,9 @@ func (u *URLAPI) walletCheckKeyExists(privKey []byte) error {
 	return fmt.Errorf("key already exist")
 }
 
-func (u *URLAPI) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKeys) (*Transaction, error) {
+func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKeys) (*Transaction, error) {
 	var err error
-	if stx.Signature, err = wallet.SignVocdoniTx(stx.Tx, u.vocapp.ChainID()); err != nil {
+	if stx.Signature, err = wallet.SignVocdoniTx(stx.Tx, a.vocapp.ChainID()); err != nil {
 		return nil, err
 	}
 	txData, err := proto.Marshal(stx)
@@ -117,7 +117,7 @@ func (u *URLAPI) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.Sign
 		return nil, err
 	}
 
-	resp, err := u.vocapp.SendTx(txData)
+	resp, err := a.vocapp.SendTx(txData)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (u *URLAPI) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.Sign
 
 // /wallet/add/{privateKey}
 // add a new account to the local store
-func (u *URLAPI) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
 	wallet := ethereum.SignKeys{}
 	if err := wallet.AddHexKey(ctx.URLParam("privateKey")); err != nil {
@@ -149,7 +149,7 @@ func (u *URLAPI) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 	// check if private key is already registered
-	if err := u.walletCheckKeyExists(privKeyBytes); err != nil {
+	if err := a.walletCheckKeyExists(privKeyBytes); err != nil {
 		return err
 	}
 	// create the UUID token that will be used as encryption key and identifier
@@ -168,7 +168,7 @@ func (u *URLAPI) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	}
 	// generate the database index (hash of token), used for finding the key afterwards
 	index := ethereum.HashRaw(token[:])
-	wtx := u.db.WriteTx()
+	wtx := a.db.WriteTx()
 	// store the encrypted private key
 	if err := wtx.Set(append([]byte(walletDBprefixEncryptedPrivateKey), index...), encryptedPrivKey); err != nil {
 		return err
@@ -195,13 +195,13 @@ func (u *URLAPI) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 
 // /wallet/bootstrap
 // set a new account
-func (u *URLAPI) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	wallet, err := u.walletFromToken(msg.AuthToken)
+func (a *API) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
 	}
 
-	if acc, _ := u.vocapp.State.GetAccount(wallet.Address(), true); acc != nil {
+	if acc, _ := a.vocapp.State.GetAccount(wallet.Address(), true); acc != nil {
 		return fmt.Errorf("account %s already exist", wallet.AddressString())
 	}
 
@@ -220,7 +220,7 @@ func (u *URLAPI) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 		return err
 	}
 
-	tx, err := u.walletSignAndSendTx(&stx, wallet)
+	tx, err := a.walletSignAndSendTx(&stx, wallet)
 	if err != nil {
 		return err
 	}
@@ -235,13 +235,13 @@ func (u *URLAPI) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 
 // /wallet/transfer/{dstAddress}/{amount}
 // transfer balance to another account
-func (u *URLAPI) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	wallet, err := u.walletFromToken(msg.AuthToken)
+func (a *API) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
 	}
 
-	acc, err := u.vocapp.State.GetAccount(wallet.Address(), true)
+	acc, err := a.vocapp.State.GetAccount(wallet.Address(), true)
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (u *URLAPI) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 		return fmt.Errorf("destination address malformed")
 	}
 	dst := common.HexToAddress(ctx.URLParam("dstAddress"))
-	if dstAcc, err := u.vocapp.State.GetAccount(dst, true); dstAcc == nil || err != nil {
+	if dstAcc, err := a.vocapp.State.GetAccount(dst, true); dstAcc == nil || err != nil {
 		return fmt.Errorf("destination account is unknown")
 	}
 	amount, err := strconv.ParseUint(ctx.URLParam("amount"), 10, 64)
@@ -271,7 +271,7 @@ func (u *URLAPI) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	if err != nil {
 		return err
 	}
-	tx, err := u.walletSignAndSendTx(&stx, wallet)
+	tx, err := a.walletSignAndSendTx(&stx, wallet)
 	if err != nil {
 		return err
 	}
@@ -285,12 +285,12 @@ func (u *URLAPI) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 
 // /wallet/election POST
 // creates an election
-func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	wallet, err := u.walletFromToken(msg.AuthToken)
+func (a *API) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
 	}
-	acc, err := u.vocapp.State.GetAccount(wallet.Address(), true)
+	acc, err := a.vocapp.State.GetAccount(wallet.Address(), true)
 	if err != nil {
 		return err
 	}
@@ -305,7 +305,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	// if start date is empty, do not attempt to parse it. Set startBlock to 0, starting the
 	// election immediately. Otherwise, ensure the startBlock is in the future
 	if !description.StartDate.IsZero() {
-		if startBlock, err = u.vocinfo.EstimateBlockHeight(description.StartDate); err != nil {
+		if startBlock, err = a.vocinfo.EstimateBlockHeight(description.StartDate); err != nil {
 			return fmt.Errorf("unable to estimate startDate block height: %w", err)
 		}
 	} else {
@@ -315,7 +315,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	if description.EndDate.Before(time.Now()) {
 		return fmt.Errorf("election end date cannot be in the past")
 	}
-	endBlock, err := u.vocinfo.EstimateBlockHeight(description.EndDate)
+	endBlock, err := a.vocinfo.EstimateBlockHeight(description.EndDate)
 	if err != nil {
 		return fmt.Errorf("unable to estimate endDate block height: %w", err)
 	}
@@ -328,7 +328,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 	if startBlock == 0 {
 		// If startBlock is set to 0 (process starts asap), set the blockcount to the desired
 		// end block, minus the expected start block of the process
-		blockCount = blockCount - uint32(u.vocinfo.Height()) + 3
+		blockCount = blockCount - uint32(a.vocinfo.Height()) + 3
 	}
 
 	// Set the envelope and process models
@@ -403,7 +403,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 		return fmt.Errorf("cannot format metadata: %w", err)
 	}
 	storageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	metadataURI, err := u.storage.Publish(storageCtx, metadataBytes)
+	metadataURI, err := a.storage.Publish(storageCtx, metadataBytes)
 	cancel()
 	if err != nil {
 		return fmt.Errorf("cannot publish metadata file: %w", err)
@@ -438,7 +438,7 @@ func (u *URLAPI) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, 
 		}}); err != nil {
 		return err
 	}
-	tx, err := u.walletSignAndSendTx(&stx, wallet)
+	tx, err := a.walletSignAndSendTx(&stx, wallet)
 	if err != nil {
 		return err
 	}

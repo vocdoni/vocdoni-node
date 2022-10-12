@@ -40,9 +40,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 
-	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 

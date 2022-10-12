@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	api "go.vocdoni.io/dvote/api"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"

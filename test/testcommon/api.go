@@ -7,18 +7,18 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/urlapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-// URLAPIserver contains all the required pieces for running an URL api server
-type URLAPIserver struct {
+// APIserver contains all the required pieces for running an URL api server
+type APIserver struct {
 	Signer         *ethereum.SignKeys
 	VochainCfg     *config.VochainCfg
 	CensusDir      string
@@ -34,7 +34,7 @@ type URLAPIserver struct {
 }
 
 // Start starts a basic URL API server for testing
-func (d *URLAPIserver) Start(t testing.TB, apis ...string) {
+func (d *APIserver) Start(t testing.TB, apis ...string) {
 	// create signer
 	d.Signer = ethereum.NewSignKeys()
 	if err := d.Signer.Generate(); err != nil {
@@ -66,7 +66,7 @@ func (d *URLAPIserver) Start(t testing.TB, apis ...string) {
 	d.ListenAddr = addr
 	t.Logf("address: %s", addr.String())
 
-	api, err := urlapi.NewURLAPI(&router, "/", t.TempDir())
+	api, err := api.NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
 	d.VochainCfg = new(config.VochainCfg)

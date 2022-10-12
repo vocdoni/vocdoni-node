@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"

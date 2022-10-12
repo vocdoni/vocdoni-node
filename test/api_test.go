@@ -8,25 +8,25 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/urlapi"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-func TestURLAPI(t *testing.T) {
-	server := testcommon.URLAPIserver{}
+func TestAPI(t *testing.T) {
+	server := testcommon.APIserver{}
 	server.Start(t,
-		urlapi.ChainHandler,
-		urlapi.CensusHandler,
-		urlapi.VoteHandler,
-		urlapi.AccountHandler,
-		urlapi.ElectionHandler,
-		urlapi.WalletHandler,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
 	)
 
 	token1 := uuid.New()
@@ -35,7 +35,7 @@ func TestURLAPI(t *testing.T) {
 	// create a new census
 	resp, code := c.Request("GET", nil, "census", "create", "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
-	censusData := &urlapi.Census{}
+	censusData := &api.Census{}
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	id1 := censusData.CensusID.String()
 
@@ -93,7 +93,7 @@ func TestURLAPI(t *testing.T) {
 	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
 	stxb, err := proto.Marshal(&stx)
 
-	election := urlapi.ElectionCreate{TxPayload: stxb}
+	election := api.ElectionCreate{TxPayload: stxb}
 	resp, code = c.Request("POST", election, "election", "create")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &election)
@@ -130,7 +130,7 @@ func TestURLAPI(t *testing.T) {
 	stxb, err = proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	v := &urlapi.Vote{TxPayload: stxb}
+	v := &api.Vote{TxPayload: stxb}
 	resp, code = c.Request("POST", v, "vote", "submit")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &v)
@@ -141,7 +141,7 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 	for {
 		resp, code := c.Request("GET", nil, "chain", "info")
 		qt.Assert(t, code, qt.Equals, 200)
-		chainInfo := urlapi.ChainInfo{}
+		chainInfo := api.ChainInfo{}
 		err := json.Unmarshal(resp, &chainInfo)
 		qt.Assert(t, err, qt.IsNil)
 		if *chainInfo.Height >= h {

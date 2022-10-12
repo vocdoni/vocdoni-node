@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"encoding/json"
@@ -14,52 +14,52 @@ const (
 	ChainHandler = "chain"
 )
 
-func (u *URLAPI) enableChainHandlers() error {
-	if err := u.api.RegisterMethod(
+func (a *API) enableChainHandlers() error {
+	if err := a.endpoint.RegisterMethod(
 		"/chain/organization/list",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.organizationListHandler,
+		a.organizationListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/chain/organization/list/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.organizationListHandler,
+		a.organizationListHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/chain/organization/count",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.organizationCountHandler,
+		a.organizationCountHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/chain/info",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.chainInfoHandler,
+		a.chainInfoHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/chain/transaction/cost",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.chainTxCostHandler,
+		a.chainTxCostHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/chain/transaction/submit",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
-		u.chainSendTxHandler,
+		a.chainSendTxHandler,
 	); err != nil {
 		return err
 	}
@@ -69,7 +69,7 @@ func (u *URLAPI) enableChainHandlers() error {
 
 // /chain/organization/list/<page>
 // list the existing organizations
-func (u *URLAPI) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	var err error
 	page := 0
 	if ctx.URLParam("page") != "" {
@@ -81,11 +81,11 @@ func (u *URLAPI) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata
 	page = page * MaxPageSize
 	organization := &Organization{}
 
-	list := u.scrutinizer.EntityList(MaxPageSize, page, "")
+	list := a.scrutinizer.EntityList(MaxPageSize, page, "")
 	for _, orgID := range list {
 		organization.Organizations = append(organization.Organizations, &OrganizationList{
 			OrganizationID: orgID,
-			ElectionCount:  u.scrutinizer.ProcessCount(orgID),
+			ElectionCount:  a.scrutinizer.ProcessCount(orgID),
 		})
 	}
 
@@ -99,8 +99,8 @@ func (u *URLAPI) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata
 
 // /chain/organization/count
 // return the number of organizations
-func (u *URLAPI) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	count := u.scrutinizer.EntityCount()
+func (a *API) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	count := a.scrutinizer.EntityCount()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
 	if err != nil {
@@ -112,12 +112,12 @@ func (u *URLAPI) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdat
 
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
-func (u *URLAPI) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	blockTimes := u.vocinfo.BlockTimes()
-	height := u.vocapp.Height()
-	timestamp := u.vocapp.Timestamp()
+func (a *API) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	blockTimes := a.vocinfo.BlockTimes()
+	height := a.vocapp.Height()
+	timestamp := a.vocapp.Timestamp()
 	data, err := json.Marshal(ChainInfo{
-		ID:        u.vocapp.ChainID(),
+		ID:        a.vocapp.ChainID(),
 		BlockTime: blockTimes,
 		Height:    &height,
 		Timestamp: &timestamp,
@@ -130,12 +130,12 @@ func (u *URLAPI) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 
 // /chain/transaction/submit
 // submits a blockchain transaction
-func (u *URLAPI) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
-	res, err := u.vocapp.SendTx(req.Payload)
+	res, err := a.vocapp.SendTx(req.Payload)
 	if err != nil {
 		return err
 	}
@@ -158,13 +158,13 @@ func (u *URLAPI) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 
 // /chain/transaction/cost
 // returns de list of transactions and its cost
-func (u *URLAPI) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	txCosts := &Transaction{
 		Costs: make(map[string]uint64),
 	}
 	var err error
 	for k, v := range vochain.TxCostNameToTxTypeMap {
-		txCosts.Costs[k], err = u.vocapp.State.TxCost(v, true)
+		txCosts.Costs[k], err = a.vocapp.State.TxCost(v, true)
 		if err != nil {
 			return err
 		}

@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"encoding/hex"
@@ -13,28 +13,28 @@ import (
 
 const VoteHandler = "vote"
 
-func (u *URLAPI) enableVoteHandlers() error {
-	if err := u.api.RegisterMethod(
+func (a *API) enableVoteHandlers() error {
+	if err := a.endpoint.RegisterMethod(
 		"/vote/submit",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
-		u.submitVoteHandler,
+		a.submitVoteHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/vote/{voteID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.getVoteHandler,
+		a.getVoteHandler,
 	); err != nil {
 		return err
 	}
-	if err := u.api.RegisterMethod(
+	if err := a.endpoint.RegisterMethod(
 		"/vote/{voteID}/{electionID}/verify",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
-		u.verifyVoteHandler,
+		a.verifyVoteHandler,
 	); err != nil {
 		return err
 	}
@@ -44,12 +44,12 @@ func (u *URLAPI) enableVoteHandlers() error {
 
 // /vote/submit
 // submit a vote
-func (u *URLAPI) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
-	res, err := u.vocapp.SendTx(req.TxPayload)
+	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
 		return err
 	}
@@ -68,7 +68,7 @@ func (u *URLAPI) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 
 // /vote/<voteID>
 // get a vote by its voteID (nullifier)
-func (u *URLAPI) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return fmt.Errorf("cannot decode voteID: %w", err)
@@ -77,7 +77,7 @@ func (u *URLAPI) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return fmt.Errorf("malformed voteId")
 	}
 
-	voteData, err := u.scrutinizer.GetEnvelope(voteID)
+	voteData, err := a.scrutinizer.GetEnvelope(voteID)
 	if err != nil {
 		return fmt.Errorf("cannot get vote: %w", err)
 	}
@@ -101,7 +101,7 @@ func (u *URLAPI) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 
 // /vote/<voteID>/<electionID>/verify
 // verify a vote (get basic information)
-func (u *URLAPI) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return fmt.Errorf("cannot decode voteID: %w", err)
@@ -116,7 +116,7 @@ func (u *URLAPI) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	if len(voteID) != types.ProcessIDsize {
 		return fmt.Errorf("malformed voteId")
 	}
-	if ok, err := u.vocapp.State.EnvelopeExists(electionID, voteID, true); !ok || err != nil {
+	if ok, err := a.vocapp.State.EnvelopeExists(electionID, voteID, true); !ok || err != nil {
 		return fmt.Errorf("not registered")
 	}
 	return nil

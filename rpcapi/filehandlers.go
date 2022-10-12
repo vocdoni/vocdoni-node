@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 )
 
 const (

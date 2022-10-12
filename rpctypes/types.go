@@ -1,4 +1,4 @@
-package api
+package rpctypes
 
 import (
 	"fmt"

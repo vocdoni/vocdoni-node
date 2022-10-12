@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ func TestCensus(t *testing.T) {
 
 	t.Logf("address: %s", addr)
 
-	api, err := NewURLAPI(&router, "/", t.TempDir())
+	api, err := NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
 	storage := data.IPFSHandle{}
@@ -148,7 +148,7 @@ func TestCensusProof(t *testing.T) {
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "census"))
 	qt.Assert(t, err, qt.IsNil)
 
-	api, err := NewURLAPI(&router, "/", t.TempDir())
+	api, err := NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
 	api.Attach(nil, nil, nil, nil)

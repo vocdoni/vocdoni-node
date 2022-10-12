@@ -1,4 +1,4 @@
-package urlapi
+package api
 
 import (
 	"fmt"
@@ -20,14 +20,14 @@ import (
 // MaxPageSize defines the maximum number of results returned by the paginated endpoints
 const MaxPageSize = 10
 
-// URLAPI is the URL based REST API supporting bearer authentication.
-type URLAPI struct {
+// API is the URL based REST API supporting bearer authentication.
+type API struct {
 	PrivateCalls uint64
 	PublicCalls  uint64
 	BaseRoute    string
 
 	router      *httprouter.HTTProuter
-	api         *bearerstdapi.BearerStandardAPI
+	endpoint    *bearerstdapi.BearerStandardAPI
 	scrutinizer *scrutinizer.Scrutinizer
 	vocapp      *vochain.BaseApplication
 	storage     data.Storage
@@ -39,8 +39,8 @@ type URLAPI struct {
 	db db.Database
 }
 
-// NewURLAPI creates a new instance of the URLAPI.  Attach must be called next.
-func NewURLAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*URLAPI, error) {
+// NewAPI creates a new instance of the API.  Attach must be called next.
+func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, error) {
 	if router == nil {
 		return nil, fmt.Errorf("httprouter is nil")
 	}
@@ -51,65 +51,65 @@ func NewURLAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*URLAP
 	if len(baseRoute) > 1 {
 		baseRoute = strings.TrimSuffix(baseRoute, "/")
 	}
-	urlapi := URLAPI{
+	api := API{
 		BaseRoute: baseRoute,
 		router:    router,
 	}
 	var err error
-	urlapi.api, err = bearerstdapi.NewBearerStandardAPI(router, baseRoute)
+	api.endpoint, err = bearerstdapi.NewBearerStandardAPI(router, baseRoute)
 	if err != nil {
 		return nil, err
 	}
 	// Create local key value database
-	urlapi.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "urlapi"))
+	api.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "api"))
 	if err != nil {
 		return nil, err
 	}
 
-	return &urlapi, nil
+	return &api, nil
 }
 
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
-func (u *URLAPI) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
+func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
 	scrutinizer *scrutinizer.Scrutinizer, data data.Storage) {
-	u.vocapp = vocdoniAPP
-	u.vocinfo = vocdoniInfo
-	u.scrutinizer = scrutinizer
-	u.storage = data
+	a.vocapp = vocdoniAPP
+	a.vocinfo = vocdoniInfo
+	a.scrutinizer = scrutinizer
+	a.storage = data
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.
-func (u *URLAPI) EnableHandlers(handlers ...string) error {
+func (a *API) EnableHandlers(handlers ...string) error {
 	for _, h := range handlers {
 		switch h {
 		case VoteHandler:
-			if u.vocapp == nil || u.scrutinizer == nil {
+			if a.vocapp == nil || a.scrutinizer == nil {
 				return fmt.Errorf("missing modules attached for enabling vote handler")
 			}
-			u.enableVoteHandlers()
+			a.enableVoteHandlers()
 		case ElectionHandler:
-			if u.scrutinizer == nil || u.vocinfo == nil || u.storage == nil {
+			if a.scrutinizer == nil || a.vocinfo == nil || a.storage == nil {
 				return fmt.Errorf("missing modules attached for enabling election handler")
 			}
-			u.enableElectionHandlers()
+			a.enableElectionHandlers()
 		case ChainHandler:
-			if u.scrutinizer == nil {
+			if a.scrutinizer == nil {
 				return fmt.Errorf("missing modules attached for enabling chain handler")
 			}
-			u.enableChainHandlers()
+			a.enableChainHandlers()
 		case WalletHandler:
-			if u.vocapp == nil {
+			if a.vocapp == nil {
 				return fmt.Errorf("missing modules attached for enabling wallet handler")
 			}
-			u.enableWalletHandlers()
+			a.enableWalletHandlers()
 		case AccountHandler:
-			if u.vocapp == nil {
+			if a.vocapp == nil {
 				return fmt.Errorf("missing modules attached for enabling account handler")
 			}
-			u.enableAccountHandlers()
+			a.enableAccountHandlers()
 		case CensusHandler:
-			u.enableCensusHandlers()
+			a.enableCensusHandlers()
 		default:
 			return fmt.Errorf("handler unknown %s", h)
 		}
