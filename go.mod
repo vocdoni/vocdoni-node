@@ -27,6 +27,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/enriquebris/goconcurrentqueue v0.6.0
 	github.com/ethereum/go-ethereum v1.10.20
+	github.com/fatih/color v1.13.0
 	github.com/frankban/quicktest v1.14.3
 	github.com/glendc/go-external-ip v0.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -47,6 +48,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.17.0
 	github.com/libp2p/go-reuseport v0.2.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
+	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/multiformats/go-multiaddr v0.6.0
 	github.com/pressly/goose/v3 v3.3.1
@@ -74,6 +76,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.2 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect

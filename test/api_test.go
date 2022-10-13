@@ -92,6 +92,7 @@ func TestAPI(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
 	stxb, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
 
 	election := api.ElectionCreate{TxPayload: stxb}
 	resp, code = c.Request("POST", election, "election", "create")

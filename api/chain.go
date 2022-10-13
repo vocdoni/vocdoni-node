@@ -49,7 +49,7 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/chain/blockdate/<timestamp>",
+		"/chain/blockdate/{timestamp}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainEstimateHeightHandler,

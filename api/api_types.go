@@ -67,16 +67,16 @@ type ElectionCreate struct {
 }
 
 type ElectionDescription struct {
-	Title        LanguageString        `json:"title,omitempty"`
-	Description  LanguageString        `json:"description,omitempty"`
-	Header       string                `json:"header,omitempty"`
-	StreamURI    string                `json:"streamUri,omitempty"`
+	Title        LanguageString        `json:"title"`
+	Description  LanguageString        `json:"description"`
+	Header       string                `json:"header"`
+	StreamURI    string                `json:"streamUri"`
 	StartDate    time.Time             `json:"startDate,omitempty"`
-	EndDate      time.Time             `json:"endDate,omitempty"`
-	VoteType     VoteType              `json:"voteType,omitempty"`
-	ElectionType ElectionType          `json:"electionType,omitempty"`
-	Questions    []Question            `json:"questions,omitempty"`
-	Census       CensusTypeDescription `json:"census,omitempty"`
+	EndDate      time.Time             `json:"endDate"`
+	VoteType     VoteType              `json:"voteType"`
+	ElectionType ElectionType          `json:"electionType"`
+	Questions    []Question            `json:"questions"`
+	Census       CensusTypeDescription `json:"census"`
 }
 
 type Result struct {
@@ -103,27 +103,27 @@ type Vote struct {
 }
 
 type CensusTypeDescription struct {
-	Type      string         `json:"type,omitempty"`
+	Type      string         `json:"type"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty"`
 	RootHash  types.HexBytes `json:"rootHash,omitempty"`
 }
 
 type VoteType struct {
-	UniqueChoices     bool `json:"uniqueChoices,omitempty"`
-	MaxVoteOverwrites int  `json:"maxVoteOverwrites,omitempty"`
-	CostFromWeight    bool `json:"costFromWeight,omitempty"`
-	CostExponent      int  `json:"costExponent,omitempty"`
-	MaxCount          int  `json:"maxCount,omitempty"`
-	MaxValue          int  `json:"maxValue,omitempty"`
+	UniqueChoices     bool `json:"uniqueChoices"`
+	MaxVoteOverwrites int  `json:"maxVoteOverwrites"`
+	CostFromWeight    bool `json:"costFromWeight"`
+	CostExponent      int  `json:"costExponent"`
+	MaxCount          int  `json:"maxCount"`
+	MaxValue          int  `json:"maxValue"`
 }
 
 type ElectionType struct {
-	Autostart         bool `json:"autostart,omitempty"`
-	Interruptible     bool `json:"interruptible,omitempty"`
-	DynamicCensus     bool `json:"dynamicCensus,omitempty"`
-	SecretUntilTheEnd bool `json:"secretUntilTheEnd,omitempty"`
-	Anonymous         bool `json:"anonymous,omitempty"`
+	Autostart         bool `json:"autostart"`
+	Interruptible     bool `json:"interruptible"`
+	DynamicCensus     bool `json:"dynamicCensus"`
+	SecretUntilTheEnd bool `json:"secretUntilTheEnd"`
+	Anonymous         bool `json:"anonymous"`
 }
 
 type Transaction struct {

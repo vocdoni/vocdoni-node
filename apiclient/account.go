@@ -11,8 +11,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+var (
+	ErrAccountNotConfigured = fmt.Errorf("account not configured")
+)
+
 func (c *HTTPclient) Account(address string) (*api.Account, error) {
 	if address == "" {
+		if c.account == nil {
+			return nil, ErrAccountNotConfigured
+		}
 		address = c.account.AddressString()
 	}
 	resp, code, err := c.Request(HTTPGET, nil, "account", address)

@@ -63,6 +63,8 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	if code != 200 {
 		return nil, nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-
+	if err := json.Unmarshal(resp, tx); err != nil {
+		return nil, nil, fmt.Errorf("could not decode response: %w", err)
+	}
 	return tx.Hash, tx.Response, nil
 }

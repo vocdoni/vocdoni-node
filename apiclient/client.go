@@ -75,6 +75,29 @@ func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	return c.account.AddHexKey(accountPrivateKey)
 }
 
+// SetAuthToken configures the bearer authentication token.
+func (c *HTTPclient) SetAuthToken(token *uuid.UUID) {
+	c.token = token
+}
+
+// SetHostAddr configures the host address of the API server.
+func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
+	c.addr = addr
+	data, status, err := c.Request(HTTPGET, nil, "chain", "info")
+	if err != nil {
+		return err
+	}
+	if status != bearerstdapi.HTTPstatusCodeOK {
+		return fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
+	}
+	info := &api.ChainInfo{}
+	if err := json.Unmarshal(data, info); err != nil {
+		return fmt.Errorf("cannot get chain ID from API server")
+	}
+	c.chainID = info.ID
+	return nil
+}
+
 // Request performs a `method` type raw request to the endpoint specyfied in urlPath parameter.
 // Method is either GET or POST. If POST, a JSON struct should be attached.  Returns the response,
 // the status code and an error.
