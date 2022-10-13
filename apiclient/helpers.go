@@ -28,7 +28,7 @@ func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
 }
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "chain", "blockdate", fmt.Sprintf("%s", date.Unix()))
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "blockdate", fmt.Sprintf("%d", date.Unix()))
 	if err != nil {
 		return 0, err
 	}

@@ -40,7 +40,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
 				Txtype: models.TxType_SET_ACCOUNT_INFO,
-				Nonce:  acc.Account.Nonce,
+				Nonce:  acc.Nonce,
 				From:   c.account.Address().Bytes(),
 				To:     to.Bytes(),
 				Value:  amount,

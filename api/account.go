@@ -37,10 +37,14 @@ func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if err != nil || acc == nil {
 		return fmt.Errorf("account %s does not exist", addr.Hex())
 	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
-		Address: addr.Bytes(),
-		Account: acc,
+		Address:       addr.Bytes(),
+		Nonce:         acc.GetNonce(),
+		Balance:       acc.GetBalance(),
+		ElectionIndex: acc.GetProcessIndex(),
+		InfoURL:       acc.GetInfoURI(),
 	}); err != nil {
 		return err
 	}

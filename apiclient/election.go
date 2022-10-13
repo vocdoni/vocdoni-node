@@ -17,14 +17,14 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Account.String())
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
 	}
 	// build the transaction
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
 			NewProcess: &models.NewProcessTx{
 				Txtype:  models.TxType_NEW_PROCESS,
-				Nonce:   acc.Account.Nonce,
+				Nonce:   acc.Nonce,
 				Process: process,
 			},
 		},
@@ -171,7 +171,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Account.String())
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
 	}
 
 	// build the process transaction
@@ -193,7 +193,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		Payload: &models.Tx_NewProcess{
 			NewProcess: &models.NewProcessTx{
 				Txtype:  models.TxType_NEW_PROCESS,
-				Nonce:   acc.Account.Nonce,
+				Nonce:   acc.Nonce,
 				Process: process,
 			},
 		},

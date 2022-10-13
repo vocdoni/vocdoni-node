@@ -6,7 +6,6 @@ import (
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -145,10 +144,12 @@ type ChainInfo struct {
 }
 
 type Account struct {
-	Address types.HexBytes   `json:"address,omitempty"`
-	Account *vochain.Account `json:"account,omitempty"`
-	Balance *uint64          `json:"balance,omitempty"`
-	Token   *uuid.UUID       `json:"token,omitempty"`
+	Address       types.HexBytes `json:"address"`
+	Nonce         uint32         `json:"nonce"`
+	Balance       uint64         `json:"balance"`
+	ElectionIndex uint32         `json:"electionIndex"`
+	InfoURL       string         `json:"infoURL,omitempty"`
+	Token         *uuid.UUID     `json:"token,omitempty"`
 }
 
 type Census struct {
