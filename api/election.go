@@ -344,6 +344,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			return fmt.Errorf("wrong metadata format: %w", err)
 		}
 	}
+	// TODO: unmarshal de transaction and check its actually a NewProcessTx and the metadata URI matches
 	// send the transaction
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
@@ -367,7 +368,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		return fmt.Errorf("received election id after executing transaction is not valid")
 	}
 
-	// if metadata, add it to the storage
+	// if metadata exists, add it to the storage
 	if req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()

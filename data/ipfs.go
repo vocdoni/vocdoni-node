@@ -56,7 +56,6 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	ipfslog.SetLogLevel("*", i.LogLevel)
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
-
 	os.Setenv("IPFS_FD_MAX", "1024")
 
 	// check if needs init
@@ -361,4 +360,13 @@ func NewIPFSkey() []byte {
 		panic(err)
 	}
 	return encPrivKey
+}
+
+// IPFScontentIdentifier calculates the IPFS Cid hash from a bytes buffer.
+func IPFScontentIdentifier(data []byte) string {
+	_, c, err := cid.CidFromBytes(data)
+	if err != nil {
+		return ""
+	}
+	return c.String()
 }

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -8,6 +9,11 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
+)
+
+const (
+	ElectionCensusTypeCSP  = "csp"
+	ElectionCensusTypeTree = "treeWeighted"
 )
 
 type Organization struct {
@@ -191,4 +197,23 @@ type TallyMode struct {
 func (t TallyMode) MarshalJSON() ([]byte, error) {
 	m := protojson.MarshalOptions{EmitUnpopulated: true, UseEnumNumbers: false}
 	return m.Marshal(&t)
+}
+
+func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byte, error) {
+	var origin models.CensusOrigin
+	var root []byte
+	switch ctype.Type {
+	case ElectionCensusTypeCSP:
+		origin = models.CensusOrigin_OFF_CHAIN_CA
+		root = ctype.PublicKey
+	case ElectionCensusTypeTree:
+		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
+		root = ctype.RootHash
+	default:
+		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)
+	}
+	if root == nil {
+		return 0, nil, fmt.Errorf("census root is not correctyl specified")
+	}
+	return origin, root, nil
 }

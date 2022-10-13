@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"time"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
@@ -44,6 +45,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainInfoHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/blockdate/<timestamp>",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainEstimateHeightHandler,
 	); err != nil {
 		return err
 	}
@@ -122,6 +131,27 @@ func (a *API) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 		Height:    &height,
 		Timestamp: &timestamp,
 	})
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// /chain/blockdate/<timestamp>
+// returns the estimated block height for the timestamp provided
+func (a *API) chainEstimateHeightHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	timestamp, err := strconv.ParseInt(ctx.URLParam("timestamp"), 10, 64)
+	if err != nil {
+		return err
+	}
+	height, err := a.vocinfo.EstimateBlockHeight(time.Unix(timestamp, 0))
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(struct {
+		Height uint32 `json:"height"`
+	}{Height: height},
+	)
 	if err != nil {
 		return err
 	}

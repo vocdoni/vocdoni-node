@@ -392,7 +392,7 @@ func (a *API) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	}
 
 	// Census Origin
-	censusOrigin, root, err := censusTypeToOrigin(description.Census)
+	censusOrigin, root, err := CensusTypeToOrigin(description.Census)
 	if err != nil {
 		return err
 	}

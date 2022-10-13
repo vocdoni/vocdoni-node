@@ -21,9 +21,9 @@ var censusDBlock = sync.RWMutex{}
 
 func censusType(t string) (models.Census_Type, bool) {
 	switch t {
-	case "zkindexed":
+	case CensusTypeZK:
 		return models.Census_ARBO_POSEIDON, true
-	case "weighted":
+	case CensusTypeWeighted:
 		return models.Census_ARBO_BLAKE2B, false
 	}
 	return models.Census_UNKNOWN, false

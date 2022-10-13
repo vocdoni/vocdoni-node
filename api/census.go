@@ -19,7 +19,9 @@ import (
 )
 
 const (
-	CensusHandler = "census"
+	CensusHandler      = "census"
+	CensusTypeWeighted = "weighted"
+	CensusTypeZK       = "zkindexed"
 
 	censusDBprefix          = "cs_"
 	censusDBreferencePrefix = "cr_"

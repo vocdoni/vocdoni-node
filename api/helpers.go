@@ -55,28 +55,6 @@ func (a *API) formatElectionType(et *models.EnvelopeType) string {
 	return ptype.String()
 }
 
-func censusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byte, error) {
-	var origin models.CensusOrigin
-	var root []byte
-	switch ctype.Type {
-	case "csp":
-		origin = models.CensusOrigin_OFF_CHAIN_CA
-		root = ctype.PublicKey
-	case "tree":
-		origin = models.CensusOrigin_OFF_CHAIN_TREE
-		root = ctype.RootHash
-	case "treeWeighted":
-		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
-		root = ctype.RootHash
-	default:
-		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)
-	}
-	if root == nil {
-		return 0, nil, fmt.Errorf("census root is not correctyl specified")
-	}
-	return origin, root, nil
-}
-
 type testHTTPclient struct {
 	c     *http.Client
 	token *uuid.UUID
