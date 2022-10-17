@@ -136,6 +136,11 @@ type Transaction struct {
 	ProcessID types.HexBytes    `json:"processId,omitempty"`
 }
 
+type TransactionReference struct {
+	Height uint32 `json:"blockHeight"`
+	Index  uint32 `json:"transactionIndex"`
+}
+
 type ChainInfo struct {
 	ID        string    `json:"chainId,omitempty"`
 	BlockTime *[5]int32 `json:"blockTime,omitempty"`

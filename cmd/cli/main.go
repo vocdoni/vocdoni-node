@@ -15,7 +15,6 @@ import (
 	ui "github.com/manifoldco/promptui"
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -95,7 +94,7 @@ func main() {
 				errorp.Println(errAccountNotConfgirued)
 				break
 			}
-			if err := bootStrapAccount(cli.api); err != nil {
+			if err := bootStrapAccount(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 3:
@@ -234,14 +233,20 @@ func networkInfo(cli *vocdoniCLI) error {
 	return nil
 }
 
-func bootStrapAccount(cli *apiclient.HTTPclient) error {
+func bootStrapAccount(cli *vocdoniCLI) error {
 	infoPrint.Printf("bootstraping account...\n")
 
-	txHash, err := cli.AccountBootstrap(nil)
+	txHash, err := cli.api.AccountBootstrap(nil)
 	if err != nil {
 		return err
 	}
 	infoPrint.Printf("transaction sent! hash %s\n", txHash.String())
+	infoPrint.Printf("waiting for confirmation...")
+	ok := cli.waitForTransaction(txHash)
+	if !ok {
+		return fmt.Errorf("transaction was not included")
+	}
+	infoPrint.Printf(" transaction confirmed!\n")
 	return nil
 }
 
@@ -311,6 +316,12 @@ func transfer(cli *vocdoniCLI) error {
 		return err
 	}
 	infoPrint.Printf("transaction sent! hash %s\n", txHash.String())
+	infoPrint.Printf("waiting for confirmation...")
+	ok := cli.waitForTransaction(txHash)
+	if !ok {
+		return fmt.Errorf("transaction was not included")
+	}
+	infoPrint.Printf(" transaction confirmed!\n")
 	return nil
 }
 

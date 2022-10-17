@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -8,11 +9,16 @@ import (
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 )
 
 const (
 	ChainHandler = "chain"
+)
+
+var (
+	ErrTransactionNotFound = fmt.Errorf("transaction hash not found")
 )
 
 func (a *API) enableChainHandlers() error {
@@ -61,6 +67,22 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainTxCostHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transaction/reference/{hash}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainTxbyHashHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transaction/{height}/{index}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainTxHandler,
 	); err != nil {
 		return err
 	}
@@ -204,4 +226,45 @@ func (a *API) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// /chain/transaction/reference/<hash>
+func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
+	if err != nil {
+		return err
+	}
+
+	ref, err := a.scrutinizer.GetTxHashReference(hash)
+	if err != nil {
+		return ErrTransactionNotFound
+	}
+
+	data, err := json.Marshal(&TransactionReference{
+		Height: ref.BlockHeight,
+		Index:  uint32(ref.TxBlockIndex),
+	})
+	if err != nil {
+		return err
+	}
+
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// /chain/transaction/<height>/<index>
+func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	if err != nil {
+		return err
+	}
+	index, err := strconv.ParseInt(ctx.URLParam("index"), 10, 64)
+	if err != nil {
+		return err
+	}
+	stx, err := a.scrutinizer.App.GetTx(uint32(height), int32(index))
+	if err != nil {
+		return fmt.Errorf("cannot get tx: %w", err)
+	}
+
+	return ctx.Send([]byte(protoFormat(stx.Tx)), bearerstdapi.HTTPstatusCodeOK)
 }

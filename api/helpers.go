@@ -15,6 +15,8 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func (a *API) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
@@ -53,6 +55,19 @@ func (a *API) formatElectionType(et *models.EnvelopeType) string {
 		ptype.WriteString(" single")
 	}
 	return ptype.String()
+}
+
+func protoFormat(tx []byte) string {
+	ptx := models.Tx{}
+	if err := proto.Unmarshal(tx, &ptx); err != nil {
+		return ""
+	}
+	pj := protojson.MarshalOptions{
+		Multiline:       false,
+		Indent:          "",
+		EmitUnpopulated: true,
+	}
+	return pj.Format(&ptx)
 }
 
 type testHTTPclient struct {

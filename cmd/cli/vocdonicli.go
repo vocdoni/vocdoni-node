@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -17,6 +18,8 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
+
+var transactionConfirmationThreshold = 30 * time.Second
 
 type Config struct {
 	Accounts []Account  `json:"accounts"`
@@ -184,6 +187,22 @@ func (v *vocdoniCLI) listAccounts() []string {
 		accounts = append(accounts, a.Memo)
 	}
 	return accounts
+}
+
+func (v *vocdoniCLI) transactionMined(txHash types.HexBytes) bool {
+	_, err := v.api.TransactionReference(txHash)
+	return err == nil
+}
+
+func (v *vocdoniCLI) waitForTransaction(txHash types.HexBytes) bool {
+	startTime := time.Now()
+	for time.Now().Before(startTime.Add(transactionConfirmationThreshold)) {
+		if v.transactionMined(txHash) {
+			return true
+		}
+		time.Sleep(3 * time.Second)
+	}
+	return false
 }
 
 func (v *vocdoniCLI) save() error {
