@@ -62,9 +62,9 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 
 func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) {
 	var err error
-	var faucet *models.FaucetPackage
+	var faucet models.FaucetPackage
 	if faucetPkg != nil {
-		if err := proto.Unmarshal(faucetPkg, faucet); err != nil {
+		if err := proto.Unmarshal(faucetPkg, &faucet); err != nil {
 			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 		}
 	}
@@ -76,7 +76,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 				Nonce:         0,
 				InfoURI:       "none", // TODO: support infoURI
 				Account:       c.account.Address().Bytes(),
-				FaucetPackage: faucet,
+				FaucetPackage: &faucet,
 			},
 		}})
 	if err != nil {

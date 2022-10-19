@@ -66,15 +66,13 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
 	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
-	key := pubKey
 	switch proof.Payload.(type) {
-	case *models.Proof_Graviton:
-		return false, nil, fmt.Errorf("graviton proof no longer supported")
 	case *models.Proof_Arbo:
 		p := proof.GetArbo()
 		if p == nil {
 			return false, nil, fmt.Errorf("arbo proof is empty")
 		}
+		// get the merkle tree hashing function
 		var hashFunc arbo.HashFunction = arbo.HashFunctionBlake2b
 		switch p.Type {
 		case models.ProofArbo_BLAKE2B:
@@ -83,6 +81,11 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 			hashFunc = arbo.HashFunctionPoseidon
 		default:
 			return false, nil, fmt.Errorf("not recognized ProofArbo type: %s", p.Type)
+		}
+		// check if the proof key is for a publickey (default) or and address
+		key := pubKey
+		if p.GetKeyType().String() == "ADDRESS" {
+			key = addr.Bytes()
 		}
 		hashedKey, err := hashFunc.Hash(key)
 		if err != nil {
