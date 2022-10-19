@@ -70,9 +70,6 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	switch proof.Payload.(type) {
 	case *models.Proof_Graviton:
 		return false, nil, fmt.Errorf("graviton proof no longer supported")
-	case *models.Proof_Iden3:
-		// NOT IMPLEMENTED
-		return false, nil, fmt.Errorf("iden3 proof not implemented")
 	case *models.Proof_Arbo:
 		p := proof.GetArbo()
 		if p == nil {

@@ -143,6 +143,9 @@ func (v *vocdoniCLI) getAccount(index int) (*Account, error) {
 }
 
 func (v *vocdoniCLI) getCurrentAccount() *Account {
+	if v.currentAccount < 0 {
+		return nil
+	}
 	return &v.config.Accounts[v.currentAccount]
 }
 

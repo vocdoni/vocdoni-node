@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -44,16 +45,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mainLabel := fmt.Sprintf("%s %s",
-		color.New(color.FgHiBlue, color.Bold, color.Underline).Sprintf("Vocdoni network client"),
-		color.New(color.FgHiGreen).Sprintf(cli.chainID),
-	)
+	accountInfoHeader := func() string {
+		account := "account not configured"
+		if a := cli.getCurrentAccount(); a != nil {
+			account = fmt.Sprintf("%s [%s]", a.Memo, a.Address.String())
+		}
+		return fmt.Sprintf("%s | %s",
+			color.New(color.FgHiGreen, color.Bold, color.Underline).Sprintf(cli.chainID),
+			color.New(color.FgHiBlue).Sprintf(account),
+		)
+	}
+
 	items := color.New(color.FgHiYellow, color.Bold)
 	errorp := color.New(color.FgHiRed)
 
 	for {
 		prompt := ui.Select{
-			Label:    mainLabel,
+			Label:    accountInfoHeader(),
 			HideHelp: true,
 			Size:     10,
 			Items: []string{
@@ -208,13 +216,13 @@ func accountInfo(c *vocdoniCLI) error {
 	}
 	localAcc := c.getCurrentAccount()
 	infoPrint.Printf("details for account %s\n", localAcc.Memo)
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> address"), valuesPrint.Sprintf(acc.Address.String()))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> publickey"), valuesPrint.Sprintf(localAcc.PublicKey.String()))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> balance"), valuesPrint.Sprintf("%d", acc.Balance))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> nonce"), valuesPrint.Sprintf("%d", acc.Nonce))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> electionIndex"), valuesPrint.Sprintf("%d", acc.ElectionIndex))
-	if acc.InfoURL != "" {
-		fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> infoURL"), valuesPrint.Sprintf(acc.InfoURL))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ address"), valuesPrint.Sprintf(acc.Address.String()))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ public key"), valuesPrint.Sprintf(localAcc.PublicKey.String()))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ balance"), valuesPrint.Sprintf("%d", acc.Balance))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ nonce"), valuesPrint.Sprintf("%d", acc.Nonce))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ electionIndex"), valuesPrint.Sprintf("%d", acc.ElectionIndex))
+	if acc.InfoURL != "" && acc.InfoURL != "none" {
+		fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ info URL"), valuesPrint.Sprintf(acc.InfoURL))
 	}
 
 	return nil
@@ -225,18 +233,33 @@ func networkInfo(cli *vocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> API host"), valuesPrint.Sprintf(cli.config.Host.Host))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> chainID"), valuesPrint.Sprintf(info.ID))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> height"), valuesPrint.Sprintf("%d", *info.Height))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> blockTime"), valuesPrint.Sprintf("%v", *info.BlockTime))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf("=> timestamp"), valuesPrint.Sprintf("%d", *info.Timestamp))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ API host"), valuesPrint.Sprintf(cli.config.Host.Host))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ chainID"), valuesPrint.Sprintf(info.ID))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ height"), valuesPrint.Sprintf("%d", *info.Height))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ block time"), valuesPrint.Sprintf("%v", *info.BlockTime))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ timestamp"), valuesPrint.Sprintf("%d", *info.Timestamp))
 	return nil
 }
 
 func bootStrapAccount(cli *vocdoniCLI) error {
+	p := ui.Prompt{
+		Label: "If you have a faucet package, please enter it here." +
+			" Otherwise, press enter to continue",
+	}
+	faucetPkgStr, err := p.Run()
+	if err != nil {
+		return err
+	}
+	var faucetPkg []byte
+	if faucetPkgStr != "" {
+		faucetPkg, err = base64.StdEncoding.DecodeString(faucetPkgStr)
+		if err != nil {
+			return fmt.Errorf("could not decode faucet package: %w", err)
+		}
+	}
 	infoPrint.Printf("bootstraping account...\n")
 
-	txHash, err := cli.api.AccountBootstrap(nil)
+	txHash, err := cli.api.AccountBootstrap(faucetPkg)
 	if err != nil {
 		return err
 	}
@@ -364,26 +387,26 @@ func electionHandler(cli *vocdoniCLI) error {
 	description := api.ElectionDescription{
 		Title:        map[string]string{"default": "election title"},
 		Description:  map[string]string{"default": "election description"},
+		Header:       "https://images.unsplash.com/photo-1540910419892-4a36d2c3266c",
+		StreamURI:    "",
 		StartDate:    time.Now().Add(time.Minute * 20),
 		EndDate:      time.Now().Add(time.Hour * 48),
 		VoteType:     api.VoteType{MaxVoteOverwrites: 1},
 		ElectionType: api.ElectionType{Autostart: true, Interruptible: true},
-		Census:       api.CensusTypeDescription{Type: "treeWeighted", RootHash: make(types.HexBytes, 32)},
 		Questions: []api.Question{
-			{
-				Title:       map[string]string{"default": "question title"},
+			{Title: map[string]string{"default": "question title"},
 				Description: map[string]string{"default": "question description"},
 				Choices: []api.ChoiceMetadata{
 					{
 						Title: map[string]string{"default": "1 choice title"},
-						Value: 0,
-					},
+						Value: 0},
 					{
 						Title: map[string]string{"default": "2 choice title"},
-						Value: 1,
-					},
-				},
-			},
+						Value: 1},
+				}}},
+		Census: api.CensusTypeDescription{
+			Type:     "treeWeighted",
+			RootHash: make(types.HexBytes, 32),
 		},
 	}
 	descriptionText, err := json.MarshalIndent(&description, "", " ")
@@ -402,6 +425,10 @@ func electionHandler(cli *vocdoniCLI) error {
 	fileName := file.Name()
 	if err := file.Close(); err != nil {
 		return nil
+	}
+
+	if err := OpenFileInEditor(fileName, GetPreferredEditorFromEnvironment); err != nil {
+		return err
 	}
 
 	p := ui.Prompt{
