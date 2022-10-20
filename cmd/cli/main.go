@@ -256,6 +256,7 @@ func bootStrapAccount(cli *vocdoniCLI) error {
 		if err != nil {
 			return fmt.Errorf("could not decode faucet package: %w", err)
 		}
+		infoPrint.Printf("faucet package size is %d bytes", len(faucetPkg))
 	}
 	infoPrint.Printf("bootstraping account...\n")
 

@@ -310,7 +310,7 @@ var Genesis = map[string]VochainGenesis{
       ],
       "oracles":[
          "0xb926be24A9ca606B515a835E91298C7cF0f2846f",
-	 "0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c"
+         "0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c"
       ],
       "accounts":[
          { 
@@ -320,6 +320,10 @@ var Genesis = map[string]VochainGenesis{
          { 
             "address":"0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c", 
             "balance":10000 
+         },
+         {
+            "address": "0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0",
+            "balance": 1000000
          }
       ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
