@@ -1403,12 +1403,17 @@ func (c *Client) CreateOrSetAccount(signer *ethereum.SignKeys, to common.Address
 	var err error
 	req.Method = "submitRawTx"
 
+	faucetPkgBytes, err := proto.Marshal(faucetPkg)
+	if err != nil {
+		return err
+	}
+
 	tx := &models.SetAccountInfoTx{
 		Txtype:        models.TxType_SET_ACCOUNT_INFO,
 		Nonce:         nonce,
 		InfoURI:       infoURI,
 		Account:       to.Bytes(),
-		FaucetPackage: faucetPkg,
+		FaucetPackage: faucetPkgBytes,
 	}
 
 	stx := models.SignedTx{}

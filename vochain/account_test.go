@@ -123,13 +123,17 @@ func testSetAccountInfoTx(t *testing.T,
 	faucetPkg *models.FaucetPackage,
 	app *BaseApplication,
 	infoURI string) error {
-	var err error
+
+	faucetPkgBytes, err := proto.Marshal(faucetPkg)
+	if err != nil {
+		return nil
+	}
 
 	tx := &models.SetAccountInfoTx{
 		Txtype:        models.TxType_SET_ACCOUNT_INFO,
 		InfoURI:       infoURI,
 		Account:       account.Bytes(),
-		FaucetPackage: faucetPkg,
+		FaucetPackage: faucetPkgBytes,
 	}
 
 	stx := &models.SignedTx{}

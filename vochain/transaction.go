@@ -205,13 +205,17 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 					); err != nil {
 						return nil, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
 					}
+					faucetPkg := models.FaucetPackage{}
+					if err := proto.Unmarshal(tx.GetFaucetPackage(), &faucetPkg); err != nil {
+						return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+					}
 					// consume provided faucet payload
 					return response, app.State.ConsumeFaucetPayload(
 						txValues.FaucetPayloadSigner,
 						&models.FaucetPayload{
-							Identifier: tx.GetFaucetPackage().GetPayload().GetIdentifier(),
-							To:         tx.GetFaucetPackage().GetPayload().GetTo(),
-							Amount:     tx.GetFaucetPackage().GetPayload().GetAmount(),
+							Identifier: faucetPkg.GetPayload().GetIdentifier(),
+							To:         faucetPkg.GetPayload().GetTo(),
+							Amount:     faucetPkg.GetPayload().GetAmount(),
 						},
 						models.TxType_SET_ACCOUNT_INFO,
 					)
