@@ -171,10 +171,8 @@ func (ps *SubPub) Listen(receiver chan<- *Message) {
 		case <-ps.close:
 			return
 		case spmsg := <-ps.Gossip.Messages:
-			log.Debugf("received gossip (%d bytes) from %s", len(spmsg.Data), spmsg.Peer)
 			receiver <- spmsg
 		case spmsg := <-ps.UnicastMsgs:
-			log.Debugf("received unicast (%d bytes) from %s", len(spmsg.Data), spmsg.Peer)
 			receiver <- spmsg
 		}
 	}

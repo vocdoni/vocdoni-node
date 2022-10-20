@@ -404,9 +404,6 @@ func (is *IPFSsync) handleEvents() {
 			if err != nil {
 				log.Warnf("cannot unmarshal message %s", err)
 			} else {
-				log.Debugf("received message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
-					imsg.Msgtype.String(), imsg.Address, imsg.Hash,
-					imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
 				go is.Handle(&imsg) // handle each incoming message in parallel, since is.Handle() is thread-safe
 			}
 
