@@ -56,7 +56,7 @@ jobs:
           GOOS=darwin go build ./...
 
   compose-test:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
@@ -81,7 +81,7 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-      - uses: docker/setup-buildx-action@v1
+      - uses: docker/setup-buildx-action@v2
       # - name: Set up QEMU
       #   id: qemu
       #   uses: docker/setup-qemu-action@v1
@@ -112,7 +112,7 @@ jobs:
         run: |
           echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )"
       - name: Push to Docker Hub, Packages and ghcr.io
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         with:
           context: .
           # platforms: linux/amd64,linux/arm64
@@ -122,7 +122,7 @@ jobs:
             ghcr.io/vocdoni/go-dvote:latest,ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch }}
 
       - name: Push to Docker Hub, Packages and ghcr.io (race enabled)
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
         with:
           context: .
