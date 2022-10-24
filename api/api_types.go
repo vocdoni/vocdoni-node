@@ -157,6 +157,13 @@ type Account struct {
 	Token         *uuid.UUID     `json:"token,omitempty"`
 }
 
+type AccountSet struct {
+	TxPayload   []byte         `json:"txPayload,omitempty"`
+	Metadata    []byte         `json:"metadata,omitempty"`
+	TxHash      types.HexBytes `json:"txHash"`
+	MetadataURL string         `json:"metadataURL"`
+}
+
 type Census struct {
 	CensusID types.HexBytes `json:"censusID,omitempty"`
 	Root     types.HexBytes `json:"root,omitempty"`

@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestAPI(t *testing.T) {
+func TestAPIcensusAndVote(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
@@ -51,8 +51,6 @@ func TestAPI(t *testing.T) {
 	// add the key we'll use for cast votes
 	voterKey := ethereum.SignKeys{}
 	qt.Assert(t, voterKey.Generate(), qt.IsNil)
-	_, priv := voterKey.HexString()
-	t.Logf("\n=> voter private key %s\n", priv)
 
 	_, code = c.Request("GET", nil, "census", id1, "add", fmt.Sprintf("%x", voterKey.PublicKey()), "1")
 	qt.Assert(t, code, qt.Equals, 200)
@@ -138,6 +136,56 @@ func TestAPI(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 }
 
+func TestAPIaccount(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// create a new account
+	signer := ethereum.SignKeys{}
+	qt.Assert(t, signer.Generate(), qt.IsNil)
+
+	// metdata
+	meta := &api.OrganizationMetadata{
+		Version: "1.0",
+	}
+	metaData, err := json.Marshal(meta)
+	qt.Assert(t, err, qt.IsNil)
+
+	// transaction
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{
+		SetAccountInfo: &models.SetAccountInfoTx{
+			Txtype:  models.TxType_SET_ACCOUNT_INFO,
+			Nonce:   0,
+			InfoURI: "ipfs://1234",
+			Account: signer.Address().Bytes(),
+		},
+	}})
+	qt.Assert(t, err, qt.IsNil)
+	stx.Signature, err = signer.SignVocdoniTx(stx.Tx, server.VochainAPP.ChainID())
+	qt.Assert(t, err, qt.IsNil)
+	stxb, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
+	// send the transaction and metadata
+	accSet := api.AccountSet{
+		Metadata:  metaData,
+		TxPayload: stxb,
+	}
+	resp, code := c.Request("POST", &accSet, "account")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+}
+
 func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 	for {
 		resp, code := c.Request("GET", nil, "chain", "info")
@@ -150,5 +198,4 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 		}
 		time.Sleep(time.Second * 1)
 	}
-
 }

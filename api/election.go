@@ -191,7 +191,7 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		ElectionSummary: ElectionSummary{
 			ElectionID:   electionID,
 			Status:       models.ProcessStatus_name[proc.Status],
-			Type:         a.formatElectionType(proc.Envelope),
+			Type:         formatElectionType(proc.Envelope),
 			StartDate:    a.vocinfo.HeightTime(int64(proc.StartBlock)),
 			EndDate:      a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults: proc.FinalResults,
@@ -211,7 +211,7 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
-	election.Type = a.formatElectionType(proc.Envelope)
+	election.Type = formatElectionType(proc.Envelope)
 
 	if proc.HaveResults {
 		results, err := a.scrutinizer.GetResults(electionID)
@@ -337,6 +337,14 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
+
+	// check if the transaction is of the correct type
+	if ok, err := isTransactionType(req.TxPayload, &models.Tx_NewProcess{}); err != nil {
+		return fmt.Errorf("could not check transaction type: %w", err)
+	} else if !ok {
+		return fmt.Errorf("transaction is not of type NewProcess")
+	}
+
 	// if election metadata defined, check the format
 	if req.Metadata != nil {
 		metadata := ElectionMetadata{}
@@ -344,7 +352,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			return fmt.Errorf("wrong metadata format: %w", err)
 		}
 	}
-	// TODO: unmarshal de transaction and check its actually a NewProcessTx and the metadata URI matches
+
 	// send the transaction
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
