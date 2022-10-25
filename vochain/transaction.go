@@ -205,13 +205,17 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 					); err != nil {
 						return nil, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
 					}
+					faucetPayload := &models.FaucetPayload{}
+					if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
+						return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+					}
 					// consume provided faucet payload
 					return response, app.State.ConsumeFaucetPayload(
 						txValues.FaucetPayloadSigner,
 						&models.FaucetPayload{
-							Identifier: tx.GetFaucetPackage().GetPayload().GetIdentifier(),
-							To:         tx.GetFaucetPackage().GetPayload().GetTo(),
-							Amount:     tx.GetFaucetPackage().GetPayload().GetAmount(),
+							Identifier: faucetPayload.GetIdentifier(),
+							To:         faucetPayload.GetTo(),
+							Amount:     faucetPayload.GetAmount(),
 						},
 						models.TxType_SET_ACCOUNT_INFO,
 					)
@@ -307,12 +311,16 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 		}
 		if commit {
 			txValues := vtx.Tx.GetCollectFaucet()
+			faucetPayload := &models.FaucetPayload{}
+			if err := proto.Unmarshal(txValues.FaucetPackage.Payload, faucetPayload); err != nil {
+				return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+			}
 			if err := app.State.ConsumeFaucetPayload(
 				*fromAcc,
 				&models.FaucetPayload{
-					Identifier: txValues.FaucetPackage.Payload.Identifier,
-					To:         txValues.FaucetPackage.Payload.To,
-					Amount:     txValues.FaucetPackage.Payload.Amount,
+					Identifier: faucetPayload.Identifier,
+					To:         faucetPayload.To,
+					Amount:     faucetPayload.Amount,
 				},
 				models.TxType_COLLECT_FAUCET,
 			); err != nil {

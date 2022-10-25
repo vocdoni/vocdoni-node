@@ -21,17 +21,24 @@ func TestPublish(t *testing.T) {
 	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
+	rnd := testutil.NewRandom(0)
+	key, value := rnd.RandomBytes(32), rnd.RandomBytes(32)
+	qt.Assert(t, censusTree.Add(key, value), qt.IsNil)
 
 	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
 
 	censusTree.Publish()
 	qt.Assert(t, censusTree.IsPublic(), qt.IsTrue)
 
+	recValue, _, err := censusTree.GenProof(key)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, value, qt.DeepEquals, recValue)
+
 	censusTree.Unpublish()
 	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
 }
 
-func TestImport(t *testing.T) {
+func TestImportWeighted(t *testing.T) {
 	db := metadb.NewTest(t)
 	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
 		CensusType: models.Census_ARBO_BLAKE2B})
@@ -84,7 +91,176 @@ func TestImport(t *testing.T) {
 	r2, err := censusTree2.Root()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, r1, qt.DeepEquals, r2)
+}
+func TestImportIndexed(t *testing.T) {
+	db := metadb.NewTest(t)
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_BLAKE2B, IndexAsKeysCensus: true})
+	qt.Assert(t, err, qt.IsNil)
 
+	rnd := testutil.NewRandom(0)
+	index := uint32(0)
+
+	// add a bunch of keys
+	for i := 1; i < 11; i++ {
+		h, err := arbo.HashFunctionBlake2b.Hash(rnd.RandomBytes(32))
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, h, qt.Not(qt.HasLen), 0)
+		err = censusTree.Add(h, nil)
+		qt.Assert(t, err, qt.IsNil)
+		index++
+	}
+
+	// check the total inex is correctly calculated
+	censusIndex, err := censusTree.GetCensusIndex()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, index, qt.Equals, censusIndex)
+
+	// dump the tree
+	dump, err := censusTree.Dump()
+	qt.Assert(t, err, qt.IsNil)
+
+	// import into a new tree
+	censusTree2, err := New(Options{Name: "test2", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_BLAKE2B, IndexAsKeysCensus: true})
+	qt.Assert(t, err, qt.IsNil)
+
+	err = censusTree2.ImportDump(dump)
+	qt.Assert(t, err, qt.IsNil)
+
+	// check the index is still the same
+	censusIndex, err = censusTree2.GetCensusIndex()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, index, qt.Equals, censusIndex)
+
+	// check root is the same after adding a new leaf
+	k := rnd.RandomBytes(32)
+	err = censusTree.Add(k, nil)
+	qt.Assert(t, err, qt.IsNil)
+	err = censusTree2.Add(k, nil)
+	qt.Assert(t, err, qt.IsNil)
+
+	r1, err := censusTree.Root()
+	qt.Assert(t, err, qt.IsNil)
+	r2, err := censusTree2.Root()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, r1, qt.DeepEquals, r2)
+}
+
+func TestWeightedProof(t *testing.T) {
+	db := metadb.NewTest(t)
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_POSEIDON, IndexAsKeysCensus: false})
+	qt.Assert(t, err, qt.IsNil)
+
+	rnd := testutil.NewRandom(0)
+
+	// add a bunch of keys
+	for i := 1; i < 11; i++ {
+		err = censusTree.Add(
+			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
+			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
+		)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	// add the last key (we will use if for testing the proof)
+	userKey := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(100000))))
+	userWeight := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(100000))))
+
+	err = censusTree.Add(userKey, userWeight)
+	qt.Assert(t, err, qt.IsNil)
+
+	censusTree.Publish()
+
+	// generate and test the proof
+	value, siblings, err := censusTree.GenProof(userKey)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, userWeight, qt.DeepEquals, value)
+
+	root, err := censusTree.Root()
+	qt.Assert(t, err, qt.IsNil)
+
+	verified, err := censusTree.VerifyProof(userKey, value, siblings, root)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, verified, qt.IsTrue)
+}
+
+func TestIndexProof(t *testing.T) {
+	db := metadb.NewTest(t)
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_POSEIDON, IndexAsKeysCensus: true})
+	qt.Assert(t, err, qt.IsNil)
+
+	rnd := testutil.NewRandom(0)
+
+	// add a bunch of keys
+	for i := 1; i < 11; i++ {
+		err = censusTree.Add(
+			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
+			nil,
+		)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	// add the last key (we will use if for testing the proof)
+	userKey := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000))))
+	qt.Assert(t, err, qt.IsNil)
+
+	err = censusTree.Add(userKey, nil)
+	qt.Assert(t, err, qt.IsNil)
+
+	censusTree.Publish()
+
+	// generate and test the proof
+	value, siblings, err := censusTree.GenProof(userKey)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, userKey, qt.DeepEquals, value)
+
+	verified, err := censusTree.VerifyProof(userKey, value, siblings, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, verified, qt.IsTrue)
+}
+
+func TestAddBatchIndexed(t *testing.T) {
+	db := metadb.NewTest(t)
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+		CensusType: models.Census_ARBO_POSEIDON, IndexAsKeysCensus: true})
+	qt.Assert(t, err, qt.IsNil)
+
+	rnd := testutil.NewRandom(0)
+	keys := [][]byte{}
+	// add a bunch of keys
+	for i := 1; i < 11; i++ {
+		keys = append(keys,
+			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
+		)
+		qt.Assert(t, err, qt.IsNil)
+	}
+	userKey := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000))))
+
+	invalid, err := censusTree.AddBatch(append(keys, userKey), nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, invalid, qt.HasLen, 0)
+
+	censusTree.Publish()
+
+	lent, err := censusTree.Size()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, lent, qt.Equals, uint64(len(keys)+1))
+
+	index, err := censusTree.GetCensusIndex()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, lent, qt.Equals, uint64(index))
+
+	// generate and test the proof
+	value, siblings, err := censusTree.GenProof(userKey)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, userKey, qt.DeepEquals, value)
+
+	verified, err := censusTree.VerifyProof(userKey, value, siblings, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, verified, qt.IsTrue)
 }
 
 func TestGetCensusWeight(t *testing.T) {

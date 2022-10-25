@@ -60,19 +60,18 @@ func testEntityList(t *testing.T, entityCount int) {
 	if ec := sc.EntityCount(); ec != uint64(entityCount) {
 		t.Fatalf("entity count is wrong, got %d expected %d", ec, entityCount)
 	}
-	var list []string
 	last := 0
 	for len(entities) <= entityCount {
-		list = sc.EntityList(10, last, "")
+		list := sc.EntityList(10, last, "")
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
 		}
 		for _, e := range list {
-			if entities[e] {
+			if entities[e.String()] {
 				t.Fatalf("found duplicated entity: %s", e)
 			}
-			entities[e] = true
+			entities[e.String()] = true
 		}
 		last += 10
 	}
@@ -151,7 +150,7 @@ func TestEntitySearch(t *testing.T) {
 		}
 	}
 	app.AdvanceTestBlock()
-	var list []string
+	var list []types.HexBytes
 	// Exact entity search
 	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
 	if len(list) < 1 {

@@ -7,9 +7,9 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/rpcapi"
+	client "go.vocdoni.io/dvote/rpcclient"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/util"
 )
 

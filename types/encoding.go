@@ -9,6 +9,10 @@ import (
 // base64 default.
 type HexBytes []byte
 
+func (b *HexBytes) String() string {
+	return hex.EncodeToString(*b)
+}
+
 func (b HexBytes) MarshalJSON() ([]byte, error) {
 	enc := make([]byte, hex.EncodedLen(len(b))+2)
 	enc[0] = '"'

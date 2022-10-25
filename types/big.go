@@ -40,6 +40,15 @@ func (i *BigInt) SetBytes(buf []byte) *BigInt {
 	return (*BigInt)(i.ToInt().SetBytes(buf))
 }
 
+// SetString interprets the string as a big number
+func (i *BigInt) SetString(s string) (*BigInt, error) {
+	bi, ok := i.ToInt().SetString(s, 10)
+	if !ok {
+		return nil, fmt.Errorf("cannot set string %s", s)
+	}
+	return (*BigInt)(bi), nil
+}
+
 // Bytes returns the bytes representation of the big number
 func (i *BigInt) Bytes() []byte {
 	return (*big.Int)(i).Bytes()

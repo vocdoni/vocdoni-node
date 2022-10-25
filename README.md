@@ -26,16 +26,16 @@ The dvotenode is the main tool of go-dvote, it contains all the required feature
 
 Currently dvotenode can operate in three modes:
 
-- **gateway** mode provides an entry point to the P2P networks for the clients (APP or Web), it uses most of the components from go-dvote. Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/gateway.html)
+- **gateway** mode provides an entry point to the P2P networks for the clients (APP or Web), it uses most of the components from vocdoni-node. Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/gateway.html)
 
 - **miner** mode provides a block validation node (full node) of the Vochain (Tendermint based blockchain for voting). Detailed information can be found [here](https://docs.vocdoni.io/architecture/services/vochain.html)
 - **oracle** mode provides a bridge between Ethereum and the Vochain
 
-One of the design primitives of go-dvote is to run everything as a single daemon in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, go-dvote uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
+One of the design primitives of vocdoni-node is to run everything as a single process in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, go-dvote uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
 
-In addition, go-dvote is currently pure GoLang code, so generating a static and reproducible binary that works on most of the Linux hosts (and probably MacOS) without any dependence is possible.
+vocdoni-node is currently pure GoLang code, so generating a static and reproducible binary that works on most of the Linux and MacOS hosts without any dependence, is possible.
 
-For running dvotenode in gateway mode, 8GB of ram is recommended (4GB works but it is risky).
+For running vocdoni-node in gateway mode, 8GB of ram is recommended (4GB works but it is risky).
 
 #### Status
 

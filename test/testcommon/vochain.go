@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"math/rand"
+	"path"
 	"strconv"
 	"testing"
 
@@ -183,11 +184,10 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	return s
 }
 
-func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplication {
+func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.SignKeys) *vochain.BaseApplication {
 	// start vochain node
 	// create config
-	d.VochainCfg = new(config.VochainCfg)
-	d.VochainCfg.DataDir = tb.TempDir()
+	cfg.DataDir = tb.TempDir()
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	// TO-DO: use tendermint/tendermint/types instead of custom (copied) types
@@ -196,61 +196,61 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 		Evidence:  vochain.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
-
 	validator, err := privval.GenFilePV(
-		d.VochainCfg.DataDir+"/config/priv_validator_key.json",
-		d.VochainCfg.DataDir+"/data/priv_validator_state.json",
+		path.Join(cfg.DataDir, "config", "priv_validator_key.json"),
+		path.Join(cfg.DataDir, "data", "priv_validator_state.json"),
 		tmtypes.ABCIPubKeyTypeEd25519,
 	)
+
 	if err != nil {
 		tb.Fatal(err)
 	}
 
-	oracles := []string{d.Signer.AddressString()}
-	treasurer := d.Signer.AddressString()
+	oracles := []string{mngKey.AddressString()}
+	treasurer := mngKey.AddressString()
 	genBytes, err := vochain.NewGenesis(
-		d.VochainCfg,
+		cfg,
 		strconv.Itoa(rand.Int()),
 		consensusParams,
 		[]privval.FilePV{*validator},
 		oracles,
 		treasurer,
+		new(vochain.TransactionCosts), // set all costs to zero
 	)
 	if err != nil {
 		tb.Fatal(err)
 	}
+
 	// creating node
-	d.VochainCfg.LogLevel = "error"
-	d.VochainCfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
-	d.VochainCfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
-	d.VochainCfg.RPCListen = fmt.Sprintf("0.0.0.0:%d", 27000+rand.Intn(1000))
-	d.VochainCfg.NoWaitSync = true
-	d.VochainCfg.MempoolSize = 20000
-	d.VochainCfg.MinerTargetBlockTimeSeconds = 3
-	d.VochainCfg.DBType = "pebble"
+	cfg.LogLevel = "error"
+	cfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
+	cfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
+	cfg.RPCListen = fmt.Sprintf("0.0.0.0:%d", 27000+rand.Intn(1000))
+	cfg.NoWaitSync = true
+	cfg.MempoolSize = 20000
+	cfg.MinerTargetBlockTimeSeconds = 3
+	cfg.DBType = "pebble"
 
 	// run node
-	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
-	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
+	cfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
+	vnode := vochain.NewVochain(cfg, genBytes)
 	tb.Cleanup(func() {
-		vnode.Service.Stop()
 		if err := vnode.Service.Stop(); err != nil {
 			tb.Error(err)
 		}
 		vnode.Service.Wait()
 	})
+	vnode.SetTestingMethods()
 	return vnode
 }
 
-func NewMockScrutinizer(tb testing.TB, d *DvoteAPIServer,
-	vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
+func NewMockScrutinizer(tb testing.TB, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
 	tb.Log("starting vochain scrutinizer")
-	d.ScrutinizerDir = tb.TempDir()
-	sc, err := scrutinizer.NewScrutinizer(d.ScrutinizerDir, vnode, true)
+	sc, err := scrutinizer.NewScrutinizer(tb.TempDir(), vnode, true)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	go sc.AfterSyncBootstrap()
+	sc.AfterSyncBootstrap()
 	return sc
 }
 

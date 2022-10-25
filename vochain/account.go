@@ -137,7 +137,7 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 
 // GetAccount retrives the Account for an address.
 // Returns a nil account and no error if the account does not exist.
-// committed is relative to the state on which the function is executed
+// Committed is relative to the state on which the function is executed.
 func (v *State) GetAccount(address common.Address, committed bool) (*Account, error) {
 	var acc Account
 	if !committed {
@@ -386,26 +386,26 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		if tx.FaucetPackage == nil {
 			return returnValues, nil
 		}
-		returnValues.CreateAccountWithFaucet = true
-		if tx.FaucetPackage.Payload == nil {
-			return nil, fmt.Errorf("faucet payload is nil")
+		if len(tx.FaucetPackage.Payload) == 0 {
+			return nil, fmt.Errorf("invalid faucet package payload")
 		}
-		if !bytes.Equal(tx.FaucetPackage.Payload.To, returnValues.TxSender.Bytes()) {
-			return nil, fmt.Errorf("payload to and tx sender missmatch")
+		faucetPayload := &models.FaucetPayload{}
+		if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
+			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+		}
+		returnValues.CreateAccountWithFaucet = true
+		if !bytes.Equal(faucetPayload.To, returnValues.TxSender.Bytes()) {
+			return nil, fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
+				faucetPayload.To, returnValues.TxSender.Bytes())
 		}
 		// get issuer address from faucetPayload
-		faucetPkgPayload := tx.FaucetPackage.GetPayload()
-		faucetPackageBytes, err := proto.Marshal(faucetPkgPayload)
-		if err != nil {
-			return nil, fmt.Errorf("cannot extract faucet package payload: %w", err)
-		}
-		issuerAddress, err := ethereum.AddrFromSignature(faucetPackageBytes, tx.FaucetPackage.Signature)
+		issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
 		if err != nil {
 			return nil, err
 		}
 		// check issuer nonce not used
 		b := make([]byte, 8)
-		binary.LittleEndian.PutUint64(b, faucetPkgPayload.Identifier)
+		binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
 		key := issuerAddress.Bytes()
 		key = append(key, b...)
 		used, err := state.FaucetNonce(crypto.Sha256(key), false)
@@ -413,7 +413,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 			return nil, fmt.Errorf("cannot check faucet nonce: %w", err)
 		}
 		if used {
-			return nil, fmt.Errorf("faucet package identifier %d already used", faucetPkgPayload.Identifier)
+			return nil, fmt.Errorf("faucet package identifier %d already used", faucetPayload.Identifier)
 		}
 		// check issuer have enough funds
 		issuerAcc, err := state.GetAccount(issuerAddress, false)
@@ -421,14 +421,14 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 			return nil, fmt.Errorf("cannot get faucet account: %w", err)
 		}
 		if issuerAcc == nil {
-			return nil, fmt.Errorf("the account signing the faucet payload does not exist")
+			return nil, fmt.Errorf("the account signing the faucet payload does not exist (%x)", issuerAddress)
 		}
 		cost, err := state.TxCost(models.TxType_COLLECT_FAUCET, false)
 		if err != nil {
 			return nil, fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
 		}
-		if issuerAcc.Balance < faucetPkgPayload.Amount+cost {
-			return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkgPayload.Amount+cost)
+		if issuerAcc.Balance < faucetPayload.Amount+cost {
+			return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPayload.Amount+cost)
 		}
 		returnValues.FaucetPayloadSigner = issuerAddress
 		return returnValues, nil
@@ -749,7 +749,13 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	if faucetPkg.Payload == nil {
 		return nil, fmt.Errorf("invalid faucet package payload")
 	}
-	if faucetPkg.Payload.Amount == 0 {
+
+	faucetPayload := &models.FaucetPayload{}
+	if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
+		return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+	}
+
+	if faucetPayload.Amount == 0 {
 		return nil, fmt.Errorf("invalid faucet package payload amount")
 	}
 	// recover txSender address from signature
@@ -762,7 +768,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	// extract the account that generated the payload
-	faucetPackageBytes, err := proto.Marshal(faucetPkg.Payload)
+	faucetPackageBytes, err := proto.Marshal(faucetPayload)
 	if err != nil {
 		return nil, fmt.Errorf("cannot extract faucet package payload: %w", err)
 	}
@@ -772,7 +778,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	}
 	// check issuer nonce not used
 	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, faucetPkg.Payload.Identifier)
+	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
 	key := fromAddr.Bytes()
 	key = append(key, b...)
 	used, err := state.FaucetNonce(crypto.Sha256(key), false)
@@ -780,7 +786,7 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 		return nil, fmt.Errorf("cannot check faucet nonce: %w", err)
 	}
 	if used {
-		return nil, fmt.Errorf("nonce %d already used", faucetPkg.Payload.Identifier)
+		return nil, fmt.Errorf("nonce %d already used", faucetPayload.Identifier)
 	}
 	// check issuer have enough funds
 	issuerAcc, err := state.GetAccount(fromAddr, false)
@@ -794,14 +800,14 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	if err != nil {
 		return nil, fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
 	}
-	if issuerAcc.Balance < faucetPkg.Payload.Amount+cost {
-		return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPkg.Payload.Amount+cost)
+	if issuerAcc.Balance < faucetPayload.Amount+cost {
+		return nil, fmt.Errorf("faucet does not have enough balance %d < %d", issuerAcc.Balance, faucetPayload.Amount+cost)
 	}
 	// check tx sender is the same as the one contained in the payload
-	if !bytes.Equal(toAddr.Bytes(), faucetPkg.Payload.To) {
+	if !bytes.Equal(toAddr.Bytes(), faucetPayload.To) {
 		return nil, fmt.Errorf("txSender %x and faucet payload To %x mismatch",
 			toAddr,
-			common.BytesToAddress(faucetPkg.Payload.To),
+			common.BytesToAddress(faucetPayload.To),
 		)
 	}
 	// get txSender account
@@ -836,7 +842,7 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, id
 		return nil, err
 	}
 	return &models.FaucetPackage{
-		Payload:   payload,
+		Payload:   payloadBytes,
 		Signature: payloadSignature,
 	}, nil
 }

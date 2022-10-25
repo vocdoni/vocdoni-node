@@ -40,7 +40,6 @@ type HTTProuter struct {
 	TLSconfig      *tls.Config
 	TLSdomain      string
 	TLSdirCert     string
-	PrometheusID   string
 	address        net.Addr
 	namespaces     map[string]RouterNamespace
 	namespacesLock sync.RWMutex
@@ -112,12 +111,6 @@ func (r *HTTProuter) Init(host string, port int) error {
 	})
 	r.Mux.Use(cors.Handler)
 
-	// Prometheus handler
-	if r.PrometheusID == "" {
-		r.PrometheusID = "gochi_http"
-	}
-	r.Mux.Use(chiprometheus.NewMiddleware(r.PrometheusID))
-
 	// For some reason the Cors handler is not returning 200 on OPTIONS.
 	// So as a workaround we declare explicitly the Options handler
 	r.Mux.Options("/*", func(w http.ResponseWriter, r *http.Request) {})
@@ -166,6 +159,16 @@ func (r *HTTProuter) Init(host string, port int) error {
 	r.address = ln.Addr()
 	return nil
 
+}
+
+// EnablePrometheusMetrics enables go-chi prometheus metrics under specified ID.
+// If ID empty, the default "gochi_http" is used.
+func (r *HTTProuter) EnablePrometheusMetrics(prometheusID string) {
+	// Prometheus handler
+	if prometheusID == "" {
+		prometheusID = "gochi_http"
+	}
+	r.Mux.Use(chiprometheus.NewMiddleware(prometheusID))
 }
 
 // Address return the current network address used by the HTTP router

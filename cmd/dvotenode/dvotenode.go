@@ -18,6 +18,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 
+	urlapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -34,7 +35,6 @@ import (
 	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/urlapi"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -91,7 +91,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
 		"enable the indexer API (required for explorer)")
-	globalCfg.API.URL = *flag.Bool("urlApi", false, "enable the url API")
+	globalCfg.API.URL = *flag.Bool("urlApi", true, "enable the url API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/",
 		"dvote HTTP API base route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
@@ -185,13 +185,10 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Dev = viper.GetBool("dev")
 	viper.BindPFlag("pprofPort", flag.Lookup("pprof"))
 
-	// Use different datadirs for non main chains
-	if globalCfg.VochainConfig.Chain != "main" {
-		globalCfg.DataDir += "/" + globalCfg.VochainConfig.Chain
-	}
+	// use different datadirs for different chains
+	globalCfg.DataDir = filepath.Join(globalCfg.DataDir, globalCfg.VochainConfig.Chain)
 
 	// Add viper config path (now we know it)
-	globalCfg.DataDir = filepath.Clean(globalCfg.DataDir)
 	viper.AddConfigPath(globalCfg.DataDir)
 
 	// binding flags to viper
@@ -644,11 +641,19 @@ func main() {
 		}
 		if globalCfg.API.URL {
 			log.Info("enabling URL API")
-			uAPI, err := urlapi.NewURLAPI(&httpRouter, "/v1/pub")
+			uAPI, err := urlapi.NewAPI(&httpRouter, "/v2", globalCfg.DataDir)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := uAPI.EnableVotingHandlers(vochainApp, vochainInfo, scrutinizer); err != nil {
+			uAPI.Attach(vochainApp, vochainInfo, scrutinizer, storage)
+			if err := uAPI.EnableHandlers(
+				urlapi.ElectionHandler,
+				urlapi.VoteHandler,
+				urlapi.ChainHandler,
+				urlapi.WalletHandler,
+				urlapi.AccountHandler,
+				urlapi.CensusHandler,
+			); err != nil {
 				log.Fatal(err)
 			}
 		}

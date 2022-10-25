@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"math/rand"
@@ -79,7 +80,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error)
 
 // NewGenesis creates a new genesis and return its bytes
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
-	validators []privval.FilePV, oracles []string, treasurer string) ([]byte, error) {
+	validators []privval.FilePV, oracles []string, treasurer string, txCosts *TransactionCosts) ([]byte, error) {
 	// default consensus params
 	appState := new(GenesisAppState)
 	appState.Validators = make([]GenesisValidator, len(validators))
@@ -102,12 +103,15 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		}
 		appState.Oracles = append(appState.Oracles, os)
 	}
+	if txCosts != nil {
+		appState.TxCost = *txCosts
+	}
 	tb, err := hex.DecodeString(util.TrimHex(treasurer))
 	if err != nil {
 		return nil, err
 	}
 	appState.Treasurer = tb
-	appStateBytes, err := tmjson.Marshal(appState)
+	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}

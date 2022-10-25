@@ -6,7 +6,7 @@ import (
 	psload "github.com/shirou/gopsutil/load"
 	psmem "github.com/shirou/gopsutil/mem"
 	psnet "github.com/shirou/gopsutil/net"
-	"go.vocdoni.io/dvote/api"
+	api "go.vocdoni.io/dvote/rpctypes"
 )
 
 const (

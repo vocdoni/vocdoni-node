@@ -57,6 +57,52 @@ func (vi *VochainInfo) BlockTimes() *[5]int32 {
 	return &[5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
 }
 
+// EstimateBlockHeight provides an estimation time for a future blockchain height number.
+func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint32, error) {
+	currentTime := time.Now()
+	// diff time in seconds
+	diffTime := target.Unix() - currentTime.Unix()
+
+	// block time in ms
+	times := vi.BlockTimes()
+	getMaxTimeFrom := func(i int) uint32 {
+		for ; i >= 0; i-- {
+			if times[i] != 0 {
+				return uint32(times[i])
+			}
+		}
+		return 10000 // fallback
+	}
+	inPast := diffTime < 0
+	absDiff := diffTime
+	if inPast {
+		absDiff = -absDiff
+	}
+	t := uint32(0)
+	switch {
+	// if less than around 15 minutes missing
+	case absDiff < 900:
+		t = getMaxTimeFrom(1)
+	// if less than around 6 hours missing
+	case absDiff < 21600:
+		t = getMaxTimeFrom(3)
+	// if less than around 6 hours missing
+	default:
+		t = getMaxTimeFrom(4)
+	}
+	// Multiply by 1000 because t is represented in seconds, not ms.
+	// Dividing t first can floor the integer, leading to divide-by-zero
+	currentHeight := uint32(vi.Height())
+	blockDiff := (uint32(absDiff*1000) / t)
+	if inPast {
+		if blockDiff > currentHeight {
+			return 0, fmt.Errorf("target time %v is before origin", target)
+		}
+		return currentHeight - uint32(blockDiff), nil
+	}
+	return currentHeight + uint32(blockDiff), nil
+}
+
 // HeightTime estimates the UTC time for a future height or returns the
 // block timestamp if height is in the past.
 func (vi *VochainInfo) HeightTime(height int64) time.Time {

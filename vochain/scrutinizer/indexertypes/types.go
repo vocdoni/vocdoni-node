@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/proto/build/go/models"
@@ -92,18 +93,18 @@ func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
 	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
 	proc.Envelope = new(models.EnvelopeType)
 	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
-		panic(err)
+		log.Error(err)
 	}
 	if len(dbproc.ModePb) > 0 {
 		proc.Mode = new(models.ProcessMode)
 		if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
-			panic(err)
+			log.Error(err)
 		}
 	}
 	if len(dbproc.VoteOptsPb) > 0 {
 		proc.VoteOpts = new(models.ProcessVoteOptions)
 		if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
-			panic(err)
+			log.Error(err)
 		}
 	}
 	return proc
@@ -117,7 +118,8 @@ func decodeVotes(input string) [][]*types.BigInt {
 		for _, s := range strings.Split(group, ",") {
 			n := new(types.BigInt)
 			if err := n.UnmarshalText([]byte(s)); err != nil {
-				panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
+				log.Error(err) // TODO(mvdan): propagate errors via a database/sql interface?
+				continue
 			}
 			element = append(element, n)
 		}
@@ -140,12 +142,13 @@ func ResultsFromDB(dbproc *scrutinizerdb.Process) *Results {
 	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
 	results.EnvelopeType = new(models.EnvelopeType)
 	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {
-		panic(err)
+		log.Error(err)
+		return nil
 	}
 	if len(dbproc.VoteOptsPb) > 0 {
 		results.VoteOpts = new(models.ProcessVoteOptions)
 		if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
-			panic(err)
+			log.Error(err)
 		}
 	}
 	return results
@@ -154,7 +157,7 @@ func ResultsFromDB(dbproc *scrutinizerdb.Process) *Results {
 func decodeBigint(s string) *types.BigInt {
 	n := new(types.BigInt)
 	if err := n.UnmarshalText([]byte(s)); err != nil {
-		panic(err)
+		log.Error(err)
 	}
 	return n
 }

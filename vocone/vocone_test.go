@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )

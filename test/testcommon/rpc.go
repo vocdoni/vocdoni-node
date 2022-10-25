@@ -69,7 +69,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		}
 	})
 
-	httpRouter := httprouter.HTTProuter{PrometheusID: d.Signer.AddressString()}
+	httpRouter := httprouter.HTTProuter{}
 	if err := httpRouter.Init("127.0.0.1", 0); err != nil {
 		log.Fatal(err)
 	}
@@ -95,10 +95,10 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 		case "census":
 			rpc.EnableCensusAPI(&cm)
 		case "vote":
-			d.VochainAPP = NewMockVochainNode(tb, d)
+			d.VochainAPP = NewMockVochainNode(tb, d.VochainCfg, d.Signer)
 			vi := vochaininfo.NewVochainInfo(d.VochainAPP)
 			go vi.Start(10)
-			d.Scrutinizer = NewMockScrutinizer(tb, d, d.VochainAPP)
+			d.Scrutinizer = NewMockScrutinizer(tb, d.VochainAPP)
 			rpc.EnableVoteAPI(d.VochainAPP, vi)
 			rpc.EnableResultsAPI(d.VochainAPP, d.Scrutinizer)
 			rpc.EnableIndexerAPI(d.VochainAPP, vi, d.Scrutinizer)

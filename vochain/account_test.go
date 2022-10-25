@@ -123,7 +123,11 @@ func testSetAccountInfoTx(t *testing.T,
 	faucetPkg *models.FaucetPackage,
 	app *BaseApplication,
 	infoURI string) error {
-	var err error
+
+	// faucetPkgBytes, err := proto.Marshal(faucetPkg)
+	// if err != nil {
+	// 	return nil
+	// }
 
 	tx := &models.SetAccountInfoTx{
 		Txtype:        models.TxType_SET_ACCOUNT_INFO,
@@ -132,6 +136,7 @@ func testSetAccountInfoTx(t *testing.T,
 		FaucetPackage: faucetPkg,
 	}
 
+	var err error
 	stx := &models.SignedTx{}
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}}); err != nil {
 		t.Fatal(err)
@@ -557,7 +562,7 @@ func testCollectFaucetTx(t *testing.T,
 	faucetPayloadSignature, err := signer.SignEthereum(faucetPayloadBytes)
 	qt.Assert(t, err, qt.IsNil)
 	faucetPkg := &models.FaucetPackage{
-		Payload:   faucetPayload,
+		Payload:   faucetPayloadBytes,
 		Signature: faucetPayloadSignature,
 	}
 	tx := &models.CollectFaucetTx{

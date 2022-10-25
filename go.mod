@@ -3,7 +3,7 @@ module go.vocdoni.io/dvote
 go 1.18
 
 // For testing purposes while dvote-protobuf becomes stable
-//replace go.vocdoni.io/proto => ../dvote-protobuf
+// replace go.vocdoni.io/proto => ../dvote-protobuf
 
 replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f
 
@@ -27,6 +27,7 @@ require (
 	github.com/dgraph-io/badger/v3 v3.2103.2
 	github.com/enriquebris/goconcurrentqueue v0.6.0
 	github.com/ethereum/go-ethereum v1.10.20
+	github.com/fatih/color v1.13.0
 	github.com/frankban/quicktest v1.14.3
 	github.com/glendc/go-external-ip v0.1.0
 	github.com/go-chi/chi v4.1.2+incompatible
@@ -47,6 +48,7 @@ require (
 	github.com/libp2p/go-libp2p-kad-dht v0.17.0
 	github.com/libp2p/go-reuseport v0.2.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
+	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.12
 	github.com/multiformats/go-multiaddr v0.6.0
 	github.com/pressly/goose/v3 v3.3.1
@@ -62,7 +64,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.21.0
-	go.vocdoni.io/proto v1.13.3-0.20220908102838-166a00ada471
+	go.vocdoni.io/proto v1.13.3-0.20221020154746-3b3b80ad5413
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa
 	golang.org/x/net v0.0.0-20220726230323-06994584191e
 	golang.org/x/term v0.0.0-20220722155259-a9ba230a4035
@@ -74,6 +76,7 @@ require (
 	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 // indirect
+	github.com/chzyer/readline v0.0.0-20180603132655-2972be24d48e // indirect
 	github.com/containerd/cgroups v1.0.4 // indirect
 	github.com/coreos/go-systemd/v22 v22.3.3-0.20220203105225-a9a7ef127534 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.2 // indirect

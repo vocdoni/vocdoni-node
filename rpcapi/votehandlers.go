@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	api "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -382,9 +382,8 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	response.EntityIDs = new([]string)
 	eids := r.scrutinizer.EntityList(request.ListSize, request.From, request.SearchTerm)
-	response.EntityIDs = &eids
+	response.EntityIDs = eids
 	return &response, nil
 }
 

@@ -187,23 +187,37 @@ func (app *BaseApplication) SetTestingMethods() {
 	mockBlockStore.Init()
 	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
 	app.SetFnGetBlockByHeight(mockBlockStore.Get)
-	app.SetFnGetTx(app.getTxTendermint)
-	app.SetFnGetTxHash(app.getTxHashTendermint)
+	app.SetFnGetTx(func(height uint32, txIndex int32) (*models.SignedTx, error) {
+		blk := mockBlockStore.Get(int64(height))
+		stx := models.SignedTx{}
+		return &stx, proto.Unmarshal(blk.Txs[txIndex], &stx)
+	})
+	app.SetFnGetTxHash(func(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
+		blk := mockBlockStore.Get(int64(height))
+		stx := models.SignedTx{}
+		tx := blk.Txs[txIndex]
+		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
+	})
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 		mockBlockStore.Add(&tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
-		return nil, nil
+		resp := app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
+		return &ctypes.ResultBroadcastTx{
+			Hash: tmtypes.Tx(tx).Hash(),
+			Code: resp.Code,
+			Data: resp.Data,
+		}, nil
 	})
 	app.SetFnMempoolSize(func() int { return 0 })
 	app.IsSynchronizing = func() bool { return false }
 
 	// For tests, we begin at block 2.
-	// The last block we finished was 1, and we did so 10s ago.
-	app.height = 1
+	// The last block we finished was 1, and we did so 3s ago.
+	app.height = 0
 	now := time.Now()
-	app.endBlockTimestamp = now.Add(-10 * time.Second).Unix()
+	app.endBlockTimestamp = now.Add(-3 * time.Second).Unix()
 	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
 		Time:   now,
-		Height: 2,
+		Height: 1,
 	}})
 }
 
@@ -446,16 +460,15 @@ func (app *BaseApplication) BeginBlock(
 }
 
 func (app *BaseApplication) AdvanceTestBlock() {
-	// Each block spans tens seconds.
+	// Each block spans 2 seconds.
 	endingHeight := int64(app.Height()) + 1
-	endingTime := time.Unix(app.TimestampStartBlock(), 0).Add(10 * time.Second)
+	endingTime := time.Unix(app.TimestampStartBlock(), 0).Add(2 * time.Second)
 	app.endBlock(endingHeight, endingTime)
-
 	app.Commit()
 
 	// The next block begins a second later.
 	nextHeight := endingHeight + 1
-	nextStartTime := endingTime.Add(2 * time.Second)
+	nextStartTime := endingTime.Add(1 * time.Second)
 	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
 		Time:   nextStartTime,
 		Height: nextHeight,

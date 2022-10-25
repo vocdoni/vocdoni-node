@@ -40,9 +40,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 
-	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/client"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	client "go.vocdoni.io/dvote/rpcclient"
+	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 
@@ -54,7 +54,7 @@ var censusWeight = flag.Int("censusWeight", 20, "weight of each census entry")
 
 func init() { rand.Seed(time.Now().UnixNano()) }
 
-func TestCensus(t *testing.T) {
+func TestCensusRPC(t *testing.T) {
 	t.Parallel()
 
 	var server testcommon.DvoteAPIServer

@@ -5,7 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/cobra"
-	"go.vocdoni.io/dvote/client"
+	client "go.vocdoni.io/dvote/rpcclient"
 )
 
 var accInfoCmd = &cobra.Command{

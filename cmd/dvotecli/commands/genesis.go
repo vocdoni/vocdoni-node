@@ -128,7 +128,15 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 	// Get chainID
 	chainID, _ := cmd.Flags().GetString("chainId")
 
-	genesisBytes, err := vochain.NewGenesis(nil, chainID, consensusParams, minerPVs, oracles, t.Address().String())
+	genesisBytes, err := vochain.NewGenesis(
+		nil,
+		chainID,
+		consensusParams,
+		minerPVs,
+		oracles,
+		t.Address().String(),
+		nil,
+	)
 	if err != nil {
 		return err
 	}
