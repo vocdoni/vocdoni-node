@@ -128,16 +128,21 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
 	var err error
-	vals[0] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+	vals[0], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
+		tmtypes.ABCIPubKeyTypeEd25519,
 	)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	rint = rand.Int()
-	vals[1] = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+	vals[1], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
+		tmtypes.ABCIPubKeyTypeEd25519,
 	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	validator0 := &models.Validator{
 		Address: vals[0].Key.Address.Bytes(),
 		PubKey:  vals[0].Key.PubKey.Bytes(),
@@ -192,10 +197,14 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
 	}
 
-	validator := privval.GenFilePV(
+	validator, err := privval.GenFilePV(
 		d.VochainCfg.DataDir+"/config/priv_validator_key.json",
 		d.VochainCfg.DataDir+"/data/priv_validator_state.json",
+		tmtypes.ABCIPubKeyTypeEd25519,
 	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 
 	oracles := []string{d.Signer.AddressString()}
 	treasurer := d.Signer.AddressString()
@@ -224,10 +233,11 @@ func NewMockVochainNode(tb testing.TB, d *DvoteAPIServer) *vochain.BaseApplicati
 	d.VochainCfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
 	vnode := vochain.NewVochain(d.VochainCfg, genBytes)
 	tb.Cleanup(func() {
-		if err := vnode.Node.Stop(); err != nil {
-			tb.Fatal(err)
+		vnode.Service.Stop()
+		if err := vnode.Service.Stop(); err != nil {
+			tb.Error(err)
 		}
-		vnode.Node.Wait()
+		vnode.Service.Wait()
 	})
 	return vnode
 }

@@ -195,10 +195,8 @@ type ConsensusParams struct {
 // BlockParams define limits on the block size and gas plus minimum time
 // between blocks.
 type BlockParams struct {
-	MaxBytes   int64 `json:"max_bytes"`
-	MaxGas     int64 `json:"max_gas"`
-	TimeIotaMs int64 `json:"time_iota_ms"` // Deprecated on TENDERMINT 0.35
-
+	MaxBytes int64 `json:"max_bytes"`
+	MaxGas   int64 `json:"max_gas"`
 }
 
 type EvidenceParams struct {

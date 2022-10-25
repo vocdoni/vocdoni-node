@@ -12,10 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
-
-	// tmcoretypes "github.com/tendermint/tendermint/rpc/coretypes" TENDERMINT 0.35
-	tmcoretypes "github.com/tendermint/tendermint/rpc/core/types"
-
+	tmcoretypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"

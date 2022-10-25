@@ -12,24 +12,21 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 
+	abciclient "github.com/tendermint/tendermint/abci/client"
 	tmcfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	tmflags "github.com/tendermint/tendermint/libs/cli/flags"
-	mempl "github.com/tendermint/tendermint/mempool"
-	nm "github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/p2p"
-	"github.com/tendermint/tendermint/privval"
-	"github.com/tendermint/tendermint/proxy"
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
 	tmos "github.com/tendermint/tendermint/libs/os"
+	"github.com/tendermint/tendermint/libs/service"
+	tmnode "github.com/tendermint/tendermint/node"
+	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/log"
 )
 
 const downloadZkVKsTimeout = 1 * time.Minute
 
-/* TENDERMINT 0.35
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
@@ -49,60 +46,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err := app.LoadZkVKs(ctx); err != nil {
 		log.Fatal(err)
 	}
-	// Set the vote cache at least as big as the mempool size
-	if app.State.CacheSize() < vochaincfg.MempoolSize {
-		app.State.SetCacheSize(vochaincfg.MempoolSize)
-	}
-	return app
-}
-*/
-
-// NewVochain starts a node with an ABCI application
-// For tendermint 0.34
-func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
-	// creating new vochain app
-	app, err := NewBaseApplication(vochaincfg.DBType, filepath.Join(vochaincfg.DataDir, "data"))
-	if err != nil {
-		log.Fatalf("cannot initialize vochain application: %s", err)
-	}
-	log.Info("creating tendermint node and application")
-	err = app.SetNode(vochaincfg, genesis)
-	if err != nil {
-		log.Fatal(err)
-	}
-	app.SetDefaultMethods()
-	if err := app.Node.Start(); err != nil {
-		log.Fatal(err)
-	}
-	// get the zk Circuits VerificationKey files
-	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
-	defer cancel()
-	if err := app.LoadZkVKs(ctx); err != nil {
-		log.Fatal(err)
-	}
-	// Set mempool function for removing transactions.
-	app.State.mempoolRemoveTxKeys = func(keys [][32]byte, removeFromCache bool) {
-		mp := app.Node.Mempool().(*mempl.CListMempool)
-
-		// We'd sometimes see panics if we used RemoveTxByKey without
-		// the mempool's lock being held, like:
-		//
-		//     panic: Remove(e) with false head
-		//
-		// The panic is hard to reproduce, so for now, we're locking the
-		// entire mempool to see if the panics go away for a while.
-		// See https://github.com/vocdoni/vocdoni-node/issues/176.
-		//
-		// TODO(mvdan): file tendermint bug if we haven't seen any
-		// panics by September 2021.
-		mp.Lock()
-		defer mp.Unlock()
-
-		for _, key := range keys {
-			mp.RemoveTxByKey(key, removeFromCache)
-		}
-	}
-	app.Node.Mempool().Flush()
 	// Set the vote cache at least as big as the mempool size
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
@@ -163,7 +106,6 @@ func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 	return &TenderLogger{Artifact: artifact, Disabled: disabled}
 }
 
-/* TENDERMINT 0.35
 // we need to set init (first time validators and oracles)
 func newTendermint(app *BaseApplication,
 	localConfig *config.VochainCfg, genesis []byte) (service.Service, error) {
@@ -297,20 +239,8 @@ func newTendermint(app *BaseApplication,
 		log.Errorf("failed to parse log level: %v", err)
 	}
 
-	// pv will contain a local private validator,
-	// if PrivValidatorListenAddr is defined, there's no need to initialize it since nm.NewNode() will ignore it
-	var pv *privval.FilePV
-
-	// TO-DO: check if current tendermint version supports hardware wallets
-	// if PrivValidatorListenAddr is defined, use a remote private validator, like TMKMS which allows signing with Ledger
-	// else, use a local private validator
-	//	if len(localConfig.PrivValidatorListenAddr) > 0 {
-	//		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
-	//		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
-	//	} else {
-
 	// read or create local private validator
-	pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
+	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
@@ -376,7 +306,7 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
 	}
 	log.Infof("found chainID %s", genesisCID.ChainID)
-	app.chainId = genesisCID.ChainID
+	app.chainID = genesisCID.ChainID
 
 	// create node
 	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file
@@ -384,243 +314,8 @@ func newTendermint(app *BaseApplication,
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
+
 	return service, nil
-}
-*/
-
-// we need to set init (first time validators and oracles)
-func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (*nm.Node, error) {
-	// create node config
-	var err error
-
-	tconfig := tmcfg.DefaultConfig()
-	tconfig.FastSyncMode = true
-	tconfig.SetRoot(localConfig.DataDir)
-	if err := os.MkdirAll(localConfig.DataDir+"/config", 0o755); err != nil {
-		log.Fatal(err)
-	}
-	if err := os.MkdirAll(localConfig.DataDir+"/data", 0o755); err != nil {
-		log.Fatal(err)
-	}
-
-	// p2p config
-	tconfig.LogLevel = localConfig.LogLevel
-	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
-	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
-	tconfig.P2P.AllowDuplicateIP = false
-	tconfig.P2P.AddrBookStrict = true
-	tconfig.P2P.FlushThrottleTimeout = 500 * time.Millisecond
-	tconfig.P2P.MaxPacketMsgPayloadSize = 10240
-	tconfig.P2P.RecvRate = 5120000
-	tconfig.P2P.DialTimeout = time.Second * 5
-
-	if localConfig.Dev {
-		tconfig.P2P.AllowDuplicateIP = true
-		tconfig.P2P.AddrBookStrict = false
-		tconfig.P2P.HandshakeTimeout = time.Second * 10
-	}
-	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
-	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
-	if !localConfig.CreateGenesis {
-		tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
-			!localConfig.IsSeedNode && ok {
-			tconfig.P2P.Seeds = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
-		}
-		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
-	}
-
-	if len(localConfig.Peers) > 0 {
-		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers, ","), "[]\"")
-	}
-	if len(tconfig.P2P.PersistentPeers) > 0 {
-		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
-	}
-
-	tconfig.P2P.SeedMode = localConfig.IsSeedNode
-	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
-
-	// consensus config
-	blockTime := 8
-	if localConfig.MinerTargetBlockTimeSeconds > 0 {
-		blockTime = localConfig.MinerTargetBlockTimeSeconds
-	}
-	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 200
-	tconfig.Consensus.TimeoutPropose = time.Second * time.Duration(float32(blockTime)*0.6)
-	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 200
-	tconfig.Consensus.TimeoutPrevote = time.Second * 1
-	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 200
-	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
-	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
-
-	log.Infof("consensus block time target: commit=%.2fs propose=%.2fs",
-		tconfig.Consensus.TimeoutCommit.Seconds(), tconfig.Consensus.TimeoutPropose.Seconds())
-
-	// disable transaction indexer (we don't use it)
-	tconfig.TxIndex.Indexer = "null"
-
-	// mempool config
-	tconfig.Mempool.Size = localConfig.MempoolSize
-	tconfig.Mempool.Recheck = false
-	tconfig.Mempool.KeepInvalidTxsInCache = true
-	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
-	tconfig.Mempool.CacheSize = 100000
-
-	//	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
-
-	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
-	// -tags=cleveldb is used, and switches to badgerdb if -tags=badger is
-	// used. See tmdb_*.go.
-	// TODO: probably switch to just badger after some benchmarking.
-	tconfig.DBBackend = string(tmdbBackend)
-	log.Infof("using db backend %s", tconfig.DBBackend)
-
-	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
-		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
-			dir, err := os.Getwd()
-			if err != nil {
-				log.Fatal(err)
-			}
-			tconfig.Genesis = dir + "/" + localConfig.Genesis
-
-		} else {
-			tconfig.Genesis = localConfig.Genesis
-		}
-	} else {
-		tconfig.Genesis = tconfig.GenesisFile()
-	}
-
-	if err := tconfig.ValidateBasic(); err != nil {
-		return nil, fmt.Errorf("config is invalid: %w", err)
-	}
-
-	// create tendermint logger
-	logDisable := false
-	if tconfig.LogLevel == "none" {
-		logDisable = true
-		tconfig.LogLevel = "error"
-	}
-	logger, err := tmflags.ParseLogLevel(tconfig.LogLevel,
-		NewTenderLogger("tendermint", logDisable), tmcfg.DefaultLogLevel)
-	if err != nil {
-		log.Errorf("failed to parse log level: %v", err)
-	}
-
-	// pv will contain a local private validator,
-	// if PrivValidatorListenAddr is defined, there's no need to initialize it since nm.NewNode() will ignore it
-	var pv *privval.FilePV
-
-	// if PrivValidatorListenAddr is defined, use a remote private validator, like TMKMS which allows signing with Ledger
-	// else, use a local private validator
-	if len(localConfig.PrivValidatorListenAddr) > 0 {
-		log.Info("PrivValidatorListenAddr defined, Tendermint will wait for a remote private validator connection")
-		tconfig.PrivValidatorListenAddr = localConfig.PrivValidatorListenAddr
-	} else {
-		// read or create local private validator
-		pv, err = NewPrivateValidator(localConfig.MinerKey, tconfig)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
-		}
-		pv.Save()
-
-		log.Infof("tendermint private key %x", pv.Key.PrivKey)
-		log.Infof("tendermint address: %s", pv.Key.Address)
-		aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
-		if err != nil {
-			return nil, err
-		}
-		log.Infof("amino private key: %s", aminoPrivKey)
-		log.Infof("amino public key: %s", aminoPubKey)
-		log.Infof("using keyfile %s", tconfig.PrivValidatorKeyFile())
-	}
-
-	// nodekey is used for the p2p transport layer
-	var nodeKey *p2p.NodeKey
-	if len(localConfig.NodeKey) > 0 {
-		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create node key: %w", err)
-		}
-	} else {
-		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
-			return nil, fmt.Errorf("cannot create or load node key: %w", err)
-		}
-	}
-	log.Infof("tendermint p2p node ID: %s", nodeKey.ID())
-
-	// read or create genesis file
-	if tmos.FileExists(tconfig.Genesis) {
-		log.Infof("found genesis file %s", tconfig.Genesis)
-	} else {
-		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := os.WriteFile(tconfig.Genesis, genesis, 0o600); err != nil {
-			return nil, err
-		}
-		log.Infof("new genesis created, stored at %s", tconfig.Genesis)
-	}
-
-	if localConfig.TendermintMetrics {
-		tconfig.Instrumentation = &tmcfg.InstrumentationConfig{
-			Prometheus:           true,
-			PrometheusListenAddr: "",
-			MaxOpenConnections:   1,
-			Namespace:            "tendermint",
-		}
-	}
-
-	// we need to fetch chain_id in order to make Replay work,
-	// since signatures depend on it.
-	log.Infof("genesis file at %s", tconfig.GenesisFile())
-	type genesisChainID struct {
-		ChainID string `json:"chain_id"`
-	}
-	genesisData, err := os.ReadFile(tconfig.Genesis)
-	if err != nil {
-		return nil, fmt.Errorf("cannot read genesis file: %w", err)
-	}
-	genesisCID := &genesisChainID{}
-	if err := json.Unmarshal(genesisData, genesisCID); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
-	}
-	log.Infof("found chainID %s", genesisCID.ChainID)
-	app.SetChainID(genesisCID.ChainID)
-
-	// create node
-	node, err := nm.NewNode(
-		tconfig,
-		pv,      // the node val
-		nodeKey, // node key
-		proxy.NewLocalClientCreator(app),
-		// Note we use proxy.NewLocalClientCreator here to create a local client
-		// instead of one communicating through a socket or gRPC.
-		nm.DefaultGenesisDocProviderFunc(tconfig),
-		nm.DefaultDBProvider,
-		nm.DefaultMetricsProvider(tconfig.Instrumentation),
-		logger)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
-	}
-
-	// If using a remote private validator, the pubkeys are only available after nm.NewNode()
-	// In that case, print them now, for debugging purposes
-	if len(localConfig.PrivValidatorListenAddr) > 0 {
-		pv := node.PrivValidator()
-		pubKey, err := pv.GetPubKey()
-		if err != nil {
-			log.Warnf("failed to get pubkey from private validator: %v", err)
-		}
-		log.Infof("tendermint address: %v", pubKey.Address())
-
-		aminoPubKey, err := AminoPubKey(pubKey.Bytes())
-		if err != nil {
-			log.Warnf("failed to get amino public key: %v", err)
-		}
-		log.Infof("amino public key: %s", aminoPubKey)
-	}
-
-	log.Debugf("consensus config %+v", *node.Config().Consensus)
-	return node, nil
 }
 
 // AminoKeys is a helper function that transforms a standard EDDSA key into

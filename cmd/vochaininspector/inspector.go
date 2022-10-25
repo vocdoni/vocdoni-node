@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,17 +12,12 @@ import (
 	"time"
 
 	flag "github.com/spf13/pflag"
-	tmcfg "github.com/tendermint/tendermint/config"
-	"github.com/tendermint/tendermint/node"
-	"github.com/tendermint/tendermint/store"
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/statedb"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -193,64 +187,10 @@ func newVochain(chain, dataDir string) *vochain.BaseApplication {
 	return vochain.NewVochain(cfg, genesisBytes)
 }
 
-func voteID(pid, nullifier []byte) ([]byte, error) {
-	if len(pid) != types.ProcessIDsize {
-		return nil, fmt.Errorf("wrong processID size %d", len(pid))
-	}
-	if len(nullifier) != types.VoteNullifierSize {
-		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
-	}
-	vid := sha256.New()
-	vid.Write(pid)
-	vid.Write(nullifier)
-	return vid.Sum(nil), nil
-}
-
 func listBlockVotes(height int64, blockStoreDir string) {
-	cfg := tmcfg.DefaultConfig()
-	cfg.RootDir = blockStoreDir
-	blockStoreDB, err := node.DefaultDBProvider(&node.DBContext{ID: "blockstore", Config: cfg})
-	if err != nil {
-		log.Fatal("Can't open blockstore")
-	}
-	blockStore := store.NewBlockStore(blockStoreDB)
-	if blockStore == nil {
-		log.Fatal("Blockstore is nil")
-	}
-	block := blockStore.LoadBlock(height)
-	if block == nil {
-		log.Fatal("Block is nil")
-	}
-	fmt.Printf("Block txs: %v\n", len(block.Data.Txs))
-	for i, blockTx := range block.Data.Txs {
-		tx := new(vochain.VochainTx)
-		if err := tx.Unmarshal(blockTx, ""); err != nil {
-			log.Error(err)
-			continue
-		}
-
-		//	fmt.Printf("%+v\n", tx)
-		vote := tx.Tx.GetVote()
-		if vote == nil {
-			continue
-		}
-		pubKey, err := ethereum.PubKeyFromSignature(tx.SignedBody, tx.Signature)
-		if err != nil {
-			log.Fatalf("cannot extract public key from signature: %v", err)
-		}
-		addr, err := ethereum.AddrFromPublicKey(pubKey)
-		if err != nil {
-			log.Fatalf("cannot extract address from public key: %v", err)
-		}
-		vote.Nullifier = vochain.GenerateNullifier(addr, vote.ProcessId)
-		// fmt.Printf("%+v\n", vote)
-		vid, err := voteID(vote.ProcessId, vote.Nullifier)
-		if err != nil {
-			log.Fatalf("cannot get voteID: %v", err)
-		}
-
-		fmt.Printf("vote %d pid:%x vid:%x proofType:%s\n", i, vote.ProcessId, vid, reflect.TypeOf(vote.Proof.Payload))
-	}
+	// TODO: reimplement this? @altergui dropped this during tendermint v0.34 -> v0.35 bump
+	// since store package was not found, possibly renamed or whatever but didn't look into it
+	log.Fatal("listBlockVotes is not yet implemented since tendermint v0.35")
 }
 
 func openStateAtHeight(height int64, stateDir string) *statedb.TreeView {

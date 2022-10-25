@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -71,12 +72,14 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	tmp := t.TempDir()
-	val := privval.GenFilePV(
+	val, err := privval.GenFilePV(
 		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
 		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
+		"ed25519",
 	)
 
-	pubk, err := val.GetPubKey()
+	qt.Assert(t, err, qt.IsNil)
+	pubk, err := val.GetPubKey(context.Background())
 	qt.Assert(t, err, qt.IsNil)
 	validator := &models.Validator{
 		Address: pubk.Address(),
