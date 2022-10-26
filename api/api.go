@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"sync"
 
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
@@ -34,9 +34,8 @@ type API struct {
 	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
-	censusMap    sync.Map
-
-	db db.Database
+	censusdb     *censusdb.CensusDB
+	db           db.Database // used for internal db operations
 }
 
 // NewAPI creates a new instance of the API.  Attach must be called next.
@@ -60,23 +59,22 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, err
 	if err != nil {
 		return nil, err
 	}
-	// Create local key value database
-	api.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "api"))
+	api.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "db"))
 	if err != nil {
 		return nil, err
 	}
-
 	return &api, nil
 }
 
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
 func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
-	scrutinizer *scrutinizer.Scrutinizer, data data.Storage) {
+	scrutinizer *scrutinizer.Scrutinizer, data data.Storage, censusdb *censusdb.CensusDB) {
 	a.vocapp = vocdoniAPP
 	a.vocinfo = vocdoniInfo
 	a.scrutinizer = scrutinizer
 	a.storage = data
+	a.censusdb = censusdb
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.
@@ -110,6 +108,9 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			a.enableAccountHandlers()
 		case CensusHandler:
 			a.enableCensusHandlers()
+			if a.censusdb == nil {
+				return fmt.Errorf("missing modules attached for enabling census handler")
+			}
 		default:
 			return fmt.Errorf("handler unknown %s", h)
 		}

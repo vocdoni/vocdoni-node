@@ -19,11 +19,13 @@ import (
 	"github.com/spf13/viper"
 
 	urlapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	ethchain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/httprouter"
@@ -645,7 +647,12 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			uAPI.Attach(vochainApp, vochainInfo, scrutinizer, storage)
+			cDB, err := metadb.New(db.TypePebble, filepath.Join(globalCfg.DataDir, "censusdb"))
+			if err != nil {
+				log.Fatal(err)
+			}
+			censusDB := censusdb.NewCensusDB(cDB)
+			uAPI.Attach(vochainApp, vochainInfo, scrutinizer, storage, censusDB)
 			if err := uAPI.EnableHandlers(
 				urlapi.ElectionHandler,
 				urlapi.VoteHandler,
