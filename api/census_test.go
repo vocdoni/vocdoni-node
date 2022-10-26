@@ -12,14 +12,12 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestCensus(t *testing.T) {
-	log.Init("debug", "stdout")
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "census"))
@@ -138,7 +136,6 @@ func TestCensus(t *testing.T) {
 }
 
 func TestCensusProof(t *testing.T) {
-	log.Init("debug", "stdout")
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "census"))
