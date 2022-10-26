@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -19,6 +20,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -242,21 +245,49 @@ func networkInfo(cli *vocdoniCLI) error {
 }
 
 func bootStrapAccount(cli *vocdoniCLI) error {
+	var faucetPkg []byte
 	p := ui.Prompt{
-		Label: "If you have a faucet package, please enter it here." +
-			" Otherwise, press enter to continue",
+		Label:     "Do you have a faucet package?",
+		IsConfirm: true,
 	}
-	faucetPkgStr, err := p.Run()
+	yes, err := p.Run()
 	if err != nil {
 		return err
 	}
-	var faucetPkg []byte
-	if faucetPkgStr != "" {
-		faucetPkg, err = base64.StdEncoding.DecodeString(faucetPkgStr)
-		if err != nil {
-			return fmt.Errorf("could not decode faucet package: %w", err)
+	if yes == "y" {
+		p := ui.Prompt{
+			Label: "Please enter the base64 payload",
 		}
+		faucetPayloadStr, err := p.Run()
+		if err != nil {
+			return err
+		}
+		p = ui.Prompt{
+			Label: "Please enter the hexadecimal signature",
+		}
+		faucetSignatureStr, err := p.Run()
+		if err != nil {
+			return err
+		}
+		faucetPayload, err := base64.StdEncoding.DecodeString(faucetPayloadStr)
+		if err != nil {
+			return err
+		}
+		faucetSignature, err := hex.DecodeString(faucetSignatureStr)
+		if err != nil {
+			return err
+		}
+		faucetPkg, err = proto.Marshal(&models.FaucetPackage{
+			Payload:   faucetPayload,
+			Signature: faucetSignature,
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		return fmt.Errorf("no package provided and automatic faucet is not implemented yet")
 	}
+
 	infoPrint.Printf("bootstraping account...\n")
 
 	txHash, err := cli.api.AccountBootstrap(faucetPkg)
