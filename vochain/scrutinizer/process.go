@@ -61,10 +61,20 @@ func encodeVotes(votes [][]*types.BigInt) string {
 }
 
 func sqliteWarnf(format string, args ...interface{}) {
+	// We only complain when running the tests.
+	// In production, the two databases are modified in parallel.
+	// For example, when a process is finished, one database is updated
+	// immediately after the other.
+	// If a client query comes in between those two write operations,
+	// the response to the query might see inconsistent results from the DBs.
+	// That is fine for production.
+	//
+	// We still want to catch the inconsistencies while running the tests,
+	// because they do help catch SQL schema and query bugs.
+	// Tests tend to be sequential with their DBs, so there aren't such races.
 	if flag.Lookup("test.run") != nil {
 		log.Fatalf(format, args...)
 	}
-	log.Warnf(format, args...)
 }
 
 // ProcessInfo returns the available information regarding an election process id
