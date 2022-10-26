@@ -8,9 +8,12 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
@@ -75,8 +78,11 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	go d.VochainInfo.Start(10)
 	d.Scrutinizer = NewMockScrutinizer(t, d.VochainAPP)
 	qt.Assert(t, d.VochainAPP.Service.Start(), qt.IsNil)
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
 
-	api.Attach(d.VochainAPP, d.VochainInfo, d.Scrutinizer, d.Storage)
+	api.Attach(d.VochainAPP, d.VochainInfo, d.Scrutinizer, d.Storage, censusDB)
 
 	err = api.EnableHandlers(apis...)
 	qt.Assert(t, err, qt.IsNil)

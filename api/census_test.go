@@ -10,7 +10,10 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
@@ -26,8 +29,13 @@ func TestCensus(t *testing.T) {
 	api, err := NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
+	// Create local key value database
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
+
 	storage := data.IPFSHandle{}
-	api.Attach(nil, nil, nil, data.Storage(&storage))
+	api.Attach(nil, nil, nil, data.Storage(&storage), censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -143,8 +151,12 @@ func TestCensusProof(t *testing.T) {
 
 	api, err := NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
+	// Create local key value database
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
 
-	api.Attach(nil, nil, nil, nil)
+	api.Attach(nil, nil, nil, nil, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()

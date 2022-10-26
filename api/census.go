@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
@@ -22,20 +21,9 @@ const (
 	CensusHandler      = "census"
 	CensusTypeWeighted = "weighted"
 	CensusTypeZK       = "zkindexed"
-
-	censusDBprefix          = "cs_"
-	censusDBreferencePrefix = "cr_"
-	censusIDsize            = 32
-	censusKeysize           = 32
+	censusIDsize       = 32
+	censusKeysize      = 32
 )
-
-type censusRef struct {
-	tree       *censustree.Tree
-	AuthToken  *uuid.UUID
-	CensusType int32
-	Indexed    bool
-	IsPublic   bool
-}
 
 func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
@@ -159,7 +147,7 @@ func (a *API) censusCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	}
 
 	censusID := util.RandomBytes(32)
-	_, err = a.createNewCensus(censusID, censusType, indexed, false, &token)
+	_, err = a.censusdb.New(censusID, censusType, indexed, false, &token)
 	if err != nil {
 		return err
 	}
@@ -188,7 +176,7 @@ func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, &token)
+	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
 		return err
 	}
@@ -204,17 +192,17 @@ func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 	} else if !ref.Indexed {
 		weight = new(types.BigInt).SetUint64(1)
 	}
-	keyHash, err := ref.tree.Hash(key)
+	keyHash, err := ref.Tree().Hash(key)
 	if err != nil {
 		return err
 	}
 	if weight != nil {
-		if err := ref.tree.Add(keyHash, ref.tree.BigIntToBytes(weight.ToInt())); err != nil {
+		if err := ref.Tree().Add(keyHash, ref.Tree().BigIntToBytes(weight.ToInt())); err != nil {
 			return fmt.Errorf("cannot add key and value to tree: %w", err)
 		}
 		log.Debugf("added key %x with weight %s to census %x", key, weight, censusID)
 	} else {
-		if err := ref.tree.Add(keyHash, nil); err != nil {
+		if err := ref.Tree().Add(keyHash, nil); err != nil {
 			return fmt.Errorf("cannot add key to tree: %w", err)
 		}
 		log.Debugf("added key %x to census %x", key, censusID)
@@ -228,11 +216,11 @@ func (a *API) censusRootHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, nil)
+	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		return err
 	}
-	root, err := ref.tree.Root()
+	root, err := ref.Tree().Root()
 	if err != nil {
 		return err
 	}
@@ -257,15 +245,15 @@ func (a *API) censusDumpHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, &token)
+	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
 		return err
 	}
-	root, err := ref.tree.Root()
+	root, err := ref.Tree().Root()
 	if err != nil {
 		return err
 	}
-	dump, err := ref.tree.Dump()
+	dump, err := ref.Tree().Dump()
 	if err != nil {
 		return err
 	}
@@ -301,7 +289,7 @@ func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("missing dump or root parameters")
 	}
 
-	ref, err := a.loadCensus(censusID, &token)
+	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
 		return err
 	}
@@ -312,11 +300,11 @@ func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("indexed flag does not match")
 	}
 
-	if err := ref.tree.ImportDump(newCompressor().decompressBytes(cdata.Data)); err != nil {
+	if err := ref.Tree().ImportDump(newCompressor().decompressBytes(cdata.Data)); err != nil {
 		return err
 	}
 
-	root, err := ref.tree.Root()
+	root, err := ref.Tree().Root()
 	if err != nil {
 		return err
 	}
@@ -334,11 +322,11 @@ func (a *API) censusWeightHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, nil)
+	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		return err
 	}
-	weight, err := ref.tree.GetCensusWeight()
+	weight, err := ref.Tree().GetCensusWeight()
 	if err != nil {
 		return err
 	}
@@ -358,11 +346,11 @@ func (a *API) censusSizeHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, nil)
+	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		return err
 	}
-	size, err := ref.tree.Size()
+	size, err := ref.Tree().Size()
 	if err != nil {
 		return err
 	}
@@ -386,22 +374,11 @@ func (a *API) censusDeleteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return err
 	}
-	_, err = a.loadCensus(censusID, &token)
+	_, err = a.censusdb.Load(censusID, &token)
 	if err != nil {
 		return err
 	}
-
-	if err := a.delCensusRefFromDB(censusID); err != nil {
-		return err
-	}
-	// return reply to the caller so the HTTP connection can be drop.
-	censusDBlock.Lock()
-	defer censusDBlock.Unlock()
-	if err := ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK); err != nil {
-		log.Error(err)
-	}
-	_, err = censustree.DeleteCensusTreeFromDatabase(a.db, censusName(censusID))
-	if err != nil {
+	if err := a.censusdb.Del(censusID); err != nil {
 		return err
 	}
 	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
@@ -419,7 +396,7 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return err
 	}
 
-	ref, err := a.loadCensus(censusID, &token)
+	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
 		return err
 	}
@@ -429,38 +406,39 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		if err != nil {
 			return fmt.Errorf("could not decode root")
 		}
-		ref.tree, err = ref.tree.FromRoot(fromRoot)
+		t, err := ref.Tree().FromRoot(fromRoot)
 		if err != nil {
 			return err
 		}
+		ref.SetTree(t)
 	}
 
 	// the root hash is used as censusID for the new published census
 	// check if a census with censusID=root already exist
-	root, err := ref.tree.Root()
+	root, err := ref.Tree().Root()
 	if err != nil {
 		return err
 	}
 
-	if a.censusRefExist(root) {
+	if a.censusdb.Exists(root) {
 		return fmt.Errorf("a published census with root %x already exist", root)
 	}
 
-	dump, err := ref.tree.Dump()
+	dump, err := ref.Tree().Dump()
 	if err != nil {
 		return err
 	}
 
-	newRef, err := a.createNewCensus(
+	newRef, err := a.censusdb.New(
 		root, models.Census_Type(ref.CensusType),
 		ref.Indexed, true, nil)
 	if err != nil {
 		return err
 	}
-	if err := newRef.tree.ImportDump(dump); err != nil {
+	if err := newRef.Tree().ImportDump(dump); err != nil {
 		return err
 	}
-	newRef.tree.Publish()
+	newRef.Tree().Publish()
 
 	// export the tree to the remote storage (IPFS)
 	uri := ""
@@ -507,15 +485,15 @@ func (a *API) censusProofHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	if err != nil {
 		return err
 	}
-	ref, err := a.loadCensus(censusID, nil)
+	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.tree.Hash(key)
+	keyHash, err := ref.Tree().Hash(key)
 	if err != nil {
 		return err
 	}
-	leafV, siblings, err := ref.tree.GenProof(keyHash)
+	leafV, siblings, err := ref.Tree().GenProof(keyHash)
 	if err != nil {
 		return err
 	}
@@ -524,10 +502,10 @@ func (a *API) censusProofHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		Proof: siblings,
 		Value: leafV,
 	}
-	if len(leafV) > 0 && !ref.tree.IsIndexed() {
+	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
 		// return the string representation of the census value (weight)
 		// to make the client know his voting power for the census
-		weight := ref.tree.BytesToBigInt(leafV)
+		weight := ref.Tree().BytesToBigInt(leafV)
 		response.Weight = (*types.BigInt)(weight)
 	}
 
@@ -554,15 +532,15 @@ func (a *API) censusVerifyHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("missing key or proof parameters")
 	}
 
-	ref, err := a.loadCensus(censusID, nil)
+	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.tree.Hash(cdata.Key)
+	keyHash, err := ref.Tree().Hash(cdata.Key)
 	if err != nil {
 		return err
 	}
-	valid, err := ref.tree.VerifyProof(keyHash, cdata.Value, cdata.Proof, cdata.Root)
+	valid, err := ref.Tree().VerifyProof(keyHash, cdata.Value, cdata.Proof, cdata.Root)
 	if err != nil {
 		return err
 	}
