@@ -76,6 +76,8 @@ type Scrutinizer struct {
 	resultsPool []*indexertypes.ScrutinizerOnProcessData
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
+	// lockPool is the lock for all *Pool operations
+	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
 	// eventOnResults is the list of external callbacks that will be executed by the scrutinizer
@@ -345,6 +347,8 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (s *Scrutinizer) Commit(height uint32) error {
+	s.lockPool.RLock()
+	defer s.lockPool.RUnlock()
 	// Add Entity and register new active process
 	for _, p := range s.newProcessPool {
 		if err := s.newEmptyProcess(p.ProcessID); err != nil {
@@ -475,6 +479,8 @@ func (s *Scrutinizer) Commit(height uint32) error {
 
 // Rollback removes the non committed pending operations
 func (s *Scrutinizer) Rollback() {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	s.votePool = make(map[string][]*models.Vote)
 	s.voteIndexPool = []*VoteWithIndex{}
 	s.newProcessPool = []*indexertypes.ScrutinizerOnProcessData{}
@@ -485,6 +491,8 @@ func (s *Scrutinizer) Rollback() {
 
 // OnProcess scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	data := &indexertypes.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.newProcessPool = append(s.newProcessPool, data)
 }
@@ -494,6 +502,8 @@ func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, t
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
 func (s *Scrutinizer) OnVote(v *models.Vote, voterID types.VoterID, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
 		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
 	}
@@ -502,17 +512,23 @@ func (s *Scrutinizer) OnVote(v *models.Vote, voterID types.VoterID, txIndex int3
 
 // OnCancel scrutinizer stores the processID and entityID
 func (s *Scrutinizer) OnCancel(pid []byte, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessKeys does nothing
 func (s *Scrutinizer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
 func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	if status == models.ProcessStatus_ENDED {
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
@@ -526,6 +542,8 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (s *Scrutinizer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
@@ -618,6 +636,8 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 			log.Errorf("published results for process %x are not correct", pid)
 		}
 	}()
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 	return nil
 }
