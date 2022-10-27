@@ -1,4 +1,4 @@
-package api
+package compressor
 
 import (
 	"time"
@@ -7,13 +7,15 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-type compressor struct {
+// Compressor is a data compressor that uses zstd.
+type Compressor struct {
 	encoder *zstd.Encoder
 	decoder *zstd.Decoder
 }
 
-func newCompressor() compressor {
-	var c compressor
+// NewCompressor creates a new data compressor.
+func NewCompressor() Compressor {
+	var c Compressor
 	var err error
 	c.encoder, err = zstd.NewWriter(nil)
 	if err != nil {
@@ -26,8 +28,8 @@ func newCompressor() compressor {
 	return c
 }
 
-// compressBytes compresses the input via zstd.
-func (c compressor) compressBytes(src []byte) []byte {
+// CompressBytes compresses the input via zstd.
+func (c Compressor) CompressBytes(src []byte) []byte {
 	// ~50KiB of JSON containing base64 tends to compress to ~10% of its
 	// original size. This size also seems like a good starting point for
 	// most realistic compression ratios.
@@ -54,10 +56,10 @@ func isZstd(src []byte) bool {
 		src[2] == 0x2f && src[3] == 0xFD
 }
 
-// decompressBytes tries to decompress the input as best it can. If it detects
+// DecompressBytes tries to decompress the input as best it can. If it detects
 // the input to be zstd, it decompresses using that algorithm. Otherwise, it
 // assumes the input bytes aren't compressed and returns them as-is.
-func (c compressor) decompressBytes(src []byte) []byte {
+func (c Compressor) DecompressBytes(src []byte) []byte {
 	if !isZstd(src) {
 		// We assume that no compression is used, e.g. before we started
 		// compressing census dumps when publishing to ipfs.

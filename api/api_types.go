@@ -176,13 +176,6 @@ type Census struct {
 	URI      string         `json:"uri,omitempty"`
 }
 
-type CensusDump struct {
-	Type     models.Census_Type `json:"type"`
-	RootHash []byte             `json:"rootHash"`
-	Data     []byte             `json:"data"`
-	Indexed  bool               `json:"indexed"`
-}
-
 // Protobuf wrappers
 
 type VoteMode struct {
