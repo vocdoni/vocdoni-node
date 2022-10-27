@@ -3,6 +3,7 @@ package downloader
 import (
 	"context"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -13,12 +14,16 @@ import (
 
 const (
 	// ImportQueueRoutines is the number of parallel routines processing the
-	// remote file download queue
+	// remote file download queue.
 	ImportQueueRoutines = 10
-
 	// ImportRetrieveTimeout the maximum duration the import queue will wait
-	// for retreiving a remote file
+	// for retreiving a remote file.
 	ImportRetrieveTimeout = 3 * time.Minute
+	// ImportQueueTimeout is the maximum duration the import queue will wait
+	// for pining a remote file.
+	ImportPinTimeout = 5 * time.Minute
+	// MaxFileSize is the maximum size of a file that can be imported.
+	MaxFileSize = 100 * 1024 * 1024 // 100MB
 
 	importQueueBuffer = 32
 )
@@ -37,8 +42,8 @@ type Downloader struct {
 
 type DownloadItem struct {
 	URI      string
-	AddedAt  time.Time
 	Callback func(URI string, data []byte)
+	Pin      bool
 }
 
 // NewDownloader returns a new Downloader
@@ -69,15 +74,10 @@ func (d *Downloader) Stop() {
 	d.wgQueueDaemons.Wait()
 }
 
-// Close closes the import queue
-func (d *Downloader) Close() {
-	close(d.importQueue)
-}
-
-// AddToImportQueue adds a new URI to the queue for being imported remotely. Once
+// AddToQueue adds a new URI to the queue for being imported remotely. Once
 // the file is downloaded, the callback is called with the URI as argument.
-func (d *Downloader) AddToQueue(URI string, callback func(string, []byte)) {
-	d.importQueue <- DownloadItem{AddedAt: time.Now(), URI: URI, Callback: callback}
+func (d *Downloader) AddToQueue(URI string, callback func(string, []byte), pin bool) {
+	d.importQueue <- DownloadItem{URI: URI, Callback: callback, Pin: pin}
 }
 
 // QueueSize returns the size of the import census queue
@@ -90,6 +90,53 @@ func (d *Downloader) ImportFailedQueueSize() int {
 	d.failedQueueLock.RLock()
 	defer d.failedQueueLock.RUnlock()
 	return len(d.failedQueue)
+}
+
+// handleImport fetches and imports a remote file. If the download fails, the file
+// is added to a secondary queue for retrying.
+func (d *Downloader) handleImport(item *DownloadItem) {
+	log.Infof("retrieving remote file %q", item.URI)
+	d.queueAddDelta(1)
+	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
+	data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+	cancel()
+	if err != nil {
+		if os.IsTimeout(err) {
+			log.Warnf("timeout importing file %q, adding it to failed queue for retry", item.URI)
+			d.failedQueueLock.Lock()
+			d.failedQueue[item.URI] = item
+			d.failedQueueLock.Unlock()
+		} else {
+			log.Warnf("cannot retrieve file %q: (%v)", item.URI, err)
+		}
+		return
+	}
+	d.queueAddDelta(-1)
+	if item.Callback != nil {
+		go item.Callback(item.URI, data)
+	}
+	if item.Pin {
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
+			defer cancel()
+			if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
+				log.Warnf("could not pin file %q: %v", item.URI, err)
+			}
+		}()
+	}
+}
+
+// importQueueDaemon fetches and imports remote files added via importQueue.
+func (d *Downloader) importQueueDaemon(ctx context.Context) {
+	for {
+		select {
+		case item := <-d.importQueue:
+			d.handleImport(&item)
+		case <-ctx.Done():
+			d.wgQueueDaemons.Done()
+			return
+		}
+	}
 }
 
 // queueAddDelta adds or substracts a delta to the queue size.
@@ -111,9 +158,9 @@ func (d *Downloader) importFailedQueue() map[string]*DownloadItem {
 // handleImportFailedQueue tries to import files that failed.
 func (d *Downloader) handleImportFailedQueue() {
 	for cid, item := range d.importFailedQueue() {
-		log.Debugf("retrying file download %s %s", cid, item.URI)
+		log.Debugf("retrying file download %s", cid)
 		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
-		data, err := d.RemoteStorage.Retrieve(ctx, item.URI[len(d.RemoteStorage.URIprefix()):], 0)
+		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
 		cancel()
 		if err != nil {
 			continue
@@ -121,8 +168,18 @@ func (d *Downloader) handleImportFailedQueue() {
 		d.failedQueueLock.Lock()
 		delete(d.failedQueue, cid)
 		d.failedQueueLock.Unlock()
+		d.queueAddDelta(-1)
 		if item.Callback != nil {
 			go item.Callback(item.URI, data)
+		}
+		if item.Pin {
+			go func() {
+				ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
+				defer cancel()
+				if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
+					log.Warnf("could not pin file %q: %v", item.URI, err)
+				}
+			}()
 		}
 	}
 }
@@ -134,43 +191,6 @@ func (d *Downloader) importFailedQueueDaemon(ctx context.Context) {
 		select {
 		case <-time.NewTimer(1 * time.Second).C:
 			d.handleImportFailedQueue()
-		case <-ctx.Done():
-			d.wgQueueDaemons.Done()
-			return
-		}
-	}
-}
-
-// handleImport fetches and imports a remote file. If the download fails, the file
-// is added to a secondary queue for retrying.
-func (d *Downloader) handleImport(i *DownloadItem) {
-	log.Infof("retrieving remote file %q", i.URI)
-	d.queueAddDelta(1)
-	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-	data, err := d.RemoteStorage.Retrieve(ctx, i.URI[len(d.RemoteStorage.URIprefix()):], 0)
-	cancel()
-	if err != nil {
-		if os.IsTimeout(err) {
-			log.Warnf("timeout importing file %q, adding it to failed queue for retry", i.URI)
-			d.failedQueueLock.Lock()
-			d.failedQueue[i.URI] = i
-			d.failedQueueLock.Unlock()
-		} else {
-			log.Warnf("cannot retrieve file %q: (%v)", i.URI, err)
-		}
-	}
-	d.queueAddDelta(-1)
-	if i.Callback != nil {
-		go i.Callback(i.URI, data)
-	}
-}
-
-// importQueueDaemon fetches and imports remote files added via importQueue.
-func (d *Downloader) importQueueDaemon(ctx context.Context) {
-	for {
-		select {
-		case item := <-d.importQueue:
-			d.handleImport(&item)
 		case <-ctx.Done():
 			d.wgQueueDaemons.Done()
 			return
