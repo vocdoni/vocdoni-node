@@ -51,9 +51,8 @@ type CensusDump struct {
 
 // CensusDB is a database of census trees.
 type CensusDB struct {
-	db           db.Database
-	censusMap    sync.Map
-	censusDBlock sync.RWMutex
+	db        db.Database
+	censusMap sync.Map
 }
 
 // NewCensusDB creates a new CensusDB object.
@@ -142,8 +141,6 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 
 // Del removes a census from the database and memory.
 func (c *CensusDB) Del(censusID []byte) error {
-	c.censusDBlock.Lock()
-	defer c.censusDBlock.Unlock()
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	if err := wtx.Delete(append([]byte(censusDBreferencePrefix), censusID...)); err != nil {
@@ -199,8 +196,6 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 // addCensusRefToDB adds a censusRef to the database.
 func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 	t models.Census_Type, indexed, public bool) (*CensusRef, error) {
-	c.censusDBlock.Lock()
-	defer c.censusDBlock.Unlock()
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	refData := bytes.Buffer{}
@@ -223,8 +218,6 @@ func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 
 // getCensusRefFromDB returns the censusRef from the database.
 func (c *CensusDB) getCensusRefFromDB(censusID []byte) (*CensusRef, error) {
-	c.censusDBlock.Lock()
-	defer c.censusDBlock.Unlock()
 	b, err := c.db.ReadTx().Get(
 		append(
 			[]byte(censusDBreferencePrefix),
