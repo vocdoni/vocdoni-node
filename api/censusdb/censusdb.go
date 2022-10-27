@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sync"
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
@@ -21,7 +20,19 @@ const (
 	censusDBreferencePrefix = "cr_"
 )
 
-// CensusRef is a reference to a census.
+var (
+	// ErrCensusNotFound is returned when a census is not found in the database.
+	ErrCensusNotFound = fmt.Errorf("census not found in the local database")
+	// ErrCensusAlreadyExists is returned by New() if the census already exists in the database.
+	ErrCensusAlreadyExists = fmt.Errorf("census already exists in the local database")
+	// ErrWrongAuthenticationToken is returned when the authentication token is invalid.
+	ErrWrongAuthenticationToken = fmt.Errorf("wrong authentication token")
+	// ErrCensusIsLocked is returned if the census does not allow write operations.
+	ErrCensusIsLocked = fmt.Errorf("census is locked")
+)
+
+// CensusRef is a reference to a census. It holds the merkle tree which can be acceded
+// by calling Tree().
 type CensusRef struct {
 	tree       *censustree.Tree // must be private to avoid gob serialization
 	AuthToken  *uuid.UUID
@@ -49,10 +60,10 @@ type CensusDump struct {
 	Indexed  bool               `json:"indexed"`
 }
 
-// CensusDB is a database of census trees.
+// CensusDB is a safe and persistent database of census trees.  It allows
+// authentication control over the census if a UUID token is provided.
 type CensusDB struct {
-	db        db.Database
-	censusMap sync.Map
+	db db.Database
 }
 
 // NewCensusDB creates a new CensusDB object.
@@ -64,7 +75,7 @@ func NewCensusDB(db db.Database) *CensusDB {
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 	indexed, public bool, authToken *uuid.UUID) (*CensusRef, error) {
 	if c.Exists(censusID) {
-		return nil, fmt.Errorf("census %x already exists", censusID)
+		return nil, ErrCensusAlreadyExists
 	}
 	tree, err := censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
 		MaxLevels: 256, CensusType: censusType, IndexAsKeysCensus: indexed})
@@ -79,39 +90,18 @@ func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 	if public {
 		ref.tree.Publish()
 	}
-	// add the tree in memory so we can quickly access to it afterwards
-	c.censusMap.Store(string(censusID), *ref)
 	return ref, nil
 }
 
 // Exists returns true if the censusID exists in the local database.
 func (c *CensusDB) Exists(censusID []byte) bool {
-	_, ok := c.censusMap.Load(string(censusID))
-	return ok
+	_, err := c.getCensusRefFromDB(censusID)
+	return err == nil
 }
 
 // Load returns an already loaded census from memory or from the persistent kv database.
 // Authentication is checked if authToken is not nil.
 func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, error) {
-	// if the tree is in memory, just return it
-	val, ok := c.censusMap.Load(string(censusID))
-	if ok {
-		ref, refOk := val.(CensusRef)
-		if !refOk {
-			panic("stored value is not of censusRef type")
-		}
-		if authToken != nil {
-			if ref.AuthToken == nil {
-				return nil, fmt.Errorf("census is locked")
-			}
-			if !bytes.Equal(authToken[:], ref.AuthToken[:]) {
-				return nil, fmt.Errorf("wrong authentication token")
-			}
-		}
-		return &ref, nil
-	}
-
-	// if not in memory, load census from DB
 	ref, err := c.getCensusRefFromDB(censusID)
 	if err != nil {
 		return nil, err
@@ -120,10 +110,10 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 	if authToken != nil {
 		// if no token stored in the reference but the called provided a token, we don't allow
 		if ref.AuthToken == nil {
-			return nil, fmt.Errorf("census is locked")
+			return nil, ErrCensusIsLocked
 		}
 		if !bytes.Equal(authToken[:], ref.AuthToken[:]) {
-			return nil, fmt.Errorf("wrong authentication token")
+			return nil, ErrWrongAuthenticationToken
 		}
 	}
 	ref.tree, err = censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
@@ -134,7 +124,6 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 	if ref.IsPublic {
 		ref.tree.Publish()
 	}
-	c.censusMap.Store(string(censusID), *ref)
 	log.Debugf("loaded tree %x", censusID)
 	return ref, nil
 }
@@ -150,7 +139,6 @@ func (c *CensusDB) Del(censusID []byte) error {
 	// This is because the tree is locked and we don't want to block the operations,
 	// and depending on the size of the tree, it can take a while to delete it.
 	go func() {
-		c.censusMap.Delete(string(censusID))
 		_, err := censustree.DeleteCensusTreeFromDatabase(c.db, censusName(censusID))
 		if err != nil {
 			log.Warnf("error deleting census tree %x: %s", censusID, err)
@@ -225,11 +213,11 @@ func (c *CensusDB) getCensusRefFromDB(censusID []byte) (*CensusRef, error) {
 		))
 	if err != nil {
 		if errors.Is(err, db.ErrKeyNotFound) {
-			return nil, fmt.Errorf("census id not found in local storage")
+			return nil, ErrCensusNotFound
 		}
 		return nil, err
 	}
-	dec := gob.NewDecoder(bytes.NewBuffer(b))
+	dec := gob.NewDecoder(bytes.NewReader(b))
 	ref := CensusRef{}
 	return &ref, dec.Decode(&ref)
 }
