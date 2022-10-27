@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
@@ -258,9 +260,9 @@ func (a *API) censusDumpHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return err
 	}
 	var data []byte
-	if data, err = json.Marshal(CensusDump{
+	if data, err = json.Marshal(censusdb.CensusDump{
 		RootHash: root,
-		Data:     newCompressor().compressBytes(dump),
+		Data:     compressor.NewCompressor().CompressBytes(dump),
 		Type:     models.Census_Type(ref.CensusType),
 		Indexed:  ref.Indexed,
 	}); err != nil {
@@ -281,7 +283,7 @@ func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 
-	cdata := CensusDump{}
+	cdata := censusdb.CensusDump{}
 	if err := json.Unmarshal(msg.Data, &cdata); err != nil {
 		return err
 	}
@@ -300,7 +302,7 @@ func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("indexed flag does not match")
 	}
 
-	if err := ref.Tree().ImportDump(newCompressor().decompressBytes(cdata.Data)); err != nil {
+	if err := ref.Tree().ImportDump(compressor.NewCompressor().DecompressBytes(cdata.Data)); err != nil {
 		return err
 	}
 
@@ -443,11 +445,11 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	// export the tree to the remote storage (IPFS)
 	uri := ""
 	if a.storage != nil {
-		export := CensusDump{
+		export := censusdb.CensusDump{
 			Type:     models.Census_Type(ref.CensusType),
 			Indexed:  ref.Indexed,
 			RootHash: root,
-			Data:     newCompressor().compressBytes(dump),
+			Data:     compressor.NewCompressor().CompressBytes(dump),
 		}
 		exportData, err := json.Marshal(export)
 		if err != nil {

@@ -116,7 +116,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 400)
 
 	// dump the tree
-	censusDump := &CensusDump{}
+	censusDump := &censusdb.CensusDump{}
 	resp, code = c.Request("GET", nil, id1, "dump")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusDump), qt.IsNil)
