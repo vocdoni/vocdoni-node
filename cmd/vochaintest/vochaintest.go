@@ -3,25 +3,18 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"os"
-	"path"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
 
-	ethkeystore "github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/spf13/cobra"
 	flag "github.com/spf13/pflag"
 
-	vocli "go.vocdoni.io/dvote/cmd/vocli/commands"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	client "go.vocdoni.io/dvote/rpcclient"
@@ -40,11 +33,6 @@ var ops = map[string]bool{
 	"tokentransactions": true,
 	"initaccounts":      true,
 }
-
-var (
-	addressRegexp = regexp.MustCompile("Public address of the key:.*")
-	pathRegexp    = regexp.MustCompile("Path of the secret key file:.*")
-)
 
 // how many times to retry flaky transactions
 // * amount of blocks to wait for a transaction to be mined before giving up
@@ -114,11 +102,6 @@ func main() {
 		fmt.Fprintf(os.Stderr,
 			"\t./test --operation=tokentransactions --gwHost "+
 				"wss://gw1test.vocdoni.net/dvote\n")
-		fmt.Fprintf(os.Stderr,
-			"=> testvocli\n\tTests major vocli functionalities\n")
-		fmt.Fprintf(os.Stderr,
-			"\t./test --operation=testvocli --treasurerKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223"+
-				"--gwHost wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
 	log.Init(*loglevel, "stdout")
@@ -189,8 +172,6 @@ func main() {
 	case "tokentransactions":
 		// end-user voting is not tested here
 		testTokenTransactions(*host, *treasurerPrivKey)
-	case "vocli":
-		testVocli(*host, *treasurerPrivKey)
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -288,7 +269,7 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 func (c *testClient) ensureTxCostEquals(signer *ethereum.SignKeys, txType models.TxType, cost uint64) error {
 	for i := 0; i < retries; i++ {
 		// if cost equals expected, we're done
-		newTxCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
+		newTxCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
 		if err != nil {
 			log.Warn(err)
 		}
@@ -1203,18 +1184,18 @@ func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
 	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
 
 	// get current tx cost
-	txCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO)
+	txCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
 	if err != nil {
 		return err
 	}
-	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO, txCost)
+	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO_URI, txCost)
 
 	// check tx cost changes
-	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO, 1000)
+	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO_URI, 1000)
 	if err != nil {
 		return err
 	}
-	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO, txCost, 1000)
+	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO_URI, txCost, 1000)
 
 	// get new treasurer nonce
 	treasurer2, err := c.GetTreasurer()
@@ -1224,7 +1205,7 @@ func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
 	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
 
 	// set tx cost back to default
-	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO, 10)
+	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO_URI, 10)
 	if err != nil {
 		return fmt.Errorf("cannot set transaction cost: %v", err)
 	}
@@ -1505,275 +1486,4 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accTo.Balance)
 
 	return nil
-}
-
-func testVocli(url, treasurerPrivKey string) {
-	vocli.SetupLogPackage = false
-
-	log.Infof("connecting to main gateway %s", url)
-	c, err := newTestClient(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer c.Close()
-
-	parseImportOutput := func(stdout string) (address, keyPath string) {
-		a := strings.TrimSpace(addressRegexp.FindString(stdout))
-		a2 := strings.Split(a, " ")
-		newAddr := a2[len(a2)-1]
-
-		k := strings.TrimSpace(pathRegexp.FindString(stdout))
-		k2 := strings.Split(k, " ")
-		keyPath = k2[len(k2)-1]
-		return newAddr, keyPath
-	}
-	generateKeyAndReturnAddress := func(url string, stdArgs []string) (address, keyPath string, err error) {
-		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
-		if err != nil {
-			return
-		}
-		address, keyPath = parseImportOutput(stdout)
-		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", keyPath, "ipfs://", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", false)
-		if err != nil {
-			return
-		}
-		out, err := c.vocliWaitUntilAccountExists(address, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		log.Infof("account %s info: %s", address, out)
-		return
-	}
-
-	dir, err := ioutil.TempDir("", "testvoclihome")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer os.RemoveAll(dir)
-	stdArgs := []string{"--password=password", fmt.Sprintf("--home=%s", dir), fmt.Sprintf("-u=%s", url)}
-
-	log.Info("vocli keys import alicePrivateKey")
-	if err := ioutil.WriteFile(path.Join(dir, "alicePrivateKey"), []byte(treasurerPrivKey), 0o700); err != nil {
-		log.Fatal(err)
-	}
-	_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "import", path.Join(dir, "/alicePrivateKey")}, stdArgs...), "", true)
-	if err != nil {
-		log.Fatal(err)
-	}
-	alice, aliceKeyPath := parseImportOutput(stdout)
-	if !strings.Contains(stdout, dir) {
-		log.Fatalf("vocli import should report that the imported key was stored in directory %s", dir)
-	}
-	log.Infof("alice key path: %s", aliceKeyPath)
-
-	log.Info("vocli keys list")
-	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"keys", "list"}, stdArgs...), "", true)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !strings.Contains(stdout, dir) {
-		log.Fatalf("vocli list should have found and shown a key in dir %s", dir)
-	}
-	log.Infof("key list: %s", stdout)
-
-	log.Info("vocli account set alice")
-	_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"account", "set", aliceKeyPath, "ipfs://aliceinwonderland"}, stdArgs...), "", true)
-	if err != nil && !strings.Contains(err.Error(), "tx already exists in cache") {
-		log.Fatal(err)
-	}
-	if !strings.Contains(stdout, fmt.Sprintf("created/updated on chain %s", url)) {
-		log.Fatalf("stdout should mention that alice's account was created on the chain, but instead: %s", stdout)
-	}
-
-	out, err := c.vocliWaitUntilAccountExists(alice, stdArgs)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("account %s fetched: %s", alice, out)
-
-	log.Info("vocli account mint alice (this lets one reuse node states across test runs, because subsequent SetAccountInfoTxs are not free")
-	err = c.vocliEnsureAccountHasBalance(aliceKeyPath, alice, "1000", stdArgs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	func() {
-		log.Info("vocli keys changepassword (a new key)")
-		_, stdout, _, err := executeCommand(vocli.RootCmd, append([]string{"keys", "new", fmt.Sprintf("-u=%s", url)}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, keyPath := parseImportOutput(stdout)
-
-		_, _, _, err = executeCommand(vocli.RootCmd, []string{"keys", "changepassword", keyPath, "--password=password"}, "fdsa\n", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		k, err := ioutil.ReadFile(keyPath)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if _, err = ethkeystore.DecryptKey(k, "fdsa"); err != nil {
-			log.Fatal(err)
-		}
-	}()
-	func() {
-		log.Info("vocli mint alice -> newAccount")
-		var newAccount string
-		if newAccount, _, err = generateKeyAndReturnAddress(url, stdArgs); err != nil {
-			log.Fatal(err)
-		}
-		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, newAccount, "100", stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	func() {
-		log.Info("vocli send a -> b")
-		a, aKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		b, _, err := generateKeyAndReturnAddress(url, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		// generateKeyAndReturnAddress only returns after the account was effectively mined.
-		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, a, "1000", stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"send", aKeyPath, b, "98"}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		_, err = c.vocliWaitUntilAccountInfoContains(b, "balance:98", stdArgs)
-		if err != nil {
-			log.Fatalf("send a -> b failed, balance still not 98 (%v)", err)
-		}
-	}()
-	func() {
-		log.Info("vocli genfaucet/claimfaucet a -> b")
-		a, aKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		b, bKeyPath, err := generateKeyAndReturnAddress(url, stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = c.vocliEnsureAccountHasBalance(aliceKeyPath, a, "1000", stdArgs)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"genfaucet", aKeyPath, b, "800"}, stdArgs...), "", true) // leave plenty of spare coins for differing txCosts
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		_, stdout, _, err = executeCommand(vocli.RootCmd, append([]string{"claimfaucet", bKeyPath, strings.TrimSpace(stdout)}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}()
-	func() {
-		log.Info("vocli txcost get NewProcess")
-		// get the initial txcosts. this is not used by the test, just for the
-		// human to read
-		if _, _, _, err := executeCommand(vocli.RootCmd, append([]string{"txcost", "get"}, stdArgs...), "", true); err != nil {
-			log.Fatal(err)
-		}
-		_, _, _, err = executeCommand(vocli.RootCmd, append([]string{"txcost", "set", aliceKeyPath, "RegisterKey", "50"}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		stdout, err = c.vocliRepeatCmdUntilStdoutContains(append([]string{"txcost", "get"}, stdArgs...), "RegisterKey 50")
-		if err != nil {
-			log.Fatal(err)
-		}
-		finalTxCosts := strings.Split(strings.TrimSpace(stdout), "\n")
-		log.Infof("new tx cost: %+v", finalTxCosts)
-	}()
-}
-
-func (c *testClient) vocliEnsureAccountHasBalance(keyPath, account, amount string, stdArgs []string) error {
-	for i := 0; i < retries; i++ {
-		_, stdout, stderr, err := executeCommand(vocli.RootCmd, append([]string{"mint", keyPath, account, amount}, stdArgs...), "", true)
-		if err != nil {
-			log.Fatal(err)
-		}
-		if strings.Contains(stdout, "invalid nonce") || strings.Contains(stderr, "invalid nonce") {
-			// race happened, try again
-			time.Sleep(time.Second)
-			continue
-		}
-		_, err = c.vocliWaitUntilAccountInfoContains(account, "balance:", stdArgs)
-		if err == nil {
-			return nil
-		}
-	}
-	return fmt.Errorf("mint failed: %s balance is still 0 (gave up after %d retries)", account, retries)
-}
-
-func (c *testClient) vocliRepeatCmdUntilStdoutContains(args []string, s string) (stdout string, err error) {
-	for i := 0; i < retries; i++ {
-		_, stdout, _, err := executeCommand(vocli.RootCmd, args, "", true)
-		if err == nil && strings.Contains(stdout, s) {
-			return stdout, nil
-		}
-		if err != nil {
-			log.Debug(err)
-		}
-		c.WaitUntilNextBlock()
-	}
-	return "", fmt.Errorf("gave up waiting after %d blocks", retries)
-}
-func (c *testClient) vocliWaitUntilAccountInfoContains(address string, s string, stdArgs []string) (stdout string, err error) {
-	return c.vocliRepeatCmdUntilStdoutContains(append([]string{"account", "info", address}, stdArgs...), s)
-}
-
-// vocliWaitUntilAccountExists executes "vocli account info <address>" until success or timeout
-// often, the SetAccountInfoTx doesn't get mined even in 2, 3x the block period
-// so keep polling until we finally confirm the account has been created
-func (c *testClient) vocliWaitUntilAccountExists(address string, stdArgs []string) (stdout string, err error) {
-	stdout, err = c.vocliWaitUntilAccountInfoContains(address, "infoURI:", stdArgs)
-	if err != nil {
-		return "", fmt.Errorf("account %s still doesn't exist: %v", address, err)
-	}
-	return stdout, nil
-}
-
-func executeCommand(root *cobra.Command, args []string, input string, verbose bool) (*cobra.Command, string, string, error) {
-	// setup stdout/stderr redirection.
-	stdoutBuf := new(bytes.Buffer)
-	stderrBuf := new(bytes.Buffer)
-	vocli.Stdout = stdoutBuf
-	vocli.Stderr = stderrBuf
-
-	stdinReader, stdinWriter, err := os.Pipe()
-	if err != nil {
-		return root, "", "", err
-	}
-	stdinWriter.Write([]byte(input))
-	vocli.Stdin = stdinReader
-
-	// cobra.Command.SetOut/SetErr() is actually useless for most purposes as it
-	// only includes the usage messages printed to stdout/stderr. For full
-	// stdout/stderr capture it's still best to use vocli.Stdout/Stderr. Let's
-	// just mock it out anyway.
-	root.SetOut(stdoutBuf)
-	root.SetErr(stderrBuf)
-	root.SetArgs(args)
-	c, err := root.ExecuteC()
-
-	if verbose {
-		log.Debug("vocli ", strings.Join(args, " "))
-		log.Debugf("stdout(%s)\tstderr(%s)", stdoutBuf, stderrBuf)
-	}
-
-	root.SetOut(os.Stdout)
-	root.SetErr(os.Stderr)
-	root.SetArgs([]string{})
-	return c, stdoutBuf.String(), stderrBuf.String(), err
 }
