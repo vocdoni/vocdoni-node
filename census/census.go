@@ -17,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
@@ -80,7 +81,7 @@ type Manager struct {
 	queueSize       int32
 	failedQueueLock sync.RWMutex
 	failedQueue     map[string]string
-	compressor
+	compressor.Compressor
 	cancel         context.CancelFunc
 	wgQueueDaemons sync.WaitGroup
 }
@@ -111,7 +112,7 @@ func (m *Manager) Start(dbType, storageDir, rootAuthPubKey string) (err error) {
 	// add a bit of buffering, to try to keep AddToImportQueue non-blocking.
 	m.importQueue = make(chan censusImport, importQueueBuffer)
 	m.AuthWindow = 10
-	m.compressor = newCompressor()
+	m.Compressor = compressor.NewCompressor()
 
 	dbDir := filepath.Join(m.StorageDir, fmt.Sprintf("v%v", CurrentCensusVersion))
 	database, err := metadb.New(dbType, dbDir)

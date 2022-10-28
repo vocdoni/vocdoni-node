@@ -113,7 +113,7 @@ func (m *Manager) handleImportFailedQueue() {
 		if err != nil {
 			continue
 		}
-		censusRaw = m.decompressBytes(censusRaw)
+		censusRaw = m.DecompressBytes(censusRaw)
 		if err := m.importTree(censusRaw, cid); err != nil {
 			log.Warnf("cannot import census %s: (%v)", cid, err)
 		}
@@ -166,7 +166,7 @@ func (m *Manager) handleImport(imp censusImport) {
 		m.queueAdd(-1)
 		return
 	}
-	censusRaw = m.decompressBytes(censusRaw)
+	censusRaw = m.DecompressBytes(censusRaw)
 	if err = m.importTree(censusRaw, cid); err != nil {
 		log.Warnf("cannot import census %s: (%s)", cid, err)
 	}

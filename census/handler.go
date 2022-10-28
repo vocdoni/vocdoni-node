@@ -211,7 +211,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			log.Warnf("cannot retrieve census: %s", err)
 			return nil, fmt.Errorf("cannot retrieve census")
 		}
-		censusRaw = m.decompressBytes(censusRaw)
+		censusRaw = m.DecompressBytes(censusRaw)
 		var dump CensusDump
 		err = json.Unmarshal(censusRaw, &dump)
 		if err != nil {
@@ -388,7 +388,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			log.Warnf("cannot marshal census dump: %s", err)
 			return nil, err
 		}
-		dumpBytes = m.compressBytes(dumpBytes)
+		dumpBytes = m.CompressBytes(dumpBytes)
 		cid, err := m.RemoteStorage.Publish(ctx, dumpBytes)
 		if err != nil {
 			log.Warnf("cannot publish census dump: %s", err)
