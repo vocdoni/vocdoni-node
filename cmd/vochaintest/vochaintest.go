@@ -171,7 +171,7 @@ func main() {
 		censusGenerate(*host, accountKeys[0], *electionSize, *keysfile, 1)
 	case "tokentransactions":
 		// end-user voting is not tested here
-		testTokenTransactions(*host, *treasurerPrivKey)
+		testTokenTransactions(*host, *treasurerPrivKey, accountKeys[0])
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -1125,6 +1125,7 @@ func cspVoteTest(
 func testTokenTransactions(
 	host,
 	treasurerPrivKey string,
+	keySigner *ethereum.SignKeys,
 ) {
 	treasurerSigner, err := privKeyToSigner(treasurerPrivKey)
 	if err != nil {
@@ -1155,7 +1156,7 @@ func testTokenTransactions(
 	}
 
 	// check create and set account
-	if err := mainClient.testCreateAndSetAccount(treasurerSigner, mainSigner, otherSigner); err != nil {
+	if err := mainClient.testCreateAndSetAccount(treasurerSigner, keySigner, mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
 	}
 
@@ -1213,9 +1214,14 @@ func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
 	return nil
 }
 
-func (c *testClient) testCreateAndSetAccount(treasurer, signer, signer2 *ethereum.SignKeys) error {
-	// create account without faucet package
-	if err := c.ensureAccountExists(signer, nil); err != nil {
+func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signer2 *ethereum.SignKeys) error {
+	// generate faucet package
+	fp, err := c.GenerateFaucetPackage(keySigner, signer.Address(), 500, rand.Uint64())
+	if err != nil {
+		return fmt.Errorf("cannot generate faucet package: %v", err)
+	}
+	// create account with faucet package
+	if err := c.ensureAccountExists(signer, fp); err != nil {
 		return err
 	}
 

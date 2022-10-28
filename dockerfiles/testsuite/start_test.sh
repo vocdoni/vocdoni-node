@@ -121,7 +121,8 @@ tokentransactions() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
 		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY
+		  --treasurerKey=$TREASURER_KEY \
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
 }
 
 ### end tests definition
