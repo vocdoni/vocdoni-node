@@ -175,13 +175,16 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// transaction
+	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
+	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{
-		SetAccountInfo: &models.SetAccountInfoTx{
-			Txtype:  models.TxType_SET_ACCOUNT_INFO,
-			Nonce:   0,
-			InfoURI: "ipfs://1234",
-			Account: signer.Address().Bytes(),
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
+		SetAccount: &models.SetAccountTx{
+			Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
+			Nonce:         0,
+			InfoURI:       "ipfs://1234",
+			Account:       signer.Address().Bytes(),
+			FaucetPackage: fp,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)
