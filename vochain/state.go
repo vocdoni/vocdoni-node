@@ -51,7 +51,7 @@ var (
 		models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
 		models.TxType_NEW_PROCESS:                "c_newProcess",
 		models.TxType_SEND_TOKENS:                "c_sendTokens",
-		models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+		models.TxType_SET_ACCOUNT_INFO_URI:       "c_setAccount",
 		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
 		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
 		models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
