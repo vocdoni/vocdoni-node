@@ -133,7 +133,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			if err := app.State.IncrementAccountProcessIndex(txSender); err != nil {
 				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
 			}
-			return response, app.State.SubtractCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
+			return response, app.State.BurnTxCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 		}
 
 	case *models.Tx_SetProcess:
@@ -168,7 +168,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return response, app.State.SubtractCostIncrementNonce(txSender, tx.Txtype)
+			return response, app.State.BurnTxCostIncrementNonce(txSender, tx.Txtype)
 		}
 
 	case *models.Tx_RegisterKey:
@@ -185,54 +185,104 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			return response, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
-	case *models.Tx_SetAccountInfo:
-		txValues, err := SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
-		if err != nil {
-			return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
+	case *models.Tx_SetAccount:
+		tx := vtx.Tx.GetSetAccount()
+		var txValues *setAccountTxCheckValues
+		var err error
+		switch tx.Txtype {
+		case models.TxType_SET_ACCOUNT_INFO_URI:
+			txValues, err = SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			if err != nil {
+				return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
+			}
+		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+			txValues, err = SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			if err != nil {
+				return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
+			}
+		default:
+			return nil, fmt.Errorf("setAccount: invalid transaction type")
 		}
+
 		if commit {
-			tx := vtx.Tx.GetSetAccountInfo()
-			// create account
-			if txValues.CreateAccount {
-				// with faucet payload provided
-				if txValues.CreateAccountWithFaucet {
+			switch tx.Txtype {
+			case models.TxType_SET_ACCOUNT_INFO_URI:
+				// create account
+				if txValues.CreateAccount {
+					// consume cost for collect faucet
+					txCost, err := app.State.TxCost(models.TxType_COLLECT_FAUCET, false)
+					if err != nil {
+						return nil, fmt.Errorf("setAccountTx: txCost %w", err)
+					}
+					if err := app.State.BurnTxCost(txValues.FaucetPayloadSigner, txCost); err != nil {
+						return nil, fmt.Errorf("setAccountTx: burnTxCost %w", err)
+					}
+					// consume faucet payload
+					if err := app.State.ConsumeFaucetPayload(
+						txValues.FaucetPayloadSigner,
+						txValues.FaucetPayload,
+					); err != nil {
+						return nil, fmt.Errorf("setAccountTx: consumeFaucet %w", err)
+					}
 					// create account
 					if err := app.State.CreateAccount(
 						txValues.TxSender,
-						tx.GetInfoURI(),
-						make([]common.Address, 0),
+						tx.InfoURI,
+						txValues.Delegates,
 						0,
 					); err != nil {
-						return nil, fmt.Errorf("setAccountInfoTxCheck: createAccount %w", err)
+						return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 					}
-					faucetPayload := &models.FaucetPayload{}
-					if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
-						return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
-					}
-					// consume provided faucet payload
-					return response, app.State.ConsumeFaucetPayload(
+					// transfer balance from faucet package issuer to created account
+					return response, app.State.TransferBalance(
 						txValues.FaucetPayloadSigner,
-						&models.FaucetPayload{
-							Identifier: faucetPayload.GetIdentifier(),
-							To:         faucetPayload.GetTo(),
-							Amount:     faucetPayload.GetAmount(),
-						},
-						models.TxType_SET_ACCOUNT_INFO,
+						txValues.TxSender,
+						txValues.FaucetPayload.Amount,
 					)
 				}
-				// any faucet payload provided, just create account
-				return response, app.State.CreateAccount(txValues.TxSender,
+				// consume cost for setAccount
+				if err := app.State.BurnTxCostIncrementNonce(
+					txValues.TxSender,
+					models.TxType_SET_ACCOUNT_INFO_URI,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountTx: burnCostIncrementNonce %w", err)
+				}
+				// change info URI
+				return response, app.State.SetAccountInfoURI(
+					txValues.TxAccount,
 					tx.GetInfoURI(),
-					make([]common.Address, 0),
-					0,
 				)
+			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+				if err := app.State.SetAccountDelegate(
+					txValues.TxSender,
+					txValues.Delegates,
+					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
+				}
+				if err := app.State.BurnTxCostIncrementNonce(
+					txValues.TxSender,
+					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
+				}
+			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+				if err := app.State.SetAccountDelegate(
+					txValues.TxSender,
+					txValues.Delegates,
+					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
+				}
+				if err := app.State.BurnTxCostIncrementNonce(
+					txValues.TxSender,
+					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
+				}
+			default:
+				return nil, fmt.Errorf("setAccount: invalid transaction type")
 			}
-			// account already created, change infoURI
-			if err := app.State.SetAccountInfoURI(txValues.Account, tx.GetInfoURI()); err != nil {
-				return nil, fmt.Errorf("setAccountInfoURI: %w", err)
-			}
-			// subtract tx costs and increment nonce
-			return response, app.State.SubtractCostIncrementNonce(txValues.TxSender, models.TxType_SET_ACCOUNT_INFO)
 		}
 
 	case *models.Tx_SetTransactionCosts:
@@ -270,64 +320,37 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 				return nil, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
 			}
 			// subtract tx costs and increment nonce
-			return response, app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
-		}
-
-	case *models.Tx_SetAccountDelegateTx:
-		txValues, err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
-		if err != nil {
-			return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
-		}
-		if commit {
-			switch vtx.Tx.GetSetAccountDelegateTx().Txtype {
-			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-				if err := app.State.SetAccountDelegate(
-					txValues.From,
-					txValues.Delegate,
-					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
-				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegate: %w", err)
-				}
-				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
-			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-				if err := app.State.SetAccountDelegate(
-					txValues.From,
-					txValues.Delegate,
-					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
-				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegate: %w", err)
-				}
-				err = app.State.SubtractCostIncrementNonce(txValues.From, models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
-			default:
-				return nil, fmt.Errorf("setAccountDelegate: invalid transaction type")
-			}
-			return response, err
+			return response, app.State.BurnTxCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
 		}
 
 	case *models.Tx_CollectFaucet:
-		fromAcc, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		fromAddress, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
 			return nil, fmt.Errorf("collectFaucetTxCheck: %w", err)
 		}
 		if commit {
+			if err := app.State.BurnTxCostIncrementNonce(*fromAddress, models.TxType_COLLECT_FAUCET); err != nil {
+				return nil, fmt.Errorf("collectFaucetTx: burnTxCost %w", err)
+			}
 			txValues := vtx.Tx.GetCollectFaucet()
 			faucetPayload := &models.FaucetPayload{}
 			if err := proto.Unmarshal(txValues.FaucetPackage.Payload, faucetPayload); err != nil {
 				return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 			}
 			if err := app.State.ConsumeFaucetPayload(
-				*fromAcc,
+				*fromAddress,
 				&models.FaucetPayload{
 					Identifier: faucetPayload.Identifier,
 					To:         faucetPayload.To,
 					Amount:     faucetPayload.Amount,
 				},
-				models.TxType_COLLECT_FAUCET,
 			); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
-			// subtract tx costs and increment nonce
-			return response, app.State.SubtractCostIncrementNonce(*fromAcc, models.TxType_COLLECT_FAUCET)
+			return response, app.State.TransferBalance(*fromAddress,
+				common.BytesToAddress(faucetPayload.To),
+				faucetPayload.Amount,
+			)
 		}
 
 	default:
