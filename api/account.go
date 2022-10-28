@@ -78,10 +78,10 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		}
 	}
 	// check if the transaction is of the correct type
-	if ok, err := isTransactionType(req.TxPayload, &models.Tx_SetAccountInfo{}); err != nil {
+	if ok, err := isTransactionType(req.TxPayload, &models.Tx_SetAccount{}); err != nil {
 		return fmt.Errorf("could not check transaction type: %w", err)
 	} else if !ok {
-		return fmt.Errorf("transaction is not of type SetAccountInfo")
+		return fmt.Errorf("transaction is not of type SetAccount")
 	}
 	// send the transaction to the blockchain
 	res, err := a.vocapp.SendTx(req.TxPayload)

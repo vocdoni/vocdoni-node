@@ -23,7 +23,7 @@ var (
 	ErrProcessNotFound      = fmt.Errorf("process not found")
 	ErrBalanceOverflow      = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
-	ErrAccountNotExist      = fmt.Errorf("account does not exists")
+	ErrAccountNotExist      = fmt.Errorf("account does not exist")
 	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
 	ErrNilTx                = fmt.Errorf("nil transaction")
 	// keys; not constants because of []byte
@@ -51,20 +51,19 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 	return ""
 }
 
-type setAccountInfoTxCheckValues struct {
-	Account, TxSender, FaucetPayloadSigner common.Address
-	CreateAccount                          bool
-	CreateAccountWithFaucet                bool
+type setAccountTxCheckValues struct {
+	TxAccount,
+	TxSender,
+	FaucetPayloadSigner common.Address
+	Delegates     []common.Address // delegate related
+	CreateAccount bool
+	FaucetPayload *models.FaucetPayload
 }
 
 type sendTokensTxCheckValues struct {
 	From, To common.Address
 	Value    uint64
 	Nonce    uint32
-}
-
-type setAccountDelegateTxCheckValues struct {
-	From, Delegate common.Address
 }
 
 // ________________________ QUERIES ________________________
@@ -90,7 +89,7 @@ type TransactionCosts struct {
 	RegisterKey             uint32 `json:"Tx_RegisterKey"`
 	NewProcess              uint32 `json:"Tx_NewProcess"`
 	SendTokens              uint32 `json:"Tx_SendTokens"`
-	SetAccountInfo          uint32 `json:"Tx_SetAccountInfo"`
+	SetAccount              uint32 `json:"Tx_SetAccountInfo"`
 	AddDelegateForAccount   uint32 `json:"Tx_AddDelegateForAccount"`
 	DelDelegateForAccount   uint32 `json:"Tx_DelDelegateForAccount"`
 	CollectFaucet           uint32 `json:"Tx_CollectFaucet"`
@@ -118,7 +117,7 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
 	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 	"SendTokens":              models.TxType_SEND_TOKENS,
-	"SetAccountInfo":          models.TxType_SET_ACCOUNT_INFO,
+	"SetAccount":              models.TxType_SET_ACCOUNT_INFO_URI,
 	"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
 	"NewProcess":              models.TxType_NEW_PROCESS,
 	"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
@@ -141,7 +140,7 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_RESULTS:        "SetProcessResults",
 	models.TxType_SET_PROCESS_QUESTION_INDEX: "SetProcessQuestionIndex",
 	models.TxType_SEND_TOKENS:                "SendTokens",
-	models.TxType_SET_ACCOUNT_INFO:           "SetAccountInfo",
+	models.TxType_SET_ACCOUNT_INFO_URI:       "SetAccount",
 	models.TxType_REGISTER_VOTER_KEY:         "RegisterKey",
 	models.TxType_NEW_PROCESS:                "NewProcess",
 	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "AddDelegateForAccount",

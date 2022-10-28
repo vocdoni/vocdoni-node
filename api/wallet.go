@@ -207,9 +207,9 @@ func (a *API) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetAccountInfo{
-			SetAccountInfo: &models.SetAccountInfoTx{
-				Txtype:        models.TxType_SET_ACCOUNT_INFO,
+		Payload: &models.Tx_SetAccount{
+			SetAccount: &models.SetAccountTx{
+				Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
 				Nonce:         0,
 				InfoURI:       "none",
 				Account:       wallet.Address().Bytes(),
@@ -261,7 +261,7 @@ func (a *API) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
-				Txtype: models.TxType_SET_ACCOUNT_INFO,
+				Txtype: models.TxType_SEND_TOKENS,
 				Nonce:  acc.GetNonce(),
 				From:   wallet.Address().Bytes(),
 				To:     dst.Bytes(),
