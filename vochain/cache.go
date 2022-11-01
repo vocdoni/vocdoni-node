@@ -107,7 +107,9 @@ func (v *State) CachePurge(height uint32) {
 			removed++
 		}
 	}
-	log.Debugf("removed %d votes from cache", removed)
+	if removed != 0 {
+		log.Debugf("removed %d votes from cache", removed)
+	}
 }
 
 // SetCacheSize sets the size for the vote LRU cache.
