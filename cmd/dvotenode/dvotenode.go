@@ -527,12 +527,15 @@ func main() {
 		// Wait for Vochain to be ready
 		var h, hPrev uint32
 		for vochainApp.Node == nil {
+			vochainApp.State.DisableVoteCache.Store(true)
 			hPrev = h
 			time.Sleep(time.Second * 10)
 			h = vochainApp.Height()
 			log.Infof("[vochain info] replaying height %d at %d blocks/s",
 				h, (h-hPrev)/5)
 		}
+		vochainApp.State.DisableVoteCache.Store(false)
+
 		log.Infof("vochain chainID %s", vochainApp.ChainID())
 	}
 
