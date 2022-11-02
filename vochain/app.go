@@ -539,7 +539,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	if err != nil {
 		log.Fatalf("cannot save state: %v", err)
 	}
-	if app.Height()%50000 == 0 && !app.IsSynchronizing() {
+	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
 		if _, err := app.State.snapshot(); err != nil {
