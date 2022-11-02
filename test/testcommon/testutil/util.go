@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"math/rand"
+	"sync"
 	"testing"
 
 	iden3cryptoutils "github.com/iden3/go-iden3-crypto/utils"
@@ -35,7 +36,8 @@ func B642byte(tb testing.TB, s string) []byte {
 }
 
 type Random struct {
-	rand *rand.Rand
+	randMu sync.Mutex
+	rand   *rand.Rand
 }
 
 func NewRandom(seed int64) Random {
@@ -46,6 +48,8 @@ func NewRandom(seed int64) Random {
 
 func (r *Random) RandomBytes(n int) []byte {
 	b := make([]byte, n)
+	r.randMu.Lock()
+	defer r.randMu.Unlock()
 	_, err := r.rand.Read(b)
 	if err != nil {
 		panic(err)
@@ -54,6 +58,8 @@ func (r *Random) RandomBytes(n int) []byte {
 }
 
 func (r *Random) RandomIntn(n int) int {
+	r.randMu.Lock()
+	defer r.randMu.Unlock()
 	return r.rand.Intn(n)
 }
 
@@ -61,6 +67,8 @@ func (r *Random) RandomIntn(n int) int {
 // ZK SNARK field.
 func (r *Random) RandomInZKField() []byte {
 	b := make([]byte, 32)
+	r.randMu.Lock()
+	defer r.randMu.Unlock()
 	for {
 		_, err := r.rand.Read(b)
 		if err != nil {
