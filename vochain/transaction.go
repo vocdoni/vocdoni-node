@@ -227,7 +227,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 					// create account
 					if err := app.State.CreateAccount(
 						txValues.TxSender,
-						tx.InfoURI,
+						*tx.InfoURI,
 						txValues.Delegates,
 						0,
 					); err != nil {

@@ -370,9 +370,9 @@ func testSetAccountTx(t *testing.T,
 	var err error
 
 	tx := &models.SetAccountTx{
-		Nonce:         nonce,
+		Nonce:         &nonce,
 		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
-		InfoURI:       infoURI,
+		InfoURI:       &infoURI,
 		Account:       account.Bytes(),
 		FaucetPackage: faucetPkg,
 	}
@@ -671,7 +671,7 @@ func testSetAccountDelegateTx(t *testing.T,
 	// tx
 	tx := &models.SetAccountTx{
 		Delegates: [][]byte{delegate.Bytes()},
-		Nonce:     nonce,
+		Nonce:     &nonce,
 		Txtype:    models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 	}
 	if !op {

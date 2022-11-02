@@ -178,11 +178,12 @@ func TestAPIaccount(t *testing.T) {
 	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
+	infoURI := string("ipfs://1234")
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
-			Nonce:         0,
-			InfoURI:       "ipfs://1234",
+			Nonce:         new(uint32),
+			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
 		},

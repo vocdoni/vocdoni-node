@@ -299,7 +299,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	}
 	tx := vtx.GetSetAccount()
 	// check signature available
-	if signature == nil || tx == nil || txBytes == nil {
+	if signature == nil || tx == nil || txBytes == nil || tx.Nonce == nil || tx.InfoURI == nil {
 		return nil, fmt.Errorf("missing signature and/or transaction")
 	}
 	// recover txSender address from signature
@@ -326,7 +326,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	// account exists
 	if txSenderAccount != nil {
 		// check txSender nonce
-		if tx.Nonce != txSenderAccount.Nonce {
+		if *tx.Nonce != txSenderAccount.Nonce {
 			return nil, fmt.Errorf(
 				"invalid nonce, expected %d got %d",
 				txSenderAccount.Nonce,
@@ -343,11 +343,11 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 			return nil, fmt.Errorf("unauthorized: %s", ErrNotEnoughBalance)
 		}
 		// check info URI
-		if len(tx.InfoURI) == 0 {
+		if len(*tx.InfoURI) == 0 {
 			return nil, fmt.Errorf("invalid URI, cannot be empty")
 		}
 		if setAccountTxValues.TxSender == setAccountTxValues.TxAccount {
-			if tx.InfoURI == txSenderAccount.InfoURI {
+			if *tx.InfoURI == txSenderAccount.InfoURI {
 				return nil, fmt.Errorf("invalid URI, must be different")
 			}
 			return setAccountTxValues, nil
@@ -361,7 +361,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		if txAccountAccount == nil {
 			return nil, ErrAccountNotExist
 		}
-		if tx.InfoURI == txAccountAccount.InfoURI {
+		if *tx.InfoURI == txAccountAccount.InfoURI {
 			return nil, fmt.Errorf("invalid URI, must be different")
 		}
 		// check if delegate
@@ -623,7 +623,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 	tx := vtx.GetSetAccount()
 	// check signature available
-	if signature == nil || tx == nil || txBytes == nil {
+	if signature == nil || tx == nil || txBytes == nil || tx.Nonce == nil {
 		return nil, fmt.Errorf("missing signature and/or transaction")
 	}
 	// check delegates
@@ -648,7 +648,7 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 		}
 	}
 	// check nonce
-	if tx.Nonce != acc.Nonce {
+	if *tx.Nonce != acc.Nonce {
 		return nil, fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
 	// check tx cost
