@@ -173,6 +173,7 @@ func (d *Downloader) handleImportFailedQueue() {
 			go item.Callback(item.URI, data)
 		}
 		if item.Pin {
+			item := item // copy the range variable as it is continuously modified
 			go func() {
 				ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
 				defer cancel()
