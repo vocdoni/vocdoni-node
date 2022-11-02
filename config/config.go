@@ -103,8 +103,6 @@ type API struct {
 		Domain  string
 		DirCert string
 	}
-	// Enable HTTP API
-	HTTP bool
 }
 
 // IPFSCfg includes all possible config params needed by IPFS
@@ -198,6 +196,8 @@ type VochainCfg struct {
 	Scrutinizer ScrutinizerCfg
 	// IsSeedNode specifies if the node is configured to act as a seed node
 	IsSeedNode bool
+	// OffChainDataDownload specifies if the node is configured to download off-chain data
+	OffChainDataDownloader bool
 }
 
 // ScrutinizerCfg handles the configuration options of the scrutinizer

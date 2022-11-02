@@ -8,30 +8,38 @@ import (
 	"strings"
 	"time"
 
-	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/downloader"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/censusdownloader"
+	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 	"go.vocdoni.io/dvote/vochain/processarchive"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 type VochainService struct {
-	Config        *config.VochainCfg
-	MetricsAgent  *metrics.Agent
-	CensusManager *census.Manager
-	Storage       data.Storage
+	Config         *config.VochainCfg
+	App            *vochain.BaseApplication
+	MetricsAgent   *metrics.Agent
+	OffChainData   *offchaindatahandler.OffChainDataHandler
+	DataDownloader *downloader.Downloader
+	CensusDB       *censusdb.CensusDB
+	Scrutinizer    *scrutinizer.Scrutinizer
+	Stats          *vochaininfo.VochainInfo
+	Storage        data.Storage
 }
 
-// Vochain creates a new vochain service
-func Vochain(vs *VochainService) (
-	*vochain.BaseApplication, *scrutinizer.Scrutinizer,
-	*vochaininfo.VochainInfo, error) {
+// NewVochainService initializes the Vochain service.  It takes the service configuration and
+// initializes the missing services of the VochainService struct.  All started services will be
+// respected unless the App, which is the main service and thus overwriten by this function.
+func NewVochainService(vs *VochainService) error {
 	log.Infof("creating vochain service for network %s", vs.Config.Chain)
 	// node + app layer
 	if len(vs.Config.PublicAddr) == 0 {
@@ -45,14 +53,14 @@ func Vochain(vs *VochainService) (
 		} else {
 			_, port, err := net.SplitHostPort(vs.Config.P2PListen)
 			if err != nil {
-				return nil, nil, nil, err
+				return err
 			}
 			vs.Config.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
 		host, port, err := net.SplitHostPort(vs.Config.PublicAddr)
 		if err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
@@ -63,15 +71,14 @@ func Vochain(vs *VochainService) (
 	// Genesis file
 	var genesisBytes []byte
 	var err error
-
 	// If genesis file from flag, prioritize it
 	if len(vs.Config.Genesis) > 0 {
 		log.Infof("using custom genesis from %s", vs.Config.Genesis)
 		if _, err := os.Stat(vs.Config.Genesis); os.IsNotExist(err) {
-			return nil, nil, nil, err
+			return err
 		}
 		if genesisBytes, err = os.ReadFile(vs.Config.Genesis); err != nil {
-			return nil, nil, nil, err
+			return err
 		}
 	} else { // If genesis flag not defined, use a hardcoded or local genesis
 		genesisBytes, err = os.ReadFile(vs.Config.DataDir + "/config/genesis.json")
@@ -84,11 +91,11 @@ func Vochain(vs *VochainService) (
 				if vochain.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
-						return nil, nil, nil, err
+						return err
 					}
 					if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
 						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
-						return nil, nil, nil, err
+						return err
 					}
 					genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
 				} else {
@@ -99,14 +106,14 @@ func Vochain(vs *VochainService) (
 			}
 		} else { // If genesis file not found
 			if !os.IsNotExist(err) {
-				return nil, nil, nil, err
+				return err
 			}
 			// If dev mode enabled, auto-update genesis file
 			log.Debug("genesis does not exist, using hardcoded genesis")
 			err = nil
 			if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
 				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
-				return nil, nil, nil, err
+				return err
 			}
 			genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
 		}
@@ -118,38 +125,53 @@ func Vochain(vs *VochainService) (
 	}
 
 	// Create the vochain node
-	vnode := vochain.NewVochain(vs.Config, genesisBytes)
+	vs.App = vochain.NewVochain(vs.Config, genesisBytes)
 
 	// If seed mode, we are finished
 	if vs.Config.IsSeedNode {
-		return vnode, nil, nil, vnode.Service.Start()
+		return vs.App.Service.Start()
 	}
 
 	// Scrutinizer
-	var sc *scrutinizer.Scrutinizer
-	if vs.Config.Scrutinizer.Enabled {
+	if vs.Config.Scrutinizer.Enabled && vs.Scrutinizer == nil {
 		log.Info("creating vochain scrutinizer service")
-		if sc, err = scrutinizer.NewScrutinizer(
+		if vs.Scrutinizer, err = scrutinizer.NewScrutinizer(
 			filepath.Join(vs.Config.DataDir, "scrutinizer"),
-			vnode,
+			vs.App,
 			!vs.Config.Scrutinizer.IgnoreLiveResults,
 		); err != nil {
-			return nil, nil, nil, err
+			return err
 		}
-		go sc.AfterSyncBootstrap()
+		// Launch the scrutinizer after sync routine (executed when the blockchain is ready)
+		go vs.Scrutinizer.AfterSyncBootstrap()
 	}
 
-	// Census Downloader
-	if vs.CensusManager != nil {
-		log.Infof("starting census downloader service")
-		censusdownloader.NewCensusDownloader(vnode, vs.CensusManager, !vs.Config.ImportPreviousCensus)
+	// Data Downloader
+	if vs.Config.OffChainDataDownloader && vs.OffChainData == nil {
+		log.Infof("creating offchain data downloader service")
+		if vs.DataDownloader == nil {
+			vs.DataDownloader = downloader.NewDownloader(vs.Storage)
+		}
+		if vs.CensusDB == nil {
+			db, err := metadb.New(db.TypePebble, filepath.Join(vs.Config.DataDir, "censusdb"))
+			if err != nil {
+				return err
+			}
+			vs.CensusDB = censusdb.NewCensusDB(db)
+		}
+		vs.OffChainData = offchaindatahandler.NewOffChainDataHandler(
+			vs.App,
+			vs.DataDownloader,
+			vs.CensusDB,
+			!vs.Config.ImportPreviousCensus,
+		)
 	}
 
 	// Process Archiver
 	if vs.Config.ProcessArchive {
-		if sc == nil {
+		if vs.Scrutinizer == nil {
 			err = fmt.Errorf("process archive needs indexer enabled")
-			return nil, nil, nil, err
+			return err
 		}
 		ipfs, ok := vs.Storage.(*data.IPFSHandle)
 		if !ok {
@@ -157,7 +179,7 @@ func Vochain(vs *VochainService) (
 		}
 		log.Infof("starting process archiver on %s", vs.Config.ProcessArchiveDataDir)
 		processarchive.NewProcessArchive(
-			sc,
+			vs.Scrutinizer,
 			ipfs,
 			vs.Config.ProcessArchiveDataDir,
 			vs.Config.ProcessArchiveKey,
@@ -165,39 +187,41 @@ func Vochain(vs *VochainService) (
 	}
 
 	// Vochain info
-	vi := vochaininfo.NewVochainInfo(vnode)
-	go vi.Start(10)
+	if vs.Stats == nil {
+		vs.Stats = vochaininfo.NewVochainInfo(vs.App)
+		go vs.Stats.Start(10)
 
-	// Grab metrics
-	go vi.CollectMetrics(vs.MetricsAgent)
+		// Grab metrics
+		go vs.Stats.CollectMetrics(vs.MetricsAgent)
+	}
 
 	// Start the vochain node
-	if err := vnode.Service.Start(); err != nil {
-		return nil, nil, nil, err
+	if err := vs.App.Service.Start(); err != nil {
+		return err
 	}
 
 	if !vs.Config.NoWaitSync {
 		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
 		i := 0
-		for !vi.Sync() {
+		for !vs.Stats.Sync() {
 			time.Sleep(time.Second * 1)
 			if i%20 == 0 {
 				log.Infof("[vochain info] fastsync running at height %d (%d blocks/s), peers %d",
-					vi.Height(), (vi.Height()-lastHeight)/20, vi.NPeers())
-				lastHeight = vi.Height()
+					vs.Stats.Height(), (vs.Stats.Height()-lastHeight)/20, vs.Stats.NPeers())
+				lastHeight = vs.Stats.Height()
 			}
 			i++
 		}
 		log.Infof("vochain fastsync completed!")
 	}
-	go VochainPrintInfo(20, vi)
+	go VochainPrintInfo(20, vs.Stats)
 
 	if vs.Config.LogLevel == "debug" {
-		go vochainPrintPeers(20*time.Second, vi)
+		go vochainPrintPeers(20*time.Second, vs.Stats)
 	}
 
-	return vnode, sc, vi, nil
+	return nil
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection

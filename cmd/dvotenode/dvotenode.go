@@ -19,13 +19,11 @@ import (
 	"github.com/spf13/viper"
 
 	urlapi "go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/metadb"
 	ethchain "go.vocdoni.io/dvote/ethereum"
 	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/httprouter"
@@ -39,8 +37,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 func newConfig() (*config.DvoteCfg, config.Error) {
@@ -85,15 +81,14 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner,seed]")
 	// api
-	globalCfg.API.HTTP = *flag.Bool("apihttp", true, "enable http transport for the API")
-	globalCfg.API.File = *flag.Bool("fileApi", true, "enable the file API")
+	globalCfg.API.File = *flag.Bool("fileApi", false, "enable the file API")
 	globalCfg.API.Census = *flag.Bool("censusApi", false, "enable the census API")
 	globalCfg.API.Vote = *flag.Bool("voteApi", true, "enable the vote API")
 	globalCfg.API.Results = *flag.Bool("resultsApi", true,
 		"enable the results API")
 	globalCfg.API.Indexer = *flag.Bool("indexerApi", false,
 		"enable the indexer API (required for explorer)")
-	globalCfg.API.URL = *flag.Bool("urlApi", true, "enable the url API")
+	globalCfg.API.URL = *flag.Bool("urlApi", true, "enable the REST API")
 	globalCfg.API.Route = *flag.String("apiRoute", "/",
 		"dvote HTTP API base route")
 	globalCfg.API.AllowPrivate = *flag.Bool("apiAllowPrivate", false,
@@ -160,7 +155,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
-
+	globalCfg.VochainConfig.OffChainDataDownloader = *flag.Bool("offChainDataDownload", true,
+		"enables the off-chain data downloader component")
 	// metrics
 	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
 	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5,
@@ -252,6 +248,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.Set("vochainConfig.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochainConfig.ProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
+	viper.BindPFlag("vochainConfig.OffChainDataDownload", flag.Lookup("offChainDataDownload"))
 
 	// metrics
 	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))
@@ -419,9 +416,7 @@ func main() {
 	var rpc *rpcapi.RPCAPI
 	var storage data.Storage
 	var censusManager *census.Manager
-	var vochainApp *vochain.BaseApplication
-	var vochainInfo *vochaininfo.VochainInfo
-	var scrutinizer *scrutinizer.Scrutinizer
+	var vochainSrv *service.VochainService
 	var vochainKeykeeper *keykeeper.KeyKeeper
 	var vochainOracle *oracle.Oracle
 	var metricsAgent *metrics.Agent
@@ -509,50 +504,50 @@ func main() {
 		// if oracle mode, we don't need live results
 		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
 
-		// create the vochain node
-		if vochainApp, scrutinizer, vochainInfo, err = service.Vochain(
-			&service.VochainService{
-				Config:        globalCfg.VochainConfig,
-				MetricsAgent:  metricsAgent,
-				CensusManager: censusManager,
-				Storage:       storage,
-			}); err != nil {
+		// create the vochain service
+		vochainSrv = &service.VochainService{
+			Config:       globalCfg.VochainConfig,
+			MetricsAgent: metricsAgent,
+			Storage:      storage,
+			// CENSUS?
+		}
+		if err = service.NewVochainService(vochainSrv); err != nil {
 			log.Fatal(err)
 		}
 		defer func() {
-			vochainApp.Service.Stop()
-			vochainApp.Service.Wait()
+			vochainSrv.App.Service.Stop()
+			vochainSrv.App.Service.Wait()
 		}()
 
 		// Wait for Vochain to be ready
 		var h, hPrev uint32
-		for vochainApp.Node == nil {
+		for vochainSrv.App.Node == nil {
 			hPrev = h
 			time.Sleep(time.Second * 10)
-			h = vochainApp.Height()
+			h = vochainSrv.App.Height()
 			log.Infof("[vochain info] replaying height %d at %d blocks/s",
 				h, (h-hPrev)/5)
 		}
-		log.Infof("vochain chainID %s", vochainApp.ChainID())
+		log.Infof("vochain chainID %s", vochainSrv.App.ChainID())
 	}
 
 	//
 	// Oracle and ethApiOracle modes
 	//
 	if globalCfg.Mode == types.ModeOracle || globalCfg.Mode == types.ModeEthAPIoracle {
-		if vochainOracle, err = oracle.NewOracle(vochainApp, signer); err != nil {
+		if vochainOracle, err = oracle.NewOracle(vochainSrv.App, signer); err != nil {
 			log.Fatal(err)
 		}
 
 		if globalCfg.Mode == types.ModeOracle {
 			// Start oracle results scrutinizer
-			vochainOracle.EnableResults(scrutinizer)
+			vochainOracle.EnableResults(vochainSrv.Scrutinizer)
 
 			// Start keykeeper service (if key index specified)
 			if globalCfg.VochainConfig.KeyKeeperIndex > 0 {
 				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
 					path.Join(globalCfg.VochainConfig.DataDir, "keykeeper"),
-					vochainApp,
+					vochainSrv.App,
 					signer,
 					globalCfg.VochainConfig.KeyKeeperIndex)
 				if err != nil {
@@ -602,7 +597,7 @@ func main() {
 					w3uris,
 					globalCfg.W3Config.ChainType,
 					signer,
-					vochainApp,
+					vochainSrv.App,
 					evh,
 					whiteListedAddr); err != nil {
 					log.Fatal(err)
@@ -627,32 +622,35 @@ func main() {
 	// Gateway API
 	//
 	if globalCfg.Mode == types.ModeGateway {
-		// dvote API service
+		// JSON-RPC service
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer || globalCfg.API.URL {
+			log.Info("enabling JSON-RPC")
 			if _, err = service.API(globalCfg.API,
-				rpc,           // rpcAPI
-				storage,       // data storage
-				censusManager, // census manager
-				vochainApp,    // vochain core
-				scrutinizer,   // scrutinizere
-				vochainInfo,   // vochain info
+				rpc,                    // rpcAPI
+				storage,                // data storage
+				censusManager,          // census manager
+				vochainSrv.App,         // vochain core
+				vochainSrv.Scrutinizer, // scrutinizere
+				vochainSrv.Stats,       // vochain info stats
 				signer,
 				metricsAgent); err != nil {
 				log.Fatal(err)
 			}
 		}
+		// HTTP API REST service
 		if globalCfg.API.URL {
-			log.Info("enabling URL API")
+			log.Info("enabling API")
 			uAPI, err := urlapi.NewAPI(&httpRouter, "/v2", globalCfg.DataDir)
 			if err != nil {
 				log.Fatal(err)
 			}
-			cDB, err := metadb.New(db.TypePebble, filepath.Join(globalCfg.DataDir, "censusdb"))
-			if err != nil {
-				log.Fatal(err)
-			}
-			censusDB := censusdb.NewCensusDB(cDB)
-			uAPI.Attach(vochainApp, vochainInfo, scrutinizer, storage, censusDB)
+			uAPI.Attach(
+				vochainSrv.App,
+				vochainSrv.Stats,
+				vochainSrv.Scrutinizer,
+				storage,
+				vochainSrv.CensusDB,
+			)
 			if err := uAPI.EnableHandlers(
 				urlapi.ElectionHandler,
 				urlapi.VoteHandler,
