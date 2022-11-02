@@ -445,18 +445,16 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	// export the tree to the remote storage (IPFS)
 	uri := ""
 	if a.storage != nil {
-		export := censusdb.CensusDump{
-			Type:     models.Census_Type(ref.CensusType),
-			Indexed:  ref.Indexed,
-			RootHash: root,
-			Data:     compressor.NewCompressor().CompressBytes(dump),
-		}
-		exportData, err := json.Marshal(export)
+		exportData, err := censusdb.BuildExportDump(
+			root,
+			dump,
+			models.Census_Type(ref.CensusType),
+			ref.Indexed,
+		)
 		if err != nil {
 			return err
 		}
-
-		sctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
 		cid, err := a.storage.Publish(sctx, exportData)
 		if err != nil {

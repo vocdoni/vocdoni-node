@@ -147,6 +147,21 @@ func (c *CensusDB) Del(censusID []byte) error {
 	return wtx.Commit()
 }
 
+// BuildExportDump builds a census serialization that can be used for import.
+func BuildExportDump(root, data []byte, typ models.Census_Type, isIndexed bool) ([]byte, error) {
+	export := CensusDump{
+		Type:     typ,
+		Indexed:  isIndexed,
+		RootHash: root,
+		Data:     compressor.NewCompressor().CompressBytes(data),
+	}
+	exportData, err := json.Marshal(export)
+	if err != nil {
+		return nil, err
+	}
+	return exportData, nil
+}
+
 // ImportAsPublic imports a census from a dump and makes it public.
 func (c *CensusDB) ImportAsPublic(data []byte) error {
 	cdata := CensusDump{}
