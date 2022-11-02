@@ -206,12 +206,13 @@ func (a *API) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	}
 
 	stx := models.SignedTx{}
+	infoURI := string("none")
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
 			SetAccount: &models.SetAccountTx{
 				Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
-				Nonce:         0,
-				InfoURI:       "none",
+				Nonce:         new(uint32),
+				InfoURI:       &infoURI,
 				Account:       wallet.Address().Bytes(),
 				FaucetPackage: nil,
 			},

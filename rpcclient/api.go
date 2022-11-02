@@ -1419,8 +1419,8 @@ func (c *Client) CreateOrSetAccount(
 
 	tx := &models.SetAccountTx{
 		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
-		Nonce:         nonce,
-		InfoURI:       infoURI,
+		Nonce:         &nonce,
+		InfoURI:       &infoURI,
 		Account:       to.Bytes(),
 		FaucetPackage: faucetPkg,
 	}
@@ -1583,7 +1583,7 @@ func (c *Client) SetAccountDelegate(
 
 	tx := &models.SetAccountTx{
 		Txtype:    models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
-		Nonce:     nonce,
+		Nonce:     &nonce,
 		Delegates: [][]byte{delegate.Bytes()},
 	}
 	if !op {
