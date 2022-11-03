@@ -231,13 +231,12 @@ func newTendermint(app *BaseApplication,
 	}
 
 	// create tendermint logger
+	logDisable := false
 	if tconfig.LogLevel == "none" {
+		logDisable = true
 		tconfig.LogLevel = "error"
 	}
-	logger, err := tmlog.NewDefaultLogger("plain", tconfig.LogLevel, false)
-	if err != nil {
-		log.Errorf("failed to parse log level: %v", err)
-	}
+	logger := NewTenderLogger("tendermint", logDisable)
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
