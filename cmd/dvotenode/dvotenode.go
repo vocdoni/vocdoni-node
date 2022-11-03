@@ -493,9 +493,11 @@ func main() {
 	//
 	// Vochain and Scrutinizer
 	//
-	if (globalCfg.Mode == types.ModeGateway && globalCfg.API.Vote) ||
-		globalCfg.Mode == types.ModeMiner || globalCfg.Mode == types.ModeOracle ||
-		globalCfg.Mode == types.ModeEthAPIoracle || globalCfg.Mode == types.ModeSeed {
+	if globalCfg.Mode == types.ModeGateway ||
+		globalCfg.Mode == types.ModeMiner ||
+		globalCfg.Mode == types.ModeOracle ||
+		globalCfg.Mode == types.ModeEthAPIoracle ||
+		globalCfg.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		globalCfg.VochainConfig.IsSeedNode = types.ModeSeed == globalCfg.Mode
 		// do we need scrutinizer?
@@ -503,13 +505,14 @@ func main() {
 			(globalCfg.Mode == types.ModeOracle)
 		// if oracle mode, we don't need live results
 		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
-
+		// offchainDataDownloader is only needed for gateways
+		globalCfg.VochainConfig.OffChainDataDownloader = globalCfg.VochainConfig.OffChainDataDownloader &&
+			globalCfg.Mode == types.ModeGateway
 		// create the vochain service
 		vochainSrv = &service.VochainService{
 			Config:       globalCfg.VochainConfig,
 			MetricsAgent: metricsAgent,
 			Storage:      storage,
-			// CENSUS?
 		}
 		if err = service.NewVochainService(vochainSrv); err != nil {
 			log.Fatal(err)
