@@ -19,7 +19,6 @@ import (
 	"github.com/spf13/viper"
 
 	urlapi "go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
@@ -415,7 +414,6 @@ func main() {
 	var httpRouter httprouter.HTTProuter
 	var rpc *rpcapi.RPCAPI
 	var storage data.Storage
-	var censusManager *census.Manager
 	var vochainSrv *service.VochainService
 	var vochainKeykeeper *keykeeper.KeyKeeper
 	var vochainOracle *oracle.Oracle
@@ -478,15 +476,6 @@ func main() {
 		storage, err = service.IPFS(globalCfg.Ipfs, signer, metricsAgent)
 		if err != nil {
 			log.Fatal(err)
-		}
-
-		// Census service
-		if globalCfg.API.Census {
-			censusManager, err = service.Census(globalCfg.VochainConfig.DBType, globalCfg.DataDir, metricsAgent)
-			if err != nil {
-				log.Fatal(err)
-			}
-			censusManager.RemoteStorage = storage
 		}
 	}
 
@@ -631,7 +620,7 @@ func main() {
 			if _, err = service.API(globalCfg.API,
 				rpc,                    // rpcAPI
 				storage,                // data storage
-				censusManager,          // census manager
+				vochainSrv.CensusDB,    // census db
 				vochainSrv.App,         // vochain core
 				vochainSrv.Scrutinizer, // scrutinizere
 				vochainSrv.Stats,       // vochain info stats

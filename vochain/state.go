@@ -1055,6 +1055,13 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statdeb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
+	// Notify listeners about processes that start in the next block.
+	if len(pidsStartNextBlock) > 0 {
+		for _, l := range v.eventListeners {
+			l.OnProcessesStart(pidsStartNextBlock)
+		}
+	}
+	// Notify listeners about the commit state
 	for _, l := range v.eventListeners {
 		if err := l.Commit(height); err != nil {
 			if _, fatal := err.(ErrHaltVochain); fatal {
@@ -1064,12 +1071,6 @@ func (v *State) Save() ([]byte, error) {
 		}
 	}
 
-	// Notify listeners about processes that start in the next block.
-	if len(pidsStartNextBlock) > 0 {
-		for _, l := range v.eventListeners {
-			l.OnProcessesStart(pidsStartNextBlock)
-		}
-	}
 	// TODO: Purge rolling censuses from all processes that start now
 	// for _, pid := range pids {
 	//   v.PurgeRollingCensus(pid)

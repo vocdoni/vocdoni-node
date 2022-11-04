@@ -97,6 +97,7 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		}
 		// enqueue for download external census if needs to be imported
 		if vochain.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+			log.Infof("adding external census %s to queue", censusURI)
 			c.queue = append(c.queue, importItem{
 				censusRoot: censusRoot,
 				uri:        censusURI,
@@ -107,18 +108,22 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 }
 
 // OnProcessStart is triggered when a process starts. It checks if the process contains a rolling census.
-func (s *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
+func (c *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 	for _, pid := range pids {
-		process, err := s.vochain.State.Process(pid, true)
+		process, err := c.vochain.State.Process(pid, true)
 		if err != nil {
 			log.Errorf("could find process with pid %x: %v", pid, err)
 			continue
 		}
 		// enqueue for import rolling census (zkSnarks voting with preregister enabled)
 		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
-			s.queueLock.Lock()
-			s.queue = append(s.queue, importItem{itemType: itemTypeRollingCensus, pid: pid})
-			s.queueLock.Unlock()
+			c.queueLock.Lock()
+			log.Infof("adding rolling census for process %x to queue", pid)
+			c.queue = append(c.queue, importItem{
+				itemType: itemTypeRollingCensus,
+				pid:      pid,
+			})
+			c.queueLock.Unlock()
 		}
 	}
 }

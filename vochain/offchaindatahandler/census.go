@@ -36,8 +36,8 @@ func (s *OffChainDataHandler) importRollingCensus(pid []byte) {
 		log.Errorf("cannot dump census with pid %x: %v", pid, err)
 		return
 	}
-	log.Infof("snapshoting rolling census %s for process %x", rcensus.CensusID, pid)
-	dump, err := censusdb.BuildExportDump(rcensus.DumpData, rcensus.DumpRoot, rcensus.Type, true)
+	log.Infof("snapshoting rolling census %s", rcensus.CensusID)
+	dump, err := censusdb.BuildExportDump(rcensus.DumpRoot, rcensus.DumpData, rcensus.Type, true)
 	if err != nil {
 		log.Errorf("cannot build census dump for process %x: %v", pid, err)
 		return
@@ -48,6 +48,6 @@ func (s *OffChainDataHandler) importRollingCensus(pid []byte) {
 			// no need to show an error message.
 			return
 		}
-		log.Warnf("could import census with pid %x: %v", pid, err)
+		log.Warnf("could not import census with pid %x: %v", pid, err)
 	}
 }

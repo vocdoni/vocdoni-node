@@ -5,14 +5,16 @@ import (
 	"math/rand"
 	"testing"
 
-	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/rpcapi"
+	"go.vocdoni.io/dvote/rpccensus"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -82,18 +84,20 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	}
 
 	// Create the Census Manager and enable it trough the router
-	var cm census.Manager
 	d.CensusDir = tb.TempDir()
-	if err := cm.Start(db.TypePebble, d.CensusDir, ""); err != nil {
-		tb.Fatal(err)
+	cDB, err := metadb.New(db.TypePebble, d.CensusDir)
+	if err != nil {
+		log.Fatal(err)
 	}
+	censusDB := censusdb.NewCensusDB(cDB)
+	cm := rpccensus.NewCensusManager(censusDB, d.Storage)
 
 	for _, api := range apis {
 		switch api {
 		case "file":
 			rpc.EnableFileAPI(d.Storage)
 		case "census":
-			rpc.EnableCensusAPI(&cm)
+			rpc.EnableCensusAPI(cm)
 		case "vote":
 			d.VochainAPP = NewMockVochainNode(tb, d.VochainCfg, d.Signer)
 			vi := vochaininfo.NewVochainInfo(d.VochainAPP)

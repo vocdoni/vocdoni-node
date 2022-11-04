@@ -1,20 +1,21 @@
 package service
 
 import (
-	"go.vocdoni.io/dvote/census"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/rpcapi"
+	census "go.vocdoni.io/dvote/rpccensus"
 
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-func API(apiconfig *config.API, rpc *rpcapi.RPCAPI, storage data.Storage, cm *census.Manager,
+func API(apiconfig *config.API, rpc *rpcapi.RPCAPI, storage data.Storage, censusdb *censusdb.CensusDB,
 	vapp *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo,
 	signer *ethereum.SignKeys, ma *metrics.Agent) (*rpcapi.RPCAPI, error) {
 	log.Infof("creating API service")
@@ -25,8 +26,9 @@ func API(apiconfig *config.API, rpc *rpcapi.RPCAPI, storage data.Storage, cm *ce
 			return nil, err
 		}
 	}
-	if apiconfig.Census && cm != nil {
+	if apiconfig.Census {
 		log.Info("enabling census API")
+		cm := census.NewCensusManager(censusdb, storage)
 		if err := rpc.EnableCensusAPI(cm); err != nil {
 			return nil, err
 		}

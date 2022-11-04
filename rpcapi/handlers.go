@@ -3,9 +3,9 @@ package rpcapi
 import (
 	"fmt"
 
-	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
+	census "go.vocdoni.io/dvote/rpccensus"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"

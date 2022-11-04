@@ -214,7 +214,7 @@ func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 	}
 	indexedKey := key
 	if t.indexAsKeysCensus {
-		indexedKey, err = t.keyToIndex(value)
+		indexedKey, err = t.KeyToIndex(value)
 		if err != nil {
 			return false, fmt.Errorf("cannot get index key")
 		}
@@ -227,7 +227,7 @@ func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 // If the census is indexed, value will be equal to key.
 func (t *Tree) GenProof(key []byte) ([]byte, []byte, error) {
 	if t.indexAsKeysCensus {
-		index, err := t.keyToIndex(key)
+		index, err := t.KeyToIndex(key)
 		if err != nil {
 			return nil, nil, fmt.Errorf("cannot get index key")
 		}
@@ -476,10 +476,14 @@ func (t *Tree) GetCensusIndex() (uint32, error) {
 	return uint32(t.BytesToBigInt(index).Uint64()), nil
 }
 
-// keyToIndex resolves the index of the key census.
+// KeyToIndex resolves the index of the key census.
 // The returned index is 64 bit little endian encoded and can
-// be used to query the tree.
-func (t *Tree) keyToIndex(key []byte) ([]byte, error) {
+// be used to query the tree.  This method is only available for
+// IdexAsKeys censuses.
+func (t *Tree) KeyToIndex(key []byte) ([]byte, error) {
+	if !t.indexAsKeysCensus {
+		return nil, fmt.Errorf("census is not indexed as keys")
+	}
 	tx := t.tree.DB().ReadTx()
 	defer tx.Discard()
 	return tx.Get(append(censusKeysToIndexPrefix, key...))
