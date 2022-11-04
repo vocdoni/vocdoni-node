@@ -841,8 +841,11 @@ func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte,
 		return nil, err
 	}
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock() // needs to be deferred due to the recover above
+		// acquire a write lock, since DeepSubTree will create some temporary trees in memory
+		// that might be read concurrently by DeliverTx path during block commit, leading to race #581
+		// https://github.com/vocdoni/vocdoni-node/issues/581
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
