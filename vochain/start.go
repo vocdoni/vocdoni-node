@@ -123,6 +123,9 @@ func newTendermint(app *BaseApplication,
 
 	// p2p config
 	tconfig.LogLevel = localConfig.LogLevel
+	if tconfig.LogLevel == "none" {
+		tconfig.LogLevel = "disabled"
+	}
 	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
 	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
 	tconfig.P2P.AllowDuplicateIP = false
@@ -230,9 +233,10 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	// create tendermint logger. if tconfig.LogLevel == "disabled", bool evals to true and log is disabled
-	// (anyway tendermint shouldn't log anything, since zerolog level == "disabled", but just in case)
-	logger := NewTenderLogger("tendermint", tconfig.LogLevel == "disabled")
+	logger, err := tmlog.NewDefaultLogger("plain", tconfig.LogLevel, false)
+	if err != nil {
+		log.Errorf("failed to parse log level: %v", err)
+	}
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
