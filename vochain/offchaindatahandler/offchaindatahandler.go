@@ -101,7 +101,7 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		}
 		// enqueue for import election metadata information
 		if m := p.GetMetadata(); m != "" {
-			log.Infof("adding election metadata %s to queue", m)
+			log.Debugf("adding election metadata %s to queue", m)
 			c.queue = append(c.queue, importItem{
 				uri:      m,
 				itemType: itemTypeElectionMetadata,

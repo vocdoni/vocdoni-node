@@ -24,6 +24,7 @@ import (
 	ipfscrypto "github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
+	"github.com/multiformats/go-multihash"
 	crypto "go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/ipfs"
@@ -364,8 +365,10 @@ func NewIPFSkey() []byte {
 
 // IPFScontentIdentifier calculates the IPFS Cid hash from a bytes buffer.
 func IPFScontentIdentifier(data []byte) string {
-	_, c, err := cid.CidFromBytes(data)
+	builder := cid.V1Builder{Codec: cid.Raw, MhType: multihash.SHA2_256, MhLength: -1}
+	c, err := builder.Sum(data)
 	if err != nil {
+		log.Warnf("%v", err)
 		return ""
 	}
 	return c.String()

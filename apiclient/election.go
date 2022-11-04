@@ -8,6 +8,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -166,6 +167,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	if err != nil {
 		return nil, fmt.Errorf("cannot format metadata: %w", err)
 	}
+	log.Debugf("election metadata: %s", string(metadataBytes))
 	metadataURI := "ipfs://" + data.IPFScontentIdentifier(metadataBytes)
 
 	// get the own account details
@@ -188,6 +190,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		CensusOrigin: censusOrigin,
 		Metadata:     &metadataURI,
 	}
+	log.Debugf("election transaction: %+v", log.FormatProto(process))
 
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
