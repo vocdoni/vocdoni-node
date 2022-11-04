@@ -91,10 +91,7 @@ func TestCensusRPC(t *testing.T) {
 	req.Digested = true
 	req.Weight = (&types.BigInt{}).SetUint64(uint64(*censusWeight))
 	resp = doRequest("addClaim", signer2)
-	if !resp.Ok {
-		t.Logf("%s", resp.Message)
-	}
-	qt.Assert(t, resp.Ok, qt.IsTrue)
+	qt.Assert(t, resp.Ok, qt.IsTrue, qt.Commentf("addClaim failed: %s", resp.Message))
 
 	// addClaim not authorized; use Request directly
 	req.CensusID = censusID
@@ -173,7 +170,6 @@ func TestCensusRPC(t *testing.T) {
 	req.CensusKeys = [][]byte{}
 	resp = doRequest("publish", signer2)
 	qt.Assert(t, resp.Ok, qt.IsTrue)
-	uri := resp.URI
 
 	// getRoot
 	resp = doRequest("getRoot", nil)
@@ -186,21 +182,6 @@ func TestCensusRPC(t *testing.T) {
 	qt.Assert(t, resp.Ok, qt.IsTrue)
 	qt.Assert(t, resp.Root, qt.DeepEquals, root)
 
-	// add second census
-	req.CensusID = "importTest"
-	resp = doRequest("addCensus", signer2)
-	qt.Assert(t, resp.Ok, qt.IsTrue)
-
-	// importRemote
-	req.CensusID = resp.CensusID
-	req.URI = uri
-	resp = doRequest("importRemote", signer2)
-	qt.Assert(t, resp.Ok, qt.IsTrue)
-
-	// getRoot
-	resp = doRequest("getRoot", nil)
-	qt.Assert(t, resp.Root, qt.DeepEquals, root)
-
 	// getSize
 	req.RootHash = nil
 	resp = doRequest("getSize", nil)
@@ -209,8 +190,4 @@ func TestCensusRPC(t *testing.T) {
 	// getCensusWeight
 	resp = doRequest("getCensusWeight", nil)
 	qt.Assert(t, resp.Weight.ToInt().Int64(), qt.Equals, int64(*censusSize)*int64(*censusWeight))
-
-	// get census list
-	resp = doRequest("getCensusList", signer2)
-	qt.Assert(t, resp.CensusList, qt.HasLen, 4)
 }

@@ -2,13 +2,13 @@ package rpcapi
 
 import (
 	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/census"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/jsonrpcapi"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
+	census "go.vocdoni.io/dvote/rpccensus"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
