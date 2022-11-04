@@ -17,6 +17,7 @@ const (
 	itemTypeRollingCensus
 	itemTypeOrganizationMetadata
 	itemTypeElectionMetadata
+	itemTypeAccountMetadata
 )
 
 type importItem struct {
@@ -73,6 +74,9 @@ func (c *OffChainDataHandler) Commit(height uint32) error {
 		case itemTypeExternalCensus:
 			log.Infof("importing external census %s", item.uri)
 			c.enqueueOffchainCensus(item.censusRoot, item.uri)
+		case itemTypeElectionMetadata, itemTypeAccountMetadata:
+			log.Infof("importing metadata from %s", item.uri)
+			c.enqueueMetadata(item.uri)
 		case itemTypeRollingCensus:
 			log.Infof("importing rolling census for process %x", item.pid)
 			c.importRollingCensus(item.pid)
@@ -94,6 +98,14 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		if err != nil || p == nil {
 			log.Errorf("could get process from state: %v", err)
 			return
+		}
+		// enqueue for import election metadata information
+		if m := p.GetMetadata(); m != "" {
+			log.Infof("adding election metadata %s to queue", m)
+			c.queue = append(c.queue, importItem{
+				uri:      m,
+				itemType: itemTypeElectionMetadata,
+			})
 		}
 		// enqueue for download external census if needs to be imported
 		if vochain.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
