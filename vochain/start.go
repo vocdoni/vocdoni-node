@@ -76,7 +76,7 @@ var _ tmlog.Logger = (*TenderLogger)(nil)
 
 func (l *TenderLogger) Debug(msg string, keyvals ...interface{}) {
 	if !l.Disabled {
-		log.Infow(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+		log.Debugw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
 	}
 }
 
@@ -101,7 +101,7 @@ func (l *TenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	return l2
 }
 
-// NewTenderLogger creates a Tenderming compatible logger for specified artifact
+// NewTenderLogger creates a Tendermint compatible logger for specified artifact
 func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 	return &TenderLogger{Artifact: artifact, Disabled: disabled}
 }
@@ -230,13 +230,9 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	// create tendermint logger
-	logDisable := false
-	if tconfig.LogLevel == "none" {
-		logDisable = true
-		tconfig.LogLevel = "error"
-	}
-	logger := NewTenderLogger("tendermint", logDisable)
+	// create tendermint logger. if tconfig.LogLevel == "disabled", bool evals to true and log is disabled
+	// (anyway tendermint shouldn't log anything, since zerolog level == "disabled", but just in case)
+	logger := NewTenderLogger("tendermint", tconfig.LogLevel == "disabled")
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)

@@ -127,8 +127,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"create local/testing genesis file for the vochain")
 	globalCfg.VochainConfig.Genesis = *flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
-	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "none",
-		"tendermint node log level (error, info, debug, none)")
+	globalCfg.VochainConfig.LogLevel = *flag.String("vochainLogLevel", "disabled",
+		"tendermint node log level (debug, info, error, disabled)")
 	globalCfg.VochainConfig.Peers = *flag.StringSlice("vochainPeers", []string{},
 		"comma-separated list of p2p peers")
 	globalCfg.VochainConfig.Seeds = *flag.StringSlice("vochainSeeds", []string{},
