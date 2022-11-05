@@ -7,7 +7,7 @@ jobs:
   go-tests:
     runs-on: self-hosted
     container:
-      image: golang:1.18.6
+      image: golang:1.18.8
       options: --user 1000
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
@@ -15,7 +15,7 @@ jobs:
         shell: bash
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: gofmt
         # Run gofmt first, as it's quick and issues are common.
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
@@ -31,7 +31,7 @@ jobs:
         run: go vet ./...
       - name: Download staticcheck
         run: |
-          curl -L https://github.com/dominikh/go-tools/releases/download/2022.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
+          curl -L https://github.com/dominikh/go-tools/releases/download/v0.3.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
       - name: staticcheck
         run: |
           ./staticcheck/staticcheck ./... 2> staticcheck/stderr
@@ -60,7 +60,7 @@ jobs:
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Run compose script
         run: |
           export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
@@ -80,7 +80,7 @@ jobs:
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - uses: docker/setup-buildx-action@v2
       # - name: Set up QEMU
       #   id: qemu
