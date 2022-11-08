@@ -19,7 +19,10 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-const ElectionHandler = "election"
+const (
+	ElectionHandler     = "election"
+	MaxOffchainFileSize = 1024 * 1024 * 1 // 1MB
+)
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
@@ -171,7 +174,7 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /election/electionID/<electionID>
+// /election/<electionID>
 // get election information
 func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -221,6 +224,20 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		for _, r := range scrutinizer.GetFriendlyResults(results.Votes) {
 			election.Results = append(election.Results, Result{Value: r})
 		}
+	}
+
+	// Try to retrieve the election metadata
+	stgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	metadataBytes, err := a.storage.Retrieve(stgCtx, election.MetadataURL, MaxOffchainFileSize)
+	if err != nil {
+		log.Warnf("cannot get metadata from %s: %v", election.MetadataURL, err)
+	} else {
+		electionMetadata := ElectionMetadata{}
+		if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
+			log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
+		}
+		election.Metadata = &electionMetadata
 	}
 
 	data, err := json.Marshal(election)
@@ -398,5 +415,4 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
-
 }

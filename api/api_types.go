@@ -40,15 +40,16 @@ type ElectionSummary struct {
 
 type Election struct {
 	ElectionSummary
-	ElectionCount uint32          `json:"electionCount"`
-	Census        *ElectionCensus `json:"census,omitempty"`
-	MetadataURL   string          `json:"metadataURL"`
-	CreationTime  time.Time       `json:"creationTime"`
-	PublicKeys    []Key           `json:"publicKeys,omitempty"`
-	PrivateKeys   []Key           `json:"privateKeys,omitempty"`
-	VoteMode      VoteMode        `json:"voteMode,omitempty"`
-	ElectionMode  ElectionMode    `json:"electionMode,omitempty"`
-	TallyMode     TallyMode       `json:"tallyMode,omitempty"`
+	ElectionCount uint32            `json:"electionCount"`
+	Census        *ElectionCensus   `json:"census,omitempty"`
+	MetadataURL   string            `json:"metadataURL"`
+	CreationTime  time.Time         `json:"creationTime"`
+	PublicKeys    []Key             `json:"publicKeys,omitempty"`
+	PrivateKeys   []Key             `json:"privateKeys,omitempty"`
+	VoteMode      VoteMode          `json:"voteMode,omitempty"`
+	ElectionMode  ElectionMode      `json:"electionMode,omitempty"`
+	TallyMode     TallyMode         `json:"tallyMode,omitempty"`
+	Metadata      *ElectionMetadata `json:"metadata,omitempty"`
 }
 
 type ElectionCensus struct {
