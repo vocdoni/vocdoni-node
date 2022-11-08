@@ -174,4 +174,6 @@ const (
 
 	VochainWsReadLimit = 20 << 20 // tendermint requires 20 MiB minimum
 	Web3WsReadLimit    = 5 << 20  // go-ethereum accepts maximum 5 MiB
+
+	MaxURLLength = 2083
 )
