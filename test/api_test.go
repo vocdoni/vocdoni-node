@@ -181,7 +181,7 @@ func TestAPIaccount(t *testing.T) {
 	infoURI := string("ipfs://1234")
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
-			Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
+			Txtype:        models.TxType_CREATE_ACCOUNT,
 			Nonce:         new(uint32),
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
