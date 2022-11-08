@@ -22,9 +22,11 @@ type keypair struct {
 }
 
 type keyring struct {
-	Seeds   []keypair `json:"seeds"`
-	Miners  []keypair `json:"miners"`
-	Oracles []keypair `json:"oracles"`
+	Seeds                 []keypair `json:"seeds"`
+	Miners                []keypair `json:"miners"`
+	Oracles               []keypair `json:"oracles"`
+	Accounts              []keypair `json:"accounts"`
+	DefaultAccountBalance int64     `json:"defaultAccountBalance"`
 	// Treasurer is unique
 	Treasurer keypair `json:"treasurer"`
 }
@@ -40,6 +42,8 @@ func init() {
 	genesisGenCmd.Flags().Int("seeds", 1, "number of seed keys")
 	genesisGenCmd.Flags().Int("miners", 4, "number of miner keys")
 	genesisGenCmd.Flags().Int("oracles", 2, "number of oracle keys")
+	genesisGenCmd.Flags().Int("accounts", 2, "number of accounts")
+	genesisGenCmd.Flags().Int("defaultAccountBalance", 100000, "initial balance for accounts")
 	genesisGenCmd.Flags().String("treasurer", "", "address of the treasurer")
 	genesisGenCmd.Flags().String("chainId", "",
 		"an ID name for the genesis chain to generate (required)")
@@ -98,6 +102,23 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 		})
 	}
 
+	// Generate Accounts
+	accCount, _ := cmd.Flags().GetInt("accounts")
+	accKeys := make([]*ethereum.SignKeys, accCount)
+	accounts := make([]string, accCount)
+	for i := range accKeys {
+		accKeys[i] = ethereum.NewSignKeys()
+		if err := accKeys[i].Generate(); err != nil {
+			return err
+		}
+		accounts[i] = accKeys[i].AddressString()
+		_, priv := accKeys[i].HexString()
+		keys.Accounts = append(keys.Accounts, keypair{
+			Address: accKeys[i].AddressString(),
+			PrivKey: priv,
+		})
+	}
+
 	// Generate genesis
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	consensusParams := &vochain.ConsensusParams{
@@ -128,12 +149,16 @@ func genesisGen(cmd *cobra.Command, args []string) error {
 	// Get chainID
 	chainID, _ := cmd.Flags().GetString("chainId")
 
+	accBalance, _ := cmd.Flags().GetInt("defaultAccountBalance")
+
 	genesisBytes, err := vochain.NewGenesis(
 		nil,
 		chainID,
 		consensusParams,
 		minerPVs,
 		oracles,
+		accounts,
+		accBalance,
 		t.Address().String(),
 		nil,
 	)
