@@ -80,7 +80,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error)
 
 // NewGenesis creates a new genesis and return its bytes
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
-	validators []privval.FilePV, oracles []string, treasurer string, txCosts *TransactionCosts) ([]byte, error) {
+	validators []privval.FilePV, oracles, accounts []string, initAccountsBalance int, treasurer string, txCosts *TransactionCosts) ([]byte, error) {
 	// default consensus params
 	appState := new(GenesisAppState)
 	appState.Validators = make([]GenesisValidator, len(validators))
@@ -103,6 +103,17 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		}
 		appState.Oracles = append(appState.Oracles, os)
 	}
+	for _, acc := range accounts {
+		accAddressBytes, err := hex.DecodeString(util.TrimHex(acc))
+		if err != nil {
+			return nil, err
+		}
+		appState.Accounts = append(appState.Accounts, GenesisAccount{
+			Address: accAddressBytes,
+			Balance: uint64(initAccountsBalance),
+		})
+	}
+
 	if txCosts != nil {
 		appState.TxCost = *txCosts
 	}
