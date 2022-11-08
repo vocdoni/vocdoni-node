@@ -148,7 +148,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
 					return nil, fmt.Errorf("set process status, status unknown")
 				}
-				if err := app.State.SetProcessStatus(tx.ProcessId, *tx.Status, true); err != nil {
+				if err := app.State.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
 			case models.TxType_SET_PROCESS_RESULTS:
@@ -187,16 +187,20 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
-		var txValues *setAccountTxCheckValues
 		var err error
 		switch tx.Txtype {
+		case models.TxType_CREATE_ACCOUNT:
+			err = CreateAccountTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			if err != nil {
+				return nil, fmt.Errorf("createAccount: %w", err)
+			}
 		case models.TxType_SET_ACCOUNT_INFO_URI:
-			txValues, err = SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err = SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 			}
 		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-			txValues, err = SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err = SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
 			}
@@ -206,79 +210,126 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 
 		if commit {
 			switch tx.Txtype {
-			case models.TxType_SET_ACCOUNT_INFO_URI:
-				// create account
-				if txValues.CreateAccount {
-					// consume cost for collect faucet
-					txCost, err := app.State.TxCost(models.TxType_COLLECT_FAUCET, false)
+			case models.TxType_CREATE_ACCOUNT:
+				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
+				if err != nil {
+					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
+				}
+				delegates := make([][]byte, 0)
+				if len(tx.Delegates) != 0 {
+					delegatesMap := make(map[common.Address]bool)
+					for _, v := range tx.Delegates {
+						d := common.BytesToAddress(v)
+						if d == types.EthereumZeroAddress {
+							return nil, fmt.Errorf("createAccountTx: delegate cannot be zero address")
+						}
+						if _, ok := delegatesMap[d]; !ok {
+							delegatesMap[d] = true
+							delegates = append(delegates, d.Bytes())
+						} else {
+							return nil, fmt.Errorf("duplicate delegate address %s", d)
+						}
+					}
+				}
+				if err := app.State.CreateAccount(
+					txSenderAddress,
+					tx.GetInfoURI(),
+					delegates,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
+				}
+				if tx.FaucetPackage != nil {
+					faucetIssuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
 					if err != nil {
-						return nil, fmt.Errorf("setAccountTx: txCost %w", err)
+						return nil, fmt.Errorf("createAccountTx: faucetIssuerAddress %w", err)
 					}
-					if err := app.State.BurnTxCost(txValues.FaucetPayloadSigner, txCost); err != nil {
-						return nil, fmt.Errorf("setAccountTx: burnTxCost %w", err)
+					txCost, err := app.State.TxCost(models.TxType_CREATE_ACCOUNT, false)
+					if err != nil {
+						return nil, fmt.Errorf("createAccountTx: txCost %w", err)
 					}
-					// consume faucet payload
+					if txCost != 0 {
+						if err := app.State.BurnTxCost(faucetIssuerAddress, txCost); err != nil {
+							return nil, fmt.Errorf("setAccountTx: burnTxCost %w", err)
+						}
+					}
+					faucetPayload := &models.FaucetPayload{}
+					if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
+						return nil, fmt.Errorf("createAccountTx: cannot unmarshal faucetPayload %w", err)
+					}
 					if err := app.State.ConsumeFaucetPayload(
-						txValues.FaucetPayloadSigner,
-						txValues.FaucetPayload,
+						faucetIssuerAddress,
+						faucetPayload,
 					); err != nil {
 						return nil, fmt.Errorf("setAccountTx: consumeFaucet %w", err)
 					}
-					// create account
-					if err := app.State.CreateAccount(
-						txValues.TxSender,
-						*tx.InfoURI,
-						txValues.Delegates,
-						0,
-					); err != nil {
-						return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
-					}
 					// transfer balance from faucet package issuer to created account
 					return response, app.State.TransferBalance(
-						txValues.FaucetPayloadSigner,
-						txValues.TxSender,
-						txValues.FaucetPayload.Amount,
+						faucetIssuerAddress,
+						txSenderAddress,
+						faucetPayload.Amount,
 					)
+				}
+				return response, nil
+
+			case models.TxType_SET_ACCOUNT_INFO_URI:
+				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
+				if err != nil {
+					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
 				// consume cost for setAccount
 				if err := app.State.BurnTxCostIncrementNonce(
-					txValues.TxSender,
+					txSenderAddress,
 					models.TxType_SET_ACCOUNT_INFO_URI,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: burnCostIncrementNonce %w", err)
 				}
-				// change info URI
+				accountAddress := common.BytesToAddress(tx.GetAccount())
+				if accountAddress != types.EthereumZeroAddress {
+					return response, app.State.SetAccountInfoURI(
+						accountAddress,
+						tx.GetInfoURI(),
+					)
+				}
 				return response, app.State.SetAccountInfoURI(
-					txValues.TxAccount,
+					txSenderAddress,
 					tx.GetInfoURI(),
 				)
+
 			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-				if err := app.State.SetAccountDelegate(
-					txValues.TxSender,
-					txValues.Delegates,
-					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
-				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegate: %w", err)
+				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
+				if err != nil {
+					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
 				if err := app.State.BurnTxCostIncrementNonce(
-					txValues.TxSender,
+					txSenderAddress,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
+				}
+				if err := app.State.SetAccountDelegate(
+					txSenderAddress,
+					tx.Delegates,
+					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
 				}
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-				if err := app.State.SetAccountDelegate(
-					txValues.TxSender,
-					txValues.Delegates,
-					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
-				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegate: %w", err)
+				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
+				if err != nil {
+					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
 				if err := app.State.BurnTxCostIncrementNonce(
-					txValues.TxSender,
+					txSenderAddress,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
+				}
+				if err := app.State.SetAccountDelegate(
+					txSenderAddress,
+					tx.Delegates,
+					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
+				); err != nil {
+					return nil, fmt.Errorf("setAccountDelegate: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("setAccount: invalid transaction type")
@@ -298,38 +349,45 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 		}
 
 	case *models.Tx_MintTokens:
-		address, amount, err := MintTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := MintTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
 			return nil, fmt.Errorf("mintTokensTx: %w", err)
 		}
 		if commit {
-			if err := app.State.MintBalance(address, amount); err != nil {
+			tx := vtx.Tx.GetMintTokens()
+			if err := app.State.MintBalance(common.BytesToAddress(tx.To), tx.Value); err != nil {
 				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
 			return response, app.State.IncrementTreasurerNonce()
 		}
 
 	case *models.Tx_SendTokens:
-		txValues, err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
 			return nil, fmt.Errorf("sendTokensTxCheck: %w", err)
 		}
 		if commit {
-			err := app.State.TransferBalance(txValues.From, txValues.To, txValues.Value)
+			tx := vtx.Tx.GetSendTokens()
+			from, to := common.BytesToAddress(tx.From), common.BytesToAddress(tx.To)
+			err := app.State.BurnTxCostIncrementNonce(from, models.TxType_SEND_TOKENS)
 			if err != nil {
-				return nil, fmt.Errorf("sendTokensTx: transferBalance: %w", err)
+				return nil, fmt.Errorf("sendTokensTx: burnTxCostIncrementNonce %w", err)
 			}
-			// subtract tx costs and increment nonce
-			return response, app.State.BurnTxCostIncrementNonce(txValues.From, models.TxType_SEND_TOKENS)
+			return response, app.State.TransferBalance(from, to, tx.Value)
 		}
 
 	case *models.Tx_CollectFaucet:
-		fromAddress, err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 		if err != nil {
 			return nil, fmt.Errorf("collectFaucetTxCheck: %w", err)
 		}
 		if commit {
-			if err := app.State.BurnTxCostIncrementNonce(*fromAddress, models.TxType_COLLECT_FAUCET); err != nil {
+			tx := vtx.Tx.GetCollectFaucet()
+			issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
+			if err != nil {
+				return nil, fmt.Errorf("collectFaucetTx: cannot get issuerAddress %w", err)
+			}
+			if err := app.State.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: burnTxCost %w", err)
 			}
 			txValues := vtx.Tx.GetCollectFaucet()
@@ -338,7 +396,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 				return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 			}
 			if err := app.State.ConsumeFaucetPayload(
-				*fromAddress,
+				issuerAddress,
 				&models.FaucetPayload{
 					Identifier: faucetPayload.Identifier,
 					To:         faucetPayload.To,
@@ -347,7 +405,7 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
-			return response, app.State.TransferBalance(*fromAddress,
+			return response, app.State.TransferBalance(issuerAddress,
 				common.BytesToAddress(faucetPayload.To),
 				faucetPayload.Amount,
 			)
@@ -672,16 +730,13 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (comm
 			return common.Address{}, ErrAccountNotExist
 		}
 		/* TODO: @jordipainan activate if cost and nonce on add or reveal process keys
-		// check nonce
 		if oracleAcc.Nonce != tx.Nonce {
 			return common.Address{}, ErrAccountNonceInvalid
 		}
-		// get tx cost
 			cost, err := state.TxCost(tx.Txtype, false)
 			if err != nil {
 				return common.Address{}, fmt.Errorf("cannot get tx %s cost", tx.Txtype.String())
 			}
-			// check enough balance
 			if oracleAcc.Balance < cost {
 				return common.Address{}, ErrNotEnoughBalance
 			}
@@ -704,7 +759,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (comm
 				process.Status == models.ProcessStatus_RESULTS {
 				return common.Address{}, fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
-			if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 {
+			if len(process.EncryptionPublicKeys[tx.GetKeyIndex()]) > 0 {
 				return common.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
@@ -721,7 +776,7 @@ func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (comm
 					process.Status == models.ProcessStatus_CANCELED) {
 				return common.Address{}, fmt.Errorf("cannot reveal keys before the process is finished")
 			}
-			if len(process.EncryptionPrivateKeys[*tx.KeyIndex]) > 0 {
+			if len(process.EncryptionPrivateKeys[tx.GetKeyIndex()]) > 0 {
 				return common.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
 			}
 			// check the keys are valid
@@ -789,11 +844,11 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
 	if (tx.EncryptionPublicKey == nil) ||
-		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
+		tx.GetKeyIndex() < 1 || tx.GetKeyIndex() > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex is not already used
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) > 0 {
+	if len(process.EncryptionPublicKeys[tx.GetKeyIndex()]) > 0 {
 		return fmt.Errorf("key index %d already exists", tx.KeyIndex)
 	}
 	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
@@ -812,21 +867,21 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 	}
 	// check if at leat 1 key is provided and the keyIndex do not over/under flow
 	if (tx.EncryptionPrivateKey == nil) ||
-		*tx.KeyIndex < 1 || *tx.KeyIndex > types.KeyKeeperMaxKeyIndex {
+		tx.GetKeyIndex() < 1 || tx.GetKeyIndex() > types.KeyKeeperMaxKeyIndex {
 		return fmt.Errorf("no keys provided or invalid key index")
 	}
 	// check if provided keyIndex exists
-	if len(process.EncryptionPublicKeys[*tx.KeyIndex]) < 1 {
-		return fmt.Errorf("key index %d does not exist", *tx.KeyIndex)
+	if len(process.EncryptionPublicKeys[tx.GetKeyIndex()]) < 1 {
+		return fmt.Errorf("key index %d does not exist", tx.GetKeyIndex())
 	}
 	// check keys actually work
 	if tx.EncryptionPrivateKey != nil {
 		if priv, err := nacl.DecodePrivate(fmt.Sprintf("%x", tx.EncryptionPrivateKey)); err == nil {
 			pub := priv.Public().Bytes()
-			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[*tx.KeyIndex] {
-				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[*tx.KeyIndex])
+			if fmt.Sprintf("%x", pub) != process.EncryptionPublicKeys[tx.GetKeyIndex()] {
+				log.Debugf("%x != %s", pub, process.EncryptionPublicKeys[tx.GetKeyIndex()])
 				return fmt.Errorf("the provided private key does not match "+
-					"with the stored public key for index %d", *tx.KeyIndex)
+					"with the stored public key for index %d", tx.GetKeyIndex())
 			}
 		} else {
 			return err

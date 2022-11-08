@@ -388,12 +388,12 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		if err := app.State.AddOracle(addr); err != nil {
 			log.Fatalf("cannot add oracles: %v", err)
 		}
-		app.State.CreateAccount(addr, "", nil, 100)
+		app.State.createAccount(addr, "", nil, 0)
 	}
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
-		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
+		if err := app.State.createAccount(addr, "", nil, acc.Balance); err != nil {
 			if err != ErrAccountAlreadyExists {
 				log.Fatalf("cannot create acount %x %v", addr, err)
 			}
