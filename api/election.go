@@ -385,6 +385,11 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			log.Errorf("could not publish to storage: %v", err)
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
+			pctx, cancel2 := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel2()
+			if err := a.storage.Pin(pctx, resp.MetadataURL); err != nil {
+				log.Errorf("could not pin file: %v", err)
+			}
 		}
 	}
 

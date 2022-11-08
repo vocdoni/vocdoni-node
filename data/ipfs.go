@@ -177,8 +177,9 @@ func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash strin
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
-	// path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
-
+	// TODO: check if already pinned
+	// Replace ipfs prefix by ipld valid prefix (this is a hack, we should make it better)
+	path = strings.Replace(path, "ipfs://", "/ipld/", 1)
 	p := corepath.New(path)
 	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
