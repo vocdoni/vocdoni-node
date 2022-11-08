@@ -197,7 +197,8 @@
         "Tx_RegisterKey": 10,
         "Tx_NewProcess": 10,
         "Tx_SendTokens": 10,
-        "Tx_SetAccountInfo": 10,
+        "Tx_CreateAccount": 10,
+        "Tx_SetAccountInfoURI": 10,
         "Tx_AddDelegateForAccount": 10,
         "Tx_DelDelegateForAccount": 10,
         "Tx_CollectFaucet": 10
