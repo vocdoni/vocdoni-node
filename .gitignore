@@ -20,3 +20,6 @@ env
 
 # VSCode
 .vscode
+
+# GoLand
+.idea
