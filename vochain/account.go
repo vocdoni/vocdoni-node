@@ -109,6 +109,9 @@ func (v *State) TransferBalance(from, to common.Address, amount uint64) error {
 	if err := v.SetAccount(to, accTo); err != nil {
 		return err
 	}
+	for _, l := range v.eventListeners {
+		l.OnTransferTokens(from.Bytes(), to.Bytes(), amount)
+	}
 	return nil
 }
 
@@ -485,6 +488,9 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 		printPrettierDelegates(account.DelegateAddrs),
 		account.ProcessIndex,
 	)
+	for _, l := range v.eventListeners {
+		l.OnSetAccount(accountAddress.Bytes(), account)
+	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))

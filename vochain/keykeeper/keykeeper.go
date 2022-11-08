@@ -292,6 +292,12 @@ func (k *KeyKeeper) OnProcessResults(pid []byte,
 // OnProcessesStart does nothing
 func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
 
+// OnSetAccount does nothing
+func (k *KeyKeeper) OnSetAccount(addr []byte, account *vochain.Account) error { return nil }
+
+// OnTransferTokens does nothing
+func (k *KeyKeeper) OnTransferTokens(from, to []byte, amount uint64) error { return nil }
+
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
 func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {

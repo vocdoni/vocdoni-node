@@ -195,6 +195,8 @@ type EventListener interface {
 	OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error
 	OnProcessesStart(pids [][]byte)
+	OnSetAccount(addr []byte, account *Account) error
+	OnTransferTokens(from, to []byte, amount uint64) error
 	Commit(height uint32) (err error)
 	Rollback()
 }

@@ -149,7 +149,12 @@ func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int3
 func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte,
 	status models.ProcessStatus, txindex int32) {
 }
-
+func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *vochain.Account) error {
+	return nil
+}
+func (c *OffChainDataHandler) OnTransferTokens(from, to []byte, amount uint64) error {
+	return nil
+}
 func (c *OffChainDataHandler) OnProcessResults(pid []byte,
 	results *models.ProcessResult, txindex int32) error {
 	return nil
