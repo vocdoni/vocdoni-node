@@ -1407,12 +1407,13 @@ func (c *Client) SetTransactionCost(
 }
 
 // CreateOrSetAccount creates or sets the infoURI of a Vochain account
-func (c *Client) CreateOrSetAccount(
+func (c *Client) SetAccount(
 	signer *ethereum.SignKeys,
 	to common.Address,
 	infoURI string,
 	nonce uint32,
 	faucetPkg *models.FaucetPackage,
+	create bool,
 ) (err error) {
 	var req api.APIrequest
 	req.Method = "submitRawTx"
@@ -1423,6 +1424,9 @@ func (c *Client) CreateOrSetAccount(
 		InfoURI:       &infoURI,
 		Account:       to.Bytes(),
 		FaucetPackage: faucetPkg,
+	}
+	if create {
+		tx.Txtype = models.TxType_CREATE_ACCOUNT
 	}
 
 	stx := models.SignedTx{}
