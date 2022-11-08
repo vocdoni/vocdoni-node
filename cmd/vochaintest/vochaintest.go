@@ -422,7 +422,7 @@ func (c *testClient) ensureAccountInfoEquals(account *ethereum.SignKeys, infoURI
 		// else, set it
 		// CreateOrSetAccount can return OK and then the tx be rejected anyway later.
 		// So, don't panic on errors, we only care about GetAccount in the next loop
-		err = c.CreateOrSetAccount(account, common.Address{}, infoURI, acct.Nonce, nil)
+		err = c.SetAccount(account, common.Address{}, infoURI, acct.Nonce, nil, false)
 		if err != nil {
 			log.Debugf("CreateOrSetAccount try %d: %v", i, err)
 		}
@@ -443,7 +443,7 @@ func (c *testClient) ensureAccountExists(account *ethereum.SignKeys, faucetPkg *
 			return nil
 		}
 
-		err = c.CreateOrSetAccount(account, common.Address{}, "ipfs://", 0, faucetPkg)
+		err = c.SetAccount(account, common.Address{}, "ipfs://", 0, faucetPkg, true)
 		if err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, nevermind, job done.
