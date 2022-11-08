@@ -17,10 +17,11 @@ func TestTransactionCostsAsMap(t *testing.T) {
 		RegisterKey:             500,
 		NewProcess:              600,
 		SendTokens:              700,
-		SetAccount:              800,
+		SetAccountInfoURI:       800,
 		AddDelegateForAccount:   900,
 		DelDelegateForAccount:   1000,
 		CollectFaucet:           1100,
+		CreateAccount:           1200,
 	}
 	txCostsBytes := txCosts.AsMap()
 
@@ -36,6 +37,7 @@ func TestTransactionCostsAsMap(t *testing.T) {
 		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   900,
 		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   1000,
 		models.TxType_COLLECT_FAUCET:             1100,
+		models.TxType_CREATE_ACCOUNT:             1200,
 	}
 	qt.Assert(t, txCostsBytes, qt.DeepEquals, expected)
 }
@@ -48,10 +50,11 @@ func TestTxCostNameToTxType(t *testing.T) {
 		"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
 		"NewProcess":              models.TxType_NEW_PROCESS,
 		"SendTokens":              models.TxType_SEND_TOKENS,
-		"SetAccount":              models.TxType_SET_ACCOUNT_INFO_URI,
+		"SetAccountInfoURI":       models.TxType_SET_ACCOUNT_INFO_URI,
 		"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 		"DelDelegateForAccount":   models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 		"CollectFaucet":           models.TxType_COLLECT_FAUCET,
+		"CreateAccount":           models.TxType_CREATE_ACCOUNT,
 	}
 	for k, v := range fields {
 		qt.Assert(t, TxCostNameToTxType(k), qt.Equals, v)

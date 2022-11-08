@@ -174,7 +174,8 @@ var Genesis = map[string]VochainGenesis{
              "Tx_RegisterKey": 1,
              "Tx_NewProcess": 10,
              "Tx_SendTokens": 1,
-             "Tx_SetAccountInfo": 5,
+             "Tx_CreateAccount": 5,
+             "Tx_SetAccountInfoURI": 5,
              "Tx_AddDelegateForAccount": 5,
              "Tx_DelDelegateForAccount": 5,
              "Tx_CollectFaucet": 0
@@ -335,7 +336,8 @@ var Genesis = map[string]VochainGenesis{
          "Tx_RegisterKey": 10,
          "Tx_NewProcess": 10,
          "Tx_SendTokens": 10,
-         "Tx_SetAccountInfo": 10,
+         "Tx_CreateAccount": 10,
+         "Tx_SetAccountInfoURI": 10,
          "Tx_AddDelegateForAccount": 10,
          "Tx_DelDelegateForAccount": 10,
          "Tx_CollectFaucet": 10
@@ -493,7 +495,8 @@ var Genesis = map[string]VochainGenesis{
          "Tx_RegisterKey": 100,
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,
-         "Tx_SetAccountInfo": 100,
+         "Tx_CreateAccount": 100,
+         "Tx_SetAccountInfoURI": 100,
          "Tx_AddDelegateForAccount": 100,
          "Tx_DelDelegateForAccount": 100,
          "Tx_CollectFaucet": 100
