@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM golang:1.18.6 AS builder
+FROM golang:1.18.8 AS builder
 
 ARG BUILDARGS
 

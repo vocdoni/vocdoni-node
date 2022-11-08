@@ -5,59 +5,50 @@ on: [push, pull_request]
 
 jobs:
   job_go_tests:
-    runs-on: ubuntu-latest      # if using self-hosted, make sure the runner has not conflicts PATH, CACHE, etc. with actions/setup-xyz
+    runs-on: ubuntu-latest
     if: github.repository == 'vocdoni/vocdoni-node'
     defaults:
       run:
         shell: bash
     steps:
-      - 
-        name: Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
-      - 
-        name: Set up Go environment
+      - name: Set up Go environment
         uses: actions/setup-go@v3
         with:
-          go-version: '1.18.6'
+          go-version: '1.18.8'
           cache: true
-      - 
-        name: Check Go and tidy cache
+      - name: Check Go and tidy cache
         run: |
           echo "* Golang version: $(go version)"
           echo "* HOME value in this node: $HOME"
           echo "* Running go mod tidy"
           go mod tidy
-      - 
-        name: Run gofmt
+      - name: Run gofmt
         # Run gofmt first, as it's quick and issues are common.
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-      - 
-        name: Run go test cover
+      - name: Run go test cover
         run: |
           # check that log lines contains no invalid chars (evidence of format mismatch)
           export LOG_PANIC_ON_INVALIDCHARS=true
           # we run vet in another step
           go test -vet=off -timeout=1m -coverprofile=covprofile ./...
-      - 
-        name: go test race
+      - name: Run go test race
         run: |
           # check that log lines contains no invalid chars (evidence of format mismatch)
           export LOG_PANIC_ON_INVALIDCHARS=true
           # -race can easily make the crypto stuff 10x slower
           go test -vet=off -timeout=15m -race ./...
-      - 
-        name: Run go vet
+      - name: Run go vet
         run: go vet ./...
-      - 
-        name: Download staticcheck
+      - name: Download staticcheck
+        # staticcheck provides a github action, use it: https://staticcheck.io/docs/running-staticcheck/ci/github-actions/
         run: |
-          curl -L https://github.com/dominikh/go-tools/releases/download/2022.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
-      - 
-        name: Run staticcheck
+          curl -L https://github.com/dominikh/go-tools/releases/download/v0.3.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
+      - name: Run staticcheck
         run: |
           ./staticcheck/staticcheck ./... 2> staticcheck/stderr
-      - 
-        name: Check staticcheck stderr (this step isn't needed because we are using actions/setup-go@v3 on GitHub hosted runner)
+      - name: Check staticcheck stderr (this step isn't needed because we are using actions/setup-go@v3 on GitHub hosted runner)
         run: |
           if cat staticcheck/stderr | grep "matched no packages" ; then
             echo "staticcheck step did nothing, due to https://github.com/vocdoni/vocdoni-node/issues/444"
@@ -71,8 +62,7 @@ jobs:
             fi
             exit 2
           fi
-      - 
-        name: Run go build for Mac
+      - name: Run go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
@@ -82,11 +72,9 @@ jobs:
     runs-on: self-hosted
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
-      - 
-        name: Check out the repo
+      - name: Check out the repo
         uses: actions/checkout@v3
-      - 
-        name: Run compose script
+      - name: Run compose script
         run: |
           export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
           export DOCKER_CLI_EXPERIMENTAL=enabled
@@ -104,35 +92,29 @@ jobs:
     needs: [job_go_tests, job_compose_test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
     steps:
-      - 
-        name: Check out the repo
+      - name: Check out the repo
         uses: actions/checkout@v3
-      - 
-        name: Set up Docker Buildx
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      - 
-        name: Login to DockerHub
+      - name: Login to DockerHub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-      - 
-        name: Login to GitHub Container Registry
+      - name: Login to GitHub Container Registry
         uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
-      - 
-        name: Get short branch name
+      - name: Get short branch name
         id: var
         shell: bash
         # Grab the short branch name, convert slashes to dashes (update these lines with updated set-output syntax)
         run: |
           # must be changed: https://github.blog/changelog/2022-10-11-github-actions-deprecating-save-state-and-set-output-commands/
           echo "##[set-output name=short_branch_name;]$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )"
-      - 
-        name: Push image to Docker Hub and ghcr.io
+      - name: Push image to Docker Hub and ghcr.io
         uses: docker/build-push-action@v3
         with:
           context: .
@@ -143,8 +125,7 @@ jobs:
             ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.short_branch_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - 
-        name: Push image to Docker Hub and ghcr.io (race enabled)
+      - name: Push image to Docker Hub and ghcr.io (race enabled)
         uses: docker/build-push-action@v3
         if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
         with:
