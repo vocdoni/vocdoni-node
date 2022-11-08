@@ -207,6 +207,8 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	}
 
 	oracles := []string{mngKey.AddressString()}
+	accounts := []string{mngKey.AddressString()}
+	defaultAccountsBalance := int(1000000)
 	treasurer := mngKey.AddressString()
 	genBytes, err := vochain.NewGenesis(
 		cfg,
@@ -214,6 +216,8 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 		consensusParams,
 		[]privval.FilePV{*validator},
 		oracles,
+		accounts,
+		defaultAccountsBalance,
 		treasurer,
 		new(vochain.TransactionCosts), // set all costs to zero
 	)
