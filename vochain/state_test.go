@@ -162,6 +162,12 @@ func (l *Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32
 func (l *Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error {
 	return nil
 }
+func (l *Listener) OnSetAccount(addr []byte, account *Account) error {
+	return nil
+}
+func (l *Listener) OnTransferTokens(from, to []byte, amount uint64) error {
+	return nil
+}
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }

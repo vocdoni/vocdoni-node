@@ -704,6 +704,13 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 func (s *Scrutinizer) OnProcessesStart(pids [][]byte) {
 }
 
+func (s *Scrutinizer) OnSetAccount(addr []byte, account *vochain.Account) error {
+	return nil
+}
+func (s *Scrutinizer) OnTransferTokens(from, to []byte, amount uint64) error {
+	return nil
+}
+
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
 	r := [][]string{}
