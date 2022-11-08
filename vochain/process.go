@@ -498,7 +498,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 			"with anonymous envelope type and viceversa")
 	}
 	if tx.Process.Mode.PreRegister &&
-		(tx.Process.MaxCensusSize == nil || *tx.Process.MaxCensusSize <= 0) {
+		(tx.Process.MaxCensusSize == nil || tx.Process.GetMaxCensusSize() <= 0) {
 		return nil, common.Address{}, fmt.Errorf("pre-register mode requires setting " +
 			"maxCensusSize to be > 0")
 	}
@@ -516,7 +516,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
 		}
-		if *tx.Process.MaxCensusSize > uint64(circuits[len(circuits)-1].Parameters[0]) {
+		if tx.Process.GetMaxCensusSize() > uint64(circuits[len(circuits)-1].Parameters[0]) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",
 				circuits[len(circuits)-1].Parameters[0])
