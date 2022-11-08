@@ -111,9 +111,9 @@ func TestBalanceTransfer(t *testing.T) {
 	addr2 := ethereum.SignKeys{}
 	addr2.Generate()
 
-	err = s.CreateAccount(addr1.Address(), "ipfs://", make([]common.Address, 0), 50)
+	err = s.createAccount(addr1.Address(), "ipfs://", [][]byte{}, 50)
 	qt.Assert(t, err, qt.IsNil)
-	err = s.CreateAccount(addr2.Address(), "ipfs://", make([]common.Address, 0), 0)
+	err = s.CreateAccount(addr2.Address(), "ipfs://", [][]byte{})
 	qt.Assert(t, err, qt.IsNil)
 
 	s.Save() // Save to test committed value on next call
