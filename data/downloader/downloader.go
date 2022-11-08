@@ -114,11 +114,11 @@ func (d *Downloader) TotalItemsAdded() int32 {
 // handleImport fetches and imports a remote file. If the download fails, the file
 // is added to a secondary queue for retrying.
 func (d *Downloader) handleImport(item *DownloadItem) {
-	log.Infof("retrieving remote file %q", item.URI)
+	log.Infof("pining remote file %q", item.URI)
 	d.queueAddDelta(1)
 	defer d.queueAddDelta(-1)
 	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-	data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+	err := d.RemoteStorage.Pin(ctx, item.URI)
 	cancel()
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -127,21 +127,18 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 			d.failedQueue[item.URI] = item
 			d.failedQueueLock.Unlock()
 		} else {
-			log.Warnf("cannot retrieve file %q: (%v)", item.URI, err)
+			log.Warnf("cannot pin file %q: (%v)", item.URI, err)
 		}
 		return
 	}
+	ctx, cancel = context.WithTimeout(context.Background(), ImportPinTimeout)
+	defer cancel()
+	data, err := d.RemoteStorage.Retrieve(ctx, item.URI, 0)
+	if err != nil {
+		log.Warnf("could not retrieve file %q: %v", item.URI, err)
+	}
 	if item.Callback != nil {
 		go item.Callback(item.URI, data)
-	}
-	if item.Pin {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
-			defer cancel()
-			if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
-				log.Warnf("could not pin file %q: %v", item.URI, err)
-			}
-		}()
 	}
 }
 
@@ -182,7 +179,7 @@ func (d *Downloader) handleImportFailedQueue() {
 	for cid, item := range d.importFailedQueue() {
 		log.Debugf("retrying download %s", cid)
 		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+		err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()))
 		cancel()
 		if err != nil {
 			continue
@@ -190,18 +187,15 @@ func (d *Downloader) handleImportFailedQueue() {
 		d.failedQueueLock.Lock()
 		delete(d.failedQueue, cid)
 		d.failedQueueLock.Unlock()
+		//item := item // copy the range variable as it is continuously modified
+		ctx, cancel = context.WithTimeout(context.Background(), ImportPinTimeout)
+		defer cancel()
+		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+		if err != nil {
+			log.Warnf("could not pin file %q: %v", item.URI, err)
+		}
 		if item.Callback != nil {
 			go item.Callback(item.URI, data)
-		}
-		if item.Pin {
-			item := item // copy the range variable as it is continuously modified
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
-				defer cancel()
-				if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
-					log.Warnf("could not pin file %q: %v", item.URI, err)
-				}
-			}()
 		}
 	}
 }

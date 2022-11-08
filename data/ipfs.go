@@ -152,13 +152,11 @@ func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (string, error) {
 }
 
 func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash string, err error) {
-
 	defer i.Node.Blockstore.PinLock(ctx).Unlock(ctx)
 	stat, err := os.Lstat(root)
 	if err != nil {
 		return "", err
 	}
-
 	f, err := files.NewSerialFile(root, false, stat)
 	if err != nil {
 		return "", err
@@ -168,18 +166,19 @@ func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash strin
 	if err != nil {
 		return "", err
 	}
-
 	node, err := fileAdder.AddAllAndPin(ctx, f)
 	if err != nil {
 		return "", err
 	}
+
 	return node.Cid().String(), nil
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	// TODO: check if already pinned
 	// Replace ipfs prefix by ipld valid prefix (this is a hack, we should make it better)
-	path = strings.Replace(path, "ipfs://", "/ipld/", 1)
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	log.Warnf("Pining %s", path)
 	p := corepath.New(path)
 	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
@@ -251,7 +250,7 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache)
 func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
-	path = strings.TrimPrefix(path, "ipfs://")
+	path = strings.ReplaceAll(path, "ipfs://", "/ipfs/")
 	ccontent := i.retriveCache.Get(path)
 	if ccontent != nil {
 		log.Debugf("retreived file %s from cache", path)
