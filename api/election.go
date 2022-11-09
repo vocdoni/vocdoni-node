@@ -171,7 +171,7 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /election/electionID/<electionID>
+// /election/<electionID>
 // get election information
 func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))

@@ -14,6 +14,23 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Election returns the election details given its ID.
+func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) {
+	resp, code, err := c.Request("GET", nil, "election", electionID.String())
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	election := &api.Election{}
+	if err = json.Unmarshal(resp, election); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return election, nil
+}
+
+// NewElectionrRaw creates a new election given the protobuf Process message.
 func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, error) {
 	// get the own account details
 	acc, err := c.Account("")
@@ -66,6 +83,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	return electionCreate.ElectionID, nil
 }
 
+// NewElection creates a new election given the election details.
 func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.HexBytes, error) {
 	var err error
 	if c.account == nil {
@@ -239,4 +257,71 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	}
 
 	return electionCreate.ElectionID, nil
+}
+
+// SetElectionStatus configures the status of an election. The status can be one of the following:
+// "READY", "ENDED", "CANCELED", "PAUSED". Not all transition status are valid.
+// Returns the transaction hash.
+func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string) (types.HexBytes, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+	statusEnum, err := func() (models.ProcessStatus, error) {
+		statusInt, ok := models.ProcessStatus_value[status]
+		if !ok {
+			return 0, fmt.Errorf("invalid status %s", status)
+		}
+		return models.ProcessStatus(statusInt), nil
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	// get the own account details
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
+	}
+
+	// build the set process transaction
+	tx := models.SetProcessTx{
+		Txtype:    models.TxType_SET_PROCESS_STATUS,
+		ProcessId: electionID,
+		Status:    &statusEnum,
+		Nonce:     acc.Nonce,
+	}
+	txb, err := proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: &tx,
+		}})
+	if err != nil {
+		return nil, err
+	}
+	signedTxb, err := c.account.SignVocdoniTx(txb, c.chainID)
+	if err != nil {
+		return nil, err
+	}
+	stx, err := proto.Marshal(
+		&models.SignedTx{
+			Tx:        txb,
+			Signature: signedTxb,
+		})
+	if err != nil {
+		return nil, err
+	}
+
+	// send the transaction
+	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transaction", "submit")
+	if err != nil {
+		return nil, err
+	}
+	if code != bearerstdapi.HTTPstatusCodeOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	txResp := new(api.Transaction)
+	err = json.Unmarshal(resp, txResp)
+	if err != nil {
+		return nil, err
+	}
+	return txResp.Hash, nil
 }
