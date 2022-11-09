@@ -10,11 +10,6 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-const (
-	ElectionCensusTypeCSP  = "csp"
-	ElectionCensusTypeTree = "treeWeighted"
-)
-
 type Organization struct {
 	OrganizationID types.HexBytes      `json:"organizationID,omitempty"`
 	Elections      []*ElectionSummary  `json:"elections,omitempty"`
@@ -209,11 +204,14 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	var origin models.CensusOrigin
 	var root []byte
 	switch ctype.Type {
-	case ElectionCensusTypeCSP:
+	case CensusTypeCSP:
 		origin = models.CensusOrigin_OFF_CHAIN_CA
 		root = ctype.PublicKey
-	case ElectionCensusTypeTree:
+	case CensusTypeWeighted:
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
+		root = ctype.RootHash
+	case CensusTypeZK:
+		origin = models.CensusOrigin_OFF_CHAIN_TREE
 		root = ctype.RootHash
 	default:
 		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)

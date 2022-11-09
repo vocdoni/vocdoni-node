@@ -57,21 +57,22 @@ func (c *HTTPclient) CensusAddVoter(censusID, voterKey types.HexBytes, weight ui
 	return nil
 }
 
-// CensusPublish publishes a census to the distributed data storage and returns its root hash.
-func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, error) {
+// CensusPublish publishes a census to the distributed data storage and returns its root hash
+// and storage URI.
+func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, string, error) {
 	resp, code, err := c.Request("GET", nil, "census", censusID.String(), "publish")
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 	if code != 200 {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+		return nil, "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
 	err = json.Unmarshal(resp, censusData)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+		return nil, "", fmt.Errorf("could not unmarshal response: %w", err)
 	}
-	return censusData.CensusID, nil
+	return censusData.CensusID, censusData.URI, nil
 }
 
 // CensusGenProof generates a proof for a voter in a census. The voterKey is the public key or address of the voter.

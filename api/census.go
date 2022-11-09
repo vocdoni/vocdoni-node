@@ -20,11 +20,14 @@ import (
 )
 
 const (
-	CensusHandler      = "census"
+	CensusHandler = "census"
+
 	CensusTypeWeighted = "weighted"
 	CensusTypeZK       = "zkindexed"
-	censusIDsize       = 32
-	censusKeysize      = 32
+	CensusTypeCSP      = "csp"
+
+	censusIDsize  = 32
+	censusKeysize = 32
 )
 
 func (a *API) enableCensusHandlers() error {
