@@ -11,6 +11,7 @@ import (
 	"path"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -73,6 +74,11 @@ func (c *HTTPclient) ChainID() string {
 func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	c.account = new(ethereum.SignKeys)
 	return c.account.AddHexKey(accountPrivateKey)
+}
+
+// MyAddress returns the address of the account used for signing transactions.
+func (c *HTTPclient) MyAddress() common.Address {
+	return c.account.Address()
 }
 
 // SetAuthToken configures the bearer authentication token.

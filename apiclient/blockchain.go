@@ -11,9 +11,11 @@ import (
 )
 
 var (
+	//ErrTransactionDoesNotExist is returned when the transaction does not exist
 	ErrTransactionDoesNotExist = fmt.Errorf("transaction does not exist")
 )
 
+// TransactionReference returns the reference of a transaction given its hash.
 func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.TransactionReference, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "chain", "transaction", "reference", txHash.String())
 	if err != nil {
@@ -29,6 +31,8 @@ func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.Transacti
 	return txRef, nil
 }
 
+// TransactionByHash returns the full transaction given its hash.  For querying if a transaction is included in a block,
+// use TransactionReference which is much faster.
 func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error) {
 	ref, err := c.TransactionReference(txHash)
 	if err != nil {

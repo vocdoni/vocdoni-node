@@ -12,9 +12,12 @@ import (
 )
 
 var (
+	// ErrAccountNotConfigured is returned when the client has not been configured with an account.
 	ErrAccountNotConfigured = fmt.Errorf("account not configured")
 )
 
+// Account returns the information about a Vocdoni account. If address is empty, it returns the information
+// about the account associated with the client.
 func (c *HTTPclient) Account(address string) (*api.Account, error) {
 	if address == "" {
 		if c.account == nil {
@@ -37,6 +40,8 @@ func (c *HTTPclient) Account(address string) (*api.Account, error) {
 	return acc, nil
 }
 
+// Transfer sends tokens from the account associated with the client to the given address.
+// Returns the transaction hash.
 func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes, error) {
 	acc, err := c.Account("")
 	if err != nil {
@@ -60,6 +65,8 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 	return txHash, err
 }
 
+// AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
+// to pay for the costs of the transaction.  Returns the transaction hash.
 func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) {
 	var err error
 	faucetPackageProto := &models.FaucetPackage{}
