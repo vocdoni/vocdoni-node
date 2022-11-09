@@ -178,7 +178,6 @@ func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	// TODO: check if already pinned
 	// Replace ipfs prefix by ipld valid prefix (this is a hack, we should make it better)
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-	log.Warnf("Pining %s", path)
 	p := corepath.New(path)
 	rp, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
