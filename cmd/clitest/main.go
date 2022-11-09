@@ -1,22 +1,17 @@
 package main
 
 import (
-	"encoding/json"
-	"io/ioutil"
-	"net/http"
+	"fmt"
 	"net/url"
 	"time"
 
 	flag "github.com/spf13/pflag"
+	vapi "go.vocdoni.io/dvote/api"
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/apiclient"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -96,7 +91,7 @@ func main() {
 	}
 
 	// Publish the census
-	root, err := api.CensusPublish(censusID)
+	root, censusURI, err := api.CensusPublish(censusID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,68 +108,53 @@ func main() {
 		proofs = append(proofs, pr)
 	}
 	log.Debugf(" %d voting proofs generated successfully", len(proofs))
-}
 
-func ensureTxIsMined(api *apiclient.HTTPclient, txHash types.HexBytes) {
-	for startTime := time.Now(); time.Since(startTime) < 30*time.Second; {
-		_, err := api.TransactionReference(txHash)
-		if err == nil {
-			return
-		}
-		time.Sleep(2 * time.Second)
-	}
-	log.Fatalf("tx %s not mined", txHash.String())
-}
+	// Create a new process
+	electionID, err := api.NewElection(&vapi.ElectionDescription{
+		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
+		Description: map[string]string{"default": "Test election description"},
+		EndDate:     time.Now().Add(time.Minute * 20),
 
-func getFaucetPkg(accountAddress string) ([]byte, error) {
-	var c http.Client
-	u, err := url.Parse(faucetURL + accountAddress)
-	if err != nil {
-		return nil, err
-	}
+		VoteType: vapi.VoteType{
+			UniqueChoices:     false,
+			MaxVoteOverwrites: 1,
+		},
 
-	resp, err := c.Do(&http.Request{
-		Method: "GET",
-		URL:    u,
-		Header: http.Header{
-			"Authorization": []string{"Bearer " + faucetToken},
-			"User-Agent":    []string{"Vocdoni API client / 1.0"},
+		ElectionType: vapi.ElectionType{
+			Autostart:         true,
+			Interruptible:     true,
+			Anonymous:         false,
+			SecretUntilTheEnd: true,
+			DynamicCensus:     false,
+		},
+
+		Census: vapi.CensusTypeDescription{
+			RootHash: root,
+			URL:      censusURI,
+			Type:     "weighted",
+		},
+
+		Questions: []vapi.Question{
+			{
+				Title:       map[string]string{"default": "Test question 1"},
+				Description: map[string]string{"default": "Test question 1 description"},
+				Choices: []vapi.ChoiceMetadata{
+					{
+						Title: map[string]string{"default": "Yes"},
+						Value: 0,
+					},
+					{
+						Title: map[string]string{"default": "No"},
+						Value: 0,
+					},
+				},
+			},
 		},
 	})
 	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+		log.Fatal(err)
 	}
 
-	log.Debugf("received response from faucet: %s", data)
-	type faucetResp struct {
-		Amount    uint32         `json:"amount"`
-		Payload   []byte         `json:"faucetPayload"`
-		Signature types.HexBytes `json:"signature"`
-	}
-
-	var fResp faucetResp
-	json.Unmarshal(data, &fResp)
-	if err != nil {
-		return nil, err
-	}
-	return proto.Marshal(&models.FaucetPackage{
-		Payload:   fResp.Payload,
-		Signature: fResp.Signature})
-}
-
-func generateAccounts(number int) ([]*ethereum.SignKeys, error) {
-	accounts := make([]*ethereum.SignKeys, number)
-	for i := 0; i < number; i++ {
-		accounts[i] = &ethereum.SignKeys{}
-		if err := accounts[i].Generate(); err != nil {
-			return nil, err
-		}
-	}
-	return accounts, nil
+	log.Infof("created new election with id %s", electionID.String())
+	// next => check election ID exists
 }
