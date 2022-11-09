@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// ChainInfo returns some information about the chain, such as block height.
 func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "chain", "info")
 	if err != nil {

@@ -7,6 +7,8 @@ import (
 
 	flag "github.com/spf13/pflag"
 	vapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/apiclient"
@@ -22,6 +24,7 @@ const (
 func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level")
+	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
 
@@ -38,35 +41,46 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Generate the organization account
-	account := util.RandomHex(32)
-	log.Infof("new account generated, private key is %s", account)
+	// Check if account is defined
+	account := *accountPrivKey
+	if account == "" {
+		// Generate the organization account
+		account = util.RandomHex(32)
+		log.Infof("new account generated, private key is %s", account)
+	}
+
+	// Set the account in the API client, so we can sign transactions
 	if err := api.SetAccount(account); err != nil {
 		log.Fatal(err)
 	}
 
-	// Get the faucet package of bootstrap tokens
-	log.Infof("getting faucet package")
-	faucetPkg, err := getFaucetPkg(api.MyAddress().Hex())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// Create the organization account and bootstraping with the faucet package
-	log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
-	hash, err := api.AccountBootstrap(faucetPkg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	ensureTxIsMined(api, hash)
-
+	// If the account does not exist, create a new one
+	// TODO: check if the account balance is low and use the faucet
 	acc, err := api.Account("")
 	if err != nil {
-		log.Fatal(err)
+		// Get the faucet package of bootstrap tokens
+		log.Infof("getting faucet package")
+		faucetPkg, err := getFaucetPkg(api.MyAddress().Hex())
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		// Create the organization account and bootstraping with the faucet package
+		log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
+		hash, err := api.AccountBootstrap(faucetPkg)
+		if err != nil {
+			log.Fatal(err)
+		}
+		ensureTxIsMined(api, hash)
+		acc, err = api.Account("")
+		if err != nil {
+			log.Fatal(err)
+		}
+		if acc.Balance == 0 {
+			log.Fatal("account balance is 0")
+		}
 	}
-	if acc.Balance == 0 {
-		log.Fatal("account balance is 0")
-	}
+
 	log.Infof("account %s balance is %d", api.MyAddress().Hex(), acc.Balance)
 
 	// Create a new census
@@ -74,7 +88,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("new census created with id %s", censusID)
+	log.Infof("new census created with id %s", censusID.String())
 
 	// Genreate 10 participant accounts
 	voterAccounts, err := generateAccounts(10)
@@ -109,7 +123,7 @@ func main() {
 	}
 	log.Debugf(" %d voting proofs generated successfully", len(proofs))
 
-	// Create a new process
+	// Create a new Election
 	electionID, err := api.NewElection(&vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
 		Description: map[string]string{"default": "Test election description"},
@@ -124,7 +138,7 @@ func main() {
 			Autostart:         true,
 			Interruptible:     true,
 			Anonymous:         false,
-			SecretUntilTheEnd: true,
+			SecretUntilTheEnd: false,
 			DynamicCensus:     false,
 		},
 
@@ -145,7 +159,7 @@ func main() {
 					},
 					{
 						Title: map[string]string{"default": "No"},
-						Value: 0,
+						Value: 1,
 					},
 				},
 			},
@@ -155,6 +169,65 @@ func main() {
 		log.Fatal(err)
 	}
 
+	election := ensureElectionCreated(api, electionID)
 	log.Infof("created new election with id %s", electionID.String())
-	// next => check election ID exists
+	log.Debugf("election details: %+v", *election)
+
+	// Wait for the election to start
+	waitUntilElectionStarts(api, electionID)
+
+	// Send the votes
+	voteIDs := []types.HexBytes{}
+	for i, voterAccount := range voterAccounts {
+		log.Infof("voting %d", i)
+		if err := api.SetAccount(fmt.Sprintf("%x", voterAccount.PrivateKey())); err != nil {
+			log.Fatal(err)
+		}
+		vid, err := api.Vote(&apiclient.VoteData{
+			ElectionID: electionID,
+			ProofTree:  proofs[i],
+			Choices:    []int{i % 2},
+			KeyType:    models.ProofArbo_ADDRESS,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+		voteIDs = append(voteIDs, vid)
+		log.Debugf("vote %d submit! with id %s", i, vid.String())
+	}
+	log.Debugf("%d votes submitted successfully", len(voteIDs))
+
+	// Set the account back to the organization account
+	if err := api.SetAccount(account); err != nil {
+		log.Fatal(err)
+	}
+
+	// End the election by seting the status to ENDED
+	log.Infof("ending election...")
+	hash, err := api.SetElectionStatus(electionID, "ENDED")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// Check the election status is actually ENDED
+	ensureTxIsMined(api, hash)
+	election, err = api.Election(electionID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if election.Status != "ENDED" {
+		log.Fatal("election status is not ENDED")
+	}
+	log.Infof("election %s status is ENDED", electionID.String())
+
+	// Wait for the election to be in RESULTS state
+	log.Infof("waiting for election to be in RESULTS state...")
+	waitUntilElectionStatus(api, electionID, "RESULTS")
+	log.Infof("election %s status is RESULTS", electionID.String())
+
+	election, err = api.Election(electionID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Infof("election results: %v", election.Results)
 }

@@ -82,6 +82,11 @@ func (k *SignKeys) PublicKey() []byte {
 	return ethcrypto.CompressPubkey(&k.Public)
 }
 
+// PrivateKey returns the private key
+func (k *SignKeys) PrivateKey() []byte {
+	return ethcrypto.FromECDSA(&k.Private)
+}
+
 // DecompressPubKey takes a hexString compressed public key and returns it descompressed. If already decompressed, returns the same key.
 func DecompressPubKey(pubComp []byte) ([]byte, error) {
 	if len(pubComp) > PubKeyLengthBytes {

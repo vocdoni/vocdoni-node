@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 const VoteHandler = "vote"
@@ -49,6 +50,15 @@ func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
+
+	// check if the transaction is of the correct type
+	if ok, err := isTransactionType(req.TxPayload, &models.Tx_Vote{}); err != nil {
+		return fmt.Errorf("could not check transaction type: %w", err)
+	} else if !ok {
+		return fmt.Errorf("transaction is not of type NewProcess")
+	}
+
+	// send the transaction to the mempool
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
 		return err
