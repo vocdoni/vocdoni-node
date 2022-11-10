@@ -172,3 +172,23 @@ func printPrettierDelegates(delegates [][]byte) []string {
 	}
 	return prettierDelegates
 }
+
+// checks if the given delegates are not duplicated
+// if addr is not nill will check if the addr is present in the delegates
+func checkDuplicateDelegates(delegates [][]byte, addr *ethcommon.Address) error {
+	delegatesToSetMap := make(map[ethcommon.Address]bool)
+	for _, delegate := range delegates {
+		delegateAddress := ethcommon.BytesToAddress(delegate)
+		if addr != nil {
+			if delegateAddress == *addr {
+				return fmt.Errorf("delegate cannot be the same as the sender")
+			}
+		}
+		if _, ok := delegatesToSetMap[delegateAddress]; !ok {
+			delegatesToSetMap[delegateAddress] = true
+			continue
+		}
+		return fmt.Errorf("duplicate delegate address %s", delegateAddress)
+	}
+	return nil
+}

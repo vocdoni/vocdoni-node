@@ -76,13 +76,11 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 		}
 	}
 	stx := models.SignedTx{}
-	infoURI := string("none")
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
 			SetAccount: &models.SetAccountTx{
-				Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
+				Txtype:        models.TxType_CREATE_ACCOUNT,
 				Nonce:         new(uint32),
-				InfoURI:       &infoURI,
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPackageProto,
 			},

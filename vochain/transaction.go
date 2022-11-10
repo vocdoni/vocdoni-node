@@ -187,23 +187,25 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
-		var err error
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
-			err = CreateAccountTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := CreateAccountTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 			if err != nil {
 				return nil, fmt.Errorf("createAccount: %w", err)
 			}
+
 		case models.TxType_SET_ACCOUNT_INFO_URI:
-			err = SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 			}
+
 		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-			err = SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
 			}
+
 		default:
 			return nil, fmt.Errorf("setAccount: invalid transaction type")
 		}
@@ -215,26 +217,10 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 				if err != nil {
 					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
-				delegates := make([][]byte, 0)
-				if len(tx.Delegates) != 0 {
-					delegatesMap := make(map[common.Address]bool)
-					for _, v := range tx.Delegates {
-						d := common.BytesToAddress(v)
-						if d == types.EthereumZeroAddress {
-							return nil, fmt.Errorf("createAccountTx: delegate cannot be zero address")
-						}
-						if _, ok := delegatesMap[d]; !ok {
-							delegatesMap[d] = true
-							delegates = append(delegates, d.Bytes())
-						} else {
-							return nil, fmt.Errorf("duplicate delegate address %s", d)
-						}
-					}
-				}
 				if err := app.State.CreateAccount(
 					txSenderAddress,
 					tx.GetInfoURI(),
-					delegates,
+					tx.GetDelegates(),
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
@@ -283,10 +269,10 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: burnCostIncrementNonce %w", err)
 				}
-				accountAddress := common.BytesToAddress(tx.GetAccount())
-				if accountAddress != types.EthereumZeroAddress {
+				txAccount := common.BytesToAddress(tx.GetAccount())
+				if txAccount != (common.Address{}) {
 					return response, app.State.SetAccountInfoURI(
-						accountAddress,
+						txAccount,
 						tx.GetInfoURI(),
 					)
 				}
@@ -390,9 +376,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			if err := app.State.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: burnTxCost %w", err)
 			}
-			txValues := vtx.Tx.GetCollectFaucet()
 			faucetPayload := &models.FaucetPayload{}
-			if err := proto.Unmarshal(txValues.FaucetPackage.Payload, faucetPayload); err != nil {
+			if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
 				return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 			}
 			if err := app.State.ConsumeFaucetPayload(
