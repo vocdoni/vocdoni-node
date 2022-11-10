@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/tendermint/tendermint/crypto"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
@@ -67,18 +66,25 @@ func (a *Account) IsDelegate(addr common.Address) bool {
 
 // AddDelegate adds an address to the list of delegates for an account
 func (a *Account) AddDelegate(addr common.Address) error {
+	if a.IsDelegate(addr) {
+		return fmt.Errorf("address %s is already a delegate", addr.String())
+	}
 	a.DelegateAddrs = append(a.DelegateAddrs, addr.Bytes())
 	return nil
 }
 
 // DelDelegate removes an address from the list of delegates for an account
-func (a *Account) DelDelegate(addr common.Address) {
+func (a *Account) DelDelegate(addr common.Address) error {
 	for i, d := range a.DelegateAddrs {
+		if !a.IsDelegate(addr) {
+			return fmt.Errorf("address %s is not a delegate", addr.String())
+		}
 		if bytes.Equal(addr.Bytes(), d) {
 			a.DelegateAddrs[i] = a.DelegateAddrs[len(a.DelegateAddrs)-1]
 			a.DelegateAddrs = a.DelegateAddrs[:len(a.DelegateAddrs)-1]
 		}
 	}
+	return nil
 }
 
 // TransferBalance transfers balance from origin address to destination address,
@@ -172,9 +178,6 @@ func (v *State) AccountFromSignature(message, signature []byte) (*common.Address
 	if err != nil {
 		return &common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	if address == types.EthereumZeroAddress {
-		return &common.Address{}, nil, fmt.Errorf("invalid address")
-	}
 	acc, err := v.GetAccount(address, false)
 	if err != nil {
 		return &common.Address{}, nil, fmt.Errorf("cannot get account: %w", err)
@@ -224,23 +227,16 @@ func (v *State) IncrementAccountProcessIndex(accountAddress common.Address) erro
 }
 
 // ConsumeFaucetPayload consumes a given faucet payload storing
-// its key to the FaucetNonce tree so it can
-// only be used once
+// its key to the FaucetNonce tree so it can only be used once
 func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.FaucetPayload) error {
 	// check faucet payload
 	if faucetPayload == nil {
 		return fmt.Errorf("invalid faucet payload")
 	}
-	// check from account
-	if from == types.EthereumZeroAddress {
-		return fmt.Errorf("invalid from address")
-	}
 	// store faucet identifier
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
-	key := from.Bytes()
-	key = append(key, b...)
-	keyHash := crypto.Sha256(key)
+	keyHash := ethereum.HashRaw(append(from.Bytes(), b...))
 	if err := v.SetFaucetNonce(keyHash); err != nil {
 		return err
 	}
@@ -253,7 +249,7 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 	return nil
 }
 
-// CreateAccountTxCheck is an abstraction of the ABCI CheckTx method for creating an account
+// CreateAccountTxCheck checks if an account creation tx is valid
 func CreateAccountTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
 	if vtx == nil || txBytes == nil || signature == nil || state == nil {
 		return fmt.Errorf("invalid parameters provided, cannot check create account tx")
@@ -284,19 +280,8 @@ func CreateAccountTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	if len(infoURI) > types.MaxURLLength {
 		return ErrInvalidURILength
 	}
-	if len(tx.Delegates) != 0 {
-		delegatesMap := make(map[common.Address]bool)
-		for _, v := range tx.Delegates {
-			delegateAddress := common.BytesToAddress(v)
-			if delegateAddress == types.EthereumZeroAddress {
-				return ErrInvalidAddress
-			}
-			if _, ok := delegatesMap[delegateAddress]; !ok {
-				delegatesMap[delegateAddress] = true
-			} else {
-				return fmt.Errorf("duplicate delegate address %s", delegateAddress)
-			}
-		}
+	if err := checkDuplicateDelegates(tx.GetDelegates(), &txSenderAddress); err != nil {
+		return fmt.Errorf("invalid delegates: %w", err)
 	}
 	txCost, err := state.TxCost(models.TxType_CREATE_ACCOUNT, false)
 	if err != nil {
@@ -338,9 +323,7 @@ func CreateAccountTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	}
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
-	key := issuerAddress.Bytes()
-	key = append(key, b...)
-	keyHash := crypto.Sha256(key)
+	keyHash := ethereum.HashRaw(append(issuerAddress.Bytes(), b...))
 	used, err := state.FaucetNonce(keyHash, false)
 	if err != nil {
 		return fmt.Errorf("cannot check if faucet payload already used: %w", err)
@@ -359,17 +342,11 @@ func CreateAccountTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 }
 
 // CreateAccount creates an account
-func (v *State) CreateAccount(accountAddress common.Address,
-	infoURI string,
-	delegates [][]byte) error {
+func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates [][]byte) error {
 	return v.createAccount(accountAddress, infoURI, delegates, 0)
 }
 
-func (v *State) createAccount(accountAddress common.Address,
-	infoURI string,
-	delegates [][]byte,
-	initialBalance uint64,
-) error {
+func (v *State) createAccount(accountAddress common.Address, infoURI string, delegates [][]byte, initialBalance uint64) error {
 	newAccount := &Account{}
 	if infoURI != "" && len(infoURI) <= types.MaxURLLength {
 		newAccount.InfoURI = infoURI
@@ -387,7 +364,7 @@ func (v *State) createAccount(accountAddress common.Address,
 	return v.SetAccount(accountAddress, newAccount)
 }
 
-// SetAccountInfoTxCheck is an abstraction of ABCI checkTx for an SetAccountInfoTx transaction
+// SetAccountInfoTxCheck checks if a set account info tx is valid
 func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
 	if vtx == nil || signature == nil || txBytes == nil || state == nil {
 		return fmt.Errorf("invalid transaction parameters provided")
@@ -395,9 +372,6 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	tx := vtx.GetSetAccount()
 	if tx == nil {
 		return fmt.Errorf("invalid transaction")
-	}
-	if tx.Nonce == nil || tx.InfoURI == nil {
-		return fmt.Errorf("missing signature and/or transaction")
 	}
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
 	if err != nil {
@@ -407,11 +381,9 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	if err != nil {
 		return fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	var txAccountAddress common.Address
-	if len(tx.Account) == 0 || bytes.Equal(tx.Account, types.EthereumZeroAddress.Bytes()) {
+	txAccountAddress := common.BytesToAddress(tx.GetAccount())
+	if txAccountAddress == (common.Address{}) {
 		txAccountAddress = txSenderAddress
-	} else {
-		txAccountAddress = common.BytesToAddress(tx.Account)
 	}
 	txSenderAccount, err := state.GetAccount(txSenderAddress, false)
 	if err != nil {
@@ -425,7 +397,7 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 		return fmt.Errorf(
 			"invalid nonce, expected %d got %d",
 			txSenderAccount.Nonce,
-			tx.Nonce,
+			tx.GetNonce(),
 		)
 	}
 	// get setAccount tx cost
@@ -489,7 +461,15 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 		account.ProcessIndex,
 	)
 	for _, l := range v.eventListeners {
-		l.OnSetAccount(accountAddress.Bytes(), account)
+		l.OnSetAccount(accountAddress.Bytes(), &Account{
+			models.Account{
+				Nonce:         account.Nonce,
+				InfoURI:       account.InfoURI,
+				Balance:       account.Balance,
+				DelegateAddrs: account.DelegateAddrs,
+				ProcessIndex:  account.ProcessIndex,
+			},
+		})
 	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
@@ -547,7 +527,7 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if tx.Value <= 0 {
 		return fmt.Errorf("invalid value")
 	}
-	if len(tx.To) == 0 || bytes.Equal(tx.To, types.EthereumZeroAddress.Bytes()) {
+	if len(tx.To) == 0 {
 		return fmt.Errorf("invalid To address")
 	}
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
@@ -596,10 +576,10 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 	if tx.Value == 0 {
 		return fmt.Errorf("invalid value")
 	}
-	if len(tx.From) == 0 || bytes.Equal(tx.From, types.EthereumZeroAddress.Bytes()) {
+	if len(tx.From) == 0 {
 		return fmt.Errorf("invalid from address")
 	}
-	if len(tx.To) == 0 || bytes.Equal(tx.To, types.EthereumZeroAddress.Bytes()) {
+	if len(tx.To) == 0 {
 		return fmt.Errorf("invalid to address")
 	}
 	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
@@ -668,20 +648,8 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	if err != nil {
 		return err
 	}
-	delegatesToSetMap := make(map[common.Address]bool)
-	for _, delegate := range tx.Delegates {
-		delegateAddress := common.BytesToAddress(delegate)
-		if delegateAddress == types.EthereumZeroAddress {
-			return ErrInvalidAddress
-		}
-		if delegateAddress == *txSenderAddress {
-			return fmt.Errorf("delegate cannot be the same as the sender")
-		}
-		if _, ok := delegatesToSetMap[delegateAddress]; !ok {
-			delegatesToSetMap[delegateAddress] = true
-			continue
-		}
-		return fmt.Errorf("duplicate delegate address %s", delegateAddress)
+	if err := checkDuplicateDelegates(tx.Delegates, txSenderAddress); err != nil {
+		return fmt.Errorf("checkDuplicateDelegates: %w", err)
 	}
 	if tx.GetNonce() != txSenderAccount.Nonce {
 		return fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
@@ -695,17 +663,17 @@ func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state 
 	}
 	switch tx.Txtype {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		for _, delegate := range txSenderAccount.DelegateAddrs {
+		for _, delegate := range tx.Delegates {
 			delegateAddress := common.BytesToAddress(delegate)
-			if _, ok := delegatesToSetMap[delegateAddress]; ok {
+			if txSenderAccount.IsDelegate(delegateAddress) {
 				return fmt.Errorf("delegate %s already exists", delegateAddress.String())
 			}
 		}
 		return nil
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		for _, delegate := range txSenderAccount.DelegateAddrs {
+		for _, delegate := range tx.Delegates {
 			delegateAddress := common.BytesToAddress(delegate)
-			if _, ok := delegatesToSetMap[delegateAddress]; !ok {
+			if !txSenderAccount.IsDelegate(delegateAddress) {
 				return fmt.Errorf("delegate %s does not exist", delegateAddress.String())
 			}
 		}
@@ -739,7 +707,9 @@ func (v *State) SetAccountDelegate(accountAddr common.Address,
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
 		log.Debugf("deleting delegates %+v for account %s", delegateAddrs, accountAddr.String())
 		for _, delegate := range delegateAddrs {
-			acc.DelDelegate(common.BytesToAddress(delegate))
+			if err := acc.DelDelegate(common.BytesToAddress(delegate)); err != nil {
+				return fmt.Errorf("cannot delete delegate, DelDelegate: %w", err)
+			}
 		}
 		return v.SetAccount(accountAddr, acc)
 	default:
@@ -807,9 +777,8 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Stat
 	}
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
-	key := fromAddr.Bytes()
-	key = append(key, b...)
-	used, err := state.FaucetNonce(crypto.Sha256(key), false)
+	keyHash := ethereum.HashRaw(append(fromAddr.Bytes(), b...))
+	used, err := state.FaucetNonce(keyHash, false)
 	if err != nil {
 		return fmt.Errorf("cannot check faucet nonce: %w", err)
 	}
