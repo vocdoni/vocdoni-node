@@ -102,7 +102,7 @@ func waitUntilHeight(api *apiclient.HTTPclient, height uint32) {
 				break
 			}
 		}
-		time.Sleep(time.Second * 2)
+		time.Sleep(time.Second * 4)
 	}
 }
 
@@ -119,7 +119,7 @@ func waitUntilElectionStarts(api *apiclient.HTTPclient, electionID types.HexByte
 }
 
 func waitUntilElectionStatus(api *apiclient.HTTPclient, electionID types.HexBytes, status string) {
-	for startTime := time.Now(); time.Since(startTime) < time.Second*40; {
+	for startTime := time.Now(); time.Since(startTime) < time.Second*80; {
 		election, err := api.Election(electionID)
 		if err != nil {
 			log.Fatal(err)
@@ -127,6 +127,7 @@ func waitUntilElectionStatus(api *apiclient.HTTPclient, electionID types.HexByte
 		if election.Status == status {
 			return
 		}
+		time.Sleep(time.Second * 5)
 	}
 	log.Fatalf("election status %s not reached", status)
 }

@@ -15,7 +15,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -218,9 +217,7 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		if err != nil {
 			return fmt.Errorf("cannot get envelope height: %w", err)
 		}
-		for _, r := range scrutinizer.GetFriendlyResults(results.Votes) {
-			election.Results = append(election.Results, Result{Value: r})
-		}
+		election.Results = results.Votes
 	}
 
 	data, err := json.Marshal(election)
