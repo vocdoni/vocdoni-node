@@ -25,6 +25,7 @@ func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level")
 	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
+	nvotes := flag.Int("votes", 10, "number of votes to cast")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
 
@@ -91,7 +92,7 @@ func main() {
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Genreate 10 participant accounts
-	voterAccounts, err := generateAccounts(10)
+	voterAccounts, err := generateAccounts(*nvotes)
 	if err != nil {
 		log.Fatal(err)
 	}

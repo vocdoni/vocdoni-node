@@ -23,14 +23,14 @@ type OrganizationList struct {
 }
 
 type ElectionSummary struct {
-	ElectionID   types.HexBytes `json:"electionId"`
-	Type         string         `json:"type"`
-	Status       string         `json:"status"`
-	StartDate    time.Time      `json:"startDate"`
-	EndDate      time.Time      `json:"endDate"`
-	VoteCount    uint64         `json:"voteCount"`
-	FinalResults bool           `json:"finalResults"`
-	Results      []Result       `json:"result,omitempty"`
+	ElectionID   types.HexBytes    `json:"electionId"`
+	Type         string            `json:"type"`
+	Status       string            `json:"status"`
+	StartDate    time.Time         `json:"startDate"`
+	EndDate      time.Time         `json:"endDate"`
+	VoteCount    uint64            `json:"voteCount"`
+	FinalResults bool              `json:"finalResults"`
+	Results      [][]*types.BigInt `json:"result,omitempty"`
 }
 
 type Election struct {
@@ -72,11 +72,6 @@ type ElectionDescription struct {
 	ElectionType ElectionType          `json:"electionType"`
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
-}
-
-type Result struct {
-	Title []string `json:"title,omitempty"`
-	Value []string `json:"value"`
 }
 
 type Key struct {
