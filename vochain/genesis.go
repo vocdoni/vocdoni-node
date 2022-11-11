@@ -27,8 +27,8 @@ func GenesisAvailableChains() []string {
 // Genesis is a map containing the defaut Genesis details
 var Genesis = map[string]VochainGenesis{
 
-	// Azeno production Network
-	"azeno": {
+	// Bizono production Network
+	"bizono": {
 		AutoUpdateGenesis: false,
 		SeedNodes:         []string{"1612de9353b4bd5891981c69f554e56e07733870@seed.azeno.vocdoni.net:26656"},
 		CircuitsConfig: []artifacts.CircuitConfig{
@@ -55,8 +55,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
       {
-         "genesis_time": "2022-05-02T17:00:33.672114557Z",
-         "chain_id": "azeno",
+         "genesis_time": "2022-11-10T17:00:33.672114557Z",
+         "chain_id": "bizono",
          "consensus_params": {
            "block": {
              "max_bytes": "5242880",
@@ -213,8 +213,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-10-26T08:43:28.668436552Z",
-   "chain_id":"vocdoni-development-70",
+   "genesis_time":"2022-11-10T08:43:28.668436552Z",
+   "chain_id":"vocdoni-development-71",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",
@@ -385,8 +385,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-02-07T16:00:01.055210151Z",
-   "chain_id":"vocdoni-stage-21",
+   "genesis_time":"2022-11-10T16:00:01.055210151Z",
+   "chain_id":"vocdoni-stage-22",
    "consensus_params":{
       "block":{
          "max_bytes":"2048000",

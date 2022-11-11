@@ -24,7 +24,7 @@ import (
 // - nonce: an incremental uint32 number
 //
 // processID: 395b41cc9abcd8da6bf26964af9d7eed9e03e53415d37aa96045000600000001 represents
-// chID:vocdoni-azeno addr:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 pt:arbo nc:1
+// chID:vocdoni-bizono addr:0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045 pt:arbo nc:1
 type ProcessID struct {
 	chainID          string
 	organizationAddr common.Address
