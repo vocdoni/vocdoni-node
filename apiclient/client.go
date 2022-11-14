@@ -78,6 +78,17 @@ func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	return c.account.AddHexKey(accountPrivateKey)
 }
 
+// Clone returns a copy of the HTTPclient with the accountPrivateKey set as the account key.
+// Panics if the accountPrivateKey is not valid.
+func (c *HTTPclient) Clone(accountPrivateKey string) *HTTPclient {
+	clone := *c
+	clone.account = new(ethereum.SignKeys)
+	if err := clone.account.AddHexKey(accountPrivateKey); err != nil {
+		panic(err)
+	}
+	return &clone
+}
+
 // MyAddress returns the address of the account used for signing transactions.
 func (c *HTTPclient) MyAddress() common.Address {
 	return c.account.Address()

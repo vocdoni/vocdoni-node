@@ -44,6 +44,14 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/elections/{electionID}/votes/count",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.electionVotesCountHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/page/{page}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
@@ -120,6 +128,25 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
+// /elections/<electionID>/votes/count
+// get the number of votes for an election
+func (a *API) electionVotesCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	if err != nil || electionID == nil {
+		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
+	}
+	count := a.vocapp.State.CountVotes(electionID, true)
+	data, err := json.Marshal(
+		struct {
+			Count uint32 `json:"count"`
+		}{Count: count},
+	)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
 // /elections/<electionID>/keys
 // returns the list of public/private encryption keys
 func (a *API) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
@@ -132,7 +159,6 @@ func (a *API) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return fmt.Errorf("cannot get election keys: %w", err)
 	}
-
 	election := Election{}
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {

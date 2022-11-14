@@ -1,9 +1,13 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -29,6 +33,8 @@ func main() {
 	logLevel := flag.String("logLevel", "info", "log level")
 	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
+	paralelCount := flag.Int("paralel", 4, "number of paralel requests")
+	timeout := flag.Int("timeout", 5, "timeout in minutes")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
 
@@ -108,7 +114,7 @@ func main() {
 				Key:    voterAccount.Address().Bytes(),
 				Weight: (*types.BigInt)(new(big.Int).SetUint64(10)),
 			})
-		if i == len(voterAccounts)-1 || i == vapi.MaxCensusAddBatchSize-1 {
+		if i == len(voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
 			if err := api.CensusAddParticipants(censusID, participants); err != nil {
 				log.Fatal(err)
 			}
@@ -177,9 +183,10 @@ func main() {
 		}
 	}
 
+	pcount := *nvotes / *paralelCount
 	var wg sync.WaitGroup
-	for i := 0; i < len(voterAccounts); i += 200 {
-		end := i + 200
+	for i := 0; i < len(voterAccounts); i += pcount {
+		end := i + pcount
 		if end > len(voterAccounts) {
 			end = len(voterAccounts)
 		}
@@ -245,26 +252,87 @@ func main() {
 	// Wait for the election to start
 	waitUntilElectionStarts(api, electionID)
 
-	// Send the votes
-	voteIDs := []types.HexBytes{}
-	for i, voterAccount := range voterAccounts {
-		log.Infof("voting %d", i)
-		if err := api.SetAccount(fmt.Sprintf("%x", voterAccount.PrivateKey())); err != nil {
-			log.Fatal(err)
+	// Send the votes (paralelized)
+	startTime := time.Now()
+	wg = sync.WaitGroup{}
+	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
+		defer wg.Done()
+		log.Infof("sending %d votes", len(accounts))
+		// We use maps instead of slices to have the capacity of resending votes
+		// without repeating them.
+		accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
+		for i, acc := range accounts {
+			accountsMap[i] = acc
 		}
-		vid, err := api.Vote(&apiclient.VoteData{
-			ElectionID: electionID,
-			ProofTree:  proofs[voterAccount.Address().Hex()],
-			Choices:    []int{i % 2},
-			KeyType:    models.ProofArbo_ADDRESS,
-		})
-		if err != nil {
-			log.Fatal(err)
+		// Send the votes
+		votesSent := 0
+		for {
+			contextDeadlines := 0
+			for i, voterAccount := range accountsMap {
+				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+				_, err := c.Vote(&apiclient.VoteData{
+					ElectionID: electionID,
+					ProofTree:  proofs[voterAccount.Address().Hex()],
+					Choices:    []int{i % 2},
+					KeyType:    models.ProofArbo_ADDRESS,
+				})
+				// if the context deadline is reached, we don't need to print it (let's jus retry)
+				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+					contextDeadlines++
+					continue
+				} else if err != nil && !strings.Contains(err.Error(), "already exists") {
+					// if the error is not "vote already exists", we need to print it
+					log.Warn(err)
+					continue
+				}
+				// if the vote was sent successfully or already exists, we remove it from the accounts map
+				votesSent++
+				delete(accountsMap, i)
+
+			}
+			if len(accountsMap) == 0 {
+				break
+			}
+			log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
+			time.Sleep(time.Second * 5)
 		}
-		voteIDs = append(voteIDs, vid)
-		log.Debugf("vote %d submit! with id %s", i, vid.String())
+		log.Infof("successfully sent %d votes", votesSent)
+		time.Sleep(time.Second * 2)
 	}
-	log.Debugf("%d votes submitted successfully", len(voteIDs))
+
+	pcount = *nvotes / *paralelCount
+	for i := 0; i < len(voterAccounts); i += pcount {
+		end := i + pcount
+		if end > len(voterAccounts) {
+			end = len(voterAccounts)
+		}
+		wg.Add(1)
+		go voteAccounts(voterAccounts[i:end], &wg)
+	}
+
+	wg.Wait()
+	log.Infof("%d votes submitted successfully, took %s. At %d votes/second",
+		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
+
+	// Wait for all the votes to be verified
+	log.Infof("waiting for all the votes to be registered...")
+	for {
+		count, err := api.ElectionVoteCount(electionID)
+		if err != nil {
+			log.Warn(err)
+		}
+		if count == uint32(*nvotes) {
+			break
+		}
+		time.Sleep(time.Second * 5)
+		log.Infof("verified %d/%d votes", count, *nvotes)
+		if time.Since(startTime) > time.Duration(*timeout)*time.Minute {
+			log.Fatalf("timeout waiting for votes to be registered")
+		}
+	}
+
+	log.Infof("%d votes registered successfully, took %s. At %d votes/second",
+		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(account); err != nil {

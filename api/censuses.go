@@ -180,7 +180,8 @@ func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 		return fmt.Errorf("missing participant parameters")
 	}
 	if len(cdata.Participants) > MaxCensusAddBatchSize {
-		return fmt.Errorf("maximum number of participants per call is %d", MaxCensusAddBatchSize)
+		return fmt.Errorf("maximum number of participants per call is %d (received %d)",
+			MaxCensusAddBatchSize, len(cdata.Participants))
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)

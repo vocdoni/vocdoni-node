@@ -24,10 +24,11 @@ const (
 	// MethodAccessTypeAdmin for admin requests
 	MethodAccessTypeAdmin = "admin"
 
-	namespace         = "bearerStd"
-	bearerPrefix      = "Bearer "
-	HTTPstatusCodeOK  = 200
-	HTTPstatusCodeErr = 400
+	namespace              = "bearerStd"
+	bearerPrefix           = "Bearer "
+	HTTPstatusCodeOK       = 200
+	HTTPstatusCodeErr      = 400
+	HTTPstatusCodeNotFound = 404
 )
 
 // BearerStandardAPI is a namespace handler for the httpRouter with Bearer authorization

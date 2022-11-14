@@ -325,3 +325,23 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	}
 	return txResp.Hash, nil
 }
+
+// ElectionVoteCount returns the number of registered votes for a given election.
+func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error) {
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "votes", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != bearerstdapi.HTTPstatusCodeOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	votes := new(struct {
+		Count uint32 `json:"count"`
+	})
+
+	err = json.Unmarshal(resp, votes)
+	if err != nil {
+		return 0, err
+	}
+	return votes.Count, nil
+}

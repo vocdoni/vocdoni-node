@@ -90,3 +90,18 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 
 	return voteAPI.VoteID, nil
 }
+
+// Verify verifies a vote. The voteID is the nullifier of the vote.
+func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
+	resp, code, err := c.Request("GET", nil, "votes", "verify", electionID.String(), voteID.String())
+	if err != nil {
+		return false, err
+	}
+	if code == 200 {
+		return true, nil
+	}
+	if code == 404 {
+		return false, nil
+	}
+	return false, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+}
