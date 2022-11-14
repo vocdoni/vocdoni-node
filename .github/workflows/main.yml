@@ -1,5 +1,5 @@
 ---
-name: MainCI
+name: Main
 
 on: [push, pull_request]
 
@@ -18,31 +18,16 @@ jobs:
         with:
           go-version: '1.18.8'
           cache: true
-      - name: Check Go and tidy cache
-        run: |
-          echo "* Golang version: $(go version)"
-          echo "* HOME value in this node: $HOME"
-          echo "* Running go mod tidy"
-          go mod tidy
+      - name: Tidy go cache
+        run: go mod tidy
       - name: Run gofmt
         # Run gofmt first, as it's quick and issues are common.
         run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
-      - name: Run go test cover
-        run: |
-          # check that log lines contains no invalid chars (evidence of format mismatch)
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          # we run vet in another step
-          go test -vet=off -timeout=1m -coverprofile=covprofile ./...
-      - name: Run go test race
-        run: |
-          # check that log lines contains no invalid chars (evidence of format mismatch)
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          # -race can easily make the crypto stuff 10x slower
-          go test -vet=off -timeout=15m -race ./...
       - name: Run go vet
         run: go vet ./...
       - name: Download staticcheck
-        # staticcheck provides a github action, use it: https://staticcheck.io/docs/running-staticcheck/ci/github-actions/
+        # staticcheck provides a github action, use it (https://staticcheck.io/docs/running-staticcheck/ci/github-actions/)
+        # or use golangci-lint (github action) with staticcheck as enabled linter
         run: |
           curl -L https://github.com/dominikh/go-tools/releases/download/v0.3.3/staticcheck_linux_amd64.tar.gz | tar -xzf -
       - name: Run staticcheck
@@ -62,11 +47,51 @@ jobs:
             fi
             exit 2
           fi
+
+  job_go_build_for_mac:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release') && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18.8'
+          cache: true
+      - name: Tidy go cache
+        run: go mod tidy
       - name: Run go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
+
+  job_go_tests_extra:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18.8'
+          cache: true
+      - name: Tidy go cache
+        run: go mod tidy
+      # - name: Run go test cover
+      #   run: |
+      #     # check that log lines contains no invalid chars (evidence of format mismatch)
+      #     export LOG_PANIC_ON_INVALIDCHARS=true
+      #     # we run vet in another step
+      #     go test -vet=off -timeout=1m -coverprofile=covprofile ./...
+      - name: Run go test race
+        run: |
+          # check that log lines contains no invalid chars (evidence of format mismatch)
+          export LOG_PANIC_ON_INVALIDCHARS=true
+          # -race can easily make the crypto stuff 10x slower
+          go test -vet=off -timeout=15m -race ./...
 
   job_compose_test:
     runs-on: self-hosted
@@ -110,10 +135,9 @@ jobs:
       - name: Get short branch name
         id: var
         shell: bash
-        # Grab the short branch name, convert slashes to dashes (update these lines with updated set-output syntax)
+        # Grab the short branch name, convert slashes to dashes
         run: |
-          # must be changed: https://github.blog/changelog/2022-10-11-github-actions-deprecating-save-state-and-set-output-commands/
-          echo "##[set-output name=short_branch_name;]$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )"
+          echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )" >> $GITHUB_OUTPUT
       - name: Push image to Docker Hub and ghcr.io
         uses: docker/build-push-action@v3
         with:
@@ -121,8 +145,8 @@ jobs:
           # platforms: linux/amd64,linux/arm64
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.var.outputs.short_branch_name }},
-            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.short_branch_name }}
+            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.var.outputs.branch_name }},
+            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push image to Docker Hub and ghcr.io (race enabled)
@@ -134,7 +158,7 @@ jobs:
           build-args: |
             BUILDARGS=-race
           tags: |
-            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.var.outputs.short_branch_name }}-race,
-            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.short_branch_name }}-race
+            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race,
+            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race
           cache-from: type=gha
           cache-to: type=gha,mode=max

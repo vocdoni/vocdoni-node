@@ -2,8 +2,6 @@ package types
 
 import (
 	"time"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 func Bool(b bool) *bool { return &b }
@@ -11,9 +9,8 @@ func Bool(b bool) *bool { return &b }
 // These exported variables should be treated as constants, to be used in API
 // responses which require *bool fields.
 var (
-	False               = Bool(false)
-	True                = Bool(true)
-	EthereumZeroAddress = common.Address{}
+	False = Bool(false)
+	True  = Bool(true)
 )
 
 const (
@@ -36,8 +33,6 @@ const (
 	ProcessIDsize = 32
 	// EthereumAddressSize is the size of an ethereum address
 	EthereumAddressSize = 20
-	// EthereumZeroAddress is the 0x0000000000000000000000000000000000000000 address
-	EthereumZeroAddressString = "0x0000000000000000000000000000000000000000"
 
 	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
@@ -174,4 +169,6 @@ const (
 
 	VochainWsReadLimit = 20 << 20 // tendermint requires 20 MiB minimum
 	Web3WsReadLimit    = 5 << 20  // go-ethereum accepts maximum 5 MiB
+
+	MaxURLLength = 2083
 )

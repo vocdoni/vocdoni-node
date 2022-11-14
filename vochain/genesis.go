@@ -27,8 +27,8 @@ func GenesisAvailableChains() []string {
 // Genesis is a map containing the defaut Genesis details
 var Genesis = map[string]VochainGenesis{
 
-	// Azeno production Network
-	"azeno": {
+	// Bizono production Network
+	"bizono": {
 		AutoUpdateGenesis: false,
 		SeedNodes:         []string{"1612de9353b4bd5891981c69f554e56e07733870@seed.azeno.vocdoni.net:26656"},
 		CircuitsConfig: []artifacts.CircuitConfig{
@@ -55,8 +55,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
       {
-         "genesis_time": "2022-05-02T17:00:33.672114557Z",
-         "chain_id": "azeno",
+         "genesis_time": "2022-11-10T17:00:33.672114557Z",
+         "chain_id": "bizono",
          "consensus_params": {
            "block": {
              "max_bytes": "5242880",
@@ -174,7 +174,8 @@ var Genesis = map[string]VochainGenesis{
              "Tx_RegisterKey": 1,
              "Tx_NewProcess": 10,
              "Tx_SendTokens": 1,
-             "Tx_SetAccountInfo": 5,
+             "Tx_CreateAccount": 5,
+             "Tx_SetAccountInfoURI": 5,
              "Tx_AddDelegateForAccount": 5,
              "Tx_DelDelegateForAccount": 5,
              "Tx_CollectFaucet": 0
@@ -212,8 +213,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-10-26T08:43:28.668436552Z",
-   "chain_id":"vocdoni-development-70",
+   "genesis_time":"2022-11-10T08:43:28.668436552Z",
+   "chain_id":"vocdoni-development-71",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",
@@ -335,7 +336,8 @@ var Genesis = map[string]VochainGenesis{
          "Tx_RegisterKey": 10,
          "Tx_NewProcess": 10,
          "Tx_SendTokens": 10,
-         "Tx_SetAccountInfo": 10,
+         "Tx_CreateAccount": 10,
+         "Tx_SetAccountInfoURI": 10,
          "Tx_AddDelegateForAccount": 10,
          "Tx_DelDelegateForAccount": 10,
          "Tx_CollectFaucet": 10
@@ -383,8 +385,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-02-07T16:00:01.055210151Z",
-   "chain_id":"vocdoni-stage-21",
+   "genesis_time":"2022-11-10T16:00:01.055210151Z",
+   "chain_id":"vocdoni-stage-22",
    "consensus_params":{
       "block":{
          "max_bytes":"2048000",
@@ -493,7 +495,8 @@ var Genesis = map[string]VochainGenesis{
          "Tx_RegisterKey": 100,
          "Tx_NewProcess": 100,
          "Tx_SendTokens": 100,
-         "Tx_SetAccountInfo": 100,
+         "Tx_CreateAccount": 100,
+         "Tx_SetAccountInfoURI": 100,
          "Tx_AddDelegateForAccount": 100,
          "Tx_DelDelegateForAccount": 100,
          "Tx_CollectFaucet": 100

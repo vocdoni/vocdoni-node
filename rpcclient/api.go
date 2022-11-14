@@ -1407,26 +1407,30 @@ func (c *Client) SetTransactionCost(
 }
 
 // CreateOrSetAccount creates or sets the infoURI of a Vochain account
-func (c *Client) CreateOrSetAccount(
+func (c *Client) SetAccount(
 	signer *ethereum.SignKeys,
 	to common.Address,
 	infoURI string,
 	nonce uint32,
 	faucetPkg *models.FaucetPackage,
+	create bool,
 ) (err error) {
 	var req api.APIrequest
 	req.Method = "submitRawTx"
 
-	tx := &models.SetAccountInfoTx{
-		Txtype:        models.TxType_SET_ACCOUNT_INFO,
-		Nonce:         nonce,
-		InfoURI:       infoURI,
+	tx := &models.SetAccountTx{
+		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
+		Nonce:         &nonce,
+		InfoURI:       &infoURI,
 		Account:       to.Bytes(),
 		FaucetPackage: faucetPkg,
 	}
+	if create {
+		tx.Txtype = models.TxType_CREATE_ACCOUNT
+	}
 
 	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountInfo{SetAccountInfo: tx}})
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: tx}})
 	if err != nil {
 		return err
 	}
@@ -1581,17 +1585,17 @@ func (c *Client) SetAccountDelegate(
 	var req api.APIrequest
 	req.Method = "submitRawTx"
 
-	tx := &models.SetAccountDelegateTx{
-		Txtype:   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
-		Nonce:    nonce,
-		Delegate: delegate.Bytes(),
+	tx := &models.SetAccountTx{
+		Txtype:    models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
+		Nonce:     &nonce,
+		Delegates: [][]byte{delegate.Bytes()},
 	}
 	if !op {
 		tx.Txtype = models.TxType_DEL_DELEGATE_FOR_ACCOUNT
 	}
 
 	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccountDelegateTx{SetAccountDelegateTx: tx}})
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: tx}})
 	if err != nil {
 		return nil, err
 	}

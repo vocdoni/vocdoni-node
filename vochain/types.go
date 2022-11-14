@@ -23,8 +23,10 @@ var (
 	ErrProcessNotFound      = fmt.Errorf("process not found")
 	ErrBalanceOverflow      = fmt.Errorf("balance overflow")
 	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
-	ErrAccountNotExist      = fmt.Errorf("account does not exists")
+	ErrAccountNotExist      = fmt.Errorf("account does not exist")
 	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
+	ErrInvalidURILength     = fmt.Errorf("invalid URI length")
+	ErrInvalidAddress       = fmt.Errorf("invalid address")
 	ErrNilTx                = fmt.Errorf("nil transaction")
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
@@ -51,22 +53,6 @@ func UniqID(tx *models.SignedTx, isAnonymous bool) string {
 	return ""
 }
 
-type setAccountInfoTxCheckValues struct {
-	Account, TxSender, FaucetPayloadSigner common.Address
-	CreateAccount                          bool
-	CreateAccountWithFaucet                bool
-}
-
-type sendTokensTxCheckValues struct {
-	From, To common.Address
-	Value    uint64
-	Nonce    uint32
-}
-
-type setAccountDelegateTxCheckValues struct {
-	From, Delegate common.Address
-}
-
 // ________________________ QUERIES ________________________
 
 // QueryData is an abstraction of any kind of data a query request could have
@@ -90,7 +76,8 @@ type TransactionCosts struct {
 	RegisterKey             uint32 `json:"Tx_RegisterKey"`
 	NewProcess              uint32 `json:"Tx_NewProcess"`
 	SendTokens              uint32 `json:"Tx_SendTokens"`
-	SetAccountInfo          uint32 `json:"Tx_SetAccountInfo"`
+	SetAccountInfoURI       uint32 `json:"Tx_SetAccountInfoURI"`
+	CreateAccount           uint32 `json:"Tx_CreateAccount"`
 	AddDelegateForAccount   uint32 `json:"Tx_AddDelegateForAccount"`
 	DelDelegateForAccount   uint32 `json:"Tx_DelDelegateForAccount"`
 	CollectFaucet           uint32 `json:"Tx_CollectFaucet"`
@@ -118,7 +105,8 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
 	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 	"SendTokens":              models.TxType_SEND_TOKENS,
-	"SetAccountInfo":          models.TxType_SET_ACCOUNT_INFO,
+	"SetAccountInfoURI":       models.TxType_SET_ACCOUNT_INFO_URI,
+	"CreateAccount":           models.TxType_CREATE_ACCOUNT,
 	"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
 	"NewProcess":              models.TxType_NEW_PROCESS,
 	"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
@@ -141,7 +129,8 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_RESULTS:        "SetProcessResults",
 	models.TxType_SET_PROCESS_QUESTION_INDEX: "SetProcessQuestionIndex",
 	models.TxType_SEND_TOKENS:                "SendTokens",
-	models.TxType_SET_ACCOUNT_INFO:           "SetAccountInfo",
+	models.TxType_SET_ACCOUNT_INFO_URI:       "SetAccountInfoURI",
+	models.TxType_CREATE_ACCOUNT:             "CreateAccount",
 	models.TxType_REGISTER_VOTER_KEY:         "RegisterKey",
 	models.TxType_NEW_PROCESS:                "NewProcess",
 	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "AddDelegateForAccount",
@@ -159,16 +148,19 @@ func TxTypeToCostName(txType models.TxType) string {
 
 // ________________________ GENESIS APP STATE ________________________
 
+// GenesisAccount represents an account in the genesis app state
+type GenesisAccount struct {
+	Address types.HexBytes `json:"address"`
+	Balance uint64         `json:"balance"`
+}
+
 // GenesisAppState application state in genesis
 type GenesisAppState struct {
 	Validators []GenesisValidator `json:"validators"`
 	Oracles    []types.HexBytes   `json:"oracles"`
-	Accounts   []struct {
-		Address types.HexBytes `json:"address"`
-		Balance uint64         `json:"balance"`
-	} `json:"accounts"`
-	Treasurer types.HexBytes   `json:"treasurer"`
-	TxCost    TransactionCosts `json:"tx_cost"`
+	Accounts   []GenesisAccount   `json:"accounts"`
+	Treasurer  types.HexBytes     `json:"treasurer"`
+	TxCost     TransactionCosts   `json:"tx_cost"`
 }
 
 // The rest of these genesis app state types are copied from

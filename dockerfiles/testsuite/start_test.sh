@@ -6,7 +6,6 @@
 #  anonvoting: run anonymous vote test
 #  cspvoting: run csp vote test
 #  tokentransactions: run token transactions test (end-user voting is not included)
-#  vocli: test the CLI tool
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 
@@ -40,7 +39,6 @@ RANDOMID="${RANDOM}${RANDOM}"
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"vocli"
 	"tokentransactions"
 	"merkle_vote_plaintext"
 	"cspvoting"
@@ -123,15 +121,8 @@ tokentransactions() {
 		  --logLevel=$LOGLEVEL \
 		  --operation=tokentransactions \
 		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY
-}
-
-vocli() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=vocli \
-		  --treasurerKey=$TREASURER_KEY
+		  --treasurerKey=$TREASURER_KEY \
+		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
 }
 
 ### end tests definition
@@ -161,7 +152,7 @@ mkdir -p $results
 
 echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
-	if [ $test == "vocli" ] || [ $test == "tokentransactions" ] || [ $CONCURRENT -eq 0 ] ; then
+	if [ $test == "tokentransactions" ] || [ $CONCURRENT -eq 0 ] ; then
 		echo "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	else

@@ -51,7 +51,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
-				Txtype: models.TxType_SET_ACCOUNT_INFO,
+				Txtype: models.TxType_SET_ACCOUNT_INFO_URI,
 				Nonce:  acc.Nonce,
 				From:   c.account.Address().Bytes(),
 				To:     to.Bytes(),
@@ -77,11 +77,10 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 	}
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetAccountInfo{
-			SetAccountInfo: &models.SetAccountInfoTx{
-				Txtype:        models.TxType_SET_ACCOUNT_INFO,
-				Nonce:         0,
-				InfoURI:       "none", // TODO: support infoURI
+		Payload: &models.Tx_SetAccount{
+			SetAccount: &models.SetAccountTx{
+				Txtype:        models.TxType_CREATE_ACCOUNT,
+				Nonce:         new(uint32),
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPackageProto,
 			},

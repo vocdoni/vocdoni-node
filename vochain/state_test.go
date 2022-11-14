@@ -111,9 +111,9 @@ func TestBalanceTransfer(t *testing.T) {
 	addr2 := ethereum.SignKeys{}
 	addr2.Generate()
 
-	err = s.CreateAccount(addr1.Address(), "ipfs://", make([]common.Address, 0), 50)
+	err = s.createAccount(addr1.Address(), "ipfs://", [][]byte{}, 50)
 	qt.Assert(t, err, qt.IsNil)
-	err = s.CreateAccount(addr2.Address(), "ipfs://", make([]common.Address, 0), 0)
+	err = s.CreateAccount(addr2.Address(), "ipfs://", [][]byte{})
 	qt.Assert(t, err, qt.IsNil)
 
 	s.Save() // Save to test committed value on next call
@@ -160,6 +160,12 @@ func (l *Listener) OnCancel(pid []byte, txIndex int32)                          
 func (l *Listener) OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)                {}
 func (l *Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)                {}
 func (l *Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error {
+	return nil
+}
+func (l *Listener) OnSetAccount(addr []byte, account *Account) error {
+	return nil
+}
+func (l *Listener) OnTransferTokens(from, to []byte, amount uint64) error {
 	return nil
 }
 func (l *Listener) OnProcessesStart(pids [][]byte) {

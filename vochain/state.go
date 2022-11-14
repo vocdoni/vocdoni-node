@@ -23,7 +23,7 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 
 	"go.vocdoni.io/dvote/types"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -51,7 +51,8 @@ var (
 		models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
 		models.TxType_NEW_PROCESS:                "c_newProcess",
 		models.TxType_SEND_TOKENS:                "c_sendTokens",
-		models.TxType_SET_ACCOUNT_INFO:           "c_setAccountInfo",
+		models.TxType_SET_ACCOUNT_INFO_URI:       "c_setAccountInfoURI",
+		models.TxType_CREATE_ACCOUNT:             "c_createAccount",
 		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
 		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
 		models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
@@ -194,6 +195,8 @@ type EventListener interface {
 	OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) error
 	OnProcessesStart(pids [][]byte)
+	OnSetAccount(addr []byte, account *Account) error
+	OnTransferTokens(from, to []byte, amount uint64) error
 	Commit(height uint32) (err error)
 	Rollback()
 }
@@ -693,9 +696,9 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		return err
 	}
 	if tx.EncryptionPublicKey != nil {
-		process.EncryptionPublicKeys[*tx.KeyIndex] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
+		process.EncryptionPublicKeys[tx.GetKeyIndex()] = fmt.Sprintf("%x", tx.EncryptionPublicKey)
 		log.Debugf("added encryption key %d for process %x: %x",
-			*tx.KeyIndex, tx.ProcessId, tx.EncryptionPublicKey)
+			tx.GetKeyIndex(), tx.ProcessId, tx.EncryptionPublicKey)
 	}
 	if process.KeyIndex == nil {
 		process.KeyIndex = new(uint32)
@@ -725,9 +728,9 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	ekey := ""
 	if tx.EncryptionPrivateKey != nil {
 		ekey = fmt.Sprintf("%x", tx.EncryptionPrivateKey)
-		process.EncryptionPrivateKeys[*tx.KeyIndex] = ekey
+		process.EncryptionPrivateKeys[tx.GetKeyIndex()] = ekey
 		log.Debugf("revealed encryption key %d for process %x: %x",
-			*tx.KeyIndex, tx.ProcessId, tx.EncryptionPrivateKey)
+			tx.GetKeyIndex(), tx.ProcessId, tx.EncryptionPrivateKey)
 	}
 	*process.KeyIndex--
 	if err := v.updateProcess(process, tx.ProcessId); err != nil {
