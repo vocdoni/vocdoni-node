@@ -41,6 +41,8 @@ func (s *Scrutinizer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxR
 
 // OnNewTx stores the transaction reference in the indexer database
 func (s *Scrutinizer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
 		Hash:         types.HexBytes(hash),
 		BlockHeight:  blockHeight,
