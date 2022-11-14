@@ -186,7 +186,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		return nil, fmt.Errorf("cannot format metadata: %w", err)
 	}
 	log.Debugf("election metadata: %s", string(metadataBytes))
-	metadataURI := "ipfs://" + data.IPFScontentIdentifier(metadataBytes)
+	metadataURI := "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
 
 	// get the own account details
 	acc, err := c.Account("")

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-cid"
+	ipfscid "github.com/ipfs/go-cid"
 	files "github.com/ipfs/go-ipfs-files"
 	keystore "github.com/ipfs/go-ipfs-keystore"
 	ipfslog "github.com/ipfs/go-log"
@@ -19,12 +19,11 @@ import (
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/ipfs/kubo/core/corerepo"
-	"github.com/ipfs/kubo/core/coreunix"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	ipfscrypto "github.com/libp2p/go-libp2p-core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
-	crypto "go.vocdoni.io/dvote/crypto/ethereum"
+	"github.com/multiformats/go-multicodec"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
@@ -130,70 +129,59 @@ func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 
-// PublishBytes publishes a file containing msg to ipfs
-func (i *IPFSHandle) publishBytes(ctx context.Context, msg []byte, fileDir string) (string, error) {
-	filePath := fmt.Sprintf("%s/%x", fileDir, crypto.HashRaw(msg))
-	log.Infof("publishing file: %s", filePath)
-	err := os.WriteFile(filePath, msg, 0o666)
+// Publish publishes a message to ipfs and returns the resulting CID v1
+func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
+	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
+	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg), options.Unixfs.CidVersion(1))
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("could not publish: %s", err)
 	}
-	rootHash, err := i.AddAndPin(ctx, filePath)
-	if err != nil {
-		return "", err
-	}
-	return rootHash, nil
+	cid = IPFSCIDv1json(rpath.Cid()).String()
+	log.Infof("published file: %s", cid)
+	return cid, nil
 }
 
-// Publish publishes a message to ipfs
-func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (string, error) {
-	// if sent a message instead of a file
-	return i.publishBytes(ctx, msg, i.DataDir)
-}
-
-func (i *IPFSHandle) AddAndPin(ctx context.Context, root string) (rootHash string, err error) {
-
-	defer i.Node.Blockstore.PinLock(ctx).Unlock(ctx)
-	stat, err := os.Lstat(root)
+func (i *IPFSHandle) AddAndPin(ctx context.Context, path string) (cid string, err error) {
+	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
 		return "", err
 	}
+	return rpath.Root().String(), nil
+}
 
-	f, err := files.NewSerialFile(root, false, stat)
+func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resolved, error) {
+	f, err := unixfsFilesNode(path)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	defer f.Close()
-	fileAdder, err := coreunix.NewAdder(ctx, i.Node.Pinning, i.Node.Blockstore, i.Node.DAG)
+
+	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
+	rpath, err := i.CoreAPI.Unixfs().Add(ctx, f, options.Unixfs.CidVersion(1),
+		options.Unixfs.Pin(true))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	node, err := fileAdder.AddAllAndPin(ctx, f)
-	if err != nil {
-		return "", err
-	}
-	return node.Cid().String(), nil
+	return rpath, nil
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	// path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
 
-	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(ctx, p)
+	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
 	if err != nil {
 		return err
 	}
-	return i.CoreAPI.Pin().Add(ctx, rp, options.Pin.Recursive(true))
+	return i.CoreAPI.Pin().Add(ctx, rpath, options.Pin.Recursive(true))
 }
 
 func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
-	p := corepath.New(path)
-	rp, err := i.CoreAPI.ResolvePath(ctx, p)
+	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
 	if err != nil {
 		return err
 	}
-	return i.CoreAPI.Pin().Rm(ctx, rp, options.Pin.RmRecursive(true))
+	return i.CoreAPI.Pin().Rm(ctx, rpath, options.Pin.RmRecursive(true))
 }
 
 func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
@@ -305,11 +293,7 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) (
 // mechanisms in order to not block the whole program execution.
 func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
 	keyalias string) (coreiface.IpnsEntry, error) {
-	root, err := i.AddAndPin(ctx, path)
-	if err != nil {
-		return nil, err
-	}
-	c, err := cid.Parse(root)
+	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -322,7 +306,7 @@ func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
 	}
 	return i.CoreAPI.Name().Publish(
 		ctx,
-		corepath.IpfsPath(c),
+		rpath,
 		options.Name.TTL(time.Minute*10),
 		options.Name.Key(keyalias),
 	)
@@ -362,15 +346,38 @@ func NewIPFSkey() []byte {
 	return encPrivKey
 }
 
-// IPFScontentIdentifier calculates the IPFS Cid hash from a bytes buffer.
-// Currently CID V0 is used.  TODO: upgrade to CID V1 the whole implementation.
-func IPFScontentIdentifier(data []byte) string {
-	builder := new(cid.V0Builder)
-	c, err := builder.Sum(data)
+// CalculateIPFSCIDv1json calculates the IPFS Cid hash (v1) from a bytes buffer,
+// using parameters Codec: JSON, MhType: SHA2_256
+func CalculateIPFSCIDv1json(data []byte) (cid string) {
+	format := ipfscid.V1Builder{
+		MhType: uint64(multicodec.Sha2_256),
+	}
+	c, err := format.Sum(data)
 	if err != nil {
 		log.Warnf("%v", err)
 		return ""
 	}
-	log.Debugf("computed cid: %s", c.String())
-	return c.String()
+	log.Debugf("computed cid: %s", IPFSCIDv1json(c).String())
+	return IPFSCIDv1json(c).String()
+}
+
+// IPFSCIDv1json converts any given Cid (v0 or v1) into a v1 with Codec: JSON (0x0200)
+func IPFSCIDv1json(cid ipfscid.Cid) ipfscid.Cid {
+	// The multicodec indicates the format of the target content
+	// it helps people and software to know how to interpret that
+	// content after the content is fetched
+	return ipfscid.NewCidV1(uint64(multicodec.Json), cid.Hash())
+}
+
+// unixfsFilesNode returns a go-ipfs files.Node given a unix path
+func unixfsFilesNode(path string) (files.Node, error) {
+	stat, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	f, err := files.NewSerialFile(path, false, stat)
+	if err != nil {
+		return nil, err
+	}
+	return f, nil
 }
