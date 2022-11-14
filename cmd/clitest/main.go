@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"math/big"
 	"net/url"
+	"sync"
 	"time"
 
 	flag "github.com/spf13/pflag"
 	vapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 
@@ -141,17 +143,54 @@ func main() {
 		log.Fatalf("published census size is %d, expected %d", size, *nvotes)
 	}
 
-	// Generate the voting proofs
-	proofs := []*apiclient.CensusProof{}
-	for i, voterAccount := range voterAccounts {
-		log.Infof("generating voting proof %d ", i)
-		pr, err := api.CensusGenProof(root, voterAccount.Address().Bytes())
-		if err != nil {
-			log.Fatal(err)
-		}
-		proofs = append(proofs, pr)
+	// Generate the voting proofs (paralelized)
+	type voterProof struct {
+		proof   *apiclient.CensusProof
+		address string
 	}
-	log.Debugf(" %d voting proofs generated successfully", len(proofs))
+	proofs := make(map[string]*apiclient.CensusProof, *nvotes)
+	proofCh := make(chan *voterProof)
+	stopProofs := make(chan bool)
+	go func() {
+		for {
+			select {
+			case p := <-proofCh:
+				proofs[p.address] = p.proof
+			case <-stopProofs:
+				return
+			}
+		}
+	}()
+
+	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
+		defer wg.Done()
+		log.Infof("generating %d voting proofs", len(accounts))
+		for _, acc := range accounts {
+			pr, err := api.CensusGenProof(root, acc.Address().Bytes())
+			if err != nil {
+				log.Fatal(err)
+			}
+			proofCh <- &voterProof{
+				proof:   pr,
+				address: acc.Address().Hex(),
+			}
+		}
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < len(voterAccounts); i += 200 {
+		end := i + 200
+		if end > len(voterAccounts) {
+			end = len(voterAccounts)
+		}
+		wg.Add(1)
+		go addNaccounts(voterAccounts[i:end], &wg)
+	}
+
+	wg.Wait()
+	time.Sleep(time.Second) // wait a grace time for the last proof to be added
+	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(voterAccounts))
+	stopProofs <- true
 
 	// Create a new Election
 	electionID, err := api.NewElection(&vapi.ElectionDescription{
@@ -215,7 +254,7 @@ func main() {
 		}
 		vid, err := api.Vote(&apiclient.VoteData{
 			ElectionID: electionID,
-			ProofTree:  proofs[i],
+			ProofTree:  proofs[voterAccount.Address().Hex()],
 			Choices:    []int{i % 2},
 			KeyType:    models.ProofArbo_ADDRESS,
 		})
