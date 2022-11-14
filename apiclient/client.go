@@ -24,8 +24,10 @@ const (
 	HTTPGET = "GET"
 	// HTTPPOST is the method string used for calling Request()
 	HTTPPOST = "POST"
+	// HTTPDELETE is the method string used for calling
+	HTTPDELETE = "DELETE"
 
-	errCodeNot200 = "API server returned status code is not 200"
+	errCodeNot200 = "API error"
 )
 
 // HTTPclient is the Vocdoni API HTTP client.

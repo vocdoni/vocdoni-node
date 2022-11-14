@@ -16,7 +16,7 @@ import (
 
 // Election returns the election details given its ID.
 func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) {
-	resp, code, err := c.Request("GET", nil, "election", electionID.String())
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	electionCreate := &api.ElectionCreate{
 		TxPayload: stx,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "election", "create")
+	resp, code, err := c.Request("POST", electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		TxPayload: stx,
 		Metadata:  metadataBytes,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "election", "create")
+	resp, code, err := c.Request("POST", electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	}
 
 	// send the transaction
-	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transaction", "submit")
+	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transactions")
 	if err != nil {
 		return nil, err
 	}

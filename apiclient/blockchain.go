@@ -17,7 +17,7 @@ var (
 
 // TransactionReference returns the reference of a transaction given its hash.
 func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.TransactionReference, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "chain", "transaction", "reference", txHash.String())
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", "reference", txHash.String())
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 		return nil, err
 	}
 	resp, code, err := c.Request(HTTPGET, nil,
-		"chain", "transaction", fmt.Sprintf("%d", ref.Height), fmt.Sprintf("%d", ref.Index))
+		"chain", "transactions", fmt.Sprintf("%d", ref.Height), fmt.Sprintf("%d", ref.Index))
 	if err != nil {
 		return nil, err
 	}

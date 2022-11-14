@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -30,12 +29,4 @@ func censusIDparse(censusID string) ([]byte, error) {
 func censusKeyParse(key string) ([]byte, error) {
 	key = util.TrimHex(key)
 	return hex.DecodeString(key)
-}
-
-func censusWeightParse(w string) (*types.BigInt, error) {
-	weight, err := new(types.BigInt).SetString(w)
-	if err != nil {
-		return nil, err
-	}
-	return weight, nil
 }

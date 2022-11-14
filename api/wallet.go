@@ -32,7 +32,7 @@ const (
 func (a *API) enableWalletHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/wallet/add/{privateKey}",
-		"GET",
+		"POST",
 		bearerstdapi.MethodAccessTypePublic,
 		a.walletAddHandler,
 	); err != nil {

@@ -3,6 +3,7 @@ package test
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
@@ -35,7 +37,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
 
 	// create a new census
-	resp, code := c.Request("GET", nil, "census", "create", "weighted")
+	resp, code := c.Request("POST", nil, "censuses", "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
 	censusData := &api.Census{}
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -43,27 +45,33 @@ func TestAPIcensusAndVote(t *testing.T) {
 
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
-	for i := 0; i < 10; i++ {
-		key := fmt.Sprintf("%x", rnd.RandomBytes(32))
-		t.Log(key)
-		_, code = c.Request("GET", nil, "census", id1, "add", key, "1")
-		qt.Assert(t, code, qt.Equals, 200)
+	cparts := api.CensusParticipants{}
+	for i := 1; i < 10; i++ {
+		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
+			Key:    rnd.RandomBytes(32),
+			Weight: (*types.BigInt)(big.NewInt(int64(1))),
+		})
 	}
+	_, code = c.Request("POST", &cparts, "censuses", id1, "participants")
+	qt.Assert(t, code, qt.Equals, 200)
 
 	// add the key we'll use for cast votes
 	voterKey := ethereum.SignKeys{}
 	qt.Assert(t, voterKey.Generate(), qt.IsNil)
 
-	_, code = c.Request("GET", nil, "census", id1, "add", fmt.Sprintf("%x", voterKey.PublicKey()), "1")
+	_, code = c.Request("POST", &api.CensusParticipants{Participants: []api.CensusParticipant{{
+		Key:    voterKey.PublicKey(),
+		Weight: (*types.BigInt)(big.NewInt(1)),
+	}}}, "censuses", id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
-	resp, code = c.Request("GET", nil, "census", id1, "publish")
+	resp, code = c.Request("POST", nil, "censuses", id1, "publish")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
 	root := censusData.CensusID
 
-	resp, code = c.Request("GET", nil, "census", root.String(), "proof", fmt.Sprintf("%x", voterKey.PublicKey()))
+	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", voterKey.PublicKey()))
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
@@ -94,10 +102,10 @@ func TestAPIcensusAndVote(t *testing.T) {
 	stxb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	election := api.ElectionCreate{TxPayload: stxb}
-	resp, code = c.Request("POST", election, "election", "create")
+	election := &api.ElectionCreate{TxPayload: stxb}
+	resp, code = c.Request("POST", election, "elections")
 	qt.Assert(t, code, qt.Equals, 200)
-	err = json.Unmarshal(resp, &election)
+	err = json.Unmarshal(resp, election)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Block 2
@@ -133,7 +141,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	v := &api.Vote{TxPayload: stxb}
-	resp, code = c.Request("POST", v, "vote", "submit")
+	resp, code = c.Request("POST", v, "votes")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &v)
 	qt.Assert(t, err, qt.IsNil)
@@ -142,7 +150,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 3)
 
-	_, code = c.Request("GET", nil, "vote", v.VoteID.String(), election.ElectionID.String(), "verify")
+	_, code = c.Request("GET", nil, "votes", "verify", election.ElectionID.String(), v.VoteID.String())
 	qt.Assert(t, code, qt.Equals, 200)
 }
 
@@ -195,7 +203,7 @@ func TestAPIaccount(t *testing.T) {
 		Metadata:  metaData,
 		TxPayload: stxb,
 	}
-	resp, code := c.Request("POST", &accSet, "account")
+	resp, code := c.Request("POST", &accSet, "accounts")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	// Block 2

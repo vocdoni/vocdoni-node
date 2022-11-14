@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"net/url"
 	"time"
 
@@ -97,13 +98,32 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Add the accounts to the census
-	for _, voterAccount := range voterAccounts {
-		log.Infof("adding voter %s", voterAccount.Address().Hex())
-		if err := api.CensusAddVoter(censusID, voterAccount.Address().Bytes(), 10); err != nil {
-			log.Fatal(err)
+	// Add the accounts to the census by batches
+	participants := &vapi.CensusParticipants{}
+	for i, voterAccount := range voterAccounts {
+		participants.Participants = append(participants.Participants,
+			vapi.CensusParticipant{
+				Key:    voterAccount.Address().Bytes(),
+				Weight: (*types.BigInt)(new(big.Int).SetUint64(10)),
+			})
+		if i == len(voterAccounts)-1 || i == vapi.MaxCensusAddBatchSize-1 {
+			if err := api.CensusAddParticipants(censusID, participants); err != nil {
+				log.Fatal(err)
+			}
+			log.Infof("added %d participants to census %s", len(participants.Participants), censusID.String())
+			participants = &vapi.CensusParticipants{}
 		}
 	}
+
+	// Check census size
+	size, err := api.CensusSize(censusID)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if size != uint64(*nvotes) {
+		log.Fatalf("census size is %d, expected %d", size, *nvotes)
+	}
+	log.Infof("census %s size is %d", censusID.String(), size)
 
 	// Publish the census
 	root, censusURI, err := api.CensusPublish(censusID)
@@ -111,6 +131,15 @@ func main() {
 		log.Fatal(err)
 	}
 	log.Infof("census published with root %s", root.String())
+
+	// Check census size (of the published census)
+	size, err = api.CensusSize(root)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if size != uint64(*nvotes) {
+		log.Fatalf("published census size is %d, expected %d", size, *nvotes)
+	}
 
 	// Generate the voting proofs
 	proofs := []*apiclient.CensusProof{}

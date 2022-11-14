@@ -76,7 +76,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	}
 
 	voteAPI := &api.Vote{TxPayload: stxb}
-	resp, code, err := c.Request("POST", voteAPI, "vote", "submit")
+	resp, code, err := c.Request("POST", voteAPI, "votes")
 	if err != nil {
 		return nil, err
 	}
