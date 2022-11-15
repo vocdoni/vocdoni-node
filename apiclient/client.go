@@ -24,8 +24,10 @@ const (
 	HTTPGET = "GET"
 	// HTTPPOST is the method string used for calling Request()
 	HTTPPOST = "POST"
+	// HTTPDELETE is the method string used for calling
+	HTTPDELETE = "DELETE"
 
-	errCodeNot200 = "API server returned status code is not 200"
+	errCodeNot200 = "API error"
 )
 
 // HTTPclient is the Vocdoni API HTTP client.
@@ -74,6 +76,17 @@ func (c *HTTPclient) ChainID() string {
 func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	c.account = new(ethereum.SignKeys)
 	return c.account.AddHexKey(accountPrivateKey)
+}
+
+// Clone returns a copy of the HTTPclient with the accountPrivateKey set as the account key.
+// Panics if the accountPrivateKey is not valid.
+func (c *HTTPclient) Clone(accountPrivateKey string) *HTTPclient {
+	clone := *c
+	clone.account = new(ethereum.SignKeys)
+	if err := clone.account.AddHexKey(accountPrivateKey); err != nil {
+		panic(err)
+	}
+	return &clone
 }
 
 // MyAddress returns the address of the account used for signing transactions.

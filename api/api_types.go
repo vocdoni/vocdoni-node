@@ -99,6 +99,15 @@ type CensusTypeDescription struct {
 	RootHash  types.HexBytes `json:"rootHash,omitempty"`
 }
 
+type CensusParticipants struct {
+	Participants []CensusParticipant `json:"participants"`
+}
+
+type CensusParticipant struct {
+	Key    types.HexBytes `json:"key"`
+	Weight *types.BigInt  `json:"weight"`
+}
+
 type VoteType struct {
 	UniqueChoices     bool `json:"uniqueChoices"`
 	MaxVoteOverwrites int  `json:"maxVoteOverwrites"`

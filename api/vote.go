@@ -12,11 +12,11 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-const VoteHandler = "vote"
+const VoteHandler = "votes"
 
 func (a *API) enableVoteHandlers() error {
 	if err := a.endpoint.RegisterMethod(
-		"/vote/submit",
+		"/votes",
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
 		a.submitVoteHandler,
@@ -24,7 +24,7 @@ func (a *API) enableVoteHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/vote/{voteID}",
+		"/votes/{voteID}",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.getVoteHandler,
@@ -32,7 +32,7 @@ func (a *API) enableVoteHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/vote/{voteID}/{electionID}/verify",
+		"/votes/verify/{electionID}/{voteID}/",
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.verifyVoteHandler,
@@ -43,7 +43,7 @@ func (a *API) enableVoteHandlers() error {
 	return nil
 }
 
-// /vote/submit
+// /votes
 // submit a vote
 func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
@@ -76,7 +76,7 @@ func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /vote/<voteID>
+// /votes/<voteID>
 // get a vote by its voteID (nullifier)
 func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
@@ -109,7 +109,7 @@ func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /vote/<voteID>/<electionID>/verify
+// /votes/verify/<electionID>/<voteID>
 // verify a vote (get basic information)
 func (a *API) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))

@@ -119,7 +119,7 @@ func waitUntilElectionStarts(api *apiclient.HTTPclient, electionID types.HexByte
 }
 
 func waitUntilElectionStatus(api *apiclient.HTTPclient, electionID types.HexBytes, status string) {
-	for startTime := time.Now(); time.Since(startTime) < time.Second*80; {
+	for startTime := time.Now(); time.Since(startTime) < time.Second*300; {
 		election, err := api.Election(electionID)
 		if err != nil {
 			log.Fatal(err)

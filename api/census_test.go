@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/url"
 	"path"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -23,7 +25,7 @@ import (
 func TestCensus(t *testing.T) {
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
-	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "census"))
+	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(t, err, qt.IsNil)
 
 	api, err := NewAPI(&router, "/", t.TempDir())
@@ -42,7 +44,7 @@ func TestCensus(t *testing.T) {
 	c := testutil.NewTestHTTPclient(t, addr, &token1)
 
 	// create a new census
-	resp, code := c.Request("GET", nil, "create", "weighted")
+	resp, code := c.Request("POST", nil, "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
 	censusData := &Census{}
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -59,17 +61,21 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Size, qt.Equals, uint64(0))
 
-	// add some keys and weights
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
 	weight := 0
 	index := uint64(0)
+	cparts := CensusParticipants{}
 	for i := 1; i < 11; i++ {
-		_, code = c.Request("GET", nil, id1, "add", fmt.Sprintf("%x", rnd.RandomBytes(32)), fmt.Sprintf("%d", i))
-		qt.Assert(t, code, qt.Equals, 200)
+		cparts.Participants = append(cparts.Participants, CensusParticipant{
+			Key:    rnd.RandomBytes(32),
+			Weight: (*types.BigInt)(big.NewInt(int64(i))),
+		})
 		weight += i
 		index++
 	}
+	_, code = c.Request("POST", &cparts, id1, "participants")
+	qt.Assert(t, code, qt.Equals, 200)
 
 	// check again weight and size
 	resp, code = c.Request("GET", nil, id1, "weight")
@@ -84,11 +90,13 @@ func TestCensus(t *testing.T) {
 
 	// add one more key and check proof
 	key := rnd.RandomBytes(32)
-	keyWeight := "100"
-	_, code = c.Request("GET", nil, id1, "add", fmt.Sprintf("%x", key), keyWeight)
+	keyWeight := (*types.BigInt)(big.NewInt(100))
+	_, code = c.Request("POST", &CensusParticipants{
+		Participants: []CensusParticipant{{Key: key, Weight: keyWeight}},
+	}, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
-	resp, code = c.Request("GET", nil, id1, "publish")
+	resp, code = c.Request("POST", nil, id1, "publish")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
@@ -97,7 +105,7 @@ func TestCensus(t *testing.T) {
 	resp, code = c.Request("GET", nil, id2, "proof", fmt.Sprintf("%x", key))
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, keyWeight)
+	qt.Assert(t, censusData.Weight.String(), qt.Equals, keyWeight.String())
 
 	proof := &Census{
 		Key:   key,
@@ -117,12 +125,12 @@ func TestCensus(t *testing.T) {
 
 	// dump the tree
 	censusDump := &censusdb.CensusDump{}
-	resp, code = c.Request("GET", nil, id1, "dump")
+	resp, code = c.Request("GET", nil, id1, "export")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusDump), qt.IsNil)
 
 	// create a new one and try to import the previous dump
-	resp2, code := c.Request("GET", nil, "create", "weighted")
+	resp2, code := c.Request("POST", nil, "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp2, censusData), qt.IsNil)
 	id3 := censusData.CensusID.String()
@@ -131,7 +139,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	// delete the first census
-	_, code = c.Request("GET", nil, id1, "delete")
+	_, code = c.Request("DELETE", nil, id1)
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// check the second census is still available
@@ -146,7 +154,7 @@ func TestCensus(t *testing.T) {
 func TestCensusProof(t *testing.T) {
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
-	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "census"))
+	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(t, err, qt.IsNil)
 
 	api, err := NewAPI(&router, "/", t.TempDir())
@@ -163,7 +171,7 @@ func TestCensusProof(t *testing.T) {
 	c := testutil.NewTestHTTPclient(t, addr, &token1)
 
 	// create a new census
-	resp, code := c.Request("GET", nil, "create", "weighted")
+	resp, code := c.Request("POST", nil, "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
 	censusData := &Census{}
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -171,16 +179,25 @@ func TestCensusProof(t *testing.T) {
 
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
-	for i := 0; i < 10; i++ {
-		_, code = c.Request("GET", nil, id1, "add", fmt.Sprintf("%x", rnd.RandomBytes(32)), "1")
-		qt.Assert(t, code, qt.Equals, 200)
+	cparts := CensusParticipants{}
+	for i := 1; i < 11; i++ {
+		cparts.Participants = append(cparts.Participants, CensusParticipant{
+			Key:    rnd.RandomBytes(32),
+			Weight: (*types.BigInt)(big.NewInt(int64(i))),
+		})
 	}
-
-	key := rnd.RandomBytes(32)
-	_, code = c.Request("GET", nil, id1, "add", fmt.Sprintf("%x", key), "1")
+	_, code = c.Request("POST", &cparts, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
-	resp, code = c.Request("GET", nil, id1, "publish")
+	// add the last participant and keep the key for veryfing the proof
+	key := rnd.RandomBytes(32)
+	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
+		Key:    key,
+		Weight: (*types.BigInt)(big.NewInt(1)),
+	}}}, id1, "participants")
+	qt.Assert(t, code, qt.Equals, 200)
+
+	resp, code = c.Request("POST", nil, id1, "publish")
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)

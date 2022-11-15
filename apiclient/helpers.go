@@ -29,7 +29,7 @@ func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
 }
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "chain", "blockdate", fmt.Sprintf("%d", date.Unix()))
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "dateToBlock", fmt.Sprintf("%d", date.Unix()))
 	if err != nil {
 		return 0, err
 	}
@@ -57,7 +57,7 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	}
 
 	tx := &api.Transaction{Payload: txData}
-	resp, code, err := c.Request(HTTPPOST, tx, "chain", "transaction", "submit")
+	resp, code, err := c.Request(HTTPPOST, tx, "chain", "transactions")
 	if err != nil {
 		return nil, nil, err
 	}
