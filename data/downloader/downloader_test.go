@@ -23,7 +23,7 @@ func TestDownloader(t *testing.T) {
 	}
 
 	d.AddToQueue(stg.URIprefix()+"testfile1", callback, false)
-	<-callbackChan // wait for retriving the file
+	<-callbackChan // wait for retrieving the file
 	qt.Assert(t, d.QueueSize(), qt.Equals, int32(0))
 
 	d.AddToQueue(stg.URIprefix()+"testfile2", callback, true)

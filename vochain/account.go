@@ -150,7 +150,7 @@ func (v *State) BurnTxCost(from common.Address, cost uint64) error {
 	return nil
 }
 
-// GetAccount retrives the Account for an address.
+// GetAccount retrieves the Account for an address.
 // Returns a nil account and no error if the account does not exist.
 // Committed is relative to the state on which the function is executed.
 func (v *State) GetAccount(address common.Address, committed bool) (*Account, error) {
