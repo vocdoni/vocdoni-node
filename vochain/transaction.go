@@ -130,7 +130,8 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 			if err := app.State.AddProcess(p); err != nil {
 				return nil, fmt.Errorf("newProcess: addProcess: %w", err)
 			}
-			if err := app.State.IncrementAccountProcessIndex(txSender); err != nil {
+			entityAddr := common.BytesToAddress(p.EntityId)
+			if err := app.State.IncrementAccountProcessIndex(entityAddr); err != nil {
 				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
 			}
 			return response, app.State.BurnTxCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)

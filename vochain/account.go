@@ -215,7 +215,18 @@ func (v *State) IncrementAccountProcessIndex(accountAddress common.Address) erro
 		return err
 	}
 	if acc == nil {
-		return ErrAccountNotExist
+		// TODO: @jordipainan
+
+		// This is an edge case atm: if the entityID is an EVM contract address
+		// and an oracle generated the tx is possible that the account does
+		// not exist, given that the entityID used is the contract address.
+		// This edge case will be solved with the introduction of
+		// the param sourceNetworkContractAddr.
+		// For now just ignore this error.
+
+		// return ErrAccountNotExist
+		log.Debugf("account %s does not exist, skipping process index increment", accountAddress.String())
+		return nil
 	}
 	// safety check for overflow protection, we allow a maximum of 4M of processes per account
 	if acc.ProcessIndex > 1<<22 {
