@@ -25,7 +25,7 @@ func (c *HTTPclient) Account(address string) (*api.Account, error) {
 		}
 		address = c.account.AddressString()
 	}
-	resp, code, err := c.Request(HTTPGET, nil, "account", address)
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", address)
 	if err != nil {
 		return nil, err
 	}

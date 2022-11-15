@@ -638,7 +638,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 	// would compute different state hash.
 	// As a temporary solution, lets compare results but just print the error.
 
-	// This code must be run async in order to not delay the consensus. The results retreival
+	// This code must be run async in order to not delay the consensus. The results retrieval
 	// could require some time.
 	go func() {
 		if results == nil || results.Votes == nil {

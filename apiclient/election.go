@@ -16,7 +16,7 @@ import (
 
 // Election returns the election details given its ID.
 func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) {
-	resp, code, err := c.Request("GET", nil, "election", electionID.String())
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String())
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	electionCreate := &api.ElectionCreate{
 		TxPayload: stx,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "election", "create")
+	resp, code, err := c.Request("POST", electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -240,7 +240,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		TxPayload: stx,
 		Metadata:  metadataBytes,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "election", "create")
+	resp, code, err := c.Request("POST", electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +311,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	}
 
 	// send the transaction
-	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transaction", "submit")
+	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transactions")
 	if err != nil {
 		return nil, err
 	}
@@ -324,4 +324,24 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 		return nil, err
 	}
 	return txResp.Hash, nil
+}
+
+// ElectionVoteCount returns the number of registered votes for a given election.
+func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error) {
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "votes", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != bearerstdapi.HTTPstatusCodeOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	votes := new(struct {
+		Count uint32 `json:"count"`
+	})
+
+	err = json.Unmarshal(resp, votes)
+	if err != nil {
+		return 0, err
+	}
+	return votes.Count, nil
 }
