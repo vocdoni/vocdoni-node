@@ -461,10 +461,21 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 
 	// check if process entityID matches tx sender
 	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		return nil, common.Address{}, fmt.Errorf(
-			"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+		// if not oracle check delegate
+		entityAddress := common.BytesToAddress(tx.Process.EntityId)
+		entityAccount, err := state.GetAccount(entityAddress, false)
+		if err != nil {
+			return nil, common.Address{}, fmt.Errorf(
+				"cannot get entity account for checking if the sender is a delegate: %w", err,
+			)
+		}
+		if entityAccount == nil {
+			return nil, common.Address{}, ErrAccountNotExist
+		}
+		if !entityAccount.IsDelegate(*addr) {
+			return nil, common.Address{}, fmt.Errorf(
+				"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+		}
 	}
 
 	// if no Oracle, build the processID (Oracles are allowed to use any processID)
@@ -576,8 +587,20 @@ func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) 
 			return common.Address{}, err
 		}
 		if !isOracle {
-			return common.Address{}, fmt.Errorf("unauthorized to set process status, recovered addr is %s", addr.Hex())
-		}
+			// check if delegate
+			entityIDAddress := common.BytesToAddress(process.EntityId)
+			entityIDAccount, err := state.GetAccount(entityIDAddress, true)
+			if err != nil {
+				return common.Address{}, fmt.Errorf(
+					"cannot get entityID account for checking if the sender is a delegate: %w", err,
+				)
+			}
+			if !entityIDAccount.IsDelegate(*addr) {
+				return common.Address{}, fmt.Errorf(
+					"unauthorized to set process status, recovered addr is %s", addr.Hex(),
+				)
+			} // is delegate
+		} // is oracle
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
