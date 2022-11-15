@@ -23,7 +23,7 @@ func (l *Cache) Add(key, value interface{}) {
 	l.lru.Add(key, value)
 }
 
-// Get retrives an element from the cache
+// Get retrieves an element from the cache
 func (l *Cache) Get(key interface{}) interface{} {
 	value, ok := l.lru.Get(key)
 	if !ok {

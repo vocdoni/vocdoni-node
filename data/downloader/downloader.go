@@ -17,7 +17,7 @@ const (
 	// remote file download queue.
 	ImportQueueRoutines = 10
 	// ImportRetrieveTimeout the maximum duration the import queue will wait
-	// for retreiving a remote file.
+	// for retrieving a remote file.
 	ImportRetrieveTimeout = 3 * time.Minute
 	// ImportQueueTimeout is the maximum duration the import queue will wait
 	// for pining a remote file.

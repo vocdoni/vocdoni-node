@@ -231,7 +231,7 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	defer app.isSyncLock.Unlock()
 	status, err := app.Node.Status(context.Background())
 	if err != nil {
-		log.Warnf("error retriving node status information: %v", err)
+		log.Warnf("error retrieving node status information: %v", err)
 		return true
 	}
 	return status.SyncInfo.CatchingUp

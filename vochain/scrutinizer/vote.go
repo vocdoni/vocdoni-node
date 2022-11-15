@@ -64,7 +64,7 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote
 	return txRef, nil
 }
 
-// GetEnvelope retreives an Envelope from the Blockchain block store identified by its nullifier.
+// GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
 	startTime := time.Now()
@@ -164,7 +164,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 	return err
 }
 
-// GetEnvelopes retreives all Envelopes of a ProcessId from the Blockchain block store
+// GetEnvelopes retrieves all Envelopes of a ProcessId from the Blockchain block store
 func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {

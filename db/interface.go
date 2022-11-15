@@ -49,7 +49,7 @@ type Database interface {
 }
 
 type ReadTx interface {
-	// Get retreives the value for the given key. If the key does not
+	// Get retrieves the value for the given key. If the key does not
 	// exist, returns the error ErrKeyNotFound
 	Get(key []byte) ([]byte, error)
 	// Discard discards the transaction. This method can be called always,

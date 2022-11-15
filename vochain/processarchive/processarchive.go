@@ -92,7 +92,7 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 	return os.WriteFile(procPath, procData, 0o644)
 }
 
-// GetProcess retreives a process from the js storage
+// GetProcess retrieves a process from the js storage
 func (js *jsonStorage) GetProcess(pid []byte) (*Process, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("process not valid")
