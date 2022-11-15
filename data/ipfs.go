@@ -31,16 +31,16 @@ import (
 )
 
 const (
-	MaxFileSizeBytes      = 1024 * 1024 * 50 // 50 MB
-	RetrivedFileCacheSize = 128
+	MaxFileSizeBytes       = 1024 * 1024 * 50 // 50 MB
+	RetrievedFileCacheSize = 128
 )
 
 type IPFSHandle struct {
-	Node         *ipfscore.IpfsNode
-	CoreAPI      coreiface.CoreAPI
-	DataDir      string
-	LogLevel     string
-	retriveCache *lru.Cache
+	Node          *ipfscore.IpfsNode
+	CoreAPI       coreiface.CoreAPI
+	DataDir       string
+	LogLevel      string
+	retrieveCache *lru.Cache
 
 	// cancel helps us stop extra goroutines and listeners which complement
 	// the IpfsNode above.
@@ -110,7 +110,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	i.Node = node
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
-	i.retriveCache = lru.New(RetrivedFileCacheSize)
+	i.retrieveCache = lru.New(RetrievedFileCacheSize)
 	return nil
 }
 
@@ -239,9 +239,9 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache)
 func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
 	path = strings.TrimPrefix(path, "ipfs://")
-	ccontent := i.retriveCache.Get(path)
+	ccontent := i.retrieveCache.Get(path)
 	if ccontent != nil {
-		log.Debugf("retreived file %s from cache", path)
+		log.Debugf("retrieved file %s from cache", path)
 		return ccontent.([]byte), nil
 	}
 	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
@@ -273,10 +273,10 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) (
 		return nil, err
 	}
 	if len(content) == 0 {
-		return nil, fmt.Errorf("retreived file is empty")
+		return nil, fmt.Errorf("retrieved file is empty")
 	}
 	// Save file to cache for future attempts
-	i.retriveCache.Add(path, content)
+	i.retrieveCache.Add(path, content)
 
 	return content, nil
 }
