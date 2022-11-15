@@ -38,6 +38,8 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 	app.State.SetAccount(BurnAddress, &Account{})
 	// set tx costs
 	app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO_URI, 100)
+	app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
+	app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 100)
 	app.State.SetTxCost(models.TxType_CREATE_ACCOUNT, 100)
 	app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 100)
 	// save state
