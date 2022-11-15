@@ -69,7 +69,7 @@ jobs:
 
   job_go_tests_extra:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -94,7 +94,7 @@ jobs:
           go test -vet=off -timeout=15m -race ./...
 
   job_compose_test:
-    runs-on: self-hosted
+    runs-on: [self-hosted, ci1]
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
