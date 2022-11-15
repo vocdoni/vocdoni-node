@@ -48,28 +48,8 @@ jobs:
             exit 2
           fi
 
-  job_go_build_for_mac:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/heads/release') && github.event_name == 'push'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up Go environment
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.18.8'
-          cache: true
-      - name: Tidy go cache
-        run: go mod tidy
-      - name: Run go build for Mac
-        run: |
-          # Some of our devs are on Mac. Ensure it builds.
-          # It's surprisingly hard with some deps like bazil.org/fuse.
-          GOOS=darwin go build ./...
-
   job_go_tests_extra:
     runs-on: ubuntu-latest
-    #if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -94,7 +74,7 @@ jobs:
           go test -vet=off -timeout=15m -race ./...
 
   job_compose_test:
-    runs-on: [self-hosted, ci1]
+    runs-on: [self-hosted, ci2-1]
     if: github.repository == 'vocdoni/vocdoni-node'
     steps:
       - name: Check out the repo
@@ -162,3 +142,22 @@ jobs:
             ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  job_go_build_for_mac:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/heads/release') && github.event_name == 'push'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18.8'
+          cache: true
+      - name: Tidy go cache
+        run: go mod tidy
+      - name: Run go build for Mac
+        run: |
+          # Some of our devs are on Mac. Ensure it builds.
+          # It's surprisingly hard with some deps like bazil.org/fuse.
+          GOOS=darwin go build ./...
