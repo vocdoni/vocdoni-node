@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 type Process struct {
@@ -51,5 +52,5 @@ type VoteReference struct {
 	Weight       string
 	TxIndex      int64
 	CreationTime time.Time
-	VoterID      types.VoterID
+	VoterID      vochain.VoterID
 }

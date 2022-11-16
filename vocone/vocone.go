@@ -1,6 +1,7 @@
 package vocone
 
 import (
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -11,20 +12,25 @@ import (
 	"github.com/enriquebris/goconcurrentqueue"
 	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	"github.com/tendermint/tendermint/crypto/tmhash"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmcoretypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/rpcapi"
+	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
+	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -42,13 +48,15 @@ const (
 type Vocone struct {
 	sc              *scrutinizer.Scrutinizer
 	kk              *keykeeper.KeyKeeper
+	oracle          *oracle.Oracle
 	mempool         *goconcurrentqueue.FixedFIFO
 	blockStore      db.Database
+	dataDir         string
 	height          int64
 	appInfo         *vochaininfo.VochainInfo
 	app             *vochain.BaseApplication
-	routerAPI       *rpcapi.RPCAPI
 	storage         data.Storage
+	censusdb        *censusdb.CensusDB
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
@@ -59,9 +67,10 @@ type Vocone struct {
 }
 
 // NewVocone returns a ready Vocone instance.
-func NewVocone(dataDir string, oracleKey *ethereum.SignKeys, disableIpfs bool) (*Vocone, error) {
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIpfs bool) (*Vocone, error) {
 	vc := &Vocone{}
 	var err error
+	vc.dataDir = dataDir
 	vc.app, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
 	if err != nil {
 		return nil, err
@@ -82,27 +91,6 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys, disableIpfs bool) (
 	vc.setDefaultMethods()
 	vc.app.State.SetHeight(uint32(vc.height))
 
-	// Add given oracle
-	if err := vc.AddOracle(oracleKey); err != nil {
-		return nil, err
-	}
-
-	oracleAcc := &vochain.Account{}
-	oracleAcc.Balance = 10000
-	if err := vc.app.State.SetAccount(oracleKey.Address(), oracleAcc); err != nil {
-		return nil, err
-	}
-	// set tx cost
-	if err := vc.app.State.SetTxCost(models.TxType_NEW_PROCESS, 10); err != nil {
-		return nil, err
-	}
-	if err := vc.app.State.SetTxCost(models.TxType_SET_PROCESS_RESULTS, 10); err != nil {
-		return nil, err
-	}
-	if err := vc.app.State.SetTxCost(models.TxType_SET_PROCESS_STATUS, 10); err != nil {
-		return nil, err
-	}
-
 	// Create burn account
 	if err := vc.CreateAccount(vochain.BurnAddress, &vochain.Account{}); err != nil {
 		return nil, err
@@ -114,47 +102,80 @@ func NewVocone(dataDir string, oracleKey *ethereum.SignKeys, disableIpfs bool) (
 		vc.app,
 		true,
 	); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	// Create key keeper
+	// Create key keeper and the oracle (same key for both)
+	if err := vc.AddOracle(keymanager); err != nil {
+		return nil, err
+	}
 	vc.kk, err = keykeeper.NewKeyKeeper(
 		filepath.Join(dataDir, "keykeeper"),
 		vc.app,
-		oracleKey,
+		keymanager,
 		1)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
+	if vc.oracle, err = oracle.NewOracle(vc.app, keymanager); err != nil {
+		return nil, err
+	}
+	vc.oracle.EnableResults(vc.sc)
 
 	// Create vochain metrics collector
 	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)
 	go vc.appInfo.Start(10)
 
 	// Create the IPFS storage layer
-	vc.storage, err = service.IPFS(&config.IPFSCfg{
+	if vc.storage, err = service.IPFS(&config.IPFSCfg{
 		ConfigPath: filepath.Join(dataDir, "ipfs"), NoInit: disableIpfs,
-	}, nil, nil)
+	}, nil, nil); err != nil {
+		return nil, err
+	}
+
+	// Create the census database for storing census data
+	cdb, err := metadb.New(db.TypePebble, filepath.Join(dataDir, "census"))
+	if err != nil {
+		return nil, err
+	}
+	vc.censusdb = censusdb.NewCensusDB(cdb)
+
+	// Create the data downloader and offchain data handler
+	offchaindatahandler.NewOffChainDataHandler(
+		vc.app,
+		downloader.NewDownloader(vc.storage),
+		vc.censusdb,
+		false,
+	)
 
 	return vc, err
 }
 
-// EnableAPI starts the HTTP API
-func (vc *Vocone) EnableAPI(host string, port int, path string) (err error) {
-	// Create router API
-	if vc.routerAPI, err = startAPI(host, port, path); err != nil {
+// EnableAPI starts the HTTP API server. It is not enabled by default.
+func (vc *Vocone) EnableAPI(host string, port int, URLpath string) error {
+	var httpRouter httprouter.HTTProuter
+	if err := httpRouter.Init(host, port); err != nil {
 		return err
 	}
-	if err := vc.routerAPI.EnableResultsAPI(vc.app, vc.sc); err != nil {
+	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.dataDir)
+	if err != nil {
 		return err
 	}
-	if err := vc.routerAPI.EnableVoteAPI(vc.app, vc.appInfo); err != nil {
-		return err
-	}
-	if err := vc.routerAPI.EnableFileAPI(vc.storage); err != nil {
-		return err
-	}
-	return vc.routerAPI.EnableIndexerAPI(vc.app, vc.appInfo, vc.sc)
+	uAPI.Attach(
+		vc.app,
+		vc.appInfo,
+		vc.sc,
+		vc.storage,
+		vc.censusdb,
+	)
+	return uAPI.EnableHandlers(
+		api.ElectionHandler,
+		api.VoteHandler,
+		api.ChainHandler,
+		api.WalletHandler,
+		api.AccountHandler,
+		api.CensusHandler,
+	)
 }
 
 // Start initializes the block production. This method should be run async.
@@ -213,17 +234,29 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 		}
 	}
 	if !oracleExist {
-		log.Warnf("adding new oracle key %s", oracleKey.Address())
+		log.Infof("adding new oracle %s", oracleKey.Address())
 		vc.vcMtx.Lock()
-		defer vc.vcMtx.Unlock()
 		vc.app.State.AddOracle(oracleKey.Address())
 		if _, err := vc.app.State.Save(); err != nil {
+			vc.vcMtx.Unlock()
 			return err
 		}
+		vc.vcMtx.Unlock()
+	}
+	// Create the account and assign balance if does not exist or balance too low
+	oAcc, err := vc.app.State.GetAccount(oracleKey.Address(), true)
+	if err != nil {
+		return err
+	}
+	if oAcc == nil || oAcc.Balance < 10000 {
+		vc.CreateAccount(oracleKey.Address(), &vochain.Account{Account: models.Account{
+			Balance: 100000,
+		}})
 	}
 	return nil
 }
 
+// CreateAccount creates a new account in the state.
 func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
@@ -265,7 +298,7 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	return nil
 }
 
-// SetTxCost configures the transaction cost for the given tx type
+// SetTxCost configures the transaction cost for the given tx type.
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
@@ -281,18 +314,26 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	return nil
 }
 
-// SetBulkTxCosts configures the transaction cost for all transaction types that have a cost
-func (vc *Vocone) SetBulkTxCosts(txCosts uint64) error {
+// SetBulkTxCosts sets the transaction cost for all existing transaction types.
+// It is useful to bootstrap the blockchain by set the transaction cost for all
+// transaction types at once. If force is enabld the cost is set for all tx types.
+// If force is disabled, the cost is set only for tx types that have not been set.
+func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	for k := range vochain.TxTypeCostToStateKey {
-		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
-		if err := vc.app.State.SetTxCost(k, txCosts); err != nil {
+		if !force {
+			_, err := vc.app.State.TxCost(k, true)
+			if err == nil || errors.Is(err, vochain.ErrTxCostNotFound) {
+				continue
+			}
+			// If error is not ErrTxCostNotFound, return it
 			return err
 		}
-	}
-	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
-		return err
+		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
+		if err := vc.app.State.SetTxCost(k, txCost); err != nil {
+			return err
+		}
 	}
 	if _, err := vc.app.State.Save(); err != nil {
 		return err
@@ -324,7 +365,7 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 	return &tmcoretypes.ResultBroadcastTx{
 		Code: resp.Code,
 		Data: resp.Data,
-		Hash: ethereum.HashRaw(tx),
+		Hash: tmhash.Sum(tx),
 	}, nil
 }
 
@@ -344,6 +385,7 @@ func (vc *Vocone) commitBlock() {
 				tx.([]byte),
 			)
 			txCount++
+			log.Debugf("deliver tx succeed %s", resp.Info)
 		} else {
 			log.Warnf("deliver tx failed: %s", resp.Data)
 		}
@@ -396,19 +438,6 @@ func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx,
 	}
 	stx := &models.SignedTx{}
 	return stx, ethereum.HashRaw(tx), proto.Unmarshal(tx, stx)
-}
-
-// Initialize the RPC API
-func startAPI(host string, port int, path string) (*rpcapi.RPCAPI, error) {
-	signer := ethereum.NewSignKeys()
-	if err := signer.Generate(); err != nil {
-		return nil, err
-	}
-	httpRouter := httprouter.HTTProuter{}
-	if err := httpRouter.Init(host, port); err != nil {
-		return nil, err
-	}
-	return rpcapi.NewAPI(signer, &httpRouter, path, nil, true)
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection

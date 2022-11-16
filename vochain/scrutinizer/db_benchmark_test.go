@@ -9,7 +9,6 @@ import (
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -69,7 +68,7 @@ func benchmarkIndexTx(b *testing.B) {
 				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))).Bytes(),
 			}
-			sc.OnVote(vote, types.VoterID{}.Nil(), j)
+			sc.OnVote(vote, vochain.VoterID{}.Nil(), j)
 		}
 		err := sc.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)

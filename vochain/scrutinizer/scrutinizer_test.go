@@ -534,7 +534,7 @@ func TestResults(t *testing.T) {
 				ProcessId: pid,
 				Weight:    big.NewInt(1).Bytes(),
 			},
-			voterID: types.VoterID{}.Nil(),
+			voterID: vochain.VoterID{}.Nil(),
 			txIndex: 0,
 		}
 		sc.voteIndexPool = append(sc.voteIndexPool, txRef)
@@ -931,13 +931,13 @@ func TestCountVotes(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		sc.OnVote(v, types.VoterID{}.Nil(), int32(i))
+		sc.OnVote(v, vochain.VoterID{}.Nil(), int32(i))
 	}
 	nullifier := util.RandomBytes(32)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: nullifier}
 	// Add last vote with known nullifier
 	txIndex := int32(100)
-	sc.OnVote(v, types.VoterID{}.Nil(), txIndex)
+	sc.OnVote(v, vochain.VoterID{}.Nil(), txIndex)
 
 	// Vote transactions are on imaginary 2000th block
 	blockHeight := uint32(2000)

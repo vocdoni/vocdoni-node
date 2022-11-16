@@ -10,6 +10,7 @@ import (
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -215,7 +216,7 @@ type VotePackage struct {
 type VoteReference struct {
 	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
 	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
-	VoterID      types.VoterID
+	VoterID      vochain.VoterID
 	Height       uint32
 	Weight       *types.BigInt
 	TxIndex      int32

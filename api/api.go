@@ -87,7 +87,7 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			}
 			a.enableVoteHandlers()
 		case ElectionHandler:
-			if a.scrutinizer == nil || a.vocinfo == nil || a.storage == nil {
+			if a.scrutinizer == nil || a.vocinfo == nil {
 				return fmt.Errorf("missing modules attached for enabling election handler")
 			}
 			a.enableElectionHandlers()

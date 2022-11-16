@@ -269,7 +269,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	}
 
 	// if metadata exists, add it to the storage
-	if req.Metadata != nil {
+	if a.storage != nil && req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		cid, err := a.storage.Publish(sctx, req.Metadata)

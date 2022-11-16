@@ -6,7 +6,6 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
@@ -141,11 +140,11 @@ func (c *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (c *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                          {}
-func (c *OffChainDataHandler) OnVote(v *models.Vote, voterID types.VoterID, txindex int32) {}
-func (c *OffChainDataHandler) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)      {}
-func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)         {}
-func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)         {}
+func (c *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                            {}
+func (c *OffChainDataHandler) OnVote(v *models.Vote, voterID vochain.VoterID, txindex int32) {}
+func (c *OffChainDataHandler) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)        {}
+func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)           {}
+func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)           {}
 func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte,
 	status models.ProcessStatus, txindex int32) {
 }

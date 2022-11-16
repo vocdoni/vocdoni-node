@@ -3,9 +3,11 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -68,4 +70,64 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 		return nil, nil, fmt.Errorf("could not decode response: %w", err)
 	}
 	return tx.Hash, tx.Response, nil
+}
+
+// TODO: add contexts to all the Wait* methods
+
+// WaitUntilHeight waits until the given height is reached.
+func (c *HTTPclient) WaitUntilHeight(height uint32) {
+	for {
+		info, err := c.ChainInfo()
+		if err != nil {
+			log.Warn(err)
+		} else {
+			if *info.Height > height {
+				break
+			}
+		}
+		time.Sleep(time.Second * 4)
+	}
+}
+
+// WaitUntilElectionStarts waits until the given election starts.
+func (c *HTTPclient) WaitUntilElectionStarts(electionID types.HexBytes) error {
+	election, err := c.Election(electionID)
+	if err != nil {
+		return err
+	}
+	startHeight, err := c.DateToHeight(election.StartDate)
+	if err != nil {
+		return err
+	}
+	c.WaitUntilHeight(startHeight + 1) // add a block to be sure
+	return nil
+}
+
+// WaitUntilElectionStatus waits until the given election has the given status.
+// If the status is not reached after 10 minutes, it returns os.ErrDeadlineExceeded.
+func (c *HTTPclient) WaitUntilElectionStatus(electionID types.HexBytes, status string) error {
+	for startTime := time.Now(); time.Since(startTime) < time.Second*300; {
+		election, err := c.Election(electionID)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if election.Status == status {
+			return nil
+		}
+		time.Sleep(time.Second * 5)
+	}
+	return os.ErrDeadlineExceeded
+}
+
+// EnsureTxIsMined waits until the given transaction is mined. If the transaction is not mined
+// after 3 minutes, it returns os.ErrDeadlineExceeded.
+func (c *HTTPclient) EnsureTxIsMined(txHash types.HexBytes) error {
+	for startTime := time.Now(); time.Since(startTime) < 180*time.Second; {
+		_, err := c.TransactionReference(txHash)
+		if err == nil {
+			return nil
+		}
+		time.Sleep(4 * time.Second)
+	}
+	return os.ErrDeadlineExceeded
 }

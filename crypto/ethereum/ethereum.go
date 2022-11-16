@@ -12,6 +12,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"go.vocdoni.io/dvote/types"
 )
 
 // SignatureLength is the size of an ECDSA signature in hexString format
@@ -78,17 +79,17 @@ func (k *SignKeys) HexString() (string, string) {
 }
 
 // PublicKey returns the compressed public key
-func (k *SignKeys) PublicKey() []byte {
+func (k *SignKeys) PublicKey() types.HexBytes {
 	return ethcrypto.CompressPubkey(&k.Public)
 }
 
 // PrivateKey returns the private key
-func (k *SignKeys) PrivateKey() []byte {
-	return ethcrypto.FromECDSA(&k.Private)
+func (k *SignKeys) PrivateKey() types.HexBytes {
+	return types.HexBytes(ethcrypto.FromECDSA(&k.Private))
 }
 
-// DecompressPubKey takes a hexString compressed public key and returns it descompressed. If already decompressed, returns the same key.
-func DecompressPubKey(pubComp []byte) ([]byte, error) {
+// DecompressPubKey takes a compressed public key and returns it descompressed. If already decompressed, returns the same key.
+func DecompressPubKey(pubComp types.HexBytes) (types.HexBytes, error) {
 	if len(pubComp) > PubKeyLengthBytes {
 		return pubComp, nil
 	}

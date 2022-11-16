@@ -6,13 +6,15 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // CensusProof represents proof for a voter in a census.
 type CensusProof struct {
-	Proof  types.HexBytes
-	Value  types.HexBytes
-	Weight uint64
+	Proof   types.HexBytes
+	Value   types.HexBytes
+	Weight  uint64
+	KeyType models.ProofArbo_KeyType
 }
 
 // NewCensus creates a new census and returns its ID. The censusType can be

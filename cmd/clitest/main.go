@@ -34,6 +34,7 @@ func main() {
 	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
 	paralelCount := flag.Int("paralel", 4, "number of paralel requests")
+	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
 	timeout := flag.Int("timeout", 5, "timeout in minutes")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
@@ -68,13 +69,15 @@ func main() {
 	// TODO: check if the account balance is low and use the faucet
 	acc, err := api.Account("")
 	if err != nil {
-		// Get the faucet package of bootstrap tokens
-		log.Infof("getting faucet package")
-		faucetPkg, err := getFaucetPkg(api.MyAddress().Hex())
-		if err != nil {
-			log.Fatal(err)
+		var faucetPkg []byte
+		if *useDevFaucet {
+			// Get the faucet package of bootstrap tokens
+			log.Infof("getting faucet package")
+			faucetPkg, err = getFaucetPkg(api.MyAddress().Hex())
+			if err != nil {
+				log.Fatal(err)
+			}
 		}
-
 		// Create the organization account and bootstraping with the faucet package
 		log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
 		hash, err := api.AccountBootstrap(faucetPkg)
@@ -86,7 +89,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if acc.Balance == 0 {
+		if *useDevFaucet && acc.Balance == 0 {
 			log.Fatal("account balance is 0")
 		}
 	}
@@ -176,6 +179,7 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
+			pr.KeyType = models.ProofArbo_ADDRESS
 			proofCh <- &voterProof{
 				proof:   pr,
 				address: acc.Address().Hex(),
@@ -271,10 +275,9 @@ func main() {
 			for i, voterAccount := range accountsMap {
 				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
 				_, err := c.Vote(&apiclient.VoteData{
-					ElectionID: electionID,
-					ProofTree:  proofs[voterAccount.Address().Hex()],
-					Choices:    []int{i % 2},
-					KeyType:    models.ProofArbo_ADDRESS,
+					ElectionID:  electionID,
+					ProofMkTree: proofs[voterAccount.Address().Hex()],
+					Choices:     []int{i % 2},
 				})
 				// if the context deadline is reached, we don't need to print it (let's jus retry)
 				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
