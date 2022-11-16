@@ -36,7 +36,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.IPFSHandle{}
+	storage := data.MockStorage(t)
 	api.Attach(nil, nil, nil, data.Storage(&storage), censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
