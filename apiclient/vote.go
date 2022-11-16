@@ -17,19 +17,21 @@ import (
 //
 // Choices is a list of choices, where each position represents a question.
 // ElectionID is the ID of the election.
-// ProofTree is the proof tree of the vote.
+// ProofMkTree is the proof of the vote for a off chain tree, weighted election.
+// ProofCSP is the proof of the vote fore a CSP election.
 //
 // KeyType is the type of the key used when the census was created. It can be
 // either models.ProofArbo_ADDRESS or models.ProofArbo_PUBKEY (default).
 type VoteData struct {
 	Choices    []int
 	ElectionID types.HexBytes
-	ProofTree  *CensusProof
-	KeyType    models.ProofArbo_KeyType
+
+	ProofMkTree *CensusProof
+	ProofCSP    types.HexBytes
 }
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
-// which contains the electionID, the choices and the proofTree.  The
+// which contains the electionID, the choices and the proof.  The
 // return value is the voteID (nullifier).
 func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	votePackage := &vochain.VotePackage{
@@ -45,18 +47,30 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		VotePackage: votePackageBytes,
 	}
 
-	if v.ProofTree != nil {
+	// Build the proof
+	switch {
+	case v.ProofMkTree != nil:
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
 					Type:     models.ProofArbo_BLAKE2B,
-					Siblings: v.ProofTree.Proof,
-					Value:    v.ProofTree.Value,
-					KeyType:  v.KeyType,
+					Siblings: v.ProofMkTree.Proof,
+					Value:    v.ProofMkTree.Value,
+					KeyType:  v.ProofMkTree.KeyType,
 				},
 			},
 		}
+	case v.ProofCSP != nil:
+		p := models.ProofCA{}
+		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
+			return nil, fmt.Errorf("could not decode CSP proof: %w", err)
+		}
+		vote.Proof = &models.Proof{
+			Payload: &models.Proof_Ca{Ca: &p},
+		}
 	}
+
+	// Sign and send the vote
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_Vote{

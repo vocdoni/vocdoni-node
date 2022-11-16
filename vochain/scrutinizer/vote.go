@@ -489,7 +489,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, voterID types.VoterID, txn *badger.Txn) error {
+	weight []byte, txIndex int32, voterID vochain.VoterID, txn *badger.Txn) error {
 	weightInt := new(types.BigInt).SetBytes(weight)
 	weightStr, err := weightInt.MarshalText()
 	if err != nil {

@@ -35,7 +35,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
+		return nil, fmt.Errorf("could not fetch account info")
 	}
 	// build the transaction
 	tx := models.Tx{

@@ -145,7 +145,7 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	}
 
 	// if metadata exists, add it to the storage and set he CID in the reply
-	if req.Metadata != nil {
+	if a.storage != nil && req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 		cid, err := a.storage.Publish(sctx, req.Metadata)

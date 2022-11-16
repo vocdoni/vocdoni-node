@@ -58,6 +58,7 @@ var (
 		models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
 	}
 	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unkown")
+	ErrTxCostNotFound              = fmt.Errorf("transaction cost is not set")
 )
 
 // rootLeafGetRoot is the GetRootFn function for a leaf that is the root
@@ -186,7 +187,7 @@ func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
 // in the blockchain. This event relays on the event handlers to decide if results are
 // valid or not since the Vochain State do not validate results.
 type EventListener interface {
-	OnVote(vote *models.Vote, voterID types.VoterID, txIndex int32)
+	OnVote(vote *models.Vote, voterID VoterID, txIndex int32)
 	OnNewTx(hash []byte, blockHeight uint32, txIndex int32)
 	OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
@@ -564,7 +565,7 @@ func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
 	}
 	var cost []byte
 	if cost, err = extraTree.Get([]byte(key)); err != nil {
-		return 0, fmt.Errorf("tx cost for %s not found", txType.String())
+		return 0, ErrTxCostNotFound
 	}
 	return binary.LittleEndian.Uint64(cost), nil
 }
@@ -778,7 +779,7 @@ func (v *State) voteCountInc() error {
 
 // AddVote adds a new vote to a process and call the even listeners to OnVote.
 // This method does not check if the vote already exist!
-func (v *State) AddVote(vote *models.Vote, voterID types.VoterID) error {
+func (v *State) AddVote(vote *models.Vote, voterID VoterID) error {
 	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
 	if err != nil {
 		return err

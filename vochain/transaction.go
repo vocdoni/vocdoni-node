@@ -406,9 +406,9 @@ func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, 
 // VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote
 // All hexadecimal strings should be already sanitized (without 0x)
 func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, signature []byte,
-	txID [32]byte, forCommit bool) (*models.Vote, types.VoterID, error) {
+	txID [32]byte, forCommit bool) (*models.Vote, VoterID, error) {
 	// Perform basic/general checks
-	voterID := types.VoterID{}
+	voterID := VoterID{}
 	if ve == nil {
 		return nil, voterID.Nil(), fmt.Errorf("vote envelope is nil")
 	}
@@ -617,7 +617,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("cannot extract public key from signature: %w", err)
 		}
-		voterID = []byte{types.VoterIDTypeECDSA}
+		voterID = []byte{VoterIDTypeECDSA}
 		voterID = append(voterID, pubKey...)
 		addr, err := ethereum.AddrFromPublicKey(pubKey)
 		if err != nil {

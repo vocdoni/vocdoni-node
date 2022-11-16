@@ -69,7 +69,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 // to pay for the costs of the transaction.  Returns the transaction hash.
 func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) {
 	var err error
-	faucetPackageProto := &models.FaucetPackage{}
+	var faucetPackageProto *models.FaucetPackage
 	if faucetPkg != nil {
 		if err := proto.Unmarshal(faucetPkg, faucetPackageProto); err != nil {
 			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
