@@ -4,9 +4,9 @@ name: Main
 on: [push, pull_request]
 
 jobs:
-  job_go_tests:
+  job_go_checks:
     runs-on: ubuntu-latest
-    if: github.repository == 'vocdoni/vocdoni-node'
+    if: github.event_name == 'push'
     defaults:
       run:
         shell: bash
@@ -48,9 +48,9 @@ jobs:
             exit 2
           fi
 
-  job_go_build_for_mac:
+  job_go_test:
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/heads/release') && github.event_name == 'push'
+    if: github.event_name == 'push'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -61,32 +61,11 @@ jobs:
           cache: true
       - name: Tidy go cache
         run: go mod tidy
-      - name: Run go build for Mac
-        run: |
-          # Some of our devs are on Mac. Ensure it builds.
-          # It's surprisingly hard with some deps like bazil.org/fuse.
-          GOOS=darwin go build ./...
-
-  job_go_tests_extra:
-    runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master'
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up Go environment
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.18.8'
-          cache: true
-      - name: Tidy go cache
-        run: go mod tidy
-      # - name: Run go test cover
-      #   run: |
-      #     # check that log lines contains no invalid chars (evidence of format mismatch)
-      #     export LOG_PANIC_ON_INVALIDCHARS=true
-      #     # we run vet in another step
-      #     go test -vet=off -timeout=1m -coverprofile=covprofile ./...
-      - name: Run go test race
+      - name: Run Go test
+        if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
+        run: go test ./...
+      - name: Run Go test race
+        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
         run: |
           # check that log lines contains no invalid chars (evidence of format mismatch)
           export LOG_PANIC_ON_INVALIDCHARS=true
@@ -94,8 +73,8 @@ jobs:
           go test -vet=off -timeout=15m -race ./...
 
   job_compose_test:
-    runs-on: [self-hosted, ci1]
-    if: github.repository == 'vocdoni/vocdoni-node'
+    runs-on: [self-hosted, ci2-1]
+    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -114,7 +93,7 @@ jobs:
 
   job_docker_release:
     runs-on: ubuntu-latest
-    needs: [job_go_tests, job_compose_test]
+    needs: [job_go_test, job_compose_test]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
@@ -162,3 +141,22 @@ jobs:
             ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  job_go_build_for_mac:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Go environment
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.18.8'
+          cache: true
+      - name: Tidy go cache
+        run: go mod tidy
+      - name: Run go build for Mac
+        run: |
+          # Some of our devs are on Mac. Ensure it builds.
+          # It's surprisingly hard with some deps like bazil.org/fuse.
+          GOOS=darwin go build ./...
