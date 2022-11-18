@@ -54,6 +54,7 @@ type IPFSsync struct {
 	Timeout         time.Duration
 	TimestampWindow int32
 	Messages        chan *subpub.Message
+	OnlyConnect     bool
 
 	hashTree   statedb.StateTree
 	state      statedb.StateDB
@@ -69,7 +70,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 		GroupKey:        groupKey,
 		PrivKey:         privKeyHex,
 		Port:            4171,
-		HelloInterval:   time.Second * 40,
+		HelloInterval:   time.Second * 60,
 		UpdateInterval:  time.Second * 20,
 		Timeout:         time.Second * 600,
 		Storage:         storage.(*data.IPFSHandle),
@@ -241,6 +242,9 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		}
 
 	case models.IpfsSync_UPDATE:
+		if is.OnlyConnect {
+			return nil
+		}
 		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
@@ -253,6 +257,9 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 
 	// received a fetchReply, adding new pins
 	case models.IpfsSync_FETCHREPLY:
+		if is.OnlyConnect {
+			return nil
+		}
 		if len(msg.Hash) == gravitonstate.GravitonHashSizeBytes && len(msg.Address) > 31 {
 			is.updateLock.Lock()
 			defer is.updateLock.Unlock()
@@ -263,6 +270,9 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 		}
 
 	case models.IpfsSync_FETCH:
+		if is.OnlyConnect {
+			return nil
+		}
 		if len(msg.Address) > 31 {
 			is.updateLock.RLock()
 			defer is.updateLock.RUnlock()
@@ -355,24 +365,25 @@ func (is *IPFSsync) unicastMsg(address string, imsg *models.IpfsSync) error {
 func (is *IPFSsync) Start() {
 	var err error
 
-	// Init pin storage
-	log.Infof("initializing new pin storage")
-	dbDir := path.Join(is.DataDir, "db")
-	if err := os.RemoveAll(dbDir); err != nil {
-		log.Fatal(err)
+	if !is.OnlyConnect {
+		// Init pin storage
+		log.Infof("initializing new pin storage")
+		dbDir := path.Join(is.DataDir, "db")
+		if err := os.RemoveAll(dbDir); err != nil {
+			log.Fatal(err)
+		}
+		is.state = &gravitonstate.GravitonState{}
+		if err = is.state.Init(dbDir, "disk"); err != nil {
+			log.Fatal(err)
+		}
+		if err = is.state.AddTree("ipfsSync"); err != nil {
+			log.Fatal(err)
+		}
+		is.hashTree = is.state.Tree("ipfsSync")
+		is.updateLocalPins()
+		log.Infof("current hash %x", is.hashTree.Hash())
+		// end Init pin storage
 	}
-	is.state = &gravitonstate.GravitonState{}
-	if err = is.state.Init(dbDir, "disk"); err != nil {
-		log.Fatal(err)
-	}
-	if err = is.state.AddTree("ipfsSync"); err != nil {
-		log.Fatal(err)
-	}
-	is.hashTree = is.state.Tree("ipfsSync")
-	is.updateLocalPins()
-	log.Infof("current hash %x", is.hashTree.Hash())
-	// end Init pin storage
-
 	// Init SubPub
 	is.Transport = subpub.NewSubPub(is.PrivKey, []byte(is.GroupKey), int32(is.Port), is.private)
 	is.Transport.BootNodes = is.Bootnodes
@@ -412,6 +423,9 @@ func (is *IPFSsync) handleEvents() {
 			is.sendHello()
 
 		case <-updateTicker.C:
+			if is.OnlyConnect {
+				continue
+			}
 			// send update messages
 			is.updateLock.Lock()
 			is.updateLocalPins()
@@ -419,6 +433,9 @@ func (is *IPFSsync) handleEvents() {
 			is.updateLock.Unlock()
 
 		case <-syncPinsTicker.C:
+			if is.OnlyConnect {
+				continue
+			}
 			// pin everything found in the merkle tree
 			if err := is.syncPins(); err != nil {
 				log.Warnf("syncPins: %v", err)

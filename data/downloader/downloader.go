@@ -17,11 +17,11 @@ const (
 	// remote file download queue.
 	ImportQueueRoutines = 10
 	// ImportRetrieveTimeout the maximum duration the import queue will wait
-	// for retrieving a remote file.
-	ImportRetrieveTimeout = 3 * time.Minute
+	// for retreiving a remote file.
+	ImportRetrieveTimeout = 5 * time.Minute
 	// ImportQueueTimeout is the maximum duration the import queue will wait
 	// for pining a remote file.
-	ImportPinTimeout = 5 * time.Minute
+	ImportPinTimeout = 3 * time.Minute
 	// MaxFileSize is the maximum size of a file that can be imported.
 	MaxFileSize = 100 * 1024 * 1024 // 100MB
 
@@ -38,6 +38,7 @@ type Downloader struct {
 	failedQueue     map[string]*DownloadItem
 	cancel          context.CancelFunc
 	wgQueueDaemons  sync.WaitGroup
+	addedItems      int32
 }
 
 type DownloadItem struct {
@@ -46,7 +47,8 @@ type DownloadItem struct {
 	Pin      bool
 }
 
-// NewDownloader returns a new Downloader
+// NewDownloader returns a new Downloader. After creating a new instance,
+// the process should be started by calling "Start()"
 func NewDownloader(remoteStorage data.Storage) *Downloader {
 	d := &Downloader{
 		RemoteStorage: remoteStorage,
@@ -56,7 +58,7 @@ func NewDownloader(remoteStorage data.Storage) *Downloader {
 	return d
 }
 
-// Start starts the import queue daemons
+// Start starts the import queue daemons. This is a non-blocking method.
 func (d *Downloader) Start() {
 	ctx, cancel := context.WithCancel(context.Background())
 	d.cancel = cancel
@@ -68,7 +70,19 @@ func (d *Downloader) Start() {
 	go d.importFailedQueueDaemon(ctx)
 }
 
-// Stop stops the import queue daemons
+// PrintLogInfo prints the current status of the downloader. This method is blocking.
+func (d *Downloader) PrintLogInfo(period time.Duration) {
+	for {
+		time.Sleep(period)
+		log.Infof("[downloader info] total:%d enqueued:%d retrying:%d",
+			d.TotalItemsAdded(),
+			d.QueueSize(),
+			d.ImportFailedQueueSize(),
+		)
+	}
+}
+
+// Stop stops the import queue daemons.
 func (d *Downloader) Stop() {
 	d.cancel()
 	d.wgQueueDaemons.Wait()
@@ -80,25 +94,31 @@ func (d *Downloader) AddToQueue(URI string, callback func(string, []byte), pin b
 	d.importQueue <- DownloadItem{URI: URI, Callback: callback, Pin: pin}
 }
 
-// QueueSize returns the size of the import census queue
+// QueueSize returns the size of the import census queue.
 func (d *Downloader) QueueSize() int32 {
 	return atomic.LoadInt32(&d.queueSize)
 }
 
-// ImportFailedQueueSize is the size of the list of remote census imported that failed
+// ImportFailedQueueSize is the size of the list of remote census imported that failed.
 func (d *Downloader) ImportFailedQueueSize() int {
 	d.failedQueueLock.RLock()
 	defer d.failedQueueLock.RUnlock()
 	return len(d.failedQueue)
 }
 
+// TotalItemsAdded is the number of items that has been added to the queue on this instance.
+func (d *Downloader) TotalItemsAdded() int32 {
+	return atomic.LoadInt32(&d.addedItems)
+}
+
 // handleImport fetches and imports a remote file. If the download fails, the file
 // is added to a secondary queue for retrying.
 func (d *Downloader) handleImport(item *DownloadItem) {
-	log.Infof("retrieving remote file %q", item.URI)
+	log.Infof("pining remote file %q", item.URI)
 	d.queueAddDelta(1)
+	defer d.queueAddDelta(-1)
 	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-	data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+	err := d.RemoteStorage.Pin(ctx, item.URI)
 	cancel()
 	if err != nil {
 		if os.IsTimeout(err) {
@@ -107,22 +127,18 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 			d.failedQueue[item.URI] = item
 			d.failedQueueLock.Unlock()
 		} else {
-			log.Warnf("cannot retrieve file %q: (%v)", item.URI, err)
+			log.Warnf("cannot pin file %q: (%v)", item.URI, err)
 		}
 		return
 	}
-	d.queueAddDelta(-1)
+	ctx, cancel = context.WithTimeout(context.Background(), ImportPinTimeout)
+	defer cancel()
+	data, err := d.RemoteStorage.Retrieve(ctx, item.URI, 0)
+	if err != nil {
+		log.Warnf("could not retrieve file %q: %v", item.URI, err)
+	}
 	if item.Callback != nil {
 		go item.Callback(item.URI, data)
-	}
-	if item.Pin {
-		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
-			defer cancel()
-			if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
-				log.Warnf("could not pin file %q: %v", item.URI, err)
-			}
-		}()
 	}
 }
 
@@ -142,6 +158,9 @@ func (d *Downloader) importQueueDaemon(ctx context.Context) {
 // queueAddDelta adds or substracts a delta to the queue size.
 func (d *Downloader) queueAddDelta(i int32) {
 	atomic.AddInt32(&d.queueSize, i)
+	if i > 0 {
+		atomic.AddInt32(&d.addedItems, i)
+	}
 }
 
 // importFailedQueue is the list of remote census imported that failed. Returns a safe copy.
@@ -158,9 +177,9 @@ func (d *Downloader) importFailedQueue() map[string]*DownloadItem {
 // handleImportFailedQueue tries to import files that failed.
 func (d *Downloader) handleImportFailedQueue() {
 	for cid, item := range d.importFailedQueue() {
-		log.Debugf("retrying file download %s", cid)
-		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout*2)
-		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+		log.Debugf("retrying download %s", cid)
+		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
+		err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()))
 		cancel()
 		if err != nil {
 			continue
@@ -168,19 +187,15 @@ func (d *Downloader) handleImportFailedQueue() {
 		d.failedQueueLock.Lock()
 		delete(d.failedQueue, cid)
 		d.failedQueueLock.Unlock()
-		d.queueAddDelta(-1)
+		//item := item // copy the range variable as it is continuously modified
+		ctx, cancel = context.WithTimeout(context.Background(), ImportPinTimeout)
+		defer cancel()
+		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+		if err != nil {
+			log.Warnf("could not pin file %q: %v", item.URI, err)
+		}
 		if item.Callback != nil {
 			go item.Callback(item.URI, data)
-		}
-		if item.Pin {
-			item := item // copy the range variable as it is continuously modified
-			go func() {
-				ctx, cancel := context.WithTimeout(context.Background(), ImportPinTimeout)
-				defer cancel()
-				if err := d.RemoteStorage.Pin(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix())); err != nil {
-					log.Warnf("could not pin file %q: %v", item.URI, err)
-				}
-			}()
 		}
 	}
 }

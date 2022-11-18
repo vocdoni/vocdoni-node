@@ -129,7 +129,7 @@ func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 
-// Publish publishes a message to ipfs and returns the resulting CID v1
+// Publish publishes a message to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
 	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
 	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg), options.Unixfs.CidVersion(1))
@@ -141,6 +141,7 @@ func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err e
 	return cid, nil
 }
 
+// AddFile adds a file to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) AddAndPin(ctx context.Context, path string) (cid string, err error) {
 	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
@@ -167,8 +168,7 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
-	// path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
-
+	path = strings.TrimPrefix(path, "ipfs://")
 	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
 	if err != nil {
 		return err

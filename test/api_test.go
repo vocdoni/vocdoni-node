@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -76,6 +77,16 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 
+	metadataBytes, err := json.Marshal(
+		&api.ElectionMetadata{
+			Title:       map[string]string{"default": "test election"},
+			Description: map[string]string{"default": "test election description"},
+			Version:     "1.0",
+		})
+
+	qt.Assert(t, err, qt.IsNil)
+	metadataURI := data.CalculateIPFSCIDv1json(metadataBytes)
+
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
 			NewProcess: &models.NewProcessTx{
@@ -90,6 +101,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 					Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 					VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
 					EnvelopeType: &models.EnvelopeType{},
+					Metadata:     &metadataURI,
 				},
 			},
 		},
@@ -102,10 +114,13 @@ func TestAPIcensusAndVote(t *testing.T) {
 	stxb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	election := &api.ElectionCreate{TxPayload: stxb}
+	election := api.ElectionCreate{
+		TxPayload: stxb,
+		Metadata:  metadataBytes,
+	}
 	resp, code = c.Request("POST", election, "elections")
 	qt.Assert(t, code, qt.Equals, 200)
-	err = json.Unmarshal(resp, election)
+	err = json.Unmarshal(resp, &election)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Block 2

@@ -72,10 +72,11 @@ func (c *OffChainDataHandler) Commit(height uint32) error {
 		switch item.itemType {
 		case itemTypeExternalCensus:
 			log.Infof("importing external census %s", item.uri)
-			c.enqueueOffchainCensus(item.censusRoot, item.uri)
+			// AddToQueue() writes to a channel that might be full, so we don't want to block the main thread.
+			go c.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
 			log.Infof("importing metadata from %s", item.uri)
-			c.enqueueMetadata(item.uri)
+			go c.enqueueMetadata(item.uri)
 		case itemTypeRollingCensus:
 			log.Infof("importing rolling census for process %x", item.pid)
 			c.importRollingCensus(item.pid)
