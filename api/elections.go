@@ -91,7 +91,6 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		ElectionSummary: ElectionSummary{
 			ElectionID:   electionID,
 			Status:       models.ProcessStatus_name[proc.Status],
-			Type:         formatElectionType(proc.Envelope),
 			StartDate:    a.vocinfo.HeightTime(int64(proc.StartBlock)),
 			EndDate:      a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults: proc.FinalResults,
@@ -111,7 +110,6 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
-	election.Type = formatElectionType(proc.Envelope)
 
 	if proc.HaveResults {
 		results, err := a.scrutinizer.GetResults(electionID)

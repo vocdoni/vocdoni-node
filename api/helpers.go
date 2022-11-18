@@ -10,7 +10,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (a *API) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
+func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 	processes := []*ElectionSummary{}
 	for _, p := range pids {
 		procInfo, err := a.scrutinizer.ProcessInfo(p)
@@ -19,33 +19,12 @@ func (a *API) getProcessSummaryList(pids ...[]byte) ([]*ElectionSummary, error) 
 		}
 		processes = append(processes, &ElectionSummary{
 			ElectionID: procInfo.ID,
-			Status:     models.ProcessStatus_name[procInfo.Status],
+			Status:     strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
 			StartDate:  procInfo.CreationTime,
 			EndDate:    a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
 		})
 	}
 	return processes, nil
-}
-
-func formatElectionType(et *models.EnvelopeType) string {
-	ptype := strings.Builder{}
-
-	if et.Anonymous {
-		ptype.WriteString("anonymous")
-	} else {
-		ptype.WriteString("poll")
-	}
-	if et.EncryptedVotes {
-		ptype.WriteString(" encrypted")
-	} else {
-		ptype.WriteString(" open")
-	}
-	if et.Serial {
-		ptype.WriteString(" serial")
-	} else {
-		ptype.WriteString(" single")
-	}
-	return ptype.String()
 }
 
 func protoFormat(tx []byte) string {

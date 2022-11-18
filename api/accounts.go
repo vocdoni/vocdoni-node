@@ -12,7 +12,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -182,7 +181,7 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 
 	var pids [][]byte
 	switch ctx.URLParam("status") {
-	case "active":
+	case "ready":
 		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "READY", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
@@ -192,7 +191,12 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
-	case "ended":
+	case "canceled":
+		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "CANCELED", false)
+		if err != nil {
+			return fmt.Errorf("cannot fetch election list: %w", err)
+		}
+	case "ended", "results":
 		pids, err = a.scrutinizer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "RESULTS", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
@@ -211,21 +215,17 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("missing status parameter or unknown")
 	}
 
-	elections, err := a.getProcessSummaryList(pids...)
+	elections, err := a.electionSummaryList(pids...)
 	if err != nil {
 		return err
 	}
 	data, err := json.Marshal(&Organization{
-		OrganizationID: types.HexBytes(organizationID),
-		Elections:      elections,
+		Elections: elections,
 	})
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	if err = ctx.Send(data, bearerstdapi.HTTPstatusCodeOK); err != nil {
-		log.Warn(err)
-	}
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
 // /accounts/<organizationID>/elections/count
