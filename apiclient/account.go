@@ -71,6 +71,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 	var err error
 	var faucetPackageProto *models.FaucetPackage
 	if faucetPkg != nil {
+		faucetPackageProto = new(models.FaucetPackage)
 		if err := proto.Unmarshal(faucetPkg, faucetPackageProto); err != nil {
 			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 		}
