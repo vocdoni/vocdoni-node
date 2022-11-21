@@ -38,8 +38,8 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 
-	?, "0", 0,
-	"", 0
+	?, '0', 0,
+	'', 0
 )
 `
 
@@ -168,9 +168,9 @@ SELECT ID FROM processes
 WHERE (LENGTH(?) = 0 OR LOWER(HEX(entity_id)) = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
-	AND (? = "" OR source_network_id = ?)
+	AND (? = '' OR source_network_id = ?)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
-	AND (? = "" OR (INSTR(LOWER(HEX(id)), ?) > 0))
+	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
 ORDER BY creation_time ASC, ID ASC
 	-- TODO(mvdan): use sqlc.arg once limit/offset support it:
