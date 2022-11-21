@@ -135,13 +135,14 @@ func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err e
 	if err != nil {
 		return "", fmt.Errorf("could not publish: %s", err)
 	}
-	// return the CIDv1 hash only computed by our ipfs halper function (without the /ipfs/ prefix)
+	// Unixfs().Add() returns a CIDv1 with codec "raw", but the content is actually json,
+	// so recalculate the CIDv1 using "json" as codec
 	cid = IPFSCIDv1json(rpath.Cid()).String()
 	log.Infof("published file: %s", cid)
 	return cid, nil
 }
 
-// AddFile adds a file to ipfs and returns the resulting CID v1.
+// AddAndPin adds a file to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) AddAndPin(ctx context.Context, path string) (cid string, err error) {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	rpath, err := i.addAndPin(ctx, path)

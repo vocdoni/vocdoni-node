@@ -229,7 +229,9 @@ func TestAPIaccount(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
-	// TODO: This is not working, should be checked! Some test issue?
+	// TODO: This is not working, should be checked!
+	// reference: https://github.com/vocdoni/vocdoni-node/pull/651#issuecomment-1307191374
+	//
 	// check the account exist
 	//resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
 	//qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))

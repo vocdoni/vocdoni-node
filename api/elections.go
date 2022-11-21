@@ -327,7 +327,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
 		if cid != metadataCID {
-			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
+			log.Errorf("Publish(metadata) returned an unexpected CID, different than metadataURI (%s != %s)", cid, metadataCID)
 		}
 	}
 
