@@ -176,6 +176,11 @@ type Census struct {
 	URI      string         `json:"uri,omitempty"`
 }
 
+type File struct {
+	Payload []byte `json:"payload,omitempty"`
+	CID     string `json:"cid,omitempty"`
+}
+
 // Protobuf wrappers
 
 type VoteMode struct {
