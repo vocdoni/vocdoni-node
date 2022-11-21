@@ -73,6 +73,14 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := a.endpoint.RegisterMethod(
+		"/files/cid",
+		"POST",
+		bearerstdapi.MethodAccessTypePublic,
+		a.computeCidHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -333,6 +341,30 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// POST /files/cid
+// helper endpoint to get the IPFS CID hash of a file
+func (a *API) computeCidHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	if len(msg.Data) > MaxOffchainFileSize {
+		return fmt.Errorf("file size exceeds the maximum allowed (%d bytes)", MaxOffchainFileSize)
+	}
+	req := &File{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return err
+	}
+	// check if the file is a valid JSON object
+	var js json.RawMessage
+	if err := json.Unmarshal(req.Payload, &js); err != nil {
+		return fmt.Errorf("payload is not a JSON object")
+	}
+	data, err := json.Marshal(&File{
+		CID: "ipfs://" + data.CalculateIPFSCIDv1json(req.Payload),
+	})
+	if err != nil {
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
