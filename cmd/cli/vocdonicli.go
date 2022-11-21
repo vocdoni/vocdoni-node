@@ -22,9 +22,10 @@ import (
 var transactionConfirmationThreshold = 30 * time.Second
 
 type Config struct {
-	Accounts []Account  `json:"accounts"`
-	Host     *url.URL   `json:"host"`
-	Token    *uuid.UUID `json:"token"`
+	Accounts        []Account  `json:"accounts"`
+	LastAccountUsed int        `json:"lastAccountUsed"`
+	Host            *url.URL   `json:"host"`
+	Token           *uuid.UUID `json:"token"`
 }
 
 func (c *Config) Load(filepath string) error {
@@ -94,12 +95,18 @@ func NewVocdoniCLI(configFile, host string) (*vocdoniCLI, error) {
 	if err != nil {
 		return nil, err
 	}
+	if len(cfg.Accounts)-1 >= cfg.LastAccountUsed {
+		log.Infof("using account %d", cfg.LastAccountUsed)
+		if err := api.SetAccount(cfg.Accounts[cfg.LastAccountUsed].PrivKey.String()); err != nil {
+			return nil, err
+		}
+	}
 	return &vocdoniCLI{
 		filepath:       configFile,
 		config:         &cfg,
 		api:            api,
 		chainID:        api.ChainID(),
-		currentAccount: -1,
+		currentAccount: cfg.LastAccountUsed,
 	}, nil
 }
 
@@ -114,7 +121,7 @@ func (v *vocdoniCLI) setHost(host string) error {
 		return err
 	}
 	v.chainID = info.ID
-	return nil
+	return v.save()
 }
 
 func (v *vocdoniCLI) setAuthToken(token string) error {
@@ -124,7 +131,7 @@ func (v *vocdoniCLI) setAuthToken(token string) error {
 	}
 	v.config.Token = &t
 	v.api.SetAuthToken(&t)
-	return nil
+	return v.save()
 }
 
 func (v *vocdoniCLI) useAccount(index int) error {
@@ -132,6 +139,10 @@ func (v *vocdoniCLI) useAccount(index int) error {
 		return fmt.Errorf("account %d does not exist", index)
 	}
 	v.currentAccount = index
+	v.config.LastAccountUsed = index
+	if err := v.save(); err != nil {
+		return err
+	}
 	return v.api.SetAccount(v.config.Accounts[index].PrivKey.String())
 }
 
@@ -149,7 +160,7 @@ func (v *vocdoniCLI) getCurrentAccount() *Account {
 	return &v.config.Accounts[v.currentAccount]
 }
 
-func (v *vocdoniCLI) setAccount(key, memo string) error {
+func (v *vocdoniCLI) setAPIaccount(key, memo string) error {
 	if err := v.api.SetAccount(key); err != nil {
 		return err
 	}
@@ -180,7 +191,7 @@ func (v *vocdoniCLI) setAccount(key, memo string) error {
 			Memo:      memo,
 		})
 	v.currentAccount = len(v.config.Accounts) - 1
-	return nil
+	return v.save()
 }
 
 // listAccounts list the memo notes of all stored accounts

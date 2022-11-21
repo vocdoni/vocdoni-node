@@ -148,12 +148,13 @@ type ChainInfo struct {
 }
 
 type Account struct {
-	Address       types.HexBytes `json:"address"`
-	Nonce         uint32         `json:"nonce"`
-	Balance       uint64         `json:"balance"`
-	ElectionIndex uint32         `json:"electionIndex"`
-	InfoURL       string         `json:"infoURL,omitempty"`
-	Token         *uuid.UUID     `json:"token,omitempty"`
+	Address       types.HexBytes   `json:"address"`
+	Nonce         uint32           `json:"nonce"`
+	Balance       uint64           `json:"balance"`
+	ElectionIndex uint32           `json:"electionIndex"`
+	InfoURL       string           `json:"infoURL,omitempty"`
+	Token         *uuid.UUID       `json:"token,omitempty"`
+	Metadata      *AccountMetadata `json:"metadata,omitempty"`
 }
 
 type AccountSet struct {
