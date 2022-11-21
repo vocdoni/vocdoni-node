@@ -96,6 +96,21 @@ func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 		return fmt.Errorf("account %s does not exist", addr.Hex())
 	}
 
+	// Try to retrieve the account info metadata
+	accMetadata := &AccountMetadata{}
+	if a.storage != nil {
+		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		metadataBytes, err := a.storage.Retrieve(stgCtx, acc.InfoURI, MaxOffchainFileSize)
+		if err != nil {
+			log.Warnf("cannot get account metadata from %s: %v", acc.InfoURI, err)
+		} else {
+			if err := json.Unmarshal(metadataBytes, &accMetadata); err != nil {
+				log.Warnf("cannot unmarshal metadata from %s: %v", acc.InfoURI, err)
+			}
+		}
+	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
 		Address:       addr.Bytes(),
@@ -103,6 +118,7 @@ func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 		Balance:       acc.GetBalance(),
 		ElectionIndex: acc.GetProcessIndex(),
 		InfoURL:       acc.GetInfoURI(),
+		Metadata:      accMetadata,
 	}); err != nil {
 		return err
 	}

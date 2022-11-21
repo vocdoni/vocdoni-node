@@ -68,17 +68,18 @@ func main() {
 			HideHelp: true,
 			Size:     10,
 			Items: []string{
-				items.Sprint("⚙️\tHandle accounts"),
-				items.Sprint("📖\tAccount info"),
-				items.Sprint("✨\tAccount bootstrap"),
-				items.Sprint("👛\tTransfer tokens"),
-				items.Sprint("🕸️\tNetwork info"),
-				items.Sprint("📝\tBuild a new census"),
-				items.Sprint("🗳️\tCreate an election"),
-				items.Sprint("☑️\tVote"),
-				items.Sprint("🖧\tChange API endpoint host"),
-				items.Sprint("💾\tSave config to file"),
-				items.Sprint("❌\tQuit"),
+				items.Sprint("⚙️\tHandle accounts"),         // 0
+				items.Sprint("📖\tAccount info"),             // 1
+				items.Sprint("✍\tAccount set metadata"),     // 2
+				items.Sprint("✨\tAccount bootstrap"),        // 3
+				items.Sprint("👛\tTransfer tokens"),          // 4
+				items.Sprint("🕸️\tNetwork info"),            // 5
+				items.Sprint("📝\tBuild a new census"),       // 6
+				items.Sprint("🗳️\tCreate an election"),      // 7
+				items.Sprint("☑️\tVote"),                    // 8
+				items.Sprint("🖧\tChange API endpoint host"), // 9
+				items.Sprint("💾\tSave config to file"),      // 10
+				items.Sprint("❌\tQuit"),                     // 11
 			},
 		}
 
@@ -105,7 +106,7 @@ func main() {
 				errorp.Println(errAccountNotConfgirued)
 				break
 			}
-			if err := bootStrapAccount(cli); err != nil {
+			if err := accountSetMetadata(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 3:
@@ -113,14 +114,22 @@ func main() {
 				errorp.Println(errAccountNotConfgirued)
 				break
 			}
-			if err := transfer(cli); err != nil {
+			if err := bootStrapAccount(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 4:
+			if !accountIsSet(cli) {
+				errorp.Println(errAccountNotConfgirued)
+				break
+			}
+			if err := transfer(cli); err != nil {
+				errorp.Println(err)
+			}
+		case 5:
 			if err := networkInfo(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 6:
+		case 7:
 			if !accountIsSet(cli) {
 				errorp.Println(errAccountNotConfgirued)
 				break
@@ -128,15 +137,15 @@ func main() {
 			if err := electionHandler(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 8:
+		case 9:
 			if err := hostHandler(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 9:
+		case 10:
 			if err := cli.save(); err != nil {
 				errorp.Println(err)
 			}
-		case 10:
+		case 11:
 			os.Exit(0)
 		default:
 			errorp.Println("unknown option or not yet implemented")
@@ -196,7 +205,7 @@ func accountSet(c *vocdoniCLI) error {
 		return err
 	}
 	infoPrint.Printf("set account %s\n", key)
-	return c.setAccount(key, memo)
+	return c.setAPIaccount(key, memo)
 }
 
 func accountGen(c *vocdoniCLI) error {
@@ -209,7 +218,7 @@ func accountGen(c *vocdoniCLI) error {
 	}
 	key := fmt.Sprintf("%x", util.RandomBytes(32))
 	infoPrint.Printf("set account %s\n", memo)
-	return c.setAccount(key, memo)
+	return c.setAPIaccount(key, memo)
 }
 
 func accountInfo(c *vocdoniCLI) error {
@@ -226,6 +235,14 @@ func accountInfo(c *vocdoniCLI) error {
 	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ electionIndex"), valuesPrint.Sprintf("%d", acc.ElectionIndex))
 	if acc.InfoURL != "" && acc.InfoURL != "none" {
 		fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ info URL"), valuesPrint.Sprintf(acc.InfoURL))
+	}
+	if acc.Metadata != nil {
+		accMetadata, err := json.MarshalIndent(acc.Metadata, "", "  ")
+		if err != nil {
+			log.Debug("account metadta cannot be unmarshal")
+		} else {
+			fmt.Printf("%s:\n%s\n", keysPrint.Sprintf(" ➥ metadata"), valuesPrint.Sprintf("%s", accMetadata))
+		}
 	}
 
 	return nil
@@ -413,6 +430,77 @@ func hostHandler(cli *vocdoniCLI) error {
 		return err
 	}
 	return cli.setAuthToken(token)
+}
+
+func accountSetMetadata(cli *vocdoniCLI) error {
+	accMeta := api.AccountMetadata{
+		Version:     "1.0",
+		Name:        map[string]string{"default": "vocdoni account " + cli.getCurrentAccount().Address.Hex()},
+		Description: map[string]string{"default": "my account description"},
+		Media: api.AccountMedia{
+			Logo:   "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
+			Avatar: "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
+			Header: "https://images.unsplash.com/photo-1543000968-1fe3fd3b714e",
+		},
+	}
+
+	accMetaText, err := json.MarshalIndent(&accMeta, "", " ")
+	if err != nil {
+		return err
+	}
+
+	file, err := ioutil.TempFile("", "accMeta*")
+	if err != nil {
+		return err
+	}
+	_, err = file.Write(accMetaText)
+	if err != nil {
+		return err
+	}
+	fileName := file.Name()
+	if err := file.Close(); err != nil {
+		return nil
+	}
+
+	if err := OpenFileInEditor(fileName, GetPreferredEditorFromEnvironment); err != nil {
+		return err
+	}
+
+	p := ui.Prompt{
+		Label: fmt.Sprintf(
+			"A template file has been created on %s for editing. Select 'y' once finished",
+			fileName),
+		IsConfirm: true,
+	}
+	confirm, err := p.Run()
+	if err != nil {
+		return err
+	}
+	if confirm == "N" {
+		return nil
+	}
+
+	data, err := os.ReadFile(fileName)
+	if err != nil {
+		return err
+	}
+
+	if err := json.Unmarshal(data, &accMeta); err != nil {
+		return err
+	}
+
+	infoPrint.Printf("set account metadata...\n")
+	txHash, err := cli.api.AccountSetMetadata(&accMeta)
+	if err != nil {
+		return err
+	}
+	infoPrint.Printf("account transaction sent! hash is %s\n", txHash.String())
+	infoPrint.Printf("waiting for confirmation...\n")
+	if !cli.waitForTransaction(txHash) {
+		return fmt.Errorf("transaction was not included")
+	}
+	return nil
+
 }
 
 func electionHandler(cli *vocdoniCLI) error {
