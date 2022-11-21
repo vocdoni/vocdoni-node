@@ -44,4 +44,4 @@ overrides:
     go_type: "go.vocdoni.io/dvote/types.Nullifier"
   
   - column: "vote_references.voter_id"
-    go_type: "go.vocdoni.io/dvote/types.VoterID"
+    go_type: "go.vocdoni.io/dvote/vochain.VoterID"
