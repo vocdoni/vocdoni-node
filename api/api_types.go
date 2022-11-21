@@ -24,7 +24,6 @@ type OrganizationList struct {
 
 type ElectionSummary struct {
 	ElectionID   types.HexBytes    `json:"electionId"`
-	Type         string            `json:"type"`
 	Status       string            `json:"status"`
 	StartDate    time.Time         `json:"startDate"`
 	EndDate      time.Time         `json:"endDate"`

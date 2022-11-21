@@ -355,6 +355,19 @@ func IPFSCIDv1json(cid ipfscid.Cid) ipfscid.Cid {
 	return ipfscid.NewCidV1(uint64(multicodec.Json), cid.Hash())
 }
 
+// IPFSCIDequals compares two Cids (v0 or v1) and returns true if they are equal
+func IPFSCIDequals(cid1, cid2 string) bool {
+	c1, err := ipfscid.Decode(cid1)
+	if err != nil {
+		return false
+	}
+	c2, err := ipfscid.Decode(cid2)
+	if err != nil {
+		return false
+	}
+	return c1.Equals(c2)
+}
+
 // unixfsFilesNode returns a go-ipfs files.Node given a unix path
 func unixfsFilesNode(path string) (files.Node, error) {
 	stat, err := os.Lstat(path)

@@ -108,6 +108,7 @@ func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 
 // POST /account
 // set account information
+// TODO: perform metadata checks as in elections.go
 func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	req := &AccountSet{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -143,7 +144,7 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		TxHash: res.Hash.Bytes(),
 	}
 
-	// if metadata exists, add it to the storage and set he CID in the reply
+	// if metadata exists, add it to the storage and set the CID in the reply
 	if a.storage != nil && req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()

@@ -286,9 +286,10 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			return fmt.Errorf("wrong metadata format: %w", err)
 		}
 
-		// check metadata URI matches metadata content
+		// set metadataCID from metadata bytes
 		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
-		if metadataCID != strings.TrimPrefix(metadataURI, "ipfs://") {
+		// check metadata URI matches metadata content
+		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
 			return fmt.Errorf("metadata URI does not match metadata content")
 		}
 	}
