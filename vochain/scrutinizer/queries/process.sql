@@ -23,8 +23,8 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 
-	?, "0", 0,
-	"", 0
+	?, '0', 0,
+	'', 0
 );
 
 -- name: GetProcess :one
@@ -39,9 +39,9 @@ SELECT ID FROM processes
 WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR LOWER(HEX(entity_id)) = sqlc.arg(entity_id))
 	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
-	AND (sqlc.arg(source_network_id) = "" OR source_network_id = sqlc.arg(source_network_id))
+	AND (sqlc.arg(source_network_id) = '' OR source_network_id = sqlc.arg(source_network_id))
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
-	AND (sqlc.arg(id_substr) = "" OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
+	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
 ORDER BY creation_time ASC, ID ASC
 	-- TODO(mvdan): use sqlc.arg once limit/offset support it:
