@@ -2,7 +2,6 @@ package downloader
 
 import (
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/data"
@@ -29,8 +28,6 @@ func TestDownloader(t *testing.T) {
 	d.AddToQueue(stg.URIprefix()+"testfile2", callback, true)
 	d.AddToQueue(stg.URIprefix()+"testfile3", callback, true)
 	d.AddToQueue(stg.URIprefix()+"testfile4", callback, true)
-	time.Sleep(100 * time.Millisecond)
-	qt.Assert(t, d.QueueSize(), qt.Equals, int32(3))
 	<-callbackChan
 	<-callbackChan
 	<-callbackChan

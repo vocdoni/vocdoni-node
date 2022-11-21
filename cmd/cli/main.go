@@ -290,7 +290,9 @@ func bootStrapAccount(cli *vocdoniCLI) error {
 
 	infoPrint.Printf("bootstraping account...\n")
 
-	txHash, err := cli.api.AccountBootstrap(faucetPkg)
+	txHash, err := cli.api.AccountBootstrap(faucetPkg, &api.AccountMetadata{
+		Name: map[string]string{"default": "vocdoni cli account " + cli.getCurrentAccount().Address.Hex()},
+	})
 	if err != nil {
 		return err
 	}
@@ -436,7 +438,7 @@ func electionHandler(cli *vocdoniCLI) error {
 						Value: 1},
 				}}},
 		Census: api.CensusTypeDescription{
-			Type:     "treeWeighted",
+			Type:     "weighted",
 			RootHash: make(types.HexBytes, 32),
 		},
 	}

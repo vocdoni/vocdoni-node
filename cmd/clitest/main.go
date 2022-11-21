@@ -81,7 +81,11 @@ func main() {
 		// Create the organization account and bootstraping with the faucet package
 		log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
 		log.Debugf("faucetPackage is %x", faucetPkg)
-		hash, err := api.AccountBootstrap(faucetPkg)
+		hash, err := api.AccountBootstrap(faucetPkg, &vapi.AccountMetadata{
+			Name:        map[string]string{"default": "test account " + api.MyAddress().Hex()},
+			Description: map[string]string{"default": "test description"},
+			Version:     "1.0",
+		})
 		if err != nil {
 			log.Fatal(err)
 		}

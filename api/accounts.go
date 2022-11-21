@@ -6,14 +6,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -113,19 +116,49 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
-	// check if the metadata is of correct type
-	metadata := &OrganizationMetadata{}
+
+	// check if the transaction is of the correct type and extract metadata URI
+	metadataURI, err := func() (string, error) {
+		stx := &models.SignedTx{}
+		if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
+			return "", err
+		}
+		tx := &models.Tx{}
+		if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+			return "", err
+		}
+		if np := tx.GetSetAccount(); np != nil {
+			return np.GetInfoURI(), nil
+		}
+		return "", nil
+	}()
+	if err != nil {
+		return err
+	}
+
+	// Check if the tx metadata URI is provided (in case of metadata bytes provided).
+	// Note that we enforce the metadata URI to be provided in the tx payload only if
+	// req.Metadata is provided, but not in the other direction.
+	if req.Metadata != nil && metadataURI == "" {
+		return fmt.Errorf("metadata provided but no metadata URI found in transaction")
+	}
+
+	var metadataCID string
 	if req.Metadata != nil {
-		if err := json.Unmarshal(req.Metadata, metadata); err != nil {
-			return fmt.Errorf("could not unmarshal metadata: %w", err)
+		// if election metadata defined, check the format
+		metadata := AccountMetadata{}
+		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
+			return fmt.Errorf("wrong metadata format: %w", err)
+		}
+
+		// set metadataCID from metadata bytes
+		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
+		// check metadata URI matches metadata content
+		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
+			return fmt.Errorf("metadata URI does not match metadata content")
 		}
 	}
-	// check if the transaction is of the correct type
-	if ok, err := isTransactionType(req.TxPayload, &models.Tx_SetAccount{}); err != nil {
-		return fmt.Errorf("could not check transaction type: %w", err)
-	} else if !ok {
-		return fmt.Errorf("transaction is not of type SetAccountInfo")
-	}
+
 	// send the transaction to the blockchain
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
@@ -143,7 +176,7 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		TxHash: res.Hash.Bytes(),
 	}
 
-	// if metadata exists, add it to the storage and set he CID in the reply
+	// if metadata exists, add it to the storage
 	if a.storage != nil && req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
@@ -152,6 +185,9 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 			log.Errorf("could not publish to storage: %v", err)
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
+		}
+		if cid != metadataCID {
+			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
 		}
 	}
 

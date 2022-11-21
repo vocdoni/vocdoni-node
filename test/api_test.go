@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -76,6 +77,16 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 
+	metadataBytes, err := json.Marshal(
+		&api.ElectionMetadata{
+			Title:       map[string]string{"default": "test election"},
+			Description: map[string]string{"default": "test election description"},
+			Version:     "1.0",
+		})
+
+	qt.Assert(t, err, qt.IsNil)
+	metadataURI := data.CalculateIPFSCIDv1json(metadataBytes)
+
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
 			NewProcess: &models.NewProcessTx{
@@ -90,6 +101,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 					Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
 					VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
 					EnvelopeType: &models.EnvelopeType{},
+					Metadata:     &metadataURI,
 				},
 			},
 		},
@@ -102,10 +114,13 @@ func TestAPIcensusAndVote(t *testing.T) {
 	stxb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	election := &api.ElectionCreate{TxPayload: stxb}
+	election := api.ElectionCreate{
+		TxPayload: stxb,
+		Metadata:  metadataBytes,
+	}
 	resp, code = c.Request("POST", election, "elections")
 	qt.Assert(t, code, qt.Equals, 200)
-	err = json.Unmarshal(resp, election)
+	err = json.Unmarshal(resp, &election)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Block 2
@@ -176,7 +191,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, signer.Generate(), qt.IsNil)
 
 	// metdata
-	meta := &api.OrganizationMetadata{
+	meta := &api.AccountMetadata{
 		Version: "1.0",
 	}
 	metaData, err := json.Marshal(meta)
@@ -186,7 +201,7 @@ func TestAPIaccount(t *testing.T) {
 	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
-	infoURI := string("ipfs://1234")
+	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -215,8 +230,10 @@ func TestAPIaccount(t *testing.T) {
 	waitUntilHeight(t, c, 2)
 
 	// TODO: This is not working, should be checked!
+	// reference: https://github.com/vocdoni/vocdoni-node/pull/651#issuecomment-1307191374
+	//
 	// check the account exist
-	//resp, code = c.Request("GET", nil, "account", signer.Address().String())
+	//resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
 	//qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
 

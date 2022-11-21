@@ -3,7 +3,6 @@ package data
 import (
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"strings"
 	"time"
@@ -129,19 +128,23 @@ func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 
-// Publish publishes a message to ipfs and returns the resulting CID v1
+// Publish publishes a message to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
 	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
 	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg), options.Unixfs.CidVersion(1))
 	if err != nil {
 		return "", fmt.Errorf("could not publish: %s", err)
 	}
+	// Unixfs().Add() returns a CIDv1 with codec "raw", but the content is actually json,
+	// so recalculate the CIDv1 using "json" as codec
 	cid = IPFSCIDv1json(rpath.Cid()).String()
 	log.Infof("published file: %s", cid)
 	return cid, nil
 }
 
+// AddAndPin adds a file to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) AddAndPin(ctx context.Context, path string) (cid string, err error) {
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
 		return "", err
@@ -167,21 +170,17 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 }
 
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
-	// path = strings.ReplaceAll(path, "/ipld/", "/ipfs/")
-
-	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
-	if err != nil {
-		return err
-	}
-	return i.CoreAPI.Pin().Add(ctx, rpath, options.Pin.Recursive(true))
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	cpath := corepath.New(path)
+	log.Infof("adding pin %s", cpath.String())
+	return i.CoreAPI.Pin().Add(ctx, cpath, options.Pin.Recursive(true))
 }
 
 func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
-	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
-	if err != nil {
-		return err
-	}
-	return i.CoreAPI.Pin().Rm(ctx, rpath, options.Pin.RmRecursive(true))
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	cpath := corepath.New(path)
+	log.Infof("removing pin %s", cpath.String())
+	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
 
 func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
@@ -238,43 +237,31 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache)
 func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
-	path = strings.TrimPrefix(path, "ipfs://")
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+
+	// check if we have the file in the local cache
 	ccontent := i.retrieveCache.Get(path)
 	if ccontent != nil {
 		log.Debugf("retrieved file %s from cache", path)
 		return ccontent.([]byte), nil
 	}
-	rpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
+
+	cnode, err := i.CoreAPI.ResolveNode(ctx, corepath.New(path))
 	if err != nil {
-		return nil, fmt.Errorf("resolvepath: %w", err)
+		return nil, fmt.Errorf("could not resolve node: %w", err)
 	}
-	if err := rpath.IsValid(); err != nil {
-		return nil, fmt.Errorf("ipfs path is invalid")
-	}
-	node, err := i.CoreAPI.Unixfs().Get(ctx, rpath)
-	if err != nil {
-		return nil, err
-	}
-	defer node.Close()
+	log.Debugf("rawdata received: %s", cnode.RawData())
 	if maxSize == 0 {
 		maxSize = MaxFileSizeBytes
 	}
-	if s, err := node.Size(); s > maxSize || err != nil {
-		return nil, fmt.Errorf("file too big or size cannot be obtained")
+	if s, err := cnode.Size(); s > uint64(maxSize) || err != nil {
+		return nil, fmt.Errorf("file too big or size cannot be obtained: (size:%d)", s)
 	}
-	r, ok := node.(files.File)
-	if !ok {
-		return nil, fmt.Errorf("received incorrect type from Unixfs().Get()")
-	}
-
-	// Fetch the file content
-	content, err := io.ReadAll(r)
-	if err != nil {
-		return nil, err
-	}
+	content := cnode.RawData()
 	if len(content) == 0 {
 		return nil, fmt.Errorf("retrieved file is empty")
 	}
+
 	// Save file to cache for future attempts
 	i.retrieveCache.Add(path, content)
 
@@ -367,6 +354,19 @@ func IPFSCIDv1json(cid ipfscid.Cid) ipfscid.Cid {
 	// it helps people and software to know how to interpret that
 	// content after the content is fetched
 	return ipfscid.NewCidV1(uint64(multicodec.Json), cid.Hash())
+}
+
+// IPFSCIDequals compares two Cids (v0 or v1) and returns true if they are equal
+func IPFSCIDequals(cid1, cid2 string) bool {
+	c1, err := ipfscid.Decode(cid1)
+	if err != nil {
+		return false
+	}
+	c2, err := ipfscid.Decode(cid2)
+	if err != nil {
+		return false
+	}
+	return c1.Equals(c2)
 }
 
 // unixfsFilesNode returns a go-ipfs files.Node given a unix path

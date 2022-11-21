@@ -151,6 +151,8 @@ func NewVochainService(vs *VochainService) error {
 		log.Infof("creating offchain data downloader service")
 		if vs.DataDownloader == nil {
 			vs.DataDownloader = downloader.NewDownloader(vs.Storage)
+			vs.DataDownloader.Start()
+			go vs.DataDownloader.PrintLogInfo(time.Second * 30)
 		}
 		if vs.CensusDB == nil {
 			db, err := metadb.New(db.TypePebble, filepath.Join(vs.Config.DataDir, "censusdb"))

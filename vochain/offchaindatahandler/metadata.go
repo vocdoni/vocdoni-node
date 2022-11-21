@@ -6,7 +6,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-// enqueueMetadata enqueue a election metadata for download
+// enqueueMetadata enqueue a election metadata for download.
+// (safe for concurrent use, simply pushes an item to a channel)
 func (d *OffChainDataHandler) enqueueMetadata(uri string) {
 	if !strings.HasPrefix(uri, d.storage.RemoteStorage.URIprefix()) {
 		log.Warnf("metadata URI not valid: %s", uri)

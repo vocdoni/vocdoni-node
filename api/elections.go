@@ -6,17 +6,23 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
-const ElectionHandler = "elections"
+const (
+	ElectionHandler     = "elections"
+	MaxOffchainFileSize = 1024 * 1024 * 1 // 1MB
+)
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
@@ -119,6 +125,21 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 		election.Results = results.Votes
 	}
 
+	// Try to retrieve the election metadata
+	if a.storage != nil {
+		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		metadataBytes, err := a.storage.Retrieve(stgCtx, election.MetadataURL, MaxOffchainFileSize)
+		if err != nil {
+			log.Warnf("cannot get metadata from %s: %v", election.MetadataURL, err)
+		} else {
+			electionMetadata := ElectionMetadata{}
+			if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
+				log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
+			}
+			election.Metadata = &electionMetadata
+		}
+	}
 	data, err := json.Marshal(election)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
@@ -228,22 +249,51 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		return err
 	}
 
-	// check if the transaction is of the correct type
-	if ok, err := isTransactionType(req.TxPayload, &models.Tx_NewProcess{}); err != nil {
-		return fmt.Errorf("could not check transaction type: %w", err)
-	} else if !ok {
-		return fmt.Errorf("transaction is not of type NewProcess")
+	// check if the transaction is of the correct type and extract metadata URI
+	metadataURI, err := func() (string, error) {
+		stx := &models.SignedTx{}
+		if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
+			return "", err
+		}
+		tx := &models.Tx{}
+		if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+			return "", err
+		}
+		if np := tx.GetNewProcess(); np != nil {
+			if p := np.GetProcess(); p != nil {
+				return p.GetMetadata(), nil
+			}
+		}
+		return "", fmt.Errorf("could not get metadata URI")
+	}()
+	if err != nil {
+		return err
 	}
 
-	// if election metadata defined, check the format
+	// Check if the tx metadata URI is provided (in case of metadata bytes provided).
+	// Note that we enforce the metadata URI to be provided in the tx payload only if
+	// req.Metadata is provided, but not in the other direction.
+	if req.Metadata != nil && metadataURI == "" {
+		return fmt.Errorf("metadata provided but no metadata URI found in transaction")
+	}
+
+	var metadataCID string
 	if req.Metadata != nil {
+		// if election metadata defined, check the format
 		metadata := ElectionMetadata{}
 		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
 			return fmt.Errorf("wrong metadata format: %w", err)
 		}
+
+		// set metadataCID from metadata bytes
+		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
+		// check metadata URI matches metadata content
+		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
+			return fmt.Errorf("metadata URI does not match metadata content")
+		}
 	}
 
-	// send the transactionQ5JaGFKcM3m7
+	// send the transaction
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
 		return err
@@ -276,6 +326,9 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
+		if cid != metadataCID {
+			log.Errorf("Publish(metadata) returned an unexpected CID, different than metadataURI (%s != %s)", cid, metadataCID)
+		}
 	}
 
 	var data []byte
@@ -283,5 +336,4 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
-
 }
