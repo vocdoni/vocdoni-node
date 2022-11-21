@@ -6,6 +6,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -67,7 +68,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 
 // AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
 // to pay for the costs of the transaction.  Returns the transaction hash.
-func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) {
+func (c *HTTPclient) AccountBootstrap(faucetPkg []byte, metadata *api.AccountMetadata) (types.HexBytes, error) {
 	var err error
 	var faucetPackageProto *models.FaucetPackage
 	if faucetPkg != nil {
@@ -76,6 +77,18 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 		}
 	}
+
+	var metadataBytes []byte
+	var metadataURI string
+	if metadata != nil {
+		metadataBytes, err = json.Marshal(metadata)
+		if err != nil {
+			return nil, fmt.Errorf("could not marshal metadata: %w", err)
+		}
+		metadataURI = "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+	}
+
+	// Build the transaction
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
@@ -84,11 +97,98 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte) (types.HexBytes, error) 
 				Nonce:         new(uint32),
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPackageProto,
+				InfoURI:       &metadataURI,
 			},
 		}})
 	if err != nil {
 		return nil, err
 	}
-	txHash, _, err := c.SignAndSendTx(&stx)
-	return txHash, err
+
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPOST, &api.AccountSet{
+		TxPayload: stxb,
+		Metadata:  metadataBytes,
+	}, "accounts")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	acc := &api.AccountSet{}
+	err = json.Unmarshal(resp, acc)
+	if err != nil {
+		return nil, err
+	}
+
+	return acc.TxHash, nil
+}
+
+// AccountUpdateMetadata updates the metadata associated with the account associated with the client.
+func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.HexBytes, error) {
+	var err error
+	var metadataBytes []byte
+	var metadataURI string
+	if metadata != nil {
+		metadataBytes, err = json.Marshal(metadata)
+		if err != nil {
+			return nil, fmt.Errorf("could not marshal metadata: %w", err)
+		}
+		metadataURI = "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+	}
+
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("account not configured: %w", err)
+	}
+
+	// Build the transaction
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetAccount{
+			SetAccount: &models.SetAccountTx{
+				Txtype:  models.TxType_SET_ACCOUNT_INFO_URI,
+				Nonce:   &acc.Nonce,
+				Account: c.account.Address().Bytes(),
+				InfoURI: &metadataURI,
+			},
+		}})
+	if err != nil {
+		return nil, err
+	}
+
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPOST, &api.AccountSet{
+		TxPayload: stxb,
+		Metadata:  metadataBytes,
+	}, "accounts")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.AccountSet{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+
+	return accv.TxHash, nil
 }

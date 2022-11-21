@@ -126,7 +126,6 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 	}
 
 	// Try to retrieve the election metadata
-	// Important: timeout must be increased when IPFS CID issue is fixed
 	if a.storage != nil {
 		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
@@ -328,7 +327,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
 		if cid != metadataCID {
-			log.Warnf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
+			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
 		}
 	}
 

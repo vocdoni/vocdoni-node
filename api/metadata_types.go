@@ -40,20 +40,20 @@ type ChoiceMetadata struct {
 	Value uint32         `json:"value"`
 }
 
-// OrganizationMetadata is the metadata for an organization
-type OrganizationMetadata struct {
-	Version     string            `json:"version,omitempty"`
-	Languages   []string          `json:"languages,omitempty"`
-	Name        LanguageString    `json:"name,omitempty"`
-	Description LanguageString    `json:"description,omitempty"`
-	NewsFeed    LanguageString    `json:"newsFeed,omitempty"`
-	Media       OrganizationMedia `json:"media,omitempty"`
-	Meta        interface{}       `json:"meta,omitempty"`
-	Actions     interface{}       `json:"actions,omitempty"`
+// AccountMetadata is the metadata for an organization
+type AccountMetadata struct {
+	Version     string         `json:"version,omitempty"`
+	Languages   []string       `json:"languages,omitempty"`
+	Name        LanguageString `json:"name,omitempty"`
+	Description LanguageString `json:"description,omitempty"`
+	NewsFeed    LanguageString `json:"newsFeed,omitempty"`
+	Media       AccountMedia   `json:"media,omitempty"`
+	Meta        interface{}    `json:"meta,omitempty"`
+	Actions     interface{}    `json:"actions,omitempty"`
 }
 
-// OrganizationMedia stores the avatar, header, and logo for an entity metadata
-type OrganizationMedia struct {
+// AccountMedia stores the avatar, header, and logo for an entity metadata
+type AccountMedia struct {
 	Avatar string `json:"avatar,omitempty"`
 	Header string `json:"header,omitempty"`
 	Logo   string `json:"logo,omitempty"`

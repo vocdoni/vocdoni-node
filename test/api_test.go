@@ -191,7 +191,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, signer.Generate(), qt.IsNil)
 
 	// metdata
-	meta := &api.OrganizationMetadata{
+	meta := &api.AccountMetadata{
 		Version: "1.0",
 	}
 	metaData, err := json.Marshal(meta)
@@ -201,7 +201,7 @@ func TestAPIaccount(t *testing.T) {
 	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
-	infoURI := string("ipfs://1234")
+	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -229,9 +229,9 @@ func TestAPIaccount(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
-	// TODO: This is not working, should be checked!
+	// TODO: This is not working, should be checked! Some test issue?
 	// check the account exist
-	//resp, code = c.Request("GET", nil, "account", signer.Address().String())
+	//resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
 	//qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
 
