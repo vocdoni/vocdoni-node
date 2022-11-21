@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/data"
@@ -286,10 +287,9 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		}
 
 		// check metadata URI matches metadata content
-		metadataCID := data.CalculateIPFSCIDv1json(req.Metadata)
-		if metadataCID != metadataURI {
-			// return fmt.Errorf("metadata URI does not match metadata content")
-			log.Warnf("metadata URI does not match metadata content (%s != %s)", metadataCID, metadataURI)
+		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
+		if metadataCID != strings.TrimPrefix(metadataURI, "ipfs://") {
+			return fmt.Errorf("metadata URI does not match metadata content")
 		}
 	}
 

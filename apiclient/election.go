@@ -187,11 +187,12 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	}
 	log.Debugf("election metadata: %s", string(metadataBytes))
 	metadataURI := "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+	log.Debugf("metadataURI: %s", metadataURI)
 
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
+		return nil, fmt.Errorf("could not fetch account info")
 	}
 
 	// build the process transaction

@@ -436,7 +436,7 @@ func electionHandler(cli *vocdoniCLI) error {
 						Value: 1},
 				}}},
 		Census: api.CensusTypeDescription{
-			Type:     "treeWeighted",
+			Type:     "weighted",
 			RootHash: make(types.HexBytes, 32),
 		},
 	}

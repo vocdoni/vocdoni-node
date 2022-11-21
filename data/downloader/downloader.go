@@ -136,9 +136,10 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 	data, err := d.RemoteStorage.Retrieve(ctx, item.URI, 0)
 	if err != nil {
 		log.Warnf("could not retrieve file %q: %v", item.URI, err)
-	}
-	if item.Callback != nil {
-		go item.Callback(item.URI, data)
+	} else {
+		if item.Callback != nil {
+			go item.Callback(item.URI, data)
+		}
 	}
 }
 
