@@ -1,12 +1,12 @@
 ---
 name: Main
 
-on: [push, pull_request]
+on: [push, pull_request, pull_request_target]
 
 jobs:
   job_go_checks:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    #if: github.event_name == 'push'
     defaults:
       run:
         shell: bash
@@ -50,7 +50,7 @@ jobs:
 
   job_go_test:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
+    #if: github.event_name == 'push'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
