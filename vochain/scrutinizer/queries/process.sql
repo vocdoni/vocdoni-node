@@ -34,9 +34,10 @@ LIMIT 1;
 
 -- name: SearchProcesses :many
 SELECT ID FROM processes
--- TODO(mvdan): drop the hex conversion on entity_id once we can use BLOB for
--- the column and parameter; see sqlc.yaml
-WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR LOWER(HEX(entity_id)) = sqlc.arg(entity_id))
+-- TODO(mvdan): when sqlc's parser is better, and does not get confused with
+-- string types, use:
+-- WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
+WHERE (sqlc.arg(entity_id_len) = 0 OR entity_id = sqlc.arg(entity_id))
 	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
 	AND (sqlc.arg(source_network_id) = '' OR source_network_id = sqlc.arg(source_network_id))
@@ -44,8 +45,10 @@ WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR LOWER(HEX(entity_id)) = sqlc.arg(entit
 	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
 ORDER BY creation_time ASC, ID ASC
-	-- TODO(mvdan): use sqlc.arg once limit/offset support it:
-	-- https://github.com/kyleconroy/sqlc/issues/1025
+-- TODO(mvdan): use sqlc.arg once limit/offset support it:
+-- https://github.com/kyleconroy/sqlc/issues/1025
+-- LIMIT sqlc.arg(limit)
+-- OFFSET sqlc.arg(offset)
 LIMIT ?
 OFFSET ?
 ;
