@@ -45,7 +45,7 @@ INSERT INTO processes (
 
 type CreateProcessParams struct {
 	ID                types.ProcessID
-	EntityID          string
+	EntityID          types.EntityID
 	EntityIndex       int64
 	StartBlock        int64
 	EndBlock          int64
@@ -165,7 +165,7 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 
 const searchProcesses = `-- name: SearchProcesses :many
 SELECT ID FROM processes
-WHERE (LENGTH(?) = 0 OR LOWER(HEX(entity_id)) = ?)
+WHERE (? = 0 OR entity_id = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
 	AND (? = '' OR source_network_id = ?)
@@ -173,14 +173,13 @@ WHERE (LENGTH(?) = 0 OR LOWER(HEX(entity_id)) = ?)
 	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
 ORDER BY creation_time ASC, ID ASC
-	-- TODO(mvdan): use sqlc.arg once limit/offset support it:
-	-- https://github.com/kyleconroy/sqlc/issues/1025
 LIMIT ?
 OFFSET ?
 `
 
 type SearchProcessesParams struct {
-	EntityID        string
+	EntityIDLen     interface{}
+	EntityID        types.EntityID
 	Namespace       int64
 	Status          int64
 	SourceNetworkID string
@@ -190,11 +189,16 @@ type SearchProcessesParams struct {
 	Offset          int32
 }
 
-// TODO(mvdan): drop the hex conversion on entity_id once we can use BLOB for
-// the column and parameter; see sqlc.yaml
+// TODO(mvdan): when sqlc's parser is better, and does not get confused with
+// string types, use:
+// WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
+// TODO(mvdan): use sqlc.arg once limit/offset support it:
+// https://github.com/kyleconroy/sqlc/issues/1025
+// LIMIT sqlc.arg(limit)
+// OFFSET sqlc.arg(offset)
 func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
 	rows, err := q.db.QueryContext(ctx, searchProcesses,
-		arg.EntityID,
+		arg.EntityIDLen,
 		arg.EntityID,
 		arg.Namespace,
 		arg.Namespace,

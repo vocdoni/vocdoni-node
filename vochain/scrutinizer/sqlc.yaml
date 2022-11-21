@@ -15,13 +15,8 @@ overrides:
     go_type: "go.vocdoni.io/dvote/types.ProcessID"
   - column: "vote_references.process_id"
     go_type: "go.vocdoni.io/dvote/types.ProcessID"
-  # TODO: breaks sqlc generate for some reason.
-  # For the time being, we store the bytes in the default TEXT form.
-  # This works fine, but note that builtins can choke on null bytes;
-  # see https://sqlite.org/nulinstr.html.
-  # For that reason, queries with entity_id parameters use hex strings.
-  # - column: "processes.entity_id"
-  #   go_type: "go.vocdoni.io/dvote/types.EntityID"
+  - column: "processes.entity_id"
+    go_type: "go.vocdoni.io/dvote/types.EntityID"
   - column: "processes.census_root"
     go_type: "go.vocdoni.io/dvote/types.CensusRoot"
   - column: "processes.rolling_census_root"

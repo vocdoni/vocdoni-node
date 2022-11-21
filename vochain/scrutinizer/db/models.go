@@ -13,7 +13,7 @@ import (
 
 type Process struct {
 	ID                    types.ProcessID
-	EntityID              string
+	EntityID              types.EntityID
 	EntityIndex           int64
 	StartBlock            int64
 	EndBlock              int64
