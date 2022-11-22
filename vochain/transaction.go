@@ -3,6 +3,7 @@ package vochain
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"math/big"
 
@@ -13,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -913,4 +915,481 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", common.BytesToAddress(treasurer.Address), sigAddress.String())
 	}
 	return tx.Value, nil
+}
+
+// NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
+func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
+	signature []byte, state *State) (*models.Process, common.Address, error) {
+	tx := vtx.GetNewProcess()
+	if tx.Process == nil {
+		return nil, common.Address{}, fmt.Errorf("process data is empty")
+	}
+	// basic required fields check
+	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
+		return nil, common.Address{}, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
+	}
+	if tx.Process.VoteOptions.MaxCount == 0 {
+		return nil, common.Address{}, fmt.Errorf("missing vote maxCount parameter")
+	}
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return nil, common.Address{}, fmt.Errorf("missing signature or new process transaction")
+	}
+	// start and block count sanity check
+	// if startBlock is zero or one, the process will be enabled on the next block
+	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
+		tx.Process.StartBlock = state.CurrentHeight() + 1
+	} else if tx.Process.StartBlock < state.CurrentHeight() {
+		return nil, common.Address{}, fmt.Errorf(
+			"cannot add process with start block lower than or equal to the current height")
+	}
+	if tx.Process.BlockCount <= 0 {
+		return nil, common.Address{}, fmt.Errorf(
+			"cannot add process with duration lower than or equal to the current height")
+	}
+	// check tx cost
+	cost, err := state.TxCost(models.TxType_NEW_PROCESS, false)
+	if err != nil {
+		return nil, common.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
+	}
+	addr, acc, err := state.AccountFromSignature(txBytes, signature)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+	if addr == nil {
+		return nil, common.Address{}, fmt.Errorf("cannot get account from signature, nil result")
+	}
+	// check balance and nonce
+	if acc.Balance < cost {
+		return nil, common.Address{}, ErrNotEnoughBalance
+	}
+	if acc.Nonce != tx.Nonce {
+		return nil, common.Address{}, ErrAccountNonceInvalid
+	}
+
+	isOracle, err := state.IsOracle(*addr)
+	if err != nil {
+		return nil, common.Address{}, err
+	}
+
+	// check if process entityID matches tx sender
+	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
+		// if not oracle check delegate
+		entityAddress := common.BytesToAddress(tx.Process.EntityId)
+		entityAccount, err := state.GetAccount(entityAddress, false)
+		if err != nil {
+			return nil, common.Address{}, fmt.Errorf(
+				"cannot get entity account for checking if the sender is a delegate: %w", err,
+			)
+		}
+		if entityAccount == nil {
+			return nil, common.Address{}, ErrAccountNotExist
+		}
+		if !entityAccount.IsDelegate(*addr) {
+			return nil, common.Address{}, fmt.Errorf(
+				"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+		}
+	}
+
+	// if no Oracle, build the processID (Oracles are allowed to use any processID)
+	if !isOracle || tx.Process.ProcessId == nil {
+		// if Oracle but processID empty, switch the entityID temporary to the Oracle address
+		// this way we ensure the account creating the process exists
+		entityID := tx.Process.EntityId
+		if isOracle {
+			tx.Process.EntityId = addr.Bytes()
+		}
+		pid, err := app.BuildProcessID(tx.Process)
+		if err != nil {
+			return nil, common.Address{}, fmt.Errorf("cannot build processID: %w", err)
+		}
+		tx.Process.ProcessId = pid.Marshal()
+		// restore original entityID
+		tx.Process.EntityId = entityID
+	}
+
+	// check if process already exists
+	_, err = state.Process(tx.Process.ProcessId, false)
+	if err == nil {
+		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
+	}
+
+	// check valid/implemented process types
+	// pre-regiser and anonymous must be either both enabled or disabled, as
+	// we only support a single scenario of pre-register + anonymous.
+	if tx.Process.Mode.PreRegister != tx.Process.EnvelopeType.Anonymous {
+		return nil, common.Address{}, fmt.Errorf("pre-register mode only supported " +
+			"with anonymous envelope type and viceversa")
+	}
+	if tx.Process.Mode.PreRegister &&
+		(tx.Process.MaxCensusSize == nil || tx.Process.GetMaxCensusSize() <= 0) {
+		return nil, common.Address{}, fmt.Errorf("pre-register mode requires setting " +
+			"maxCensusSize to be > 0")
+	}
+	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
+		var circuits []artifacts.CircuitConfig
+		if genesis, ok := Genesis[app.chainID]; ok {
+			circuits = genesis.CircuitsConfig
+		} else {
+			log.Warn("Using dev network genesis CircuitsConfig")
+			circuits = Genesis["dev"].CircuitsConfig
+		}
+		if len(circuits) == 0 {
+			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainID)
+		}
+		if tx.Process.MaxCensusSize == nil {
+			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
+		}
+		if tx.Process.GetMaxCensusSize() > uint64(circuits[len(circuits)-1].Parameters[0]) {
+			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
+				"cannot be bigger than the parameter for the biggest circuit (%v)",
+				circuits[len(circuits)-1].Parameters[0])
+		}
+	}
+
+	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
+	// all the required changes to support a process with a rolling census
+	// that is not Anonymous.
+	if tx.Process.EnvelopeType.Serial {
+		return nil, common.Address{}, fmt.Errorf("serial process not yet implemented")
+	}
+
+	if tx.Process.EnvelopeType.EncryptedVotes || tx.Process.EnvelopeType.Anonymous {
+		// We consider the zero value as nil for security
+		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
+		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
+	}
+	return tx.Process, *addr, nil
+}
+
+// SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
+func SetProcessTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) (common.Address, error) {
+	tx := vtx.GetSetProcess()
+	// check signature available
+	if signature == nil || tx == nil || txBytes == nil {
+		return common.Address{}, fmt.Errorf("missing signature on setProcess transaction")
+	}
+	// get tx cost
+	cost, err := state.TxCost(tx.Txtype, false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
+	}
+	addr, acc, err := state.AccountFromSignature(txBytes, signature)
+	if err != nil {
+		return common.Address{}, err
+	}
+	// check balance and nonce
+	if acc.Balance < cost {
+		return common.Address{}, ErrNotEnoughBalance
+	}
+	if acc.Nonce != tx.Nonce {
+		return common.Address{}, ErrAccountNonceInvalid
+	}
+	// get process
+	process, err := state.Process(tx.ProcessId, false)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
+	}
+	// check process entityID matches tx sender
+	isOracle := false
+	if !bytes.Equal(process.EntityId, addr.Bytes()) {
+		// Check if the transaction comes from an oracle
+		// Oracles can create processes with any entityID
+		isOracle, err = state.IsOracle(*addr)
+		if err != nil {
+			return common.Address{}, err
+		}
+		if !isOracle {
+			// check if delegate
+			entityIDAddress := common.BytesToAddress(process.EntityId)
+			entityIDAccount, err := state.GetAccount(entityIDAddress, true)
+			if err != nil {
+				return common.Address{}, fmt.Errorf(
+					"cannot get entityID account for checking if the sender is a delegate: %w", err,
+				)
+			}
+			if !entityIDAccount.IsDelegate(*addr) {
+				return common.Address{}, fmt.Errorf(
+					"unauthorized to set process status, recovered addr is %s", addr.Hex(),
+				)
+			} // is delegate
+		} // is oracle
+	}
+	switch tx.Txtype {
+	case models.TxType_SET_PROCESS_RESULTS:
+		if !isOracle {
+			return common.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
+		}
+		if acc.Balance < cost {
+			return common.Address{}, ErrNotEnoughBalance
+		}
+		if acc.Nonce != tx.Nonce {
+			return common.Address{}, ErrAccountNonceInvalid
+		}
+		results := tx.GetResults()
+		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
+			return common.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
+		}
+		return *addr, state.SetProcessResults(process.ProcessId, results, false)
+	case models.TxType_SET_PROCESS_STATUS:
+		return *addr, state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+	case models.TxType_SET_PROCESS_CENSUS:
+		return *addr, state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
+	default:
+		return common.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
+	}
+}
+
+// MintTokensTxCheck checks if a given MintTokensTx and its data are valid
+func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+	if vtx == nil || txBytes == nil || signature == nil || state == nil {
+		return fmt.Errorf("invalid parameters")
+	}
+	tx := vtx.GetMintTokens()
+	if tx == nil {
+		return fmt.Errorf("invalid tx")
+	}
+	if tx.Value <= 0 {
+		return fmt.Errorf("invalid value")
+	}
+	if len(tx.To) == 0 {
+		return fmt.Errorf("invalid To address")
+	}
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	treasurer, err := state.Treasurer(false)
+	if err != nil {
+		return err
+	}
+	treasurerAddress := common.BytesToAddress(treasurer.Address)
+	if treasurerAddress != txSenderAddress {
+		return fmt.Errorf(
+			"address recovered not treasurer: expected %s got %s",
+			treasurerAddress.String(),
+			txSenderAddress.String(),
+		)
+	}
+	if tx.Nonce != treasurer.Nonce {
+		return fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
+	}
+	toAddr := common.BytesToAddress(tx.To)
+	toAcc, err := state.GetAccount(toAddr, false)
+	if err != nil {
+		return fmt.Errorf("cannot get to account: %w", err)
+	}
+	if toAcc == nil {
+		return ErrAccountNotExist
+	}
+	return nil
+}
+
+// SendTokensTxCheck checks if a given SendTokensTx and its data are valid
+func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+	if vtx == nil || signature == nil || txBytes == nil || state == nil {
+		return fmt.Errorf("invalid parameters")
+	}
+	tx := vtx.GetSendTokens()
+	if tx == nil {
+		return fmt.Errorf("invalid tx")
+	}
+	if tx.Value == 0 {
+		return fmt.Errorf("invalid value")
+	}
+	if len(tx.From) == 0 {
+		return fmt.Errorf("invalid from address")
+	}
+	if len(tx.To) == 0 {
+		return fmt.Errorf("invalid to address")
+	}
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	txFromAddress := common.BytesToAddress(tx.From)
+	if txFromAddress != txSenderAddress {
+		return fmt.Errorf("from (%s) field and extracted signature (%s) mismatch",
+			txFromAddress.String(),
+			txSenderAddress.String(),
+		)
+	}
+	txToAddress := common.BytesToAddress(tx.To)
+	toTxAccount, err := state.GetAccount(txToAddress, false)
+	if err != nil {
+		return fmt.Errorf("cannot get to account: %w", err)
+	}
+	if toTxAccount == nil {
+		return ErrAccountNotExist
+	}
+	acc, err := state.GetAccount(txSenderAddress, false)
+	if err != nil {
+		return fmt.Errorf("cannot get from account: %w", err)
+	}
+	if acc == nil {
+		return ErrAccountNotExist
+	}
+	if tx.Nonce != acc.Nonce {
+		return fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
+	}
+	cost, err := state.TxCost(models.TxType_SEND_TOKENS, false)
+	if err != nil {
+		return err
+	}
+	if (tx.Value + cost) > acc.Balance {
+		return ErrNotEnoughBalance
+	}
+	return nil
+}
+
+// SetAccountDelegateTxCheck checks if a SetAccountDelegateTx and its data are valid
+func SetAccountDelegateTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+	if vtx == nil || signature == nil || txBytes == nil || state == nil {
+		return fmt.Errorf("invalid parameters")
+	}
+	tx := vtx.GetSetAccount()
+	if tx == nil {
+		return fmt.Errorf("invalid tx")
+	}
+	if tx.Txtype != models.TxType_ADD_DELEGATE_FOR_ACCOUNT &&
+		tx.Txtype != models.TxType_DEL_DELEGATE_FOR_ACCOUNT {
+		return fmt.Errorf("invalid tx type")
+	}
+	if tx.Nonce == nil {
+		return fmt.Errorf("invalid nonce")
+	}
+	if len(tx.Delegates) == 0 {
+		return fmt.Errorf("invalid delegates")
+	}
+	txSenderAddress, txSenderAccount, err := state.AccountFromSignature(txBytes, signature)
+	if err != nil {
+		return err
+	}
+	if err := checkDuplicateDelegates(tx.Delegates, txSenderAddress); err != nil {
+		return fmt.Errorf("checkDuplicateDelegates: %w", err)
+	}
+	if tx.GetNonce() != txSenderAccount.Nonce {
+		return fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
+	}
+	cost, err := state.TxCost(tx.Txtype, false)
+	if err != nil {
+		return fmt.Errorf("cannot get tx cost: %w", err)
+	}
+	if txSenderAccount.Balance < cost {
+		return ErrNotEnoughBalance
+	}
+	switch tx.Txtype {
+	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+		for _, delegate := range tx.Delegates {
+			delegateAddress := common.BytesToAddress(delegate)
+			if txSenderAccount.IsDelegate(delegateAddress) {
+				return fmt.Errorf("delegate %s already exists", delegateAddress.String())
+			}
+		}
+		return nil
+	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+		for _, delegate := range tx.Delegates {
+			delegateAddress := common.BytesToAddress(delegate)
+			if !txSenderAccount.IsDelegate(delegateAddress) {
+				return fmt.Errorf("delegate %s does not exist", delegateAddress.String())
+			}
+		}
+		return nil
+	default:
+		// should never happen
+		return fmt.Errorf("invalid tx type")
+	}
+}
+
+// CollectFaucetTxCheck checks if a CollectFaucetTx and its data are valid
+func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
+	if vtx == nil || signature == nil || txBytes == nil || state == nil {
+		return fmt.Errorf("invalid parameters")
+	}
+	tx := vtx.GetCollectFaucet()
+	if tx == nil {
+		return fmt.Errorf("invalid tx")
+	}
+	faucetPkg := tx.GetFaucetPackage()
+	if faucetPkg == nil {
+		return fmt.Errorf("nil faucet package")
+	}
+	if faucetPkg.Signature == nil {
+		return fmt.Errorf("invalid faucet package signature")
+	}
+	if faucetPkg.Payload == nil {
+		return fmt.Errorf("invalid faucet package payload")
+	}
+	faucetPayload := &models.FaucetPayload{}
+	if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
+		return fmt.Errorf("could not unmarshal faucet package: %w", err)
+	}
+	if faucetPayload.Amount == 0 {
+		return fmt.Errorf("invalid faucet package payload amount")
+	}
+	if len(faucetPayload.To) == 0 {
+		return fmt.Errorf("invalid faucet package payload to")
+	}
+	payloadToAddress := common.BytesToAddress(faucetPayload.To)
+	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
+	if err != nil {
+		return fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	if txSenderAddress != payloadToAddress {
+		return fmt.Errorf("txSender %s and faucet payload to %s mismatch",
+			txSenderAddress,
+			payloadToAddress,
+		)
+	}
+	txSenderAccount, err := state.GetAccount(txSenderAddress, false)
+	if err != nil {
+		return fmt.Errorf("cannot check if account %s exists: %w", txSenderAddress.String(), err)
+	}
+	if txSenderAccount == nil {
+		return ErrAccountNotExist
+	}
+	if txSenderAccount.Nonce != tx.Nonce {
+		return fmt.Errorf("invalid nonce")
+	}
+	fromAddr, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from faucet package signature: %w", err)
+	}
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
+	keyHash := ethereum.HashRaw(append(fromAddr.Bytes(), b...))
+	used, err := state.FaucetNonce(keyHash, false)
+	if err != nil {
+		return fmt.Errorf("cannot check faucet nonce: %w", err)
+	}
+	if used {
+		return fmt.Errorf("faucet payload already used")
+	}
+	issuerAcc, err := state.GetAccount(fromAddr, false)
+	if err != nil {
+		return fmt.Errorf("cannot get faucet account: %w", err)
+	}
+	if issuerAcc == nil {
+		return fmt.Errorf("the account signing the faucet payload does not exist")
+	}
+	cost, err := state.TxCost(models.TxType_COLLECT_FAUCET, false)
+	if err != nil {
+		return fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
+	}
+	if issuerAcc.Balance < faucetPayload.Amount+cost {
+		return fmt.Errorf("faucet does not have enough balance %d, required %d", issuerAcc.Balance, faucetPayload.Amount+cost)
+	}
+	return nil
 }

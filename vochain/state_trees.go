@@ -2,9 +2,12 @@ package vochain
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 // StateDB Tree hierarchy
@@ -30,6 +33,40 @@ const (
 	ChildTreePreRegisterNullifiers = "PreRegisterNullifiers"
 	ChildTreeVotes                 = "Votes"
 )
+
+var (
+	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unkown")
+)
+
+// treeTxWithMutex is a wrapper over TreeTx with a mutex for convenient
+// RWLocking.
+type treeTxWithMutex struct {
+	*statedb.TreeTx
+	sync.RWMutex
+}
+
+// MainTreeView is a thread-safe function to obtain a pointer to the last
+// opened mainTree as a TreeView.
+func (v *State) MainTreeView() *statedb.TreeView {
+	return v.mainTreeViewValue.Load().(*statedb.TreeView)
+}
+
+// setMainTreeView is a thread-safe function to store a pointer to the last
+// opened mainTree as TreeView.
+func (v *State) setMainTreeView(treeView *statedb.TreeView) {
+	v.mainTreeViewValue.Store(treeView)
+}
+
+// mainTreeViewer returns the mainTree as a treeViewer.
+// When committed is false, the mainTree returned is the not yet commited one
+// from the currently open StateDB transaction.
+// When committed is true, the mainTree returned is the last commited version.
+func (v *State) mainTreeViewer(committed bool) statedb.TreeViewer {
+	if committed {
+		return v.MainTreeView()
+	}
+	return v.Tx.AsTreeView()
+}
 
 var (
 	// MainTrees contains the configuration for the singleton state trees
@@ -160,4 +197,117 @@ func StateParentChildTreeCfg(parent, child string, key []byte) (statedb.TreeConf
 	parentTree := StateTreeCfg(parent)
 	childTree := StateChildTreeCfg(child)
 	return parentTree, childTree.WithKey(key)
+}
+
+// rootLeafGetRoot is the GetRootFn function for a leaf that is the root
+// itself.
+func rootLeafGetRoot(value []byte) ([]byte, error) {
+	if len(value) != defaultHashLen {
+		return nil, fmt.Errorf("len(value) = %v != %v: %w",
+			len(value),
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
+	}
+	return value, nil
+}
+
+// rootLeafSetRoot is the SetRootFn function for a leaf that is the root
+// itself.
+func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
+	if len(value) != defaultHashLen {
+		return nil, fmt.Errorf("len(value) = %v != %v", len(value), defaultHashLen)
+	}
+	return root, nil
+}
+
+// processGetCensusRoot is the GetRootFn function to get the rolling census
+// root of a process leaf.
+func processGetCensusRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.Process.RollingCensusRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.Process.RollingCensusRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
+	}
+	return sdbProc.Process.RollingCensusRoot, nil
+}
+
+// processSetCensusRoot is the SetRootFn function to set the rolling census
+// root of a process leaf.
+func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.Process.RollingCensusRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
+}
+
+// processGetPreRegisterNullifiersRoot is the GetRootFn function to get the nullifiers
+// root of a process leaf.
+func processGetPreRegisterNullifiersRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.Process.NullifiersRoot) != defaultHashLen {
+		return nil, fmt.Errorf("len(sdbProc.Process.NullifiersRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown,
+		)
+	}
+	return sdbProc.Process.NullifiersRoot, nil
+}
+
+// processSetPreRegisterNullifiersRoot is the SetRootFn function to set the nullifiers
+// root of a process leaf.
+func processSetPreRegisterNullifiersRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.Process.NullifiersRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
+}
+
+// processGetVotesRoot is the GetRootFn function to get the votes root of a
+// process leaf.
+func processGetVotesRoot(value []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	if len(sdbProc.VotesRoot) != defaultHashLen {
+		return nil, fmt.Errorf(
+			"len(sdbProc.VotesRoot) != %v: %w",
+			defaultHashLen,
+			ErrProcessChildLeafRootUnknown)
+	}
+	return sdbProc.VotesRoot, nil
+}
+
+// processSetVotesRoot is the SetRootFn function to set the votes root of a
+// process leaf.
+func processSetVotesRoot(value []byte, root []byte) ([]byte, error) {
+	var sdbProc models.StateDBProcess
+	if err := proto.Unmarshal(value, &sdbProc); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
+	}
+	sdbProc.VotesRoot = root
+	newValue, err := proto.Marshal(&sdbProc)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
+	}
+	return newValue, nil
 }

@@ -271,32 +271,6 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
-// OnProcessKeys does nothing
-func (k *KeyKeeper) OnProcessKeys(pid []byte, pub string, txindex int32) {
-	// do nothing
-}
-
-// OnRevealKeys does nothing
-func (k *KeyKeeper) OnRevealKeys(pid []byte, priv string, txindex int32) {
-	// do nothing
-}
-
-// OnProcessResults does nothing
-func (k *KeyKeeper) OnProcessResults(pid []byte,
-	results *models.ProcessResult, txindex int32) error {
-	// do nothing
-	return nil
-}
-
-// OnProcessesStart does nothing
-func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
-
-// OnSetAccount does nothing
-func (k *KeyKeeper) OnSetAccount(addr []byte, account *vochain.Account) error { return nil }
-
-// OnTransferTokens does nothing
-func (k *KeyKeeper) OnTransferTokens(from, to []byte, amount uint64) error { return nil }
-
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
 func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
@@ -507,3 +481,21 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 	}
 	return nil
 }
+
+// OnProcessKeys does nothing
+func (k *KeyKeeper) OnProcessKeys(pid []byte, pub string, txindex int32) {}
+
+// OnRevealKeys does nothing
+func (k *KeyKeeper) OnRevealKeys(pid []byte, priv string, txindex int32) {}
+
+// OnProcessResults does nothing
+func (k *KeyKeeper) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {}
+
+// OnProcessesStart does nothing
+func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
+
+// OnSetAccount does nothing
+func (k *KeyKeeper) OnSetAccount(addr []byte, account *vochain.Account) {}
+
+// OnTransferTokens does nothing
+func (k *KeyKeeper) OnTransferTokens(from, to []byte, amount uint64) {}

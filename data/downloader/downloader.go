@@ -41,6 +41,7 @@ type Downloader struct {
 	addedItems      int32
 }
 
+// DownloadItem is a remote file to be downloaded.
 type DownloadItem struct {
 	URI      string
 	Callback func(URI string, data []byte)
