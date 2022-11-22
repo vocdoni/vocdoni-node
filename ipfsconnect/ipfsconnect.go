@@ -24,7 +24,7 @@ const (
 	IPv6       = 6
 )
 
-type IPFSsync struct {
+type IPFSConnect struct {
 	Key             string
 	PrivKey         string
 	Port            int16
@@ -40,8 +40,8 @@ type IPFSsync struct {
 }
 
 // New creates a new IPFSConnect instance. Transports supported are "libp2p" or "privlibp2p"
-func New(groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync {
-	is := &IPFSsync{
+func New(groupKey, privKeyHex, transport string, storage data.Storage) *IPFSConnect {
+	is := &IPFSConnect{
 		GroupKey:        groupKey,
 		PrivKey:         privKeyHex,
 		Port:            4171,
@@ -57,7 +57,7 @@ func New(groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync
 	return is
 }
 
-func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
+func (is *IPFSConnect) broadcastMsg(imsg *models.IpfsSync) error {
 	imsg.Timestamp = uint32(time.Now().Unix())
 	d, err := proto.Marshal(imsg)
 	if err != nil {
@@ -69,7 +69,7 @@ func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
 }
 
 // Handle handles a Message in a thread-safe way
-func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
+func (is *IPFSConnect) Handle(msg *models.IpfsSync) error {
 	if msg.Address == is.Transport.Address() {
 		return nil
 	}
@@ -107,7 +107,7 @@ func (is *IPFSsync) Handle(msg *models.IpfsSync) error {
 	return nil
 }
 
-func (is *IPFSsync) sendHelloWithAddr(multiaddress string) {
+func (is *IPFSConnect) sendHelloWithAddr(multiaddress string) {
 	var msg models.IpfsSync
 	msg.Msgtype = models.IpfsSync_HELLO
 	msg.Address = is.Transport.Address()
@@ -118,13 +118,13 @@ func (is *IPFSsync) sendHelloWithAddr(multiaddress string) {
 	}
 }
 
-func (is *IPFSsync) sendHello() {
+func (is *IPFSConnect) sendHello() {
 	for _, addr := range is.ipfsAddrs() {
 		is.sendHelloWithAddr(addr.String())
 	}
 }
 
-func (is *IPFSsync) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
+func (is *IPFSConnect) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 	ipfs, err := multiaddr.NewMultiaddr("/ipfs/" + is.IPFS.Node.PeerHost.ID().String())
 	if err != nil {
 		return nil
@@ -143,21 +143,21 @@ func (is *IPFSsync) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 	return maddrs
 }
 
-// Start initializes and start an IPFSsync instance
-func (is *IPFSsync) Start() {
+// Start initializes and start an IPFSConnect instance
+func (is *IPFSConnect) Start() {
 	// Init SubPub
 	is.Transport = subpub.NewSubPub(is.PrivKey, []byte(is.GroupKey), int32(is.Port), is.private)
 	is.Transport.BootNodes = is.Bootnodes
 	is.Transport.Start(context.Background(), is.Messages)
 	// end Init SubPub
 
-	go is.handleEvents() // this spawns a single background task per IPFSsync instance
+	go is.handleEvents() // this spawns a single background task per IPFSConnect instance
 }
 
 // handleEvents runs an event loop that
 // * checks for incoming messages, passing them to is.Handle(),
 // * at regular interval sends HELLOs, UPDATEs and calls syncPins()
-func (is *IPFSsync) handleEvents() {
+func (is *IPFSConnect) handleEvents() {
 	helloTicker := time.NewTicker(is.HelloInterval)
 	defer helloTicker.Stop()
 
