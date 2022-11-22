@@ -9,7 +9,7 @@ import (
 	"time"
 
 	libpeer "github.com/libp2p/go-libp2p-core/peer"
-	"go.vocdoni.io/dvote/ipfssync/subpub"
+	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )

@@ -9,7 +9,7 @@ package subpub_test
 import (
 	"context"
 
-	"go.vocdoni.io/dvote/ipfssync/subpub"
+	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )

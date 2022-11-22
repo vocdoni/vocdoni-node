@@ -1,5 +1,5 @@
-// Package ipfssync provides a service to synchronize IPFS datasets over a p2p network between two or more nodes
-package ipfssync
+// Package ipfsconnect provides a service to maintain persistent connections (PersistPeers) between two or more IPFS nodes
+package ipfsconnect
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/multiformats/go-multiaddr"
-	"go.vocdoni.io/dvote/ipfssync/subpub"
+	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	statedb "go.vocdoni.io/dvote/statedblegacy"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -59,8 +59,8 @@ type IPFSsync struct {
 	private    bool
 }
 
-// NewIPFSsync creates a new IPFSsync instance. Transports supported are "libp2p" or "privlibp2p"
-func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync {
+// New creates a new IPFSConnect instance. Transports supported are "libp2p" or "privlibp2p"
+func New(dataDir, groupKey, privKeyHex, transport string, storage data.Storage) *IPFSsync {
 	is := &IPFSsync{
 		DataDir:         dataDir,
 		GroupKey:        groupKey,
