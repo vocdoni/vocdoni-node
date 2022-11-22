@@ -65,8 +65,7 @@ func (is *IPFSsync) broadcastMsg(imsg *models.IpfsSync) error {
 	}
 	log.Debugf("broadcasting message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
 		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
-	is.Transport.SendBroadcast(subpub.Message{Data: d})
-	return nil
+	return is.Transport.SendBroadcast(subpub.Message{Data: d})
 }
 
 // Handle handles a Message in a thread-safe way
