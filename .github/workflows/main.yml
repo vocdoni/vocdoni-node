@@ -1,16 +1,22 @@
 ---
 name: Main
 
-on: [push, pull_request, pull_request_target]
+on: [push, pull_request]
 
 jobs:
   job_go_checks:
     runs-on: ubuntu-latest
-    #if: github.event_name == 'push'
     defaults:
       run:
         shell: bash
     steps:
+      - name: Print github env vars
+        run: |
+          echo github.event_name: ${{ github.event_name }}
+          echo github.ref: ${{ github.ref }}
+          echo github.ref_name: ${{ github.ref_name }}
+          echo github.head_ref: ${{ github.head_ref }}
+          echo github.base_ref: ${{ github.base_ref }}
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up Go environment
@@ -50,7 +56,6 @@ jobs:
 
   job_go_test:
     runs-on: ubuntu-latest
-    #if: github.event_name == 'push'
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -74,7 +79,10 @@ jobs:
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+    if: |
+      github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+      || (startsWith(github.ref, 'refs/pull/') && endsWith(github.ref, '/merge') )
+      || github.ref == 'refs/heads/main'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
