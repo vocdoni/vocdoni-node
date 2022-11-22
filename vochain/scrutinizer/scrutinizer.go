@@ -621,7 +621,7 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
 func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult,
-	txIndex int32) error {
+	txIndex int32) {
 	// Execute callbacks
 	for _, l := range s.eventOnResults {
 		go l.OnOracleResults(results, pid, s.App.Height())
@@ -629,7 +629,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 
 	// We don't execute any action if the blockchain is being syncronized
 	if s.App.IsSynchronizing() {
-		return nil
+		return
 	}
 
 	// TODO: check results are valid and return an error if not.
@@ -697,19 +697,12 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
-	return nil
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (s *Scrutinizer) OnProcessesStart(pids [][]byte) {
-}
-
-func (s *Scrutinizer) OnSetAccount(addr []byte, account *vochain.Account) error {
-	return nil
-}
-func (s *Scrutinizer) OnTransferTokens(from, to []byte, amount uint64) error {
-	return nil
-}
+func (s *Scrutinizer) OnProcessesStart(pids [][]byte)                     {}
+func (s *Scrutinizer) OnSetAccount(addr []byte, account *vochain.Account) {}
+func (s *Scrutinizer) OnTransferTokens(from, to []byte, amount uint64)    {}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

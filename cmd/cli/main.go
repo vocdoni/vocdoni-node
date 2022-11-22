@@ -433,15 +433,28 @@ func hostHandler(cli *vocdoniCLI) error {
 }
 
 func accountSetMetadata(cli *vocdoniCLI) error {
+	currentAccount, err := cli.api.Account("")
+	if err != nil {
+		return err
+	}
+	if currentAccount == nil {
+		return fmt.Errorf("account does not exist yet")
+	}
+
 	accMeta := api.AccountMetadata{
 		Version:     "1.0",
 		Name:        map[string]string{"default": "vocdoni account " + cli.getCurrentAccount().Address.Hex()},
 		Description: map[string]string{"default": "my account description"},
-		Media: api.AccountMedia{
+		Media: &api.AccountMedia{
 			Logo:   "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
 			Avatar: "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
 			Header: "https://images.unsplash.com/photo-1543000968-1fe3fd3b714e",
 		},
+	}
+
+	if currentAccount.Metadata != nil {
+		log.Infof("account has metadata (%s) let's update it", currentAccount.InfoURL)
+		accMeta = *currentAccount.Metadata
 	}
 
 	accMetaText, err := json.MarshalIndent(&accMeta, "", " ")

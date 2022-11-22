@@ -140,22 +140,30 @@ func (c *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 	}
 }
 
+// OnSetAccount is triggered when a new account is created or modifyied. If metadata info is present, it is enqueued.
+func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *vochain.Account) {
+	c.queueLock.Lock()
+	defer c.queueLock.Unlock()
+	if !c.importOnlyNew || !c.isFastSync {
+		// enqueue for import account metadata information
+		if m := account.GetInfoURI(); m != "" {
+			log.Debugf("adding account info metadata %s to queue", m)
+			c.queue = append(c.queue, importItem{
+				uri:      m,
+				itemType: itemTypeAccountMetadata,
+			})
+		}
+	}
+}
+
 // NOT USED but required for implementing the vochain.EventListener interface
 func (c *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                            {}
 func (c *OffChainDataHandler) OnVote(v *models.Vote, voterID vochain.VoterID, txindex int32) {}
 func (c *OffChainDataHandler) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)        {}
 func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)           {}
 func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)           {}
-func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte,
-	status models.ProcessStatus, txindex int32) {
+func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 }
-func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *vochain.Account) error {
-	return nil
-}
-func (c *OffChainDataHandler) OnTransferTokens(from, to []byte, amount uint64) error {
-	return nil
-}
-func (c *OffChainDataHandler) OnProcessResults(pid []byte,
-	results *models.ProcessResult, txindex int32) error {
-	return nil
+func (c *OffChainDataHandler) OnTransferTokens(from, to []byte, amount uint64) {}
+func (c *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
 }

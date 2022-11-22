@@ -47,7 +47,7 @@ type AccountMetadata struct {
 	Name        LanguageString `json:"name,omitempty"`
 	Description LanguageString `json:"description,omitempty"`
 	NewsFeed    LanguageString `json:"newsFeed,omitempty"`
-	Media       AccountMedia   `json:"media,omitempty"`
+	Media       *AccountMedia  `json:"media,omitempty"`
 	Meta        interface{}    `json:"meta,omitempty"`
 	Actions     interface{}    `json:"actions,omitempty"`
 }
