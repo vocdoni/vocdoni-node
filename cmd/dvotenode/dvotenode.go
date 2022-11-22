@@ -38,6 +38,21 @@ import (
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 )
 
+// deprecatedFlagsFunc makes deprecated flags work the same as the new flags, but prints a warning
+func deprecatedFlagsFunc(f *flag.FlagSet, name string) flag.NormalizedName {
+	oldName := name
+	switch name {
+	case "ipfsSyncKey":
+		name = "ipfsConnectKey"
+	case "ipfsSyncPeers":
+		name = "ipfsConnectPeers"
+	}
+	if oldName != name {
+		fmt.Printf("Flag --%s has been deprecated, please use --%s instead\n", oldName, name)
+	}
+	return flag.NormalizedName(name)
+}
+
 func newConfig() (*config.DvoteCfg, config.Error) {
 	var err error
 	var cfgError config.Error
@@ -112,10 +127,10 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
 		"disable inter planetary file system support")
-	globalCfg.Ipfs.SyncKey = *flag.StringP("ipfsSyncKey", "i", "",
+	globalCfg.Ipfs.ConnectKey = *flag.StringP("ipfsConnectKey", "i", "",
 		"enable IPFS cluster synchronization using the given secret key")
-	globalCfg.Ipfs.SyncPeers = *flag.StringSlice("ipfsSyncPeers", []string{},
-		"use custom ipfsSync peers/bootnodes for accessing the DHT (comma-separated)")
+	globalCfg.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
+		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
 	// vochain
 	globalCfg.VochainConfig.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
@@ -162,6 +177,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"metrics refresh interval in seconds")
 
 	flag.CommandLine.SortFlags = false
+	flag.CommandLine.SetNormalizeFunc(deprecatedFlagsFunc)
 	// parse flags
 	flag.Parse()
 
@@ -222,8 +238,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ipfs
 	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
 	viper.BindPFlag("ipfs.NoInit", flag.Lookup("ipfsNoInit"))
-	viper.BindPFlag("ipfs.SyncKey", flag.Lookup("ipfsSyncKey"))
-	viper.BindPFlag("ipfs.SyncPeers", flag.Lookup("ipfsSyncPeers"))
+	viper.BindPFlag("ipfs.ConnectKey", flag.Lookup("ipfsConnectKey"))
+	viper.BindPFlag("ipfs.ConnectPeers", flag.Lookup("ipfsConnectPeers"))
 
 	// vochain
 	viper.Set("vochainConfig.DataDir", globalCfg.DataDir+"/vochain")

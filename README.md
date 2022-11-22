@@ -51,7 +51,7 @@ For running vocdoni-node in gateway mode, 8GB of ram is recommended (4GB works b
 - [x] secp256k1 and ed25519 signature and encryption
 - [x] Census Merkle Tree implementation
 - [x] Native IPFS support
-- [x] IPFS cluster support (custom implementation named ipfsSync)
+- [x] IPFS cluster support (custom implementation named ipfsconnect)
 - [x] Tendermint voting blockchain implementation
 - [x] Vote Scrutinizer
 - [x] BabyJubJub signature and hashing (ZK-snark friendly)

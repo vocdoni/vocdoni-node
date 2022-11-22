@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"os"
-	"path/filepath"
 	"time"
 
 	"go.vocdoni.io/dvote/config"
@@ -40,19 +39,18 @@ func IPFS(ipfsconfig *config.IPFSCfg, signer *ethereum.SignKeys,
 
 		go storage.CollectMetrics(context.Background(), ma)
 
-		if len(ipfsconfig.SyncKey) > 0 {
-			log.Info("enabling ipfs synchronization")
+		if len(ipfsconfig.ConnectKey) > 0 {
+			log.Info("enabling ipfsconnect cluster")
 			_, priv := signer.HexString()
 			ipfsconn := ipfsconnect.New(
-				filepath.Join(ipfsconfig.ConfigPath, "ipfsSync"),
-				ipfsconfig.SyncKey,
+				ipfsconfig.ConnectKey,
 				priv,
 				"libp2p",
 				storage,
 			)
-			if len(ipfsconfig.SyncPeers) > 0 && len(ipfsconfig.SyncPeers[0]) > 8 {
-				log.Debugf("using custom ipfs sync bootnodes %s", ipfsconfig.SyncPeers)
-				ipfsconn.Transport.BootNodes = ipfsconfig.SyncPeers
+			if len(ipfsconfig.ConnectPeers) > 0 && len(ipfsconfig.ConnectPeers[0]) > 8 {
+				log.Debugf("using custom ipfsconnect bootnodes %s", ipfsconfig.ConnectPeers)
+				ipfsconn.Transport.BootNodes = ipfsconfig.ConnectPeers
 			}
 			ipfsconn.Start()
 		}
