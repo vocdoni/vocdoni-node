@@ -97,7 +97,7 @@ func (ps *SubPub) setupDiscovery(ctx context.Context) {
 	discutil.Advertise(ctx, ps.routing, ps.Topic)
 
 	// Discover new peers periodically
-	go func() { // this spawns a single background task per IPFSsync instance
+	go func() { // this spawns a single background task per instance
 		for {
 			select {
 			case <-ps.close:

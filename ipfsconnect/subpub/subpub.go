@@ -160,9 +160,9 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 
 	ps.setupGossip(ctx)
 
-	go ps.Listen(receiver) // this spawns a single background task per IPFSsync instance, that just deals with chans
+	go ps.Listen(receiver) // this spawns a single background task per instance, that just deals with chans
 
-	go ps.printStats() // this spawns a single background task per IPFSsync instance, that just prints logs
+	go ps.printStats() // this spawns a single background task per instance, that just prints logs
 }
 
 func (ps *SubPub) Listen(receiver chan<- *Message) {

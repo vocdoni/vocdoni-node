@@ -110,10 +110,10 @@ type IPFSCfg struct {
 	// ConfigPath root path used by IPFS running node
 	ConfigPath string
 	// Daemon
-	Daemon    string
-	NoInit    bool
-	SyncKey   string
-	SyncPeers []string
+	Daemon       string
+	NoInit       bool
+	ConnectKey   string
+	ConnectPeers []string
 }
 
 // EthCfg stores global configs for ethereum bockchain

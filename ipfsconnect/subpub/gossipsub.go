@@ -71,7 +71,7 @@ func JoinGossip(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topic st
 	}
 
 	// start reading messages from the subscription in a loop
-	go g.readLoop() // this spawns a single background task per IPFSsync instance (since a single gossip topic is used)
+	go g.readLoop() // this spawns a single background task per instance (since a single gossip topic is used)
 	return g, nil
 }
 
