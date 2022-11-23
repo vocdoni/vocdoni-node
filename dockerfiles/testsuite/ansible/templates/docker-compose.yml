@@ -3,7 +3,7 @@ version: "3.7"
 services:
 {% for key in seed_keys %}
   seed{{loop.index0}}:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "vocdoninode:${TESTSUITE_BUILD_TAG:-latest}"
 {%  if loop.first %}
     build: # reused by the other services
       context: {{git_root}}
@@ -21,7 +21,7 @@ services:
 {% endfor %}
 {% for key in miner_keys %}
   miner{{loop.index0}}:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "vocdoninode:${TESTSUITE_BUILD_TAG:-latest}"
     environment:
       - DVOTE_VOCHAINCONFIG_PUBLICADDR=miner{{loop.index0}}:26656
       - DVOTE_VOCHAINCONFIG_MINERKEY=0x{{key.priv_key}}
@@ -38,7 +38,7 @@ services:
 {% endfor %}
 {% for key in oracle_keys %}
   oracle{{loop.index0}}:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "vocdoninode:${TESTSUITE_BUILD_TAG:-latest}"
     environment:
       - DVOTE_VOCHAINCONFIG_PUBLICADDR=oracle{{loop.index0}}:26656
       - DVOTE_ETHCONFIG_SIGNINGKEY={{key.priv_key}}
@@ -55,7 +55,7 @@ services:
 {% endfor %}
 {% for id in range(gateways|int) %}
   gateway{{id}}:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "vocdoninode:${TESTSUITE_BUILD_TAG:-latest}"
     environment:
       - DVOTE_VOCHAINCONFIG_PUBLICADDR=gateway{{id}}:26656
     env_file:
@@ -73,7 +73,7 @@ services:
 
 {% endfor %}
   test:
-    image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "vocdoninode-test:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: {{git_root}}
       target: test

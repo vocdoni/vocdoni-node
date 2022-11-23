@@ -16,15 +16,15 @@ var (
 const (
 	// All
 
-	// The mode defines the behaviour of the dvotenode
+	// The mode defines the behaviour of the vocdoninode
 
-	// ModeOracle starts dvotenode as an oracle
+	// ModeOracle starts vocdoninode as an oracle
 	ModeOracle = "oracle"
-	// ModeMiner starts dvotenode as a miner
+	// ModeMiner starts vocdoninode as a miner
 	ModeMiner = "miner"
-	// ModeSeed starts dvotenode as a seed node
+	// ModeSeed starts vocdoninode as a seed node
 	ModeSeed = "seed"
-	// ModeGateway starts the dvotenode as a gateway
+	// ModeGateway starts the vocdoninode as a gateway
 	ModeGateway = "gateway"
 	// ModeEthAPIoracle starts an Ethereum signaling API oracle
 	ModeEthAPIoracle = "ethApiOracle"

@@ -34,7 +34,7 @@ func New(typ, dir string) (db.Database, error) {
 func ForTest() (typ string) {
 	dbType := os.Getenv("DVOTE_DB_TYPE")
 	if dbType == "" {
-		dbType = "pebble" // default to Pebble, just like dvotenode
+		dbType = "pebble" // default to Pebble, just like vocdoninode
 	}
 	return dbType
 }

@@ -12,7 +12,7 @@ ENV CGO_ENABLED=1
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
-	./cmd/dvotenode ./cmd/vochaintest ./cmd/voconed
+	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
 
 FROM node:lts-bullseye-slim AS test
 
@@ -27,6 +27,6 @@ FROM debian:11.3-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
-COPY --from=builder /src/dvotenode ./
+COPY --from=builder /src/node ./
 COPY --from=builder /src/voconed ./
-ENTRYPOINT ["/app/dvotenode"]
+ENTRYPOINT ["/app/node"]
