@@ -16,23 +16,23 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 // APIserver contains all the required pieces for running an URL api server
 type APIserver struct {
-	Signer         *ethereum.SignKeys
-	VochainCfg     *config.VochainCfg
-	CensusDir      string
-	IpfsDir        string
-	ScrutinizerDir string
-	ListenAddr     *url.URL
-	Storage        data.Storage
-	IpfsPort       int
+	Signer     *ethereum.SignKeys
+	VochainCfg *config.VochainCfg
+	CensusDir  string
+	IpfsDir    string
+	IndexerDir string
+	ListenAddr *url.URL
+	Storage    data.Storage
+	IpfsPort   int
 
 	VochainAPP  *vochain.BaseApplication
-	Scrutinizer *scrutinizer.Scrutinizer
+	Indexer     *indexer.Indexer
 	VochainInfo *vochaininfo.VochainInfo
 }
 
@@ -76,13 +76,13 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	d.VochainAPP = NewMockVochainNode(t, d.VochainCfg, d.Signer)
 	d.VochainInfo = vochaininfo.NewVochainInfo(d.VochainAPP)
 	go d.VochainInfo.Start(10)
-	d.Scrutinizer = NewMockScrutinizer(t, d.VochainAPP)
+	d.Indexer = NewMockIndexer(t, d.VochainAPP)
 	qt.Assert(t, d.VochainAPP.Service.Start(), qt.IsNil)
 	db, err := metadb.New(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	api.Attach(d.VochainAPP, d.VochainInfo, d.Scrutinizer, d.Storage, censusDB)
+	api.Attach(d.VochainAPP, d.VochainInfo, d.Indexer, d.Storage, censusDB)
 
 	err = api.EnableHandlers(apis...)
 	qt.Assert(t, err, qt.IsNil)

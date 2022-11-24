@@ -87,7 +87,7 @@ func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 		return fmt.Errorf("malformed voteId")
 	}
 
-	voteData, err := a.scrutinizer.GetEnvelope(voteID)
+	voteData, err := a.indexer.GetEnvelope(voteID)
 	if err != nil {
 		return fmt.Errorf("cannot get vote: %w", err)
 	}

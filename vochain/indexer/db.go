@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ func InitDB(dataDir string) (*badgerhold.Store, error) {
 	return badgerhold.Open(opts)
 }
 
-func (s *Scrutinizer) queryWithRetries(query func() error) error {
+func (s *Indexer) queryWithRetries(query func() error) error {
 	maxTries := 1000
 	for {
 		if err := query(); err != nil {

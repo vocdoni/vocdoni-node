@@ -192,19 +192,19 @@ type VochainCfg struct {
 	ProcessArchiveKey string
 	// Data directory for storing the process archive
 	ProcessArchiveDataDir string
-	// Scrutinizer holds the configuration regarding the scrutinizer component
-	Scrutinizer ScrutinizerCfg
+	// Indexer holds the configuration regarding the indexer component
+	Indexer IndexerCfg
 	// IsSeedNode specifies if the node is configured to act as a seed node
 	IsSeedNode bool
 	// OffChainDataDownload specifies if the node is configured to download off-chain data
 	OffChainDataDownloader bool
 }
 
-// ScrutinizerCfg handles the configuration options of the scrutinizer
-type ScrutinizerCfg struct {
-	// Enables Scrutinizer
+// IndexerCfg handles the configuration options of the indexer
+type IndexerCfg struct {
+	// Enables Indexer
 	Enabled bool
-	// Disables live results computation on scrutinizer
+	// Disables live results computation on indexer
 	IgnoreLiveResults bool
 }
 

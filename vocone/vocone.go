@@ -29,9 +29,9 @@ import (
 	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -46,7 +46,7 @@ const (
 
 // Vocone is an implementation of the Vocdoni protocol run by a single (atomic) node.
 type Vocone struct {
-	sc              *scrutinizer.Scrutinizer
+	sc              *indexer.Indexer
 	kk              *keykeeper.KeyKeeper
 	oracle          *oracle.Oracle
 	mempool         *goconcurrentqueue.FixedFIFO
@@ -96,9 +96,9 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIpfs bool) 
 		return nil, err
 	}
 
-	// Create scrutinizer
-	if vc.sc, err = scrutinizer.NewScrutinizer(
-		filepath.Join(dataDir, "scrutinizer"),
+	// Create indexer
+	if vc.sc, err = indexer.NewIndexer(
+		filepath.Join(dataDir, "indexer"),
 		vc.app,
 		true,
 	); err != nil {

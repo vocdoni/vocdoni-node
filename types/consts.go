@@ -108,17 +108,17 @@ const (
 	// make in order to dial to an endpoint before considering the endpoint unreachable
 	EthereumDialMaxRetry = 10
 
-	// Scrutinizer
+	// Indexer
 
-	// ScrutinizerLiveProcessPrefix is used for sotring temporary results on live
-	ScrutinizerLiveProcessPrefix = byte(0x21)
-	// ScrutinizerEntityPrefix is the prefix for the storage entity keys
-	ScrutinizerEntityPrefix = byte(0x22)
-	// ScrutinizerResultsPrefix is the prefix of the storage results summary keys
-	ScrutinizerResultsPrefix = byte(0x24)
-	// ScrutinizerProcessEndingPrefix is the prefix for keep track of the processes ending
+	// IndexerLiveProcessPrefix is used for sotring temporary results on live
+	IndexerLiveProcessPrefix = byte(0x21)
+	// IndexerEntityPrefix is the prefix for the storage entity keys
+	IndexerEntityPrefix = byte(0x22)
+	// IndexerResultsPrefix is the prefix of the storage results summary keys
+	IndexerResultsPrefix = byte(0x24)
+	// IndexerProcessEndingPrefix is the prefix for keep track of the processes ending
 	// on a specific block
-	ScrutinizerProcessEndingPrefix = byte(0x25)
+	IndexerProcessEndingPrefix = byte(0x25)
 
 	// Vochain
 

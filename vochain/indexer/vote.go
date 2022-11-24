@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"encoding/hex"
@@ -22,8 +22,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
-	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but
@@ -35,7 +35,7 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 
 // Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
+func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	bhStartTime := time.Now()
 	txRef := &indexertypes.VoteReference{}
 	// TODO(sqlite): reimplement
@@ -66,7 +66,7 @@ func (s *Scrutinizer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote
 
 // GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
+func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
 	startTime := time.Now()
 	defer func() { log.Debugf("GetEnvelope took %s", time.Since(startTime)) }()
 	t := time.Now()
@@ -113,7 +113,7 @@ func (s *Scrutinizer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePacka
 // WalkEnvelopes executes callback for each envelopes of the ProcessId.
 // The callback function is executed async (in a goroutine) if async=true.
 // The method will return once all goroutines have finished the work.
-func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
+func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.VoteEnvelope, *big.Int)) error {
 	wg := sync.WaitGroup{}
 
@@ -165,7 +165,7 @@ func (s *Scrutinizer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retrieves all Envelopes of a ProcessId from the Blockchain block store
-func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
+func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("envelopeList: invalid value: from is invalid value %d", from)
@@ -256,7 +256,7 @@ func (s *Scrutinizer) GetEnvelopes(processId []byte, max, from int,
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
-func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	// TODO(sqlite): reimplement
 	startTime := time.Now()
 	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
@@ -287,7 +287,7 @@ func (s *Scrutinizer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
 // Once this function is called, any future live vote event for the processId will be discarted.
-func (s *Scrutinizer) ComputeResult(processID []byte) error {
+func (s *Indexer) ComputeResult(processID []byte) error {
 	height := s.App.Height()
 	log.Debugf("computing results on height %d for %x", height, processID)
 
@@ -328,7 +328,7 @@ func (s *Scrutinizer) ComputeResult(processID []byte) error {
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.SetProcessResultsReady(ctx, scrutinizerdb.SetProcessResultsReadyParams{
+	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:             processID,
 		Votes:          encodeVotes(results.Votes),
 		Weight:         results.Weight.String(),
@@ -362,7 +362,7 @@ func joinHexBytes(list []types.HexBytes) string {
 }
 
 // GetResults returns the current result for a processId
-func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error) {
+func (s *Indexer) GetResults(processID []byte) (*indexertypes.Results, error) {
 	results := &indexertypes.Results{}
 	if enableBadgerhold {
 		startTime := time.Now()
@@ -416,7 +416,7 @@ func (s *Scrutinizer) GetResults(processID []byte) (*indexertypes.Results, error
 }
 
 // GetResultsWeight returns the current weight of cast votes for a processId.
-func (s *Scrutinizer) GetResultsWeight(processID []byte) (*big.Int, error) {
+func (s *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	startTime := time.Now()
 	defer func() { log.Debugf("GetResultsWeight took %s", time.Since(startTime)) }()
 	s.addVoteLock.RLock()
@@ -458,7 +458,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*vochain.VotePackage, err
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
+func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 	results *indexertypes.Results) error {
 	// If live process, add vote to temporary results
 	var vote *vochain.VotePackage
@@ -488,7 +488,7 @@ func (s *Scrutinizer) addLiveVote(pid []byte, VotePackage []byte, weight *big.In
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
+func (s *Indexer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	weight []byte, txIndex int32, voterID vochain.VoterID, txn *badger.Txn) error {
 	weightInt := new(types.BigInt).SetBytes(weight)
 	weightStr, err := weightInt.MarshalText()
@@ -523,7 +523,7 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.CreateVoteReference(ctx, scrutinizerdb.CreateVoteReferenceParams{
+	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
 		Nullifier:    nullifier,
 		ProcessID:    pid,
 		Height:       int64(blockHeight),
@@ -540,17 +540,17 @@ func (s *Scrutinizer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
-func (s *Scrutinizer) addProcessToLiveResults(pid []byte) {
+func (s *Indexer) addProcessToLiveResults(pid []byte) {
 	s.liveResultsProcs.Store(string(pid), true)
 }
 
 // delProcessFromLiveResults removes the process id from the liveResultsProcs map
-func (s *Scrutinizer) delProcessFromLiveResults(pid []byte) {
+func (s *Indexer) delProcessFromLiveResults(pid []byte) {
 	s.liveResultsProcs.Delete(string(pid))
 }
 
 // isProcessLiveResults returns true if the process id is in the liveResultsProcs map
-func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
+func (s *Indexer) isProcessLiveResults(pid []byte) bool {
 	_, ok := s.liveResultsProcs.Load(string(pid))
 	return ok
 }
@@ -558,7 +558,7 @@ func (s *Scrutinizer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (s *Scrutinizer) commitVotes(pid []byte,
+func (s *Indexer) commitVotes(pid []byte,
 	partialResults *indexertypes.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait
 	s.recoveryBootLock.RLock()
@@ -570,7 +570,7 @@ func (s *Scrutinizer) commitVotes(pid []byte,
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
+func (s *Indexer) commitVotesUnsafe(pid []byte,
 	partialResults *indexertypes.Results, height uint32) error {
 
 	if enableBadgerhold {
@@ -608,7 +608,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 	results := indexertypes.ResultsFromDB(&sqlProcInner)
 	results.Add(partialResults)
 
-	if _, err := queries.UpdateProcessResults(ctx, scrutinizerdb.UpdateProcessResultsParams{
+	if _, err := queries.UpdateProcessResults(ctx, indexerdb.UpdateProcessResultsParams{
 		ID:             pid,
 		Votes:          encodeVotes(results.Votes),
 		Weight:         results.Weight.String(),
@@ -621,7 +621,7 @@ func (s *Scrutinizer) commitVotesUnsafe(pid []byte,
 }
 
 // computeFinalResults walks through the envelopes of a process and computes the results.
-func (s *Scrutinizer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
+func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}

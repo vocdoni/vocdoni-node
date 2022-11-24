@@ -11,7 +11,7 @@ import (
 	census "go.vocdoni.io/dvote/rpccensus"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
@@ -26,7 +26,7 @@ type RPCAPI struct {
 
 	router       *httprouter.HTTProuter
 	rpcAPI       *jsonrpcapi.SignedJRPC
-	scrutinizer  *scrutinizer.Scrutinizer
+	indexer      *indexer.Indexer
 	methods      map[string]Handler
 	storage      data.Storage
 	signer       *ethereum.SignKeys
@@ -70,8 +70,8 @@ func (a *RPCAPI) RegisterPublic(method string, requireSignature bool, h Handler)
 	a.methods[method] = h
 }
 
-func (a *RPCAPI) SetScrutinizer(sc *scrutinizer.Scrutinizer) {
-	a.scrutinizer = sc
+func (a *RPCAPI) SetIndexer(sc *indexer.Indexer) {
+	a.indexer = sc
 }
 
 func (a *RPCAPI) SetVocdoniApp(app *vochain.BaseApplication) {

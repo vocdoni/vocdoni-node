@@ -92,11 +92,11 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 	if err != nil {
 		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
 	}
-	proc, err := a.scrutinizer.ProcessInfo(electionID)
+	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
 		return fmt.Errorf("cannot fetch electionID %x: %w", electionID, err)
 	}
-	count, err := a.scrutinizer.GetEnvelopeHeight(electionID)
+	count, err := a.indexer.GetEnvelopeHeight(electionID)
 	if err != nil {
 		return fmt.Errorf("cannot get envelope height: %w", err)
 	}
@@ -126,7 +126,7 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 	election.Status = models.ProcessStatus_name[proc.Status]
 
 	if proc.HaveResults {
-		results, err := a.scrutinizer.GetResults(electionID)
+		results, err := a.indexer.GetResults(electionID)
 		if err != nil {
 			return fmt.Errorf("cannot get envelope height: %w", err)
 		}
@@ -229,7 +229,7 @@ func (a *API) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	}
 	page = page * MaxPageSize
 
-	votesRaw, err := a.scrutinizer.GetEnvelopes(electionID, MaxPageSize, page, "")
+	votesRaw, err := a.indexer.GetEnvelopes(electionID, MaxPageSize, page, "")
 	if err != nil {
 		return err
 	}

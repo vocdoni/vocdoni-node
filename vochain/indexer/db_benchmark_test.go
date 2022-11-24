@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"fmt"
@@ -38,7 +38,7 @@ func BenchmarkNewProcess(b *testing.B) {
 func benchmarkIndexTx(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestScrutinizer(b, app, true)
+	sc := newTestIndexer(b, app, true)
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -79,7 +79,7 @@ func benchmarkFetchTx(b *testing.B) {
 	numTxs := 1000
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestScrutinizer(b, app, true)
+	sc := newTestIndexer(b, app, true)
 
 	for i := 0; i < b.N; i++ {
 		sc.Rollback()
@@ -111,7 +111,7 @@ func benchmarkFetchTx(b *testing.B) {
 func benchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestScrutinizer(b, app, true)
+	sc := newTestIndexer(b, app, true)
 	startTime := time.Now()
 	numProcesses := b.N
 	entityID := util.RandomBytes(20)

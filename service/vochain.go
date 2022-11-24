@@ -18,9 +18,9 @@ import (
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 	"go.vocdoni.io/dvote/vochain/processarchive"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
@@ -31,7 +31,7 @@ type VochainService struct {
 	OffChainData   *offchaindatahandler.OffChainDataHandler
 	DataDownloader *downloader.Downloader
 	CensusDB       *censusdb.CensusDB
-	Scrutinizer    *scrutinizer.Scrutinizer
+	Indexer        *indexer.Indexer
 	Stats          *vochaininfo.VochainInfo
 	Storage        data.Storage
 }
@@ -132,18 +132,18 @@ func NewVochainService(vs *VochainService) error {
 		return vs.App.Service.Start()
 	}
 
-	// Scrutinizer
-	if vs.Config.Scrutinizer.Enabled && vs.Scrutinizer == nil {
-		log.Info("creating vochain scrutinizer service")
-		if vs.Scrutinizer, err = scrutinizer.NewScrutinizer(
-			filepath.Join(vs.Config.DataDir, "scrutinizer"),
+	// Indexer
+	if vs.Config.Indexer.Enabled && vs.Indexer == nil {
+		log.Info("creating vochain indexer service")
+		if vs.Indexer, err = indexer.NewIndexer(
+			filepath.Join(vs.Config.DataDir, "indexer"),
 			vs.App,
-			!vs.Config.Scrutinizer.IgnoreLiveResults,
+			!vs.Config.Indexer.IgnoreLiveResults,
 		); err != nil {
 			return err
 		}
-		// Launch the scrutinizer after sync routine (executed when the blockchain is ready)
-		go vs.Scrutinizer.AfterSyncBootstrap()
+		// Launch the indexer after sync routine (executed when the blockchain is ready)
+		go vs.Indexer.AfterSyncBootstrap()
 	}
 
 	// Data Downloader
@@ -171,7 +171,7 @@ func NewVochainService(vs *VochainService) error {
 
 	// Process Archiver
 	if vs.Config.ProcessArchive {
-		if vs.Scrutinizer == nil {
+		if vs.Indexer == nil {
 			err = fmt.Errorf("process archive needs indexer enabled")
 			return err
 		}
@@ -181,7 +181,7 @@ func NewVochainService(vs *VochainService) error {
 		}
 		log.Infof("starting process archiver on %s", vs.Config.ProcessArchiveDataDir)
 		processarchive.NewProcessArchive(
-			vs.Scrutinizer,
+			vs.Indexer,
 			ipfs,
 			vs.Config.ProcessArchiveDataDir,
 			vs.Config.ProcessArchiveKey,

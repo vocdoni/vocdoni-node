@@ -112,11 +112,11 @@ func (a *API) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	page = page * MaxPageSize
 	organization := &Organization{}
 
-	list := a.scrutinizer.EntityList(MaxPageSize, page, "")
+	list := a.indexer.EntityList(MaxPageSize, page, "")
 	for _, orgID := range list {
 		organization.Organizations = append(organization.Organizations, &OrganizationList{
 			OrganizationID: orgID,
-			ElectionCount:  a.scrutinizer.ProcessCount(orgID),
+			ElectionCount:  a.indexer.ProcessCount(orgID),
 		})
 	}
 
@@ -131,7 +131,7 @@ func (a *API) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 // /chain/organizations/count
 // return the number of organizations
 func (a *API) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
-	count := a.scrutinizer.EntityCount()
+	count := a.indexer.EntityCount()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
 	if err != nil {
@@ -235,7 +235,7 @@ func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return err
 	}
 
-	ref, err := a.scrutinizer.GetTxHashReference(hash)
+	ref, err := a.indexer.GetTxHashReference(hash)
 	if err != nil {
 		return ErrTransactionNotFound
 	}
@@ -261,7 +261,7 @@ func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if err != nil {
 		return err
 	}
-	stx, err := a.scrutinizer.App.GetTx(uint32(height), int32(index))
+	stx, err := a.indexer.App.GetTx(uint32(height), int32(index))
 	if err != nil {
 		return fmt.Errorf("cannot get tx: %w", err)
 	}

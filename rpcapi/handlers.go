@@ -7,7 +7,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	census "go.vocdoni.io/dvote/rpccensus"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
@@ -93,16 +93,16 @@ func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochain
 }
 
 // EnableResultsAPI enabled the vote results API in the Router
-func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *scrutinizer.Scrutinizer) error {
-	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil && scrutinizer == nil) {
-		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
+func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, indexer *indexer.Indexer) error {
+	if (r.vocapp == nil && vocapp == nil) || (r.indexer == nil && indexer == nil) {
+		return fmt.Errorf("vocdoni APP or indexer are nil")
 	}
 	log.Infof("enabling results API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
-	if r.scrutinizer == nil {
-		r.scrutinizer = scrutinizer
+	if r.indexer == nil {
+		r.indexer = indexer
 	}
 	r.APIs = append(r.APIs, "results")
 
@@ -123,10 +123,10 @@ func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, scrutinizer *
 
 // EnableIndexerAPI enables the vote indexer API in the Router
 func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
-	vocinfo *vochaininfo.VochainInfo, scrutinizer *scrutinizer.Scrutinizer) error {
-	if (r.vocapp == nil && vocapp == nil) || (r.scrutinizer == nil && scrutinizer == nil) ||
+	vocinfo *vochaininfo.VochainInfo, indexer *indexer.Indexer) error {
+	if (r.vocapp == nil && vocapp == nil) || (r.indexer == nil && indexer == nil) ||
 		(r.vocinfo == nil && vocinfo == nil) {
-		return fmt.Errorf("vocdoni APP or scrutinizer are nil")
+		return fmt.Errorf("vocdoni APP or indexer are nil")
 	}
 	log.Infof("enabling indexer API")
 	if r.vocapp == nil {
@@ -135,12 +135,12 @@ func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	if r.vocinfo == nil {
 		r.vocinfo = vocinfo
 	}
-	if r.scrutinizer == nil {
-		r.scrutinizer = scrutinizer
+	if r.indexer == nil {
+		r.indexer = indexer
 	}
 
-	if r.scrutinizer == nil {
-		log.Fatal("cannot enable indexer API without scrutinizer")
+	if r.indexer == nil {
+		log.Fatal("cannot enable indexer API without indexer")
 	}
 	r.APIs = append(r.APIs, "indexer")
 

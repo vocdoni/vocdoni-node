@@ -342,7 +342,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	- ethevents
 	- census
 	- vochain
-	- scrutinizer
+	- indexer
 	- metrics
 
   Oracle needs:
@@ -496,7 +496,7 @@ func main() {
 	}
 
 	//
-	// Vochain and Scrutinizer
+	// Vochain and Indexer
 	//
 	if globalCfg.Mode == types.ModeGateway ||
 		globalCfg.Mode == types.ModeMiner ||
@@ -505,11 +505,11 @@ func main() {
 		globalCfg.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		globalCfg.VochainConfig.IsSeedNode = types.ModeSeed == globalCfg.Mode
-		// do we need scrutinizer?
-		globalCfg.VochainConfig.Scrutinizer.Enabled = (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
+		// do we need indexer?
+		globalCfg.VochainConfig.Indexer.Enabled = (globalCfg.Mode == types.ModeGateway && globalCfg.API.Results) ||
 			(globalCfg.Mode == types.ModeOracle)
 		// if oracle mode, we don't need live results
-		globalCfg.VochainConfig.Scrutinizer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
+		globalCfg.VochainConfig.Indexer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.VochainConfig.OffChainDataDownloader = globalCfg.VochainConfig.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway
@@ -548,8 +548,8 @@ func main() {
 		}
 
 		if globalCfg.Mode == types.ModeOracle {
-			// Start oracle results scrutinizer
-			vochainOracle.EnableResults(vochainSrv.Scrutinizer)
+			// Start oracle results indexer
+			vochainOracle.EnableResults(vochainSrv.Indexer)
 
 			// Start keykeeper service (if key index specified)
 			if globalCfg.VochainConfig.KeyKeeperIndex > 0 {
@@ -634,12 +634,12 @@ func main() {
 		if globalCfg.API.File || globalCfg.API.Census || globalCfg.API.Vote || globalCfg.API.Indexer || globalCfg.API.URL {
 			log.Info("enabling JSON-RPC")
 			if _, err = service.API(globalCfg.API,
-				rpc,                    // rpcAPI
-				storage,                // data storage
-				vochainSrv.CensusDB,    // census db
-				vochainSrv.App,         // vochain core
-				vochainSrv.Scrutinizer, // scrutinizere
-				vochainSrv.Stats,       // vochain info stats
+				rpc,                 // rpcAPI
+				storage,             // data storage
+				vochainSrv.CensusDB, // census db
+				vochainSrv.App,      // vochain core
+				vochainSrv.Indexer,  // indexer
+				vochainSrv.Stats,    // vochain info stats
 				signer,
 				metricsAgent); err != nil {
 				log.Fatal(err)
@@ -655,7 +655,7 @@ func main() {
 			uAPI.Attach(
 				vochainSrv.App,
 				vochainSrv.Stats,
-				vochainSrv.Scrutinizer,
+				vochainSrv.Indexer,
 				storage,
 				vochainSrv.CensusDB,
 			)

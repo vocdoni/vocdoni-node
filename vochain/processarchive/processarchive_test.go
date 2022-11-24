@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 func TestJsonStorage(t *testing.T) {

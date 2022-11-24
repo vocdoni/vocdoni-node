@@ -3,7 +3,7 @@
 //   sqlc v1.16.0
 // source: process.sql
 
-package scrutinizerdb
+package indexerdb
 
 import (
 	"context"

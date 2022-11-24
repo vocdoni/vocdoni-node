@@ -16,24 +16,24 @@ import (
 	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/rpccensus"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 // DvoteAPIServer contains all the required pieces for running a go-dvote api server
 type DvoteAPIServer struct {
-	Signer         *ethereum.SignKeys
-	VochainCfg     *config.VochainCfg
-	CensusDir      string
-	CensusBackend  string // graviton or asmt // NOTE: CensusBackend is not used
-	IpfsDir        string
-	ScrutinizerDir string
-	ListenAddr     string
-	Storage        data.Storage
-	IpfsPort       int
+	Signer        *ethereum.SignKeys
+	VochainCfg    *config.VochainCfg
+	CensusDir     string
+	CensusBackend string // graviton or asmt // NOTE: CensusBackend is not used
+	IpfsDir       string
+	IndexerDir    string
+	ListenAddr    string
+	Storage       data.Storage
+	IpfsPort      int
 
-	VochainAPP  *vochain.BaseApplication
-	Scrutinizer *scrutinizer.Scrutinizer
+	VochainAPP *vochain.BaseApplication
+	Indexer    *indexer.Indexer
 }
 
 /*
@@ -44,7 +44,7 @@ Start starts a basic dvote server
 4. Starts the Census Manager
 5. Starts the Vochain miner if vote api enabled
 6. Starts the Dvote API router if enabled
-7. Starts the scrutinizer service and API if enabled
+7. Starts the indexer service and API if enabled
 */
 func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// create signer
@@ -102,10 +102,10 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 			d.VochainAPP = NewMockVochainNode(tb, d.VochainCfg, d.Signer)
 			vi := vochaininfo.NewVochainInfo(d.VochainAPP)
 			go vi.Start(10)
-			d.Scrutinizer = NewMockScrutinizer(tb, d.VochainAPP)
+			d.Indexer = NewMockIndexer(tb, d.VochainAPP)
 			rpc.EnableVoteAPI(d.VochainAPP, vi)
-			rpc.EnableResultsAPI(d.VochainAPP, d.Scrutinizer)
-			rpc.EnableIndexerAPI(d.VochainAPP, vi, d.Scrutinizer)
+			rpc.EnableResultsAPI(d.VochainAPP, d.Indexer)
+			rpc.EnableIndexerAPI(d.VochainAPP, vi, d.Indexer)
 		default:
 			tb.Fatalf("unknown api: %q", api)
 		}
