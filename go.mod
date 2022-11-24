@@ -23,7 +23,6 @@ require (
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
 	github.com/cockroachdb/pebble v0.0.0-20221021145029-f34af25a0187
 	github.com/dgraph-io/badger/v3 v3.2103.4
-	github.com/enriquebris/goconcurrentqueue v0.6.3
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/fatih/color v1.13.0
 	github.com/frankban/quicktest v1.14.3
