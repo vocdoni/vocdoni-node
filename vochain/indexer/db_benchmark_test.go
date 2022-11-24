@@ -38,7 +38,7 @@ func BenchmarkNewProcess(b *testing.B) {
 func benchmarkIndexTx(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app, true)
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -51,7 +51,7 @@ func benchmarkIndexTx(b *testing.B) {
 	}); err != nil {
 		b.Fatal(err)
 	}
-	err := sc.newEmptyProcess(pid)
+	err := idx.newEmptyProcess(pid)
 	qt.Assert(b, err, qt.IsNil)
 
 	s := new(ethereum.SignKeys)
@@ -59,7 +59,7 @@ func benchmarkIndexTx(b *testing.B) {
 	qt.Assert(b, err, qt.IsNil)
 
 	for i := 0; i < b.N; i++ {
-		sc.Rollback()
+		idx.Rollback()
 		for j := int32(0); j < 2000; j++ {
 			vote := &models.Vote{
 				Height:      uint32(util.RandomInt(10, 10000)),
@@ -68,9 +68,9 @@ func benchmarkIndexTx(b *testing.B) {
 				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))).Bytes(),
 			}
-			sc.OnVote(vote, vochain.VoterID{}.Nil(), j)
+			idx.OnVote(vote, vochain.VoterID{}.Nil(), j)
 		}
-		err := sc.Commit(uint32(i))
+		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
 	}
 }
@@ -79,28 +79,28 @@ func benchmarkFetchTx(b *testing.B) {
 	numTxs := 1000
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app, true)
 
 	for i := 0; i < b.N; i++ {
-		sc.Rollback()
+		idx.Rollback()
 		for j := 0; j < numTxs; j++ {
-			sc.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
+			idx.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
 		}
-		err := sc.Commit(uint32(i))
+		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
 
 		time.Sleep(time.Second * 2)
 
 		startTime := time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = sc.GetTxReference(uint64((i * numTxs) + j + 1))
+			_, err = idx.GetTxReference(uint64((i * numTxs) + j + 1))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by index, took %s",
 			numTxs, (i+1)*numTxs, time.Since(startTime))
 		startTime = time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = sc.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			_, err = idx.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by hash, took %s",
@@ -111,7 +111,7 @@ func benchmarkFetchTx(b *testing.B) {
 func benchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	sc := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app, true)
 	startTime := time.Now()
 	numProcesses := b.N
 	entityID := util.RandomBytes(20)
@@ -130,7 +130,7 @@ func benchmarkNewProcess(b *testing.B) {
 		}); err != nil {
 			b.Fatal(err)
 		}
-		err := sc.newEmptyProcess(pid)
+		err := idx.newEmptyProcess(pid)
 		qt.Assert(b, err, qt.IsNil)
 
 	}
