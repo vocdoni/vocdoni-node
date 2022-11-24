@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/enriquebris/goconcurrentqueue"
 	"github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"github.com/tendermint/tendermint/crypto/tmhash"
@@ -49,7 +48,7 @@ type Vocone struct {
 	sc              *indexer.Indexer
 	kk              *keykeeper.KeyKeeper
 	oracle          *oracle.Oracle
-	mempool         *goconcurrentqueue.FixedFIFO
+	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
 	dataDir         string
 	height          int64
@@ -75,7 +74,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIpfs bool) 
 	if err != nil {
 		return nil, err
 	}
-	vc.mempool = goconcurrentqueue.NewFixedFIFO(mempoolSize)
+	vc.mempool = make(chan []byte, mempoolSize)
 	vc.blockTimeTarget = DefaultBlockTimeTarget
 	vc.txsPerBlock = DefaultTxsPerBlock
 	version, err := vc.app.State.Store.Version()
@@ -353,7 +352,9 @@ func (vc *Vocone) setDefaultMethods() {
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 	resp := vc.app.CheckTx(abcitypes.RequestCheckTx{Tx: tx})
 	if resp.Code == 0 {
-		if err := vc.mempool.Enqueue(tx); err != nil {
+		select {
+		case vc.mempool <- tx:
+		default: // mempool is full
 			return &tmcoretypes.ResultBroadcastTx{
 				Code: 1,
 				Data: []byte("mempool is full"),
@@ -373,16 +374,19 @@ func (vc *Vocone) commitBlock() {
 	blockStoreTx := vc.blockStore.WriteTx()
 	defer blockStoreTx.Discard()
 	var txCount int
+txLoop:
 	for txCount = 0; txCount < vc.txsPerBlock; {
-		tx, err := vc.mempool.Dequeue()
-		if err != nil {
-			break
+		var tx []byte
+		select {
+		case tx = <-vc.mempool:
+		default: // mempool is empty
+			break txLoop
 		}
-		resp := vc.app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx.([]byte)})
+		resp := vc.app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
 		if resp.Code == 0 {
 			blockStoreTx.Set(
 				[]byte(fmt.Sprintf("%d_%d", vc.height, txCount)),
-				tx.([]byte),
+				tx,
 			)
 			txCount++
 			log.Debugf("deliver tx succeed %s", resp.Info)
@@ -427,7 +431,7 @@ func (vc *Vocone) getTx(height uint32, txIndex int32) (*models.SignedTx, error) 
 }
 
 func (vc *Vocone) mempoolSize() int {
-	return vc.mempool.GetLen()
+	return len(vc.mempool)
 }
 
 func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
