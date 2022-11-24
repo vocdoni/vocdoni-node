@@ -57,8 +57,8 @@ type EventListener interface {
 
 // AddEventListener adds a new event listener, to receive method calls on block
 // events as documented in EventListener.
-func (s *Indexer) AddEventListener(l EventListener) {
-	s.eventOnResults = append(s.eventOnResults, l)
+func (idx *Indexer) AddEventListener(l EventListener) {
+	idx.eventOnResults = append(idx.eventOnResults, l)
 }
 
 // Indexer is the component which makes the accounting of the voting processes
@@ -180,12 +180,12 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 	return s, nil
 }
 
-func (s *Indexer) Close() error {
-	s.cancelFunc()
-	s.WaitIdle()
+func (idx *Indexer) Close() error {
+	idx.cancelFunc()
+	idx.WaitIdle()
 	// Try closing both before reporting errors.
-	err1 := s.db.Close()
-	err2 := s.sqlDB.Close()
+	err1 := idx.db.Close()
+	err2 := idx.sqlDB.Close()
 	if err1 != nil {
 		return err1
 	}
@@ -200,13 +200,13 @@ func (s *Indexer) Close() error {
 //
 // Note that this method is racy by nature if the indexer keeps committing
 // more blocks, as it simply waits for any goroutines already started to stop.
-func (s *Indexer) WaitIdle() {
+func (idx *Indexer) WaitIdle() {
 	var slept time.Duration
 	for {
 		const debounce = 100 * time.Millisecond
 		time.Sleep(debounce)
 		slept += debounce
-		if atomic.LoadInt64(&s.liveGoroutines) == 0 {
+		if atomic.LoadInt64(&idx.liveGoroutines) == 0 {
 			break
 		}
 		if slept > 10*time.Second {
@@ -216,25 +216,25 @@ func (s *Indexer) WaitIdle() {
 	}
 }
 
-func (s *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, context.CancelFunc) {
+func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, context.CancelFunc) {
 	ctx := context.TODO()
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	queries := indexerdb.New(s.sqlDB)
+	queries := indexerdb.New(idx.sqlDB)
 	return queries, ctx, cancel
 }
 
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
 // If no CountStore model is stored for the type, it counts all db entries of that type.
-func (s *Indexer) retrieveCounts() (map[uint8]uint64, error) {
+func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 	var err error
 	txCountStore := new(indexertypes.CountStore)
 	envelopeCountStore := new(indexertypes.CountStore)
 	processCountStore := new(indexertypes.CountStore)
 	entityCountStore := new(indexertypes.CountStore)
 	if enableBadgerhold {
-		if err = s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
+		if err = idx.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
 			log.Warnf("could not get the transaction count: %v", err)
-			count, err := s.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
+			count, err := idx.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
 			if err != nil {
 				if err != badger.ErrKeyNotFound {
 					return nil, fmt.Errorf("could not count total transactions: %v", err)
@@ -245,46 +245,46 @@ func (s *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 			// Store new countStore value
 			txCountStore.Count = uint64(count)
 			txCountStore.Type = indexertypes.CountStoreTransactions
-			if err := s.db.Upsert(txCountStore.Type, txCountStore); err != nil {
+			if err := idx.db.Upsert(txCountStore.Type, txCountStore); err != nil {
 				return nil, fmt.Errorf("could not store transaction count: %v", err)
 			}
 		}
-		if err = s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
+		if err = idx.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
 			log.Warnf("could not get the envelope count: %v", err)
-			count, err := s.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
+			count, err := idx.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total envelopes: %v", err)
 			}
 			// Store new countStore value
 			envelopeCountStore.Count = uint64(count)
 			envelopeCountStore.Type = indexertypes.CountStoreEnvelopes
-			if err := s.db.Upsert(envelopeCountStore.Type, envelopeCountStore); err != nil {
+			if err := idx.db.Upsert(envelopeCountStore.Type, envelopeCountStore); err != nil {
 				return nil, fmt.Errorf("could not store envelope count: %v", err)
 			}
 		}
-		if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
+		if err = idx.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
 			log.Warnf("could not get the process count: %v", err)
-			count, err := s.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
+			count, err := idx.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total processes: %v", err)
 			}
 			// Store new countStore value
 			processCountStore.Count = uint64(count)
 			processCountStore.Type = indexertypes.CountStoreProcesses
-			if err := s.db.Upsert(processCountStore.Type, processCountStore); err != nil {
+			if err := idx.db.Upsert(processCountStore.Type, processCountStore); err != nil {
 				return nil, fmt.Errorf("could not store process count: %v", err)
 			}
 		}
-		if err = s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
+		if err = idx.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
 			log.Warnf("could not get the entity count: %v", err)
-			count, err := s.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
+			count, err := idx.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total entities: %v", err)
 			}
 			// Store new countStore value
 			entityCountStore.Count = uint64(count)
 			entityCountStore.Type = indexertypes.CountStoreEntities
-			if err := s.db.Upsert(entityCountStore.Type, entityCountStore); err != nil {
+			if err := idx.db.Upsert(entityCountStore.Type, entityCountStore); err != nil {
 				return nil, fmt.Errorf("could not store entity count: %v", err)
 			}
 		}
@@ -302,9 +302,9 @@ func (s *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 // still open (live) and updates all temporary data (current voting weight and live results
 // if unecrypted). This method might be called on a goroutine after initializing the Indexer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
-func (s *Indexer) AfterSyncBootstrap() {
+func (idx *Indexer) AfterSyncBootstrap() {
 	// if no live results, we don't need the bootstraping
-	if s.ignoreLiveResults {
+	if idx.ignoreLiveResults {
 		return
 	}
 	if !enableBadgerhold {
@@ -318,7 +318,7 @@ func (s *Indexer) AfterSyncBootstrap() {
 	syncSignals := 5
 	for {
 		// Add some grace time to avoid false positive on IsSynchronizing()
-		if !s.App.IsSynchronizing() {
+		if !idx.App.IsSynchronizing() {
 			syncSignals--
 		} else {
 			syncSignals = 5
@@ -330,13 +330,13 @@ func (s *Indexer) AfterSyncBootstrap() {
 	}
 	log.Infof("running indexer after-sync bootstrap")
 	// Block the new votes addition until the recovery finishes.
-	s.recoveryBootLock.Lock()
-	defer s.recoveryBootLock.Unlock()
+	idx.recoveryBootLock.Lock()
+	defer idx.recoveryBootLock.Unlock()
 	// Find those processes which do not have yet final results,
 	// they are considered live so we need to compute the temporary
 	// results (or only its weight in case of Encrypted)
 	prcs := [][]byte{}
-	err := s.db.ForEach(
+	err := idx.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
 		func(p *indexertypes.Process) error {
 			prcs = append(prcs, p.ID)
@@ -354,14 +354,14 @@ func (s *Indexer) AfterSyncBootstrap() {
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
 		log.Infof("recovering live process %x", p)
-		process, err := s.App.State.Process(p, false)
+		process, err := idx.App.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := s.queryWithRetries(func() error {
-			return s.db.Upsert(p, &indexertypes.Results{
+		if err := idx.queryWithRetries(func() error {
+			return idx.db.Upsert(p, &indexertypes.Results{
 				ProcessID: p,
 				// MaxValue requires +1 since 0 is also an option
 				Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
@@ -381,8 +381,8 @@ func (s *Indexer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
-		if err := s.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
-			if err := s.addLiveVote(vote.ProcessId, vote.VotePackage,
+		if err := idx.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
+			if err := idx.addLiveVote(vote.ProcessId, vote.VotePackage,
 				weight, results); err != nil {
 				log.Warn(err)
 			}
@@ -391,56 +391,56 @@ func (s *Indexer) AfterSyncBootstrap() {
 			continue
 		}
 		// Store the results on the persisten database
-		if err := s.commitVotesUnsafe(p, results, s.App.Height()); err != nil {
+		if err := idx.commitVotesUnsafe(p, results, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes: (%v)", err)
 			continue
 		}
 		// Add process to live results so new votes will be added
-		s.addProcessToLiveResults(p)
+		idx.addProcessToLiveResults(p)
 	}
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Indexer) Commit(height uint32) error {
-	s.lockPool.RLock()
-	defer s.lockPool.RUnlock()
+func (idx *Indexer) Commit(height uint32) error {
+	idx.lockPool.RLock()
+	defer idx.lockPool.RUnlock()
 	// Add Entity and register new active process
-	for _, p := range s.newProcessPool {
-		if err := s.newEmptyProcess(p.ProcessID); err != nil {
+	for _, p := range idx.newProcessPool {
+		if err := idx.newEmptyProcess(p.ProcessID); err != nil {
 			log.Errorf("commit: cannot create new empty process: %v", err)
 			continue
 		}
-		if !s.App.IsSynchronizing() {
-			s.addProcessToLiveResults(p.ProcessID)
+		if !idx.App.IsSynchronizing() {
+			idx.addProcessToLiveResults(p.ProcessID)
 		}
 	}
 
 	// Update existing processes
-	for _, p := range s.updateProcessPool {
-		if err := s.updateProcess(p); err != nil {
+	for _, p := range idx.updateProcessPool {
+		if err := idx.updateProcess(p); err != nil {
 			log.Errorf("commit: cannot update process %x: %v", p, err)
 		}
 	}
 
 	// Index new transactions
-	atomic.AddInt64(&s.liveGoroutines, 1)
-	go s.indexNewTxs(s.newTxPool)
+	atomic.AddInt64(&idx.liveGoroutines, 1)
+	go idx.indexNewTxs(idx.newTxPool)
 
 	// Schedule results computation
-	for _, p := range s.resultsPool {
-		if err := s.setResultsHeight(p.ProcessID, height+1); err != nil {
+	for _, p := range idx.resultsPool {
+		if err := idx.setResultsHeight(p.ProcessID, height+1); err != nil {
 			log.Errorf("commit: cannot update process %x: %v", p.ProcessID, err)
 			continue
 		}
-		s.delProcessFromLiveResults(p.ProcessID)
+		idx.delProcessFromLiveResults(p.ProcessID)
 		log.Infof("scheduled results computation on next block for %x", p.ProcessID)
 	}
 
 	startTime := time.Now()
-	txn := s.db.Badger().NewTransaction(true)
-	for _, v := range s.voteIndexPool {
-		if err := s.addVoteIndex(
+	txn := idx.db.Badger().NewTransaction(true)
+	for _, v := range idx.voteIndexPool {
+		if err := idx.addVoteIndex(
 			v.vote.Nullifier,
 			v.vote.ProcessId,
 			height,
@@ -451,8 +451,8 @@ func (s *Indexer) Commit(height uint32) error {
 			log.Warn(err)
 		}
 	}
-	if len(s.voteIndexPool) > 0 {
-		s.voteTxLock.Lock()
+	if len(idx.voteIndexPool) > 0 {
+		idx.voteTxLock.Lock()
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		txn.CommitWith(func(err error) {
@@ -462,19 +462,19 @@ func (s *Indexer) Commit(height uint32) error {
 			wg.Done()
 		})
 		wg.Wait()
-		s.voteTxLock.Unlock()
+		idx.voteTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
-			len(s.voteIndexPool), time.Since(startTime))
+			len(idx.voteIndexPool), time.Since(startTime))
 
 		if enableBadgerhold {
-			if err := s.db.UpdateMatching(&indexertypes.CountStore{},
+			if err := idx.db.UpdateMatching(&indexertypes.CountStore{},
 				badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEnvelopes),
 				func(record interface{}) error {
 					update, ok := record.(*indexertypes.CountStore)
 					if !ok {
 						return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
 					}
-					update.Count += uint64(len(s.voteIndexPool))
+					update.Count += uint64(len(idx.voteIndexPool))
 					return nil
 				},
 			); err != nil {
@@ -488,9 +488,9 @@ func (s *Indexer) Commit(height uint32) error {
 	nvotes := 0
 	startTime = time.Now()
 
-	for pid, votes := range s.votePool {
+	for pid, votes := range idx.votePool {
 		// Get the process information
-		proc, err := s.ProcessInfo([]byte(pid))
+		proc, err := idx.ProcessInfo([]byte(pid))
 		if err != nil {
 			log.Warnf("cannot get process %x", []byte(pid))
 			continue
@@ -503,7 +503,7 @@ func (s *Indexer) Commit(height uint32) error {
 			EnvelopeType: proc.Envelope,
 		}
 		for _, v := range votes {
-			if err := s.addLiveVote(v.ProcessId,
+			if err := idx.addLiveVote(v.ProcessId,
 				v.VotePackage,
 				// TBD: Not 100% sure what happens if weight=nil
 				new(big.Int).SetBytes(v.GetWeight()),
@@ -514,7 +514,7 @@ func (s *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := s.commitVotes([]byte(pid), results, s.App.Height()); err != nil {
+		if err := idx.commitVotes([]byte(pid), results, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
@@ -529,80 +529,80 @@ func (s *Indexer) Commit(height uint32) error {
 	// an initial results height of 0, and we don't want to compute results
 	// for such an initial height.
 	if height > 0 {
-		atomic.AddInt64(&s.liveGoroutines, 1)
-		go s.computePendingProcesses(height)
+		atomic.AddInt64(&idx.liveGoroutines, 1)
+		go idx.computePendingProcesses(height)
 	}
 	return nil
 }
 
 // Rollback removes the non committed pending operations
-func (s *Indexer) Rollback() {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	s.votePool = make(map[string][]*models.Vote)
-	s.voteIndexPool = []*VoteWithIndex{}
-	s.newProcessPool = []*indexertypes.IndexerOnProcessData{}
-	s.resultsPool = []*indexertypes.IndexerOnProcessData{}
-	s.updateProcessPool = [][]byte{}
-	s.newTxPool = []*indexertypes.TxReference{}
+func (idx *Indexer) Rollback() {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.votePool = make(map[string][]*models.Vote)
+	idx.voteIndexPool = []*VoteWithIndex{}
+	idx.newProcessPool = []*indexertypes.IndexerOnProcessData{}
+	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
+	idx.updateProcessPool = [][]byte{}
+	idx.newTxPool = []*indexertypes.TxReference{}
 }
 
 // OnProcess indexer stores the processID and entityID
-func (s *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
+func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 	data := &indexertypes.IndexerOnProcessData{EntityID: eid, ProcessID: pid}
-	s.newProcessPool = append(s.newProcessPool, data)
+	idx.newProcessPool = append(idx.newProcessPool, data)
 }
 
 // OnVote indexer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (s *Indexer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
-		s.votePool[string(v.ProcessId)] = append(s.votePool[string(v.ProcessId)], v)
+func (idx *Indexer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex int32) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessId) {
+		idx.votePool[string(v.ProcessId)] = append(idx.votePool[string(v.ProcessId)], v)
 	}
-	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
+	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
 }
 
 // OnCancel indexer stores the processID and entityID
-func (s *Indexer) OnCancel(pid []byte, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	s.updateProcessPool = append(s.updateProcessPool, pid)
+func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // OnProcessKeys does nothing
-func (s *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	s.updateProcessPool = append(s.updateProcessPool, pid)
+func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
-func (s *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
+func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 	if status == models.ProcessStatus_ENDED {
-		if live, err := s.isOpenProcess(pid); err != nil {
+		if live, err := idx.isOpenProcess(pid); err != nil {
 			log.Warn(err)
 		} else if live {
-			s.resultsPool = append(s.resultsPool, &indexertypes.IndexerOnProcessData{ProcessID: pid})
+			idx.resultsPool = append(idx.resultsPool, &indexertypes.IndexerOnProcessData{ProcessID: pid})
 		}
 	}
-	s.updateProcessPool = append(s.updateProcessPool, pid)
+	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (s *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	p, err := s.App.State.Process(pid, false)
+func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
 		return
@@ -614,21 +614,21 @@ func (s *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 	// if all keys have been revealed, compute the results
 	if *p.KeyIndex < 1 {
 		data := indexertypes.IndexerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
-		s.resultsPool = append(s.resultsPool, &data)
+		idx.resultsPool = append(idx.resultsPool, &data)
 	}
-	s.updateProcessPool = append(s.updateProcessPool, pid)
+	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
-func (s *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
+func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 	txIndex int32) {
 	// Execute callbacks
-	for _, l := range s.eventOnResults {
-		go l.OnOracleResults(results, pid, s.App.Height())
+	for _, l := range idx.eventOnResults {
+		go l.OnOracleResults(results, pid, idx.App.Height())
 	}
 
 	// We don't execute any action if the blockchain is being syncronized
-	if s.App.IsSynchronizing() {
+	if idx.App.IsSynchronizing() {
 		return
 	}
 
@@ -653,7 +653,7 @@ func (s *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 				log.Errorf("could not fetch results after max retries")
 				return
 			}
-			myResults, err = s.GetResults(pid)
+			myResults, err = idx.GetResults(pid)
 			if err == nil {
 				break
 			}
@@ -694,15 +694,15 @@ func (s *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 			log.Errorf("published results for process %x are not correct", pid)
 		}
 	}()
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	s.updateProcessPool = append(s.updateProcessPool, pid)
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (s *Indexer) OnProcessesStart(pids [][]byte)                     {}
-func (s *Indexer) OnSetAccount(addr []byte, account *vochain.Account) {}
-func (s *Indexer) OnTransferTokens(from, to []byte, amount uint64)    {}
+func (idx *Indexer) OnProcessesStart(pids [][]byte)                     {}
+func (idx *Indexer) OnSetAccount(addr []byte, account *vochain.Account) {}
+func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)    {}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

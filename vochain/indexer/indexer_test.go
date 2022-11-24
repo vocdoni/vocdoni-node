@@ -28,17 +28,17 @@ func init() {
 }
 
 func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResults bool) *Indexer {
-	sc, err := NewIndexer(tb.TempDir(), app, true)
+	idx, err := NewIndexer(tb.TempDir(), app, true)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	sc.skipTargetHeightSleeps = true
+	idx.skipTargetHeightSleeps = true
 	tb.Cleanup(func() {
-		if err := sc.Close(); err != nil {
+		if err := idx.Close(); err != nil {
 			tb.Error(err)
 		}
 	})
-	return sc
+	return idx
 }
 
 func TestEntityList(t *testing.T) {
@@ -51,7 +51,7 @@ func TestEntityList(t *testing.T) {
 
 func testEntityList(t *testing.T, entityCount int) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 	for i := 0; i < entityCount; i++ {
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
@@ -69,12 +69,12 @@ func testEntityList(t *testing.T, entityCount int) {
 	}
 	app.AdvanceTestBlock()
 	entities := make(map[string]bool)
-	if ec := sc.EntityCount(); ec != uint64(entityCount) {
+	if ec := idx.EntityCount(); ec != uint64(entityCount) {
 		t.Fatalf("entity count is wrong, got %d expected %d", ec, entityCount)
 	}
 	last := 0
 	for len(entities) <= entityCount {
-		list := sc.EntityList(10, last, "")
+		list := idx.EntityList(10, last, "")
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
@@ -94,7 +94,7 @@ func testEntityList(t *testing.T, entityCount int) {
 
 func TestEntitySearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	entityIds := []string{
 		"1011d50537fa164b6fef261141797bbe4014526e",
@@ -161,17 +161,17 @@ func TestEntitySearch(t *testing.T) {
 	app.AdvanceTestBlock()
 	var list []types.HexBytes
 	// Exact entity search
-	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	list = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
 	if len(list) < 1 {
 		t.Fatalf("expected 1 entity, got %d", len(list))
 	}
 	// Search for nonexistent entity
-	list = sc.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
+	list = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
 	if len(list) > 0 {
 		t.Fatalf("expected 0 entities, got %d", len(list))
 	}
 	// Search containing part of all manually-defined entities
-	list = sc.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
+	list = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
 	log.Info(list)
 	if len(list) < len(entityIds) {
 		t.Fatalf("expected %d entities, got %d", len(entityIds), len(list))
@@ -186,7 +186,7 @@ func TestProcessList(t *testing.T) {
 
 func testProcessList(t *testing.T, procsCount int) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
@@ -224,7 +224,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	procs := make(map[string]bool)
 	last := 0
 	for len(procs) < procsCount {
-		list, err := sc.ProcessList(eidTest, last, 10, "", 0, "", "", false)
+		list, err := idx.ProcessList(eidTest, last, 10, "", 0, "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -244,7 +244,7 @@ func testProcessList(t *testing.T, procsCount int) {
 		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
 	}
 
-	_, err := sc.ProcessList(nil, 0, 64, "", 0, "", "", false)
+	_, err := idx.ProcessList(nil, 0, 64, "", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 func TestProcessSearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
@@ -332,7 +332,7 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, err := sc.ProcessList(eidTest, 0, 10, pidExact, 0, "", "", false)
+	list, err := idx.ProcessList(eidTest, 0, 10, pidExact, 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -341,7 +341,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Exact process search, with it being encrypted.
 	// This once caused a sqlite bug due to a mistake in the SQL query.
-	list, err = sc.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, "", "", false)
+	list, err = idx.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -349,7 +349,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 1 process, got %d", len(list))
 	}
 	// Search for nonexistent process
-	list, err = sc.ProcessList(eidTest, 0, 10,
+	list, err = idx.ProcessList(eidTest, 0, 10,
 		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -358,7 +358,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 0 processes, got %d", len(list))
 	}
 	// Search containing part of all manually-defined processes
-	list, err = sc.ProcessList(eidTest, 0, 10,
+	list, err = idx.ProcessList(eidTest, 0, 10,
 		"011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
@@ -367,7 +367,7 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(processIds), len(list))
 	}
 
-	list, err = sc.ProcessList(eidTest, 0, 100,
+	list, err = idx.ProcessList(eidTest, 0, 100,
 		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "", "ENDED", false)
 	if err != nil {
 		t.Fatal(err)
@@ -378,7 +378,7 @@ func TestProcessSearch(t *testing.T) {
 
 	// Search with an exact Entity ID, but starting with a null byte.
 	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
-	list, err = sc.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, "", "", false)
+	list, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, "", "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -387,12 +387,12 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// list all processes, with a max of 10
-	list, err = sc.ProcessList(nil, 0, 10, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 10, "", 0, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 10)
 
 	// list all processes, with a max of 1000
-	list, err = sc.ProcessList(nil, 0, 1000, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 1000, "", 0, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 21)
 }
@@ -400,7 +400,7 @@ func TestProcessSearch(t *testing.T) {
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
 	for i := 0; i < 10; i++ {
@@ -439,25 +439,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Get the process list for namespace 123
-	list, err := sc.ProcessList(eid20, 0, 100, "", 123, "", "", false)
+	list, err := idx.ProcessList(eid20, 0, 100, "", 123, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 0, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, 100, "", 10, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 10, "", "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = sc.ProcessList(nil, 0, 100, "", 0, "", "READY", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 0, "", "READY", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
@@ -466,7 +466,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	app.State.SetHeight(3)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
 	err := app.State.AddProcess(&models.Process{
@@ -510,7 +510,7 @@ func TestResults(t *testing.T) {
 	// commits of blocks with heights 0-300. The two are parallel and should
 	// probably be joined.
 	for i := int32(0); i < 300; i++ {
-		sc.Rollback()
+		idx.Rollback()
 		vote := &models.VoteEnvelope{
 			Nonce:                util.RandomBytes(32),
 			ProcessId:            pid,
@@ -537,8 +537,8 @@ func TestResults(t *testing.T) {
 			voterID: vochain.VoterID{}.Nil(),
 			txIndex: 0,
 		}
-		sc.voteIndexPool = append(sc.voteIndexPool, txRef)
-		err = sc.Commit(uint32(i))
+		idx.voteIndexPool = append(idx.voteIndexPool, txRef)
+		err = idx.Commit(uint32(i))
 		qt.Assert(t, err, qt.IsNil)
 	}
 
@@ -550,15 +550,15 @@ func TestResults(t *testing.T) {
 		KeyIndex:             &ki,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	err = sc.updateProcess(pid)
+	err = idx.updateProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
-	err = sc.setResultsHeight(pid, app.State.CurrentHeight())
+	err = idx.setResultsHeight(pid, app.State.CurrentHeight())
 	qt.Assert(t, err, qt.IsNil)
-	err = sc.ComputeResult(pid)
+	err = idx.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Test results
-	result, err := sc.GetResults(pid)
+	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	log.Infof("results: %s", GetFriendlyResults(result.Votes))
 	v0 := big.NewInt(0)
@@ -596,7 +596,7 @@ func TestResults(t *testing.T) {
 func TestLiveResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
@@ -623,23 +623,23 @@ func TestLiveResults(t *testing.T) {
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
 	}
-	sc.addProcessToLiveResults(pid)
+	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
-		qt.Assert(t, sc.addLiveVote(
+		qt.Assert(t, idx.addLiveVote(
 			pid,
 			vp,
 			new(big.Int).SetUint64(1),
 			r),
 			qt.IsNil)
 	}
-	qt.Assert(t, sc.commitVotes(pid, r, 1), qt.IsNil)
+	qt.Assert(t, idx.commitVotes(pid, r, 1), qt.IsNil)
 
-	if live, err := sc.isOpenProcess(pid); !live || err != nil {
+	if live, err := idx.isOpenProcess(pid); !live || err != nil {
 		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
 	}
 
 	// Test results
-	result, err := sc.GetResults(pid)
+	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 
 	v0 := big.NewInt(0)
@@ -664,7 +664,7 @@ func TestLiveResults(t *testing.T) {
 func TestAddVote(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
@@ -686,7 +686,7 @@ func TestAddVote(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 
-	pr, err := sc.GetResults(pid)
+	pr, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	// Should be fine
 	err = pr.AddVote([]int{1, 2, 3}, nil, nil)
@@ -734,7 +734,7 @@ func TestAddVote(t *testing.T) {
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
-var vote = func(v []int, sc *Indexer, pid []byte, weight *big.Int) error {
+var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
@@ -748,7 +748,7 @@ var vote = func(v []int, sc *Indexer, pid []byte, weight *big.Int) error {
 			max = i
 		}
 	}
-	proc, err := sc.ProcessInfo(pid)
+	proc, err := idx.ProcessInfo(pid)
 	if err != nil {
 		return err
 	}
@@ -761,18 +761,18 @@ var vote = func(v []int, sc *Indexer, pid []byte, weight *big.Int) error {
 		VoteOpts:     proc.VoteOpts,
 		EnvelopeType: proc.Envelope,
 	}
-	sc.addProcessToLiveResults(pid)
-	if err := sc.addLiveVote(pid, vp, weight, r); err != nil {
+	idx.addProcessToLiveResults(pid)
+	if err := idx.addLiveVote(pid, vp, weight, r); err != nil {
 		return err
 	}
-	return sc.commitVotes(pid, r, 1)
+	return idx.commitVotes(pid, r, 1)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -790,14 +790,14 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
-	qt.Assert(t, vote([]int{4, 2}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{4, 2}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 4}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 4}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 5}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{0, 0, 0}, sc, pid, nil), qt.ErrorMatches, ".*")
+	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 4}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 4}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 5}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{0, 0, 0}, idx, pid, nil), qt.ErrorMatches, ".*")
 
-	result, err := sc.GetResults(pid)
+	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
@@ -808,7 +808,7 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -836,17 +836,17 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	//  weight: 20000000000, 100000^2 + 112345^2 // wrong
 
 	// Good
-	qt.Assert(t, vote([]int{10, 28}, sc, pid, new(big.Int).SetUint64(1000)), qt.IsNil)
-	qt.Assert(t, vote([]int{5, 5}, sc, pid, new(big.Int).SetUint64(50)), qt.IsNil)
-	qt.Assert(t, vote([]int{100000, 100000}, sc, pid, new(big.Int).SetUint64(20000000000)), qt.IsNil)
-	qt.Assert(t, vote([]int{1, 0}, sc, pid, new(big.Int).SetUint64(1)), qt.IsNil)
+	qt.Assert(t, vote([]int{10, 28}, idx, pid, new(big.Int).SetUint64(1000)), qt.IsNil)
+	qt.Assert(t, vote([]int{5, 5}, idx, pid, new(big.Int).SetUint64(50)), qt.IsNil)
+	qt.Assert(t, vote([]int{100000, 100000}, idx, pid, new(big.Int).SetUint64(20000000000)), qt.IsNil)
+	qt.Assert(t, vote([]int{1, 0}, idx, pid, new(big.Int).SetUint64(1)), qt.IsNil)
 	// Wrong
-	qt.Assert(t, vote([]int{5, 2}, sc, pid, new(big.Int).SetUint64(25)),
+	qt.Assert(t, vote([]int{5, 2}, idx, pid, new(big.Int).SetUint64(25)),
 		qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{100000, 112345}, sc, pid, new(big.Int).SetUint64(20000000000)),
+	qt.Assert(t, vote([]int{100000, 112345}, idx, pid, new(big.Int).SetUint64(20000000000)),
 		qt.ErrorMatches, ".*overflow.*")
 
-	result, err := sc.GetResults(pid)
+	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"100016"})
@@ -858,7 +858,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -883,13 +883,13 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Multichoice (choose 3 ouf of 5):
 	// - Vote Envelope: `[1,1,1,0,0]` `[0,1,1,1,0]` `[1,1,0,0,0]`
 	// - Results: `[ [1, 2], [0, 3], [1, 2], [2, 1], [3, 0] ]`
-	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, sc, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, sc, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, idx, pid, nil), qt.IsNil)
+	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
 
-	result, err := sc.GetResults(pid)
+	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "2"})
@@ -901,7 +901,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 func TestCountVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 	pid := util.RandomBytes(32)
 
 	err := app.State.AddProcess(&models.Process{
@@ -926,34 +926,34 @@ func TestCountVotes(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	sc.Rollback()
-	sc.addProcessToLiveResults(pid)
+	idx.Rollback()
+	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
 		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		sc.OnVote(v, vochain.VoterID{}.Nil(), int32(i))
+		idx.OnVote(v, vochain.VoterID{}.Nil(), int32(i))
 	}
 	nullifier := util.RandomBytes(32)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: nullifier}
 	// Add last vote with known nullifier
 	txIndex := int32(100)
-	sc.OnVote(v, vochain.VoterID{}.Nil(), txIndex)
+	idx.OnVote(v, vochain.VoterID{}.Nil(), txIndex)
 
 	// Vote transactions are on imaginary 2000th block
 	blockHeight := uint32(2000)
-	err = sc.Commit(blockHeight)
+	err = idx.Commit(blockHeight)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Test envelope height for this PID
-	height, err := sc.GetEnvelopeHeight(pid)
+	height, err := idx.GetEnvelopeHeight(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 	// Test global envelope height
-	height, err = sc.GetEnvelopeHeight([]byte{})
+	height, err = idx.GetEnvelopeHeight([]byte{})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 
-	ref, err := sc.GetEnvelopeReference(nullifier)
+	ref, err := idx.GetEnvelopeReference(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
 	qt.Assert(t, ref.TxIndex, qt.CmpEquals(), txIndex)
@@ -962,24 +962,24 @@ func TestCountVotes(t *testing.T) {
 func TestTxIndexer(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app, true)
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			sc.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
+			idx.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
 		}
 	}
-	qt.Assert(t, sc.Commit(0), qt.IsNil)
-	sc.WaitIdle()
+	qt.Assert(t, idx.Commit(0), qt.IsNil)
+	idx.WaitIdle()
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
-			ref, err := sc.GetTxReference(uint64(i*10 + j + 1))
+			ref, err := idx.GetTxReference(uint64(i*10 + j + 1))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
 
-			hashRef, err := sc.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			hashRef, err := idx.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))
