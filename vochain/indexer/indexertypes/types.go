@@ -11,7 +11,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
-	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -34,7 +34,7 @@ type CountStore struct {
 }
 
 // Process represents an election process handled by the Vochain.
-// The scrutinizer Process data type is different from the vochain state data type
+// The indexer Process data type is different from the vochain state data type
 // since it is optimized for querying purposes and not for keeping a shared consensus state.
 type Process struct {
 	ID                types.HexBytes             `badgerholdKey:"ID" json:"processId"`
@@ -65,7 +65,7 @@ type Process struct {
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 }
 
-func ProcessFromDB(dbproc *scrutinizerdb.Process) *Process {
+func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
 		EntityID:          nonEmptyBytes([]byte(dbproc.EntityID)),
@@ -129,7 +129,7 @@ func decodeVotes(input string) [][]*types.BigInt {
 	return votes
 }
 
-func ResultsFromDB(dbproc *scrutinizerdb.Process) *Results {
+func ResultsFromDB(dbproc *indexerdb.Process) *Results {
 	results := &Results{
 		ProcessID:      dbproc.ID,
 		Votes:          decodeVotes(dbproc.ResultsVotes),
@@ -223,7 +223,7 @@ type VoteReference struct {
 	CreationTime time.Time
 }
 
-func VoteReferenceFromDB(dbvote *scrutinizerdb.VoteReference) *VoteReference {
+func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 	weightInt := new(types.BigInt)
 	if err := weightInt.UnmarshalText([]byte(dbvote.Weight)); err != nil {
 		panic(err) // should never happen
@@ -327,9 +327,9 @@ func (b *BlockMetadata) String() string {
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________
 
-// ScrutinizerOnProcessData holds the required data for callbacks when
+// IndexerOnProcessData holds the required data for callbacks when
 // a new process is added into the vochain.
-type ScrutinizerOnProcessData struct {
+type IndexerOnProcessData struct {
 	EntityID  []byte
 	ProcessID []byte
 }

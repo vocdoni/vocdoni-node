@@ -11,12 +11,12 @@ import (
 	census "go.vocdoni.io/dvote/rpccensus"
 
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
 func API(apiconfig *config.API, rpc *rpcapi.RPCAPI, storage data.Storage, censusdb *censusdb.CensusDB,
-	vapp *vochain.BaseApplication, sc *scrutinizer.Scrutinizer, vi *vochaininfo.VochainInfo,
+	vapp *vochain.BaseApplication, sc *indexer.Indexer, vi *vochaininfo.VochainInfo,
 	signer *ethereum.SignKeys, ma *metrics.Agent) (*rpcapi.RPCAPI, error) {
 	log.Infof("creating API service")
 

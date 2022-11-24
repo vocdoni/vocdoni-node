@@ -6,7 +6,7 @@ import (
 
 	tmtypes "github.com/tendermint/tendermint/types"
 	api "go.vocdoni.io/dvote/rpctypes"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -23,12 +23,12 @@ func (r *RPCAPI) getStats(request *api.APIrequest) (*api.APIresponse, error) {
 		return nil, fmt.Errorf("could not get block at height: (%v)", height)
 	}
 	stats.BlockTimeStamp = int32(block.Header.Time.Unix())
-	stats.EntityCount = int64(r.scrutinizer.EntityCount())
-	if stats.EnvelopeCount, err = r.scrutinizer.GetEnvelopeHeight([]byte{}); err != nil {
+	stats.EntityCount = int64(r.indexer.EntityCount())
+	if stats.EnvelopeCount, err = r.indexer.GetEnvelopeHeight([]byte{}); err != nil {
 		return nil, fmt.Errorf("could not count vote envelopes: %w", err)
 	}
-	stats.ProcessCount = int64(r.scrutinizer.ProcessCount([]byte{}))
-	if stats.TransactionCount, err = r.scrutinizer.TransactionCount(); err != nil {
+	stats.ProcessCount = int64(r.indexer.ProcessCount([]byte{}))
+	if stats.TransactionCount, err = r.indexer.TransactionCount(); err != nil {
 		return nil, fmt.Errorf("could not count transactions: %w", err)
 	}
 	vals, _ := r.vocapp.State.Validators(true)
@@ -56,7 +56,7 @@ func (r *RPCAPI) getEnvelopeList(request *api.APIrequest) (*api.APIresponse, err
 		max = MaxListSize
 	}
 	var err error
-	if response.Envelopes, err = r.scrutinizer.GetEnvelopes(
+	if response.Envelopes, err = r.indexer.GetEnvelopes(
 		request.ProcessID, max, request.From, request.SearchTerm); err != nil {
 		return nil, fmt.Errorf("cannot get envelope list: %w", err)
 	}
@@ -93,7 +93,7 @@ func (r *RPCAPI) getBlock(request *api.APIrequest) (*api.APIresponse, error) {
 		return nil, fmt.Errorf("block height %d not valid for vochain with height %d", request.Height, r.vocapp.Height())
 	}
 	if response.Block = blockMetadataFromBlockModel(
-		r.scrutinizer.App.GetBlockByHeight(int64(request.Height)), false, true); response.Block == nil {
+		r.indexer.App.GetBlockByHeight(int64(request.Height)), false, true); response.Block == nil {
 		return nil, fmt.Errorf("cannot get block: no block with height %d", request.Height)
 	}
 	return &response, nil
@@ -102,7 +102,7 @@ func (r *RPCAPI) getBlock(request *api.APIrequest) (*api.APIresponse, error) {
 func (r *RPCAPI) getBlockByHash(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	response.Block = blockMetadataFromBlockModel(
-		r.scrutinizer.App.GetBlockByHash(request.Hash), true, false)
+		r.indexer.App.GetBlockByHash(request.Hash), true, false)
 	if response.Block == nil {
 		return nil, fmt.Errorf("cannot get block: no block with hash %x", request.Hash)
 	}
@@ -117,7 +117,7 @@ func (r *RPCAPI) getBlockList(request *api.APIrequest) (*api.APIresponse, error)
 			break
 		}
 		blkMeta := blockMetadataFromBlockModel(
-			r.scrutinizer.App.GetBlockByHeight(
+			r.indexer.App.GetBlockByHeight(
 				int64(request.From)+int64(i),
 			),
 			true,
@@ -144,7 +144,7 @@ func protoFormat(tx []byte) string {
 
 func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	tx, hash, err := r.scrutinizer.App.GetTxHash(request.Height, request.TxIndex)
+	tx, hash, err := r.indexer.App.GetTxHash(request.Height, request.TxIndex)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
@@ -165,11 +165,11 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 // TODO @pau: the transaction payload is returned twice, base64 and json
 func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	txRef, err := r.scrutinizer.GetTxReference(uint64(request.ID))
+	txRef, err := r.indexer.GetTxReference(uint64(request.ID))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx reference with ID %d: %w", request.ID, err)
 	}
-	tx, hash, err := r.scrutinizer.App.GetTxHash(txRef.BlockHeight, txRef.TxBlockIndex)
+	tx, hash, err := r.indexer.App.GetTxHash(txRef.BlockHeight, txRef.TxBlockIndex)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}
@@ -188,11 +188,11 @@ func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 
 func (r *RPCAPI) getTxByHash(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	txRef, err := r.scrutinizer.GetTxHashReference(request.Hash)
+	txRef, err := r.indexer.GetTxHashReference(request.Hash)
 	if err != nil {
 		return nil, fmt.Errorf("tx %x not found: %w", request.Hash, err)
 	}
-	tx, err := r.scrutinizer.App.GetTx(txRef.BlockHeight, txRef.TxBlockIndex)
+	tx, err := r.indexer.App.GetTx(txRef.BlockHeight, txRef.TxBlockIndex)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx: %w", err)
 	}

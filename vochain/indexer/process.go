@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"encoding/hex"
@@ -17,8 +17,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 var zeroBytes = []byte("")
@@ -79,7 +79,7 @@ func sqliteWarnf(format string, args ...interface{}) {
 }
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
+func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	proc := &indexertypes.Process{}
 	if enableBadgerhold {
 		bhStartTime := time.Now()
@@ -116,7 +116,7 @@ func (s *Scrutinizer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // EntityID, searchTerm, namespace, status, and withResults are optional filters, if
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Scrutinizer) ProcessList(entityID []byte,
+func (s *Indexer) ProcessList(entityID []byte,
 	from,
 	max int,
 	searchTerm string,
@@ -245,7 +245,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 		}
 	}
 	sqlStartTime := time.Now()
-	sqlProcs, err := queries.SearchProcesses(ctx, scrutinizerdb.SearchProcessesParams{
+	sqlProcs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
 		Namespace:       int64(namespace),
@@ -276,7 +276,7 @@ func (s *Scrutinizer) ProcessList(entityID []byte,
 }
 
 // ProcessCount returns the number of processes indexed
-func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
+func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 	if !enableBadgerhold {
 		// TODO(sqlite): reimplement
 		return 0
@@ -301,10 +301,10 @@ func (s *Scrutinizer) ProcessCount(entityID []byte) uint64 {
 	return uint64(c)
 }
 
-// EntityList returns the list of entities indexed by the scrutinizer
+// EntityList returns the list of entities indexed by the indexer
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
-func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []types.HexBytes {
+func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
 	if !enableBadgerhold {
 		// TODO(sqlite): reimplement
 		return nil
@@ -325,7 +325,7 @@ func (s *Scrutinizer) EntityList(max, from int, searchTerm string) []types.HexBy
 }
 
 // EntityProcessCount returns the number of processes that an entity holds
-func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
+func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
 	if !enableBadgerhold {
 		// TODO(sqlite): reimplement
 		return 0, nil
@@ -337,8 +337,8 @@ func (s *Scrutinizer) EntityProcessCount(entityId []byte) (uint32, error) {
 	return entity.ProcessCount, nil
 }
 
-// EntityCount return the number of entities indexed by the scrutinizer
-func (s *Scrutinizer) EntityCount() uint64 {
+// EntityCount return the number of entities indexed by the indexer
+func (s *Indexer) EntityCount() uint64 {
 	if !enableBadgerhold {
 		// TODO(sqlite): reimplement
 		return 0
@@ -352,7 +352,7 @@ func (s *Scrutinizer) EntityCount() uint64 {
 }
 
 // Return whether a process must have live results or not
-func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
+func (s *Indexer) isOpenProcess(processID []byte) (bool, error) {
 	p, err := s.App.State.Process(processID, false)
 	if err != nil {
 		return false, err
@@ -364,7 +364,7 @@ func (s *Scrutinizer) isOpenProcess(processID []byte) (bool, error) {
 }
 
 // compute results if the current heigh has scheduled ending processes
-func (s *Scrutinizer) computePendingProcesses(height uint32) {
+func (s *Indexer) computePendingProcesses(height uint32) {
 	defer atomic.AddInt64(&s.liveGoroutines, -1)
 	// We wait a random number of blocks (between 0 and 5) in order to decrease the collision risk
 	// between several Oracles.
@@ -397,7 +397,7 @@ func (s *Scrutinizer) computePendingProcesses(height uint32) {
 
 // newEmptyProcess creates a new empty process and stores it into the database.
 // The process must exist on the Vochain state, else an error is returned.
-func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
+func (s *Indexer) newEmptyProcess(pid []byte) error {
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
@@ -525,7 +525,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.CreateProcess(ctx, scrutinizerdb.CreateProcessParams{
+	if _, err := queries.CreateProcess(ctx, indexerdb.CreateProcessParams{
 		ID:       pid,
 		EntityID: nonNullBytes(eid),
 		// EntityIndex: int64(entity.ProcessCount), // TODO(sqlite): replace with a COUNT
@@ -561,7 +561,7 @@ func (s *Scrutinizer) newEmptyProcess(pid []byte) error {
 
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
-func (s *Scrutinizer) updateProcess(pid []byte) error {
+func (s *Indexer) updateProcess(pid []byte) error {
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
@@ -626,7 +626,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 	if err != nil {
 		return err
 	}
-	if _, err := queries.UpdateProcessFromState(ctx, scrutinizerdb.UpdateProcessFromStateParams{
+	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
 		ID:                pid,
 		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
 		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
@@ -650,7 +650,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 		}
 		queries = queries.WithTx(tx)
 
-		if _, err := queries.SetProcessResultsHeight(ctx, scrutinizerdb.SetProcessResultsHeightParams{
+		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 			ID:            pid,
 			ResultsHeight: 0,
 		}); err != nil {
@@ -667,7 +667,7 @@ func (s *Scrutinizer) updateProcess(pid []byte) error {
 }
 
 // setResultsHeight updates the Rheight of any process whose ID is pid.
-func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
+func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
@@ -688,7 +688,7 @@ func (s *Scrutinizer) setResultsHeight(pid []byte, height uint32) error {
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.SetProcessResultsHeight(ctx, scrutinizerdb.SetProcessResultsHeightParams{
+	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 		ID:            pid,
 		ResultsHeight: int64(height),
 	}); err != nil {

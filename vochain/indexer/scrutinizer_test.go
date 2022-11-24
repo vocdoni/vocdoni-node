@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"encoding/hex"
@@ -17,7 +17,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -27,8 +27,8 @@ func init() {
 	goose.SetLogger(stdlog.New(io.Discard, "", 0))
 }
 
-func newTestScrutinizer(tb testing.TB, app *vochain.BaseApplication, countLiveResults bool) *Scrutinizer {
-	sc, err := NewScrutinizer(tb.TempDir(), app, true)
+func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResults bool) *Indexer {
+	sc, err := NewIndexer(tb.TempDir(), app, true)
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -51,7 +51,7 @@ func TestEntityList(t *testing.T) {
 
 func testEntityList(t *testing.T, entityCount int) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 	for i := 0; i < entityCount; i++ {
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
@@ -94,7 +94,7 @@ func testEntityList(t *testing.T, entityCount int) {
 
 func TestEntitySearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	entityIds := []string{
 		"1011d50537fa164b6fef261141797bbe4014526e",
@@ -186,7 +186,7 @@ func TestProcessList(t *testing.T) {
 
 func testProcessList(t *testing.T, procsCount int) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
@@ -252,7 +252,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 func TestProcessSearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
@@ -400,7 +400,7 @@ func TestProcessSearch(t *testing.T) {
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
 	for i := 0; i < 10; i++ {
@@ -466,7 +466,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	app.State.SetHeight(3)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
 	err := app.State.AddProcess(&models.Process{
@@ -596,7 +596,7 @@ func TestResults(t *testing.T) {
 func TestLiveResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
@@ -664,7 +664,7 @@ func TestLiveResults(t *testing.T) {
 func TestAddVote(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
@@ -734,7 +734,7 @@ func TestAddVote(t *testing.T) {
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
-var vote = func(v []int, sc *Scrutinizer, pid []byte, weight *big.Int) error {
+var vote = func(v []int, sc *Indexer, pid []byte, weight *big.Int) error {
 	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: v,
@@ -772,7 +772,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -808,7 +808,7 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -858,7 +858,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -901,7 +901,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 func TestCountVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 	pid := util.RandomBytes(32)
 
 	err := app.State.AddProcess(&models.Process{
@@ -962,7 +962,7 @@ func TestCountVotes(t *testing.T) {
 func TestTxIndexer(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	sc := newTestScrutinizer(t, app, true)
+	sc := newTestIndexer(t, app, true)
 
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {

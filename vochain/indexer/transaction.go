@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"fmt"
@@ -7,11 +7,11 @@ import (
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 // TransactionCount returns the number of transactions indexed
-func (s *Scrutinizer) TransactionCount() (uint64, error) {
+func (s *Indexer) TransactionCount() (uint64, error) {
 	txCountStore := &indexertypes.CountStore{}
 	if err := s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
 		return txCountStore.Count, err
@@ -20,7 +20,7 @@ func (s *Scrutinizer) TransactionCount() (uint64, error) {
 }
 
 // GetTxReference fetches the txReference for the given tx height
-func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
+func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where(badgerhold.Key).Eq(height))
 	if err != nil {
@@ -30,7 +30,7 @@ func (s *Scrutinizer) GetTxReference(height uint64) (*indexertypes.TxReference, 
 }
 
 // GetTxReference fetches the txReference for the given tx hash
-func (s *Scrutinizer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
+func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash).Index("Hash"))
 	if err != nil {
@@ -40,7 +40,7 @@ func (s *Scrutinizer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxR
 }
 
 // OnNewTx stores the transaction reference in the indexer database
-func (s *Scrutinizer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
+func (s *Indexer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
@@ -52,7 +52,7 @@ func (s *Scrutinizer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 
 // indexNewTxs indexes the txs pending in the newTxPool and updates the transaction count
 // this function should only be called within Commit(), on a new block.
-func (s *Scrutinizer) indexNewTxs(txList []*indexertypes.TxReference) {
+func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
 	defer atomic.AddInt64(&s.liveGoroutines, -1)
 	if len(txList) == 0 {
 		return

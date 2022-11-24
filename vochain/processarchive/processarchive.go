@@ -12,13 +12,13 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
 type ProcessArchive struct {
-	indexer    *scrutinizer.Scrutinizer
+	indexer    *indexer.Indexer
 	ipfs       *data.IPFSHandle
 	storage    *jsonStorage
 	publish    chan (bool)
@@ -162,7 +162,7 @@ func BuildIndex(datadir string) (*Index, error) {
 // The key parameter must be either a valid IPFS base64 encoded private key
 // or empty (a new key will be generated).
 // If ipfs is nil, only JSON archive storage will be performed.
-func NewProcessArchive(s *scrutinizer.Scrutinizer, ipfs *data.IPFSHandle,
+func NewProcessArchive(s *indexer.Indexer, ipfs *data.IPFSHandle,
 	datadir, key string) (*ProcessArchive, error) {
 	js, err := NewJsonStorage(datadir)
 	if err != nil {

@@ -1,4 +1,4 @@
-package scrutinizer
+package indexer
 
 import (
 	"bytes"
@@ -19,8 +19,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
-	scrutinizerdb "go.vocdoni.io/dvote/vochain/scrutinizer/db"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
@@ -57,31 +57,31 @@ type EventListener interface {
 
 // AddEventListener adds a new event listener, to receive method calls on block
 // events as documented in EventListener.
-func (s *Scrutinizer) AddEventListener(l EventListener) {
+func (s *Indexer) AddEventListener(l EventListener) {
 	s.eventOnResults = append(s.eventOnResults, l)
 }
 
-// Scrutinizer is the component which makes the accounting of the voting processes
+// Indexer is the component which makes the accounting of the voting processes
 // and keeps it indexed in a local database.
-type Scrutinizer struct {
+type Indexer struct {
 	App *vochain.BaseApplication
 	// voteIndexPool is the list of votes that will be indexed in the database
 	voteIndexPool []*VoteWithIndex
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*models.Vote
 	// newProcessPool is the list of new process IDs on the current block
-	newProcessPool []*indexertypes.ScrutinizerOnProcessData
+	newProcessPool []*indexertypes.IndexerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
 	// resultsPool is the list of processes that finish on the current block
-	resultsPool []*indexertypes.ScrutinizerOnProcessData
+	resultsPool []*indexertypes.IndexerOnProcessData
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
 	// lockPool is the lock for all *Pool operations
 	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map
-	// eventOnResults is the list of external callbacks that will be executed by the scrutinizer
+	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
 	db             *badgerhold.Store
 	sqlDB          *sql.DB
@@ -125,11 +125,11 @@ type VoteWithIndex struct {
 	txIndex int32
 }
 
-// NewScrutinizer returns an instance of the Scrutinizer
+// NewIndexer returns an instance of the Indexer
 // using the local storage database of dbPath and integrated into the state vochain instance
-func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Scrutinizer, error) {
+func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-	s := &Scrutinizer{
+	s := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
 
@@ -146,7 +146,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResult
 
 	countMap, err := s.retrieveCounts()
 	if err != nil {
-		return nil, fmt.Errorf("could not create scrutinizer: %v", err)
+		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
 
 	log.Infof("indexer initialization took %s, stored %d "+
@@ -180,7 +180,7 @@ func NewScrutinizer(dbPath string, app *vochain.BaseApplication, countLiveResult
 	return s, nil
 }
 
-func (s *Scrutinizer) Close() error {
+func (s *Indexer) Close() error {
 	s.cancelFunc()
 	s.WaitIdle()
 	// Try closing both before reporting errors.
@@ -198,9 +198,9 @@ func (s *Scrutinizer) Close() error {
 // WaitIdle waits until there are no live asynchronous goroutines, such as those
 // started by the Commit method.
 //
-// Note that this method is racy by nature if the scrutinizer keeps committing
+// Note that this method is racy by nature if the indexer keeps committing
 // more blocks, as it simply waits for any goroutines already started to stop.
-func (s *Scrutinizer) WaitIdle() {
+func (s *Indexer) WaitIdle() {
 	var slept time.Duration
 	for {
 		const debounce = 100 * time.Millisecond
@@ -216,16 +216,16 @@ func (s *Scrutinizer) WaitIdle() {
 	}
 }
 
-func (s *Scrutinizer) timeoutQueries() (*scrutinizerdb.Queries, context.Context, context.CancelFunc) {
+func (s *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, context.CancelFunc) {
 	ctx := context.TODO()
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	queries := scrutinizerdb.New(s.sqlDB)
+	queries := indexerdb.New(s.sqlDB)
 	return queries, ctx, cancel
 }
 
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
 // If no CountStore model is stored for the type, it counts all db entries of that type.
-func (s *Scrutinizer) retrieveCounts() (map[uint8]uint64, error) {
+func (s *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 	var err error
 	txCountStore := new(indexertypes.CountStore)
 	envelopeCountStore := new(indexertypes.CountStore)
@@ -300,9 +300,9 @@ func (s *Scrutinizer) retrieveCounts() (map[uint8]uint64, error) {
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
 // and then execute a set of recovery actions. It mainly checks for those processes which are
 // still open (live) and updates all temporary data (current voting weight and live results
-// if unecrypted). This method might be called on a goroutine after initializing the Scrutinizer.
+// if unecrypted). This method might be called on a goroutine after initializing the Indexer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
-func (s *Scrutinizer) AfterSyncBootstrap() {
+func (s *Indexer) AfterSyncBootstrap() {
 	// if no live results, we don't need the bootstraping
 	if s.ignoreLiveResults {
 		return
@@ -328,7 +328,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 		}
 		time.Sleep(time.Second * 1)
 	}
-	log.Infof("running scrutinizer after-sync bootstrap")
+	log.Infof("running indexer after-sync bootstrap")
 	// Block the new votes addition until the recovery finishes.
 	s.recoveryBootLock.Lock()
 	defer s.recoveryBootLock.Unlock()
@@ -402,7 +402,7 @@ func (s *Scrutinizer) AfterSyncBootstrap() {
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
-func (s *Scrutinizer) Commit(height uint32) error {
+func (s *Indexer) Commit(height uint32) error {
 	s.lockPool.RLock()
 	defer s.lockPool.RUnlock()
 	// Add Entity and register new active process
@@ -536,30 +536,30 @@ func (s *Scrutinizer) Commit(height uint32) error {
 }
 
 // Rollback removes the non committed pending operations
-func (s *Scrutinizer) Rollback() {
+func (s *Indexer) Rollback() {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.votePool = make(map[string][]*models.Vote)
 	s.voteIndexPool = []*VoteWithIndex{}
-	s.newProcessPool = []*indexertypes.ScrutinizerOnProcessData{}
-	s.resultsPool = []*indexertypes.ScrutinizerOnProcessData{}
+	s.newProcessPool = []*indexertypes.IndexerOnProcessData{}
+	s.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	s.updateProcessPool = [][]byte{}
 	s.newTxPool = []*indexertypes.TxReference{}
 }
 
-// OnProcess scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
+// OnProcess indexer stores the processID and entityID
+func (s *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
-	data := &indexertypes.ScrutinizerOnProcessData{EntityID: eid, ProcessID: pid}
+	data := &indexertypes.IndexerOnProcessData{EntityID: eid, ProcessID: pid}
 	s.newProcessPool = append(s.newProcessPool, data)
 }
 
-// OnVote scrutinizer stores the votes if the processId is live results (on going)
+// OnVote indexer stores the votes if the processId is live results (on going)
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (s *Scrutinizer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex int32) {
+func (s *Indexer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	if !s.ignoreLiveResults && s.isProcessLiveResults(v.ProcessId) {
@@ -568,22 +568,22 @@ func (s *Scrutinizer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex in
 	s.voteIndexPool = append(s.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
 }
 
-// OnCancel scrutinizer stores the processID and entityID
-func (s *Scrutinizer) OnCancel(pid []byte, txIndex int32) {
+// OnCancel indexer stores the processID and entityID
+func (s *Indexer) OnCancel(pid []byte, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessKeys does nothing
-func (s *Scrutinizer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
+func (s *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
-func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
+func (s *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
@@ -591,7 +591,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 		if live, err := s.isOpenProcess(pid); err != nil {
 			log.Warn(err)
 		} else if live {
-			s.resultsPool = append(s.resultsPool, &indexertypes.ScrutinizerOnProcessData{ProcessID: pid})
+			s.resultsPool = append(s.resultsPool, &indexertypes.IndexerOnProcessData{ProcessID: pid})
 		}
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)
@@ -599,7 +599,7 @@ func (s *Scrutinizer) OnProcessStatusChange(pid []byte, status models.ProcessSta
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (s *Scrutinizer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
+func (s *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	p, err := s.App.State.Process(pid, false)
@@ -613,14 +613,14 @@ func (s *Scrutinizer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 	}
 	// if all keys have been revealed, compute the results
 	if *p.KeyIndex < 1 {
-		data := indexertypes.ScrutinizerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
+		data := indexertypes.IndexerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		s.resultsPool = append(s.resultsPool, &data)
 	}
 	s.updateProcessPool = append(s.updateProcessPool, pid)
 }
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
-func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult,
+func (s *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 	txIndex int32) {
 	// Execute callbacks
 	for _, l := range s.eventOnResults {
@@ -634,7 +634,7 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 
 	// TODO: check results are valid and return an error if not.
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
-	// the validaros (that do not check the results) and the full-nodes (with the scrutinizer enabled)
+	// the validaros (that do not check the results) and the full-nodes (with the indexer enabled)
 	// would compute different state hash.
 	// As a temporary solution, lets compare results but just print the error.
 
@@ -700,9 +700,9 @@ func (s *Scrutinizer) OnProcessResults(pid []byte, results *models.ProcessResult
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (s *Scrutinizer) OnProcessesStart(pids [][]byte)                     {}
-func (s *Scrutinizer) OnSetAccount(addr []byte, account *vochain.Account) {}
-func (s *Scrutinizer) OnTransferTokens(from, to []byte, amount uint64)    {}
+func (s *Indexer) OnProcessesStart(pids [][]byte)                     {}
+func (s *Indexer) OnSetAccount(addr []byte, account *vochain.Account) {}
+func (s *Indexer) OnTransferTokens(from, to []byte, amount uint64)    {}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

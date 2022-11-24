@@ -1,7 +1,7 @@
 version: 1
 packages:
   - path: "db"
-    name: "scrutinizerdb"
+    name: "indexerdb"
     engine: "mysql" # TODO: sqlite
     schema: "migrations"
     queries: "queries"

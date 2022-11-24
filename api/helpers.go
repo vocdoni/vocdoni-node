@@ -13,7 +13,7 @@ import (
 func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 	processes := []*ElectionSummary{}
 	for _, p := range pids {
-		procInfo, err := a.scrutinizer.ProcessInfo(p)
+		procInfo, err := a.indexer.ProcessInfo(p)
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch election info: %w", err)
 		}

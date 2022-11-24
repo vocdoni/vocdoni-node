@@ -19,7 +19,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -248,9 +248,9 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	return vnode
 }
 
-func NewMockScrutinizer(tb testing.TB, vnode *vochain.BaseApplication) *scrutinizer.Scrutinizer {
-	tb.Log("starting vochain scrutinizer")
-	sc, err := scrutinizer.NewScrutinizer(tb.TempDir(), vnode, true)
+func NewMockIndexer(tb testing.TB, vnode *vochain.BaseApplication) *indexer.Indexer {
+	tb.Log("starting vochain indexer")
+	sc, err := indexer.NewIndexer(tb.TempDir(), vnode, true)
 	if err != nil {
 		tb.Fatal(err)
 	}

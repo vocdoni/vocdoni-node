@@ -13,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
@@ -26,11 +26,11 @@ type API struct {
 	PublicCalls  uint64
 	BaseRoute    string
 
-	router      *httprouter.HTTProuter
-	endpoint    *bearerstdapi.BearerStandardAPI
-	scrutinizer *scrutinizer.Scrutinizer
-	vocapp      *vochain.BaseApplication
-	storage     data.Storage
+	router   *httprouter.HTTProuter
+	endpoint *bearerstdapi.BearerStandardAPI
+	indexer  *indexer.Indexer
+	vocapp   *vochain.BaseApplication
+	storage  data.Storage
 	//lint:ignore U1000 unused
 	metricsagent *metrics.Agent
 	vocinfo      *vochaininfo.VochainInfo
@@ -69,10 +69,10 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, err
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
 func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
-	scrutinizer *scrutinizer.Scrutinizer, data data.Storage, censusdb *censusdb.CensusDB) {
+	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB) {
 	a.vocapp = vocdoniAPP
 	a.vocinfo = vocdoniInfo
-	a.scrutinizer = scrutinizer
+	a.indexer = indexer
 	a.storage = data
 	a.censusdb = censusdb
 }
@@ -82,17 +82,17 @@ func (a *API) EnableHandlers(handlers ...string) error {
 	for _, h := range handlers {
 		switch h {
 		case VoteHandler:
-			if a.vocapp == nil || a.scrutinizer == nil {
+			if a.vocapp == nil || a.indexer == nil {
 				return fmt.Errorf("missing modules attached for enabling vote handler")
 			}
 			a.enableVoteHandlers()
 		case ElectionHandler:
-			if a.scrutinizer == nil || a.vocinfo == nil {
+			if a.indexer == nil || a.vocinfo == nil {
 				return fmt.Errorf("missing modules attached for enabling election handler")
 			}
 			a.enableElectionHandlers()
 		case ChainHandler:
-			if a.scrutinizer == nil {
+			if a.indexer == nil {
 				return fmt.Errorf("missing modules attached for enabling chain handler")
 			}
 			a.enableChainHandlers()

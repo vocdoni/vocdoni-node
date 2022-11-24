@@ -9,8 +9,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/scrutinizer"
-	"go.vocdoni.io/dvote/vochain/scrutinizer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,7 +32,7 @@ func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle
 	return &Oracle{VochainApp: app, signer: signer}, nil
 }
 
-func (o *Oracle) EnableResults(scr *scrutinizer.Scrutinizer) {
+func (o *Oracle) EnableResults(scr *indexer.Indexer) {
 	log.Infof("oracle results enabled")
 	scr.AddEventListener(o)
 }
@@ -104,7 +104,7 @@ func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
 	return res.Data.Bytes(), nil
 }
 
-// OnComputeResults is called once a process result is computed by the scrutinizer.
+// OnComputeResults is called once a process result is computed by the indexer.
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
 func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexertypes.Process, h uint32) {
@@ -144,7 +144,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 	// create setProcessTx
 	setprocessTxArgs := &models.SetProcessTx{
 		ProcessId: results.ProcessID,
-		Results:   scrutinizer.BuildProcessResult(results, vocProcessData.EntityId),
+		Results:   indexer.BuildProcessResult(results, vocProcessData.EntityId),
 		Status:    models.ProcessStatus_RESULTS.Enum(),
 		Txtype:    models.TxType_SET_PROCESS_RESULTS,
 		Nonce:     acc.Nonce,
@@ -198,6 +198,6 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 	log.Infof("oracle transaction sent, hash: %x", res.Hash)
 }
 
-// OnOracleResults does nothing. Required for implementing the scrutinizer EventListener interface
+// OnOracleResults does nothing. Required for implementing the indexer EventListener interface
 func (o *Oracle) OnOracleResults(procResults *models.ProcessResult, pid []byte, height uint32) {
 }
