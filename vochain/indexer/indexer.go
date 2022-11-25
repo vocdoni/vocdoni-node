@@ -163,6 +163,15 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 	if err != nil {
 		return nil, err
 	}
+	// sqlite doesn't support multiple concurrent writers.
+	// Since we execute queries from many goroutines, allowing multiple open
+	// connections may lead to concurrent writes, resulting in confusing
+	// "database is locked" errors. See TestIndexerConcurrentDB.
+	// While here, also set other reasonable maximum values.
+	s.sqlDB.SetMaxOpenConns(1)
+	s.sqlDB.SetMaxIdleConns(2)
+	s.sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	s.sqlDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
