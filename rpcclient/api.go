@@ -238,10 +238,6 @@ func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) (res
 		c.WaitUntilNextBlock()
 		results, _, final, err = c.GetResults(pid)
 		if err != nil {
-			if strings.Contains(err.Error(), "database is locked") {
-				// temp problem, just try again
-				continue
-			}
 			return nil, err
 		}
 		if final {
