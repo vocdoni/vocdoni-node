@@ -181,6 +181,16 @@ type File struct {
 	CID     string `json:"cid,omitempty"`
 }
 
+type ValidatorList struct {
+	Validators []Validator `json:"validators"`
+}
+type Validator struct {
+	Power   uint64         `json:"power"`
+	PubKey  types.HexBytes `json:"pubKey"`
+	Address types.HexBytes `json:"address"`
+	Name    string         `json:"name"`
+}
+
 // Protobuf wrappers
 
 type VoteMode struct {

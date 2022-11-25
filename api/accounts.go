@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -37,6 +38,14 @@ func (a *API) enableAccountHandlers() error {
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
 		a.accountSetHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/accounts/treasurer",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.treasurerHandler,
 	); err != nil {
 		return err
 	}
@@ -209,6 +218,26 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// GET /accounts/treasurer
+// get the treasurer address
+func (a *API) treasurerHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	acc, err := a.vocapp.State.Treasurer(true)
+	if err != nil {
+		return err
+	}
+	if acc == nil {
+		return fmt.Errorf("treasurer account does not exist")
+	}
+	data, err := json.Marshal(struct {
+		Address types.HexBytes `json:"address"`
+	}{Address: acc.GetAddress()})
+
+	if err != nil {
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
