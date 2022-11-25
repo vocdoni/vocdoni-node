@@ -351,9 +351,3 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
-
-// Duktape is very slow to build, and can't be built with multiple cores since
-// it includes a lot of C in a single file. Until
-// https://github.com/ethereum/go-ethereum/issues/20590 is fixed, stub it out
-// with a replace directive. The stub was hacked together with vim.
-replace gopkg.in/olebedev/go-duktape.v3 => ./duktape-stub
