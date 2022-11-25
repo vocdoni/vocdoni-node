@@ -19,6 +19,7 @@ const (
 
 var (
 	ErrTransactionNotFound = fmt.Errorf("transaction hash not found")
+	ErrBlockNotFound       = fmt.Errorf("block not found")
 )
 
 func (a *API) enableChainHandlers() error {
@@ -91,6 +92,30 @@ func (a *API) enableChainHandlers() error {
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainSendTxHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/validators",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainValidatorsHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/blocks/{height}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainBlockHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/blocks/hash/{hash}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainBlockByHashHandler,
 	); err != nil {
 		return err
 	}
@@ -267,4 +292,64 @@ func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	}
 
 	return ctx.Send([]byte(protoFormat(stx.Tx)), bearerstdapi.HTTPstatusCodeOK)
+}
+
+// GET /chain/validators
+// returns the list of validators
+func (a *API) chainValidatorsHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	stateValidators, err := a.vocapp.State.Validators(true)
+	if err != nil {
+		return err
+	}
+	validators := ValidatorList{}
+	for _, v := range stateValidators {
+		validators.Validators = append(validators.Validators, Validator{
+			Address: v.GetAddress(),
+			Power:   v.GetPower(),
+			Name:    v.GetName(),
+			PubKey:  v.GetPubKey(),
+		})
+	}
+
+	data, err := json.Marshal(&validators)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// GET /chain/blocks/<height>
+// returns the block at the given height
+func (a *API) chainBlockHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	if err != nil {
+		return err
+	}
+	block := a.indexer.App.GetBlockByHeight(height)
+	if block == nil {
+		return ErrBlockNotFound
+	}
+	data, err := json.Marshal(block)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+}
+
+// GET /chain/blocks/hash/<hash>
+// returns the block from the given hash
+func (a *API) chainBlockByHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
+	if err != nil {
+		return err
+	}
+	block := a.indexer.App.GetBlockByHash(hash)
+	if block == nil {
+		return ErrBlockNotFound
+	}
+	data, err := json.Marshal(block)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
