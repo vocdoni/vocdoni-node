@@ -3,6 +3,9 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -130,4 +133,67 @@ func (c *HTTPclient) EnsureTxIsMined(txHash types.HexBytes) error {
 		time.Sleep(4 * time.Second)
 	}
 	return os.ErrDeadlineExceeded
+}
+
+// GetFaucetPackageFromRemoteService returns a faucet package from a remote HTTP faucet service.
+// This service usueally requires a valid bearer token.
+// faucetURL usually includes the destination wallet address that will receive the funds.
+func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetPackage, error) {
+	u, err := url.Parse(faucetURL)
+	if err != nil {
+		return nil, err
+	}
+	c := http.Client{}
+	resp, err := c.Do(&http.Request{
+		Method: HTTPGET,
+		URL:    u,
+		Header: http.Header{
+			"Authorization": []string{"Bearer " + token},
+			"User-Agent":    []string{"Vocdoni API client / 1.0"},
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("faucet request failed: %s", resp.Status)
+	}
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	return UnmarshalFaucetPackage(data)
+}
+
+// UnmarshalFaucetPackage unmarshals a faucet package into a FaucetPackage struct.
+func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
+	type faucetResponse struct {
+		Amount  *types.BigInt `json:"amount"`
+		Package []byte        `json:"faucetPackage"`
+	}
+	type faucetPackage struct {
+		Payload   []byte `json:"faucetPayload"`
+		Signature []byte `json:"signature"`
+	}
+
+	fresp := faucetResponse{}
+	if err := json.Unmarshal(data, &fresp); err != nil {
+		return nil, err
+	}
+	if fresp.Amount == nil {
+		return nil, fmt.Errorf("faucet response is missing amount")
+	}
+	if fresp.Package == nil {
+		return nil, fmt.Errorf("faucet response is missing package")
+	}
+	fpackage := faucetPackage{}
+	if err := json.Unmarshal(fresp.Package, &fpackage); err != nil {
+		return nil, err
+	}
+
+	return &models.FaucetPackage{
+		Payload:   fpackage.Payload,
+		Signature: fpackage.Signature,
+	}, nil
+
 }

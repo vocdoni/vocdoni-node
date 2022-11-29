@@ -23,11 +23,6 @@ import (
 	"go.vocdoni.io/dvote/util"
 )
 
-const (
-	faucetURL   = "https://faucet-azeno.vocdoni.net/faucet/vocdoni/dev/"
-	faucetToken = "158a58ba-bd3e-479e-b230-2814a34fae8f"
-)
-
 func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level")
@@ -69,11 +64,14 @@ func main() {
 	// TODO: check if the account balance is low and use the faucet
 	acc, err := api.Account("")
 	if err != nil {
-		var faucetPkg []byte
+		var faucetPkg *models.FaucetPackage
 		if *useDevFaucet {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			faucetPkg, err = getFaucetPkg(api.MyAddress().Hex())
+			faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
+				apiclient.DefaultDevelopmentFaucetURL+api.MyAddress().Hex(),
+				apiclient.DefaultDevelopmentFaucetToken,
+			)
 			if err != nil {
 				log.Fatal(err)
 			}

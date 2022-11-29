@@ -12,6 +12,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	// DefaultDevelopmentFaucetURL is the default URL for the development faucet which can be used freely.
+	DefaultDevelopmentFaucetURL = "https://faucet-azeno.vocdoni.net/faucet/vocdoni/dev/"
+	// DefaultDevelopmentFaucetToken is the default token for the development faucet which can be used freely.
+	DefaultDevelopmentFaucetToken = "158a58ba-bd3e-479e-b230-2814a34fae8f"
+)
+
 var (
 	// ErrAccountNotConfigured is returned when the client has not been configured with an account.
 	ErrAccountNotConfigured = fmt.Errorf("account not configured")
@@ -67,17 +74,9 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 }
 
 // AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
-// to pay for the costs of the transaction.  Returns the transaction hash.
-func (c *HTTPclient) AccountBootstrap(faucetPkg []byte, metadata *api.AccountMetadata) (types.HexBytes, error) {
+// to pay for the costs of the transaction if the blockchain requires it.  Returns the transaction hash.
+func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata) (types.HexBytes, error) {
 	var err error
-	var faucetPackageProto *models.FaucetPackage
-	if faucetPkg != nil {
-		faucetPackageProto = new(models.FaucetPackage)
-		if err := proto.Unmarshal(faucetPkg, faucetPackageProto); err != nil {
-			return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
-		}
-	}
-
 	var metadataBytes []byte
 	var metadataURI string
 	if metadata != nil {
@@ -96,7 +95,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg []byte, metadata *api.AccountMet
 				Txtype:        models.TxType_CREATE_ACCOUNT,
 				Nonce:         new(uint32),
 				Account:       c.account.Address().Bytes(),
-				FaucetPackage: faucetPackageProto,
+				FaucetPackage: faucetPkg,
 				InfoURI:       &metadataURI,
 			},
 		}})
