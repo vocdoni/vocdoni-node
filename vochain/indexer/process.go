@@ -306,8 +306,23 @@ func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 // will be ignored. Searches against the ID field.
 func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
 	if !enableBadgerhold {
-		// TODO(sqlite): reimplement
-		return nil
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+
+		entityIDs, err := queries.SearchEntities(ctx, indexerdb.SearchEntitiesParams{
+			EntityIDSubstr: searchTerm,
+			Offset:         int32(from),
+			Limit:          int32(max),
+		})
+		if err != nil {
+			log.Errorf("error listing entities: %v", err)
+			return nil
+		}
+		hexIDs := make([]types.HexBytes, len(entityIDs))
+		for i, id := range entityIDs {
+			hexIDs[i] = types.HexBytes(id)
+		}
+		return hexIDs
 	}
 	entities := []types.HexBytes{}
 	if err := s.db.ForEach(
@@ -319,7 +334,7 @@ func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes 
 			entities = append(entities, e.ID)
 			return nil
 		}); err != nil {
-		log.Warnf("error listing entities: %v", err)
+		log.Errorf("error listing entities: %v", err)
 	}
 	return entities
 }
@@ -340,8 +355,15 @@ func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
 // EntityCount return the number of entities indexed by the indexer
 func (s *Indexer) EntityCount() uint64 {
 	if !enableBadgerhold {
-		// TODO(sqlite): reimplement
-		return 0
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+
+		count, err := queries.GetEntityCount(ctx)
+		if err != nil {
+			log.Errorf("could not get the entity count: %v", err)
+			return 0
+		}
+		return uint64(count)
 	}
 	entityCountStore := &indexertypes.CountStore{}
 	if err := s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
