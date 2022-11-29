@@ -184,6 +184,19 @@ func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const getProcessEnvelopeHeight = `-- name: GetProcessEnvelopeHeight :one
+SELECT results_envelope_height FROM processes
+WHERE id = ?
+LIMIT 1
+`
+
+func (q *Queries) GetProcessEnvelopeHeight(ctx context.Context, id types.ProcessID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getProcessEnvelopeHeight, id)
+	var results_envelope_height int64
+	err := row.Scan(&results_envelope_height)
+	return results_envelope_height, err
+}
+
 const getProcessStatus = `-- name: GetProcessStatus :one
 SELECT status FROM processes
 WHERE id = ?
@@ -195,6 +208,17 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 	var status int64
 	err := row.Scan(&status)
 	return status, err
+}
+
+const getTotalProcessEnvelopeHeight = `-- name: GetTotalProcessEnvelopeHeight :one
+SELECT SUM(results_envelope_height) FROM processes
+`
+
+func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getTotalProcessEnvelopeHeight)
+	var sum interface{}
+	err := row.Scan(&sum)
+	return sum, err
 }
 
 const searchEntities = `-- name: SearchEntities :many

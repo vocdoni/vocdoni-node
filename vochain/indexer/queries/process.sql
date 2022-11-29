@@ -71,6 +71,14 @@ SELECT status FROM processes
 WHERE id = ?
 LIMIT 1;
 
+-- name: GetProcessEnvelopeHeight :one
+SELECT results_envelope_height FROM processes
+WHERE id = ?
+LIMIT 1;
+
+-- name: GetTotalProcessEnvelopeHeight :one
+SELECT SUM(results_envelope_height) FROM processes;
+
 -- name: SetProcessResultsHeight :execresult
 UPDATE processes
 SET results_height = sqlc.arg(results_height)
