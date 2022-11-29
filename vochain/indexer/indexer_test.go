@@ -191,11 +191,16 @@ func testProcessList(t *testing.T, procsCount int) {
 	idx := newTestIndexer(t, app, true)
 
 	// Add 10 entities and process for storing random content
+	var eidOneProcess []byte // entity ID with one process
 	for i := 0; i < 10; i++ {
+		eid := util.RandomBytes(20)
+		if i == 0 {
+			eidOneProcess = eid
+		}
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     eid,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 		})
@@ -206,13 +211,13 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	}
 
-	// For a entity, add 25 processes (this will be the queried entity)
-	eidTest := util.RandomBytes(20)
+	// For a entity, add entityCount processes (this will be the queried entity)
+	eidProcsCount := util.RandomBytes(20) // entity ID with procsCount processes
 	for i := 0; i < procsCount; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     eidTest,
+			EntityId:     eidProcsCount,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
 		})
@@ -226,7 +231,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	procs := make(map[string]bool)
 	last := 0
 	for len(procs) < procsCount {
-		list, err := idx.ProcessList(eidTest, last, 10, "", 0, "", "", false)
+		list, err := idx.ProcessList(eidProcsCount, last, 10, "", 0, "", "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -242,14 +247,17 @@ func testProcessList(t *testing.T, procsCount int) {
 		}
 		last += 10
 	}
-	if len(procs) != procsCount {
-		t.Fatalf("expected %d processes, got %d", procsCount, len(procs))
-	}
+	qt.Assert(t, procs, qt.HasLen, procsCount)
 
 	_, err := idx.ProcessList(nil, 0, 64, "", 0, "", "", false)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
+
+	qt.Assert(t, idx.ProcessCount(eidOneProcess), qt.Equals, uint64(1))
+	qt.Assert(t, idx.ProcessCount(eidProcsCount), qt.Equals, uint64(procsCount))
+	qt.Assert(t, idx.ProcessCount(nil), qt.Equals, uint64(10+procsCount))
+	// TODO(mvdan): our badgerhold code errors out unnecessarily in this case.
+	// Reenable this test once we've dropped badgerhold.
+	// qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
 }
 
 func TestProcessSearch(t *testing.T) {
