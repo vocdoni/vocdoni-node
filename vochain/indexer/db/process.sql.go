@@ -116,6 +116,18 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const getEntityProcessCount = `-- name: GetEntityProcessCount :one
+SELECT COUNT(*) FROM processes
+WHERE entity_id = ?
+`
+
+func (q *Queries) GetEntityProcessCount(ctx context.Context, entityID types.EntityID) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getEntityProcessCount, entityID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getProcess = `-- name: GetProcess :one
 SELECT id, entity_id, entity_index, start_block, end_block, results_height, have_results, final_results, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height FROM processes
 WHERE id = ?
@@ -159,6 +171,17 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.ResultsBlockHeight,
 	)
 	return i, err
+}
+
+const getProcessCount = `-- name: GetProcessCount :one
+SELECT COUNT(*) FROM processes
+`
+
+func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getProcessCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const getProcessStatus = `-- name: GetProcessStatus :one

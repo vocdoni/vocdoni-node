@@ -278,8 +278,23 @@ func (s *Indexer) ProcessList(entityID []byte,
 // ProcessCount returns the number of processes indexed
 func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 	if !enableBadgerhold {
-		// TODO(sqlite): reimplement
-		return 0
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+
+		if len(entityID) == 0 {
+			count, err := queries.GetProcessCount(ctx)
+			if err != nil {
+				log.Errorf("could not get the process count: %v", err)
+				return 0
+			}
+			return uint64(count)
+		}
+		count, err := s.EntityProcessCount(entityID)
+		if err != nil {
+			log.Errorf("processCount: cannot fetch entity process count: %v", err)
+			return 0
+		}
+		return uint64(count)
 	}
 	startTime := time.Now()
 	defer func() { log.Debugf("ProcessCount took %s", time.Since(startTime)) }()
@@ -342,8 +357,14 @@ func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes 
 // EntityProcessCount returns the number of processes that an entity holds
 func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
 	if !enableBadgerhold {
-		// TODO(sqlite): reimplement
-		return 0, nil
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+
+		count, err := queries.GetEntityProcessCount(ctx, entityId)
+		if err != nil {
+			return 0, err
+		}
+		return uint32(count), nil
 	}
 	entity := &indexertypes.Entity{}
 	if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(entityId)); err != nil {
