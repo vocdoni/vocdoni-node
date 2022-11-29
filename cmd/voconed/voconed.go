@@ -44,7 +44,7 @@ func main() {
 	setTxCosts := flag.Bool("setTxCosts", false, "if true, transaction costs are set to the value of txCosts flag")
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction costs for all types")
 	flag.BoolVar(&config.disableIpfs, "disableIpfs", false, "disable built-in IPFS node")
-	flag.StringArrayVar(&config.fundedAccounts, "fundedAccounts", []string{},
+	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
 		"list of pre-funded accounts (address:balance,address:balance,...)")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
