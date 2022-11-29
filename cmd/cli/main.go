@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -17,11 +16,11 @@ import (
 	ui "github.com/manifoldco/promptui"
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 var (
@@ -262,10 +261,10 @@ func networkInfo(cli *vocdoniCLI) error {
 }
 
 func bootStrapAccount(cli *vocdoniCLI) error {
-	var faucetPkg []byte
+	var faucetPkg *models.FaucetPackage
 	p := ui.Prompt{
-		Label:     "Do you have a faucet package?",
-		IsConfirm: true,
+		Label:   "Do you have a faucet package? [y,n]",
+		Default: "n",
 	}
 	yes, err := p.Run()
 	if err != nil {
@@ -273,36 +272,31 @@ func bootStrapAccount(cli *vocdoniCLI) error {
 	}
 	if yes == "y" {
 		p := ui.Prompt{
-			Label: "Please enter the base64 payload",
+			Label: "Please enter the base64 faucet package",
 		}
-		faucetPayloadStr, err := p.Run()
+		faucetPkgString, err := p.Run()
 		if err != nil {
 			return err
 		}
-		p = ui.Prompt{
-			Label: "Please enter the hexadecimal signature",
-		}
-		faucetSignatureStr, err := p.Run()
+
+		faucetPkgBytes, err := base64.StdEncoding.DecodeString(faucetPkgString)
 		if err != nil {
 			return err
 		}
-		faucetPayload, err := base64.StdEncoding.DecodeString(faucetPayloadStr)
-		if err != nil {
-			return err
-		}
-		faucetSignature, err := hex.DecodeString(faucetSignatureStr)
-		if err != nil {
-			return err
-		}
-		faucetPkg, err = proto.Marshal(&models.FaucetPackage{
-			Payload:   faucetPayload,
-			Signature: faucetSignature,
-		})
+		faucetPkg, err = apiclient.UnmarshalFaucetPackage(faucetPkgBytes)
 		if err != nil {
 			return err
 		}
 	} else {
-		return fmt.Errorf("no package provided and automatic faucet is not implemented yet")
+		infoPrint.Printf("trying to fetch faucet package from remote service...\n")
+		faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
+			apiclient.DefaultDevelopmentFaucetURL+cli.api.MyAddress().Hex(),
+			apiclient.DefaultDevelopmentFaucetToken,
+		)
+		if err != nil {
+			return err
+		}
+		infoPrint.Printf("got faucet package!")
 	}
 
 	infoPrint.Printf("bootstraping account...\n")
