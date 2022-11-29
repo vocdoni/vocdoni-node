@@ -65,8 +65,9 @@ func TxKey(tx tmtypes.Tx) [32]byte {
 
 // AddTx check the validity of a transaction and adds it to the state if commit=true.
 // It returns a bytes value which depends on the transaction type:
-//  Tx_Vote: vote nullifier
-//  default: []byte{}
+//
+//	Tx_Vote: vote nullifier
+//	default: []byte{}
 func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, error) {
 	if vtx.Tx == nil || app.State == nil || vtx.Tx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
@@ -930,6 +931,9 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 	if tx.Process.VoteOptions.MaxCount == 0 {
 		return nil, common.Address{}, fmt.Errorf("missing vote maxCount parameter")
+	}
+	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
+		return nil, common.Address{}, fmt.Errorf("status must be READY or PAUSED")
 	}
 	// check signature available
 	if signature == nil || tx == nil || txBytes == nil {
