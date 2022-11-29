@@ -38,11 +38,12 @@ var ErrNotFoundInDatabase = badgerhold.ErrNotFound
 func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	bhStartTime := time.Now()
 	txRef := &indexertypes.VoteReference{}
-	// TODO(sqlite): reimplement
-	if err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier)); err != nil {
-		return nil, err
+	if enableBadgerhold {
+		if err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier)); err != nil {
+			return nil, err
+		}
+		log.Debugf("GetEnvelopeReference badgerhold took %s", time.Since(bhStartTime))
 	}
-	log.Debugf("GetEnvelopeReference badgerhold took %s", time.Since(bhStartTime))
 
 	sqlStartTime := time.Now()
 
@@ -55,13 +56,13 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 
 	log.Debugf("GetEnvelopeReference sqlite took %s", time.Since(sqlStartTime))
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
-	if false { // TODO(mvdan): reenable when we're finished porting votes to sqlite
+	if enableBadgerhold {
 		if diff := cmp.Diff(txRef, sqlTxRef); diff != "" {
 			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", nullifier, diff)
 		}
 	}
 
-	return txRef, nil
+	return sqlTxRef, nil
 }
 
 // GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
@@ -257,7 +258,17 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
-	// TODO(sqlite): reimplement
+	if !enableBadgerhold {
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		if len(processID) == 0 {
+			height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
+			return uint64(height.(int64)), err
+		}
+		height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
+		return uint64(height), err
+	}
+
 	startTime := time.Now()
 	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
 	if len(processID) == 0 {

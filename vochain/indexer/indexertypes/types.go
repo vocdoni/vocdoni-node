@@ -231,7 +231,7 @@ func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 	return &VoteReference{
 		Nullifier:    dbvote.Nullifier,
 		ProcessID:    dbvote.ProcessID,
-		VoterID:      dbvote.VoterID,
+		VoterID:      nonEmptyBytes(dbvote.VoterID),
 		Height:       uint32(dbvote.Height),
 		Weight:       weightInt,
 		TxIndex:      int32(dbvote.TxIndex),
