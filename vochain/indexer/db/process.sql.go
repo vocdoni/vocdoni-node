@@ -105,6 +105,17 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 	)
 }
 
+const getEntityCount = `-- name: GetEntityCount :one
+SELECT COUNT(DISTINCT entity_id) FROM processes
+`
+
+func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, getEntityCount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const getProcess = `-- name: GetProcess :one
 SELECT id, entity_id, entity_index, start_block, end_block, results_height, have_results, final_results, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height FROM processes
 WHERE id = ?
@@ -161,6 +172,48 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 	var status int64
 	err := row.Scan(&status)
 	return status, err
+}
+
+const searchEntities = `-- name: SearchEntities :many
+SELECT entity_id FROM processes
+WHERE (? = '' OR (INSTR(LOWER(HEX(entity_id)), ?) > 0))
+ORDER BY creation_time ASC, ID ASC
+LIMIT ?
+OFFSET ?
+`
+
+type SearchEntitiesParams struct {
+	EntityIDSubstr string
+	Limit          int32
+	Offset         int32
+}
+
+func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]types.EntityID, error) {
+	rows, err := q.db.QueryContext(ctx, searchEntities,
+		arg.EntityIDSubstr,
+		arg.EntityIDSubstr,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.EntityID
+	for rows.Next() {
+		var entity_id types.EntityID
+		if err := rows.Scan(&entity_id); err != nil {
+			return nil, err
+		}
+		items = append(items, entity_id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const searchProcesses = `-- name: SearchProcesses :many

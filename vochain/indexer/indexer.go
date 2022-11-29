@@ -30,6 +30,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// enableBadgerhold is true by default;
+// badgerhold can be disabled via DISABLE_BADGERHOLD=true.
 var enableBadgerhold = os.Getenv("DISABLE_BADGERHOLD") != "true"
 
 //go:embed migrations/*.sql

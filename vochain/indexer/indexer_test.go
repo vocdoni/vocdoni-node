@@ -55,9 +55,10 @@ func testEntityList(t *testing.T, entityCount int) {
 	idx := newTestIndexer(t, app, true)
 	for i := 0; i < entityCount; i++ {
 		pid := util.RandomBytes(32)
+		eid := util.RandomBytes(20)
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
+			EntityId:     eid,
 			BlockCount:   10,
 			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
 			EnvelopeType: &models.EnvelopeType{},
@@ -69,27 +70,27 @@ func testEntityList(t *testing.T, entityCount int) {
 		}
 	}
 	app.AdvanceTestBlock()
-	entities := make(map[string]bool)
-	if ec := idx.EntityCount(); ec != uint64(entityCount) {
-		t.Fatalf("entity count is wrong, got %d expected %d", ec, entityCount)
-	}
+
+	qt.Assert(t, idx.EntityCount(), qt.Equals, uint64(entityCount))
+
+	entitiesByID := make(map[string]bool)
 	last := 0
-	for len(entities) <= entityCount {
+	for len(entitiesByID) <= entityCount {
 		list := idx.EntityList(10, last, "")
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
 		}
 		for _, e := range list {
-			if entities[e.String()] {
+			if entitiesByID[e.String()] {
 				t.Fatalf("found duplicated entity: %s", e)
 			}
-			entities[e.String()] = true
+			entitiesByID[e.String()] = true
 		}
 		last += 10
 	}
-	if len(entities) < entityCount {
-		t.Fatalf("expected %d entities, got %d", entityCount, len(entities))
+	if len(entitiesByID) < entityCount {
+		t.Fatalf("expected %d entities, got %d", entityCount, len(entitiesByID))
 	}
 }
 

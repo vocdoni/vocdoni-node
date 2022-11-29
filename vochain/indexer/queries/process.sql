@@ -98,3 +98,14 @@ WHERE id = sqlc.arg(id);
 UPDATE processes
 SET have_results = FALSE, final_results = TRUE
 WHERE id = sqlc.arg(id);
+
+-- name: GetEntityCount :one
+SELECT COUNT(DISTINCT entity_id) FROM processes;
+
+-- name: SearchEntities :many
+SELECT entity_id FROM processes
+WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
+ORDER BY creation_time ASC, ID ASC
+LIMIT ?
+OFFSET ?
+;
