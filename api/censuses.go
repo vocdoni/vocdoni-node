@@ -22,9 +22,10 @@ import (
 const (
 	CensusHandler = "censuses"
 
-	CensusTypeWeighted = "weighted"
-	CensusTypeZK       = "zkindexed"
-	CensusTypeCSP      = "csp"
+	CensusTypeWeighted   = "weighted"
+	CensusTypeZKWeighted = "zkweighted"
+	CensusTypeZK         = "zkindexed" // Will be deprecated soon
+	CensusTypeCSP        = "csp"
 
 	MaxCensusAddBatchSize = 8192
 
@@ -206,7 +207,7 @@ func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 		// compute the hash, we use it as key for the merkle tree
 		keyHash, err := ref.Tree().Hash(p.Key)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not compute key hash: %w", err)
 		}
 		keys = append(keys, keyHash)
 		if !ref.Indexed {
