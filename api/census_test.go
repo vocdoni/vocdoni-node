@@ -11,6 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
@@ -171,7 +174,7 @@ func TestCensusProof(t *testing.T) {
 	c := testutil.NewTestHTTPclient(t, addr, &token1)
 
 	// create a new census
-	resp, code := c.Request("POST", nil, "weighted")
+	resp, code := c.Request("POST", nil, CensusTypeWeighted)
 	qt.Assert(t, code, qt.Equals, 200)
 	censusData := &Census{}
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -234,4 +237,83 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
 	qt.Assert(t, weight.Uint64(), qt.Equals, uint64(1))
+}
+
+func TestCensusZk(t *testing.T) {
+	router := httprouter.HTTProuter{}
+	router.Init("127.0.0.1", 0)
+	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
+	qt.Assert(t, err, qt.IsNil)
+
+	api, err := NewAPI(&router, "/", t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+
+	// Create local key value database
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
+
+	storage := data.MockStorage(t)
+	api.Attach(nil, nil, nil, data.Storage(&storage), censusDB)
+	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, addr, &token1)
+
+	// create a new zk census
+	resp, code := c.Request("POST", nil, CensusTypeZKWeighted)
+	qt.Assert(t, code, qt.Equals, 200)
+	censusData := &Census{}
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	id1 := censusData.CensusID.String()
+
+	// add a bunch of keys and values (weights)
+	keys := [][]byte{}
+	for i := 1; i < 11; i++ {
+		k := babyjub.NewRandPrivKey()
+		publicKeyHash, err := poseidon.Hash([]*big.Int{
+			k.Public().X,
+			k.Public().Y,
+		})
+		qt.Assert(t, err, qt.IsNil)
+		keys = append(keys, arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), publicKeyHash))
+	}
+
+	weight := 0
+	index := uint64(0)
+	cparts := CensusParticipants{}
+	for i := 1; i < 11; i++ {
+		cparts.Participants = append(cparts.Participants, CensusParticipant{
+			Key:    keys[i-1],
+			Weight: (*types.BigInt)(big.NewInt(int64(i))),
+		})
+		weight += i
+		index++
+	}
+	_, code = c.Request("POST", &cparts, id1, "participants")
+	qt.Assert(t, code, qt.Equals, 200)
+
+	// check weight and size
+	resp, code = c.Request("GET", nil, id1, "weight")
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	qt.Assert(t, censusData.Weight.String(), qt.Equals, fmt.Sprintf("%d", weight))
+
+	resp, code = c.Request("GET", nil, id1, "size")
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	qt.Assert(t, censusData.Size, qt.Equals, index)
+
+	// publish the census
+	resp, code = c.Request("POST", nil, id1, "publish")
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
+	root := censusData.CensusID.String()
+
+	// generate a proof
+	resp, code = c.Request("GET", nil, root, "proof", fmt.Sprintf("%x", keys[0]))
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 }

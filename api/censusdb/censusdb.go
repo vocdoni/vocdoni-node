@@ -124,7 +124,7 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 	if ref.IsPublic {
 		ref.tree.Publish()
 	}
-	log.Debugf("loaded tree %x", censusID)
+	log.Debugf("loaded tree %x of type %s", censusID, models.Census_Type_name[ref.CensusType])
 	return ref, nil
 }
 
