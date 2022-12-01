@@ -15,13 +15,13 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 func TestVochainState(t *testing.T) {
 	t.Parallel()
 
-	s, err := vochain.NewState(db.TypePebble, t.TempDir())
+	s, err := state.NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
 
@@ -30,7 +30,7 @@ func TestVochainState(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, exists, qt.Equals, false)
 
-	treeCfg := vochain.StateTreeCfg(vochain.TreeProcess)
+	treeCfg := state.StateTreeCfg(state.TreeProcess)
 	s.Tx.Add(treeCfg.Key(), make([]byte, treeCfg.HashFunc().Len()))
 	for i := 0; i < 10; i++ {
 		s.Tx.Add([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))

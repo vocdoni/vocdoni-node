@@ -20,7 +20,7 @@ import (
 	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -1237,7 +1237,7 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("account %s successfully created: %+v", signer.Address(), acc)
 
@@ -1253,7 +1253,7 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	if acc.InfoURI != "ipfs://XXX" {
 		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
@@ -1276,7 +1276,7 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 		return err
 	}
 	if acc2 == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	// check balance added from payload
 	if acc2.Balance != 5000 {
@@ -1297,7 +1297,7 @@ func (c *testClient) testSendTokens(treasurerSigner, signer, signer2 *ethereum.S
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc.Nonce, acc.Balance)
 	// try send tokens
@@ -1319,7 +1319,7 @@ func (c *testClient) testSendTokens(treasurerSigner, signer, signer2 *ethereum.S
 		return err
 	}
 	if acc2 == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched to account %s with nonce %d and balance %d", signer2.Address(), acc2.Nonce, acc2.Balance)
 	if acc2.Balance != 5100 {
@@ -1330,7 +1330,7 @@ func (c *testClient) testSendTokens(treasurerSigner, signer, signer2 *ethereum.S
 		return err
 	}
 	if acc3 == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc3.Nonce, acc3.Balance)
 	if acc.Balance-(100+txCost) != acc3.Balance {
@@ -1359,7 +1359,7 @@ func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) 
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
 	// add delegate
@@ -1381,7 +1381,7 @@ func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) 
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
 	if len(acc.DelegateAddrs) != 1 {
@@ -1397,7 +1397,7 @@ func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) 
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	txhash, err = c.SetAccountDelegate(signer,
 		signer2.Address(),
@@ -1417,7 +1417,7 @@ func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) 
 		return err
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
 	if len(acc.DelegateAddrs) != 0 {
@@ -1439,7 +1439,7 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 		return err
 	}
 	if accFrom == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
@@ -1449,7 +1449,7 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 		return err
 	}
 	if accTo == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
 
@@ -1477,7 +1477,7 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 		return err
 	}
 	if accFrom == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
 
@@ -1487,7 +1487,7 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 		return err
 	}
 	if accTo == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accTo.Balance)
 

@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"crypto/sha256"
@@ -12,6 +12,11 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
+)
+
+var (
+	// keys; not constants because of []byte
+	voteCountKey = []byte("voteCount")
 )
 
 // VoteCount return the global vote count.

@@ -21,6 +21,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
+	vstate "go.vocdoni.io/dvote/vochain/state"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
@@ -34,7 +35,7 @@ import (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State   *State
+	State   *vstate.State
 	Service service.Service
 	Node    *tmcli.Local
 
@@ -71,7 +72,7 @@ var _ abcitypes.Application = (*BaseApplication)(nil)
 // Node still needs to be initialized with SetNode
 // Callback functions still need to be initialized
 func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
-	state, err := NewState(dbType, dbpath)
+	state, err := vstate.NewState(dbType, dbpath)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
 	}
@@ -388,13 +389,13 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		if err := app.State.AddOracle(addr); err != nil {
 			log.Fatalf("cannot add oracles: %v", err)
 		}
-		app.State.createAccount(addr, "", nil, 0)
+		app.State.CreateAccount(addr, "", nil, 0)
 	}
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
-		if err := app.State.createAccount(addr, "", nil, acc.Balance); err != nil {
-			if err != ErrAccountAlreadyExists {
+		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
+			if err != vstate.ErrAccountAlreadyExists {
 				log.Fatalf("cannot create acount %x %v", addr, err)
 			}
 			if err := app.State.MintBalance(addr, acc.Balance); err != nil {
@@ -435,7 +436,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// create burn account
-	if err := app.State.SetAccount(BurnAddress, &Account{}); err != nil {
+	if err := app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}); err != nil {
 		log.Fatal("unable to set burn address")
 	}
 
@@ -519,7 +520,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
-		for _, e := range app.State.eventListeners {
+		for _, e := range app.State.EventListeners() {
 			e.OnNewTx(tmtypes.Tx(req.Tx).Hash(), app.Height()+1, app.State.TxCounter())
 		}
 	} else {
@@ -542,11 +543,11 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
-		if _, err := app.State.snapshot(); err != nil {
+		if _, err := app.State.Snapshot(); err != nil {
 			log.Fatalf("cannot make state snapshot: %v", err)
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
-		log.Debugf("%+v", app.State.listSnapshots())
+		log.Debugf("%+v", app.State.ListSnapshots())
 	}
 	return abcitypes.ResponseCommit{
 		Data: data,

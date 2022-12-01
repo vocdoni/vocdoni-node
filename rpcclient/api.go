@@ -25,6 +25,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -1105,7 +1106,7 @@ func (c *Client) CreateProcess(
 		return 0, nil, fmt.Errorf("cannot get account")
 	}
 	if acc == nil {
-		return 0, nil, vochain.ErrAccountNotExist
+		return 0, nil, state.ErrAccountNotExist
 	}
 	p := &models.NewProcessTx{
 		Txtype:  models.TxType_NEW_PROCESS,
@@ -1168,7 +1169,7 @@ func (c *Client) SetProcessStatus(
 		return fmt.Errorf("cannot get account")
 	}
 	if acc == nil {
-		return vochain.ErrAccountNotExist
+		return state.ErrAccountNotExist
 	}
 	p := &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_STATUS,
@@ -1441,10 +1442,10 @@ func (c *Client) SetAccount(
 }
 
 // GetAccount returns information of a given account
-func (c *Client) GetAccount(accountAddr common.Address) (*vochain.Account, error) {
+func (c *Client) GetAccount(accountAddr common.Address) (*state.Account, error) {
 	req := api.APIrequest{Method: "getAccount", EntityId: accountAddr.Bytes()}
 	resp, err := c.Request(req, nil)
-	acc := &vochain.Account{}
+	acc := &state.Account{}
 	if err != nil {
 		return nil, err
 	}

@@ -31,6 +31,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -91,7 +92,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIpfs bool) 
 	vc.app.State.SetHeight(uint32(vc.height))
 
 	// Create burn account
-	if err := vc.CreateAccount(vochain.BurnAddress, &vochain.Account{}); err != nil {
+	if err := vc.CreateAccount(state.BurnAddress, &state.Account{}); err != nil {
 		return nil, err
 	}
 
@@ -248,7 +249,7 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 		return err
 	}
 	if oAcc == nil || oAcc.Balance < 10000 {
-		vc.CreateAccount(oracleKey.Address(), &vochain.Account{Account: models.Account{
+		vc.CreateAccount(oracleKey.Address(), &state.Account{Account: models.Account{
 			Balance: 100000,
 		}})
 	}
@@ -256,7 +257,7 @@ func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
 }
 
 // CreateAccount creates a new account in the state.
-func (vc *Vocone) CreateAccount(key common.Address, acc *vochain.Account) error {
+func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	if err := vc.app.State.SetAccount(key, acc); err != nil {
@@ -320,10 +321,10 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	for k := range vochain.TxTypeCostToStateKey {
+	for k := range state.TxTypeCostToStateKey {
 		if !force {
 			_, err := vc.app.State.TxCost(k, true)
-			if err == nil || errors.Is(err, vochain.ErrTxCostNotFound) {
+			if err == nil || errors.Is(err, state.ErrTxCostNotFound) {
 				continue
 			}
 			// If error is not ErrTxCostNotFound, return it

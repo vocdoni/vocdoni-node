@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"fmt"
@@ -110,9 +110,9 @@ func TestBalanceTransfer(t *testing.T) {
 	addr2 := ethereum.SignKeys{}
 	addr2.Generate()
 
-	err = s.createAccount(addr1.Address(), "ipfs://", [][]byte{}, 50)
+	err = s.CreateAccount(addr1.Address(), "ipfs://", [][]byte{}, 50)
 	qt.Assert(t, err, qt.IsNil)
-	err = s.CreateAccount(addr2.Address(), "ipfs://", [][]byte{})
+	err = s.CreateAccount(addr2.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	s.Save() // Save to test committed value on next call

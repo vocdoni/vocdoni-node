@@ -1,20 +1,22 @@
 package vochain
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"strconv"
+	"time"
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
+	models "go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	cfg "github.com/tendermint/tendermint/config"
@@ -23,17 +25,7 @@ import (
 	tmtime "github.com/tendermint/tendermint/libs/time"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
-	"go.vocdoni.io/proto/build/go/models"
 )
-
-// GenerateNullifier generates the nullifier of a vote (hash(address+processId))
-// This function assumes address and processID are correct.
-func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
-	nullifier := bytes.Buffer{}
-	nullifier.Write(address.Bytes())
-	nullifier.Write(processID)
-	return ethereum.HashRaw(nullifier.Bytes())
-}
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
@@ -154,41 +146,24 @@ func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
 	return signKeys.VerifySender(message, signature)
 }
 
-func GetFriendlyResults(results []*models.QuestionResult) [][]string {
-	r := [][]string{}
-	for i := range results {
-		r = append(r, []string{})
-		for j := range results[i].Question {
-			r[i] = append(r[i], new(big.Int).SetBytes(results[i].Question[j]).String())
-		}
+// GenerateFaucetPackage generates a faucet package
+func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
+	rand.Seed(time.Now().UnixNano())
+	payload := &models.FaucetPayload{
+		Identifier: identifier,
+		To:         to.Bytes(),
+		Amount:     value,
 	}
-	return r
-}
-
-func printPrettierDelegates(delegates [][]byte) []string {
-	prettierDelegates := make([]string, len(delegates))
-	for _, delegate := range delegates {
-		prettierDelegates = append(prettierDelegates, ethcommon.BytesToAddress(delegate).String())
+	payloadBytes, err := proto.Marshal(payload)
+	if err != nil {
+		return nil, err
 	}
-	return prettierDelegates
-}
-
-// checks if the given delegates are not duplicated
-// if addr is not nill will check if the addr is present in the delegates
-func checkDuplicateDelegates(delegates [][]byte, addr *ethcommon.Address) error {
-	delegatesToSetMap := make(map[ethcommon.Address]bool)
-	for _, delegate := range delegates {
-		delegateAddress := ethcommon.BytesToAddress(delegate)
-		if addr != nil {
-			if delegateAddress == *addr {
-				return fmt.Errorf("delegate cannot be the same as the sender")
-			}
-		}
-		if _, ok := delegatesToSetMap[delegateAddress]; !ok {
-			delegatesToSetMap[delegateAddress] = true
-			continue
-		}
-		return fmt.Errorf("duplicate delegate address %s", delegateAddress)
+	payloadSignature, err := from.SignEthereum(payloadBytes)
+	if err != nil {
+		return nil, err
 	}
-	return nil
+	return &models.FaucetPackage{
+		Payload:   payloadBytes,
+		Signature: payloadSignature,
+	}, nil
 }
