@@ -41,6 +41,40 @@ func (q *Queries) CreateTxReference(ctx context.Context, arg CreateTxReferencePa
 	return q.db.ExecContext(ctx, createTxReference, arg.Hash, arg.BlockHeight, arg.TxBlockIndex)
 }
 
+const getLastTxReferences = `-- name: GetLastTxReferences :many
+SELECT id, hash, block_height, tx_block_index FROM tx_references
+ORDER BY id DESC
+LIMIT ?
+`
+
+func (q *Queries) GetLastTxReferences(ctx context.Context, limit int32) ([]TxReference, error) {
+	rows, err := q.db.QueryContext(ctx, getLastTxReferences, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TxReference
+	for rows.Next() {
+		var i TxReference
+		if err := rows.Scan(
+			&i.ID,
+			&i.Hash,
+			&i.BlockHeight,
+			&i.TxBlockIndex,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTxReference = `-- name: GetTxReference :one
 SELECT id, hash, block_height, tx_block_index FROM tx_references
 WHERE id = ?

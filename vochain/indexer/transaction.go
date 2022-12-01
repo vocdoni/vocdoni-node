@@ -64,6 +64,22 @@ func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxRefer
 	return txReference, nil
 }
 
+// GetLastTxReferences fetches a number of the latest indexed transactions.
+// The first one returned is the newest, so they are in descending order.
+func (s *Indexer) GetLastTxReferences(limit int32) ([]*indexertypes.TxReference, error) {
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlTxRefs, err := queries.GetLastTxReferences(ctx, limit)
+	if err != nil {
+		return nil, fmt.Errorf("could not get last %d tx refs: %v", limit, err)
+	}
+	txRefs := make([]*indexertypes.TxReference, len(sqlTxRefs))
+	for i, sqlTxRef := range sqlTxRefs {
+		txRefs[i] = indexertypes.TxReferenceFromDB(&sqlTxRef)
+	}
+	return txRefs, nil
+}
+
 // OnNewTx stores the transaction reference in the indexer database
 func (s *Indexer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 	s.lockPool.Lock()
