@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 type Process struct {

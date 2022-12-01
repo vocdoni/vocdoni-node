@@ -53,7 +53,8 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	// set account 0
 	qt.Assert(t,
-		app.State.SetAccount(signers[0].Address(), &state.Account{models.Account{Balance: 10000, InfoURI: infoURI}}),
+		app.State.SetAccount(signers[0].Address(), &state.Account{
+			Account: models.Account{Balance: 10000, InfoURI: infoURI}}),
 		qt.IsNil,
 	)
 	app.Commit()

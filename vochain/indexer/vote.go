@@ -24,6 +24,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but
@@ -500,7 +501,7 @@ func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Indexer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, voterID vochain.VoterID, txn *badger.Txn) error {
+	weight []byte, txIndex int32, voterID state.VoterID, txn *badger.Txn) error {
 	weightInt := new(types.BigInt).SetBytes(weight)
 	weightStr, err := weightInt.MarshalText()
 	if err != nil {
