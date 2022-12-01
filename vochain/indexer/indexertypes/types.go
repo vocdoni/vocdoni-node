@@ -285,6 +285,15 @@ type TxReference struct {
 	TxBlockIndex int32
 }
 
+func TxReferenceFromDB(dbtx *indexerdb.TxReference) *TxReference {
+	return &TxReference{
+		Index:        uint64(dbtx.ID),
+		Hash:         dbtx.Hash,
+		BlockHeight:  uint32(dbtx.BlockHeight),
+		TxBlockIndex: int32(dbtx.TxBlockIndex),
+	}
+}
+
 // BlockMetadata contains the metadata for a single tendermint block
 type BlockMetadata struct {
 	Height          uint32         `json:"height,omitempty"`

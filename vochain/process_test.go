@@ -83,6 +83,23 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, randomAcc.Balance, qt.Equals, uint64(10000))
 	qt.Assert(t, randomAcc.Nonce, qt.Equals, uint32(0))
 	qt.Assert(t, randomAcc.ProcessIndex, qt.Equals, uint32(0))
+
+	// create process with status PAUSED (should work)
+	process.Status = models.ProcessStatus_PAUSED
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process), qt.IsNil)
+	// create process with status different than READY or PAUSED (should not work)
+	process.Status = models.ProcessStatus_CANCELED
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
+	process.Status = models.ProcessStatus_PROCESS_UNKNOWN
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
+	process.Status = models.ProcessStatus_ENDED
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
+	process.Status = models.ProcessStatus_RESULTS
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
 }
 
 func testNewProcess(t *testing.T, pid []byte, txSender *ethereum.SignKeys,

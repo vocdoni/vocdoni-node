@@ -12,6 +12,8 @@ func censusType(t string) (models.Census_Type, bool) {
 	switch t {
 	case CensusTypeZK:
 		return models.Census_ARBO_POSEIDON, true
+	case CensusTypeZKWeighted:
+		return models.Census_ARBO_POSEIDON, false
 	case CensusTypeWeighted:
 		return models.Census_ARBO_BLAKE2B, false
 	}

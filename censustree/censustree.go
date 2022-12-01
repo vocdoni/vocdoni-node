@@ -288,7 +288,6 @@ func (t *Tree) updateCensusIndex(wTx db.WriteTx, delta uint32) (uint64, error) {
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.Lock()
 	defer t.Unlock()
-
 	wTx := t.tree.DB().WriteTx()
 	defer wTx.Discard()
 
@@ -321,7 +320,7 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 
 	invalids, err := t.tree.AddBatch(wTx, newKeys, newValues)
 	if err != nil {
-		return invalids, err
+		return invalids, fmt.Errorf("addBatch failed: %w", err)
 	}
 
 	// update the census index

@@ -974,17 +974,24 @@ func TestTxIndexer(t *testing.T) {
 
 	idx := newTestIndexer(t, app, true)
 
-	for i := 0; i < 10; i++ {
-		for j := 0; j < 10; j++ {
+	const totalBlocks = 10
+	const txsPerBlock = 10
+	for i := 0; i < totalBlocks; i++ {
+		for j := 0; j < txsPerBlock; j++ {
 			idx.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
 		}
 	}
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
 	idx.WaitIdle()
 
-	for i := 0; i < 10; i++ {
-		for j := 0; j < 10; j++ {
-			ref, err := idx.GetTxReference(uint64(i*10 + j + 1))
+	count, err := idx.TransactionCount()
+	qt.Assert(t, err, qt.IsNil)
+	const totalTxs = totalBlocks * txsPerBlock
+	qt.Assert(t, count, qt.Equals, uint64(totalTxs))
+
+	for i := 0; i < totalBlocks; i++ {
+		for j := 0; j < txsPerBlock; j++ {
+			ref, err := idx.GetTxReference(uint64(i*txsPerBlock + j + 1))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
@@ -994,6 +1001,16 @@ func TestTxIndexer(t *testing.T) {
 			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))
 		}
+	}
+
+	txs, err := idx.GetLastTxReferences(15)
+	qt.Assert(t, err, qt.IsNil)
+	for i, tx := range txs {
+		// Index is between 1 and totalCount.
+		qt.Assert(t, tx.Index, qt.Equals, uint64(totalTxs-i))
+		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
+		qt.Assert(t, tx.BlockHeight, qt.Equals, uint32(totalTxs-i-1)/txsPerBlock)
+		qt.Assert(t, tx.TxBlockIndex, qt.Equals, int32(totalTxs-i-1)%txsPerBlock)
 	}
 }
 
