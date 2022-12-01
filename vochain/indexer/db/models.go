@@ -45,6 +45,13 @@ type Process struct {
 	ResultsBlockHeight    int64
 }
 
+type TxReference struct {
+	ID           int64
+	Hash         types.Hash
+	BlockHeight  int64
+	TxBlockIndex int64
+}
+
 type VoteReference struct {
 	Nullifier    types.Nullifier
 	ProcessID    types.ProcessID

@@ -982,6 +982,10 @@ func TestTxIndexer(t *testing.T) {
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
 	idx.WaitIdle()
 
+	count, err := idx.TransactionCount()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, count, qt.Equals, uint64(10*10))
+
 	for i := 0; i < 10; i++ {
 		for j := 0; j < 10; j++ {
 			ref, err := idx.GetTxReference(uint64(i*10 + j + 1))

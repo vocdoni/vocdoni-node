@@ -7,11 +7,18 @@ import (
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 // TransactionCount returns the number of transactions indexed
 func (s *Indexer) TransactionCount() (uint64, error) {
+	if !enableBadgerhold {
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		count, err := queries.CountTxReferences(ctx)
+		return uint64(count), err
+	}
 	txCountStore := &indexertypes.CountStore{}
 	if err := s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
 		return txCountStore.Count, err
@@ -21,6 +28,15 @@ func (s *Indexer) TransactionCount() (uint64, error) {
 
 // GetTxReference fetches the txReference for the given tx height
 func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
+	if !enableBadgerhold {
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		sqlTxRef, err := queries.GetTxReference(ctx, int64(height))
+		if err != nil {
+			return nil, fmt.Errorf("tx height %d not found: %v", height, err)
+		}
+		return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
+	}
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where(badgerhold.Key).Eq(height))
 	if err != nil {
@@ -31,6 +47,15 @@ func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, erro
 
 // GetTxReference fetches the txReference for the given tx hash
 func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
+	if !enableBadgerhold {
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		sqlTxRef, err := queries.GetTxReferenceByHash(ctx, hash)
+		if err != nil {
+			return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
+		}
+		return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
+	}
 	txReference := &indexertypes.TxReference{}
 	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash).Index("Hash"))
 	if err != nil {
@@ -59,6 +84,27 @@ func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
 	}
 	if s.cancelCtx.Err() != nil {
 		return // closing
+	}
+
+	// TODO(mvdan): use a single transaction
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	for _, tx := range txList {
+		if s.cancelCtx.Err() != nil {
+			return // closing
+		}
+		if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
+			Hash:         tx.Hash,
+			BlockHeight:  int64(tx.BlockHeight),
+			TxBlockIndex: int64(tx.TxBlockIndex),
+		}); err != nil {
+			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
+			return
+		}
+	}
+
+	if !enableBadgerhold {
+		return
 	}
 	s.txIndexLock.Lock()
 	defer s.txIndexLock.Unlock()
