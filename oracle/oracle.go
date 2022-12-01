@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -48,17 +49,17 @@ func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
 	if len(process.EntityId) != types.EntityIDsize {
 		return nil, fmt.Errorf("entityId size is wrong")
 	}
-	if _, ok := vochain.CensusOrigins[process.CensusOrigin]; !ok {
+	if _, ok := state.CensusOrigins[process.CensusOrigin]; !ok {
 		return nil, fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
 	}
-	if vochain.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
+	if state.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
 		return nil, fmt.Errorf("census %s needs URI but none has been provided",
-			vochain.CensusOrigins[process.CensusOrigin].Name)
+			state.CensusOrigins[process.CensusOrigin].Name)
 	}
 	if process.BlockCount < types.ProcessesContractMinBlockCount {
 		return nil, fmt.Errorf("block count is too low")
 	}
-	if vochain.CensusOrigins[process.CensusOrigin].NeedsIndexSlot && process.EthIndexSlot == nil {
+	if state.CensusOrigins[process.CensusOrigin].NeedsIndexSlot && process.EthIndexSlot == nil {
 		return nil, fmt.Errorf("censusOrigin needs index slot (not provided)")
 	}
 
@@ -156,7 +157,7 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 		ChainID:   o.VochainApp.ChainID(),
 		EntityID:  vocProcessData.EntityId,
 		ProcessID: results.ProcessID,
-		Results:   vochain.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
+		Results:   state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
 	}
 	resultsPayload, err := json.Marshal(signedResultsPayload)
 	if err != nil {

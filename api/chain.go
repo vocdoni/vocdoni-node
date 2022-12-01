@@ -290,7 +290,6 @@ func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if err != nil {
 		return fmt.Errorf("cannot get tx: %w", err)
 	}
-
 	return ctx.Send([]byte(protoFormat(stx.Tx)), bearerstdapi.HTTPstatusCodeOK)
 }
 

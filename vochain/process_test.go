@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	vstate "go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -474,25 +475,25 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 		keys = append(keys, key)
 	}
 	// create burn account
-	qt.Assert(t, app.State.SetAccount(BurnAddress, &Account{}), qt.IsNil)
+	qt.Assert(t, app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}), qt.IsNil)
 
 	// create oracle account
 	qt.Assert(t, app.State.SetAccount(keys[0].Address(),
-		&Account{Account: models.Account{Balance: 10000}},
+		&vstate.Account{Account: models.Account{Balance: 10000}},
 	), qt.IsNil)
 	// add oracle to oracle list
 	qt.Assert(t, app.State.AddOracle(keys[0].Address()), qt.IsNil)
 
 	// create delegate
 	qt.Assert(t, app.State.SetAccount(keys[2].Address(),
-		&Account{Account: models.Account{Balance: 10000}},
+		&vstate.Account{Account: models.Account{Balance: 10000}},
 	), qt.IsNil)
 
 	// create entity account and add delegate
 	delegates := make([][]byte, 1)
 	delegates[0] = keys[2].Address().Bytes()
 	qt.Assert(t, app.State.SetAccount(keys[1].Address(),
-		&Account{Account: models.Account{
+		&vstate.Account{Account: models.Account{
 			Balance:       10000,
 			DelegateAddrs: delegates,
 		}},
@@ -503,7 +504,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 
 	// create random account
 	qt.Assert(t, app.State.SetAccount(keys[4].Address(),
-		&Account{Account: models.Account{Balance: 10000}},
+		&vstate.Account{Account: models.Account{Balance: 10000}},
 	), qt.IsNil)
 
 	// set tx costs

@@ -1,12 +1,9 @@
-package vochain
+package state
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
@@ -174,104 +171,8 @@ func (v *State) IncrementAccountProcessIndex(accountAddress common.Address) erro
 	return v.SetAccount(accountAddress, acc)
 }
 
-// CreateAccountTxCheck checks if an account creation tx is valid
-func CreateAccountTxCheck(vtx *models.Tx, txBytes, signature []byte, state *State) error {
-	if vtx == nil || txBytes == nil || signature == nil || state == nil {
-		return fmt.Errorf("invalid parameters provided, cannot check create account tx")
-	}
-	tx := vtx.GetSetAccount()
-	if tx == nil {
-		return fmt.Errorf("invalid tx")
-	}
-	if tx.Txtype != models.TxType_CREATE_ACCOUNT {
-		return fmt.Errorf("invalid tx type, expected %s, got %s", models.TxType_CREATE_ACCOUNT, tx.Txtype)
-	}
-	pubKey, err := ethereum.PubKeyFromSignature(txBytes, signature)
-	if err != nil {
-		return fmt.Errorf("cannot extract public key from signature: %w", err)
-	}
-	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: %w", err)
-	}
-	txSenderAcc, err := state.GetAccount(txSenderAddress, false)
-	if err != nil {
-		return fmt.Errorf("cannot get account: %w", err)
-	}
-	if txSenderAcc != nil {
-		return ErrAccountAlreadyExists
-	}
-	infoURI := tx.GetInfoURI()
-	if len(infoURI) > types.MaxURLLength {
-		return ErrInvalidURILength
-	}
-	if err := checkDuplicateDelegates(tx.GetDelegates(), &txSenderAddress); err != nil {
-		return fmt.Errorf("invalid delegates: %w", err)
-	}
-	txCost, err := state.TxCost(models.TxType_CREATE_ACCOUNT, false)
-	if err != nil {
-		return fmt.Errorf("cannot get tx cost: %w", err)
-	}
-	if txCost == 0 {
-		return nil
-	}
-	if tx.FaucetPackage == nil {
-		return fmt.Errorf("invalid faucet package provided")
-	}
-	if tx.FaucetPackage.Payload == nil {
-		return fmt.Errorf("invalid faucet package payload")
-	}
-	faucetPayload := &models.FaucetPayload{}
-	if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
-		return fmt.Errorf("could not unmarshal faucet package: %w", err)
-	}
-	if faucetPayload.Amount == 0 {
-		return fmt.Errorf("invalid faucet payload amount provided")
-	}
-	if faucetPayload.To == nil {
-		return fmt.Errorf("invalid to address provided")
-	}
-	if !bytes.Equal(faucetPayload.To, txSenderAddress.Bytes()) {
-		return fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
-			faucetPayload.To, txSenderAddress.Bytes())
-	}
-	issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
-	if err != nil {
-		return fmt.Errorf("cannot extract issuer address from faucet package signature: %w", err)
-	}
-	issuerAcc, err := state.GetAccount(issuerAddress, false)
-	if err != nil {
-		return fmt.Errorf("cannot get faucet issuer address account: %w", err)
-	}
-	if issuerAcc == nil {
-		return fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress.String())
-	}
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
-	keyHash := ethereum.HashRaw(append(issuerAddress.Bytes(), b...))
-	used, err := state.FaucetNonce(keyHash, false)
-	if err != nil {
-		return fmt.Errorf("cannot check if faucet payload already used: %w", err)
-	}
-	if used {
-		return fmt.Errorf("faucet payload %x already used", keyHash)
-	}
-	if issuerAcc.Balance < faucetPayload.Amount+txCost {
-		return fmt.Errorf(
-			"issuer address does not have enough balance %d, required %d",
-			issuerAcc.Balance,
-			faucetPayload.Amount+txCost,
-		)
-	}
-	return nil
-}
-
 // CreateAccount creates an account
-func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates [][]byte) error {
-	return v.createAccount(accountAddress, infoURI, delegates, 0)
-}
-
-func (v *State) createAccount(accountAddress common.Address, infoURI string, delegates [][]byte, initialBalance uint64) error {
+func (v *State) CreateAccount(accountAddress common.Address, infoURI string, delegates [][]byte, initialBalance uint64) error {
 	newAccount := &Account{}
 	if infoURI != "" && len(infoURI) <= types.MaxURLLength {
 		newAccount.InfoURI = infoURI
@@ -464,26 +365,4 @@ func (v *State) SetAccountDelegate(accountAddr common.Address,
 	default:
 		return fmt.Errorf("invalid tx type")
 	}
-}
-
-// GenerateFaucetPackage generates a faucet package
-func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
-	rand.Seed(time.Now().UnixNano())
-	payload := &models.FaucetPayload{
-		Identifier: identifier,
-		To:         to.Bytes(),
-		Amount:     value,
-	}
-	payloadBytes, err := proto.Marshal(payload)
-	if err != nil {
-		return nil, err
-	}
-	payloadSignature, err := from.SignEthereum(payloadBytes)
-	if err != nil {
-		return nil, err
-	}
-	return &models.FaucetPackage{
-		Payload:   payloadBytes,
-		Signature: payloadSignature,
-	}, nil
 }

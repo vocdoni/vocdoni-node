@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -23,14 +22,11 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	ethchain "go.vocdoni.io/dvote/ethereum"
-	"go.vocdoni.io/dvote/ethereum/ethevents"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/oracle"
-	"go.vocdoni.io/dvote/oracle/apioracle"
 	"go.vocdoni.io/dvote/rpcapi"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
@@ -116,14 +112,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	// ssl
 	globalCfg.API.Ssl.Domain = *flag.String("sslDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
-	// ethereum node
-	globalCfg.EthConfig.SigningKey = *flag.StringP("ethSigningKey", "k", "",
-		"signing private Key (if not specified the Ethereum keystore will be used)")
-	// ethereum web3
-	globalCfg.W3Config.ChainType = *flag.StringP("ethChain", "c", "rinkeby",
-		fmt.Sprintf("Ethereum blockchain to use: %s", ethchain.AvailableChains))
-	globalCfg.W3Config.W3External = *flag.StringSliceP("w3External", "w", []string{},
-		"comma-separated list of ethereum web3 endpoints. Supported protocols: http(s)://, ws(s):// and IPC filepath")
+	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
+		"signing private Key")
 	// ipfs
 	globalCfg.Ipfs.NoInit = *flag.Bool("ipfsNoInit", false,
 		"disable inter planetary file system support")
@@ -162,9 +152,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		"index slot used by this node if it is a key keeper")
 	globalCfg.VochainConfig.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
 		"if enabled the census downloader will import all existing census")
-	globalCfg.VochainConfig.EthereumWhiteListAddrs = *flag.StringSlice("ethereumWhiteListAddrs",
-		[]string{},
-		"comma-separated list of ethereum addresses allowed to create processes on the vochain (oracle mode only)")
 	globalCfg.VochainConfig.ProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
 	globalCfg.VochainConfig.ProcessArchiveKey = *flag.String("processArchiveKey", "",
@@ -227,13 +214,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.ListenPort", flag.Lookup("listenPort"))
 	viper.Set("api.Ssl.DirCert", globalCfg.DataDir+"/tls")
 	viper.BindPFlag("api.Ssl.Domain", flag.Lookup("sslDomain"))
-
-	// ethereum node
-	viper.BindPFlag("ethConfig.SigningKey", flag.Lookup("ethSigningKey"))
-
-	// ethereum web3
-	viper.BindPFlag("w3Config.ChainType", flag.Lookup("ethChain"))
-	viper.BindPFlag("w3Config.W3External", flag.Lookup("w3External"))
+	viper.BindPFlag("SigningKey", flag.Lookup("ethSigningKey"))
 
 	// ipfs
 	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
@@ -259,7 +240,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("vochainConfig.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
 	viper.BindPFlag("vochainConfig.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochainConfig.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
-	viper.BindPFlag("vochainConfig.EthereumWhiteListAddrs", flag.Lookup("ethereumWhiteListAddrs"))
 	viper.Set("vochainConfig.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochainConfig.ProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochainConfig.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
@@ -304,7 +284,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 		}
 	}
 
-	if len(globalCfg.EthConfig.SigningKey) < 32 {
+	if len(globalCfg.SigningKey) < 32 {
 		fmt.Println("no signing key, generating one...")
 		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
@@ -315,8 +295,8 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 			return globalCfg, cfgError
 		}
 		_, priv := signer.HexString()
-		viper.Set("ethConfig.signingKey", priv)
-		globalCfg.EthConfig.SigningKey = priv
+		viper.Set("signingKey", priv)
+		globalCfg.SigningKey = priv
 		globalCfg.SaveConfig = true
 	}
 
@@ -438,6 +418,7 @@ func main() {
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled!")
 	}
+
 	if globalCfg.Mode == types.ModeGateway ||
 		globalCfg.Mode == types.ModeOracle ||
 		globalCfg.Mode == types.ModeEthAPIoracle {
@@ -452,14 +433,13 @@ func main() {
 		}
 
 		// Add signing private key if exist in configuration or flags
-		if len(globalCfg.EthConfig.SigningKey) != 32 {
+		if len(globalCfg.SigningKey) != 32 {
 			log.Infof("adding custom signing key")
-			err := signer.AddHexKey(globalCfg.EthConfig.SigningKey)
+			err := signer.AddHexKey(globalCfg.SigningKey)
 			if err != nil {
 				log.Fatalf("error adding hex key: (%s)", err)
 			}
-			pub, _ := signer.HexString()
-			log.Infof("using custom pubKey %s", pub)
+			log.Infof("using custom pubKey %x", signer.PublicKey())
 		} else {
 			log.Fatal("no private key or wrong key (size != 16 bytes)")
 		}
@@ -562,66 +542,6 @@ func main() {
 					log.Fatal(err)
 				}
 				go vochainKeykeeper.RevealUnpublished()
-			}
-
-			var w3uris []string
-			if globalCfg.W3Config.W3External != nil {
-				for idx, web3Endpoint := range globalCfg.W3Config.W3External {
-					web3EndpointTrimmed := strings.Trim(web3Endpoint, `"[]`)
-					log.Debugf("web3endpoint %d: %s", idx, web3EndpointTrimmed)
-					switch {
-					case strings.HasPrefix(web3EndpointTrimmed, "ws"):
-						w3uris = append(w3uris, web3EndpointTrimmed)
-					case strings.HasSuffix(web3EndpointTrimmed, "ipc"):
-						w3uris = append(w3uris, web3EndpointTrimmed)
-					default:
-						log.Warnf(`invalid web3 endpoint %s must be websocket or IPC
-						for event subscription`, web3EndpointTrimmed)
-					}
-				}
-			}
-			// Start ethereum events (if at least one web3 endpoint configured)
-			if len(w3uris) > 0 {
-				var evh []ethevents.EventHandler
-				evh = append(evh, ethevents.HandleVochainOracle)
-
-				whiteListedAddr := []string{}
-				for _, addr := range globalCfg.VochainConfig.EthereumWhiteListAddrs {
-					if addr == "[]" {
-						// avoid empty address and pflag autofill in case of empty array
-						continue
-					}
-					if ethcommon.IsHexAddress(addr) {
-						whiteListedAddr = append(whiteListedAddr, addr)
-					} else {
-						log.Warnf("whitelist address %s is not a valid hex address", addr)
-					}
-				}
-				if len(whiteListedAddr) > 0 {
-					log.Infof("ethereum whitelisted addresses %+v", whiteListedAddr)
-				}
-				if err := service.EthEvents(
-					context.Background(),
-					w3uris,
-					globalCfg.W3Config.ChainType,
-					signer,
-					vochainSrv.App,
-					evh,
-					whiteListedAddr); err != nil {
-					log.Fatal(err)
-				}
-			}
-		}
-
-		// Ethereum API oracle
-		if globalCfg.Mode == types.ModeEthAPIoracle {
-			log.Info("starting oracle API")
-			apior, err := apioracle.NewAPIoracle(vochainOracle, rpc)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if err := apior.EnableERC20(globalCfg.W3Config.ChainType, globalCfg.W3Config.W3External); err != nil {
-				log.Fatal(err)
 			}
 		}
 	}

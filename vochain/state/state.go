@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"bytes"
@@ -24,6 +24,9 @@ import (
 )
 
 const (
+	voteCachePurgeThreshold = uint32(180) // in blocks about 30 minutes
+	voteCacheSize           = 100000
+
 	// defaultHashLen is the most common default hash length for Arbo hashes.  This
 	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
 	// arbo.HashFunctionBlake2b.Len()
@@ -33,6 +36,32 @@ const (
 	// snapshotsDirectory is the final directory name where the snapshots are stored.
 	snapshotsDirectory = "snapshots"
 )
+
+var BurnAddress = common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
+
+// _________________________ CENSUS ORIGINS __________________________
+
+type CensusProperties struct {
+	Name              string
+	AllowCensusUpdate bool
+	NeedsDownload     bool
+	NeedsIndexSlot    bool
+	NeedsURI          bool
+	WeightedSupport   bool
+}
+
+var CensusOrigins = map[models.CensusOrigin]CensusProperties{
+	models.CensusOrigin_OFF_CHAIN_TREE: {Name: "offchain tree",
+		NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
+	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {
+		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
+		WeightedSupport: true, AllowCensusUpdate: true,
+	},
+	models.CensusOrigin_ERC20: {Name: "erc20", NeedsDownload: true,
+		WeightedSupport: true, NeedsIndexSlot: true},
+	models.CensusOrigin_OFF_CHAIN_CA: {Name: "ca", WeightedSupport: true,
+		NeedsURI: true, AllowCensusUpdate: true},
+}
 
 type ErrHaltVochain struct {
 	reason error
@@ -187,6 +216,11 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	return sdb, update.Commit(0)
 }
 
+// EventListeners returns the list of subscribed event listeners.
+func (v *State) EventListeners() []EventListener {
+	return v.eventListeners
+}
+
 // SetChainID sets the blockchain identifier.
 func (v *State) SetChainID(chID string) {
 	v.chainID = chID
@@ -335,7 +369,7 @@ func (v *State) AddProcessKeys(tx *models.AdminTx) error {
 		process.KeyIndex = new(uint32)
 	}
 	*process.KeyIndex++
-	if err := v.updateProcess(process, tx.ProcessId); err != nil {
+	if err := v.UpdateProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
@@ -364,7 +398,7 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 			tx.GetKeyIndex(), tx.ProcessId, tx.EncryptionPrivateKey)
 	}
 	*process.KeyIndex--
-	if err := v.updateProcess(process, tx.ProcessId); err != nil {
+	if err := v.UpdateProcess(process, tx.ProcessId); err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {

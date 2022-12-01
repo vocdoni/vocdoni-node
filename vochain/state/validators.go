@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	models "go.vocdoni.io/proto/build/go/models"

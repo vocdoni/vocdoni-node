@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -105,8 +106,8 @@ var (
 	}
 )
 
-func NewVochainState(tb testing.TB) *vochain.State {
-	s, err := vochain.NewState(db.TypePebble, tb.TempDir())
+func NewVochainState(tb testing.TB) *state.State {
+	s, err := state.NewState(db.TypePebble, tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func NewVochainState(tb testing.TB) *vochain.State {
 	return s
 }
 
-func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
+func NewVochainStateWithOracles(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
 	for _, o := range OracleListHardcoded {
 		if err := s.AddOracle(o); err != nil {
@@ -124,7 +125,7 @@ func NewVochainStateWithOracles(tb testing.TB) *vochain.State {
 	return s
 }
 
-func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
+func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
@@ -168,7 +169,7 @@ func NewVochainStateWithValidators(tb testing.TB) *vochain.State {
 	return s
 }
 
-func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
+func NewVochainStateWithProcess(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
 	// add process
 	processBytes, err := proto.Marshal(StateDBProcessHardcoded)
@@ -178,7 +179,7 @@ func NewVochainStateWithProcess(tb testing.TB) *vochain.State {
 	if err = s.Tx.DeepSet(
 		testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		processBytes,
-		vochain.StateTreeCfg(vochain.TreeProcess)); err != nil {
+		state.StateTreeCfg(state.TreeProcess)); err != nil {
 		tb.Fatal(err)
 	}
 	return s

@@ -7,14 +7,10 @@ import (
 
 // DvoteCfg stores global configs for dvote
 type DvoteCfg struct {
-	// W3Config ethereum config options
-	W3Config *W3Cfg
 	// VochainConfig vochain config options
 	VochainConfig *VochainCfg
 	// Ipfs ipfs config options
 	Ipfs *IPFSCfg
-	// EthConfig ethereum client config options
-	EthConfig *EthCfg
 	// API api config options
 	API *API
 	// Metrics config options
@@ -29,6 +25,8 @@ type DvoteCfg struct {
 	DataDir string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
+	// SigningKey key used to sign transactions
+	SigningKey string
 	// Mode describes the operation mode of program
 	Mode string
 	// Dev enables the development mode (less security)
@@ -72,10 +70,8 @@ func (c *VochainCfg) ValidDBType() bool {
 // NewGatewayConfig initializes the fields in the gateway config stuct
 func NewConfig() *DvoteCfg {
 	return &DvoteCfg{
-		W3Config:      new(W3Cfg),
 		VochainConfig: new(VochainCfg),
 		Ipfs:          new(IPFSCfg),
-		EthConfig:     new(EthCfg),
 		API:           new(API),
 		Metrics:       new(MetricsCfg),
 	}
@@ -114,20 +110,6 @@ type IPFSCfg struct {
 	NoInit       bool
 	ConnectKey   string
 	ConnectPeers []string
-}
-
-// EthCfg stores global configs for ethereum bockchain
-type EthCfg struct {
-	// SigningKey key used to sign transactions
-	SigningKey string
-}
-
-// W3Cfg stores global configs for web3
-type W3Cfg struct {
-	// ChainType chain to connect with
-	ChainType string
-	// W3External URLs of an external ethereum nodes to connect with
-	W3External []string
 }
 
 // VochainCfg includes all possible config params needed by the Vochain
@@ -214,10 +196,6 @@ type OracleCfg struct {
 	Dev bool
 	// DataDir directory where data and config files are stored
 	DataDir string
-	// EthereumConfig ethereum node config parameters
-	EthConfig *EthCfg
-	// W3Config Web3 config parameters
-	W3Config *W3Cfg
 	// VochainConfig vochain node config parameters
 	VochainConfig *VochainCfg
 	// LogLevel logging level
@@ -226,8 +204,6 @@ type OracleCfg struct {
 	LogOutput string
 	// SubscribeOnly if true only new received events will be processed, otherwise all events of the current chain will be processed
 	SubscribeOnly bool
-	// EthProcessDomain ethereum contract to use as source of truth for some operations
-	EthProcessDomain string
 	// SaveConfig overwrites the config file with the CLI provided flags
 	SaveConfig bool
 }
@@ -235,8 +211,6 @@ type OracleCfg struct {
 // NewOracleCfg initializes the Oracle config
 func NewOracleCfg() *OracleCfg {
 	return &OracleCfg{
-		EthConfig:     new(EthCfg),
-		W3Config:      new(W3Cfg),
 		VochainConfig: new(VochainCfg),
 	}
 }

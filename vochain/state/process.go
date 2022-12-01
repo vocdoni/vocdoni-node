@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"bytes"
@@ -190,8 +190,8 @@ func updateProcess(tx *treeTxWithMutex, p *models.Process, pid []byte) error {
 	return processesTree.Set(pid, updatedProcessBytes)
 }
 
-// updateProcess updates an existing process
-func (v *State) updateProcess(p *models.Process, pid []byte) error {
+// UpdateProcess updates an existing process
+func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
@@ -269,7 +269,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 
 	if commit {
 		process.Status = newstatus
-		if err := v.updateProcess(process, process.ProcessId); err != nil {
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
 		for _, l := range v.eventListeners {
@@ -332,7 +332,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 		}
 		process.Results = append(process.Results, result)
 		process.Status = models.ProcessStatus_RESULTS
-		if err := v.updateProcess(process, process.ProcessId); err != nil {
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return fmt.Errorf("cannot set results: %w", err)
 		}
 		// Call event listeners
@@ -393,7 +393,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 	if commit {
 		process.CensusRoot = censusRoot
 		process.CensusURI = &censusURI
-		if err := v.updateProcess(process, process.ProcessId); err != nil {
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
 	}

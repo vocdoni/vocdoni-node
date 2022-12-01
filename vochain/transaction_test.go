@@ -160,7 +160,7 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	process, err = app.State.Process(processId[:], false)
 	qt.Assert(t, err, qt.IsNil)
 	process.RollingCensusRoot = arbo.BigIntToBytes(32, censusRootBI)
-	err = app.State.updateProcess(process, processId[:])
+	err = app.State.UpdateProcess(process, processId[:])
 	qt.Assert(t, err, qt.IsNil)
 
 	// proof data generated from js (snarkjs)

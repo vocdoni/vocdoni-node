@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -230,7 +231,7 @@ func graphVizMainTree(height int64, stateDir string) {
 func listStateProcesses(height int64, stateDir string) {
 	log.Infof("listing state processes for height %d", height)
 	snapshot := openStateAtHeight(height, stateDir)
-	processes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess))
+	processes, err := snapshot.DeepSubTree(state.StateTreeCfg(state.TreeProcess))
 	if err != nil {
 		log.Fatalf("Can't get Processes: %v", err)
 	}
@@ -247,8 +248,8 @@ func listStateProcesses(height int64, stateDir string) {
 }
 
 func countVotes(snapshot *statedb.TreeView, processID []byte) int64 {
-	treeCfg := vochain.MainTrees[vochain.ChildTreeVotes]
-	votes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess), treeCfg.WithKey(processID))
+	treeCfg := state.MainTrees[state.ChildTreeVotes]
+	votes, err := snapshot.DeepSubTree(state.StateTreeCfg(state.TreeProcess), treeCfg.WithKey(processID))
 	if err != nil {
 		if errors.Is(err, statedb.ErrEmptyTree) {
 			return 0
@@ -269,8 +270,8 @@ func listStateVotes(processID string, height int64, stateDir string) {
 	if err != nil {
 		panic(err)
 	}
-	treeCfg := vochain.MainTrees[vochain.ChildTreeVotes]
-	votes, err := snapshot.DeepSubTree(vochain.StateTreeCfg(vochain.TreeProcess), treeCfg.WithKey(pid))
+	treeCfg := state.MainTrees[state.ChildTreeVotes]
+	votes, err := snapshot.DeepSubTree(state.StateTreeCfg(state.TreeProcess), treeCfg.WithKey(pid))
 	if err != nil {
 		log.Fatalf("Can't get Votes: %v", err)
 	}

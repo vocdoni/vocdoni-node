@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -68,7 +69,7 @@ func benchmarkIndexTx(b *testing.B) {
 				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))).Bytes(),
 			}
-			idx.OnVote(vote, vochain.VoterID{}.Nil(), j)
+			idx.OnVote(vote, state.VoterID{}.Nil(), j)
 		}
 		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)

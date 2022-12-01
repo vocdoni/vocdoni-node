@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vocone"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -142,7 +142,7 @@ func main() {
 			}
 			a := common.HexToAddress(data[0])
 			log.Infof("funding account %s with balance %d", a.Hex(), balance)
-			vc.CreateAccount(a, &vochain.Account{
+			vc.CreateAccount(a, &state.Account{
 				Account: models.Account{
 					Balance: balance,
 				},

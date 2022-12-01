@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"fmt"

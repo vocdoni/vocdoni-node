@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -243,7 +244,7 @@ func (k *KeyKeeper) Commit(height uint32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *models.Vote, voterID vochain.VoterID, txindex int32) {
+func (k *KeyKeeper) OnVote(v *models.Vote, voterID state.VoterID, txindex int32) {
 	// do nothing
 }
 
@@ -495,7 +496,7 @@ func (k *KeyKeeper) OnProcessResults(pid []byte, results *models.ProcessResult, 
 func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
 
 // OnSetAccount does nothing
-func (k *KeyKeeper) OnSetAccount(addr []byte, account *vochain.Account) {}
+func (k *KeyKeeper) OnSetAccount(addr []byte, account *state.Account) {}
 
 // OnTransferTokens does nothing
 func (k *KeyKeeper) OnTransferTokens(from, to []byte, amount uint64) {}

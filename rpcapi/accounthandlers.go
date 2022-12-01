@@ -7,6 +7,7 @@ import (
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -24,7 +25,7 @@ func (r *RPCAPI) getAccount(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 	// account does not exist
 	if acc == nil {
-		return nil, vochain.ErrAccountNotExist
+		return nil, state.ErrAccountNotExist
 	}
 	response := api.APIresponse{
 		InfoURI:      acc.InfoURI,
@@ -48,7 +49,7 @@ func (r *RPCAPI) getTreasurer(request *api.APIrequest) (*api.APIresponse, error)
 	}
 	// treasurer does not exist
 	if t == nil {
-		return nil, vochain.ErrAccountNotExist
+		return nil, state.ErrAccountNotExist
 	}
 	response := api.APIresponse{EntityID: common.BytesToAddress(t.Address).String()}
 	response.Nonce = new(uint32)

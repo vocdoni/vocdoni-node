@@ -11,6 +11,7 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -35,7 +36,7 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 		signers[i] = &signer
 	}
 	// create burn account
-	app.State.SetAccount(BurnAddress, &Account{})
+	app.State.SetAccount(state.BurnAddress, &state.Account{})
 	// set tx costs
 	app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO_URI, 100)
 	app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
@@ -52,7 +53,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	// set account 0
 	qt.Assert(t,
-		app.State.SetAccount(signers[0].Address(), &Account{models.Account{Balance: 10000, InfoURI: infoURI}}),
+		app.State.SetAccount(signers[0].Address(), &state.Account{models.Account{Balance: 10000, InfoURI: infoURI}}),
 		qt.IsNil,
 	)
 	app.Commit()
@@ -577,10 +578,10 @@ func TestMintTokensTx(t *testing.T) {
 	}
 
 	app.State.SetTreasurer(signer.Address(), 0)
-	err := app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{})
+	err := app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 	toAccAddr := common.HexToAddress(randomEthAccount)
-	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 	app.Commit()
 
@@ -613,7 +614,7 @@ func TestMintTokensTx(t *testing.T) {
 		t.Fatal(err)
 	}
 	if toAcc == nil {
-		t.Fatal(ErrAccountNotExist)
+		t.Fatal("account not found")
 	}
 	if toAcc.Balance != 100 {
 		t.Fatalf("infoURI missmatch, got %d expected %d", toAcc.Balance, 100)
@@ -663,7 +664,7 @@ func TestSendTokensTx(t *testing.T) {
 	err := signer.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	app.State.SetAccount(BurnAddress, &Account{})
+	app.State.SetAccount(state.BurnAddress, &state.Account{})
 
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
@@ -671,11 +672,11 @@ func TestSendTokensTx(t *testing.T) {
 	err = app.State.SetTxCost(models.TxType_SEND_TOKENS, 10)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	toAccAddr := common.HexToAddress(randomEthAccount)
-	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.MintBalance(signer.Address(), 1000)
@@ -751,7 +752,7 @@ func TestSetAccountDelegateTx(t *testing.T) {
 	err = signer2.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	app.State.SetAccount(BurnAddress, &Account{})
+	app.State.SetAccount(state.BurnAddress, &state.Account{})
 
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
@@ -761,12 +762,12 @@ func TestSetAccountDelegateTx(t *testing.T) {
 	err = app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 10)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 	toAccAddr := common.HexToAddress(randomEthAccount)
-	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
-	err = app.State.CreateAccount(signer2.Address(), "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(signer2.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.MintBalance(signer.Address(), 1000)
@@ -852,7 +853,7 @@ func TestCollectFaucetTx(t *testing.T) {
 	err = toSigner.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	app.State.SetAccount(BurnAddress, &Account{})
+	app.State.SetAccount(state.BurnAddress, &state.Account{})
 
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
@@ -860,9 +861,9 @@ func TestCollectFaucetTx(t *testing.T) {
 	err = app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
-	err = app.State.CreateAccount(toSigner.Address(), "ipfs://", [][]byte{})
+	err = app.State.CreateAccount(toSigner.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.MintBalance(signer.Address(), 1000)
@@ -881,7 +882,7 @@ func TestCollectFaucetTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(90))
 	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(1))
-	burnAcc, err := app.State.GetAccount(BurnAddress, true)
+	burnAcc, err := app.State.GetAccount(state.BurnAddress, true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, burnAcc.Balance, qt.Equals, uint64(10))
 
@@ -897,7 +898,7 @@ func TestCollectFaucetTx(t *testing.T) {
 
 	err = testCollectFaucetTx(t, &signer, &nonExistentAccount, app, 0, 1, randomIdentifier+1)
 	qt.Assert(t, err, qt.IsNotNil)
-	qt.Assert(t, err, qt.ErrorMatches, fmt.Sprintf(".* %s", ErrAccountNotExist))
+	qt.Assert(t, err, qt.ErrorMatches, fmt.Sprintf(".* %s", state.ErrAccountNotExist))
 
 	// should fail if from acc does not exist
 	err = testCollectFaucetTx(t, &nonExistentAccount, &toSigner, app, 0, 1, randomIdentifier+1)
@@ -928,7 +929,7 @@ func TestCollectFaucetTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, signerAcc.Balance, qt.Equals, uint64(90))
 	qt.Assert(t, signerAcc.Nonce, qt.Equals, uint32(1))
-	burnAcc, err = app.State.GetAccount(BurnAddress, true)
+	burnAcc, err = app.State.GetAccount(state.BurnAddress, true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, burnAcc.Balance, qt.Equals, uint64(10))
 }

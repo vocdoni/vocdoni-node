@@ -2,39 +2,19 @@ package vochain
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"reflect"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-const (
-	voteCachePurgeThreshold = uint32(180) // in blocks about 30 minutes
-	voteCacheSize           = 100000
-)
-
 var (
-	ErrVoteDoesNotExist     = fmt.Errorf("vote does not exist")
-	ErrNotEnoughBalance     = fmt.Errorf("not enough balance to transfer")
-	ErrAccountNonceInvalid  = fmt.Errorf("invalid account nonce")
-	ErrProcessNotFound      = fmt.Errorf("process not found")
-	ErrBalanceOverflow      = fmt.Errorf("balance overflow")
-	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
-	ErrAccountNotExist      = fmt.Errorf("account does not exist")
-	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
-	ErrInvalidURILength     = fmt.Errorf("invalid URI length")
-	ErrInvalidAddress       = fmt.Errorf("invalid address")
-	ErrNilTx                = fmt.Errorf("nil transaction")
-	// keys; not constants because of []byte
-	voteCountKey = []byte("voteCount")
+	ErrInvalidURILength = fmt.Errorf("invalid URI length")
+	ErrInvalidAddress   = fmt.Errorf("invalid address")
+	ErrNilTx            = fmt.Errorf("nil transaction")
 )
-
-var BurnAddress = common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
@@ -43,16 +23,6 @@ var PrefixDBCacheSize = 0
 type VotePackage struct {
 	Nonce string `json:"nonce,omitempty"`
 	Votes []int  `json:"votes"`
-}
-
-// UniqID returns a uniq identifier for the VoteTX. It depends on the Type.
-func UniqID(tx *models.SignedTx, isAnonymous bool) string {
-	if !isAnonymous {
-		if len(tx.Signature) > 32 {
-			return string(tx.Signature[:32])
-		}
-	}
-	return ""
 }
 
 // ________________________ QUERIES ________________________
@@ -217,84 +187,4 @@ type GenesisValidator struct {
 type TendermintPubKey struct {
 	Type  string `json:"type"`
 	Value []byte `json:"value"`
-}
-
-// _________________________ CENSUS ORIGINS __________________________
-
-type CensusProperties struct {
-	Name              string
-	AllowCensusUpdate bool
-	NeedsDownload     bool
-	NeedsIndexSlot    bool
-	NeedsURI          bool
-	WeightedSupport   bool
-}
-
-var CensusOrigins = map[models.CensusOrigin]CensusProperties{
-	models.CensusOrigin_OFF_CHAIN_TREE: {Name: "offchain tree",
-		NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
-	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {
-		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
-		WeightedSupport: true, AllowCensusUpdate: true,
-	},
-	models.CensusOrigin_ERC20: {Name: "erc20", NeedsDownload: true,
-		WeightedSupport: true, NeedsIndexSlot: true},
-	models.CensusOrigin_OFF_CHAIN_CA: {Name: "ca", WeightedSupport: true,
-		NeedsURI: true, AllowCensusUpdate: true},
-}
-
-// VoterID is the indentifier of a voter.
-// The first byte of the slice indicates one of the supported identifiers
-// For example for an Ethereum public key the VoterID is [1, pubkb0, pubkb1, ...]
-// where pubkb0 is the first byte of the Ethereum public key
-type VoterID []byte
-
-// VoterIDType represents the type of a voterID
-type VoterIDType = uint8
-
-const (
-	VoterIDTypeUndefined VoterIDType = 0
-	VoterIDTypeECDSA     VoterIDType = 1
-)
-
-// Enum value map for VoterIDType.
-var voterIDTypeName = map[VoterIDType]string{
-	VoterIDTypeUndefined: "UNDEFINED",
-	VoterIDTypeECDSA:     "ECDSA",
-}
-
-var errUnsupportedVoterIDType error = errors.New("voterID type not supported")
-
-// Type returns the VoterID type defined in VoterIDTypeName
-func (v VoterID) Type() VoterIDType {
-	return VoterIDType(v[0])
-}
-
-// VoterIDTypeToString returns the string representation of the VoterIDType
-func (v VoterID) VoterIDTypeToString() string {
-	return voterIDTypeName[v[0]]
-}
-
-// Nil returns the default value for VoterID which is a non-nil slice
-func (v VoterID) Nil() []byte {
-	return []byte{}
-}
-
-// IsNil returns true if the VoterID is empty
-func (v VoterID) IsNil() bool {
-	return len(v) == 0
-}
-
-// Address returns the voterID Address depending on the VoterIDType
-func (v VoterID) Address() ([]byte, error) {
-	switch v[0] {
-	case VoterIDTypeECDSA:
-		ethAddr, err := ethereum.AddrFromPublicKey(v[1:])
-		if err != nil {
-			return nil, err
-		}
-		return ethAddr.Bytes(), nil
-	default:
-		return nil, errUnsupportedVoterIDType
-	}
 }

@@ -13,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -55,7 +55,7 @@ func TestVocone(t *testing.T) {
 	err = testCreateAccount(cli)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = vc.CreateAccount(account.Address(), &vochain.Account{Account: models.Account{Balance: 10000}})
+	err = vc.CreateAccount(account.Address(), &state.Account{Account: models.Account{Balance: 10000}})
 	qt.Assert(t, err, qt.IsNil)
 
 	err = testCSPvote(cli)

@@ -1,4 +1,4 @@
-package vochain
+package state
 
 import (
 	"bytes"
@@ -276,7 +276,7 @@ func (s *StateSnapshot) Write(b []byte) (int, error) {
 
 // snapshot performs a snapshot of the last commited state for all trees.
 // The snapshot is stored in disk and the file path is returned.
-func (v *State) snapshot() (string, error) {
+func (v *State) Snapshot() (string, error) {
 	t := v.MainTreeView()
 	height, err := v.LastHeight()
 	if err != nil {
@@ -390,8 +390,8 @@ type diskSnapshotInfo struct {
 	Size    int64
 }
 
-// listSnapshots returns the list of the current state snapshots stored in disk.
-func (v *State) listSnapshots() []diskSnapshotInfo {
+// ListSnapshots returns the list of the current state snapshots stored in disk.
+func (v *State) ListSnapshots() []diskSnapshotInfo {
 	files, err := ioutil.ReadDir(filepath.Join(
 		v.dataDir,
 		storageDirectory,
