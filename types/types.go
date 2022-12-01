@@ -17,3 +17,5 @@ type CensusRoot = []byte
 type EncodedProtoBuf = []byte
 
 type Nullifier = []byte
+
+type Hash = []byte
