@@ -15,5 +15,10 @@ SELECT * FROM tx_references
 WHERE hash = ?
 LIMIT 1;
 
+-- name: GetLastTxReferences :many
+SELECT * FROM tx_references
+ORDER BY id DESC
+LIMIT ?;
+
 -- name: CountTxReferences :one
 SELECT COUNT(*) FROM tx_references;
