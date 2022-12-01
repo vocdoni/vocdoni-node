@@ -21,6 +21,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
@@ -123,7 +124,7 @@ type Indexer struct {
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
 	vote    *models.Vote
-	voterID vochain.VoterID
+	voterID state.VoterID
 	txIndex int32
 }
 
@@ -570,7 +571,7 @@ func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txI
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (idx *Indexer) OnVote(v *models.Vote, voterID vochain.VoterID, txIndex int32) {
+func (idx *Indexer) OnVote(v *models.Vote, voterID state.VoterID, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessId) {
@@ -711,9 +712,9 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (idx *Indexer) OnProcessesStart(pids [][]byte)                     {}
-func (idx *Indexer) OnSetAccount(addr []byte, account *vochain.Account) {}
-func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)    {}
+func (idx *Indexer) OnProcessesStart(pids [][]byte)                   {}
+func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
+func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)  {}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

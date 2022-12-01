@@ -17,7 +17,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -624,14 +623,14 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		if err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("cannot extract public key from signature: %w", err)
 		}
-		voterID = []byte{state.VoterIDTypeECDSA}
+		voterID = []byte{vstate.VoterIDTypeECDSA}
 		voterID = append(voterID, pubKey...)
 		addr, err := ethereum.AddrFromPublicKey(pubKey)
 		if err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("cannot extract address from public key: %w", err)
 		}
 		// assign a nullifier
-		vote.Nullifier = state.GenerateNullifier(addr, vote.ProcessId)
+		vote.Nullifier = vstate.GenerateNullifier(addr, vote.ProcessId)
 
 		// check if vote already exists
 		if exist, err := app.State.EnvelopeExists(vote.ProcessId,
@@ -662,7 +661,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 }
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *state.State) (common.Address, error) {
+func AdminTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate.State) (common.Address, error) {
 	if vtx == nil {
 		return common.Address{}, ErrNilTx
 	}

@@ -198,6 +198,7 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("logErrorFile", flag.Lookup("logErrorFile"))
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
+	viper.BindPFlag("signingKey", flag.Lookup("signingKey"))
 
 	// api
 	viper.BindPFlag("api.Http", flag.Lookup("apihttp"))
@@ -214,7 +215,6 @@ func newConfig() (*config.DvoteCfg, config.Error) {
 	viper.BindPFlag("api.ListenPort", flag.Lookup("listenPort"))
 	viper.Set("api.Ssl.DirCert", globalCfg.DataDir+"/tls")
 	viper.BindPFlag("api.Ssl.Domain", flag.Lookup("sslDomain"))
-	viper.BindPFlag("SigningKey", flag.Lookup("ethSigningKey"))
 
 	// ipfs
 	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")

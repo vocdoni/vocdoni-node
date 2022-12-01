@@ -77,7 +77,6 @@ services:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file:
       - "${COMPOSE_HOST_PATH:-.}/env.oracle"
-      - "${COMPOSE_HOST_PATH:-.}/env.oracle0key"
     volumes:
       - data-oracle:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json

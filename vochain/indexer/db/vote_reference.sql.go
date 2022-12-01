@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 const createVoteReference = `-- name: CreateVoteReference :execresult
@@ -30,7 +30,7 @@ type CreateVoteReferenceParams struct {
 	Height       int64
 	Weight       string
 	TxIndex      int64
-	VoterID      vochain.VoterID
+	VoterID      state.VoterID
 	CreationTime time.Time
 }
 

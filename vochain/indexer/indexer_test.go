@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -544,7 +545,7 @@ func TestResults(t *testing.T) {
 				ProcessId: pid,
 				Weight:    big.NewInt(1).Bytes(),
 			},
-			voterID: vochain.VoterID{}.Nil(),
+			voterID: state.VoterID{}.Nil(),
 			txIndex: 0,
 		}
 		idx.voteIndexPool = append(idx.voteIndexPool, txRef)
@@ -941,13 +942,13 @@ func TestCountVotes(t *testing.T) {
 	for i := 0; i < 100; i++ {
 		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		idx.OnVote(v, vochain.VoterID{}.Nil(), int32(i))
+		idx.OnVote(v, state.VoterID{}.Nil(), int32(i))
 	}
 	nullifier := util.RandomBytes(32)
 	v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: nullifier}
 	// Add last vote with known nullifier
 	txIndex := int32(100)
-	idx.OnVote(v, vochain.VoterID{}.Nil(), txIndex)
+	idx.OnVote(v, state.VoterID{}.Nil(), txIndex)
 
 	// Vote transactions are on imaginary 2000th block
 	blockHeight := uint32(2000)

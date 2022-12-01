@@ -16,7 +16,6 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	cfg "github.com/tendermint/tendermint/config"
@@ -147,7 +146,7 @@ func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
 }
 
 // GenerateFaucetPackage generates a faucet package
-func GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
+func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, value, identifier uint64) (*models.FaucetPackage, error) {
 	rand.Seed(time.Now().UnixNano())
 	payload := &models.FaucetPayload{
 		Identifier: identifier,
