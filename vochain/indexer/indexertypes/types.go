@@ -241,21 +241,21 @@ func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
 type EnvelopeMetadata struct {
-	ProcessId types.HexBytes `json:"process_id"`
+	ProcessId types.HexBytes `json:"processId"`
 	Nullifier types.HexBytes `json:"nullifier"`
-	VoterID   types.HexBytes `json:"voter_id"`
-	TxIndex   int32          `json:"tx_index"`
+	VoterID   types.HexBytes `json:"voterId"`
+	TxIndex   int32          `json:"txIndex"`
 	Height    uint32         `json:"height"`
-	TxHash    types.HexBytes `json:"tx_hash"`
+	TxHash    types.HexBytes `json:"txHash"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
 type EnvelopePackage struct {
-	EncryptionKeyIndexes []uint32         `json:"encryption_key_indexes"`
+	EncryptionKeyIndexes []uint32         `json:"encryptionKeyIndexes"`
 	Meta                 EnvelopeMetadata `json:"meta"`
 	Nonce                types.HexBytes   `json:"nonce"`
 	Signature            types.HexBytes   `json:"signature"`
-	VotePackage          []byte           `json:"vote_package"`
+	VotePackage          []byte           `json:"votePackage"`
 	Weight               string           `json:"weight"`
 }
 
@@ -263,7 +263,7 @@ type EnvelopePackage struct {
 type TxPackage struct {
 	Tx          []byte         `json:"tx"`
 	ID          uint32         `json:"id,omitempty"`
-	BlockHeight uint32         `json:"block_height,omitempty"`
+	BlockHeight uint32         `json:"blockHeight,omitempty"`
 	Index       *int32         `json:"index,omitempty"`
 	Hash        types.HexBytes `json:"hash"`
 	Signature   types.HexBytes `json:"signature"`
@@ -272,17 +272,18 @@ type TxPackage struct {
 // TxMetadata contains tx information for the TransactionList api
 type TxMetadata struct {
 	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"block_height,omitempty"`
+	BlockHeight uint32         `json:"blockHeight,omitempty"`
 	Index       int32          `json:"index"`
 	Hash        types.HexBytes `json:"hash"`
 }
 
 // TxReference holds the db reference for a single transaction
 type TxReference struct {
-	Index        uint64         `badgerholdKey:"Index"`
-	Hash         types.HexBytes `badgerholdIndex:"Hash"`
-	BlockHeight  uint32
-	TxBlockIndex int32
+	Index        uint64         `badgerholdKey:"Index" json:"transactionNumber"`
+	Hash         types.HexBytes `badgerholdIndex:"Hash" json:"transactionHash"`
+	BlockHeight  uint32         `json:"blockHeight"`
+	TxBlockIndex int32          `json:"transactionIndex"`
+	TxType       string         `json:"transactionType"`
 }
 
 func TxReferenceFromDB(dbtx *indexerdb.TxReference) *TxReference {
@@ -299,9 +300,9 @@ type BlockMetadata struct {
 	Height          uint32         `json:"height,omitempty"`
 	Timestamp       time.Time      `json:"timestamp"`
 	Hash            types.HexBytes `json:"hash,omitempty"`
-	NumTxs          uint64         `json:"num_txs"`
-	LastBlockHash   types.HexBytes `json:"last_block_hash"`
-	ProposerAddress types.HexBytes `json:"proposer_address"`
+	NumTxs          uint64         `json:"numTxs"`
+	LastBlockHash   types.HexBytes `json:"lastBlockHash"`
+	ProposerAddress types.HexBytes `json:"proposerAddress"`
 }
 
 // String prints the BlockMetadata in a human-readable format

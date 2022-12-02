@@ -9,6 +9,8 @@ import (
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 // TransactionCount returns the number of transactions indexed
@@ -84,10 +86,21 @@ func (s *Indexer) GetLastTxReferences(limit int32) ([]*indexertypes.TxReference,
 func (s *Indexer) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
+	signedTx, err := s.App.GetTx(blockHeight, txIndex)
+	if err != nil {
+		log.Warnf("could not get tx %x from block %d: %v", hash, blockHeight, err)
+		return
+	}
+	tx := models.Tx{}
+	if err := proto.Unmarshal(signedTx.GetTx(), &tx); err != nil {
+		log.Warnf("could not unmarshal tx %x from block %d: %v", hash, blockHeight, err)
+		return
+	}
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
 		Hash:         types.HexBytes(hash),
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
+		TxType:       fmt.Sprintf("%s", tx.ProtoReflect().Type()),
 	})
 }
 

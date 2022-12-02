@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 const (
@@ -92,6 +93,14 @@ func (a *API) enableChainHandlers() error {
 		"POST",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainSendTxHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions/page/{page}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainTxListPaginated,
 	); err != nil {
 		return err
 	}
@@ -253,22 +262,41 @@ func (a *API) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /chain/transaction/reference/<hash>
+// /chain/transactions/page/<page>
+func (a *API) chainTxListPaginated(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	page, err := strconv.Atoi(ctx.URLParam("page"))
+	if err != nil {
+		return err
+	}
+	firstTx := page * MaxPageSize
+	//lastTx := firstTx + MaxPageSize
+	refs := []*indexertypes.TxReference{}
+	if firstTx == 0 {
+		refs, err = a.indexer.GetLastTxReferences(MaxPageSize)
+		if err != nil {
+			return err
+		}
+	}
+	data, err := json.Marshal(refs)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+
+}
+
+// /chain/transactions/reference/<hash>
 func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
 	}
-
 	ref, err := a.indexer.GetTxHashReference(hash)
 	if err != nil {
 		return ErrTransactionNotFound
 	}
 
-	data, err := json.Marshal(&TransactionReference{
-		Height: ref.BlockHeight,
-		Index:  uint32(ref.TxBlockIndex),
-	})
+	data, err := json.Marshal(ref)
 	if err != nil {
 		return err
 	}
@@ -276,7 +304,7 @@ func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
-// /chain/transaction/<height>/<index>
+// /chain/transactions/<height>/<index>
 func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
@@ -309,7 +337,6 @@ func (a *API) chainValidatorsHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 			PubKey:  v.GetPubKey(),
 		})
 	}
-
 	data, err := json.Marshal(&validators)
 	if err != nil {
 		return err
@@ -324,7 +351,7 @@ func (a *API) chainBlockHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	block := a.indexer.App.GetBlockByHeight(height)
+	block := a.vocapp.GetBlockByHeight(height)
 	if block == nil {
 		return ErrBlockNotFound
 	}
@@ -342,7 +369,7 @@ func (a *API) chainBlockByHashHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	if err != nil {
 		return err
 	}
-	block := a.indexer.App.GetBlockByHash(hash)
+	block := a.vocapp.GetBlockByHash(hash)
 	if block == nil {
 		return ErrBlockNotFound
 	}
