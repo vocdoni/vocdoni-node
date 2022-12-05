@@ -8,7 +8,6 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -18,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -26,14 +26,6 @@ import (
 // and stored in the vote cache
 var ErrorAlreadyExistInCache = fmt.Errorf("vote already exist in cache")
 
-// VochainTx is a wrapper around a protobuf transaction with some helpers
-type VochainTx struct {
-	Tx         *models.Tx
-	SignedBody []byte
-	Signature  []byte
-	TxID       [32]byte
-}
-
 // AddTxResponse is the data returned by AddTx()
 type AddTxResponse struct {
 	TxHash []byte
@@ -41,35 +33,12 @@ type AddTxResponse struct {
 	Log    string
 }
 
-// Unmarshal unarshal the content of a bytes serialized transaction.
-// Returns the transaction struct, the original bytes and the signature
-// of those bytes.
-func (tx *VochainTx) Unmarshal(content []byte, chainID string) error {
-	stx := new(models.SignedTx)
-	if err := proto.Unmarshal(content, stx); err != nil {
-		return err
-	}
-	tx.Tx = new(models.Tx)
-	if err := proto.Unmarshal(stx.GetTx(), tx.Tx); err != nil {
-		return err
-	}
-	tx.Signature = stx.GetSignature()
-	tx.TxID = TxKey(content)
-	tx.SignedBody = ethereum.BuildVocdoniTransaction(stx.GetTx(), chainID)
-	return nil
-}
-
-// TxKey computes the checksum of the tx
-func TxKey(tx tmtypes.Tx) [32]byte {
-	return sha256.Sum256(tx)
-}
-
 // AddTx check the validity of a transaction and adds it to the state if commit=true.
 // It returns a bytes value which depends on the transaction type:
 //
 //	Tx_Vote: vote nullifier
 //	default: []byte{}
-func (app *BaseApplication) AddTx(vtx *VochainTx, commit bool) (*AddTxResponse, error) {
+func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTxResponse, error) {
 	if vtx.Tx == nil || app.State == nil || vtx.Tx.Payload == nil {
 		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
 	}

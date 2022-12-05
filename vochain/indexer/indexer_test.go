@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -972,14 +973,17 @@ func TestCountVotes(t *testing.T) {
 
 func TestTxIndexer(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-
 	idx := newTestIndexer(t, app, true)
+
+	getTxID := func(i, j int) [32]byte {
+		return [32]byte{byte(i), byte(j)}
+	}
 
 	const totalBlocks = 10
 	const txsPerBlock = 10
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			idx.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
+			idx.OnNewTx(&vochaintx.VochainTx{TxID: getTxID(i, j)}, uint32(i), int32(j))
 		}
 	}
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
@@ -996,8 +1000,10 @@ func TestTxIndexer(t *testing.T) {
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
-
-			hashRef, err := idx.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			h := make([]byte, 32)
+			id := getTxID(i, j)
+			copy(h, id[:])
+			hashRef, err := idx.GetTxHashReference(h)
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))

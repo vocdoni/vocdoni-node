@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -85,7 +86,7 @@ func benchmarkFetchTx(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		idx.Rollback()
 		for j := 0; j < numTxs; j++ {
-			idx.OnNewTx([]byte(fmt.Sprintf("hash%d%d", i, j)), uint32(i), int32(j))
+			idx.OnNewTx(&vochaintx.VochainTx{TxID: util.Random32()}, uint32(i), int32(j))
 		}
 		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
