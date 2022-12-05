@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -152,7 +153,7 @@ type Listener struct {
 }
 
 func (l *Listener) OnVote(vote *models.Vote, voterID VoterID, txIndex int32)                     {}
-func (l *Listener) OnNewTx(hash []byte, blockHeight uint32, txIndex int32)                       {}
+func (l *Listener) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32)           {}
 func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
 func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
 func (l *Listener) OnCancel(pid []byte, txIndex int32)                                           {}

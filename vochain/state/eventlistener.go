@@ -1,6 +1,9 @@
 package state
 
-import "go.vocdoni.io/proto/build/go/models"
+import (
+	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/proto/build/go/models"
+)
 
 // EventListener is an interface used for executing custom functions during the
 // events of the block creation process.
@@ -16,7 +19,7 @@ import "go.vocdoni.io/proto/build/go/models"
 // valid or not since the Vochain State do not validate results.
 type EventListener interface {
 	OnVote(vote *models.Vote, voterID VoterID, txIndex int32)
-	OnNewTx(hash []byte, blockHeight uint32, txIndex int32)
+	OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32)
 	OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
 	OnCancel(pid []byte, txIndex int32)

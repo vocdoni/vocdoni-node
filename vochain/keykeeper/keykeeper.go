@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -249,7 +250,7 @@ func (k *KeyKeeper) OnVote(v *models.Vote, voterID state.VoterID, txindex int32)
 }
 
 // OnNewTx is not used by the KeyKeeper
-func (k *KeyKeeper) OnNewTx(hash []byte, blockHeight uint32, txIndex int32) {
+func (k *KeyKeeper) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {
 	// do nothing
 }
 

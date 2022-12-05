@@ -22,6 +22,7 @@ import (
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/vochaintx"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
@@ -193,12 +194,25 @@ func (app *BaseApplication) SetTestingMethods() {
 	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
 	app.SetFnGetBlockByHeight(mockBlockStore.Get)
 	app.SetFnGetTx(func(height uint32, txIndex int32) (*models.SignedTx, error) {
+		log.Warnf("AQUI")
 		blk := mockBlockStore.Get(int64(height))
+		if blk == nil {
+			return nil, fmt.Errorf("block not found")
+		}
+		if len(blk.Txs) <= int(txIndex) {
+			return nil, fmt.Errorf("txIndex out of range")
+		}
 		stx := models.SignedTx{}
 		return &stx, proto.Unmarshal(blk.Txs[txIndex], &stx)
 	})
 	app.SetFnGetTxHash(func(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 		blk := mockBlockStore.Get(int64(height))
+		if blk == nil {
+			return nil, nil, fmt.Errorf("block not found")
+		}
+		if len(blk.Txs) <= int(txIndex) {
+			return nil, nil, fmt.Errorf("txIndex out of range")
+		}
 		stx := models.SignedTx{}
 		tx := blk.Txs[txIndex]
 		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
@@ -487,7 +501,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0}
 	}
-	tx := new(VochainTx)
+	tx := new(vochaintx.VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		if response, err = app.AddTx(tx, false); err != nil {
 			if errors.Is(err, ErrorAlreadyExistInCache) {
@@ -513,7 +527,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
-	tx := new(VochainTx)
+	tx := new(vochaintx.VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		log.Debugf("deliver tx: %s", log.FormatProto(tx.Tx))
 		if response, err = app.AddTx(tx, true); err != nil {
@@ -521,7 +535,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
 		for _, e := range app.State.EventListeners() {
-			e.OnNewTx(tmtypes.Tx(req.Tx).Hash(), app.Height()+1, app.State.TxCounter())
+			e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
 		}
 	} else {
 		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}

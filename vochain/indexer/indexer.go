@@ -245,7 +245,6 @@ func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 	entityCountStore := new(indexertypes.CountStore)
 	if enableBadgerhold {
 		if err = idx.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
-			log.Warnf("could not get the transaction count: %v", err)
 			count, err := idx.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
 			if err != nil {
 				if err != badger.ErrKeyNotFound {
@@ -262,7 +261,6 @@ func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 			}
 		}
 		if err = idx.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
-			log.Warnf("could not get the envelope count: %v", err)
 			count, err := idx.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total envelopes: %v", err)
@@ -275,7 +273,6 @@ func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 			}
 		}
 		if err = idx.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
-			log.Warnf("could not get the process count: %v", err)
 			count, err := idx.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total processes: %v", err)
@@ -288,7 +285,6 @@ func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 			}
 		}
 		if err = idx.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
-			log.Warnf("could not get the entity count: %v", err)
 			count, err := idx.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
 			if err != nil && err != badger.ErrKeyNotFound {
 				return nil, fmt.Errorf("could not count total entities: %v", err)

@@ -78,7 +78,8 @@ type State struct {
 	db db.Database
 	// Store contains the StateDB.  We match every StateDB commit version
 	// with the block height.
-	Store *statedb.StateDB
+	Store          *statedb.StateDB
+	eventListeners []EventListener
 	// Tx must always be accessed via mutex because there will be
 	// concurrent operations on it.  In particular, while the Tx is being
 	// written serially via Tendermint DeliverTx (which updates the StateDB
@@ -90,7 +91,6 @@ type State struct {
 	DisableVoteCache  atomic.Value
 	voteCache         *lru.Cache
 	txCounter         int32
-	eventListeners    []EventListener
 	// currentHeight is the height of the current started block
 	currentHeight uint32
 	// chainID identifies the blockchain
