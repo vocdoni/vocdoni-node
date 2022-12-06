@@ -13,8 +13,8 @@ import (
 	"time"
 
 	chiprometheus "github.com/766b/chi-prometheus"
-	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	reuse "github.com/libp2p/go-reuseport"
 	"go.uber.org/zap"

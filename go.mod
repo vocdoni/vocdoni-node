@@ -27,11 +27,11 @@ require (
 	github.com/fatih/color v1.13.0
 	github.com/frankban/quicktest v1.14.3
 	github.com/glendc/go-external-ip v0.1.0
-	github.com/go-chi/chi v4.1.2+incompatible
+	github.com/go-chi/chi/v5 v5.0.7
 	github.com/go-chi/cors v1.2.1
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/golang-lru v0.5.5-0.20210104140557-80c98217689d
+	github.com/hashicorp/golang-lru v0.6.0
 	github.com/iden3/go-iden3-crypto v0.0.13
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-ipfs-files v0.1.1
@@ -120,6 +120,7 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.1 // indirect
 	github.com/getsentry/sentry-go v0.12.0 // indirect
+	github.com/go-chi/chi v4.1.2+incompatible // indirect
 	github.com/go-kit/kit v0.12.0 // indirect
 	github.com/go-kit/log v0.2.1 // indirect
 	github.com/go-logfmt/logfmt v0.5.1 // indirect
