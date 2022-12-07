@@ -118,6 +118,7 @@ func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
 			Hash:         tx.Hash,
 			BlockHeight:  int64(tx.BlockHeight),
 			TxBlockIndex: int64(tx.TxBlockIndex),
+			TxType:       tx.TxType,
 		}); err != nil {
 			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
 			return
