@@ -377,7 +377,8 @@ func (a *API) chainBlockHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+
+	return ctx.Send(convertKeysToCamel(data), bearerstdapi.HTTPstatusCodeOK)
 }
 
 // GET /chain/blocks/hash/<hash>
@@ -395,5 +396,5 @@ func (a *API) chainBlockByHashHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), bearerstdapi.HTTPstatusCodeOK)
 }

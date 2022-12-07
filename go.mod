@@ -68,6 +68,8 @@ require (
 	google.golang.org/protobuf v1.28.1
 )
 
+require github.com/iancoleman/strcase v0.2.0
+
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
