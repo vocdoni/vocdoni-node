@@ -13,11 +13,11 @@ COMPOSE_CMD=${COMPOSE_CMD:-"docker-compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
 [ -n "$NOTTY" ] && COMPOSE_CMD_RUN="$COMPOSE_CMD_RUN -T"
 
-ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-300}
+ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-30}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-info}
-CONCURRENT=${CONCURRENT:-1}
+CONCURRENT=${CONCURRENT:-0}
 ### must be splited by lines
 DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11
 be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
@@ -40,10 +40,9 @@ RANDOMID="${RANDOM}${RANDOM}"
 
 tests_to_run=(
 	"tokentransactions"
-	"merkle_vote_plaintext"
+	"merkle_vote_encrypted"
 	"cspvoting"
 	"anonvoting"
-	"merkle_vote_encrypted"
 )
 
 # print help
@@ -52,8 +51,9 @@ tests_to_run=(
 	echo "available tests: ${tests_to_run[@]}"
 	echo "env vars:"
 	echo "  CLEAN=1"
-	echo "  ELECTION_SIZE=300"
-	echo "  ELECTION_SIZE_ANON=10"
+	echo "  ELECTION_SIZE=30"
+	echo "  ELECTION_SIZE_ANON=8"
+	echo "  CONCURRENT=0"
 	echo "  LOGLEVEL=info"
 	echo "  GWHOST=http://gateway0:9090/dvote"
 	exit 0
