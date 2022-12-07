@@ -11,7 +11,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 const (
@@ -77,6 +76,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		bearerstdapi.MethodAccessTypePublic,
 		a.chainTxbyHashHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions/reference/index/{index}",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.chainTxByIndexHandler,
 	); err != nil {
 		return err
 	}
@@ -268,21 +275,16 @@ func (a *API) chainTxListPaginated(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	if err != nil {
 		return err
 	}
-	firstTx := page * MaxPageSize
-	//lastTx := firstTx + MaxPageSize
-	refs := []*indexertypes.TxReference{}
-	if firstTx == 0 {
-		refs, err = a.indexer.GetLastTxReferences(MaxPageSize)
-		if err != nil {
-			return err
-		}
+	offset := int32(page * MaxPageSize)
+	refs, err := a.indexer.GetLastTxReferences(MaxPageSize, offset)
+	if err != nil {
+		return err
 	}
 	data, err := json.Marshal(refs)
 	if err != nil {
 		return err
 	}
 	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
-
 }
 
 // /chain/transactions/reference/<hash>
@@ -295,7 +297,6 @@ func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	if err != nil {
 		return ErrTransactionNotFound
 	}
-
 	data, err := json.Marshal(ref)
 	if err != nil {
 		return err
@@ -314,11 +315,28 @@ func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if err != nil {
 		return err
 	}
-	stx, err := a.indexer.App.GetTx(uint32(height), int32(index))
+	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
 		return fmt.Errorf("cannot get tx: %w", err)
 	}
 	return ctx.Send([]byte(protoFormat(stx.Tx)), bearerstdapi.HTTPstatusCodeOK)
+}
+
+// /chain/transactions/reference/index/<index>
+func (a *API) chainTxByIndexHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
+	if err != nil {
+		return err
+	}
+	ref, err := a.indexer.GetTxReference(index)
+	if err != nil {
+		return fmt.Errorf("cannot get tx: %w", err)
+	}
+	data, err := json.Marshal(ref)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
 // GET /chain/validators
