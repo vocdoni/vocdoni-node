@@ -1010,7 +1010,7 @@ func TestTxIndexer(t *testing.T) {
 		}
 	}
 
-	txs, err := idx.GetLastTxReferences(15)
+	txs, err := idx.GetLastTxReferences(15, 0)
 	qt.Assert(t, err, qt.IsNil)
 	for i, tx := range txs {
 		// Index is between 1 and totalCount.
@@ -1019,6 +1019,11 @@ func TestTxIndexer(t *testing.T) {
 		qt.Assert(t, tx.BlockHeight, qt.Equals, uint32(totalTxs-i-1)/txsPerBlock)
 		qt.Assert(t, tx.TxBlockIndex, qt.Equals, int32(totalTxs-i-1)%txsPerBlock)
 	}
+
+	txs, err = idx.GetLastTxReferences(1, 5)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, txs, qt.HasLen, 1)
+	qt.Assert(t, txs[0].Index, qt.Equals, uint64(95))
 }
 
 // Test that we can do concurrent reads and writes to sqlite without running

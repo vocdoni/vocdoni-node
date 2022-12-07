@@ -5,8 +5,8 @@ CREATE TABLE tx_references (
   id             INTEGER NOT NULL PRIMARY KEY,
   hash           BLOB NOT NULL,
   block_height   INTEGER NOT NULL,
-  tx_block_index INTEGER NOT NULL
-
+  tx_block_index INTEGER NOT NULL,
+  tx_type        TEXT NOT NULL
 );
 
 CREATE INDEX tx_references_hash
