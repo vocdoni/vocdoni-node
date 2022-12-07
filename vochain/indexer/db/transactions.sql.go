@@ -25,9 +25,9 @@ func (q *Queries) CountTxReferences(ctx context.Context) (int64, error) {
 
 const createTxReference = `-- name: CreateTxReference :execresult
 INSERT INTO tx_references (
-	hash, block_height, tx_block_index
+	hash, block_height, tx_block_index, tx_type
 ) VALUES (
-	?, ?, ?
+	?, ?, ?, ?
 )
 `
 
@@ -35,20 +35,32 @@ type CreateTxReferenceParams struct {
 	Hash         types.Hash
 	BlockHeight  int64
 	TxBlockIndex int64
+	TxType       string
 }
 
 func (q *Queries) CreateTxReference(ctx context.Context, arg CreateTxReferenceParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createTxReference, arg.Hash, arg.BlockHeight, arg.TxBlockIndex)
+	return q.db.ExecContext(ctx, createTxReference,
+		arg.Hash,
+		arg.BlockHeight,
+		arg.TxBlockIndex,
+		arg.TxType,
+	)
 }
 
 const getLastTxReferences = `-- name: GetLastTxReferences :many
-SELECT id, hash, block_height, tx_block_index FROM tx_references
+SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
 ORDER BY id DESC
 LIMIT ?
+OFFSET ?
 `
 
-func (q *Queries) GetLastTxReferences(ctx context.Context, limit int32) ([]TxReference, error) {
-	rows, err := q.db.QueryContext(ctx, getLastTxReferences, limit)
+type GetLastTxReferencesParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetLastTxReferences(ctx context.Context, arg GetLastTxReferencesParams) ([]TxReference, error) {
+	rows, err := q.db.QueryContext(ctx, getLastTxReferences, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +73,7 @@ func (q *Queries) GetLastTxReferences(ctx context.Context, limit int32) ([]TxRef
 			&i.Hash,
 			&i.BlockHeight,
 			&i.TxBlockIndex,
+			&i.TxType,
 		); err != nil {
 			return nil, err
 		}
@@ -76,7 +89,7 @@ func (q *Queries) GetLastTxReferences(ctx context.Context, limit int32) ([]TxRef
 }
 
 const getTxReference = `-- name: GetTxReference :one
-SELECT id, hash, block_height, tx_block_index FROM tx_references
+SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
 WHERE id = ?
 LIMIT 1
 `
@@ -89,12 +102,13 @@ func (q *Queries) GetTxReference(ctx context.Context, id int64) (TxReference, er
 		&i.Hash,
 		&i.BlockHeight,
 		&i.TxBlockIndex,
+		&i.TxType,
 	)
 	return i, err
 }
 
 const getTxReferenceByHash = `-- name: GetTxReferenceByHash :one
-SELECT id, hash, block_height, tx_block_index FROM tx_references
+SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
 WHERE hash = ?
 LIMIT 1
 `
@@ -107,6 +121,7 @@ func (q *Queries) GetTxReferenceByHash(ctx context.Context, hash types.Hash) (Tx
 		&i.Hash,
 		&i.BlockHeight,
 		&i.TxBlockIndex,
+		&i.TxType,
 	)
 	return i, err
 }

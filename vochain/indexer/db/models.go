@@ -50,6 +50,7 @@ type TxReference struct {
 	Hash         types.Hash
 	BlockHeight  int64
 	TxBlockIndex int64
+	TxType       string
 }
 
 type VoteReference struct {

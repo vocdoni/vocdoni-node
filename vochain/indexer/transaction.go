@@ -67,10 +67,13 @@ func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxRefer
 
 // GetLastTxReferences fetches a number of the latest indexed transactions.
 // The first one returned is the newest, so they are in descending order.
-func (s *Indexer) GetLastTxReferences(limit int32) ([]*indexertypes.TxReference, error) {
+func (s *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxReference, error) {
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	sqlTxRefs, err := queries.GetLastTxReferences(ctx, limit)
+	sqlTxRefs, err := queries.GetLastTxReferences(ctx, indexerdb.GetLastTxReferencesParams{
+		Limit:  limit,
+		Offset: offset,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("could not get last %d tx refs: %v", limit, err)
 	}
