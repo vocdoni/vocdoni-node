@@ -532,8 +532,12 @@ func TestSetTransactionsCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// should not change tx costs if not treasurer
-	if err := testSetTransactionCostsTx(t, app, &signer, 0, 20); err == nil {
+	randomAcc := ethereum.SignKeys{}
+	if err := randomAcc.Generate(); err != nil {
 		t.Fatal(err)
+	}
+	if err := testSetTransactionCostsTx(t, app, &randomAcc, 0, 30); err == nil {
+		t.Fatal("should not change tx costs if not treasurer")
 	}
 	if cost, err := app.State.TxCost(models.TxType_COLLECT_FAUCET, false); err != nil {
 		t.Fatal(err)
