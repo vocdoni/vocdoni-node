@@ -14,8 +14,7 @@ import (
 	ethereumhandler "go.vocdoni.io/dvote/ethereum/handler"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
-	models "go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 var ethereumEventList = map[string]string{
@@ -136,31 +135,9 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			processTx.Process.StartBlock = e.VochainApp.Height() + processStartBlockDelay
 		}
 
-		oracle, err := e.getAccount(e.Signer.Address())
-		if err != nil {
-			return fmt.Errorf("newProcess handle: %w", err)
-		}
-		processTx.Nonce = oracle.GetNonce()
-		stx := &models.SignedTx{}
-		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: processTx}})
-		if err != nil {
-			return fmt.Errorf("cannot marshal newProcess tx: %w", err)
-		}
-		stx.Signature, err = e.Signer.SignVocdoniTx(stx.Tx, e.VochainApp.ChainID())
-		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: %w", err)
-		}
-		txb, err := proto.Marshal(stx)
-		if err != nil {
-			return fmt.Errorf("error marshaling process tx: %s", err)
-		}
-		log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
-
-		res, err := e.VochainApp.SendTx(txb)
-		if err != nil || res == nil {
-			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-		}
-		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+		// Enqueue the transaction
+		e.transactionPool <- &pendingTransaction{tx: &models.Tx_NewProcess{NewProcess: processTx}}
+		log.Debugf("enqueued tx: %s", log.FormatProto(processTx))
 
 	case ethereumEventList["processesStatusUpdated"]:
 		log.Infof("executing StatusUpdate event")
@@ -181,31 +158,10 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 			log.Infof("process already canceled or ended, skipping")
 			return nil
 		}
-		oracle, err := e.getAccount(e.Signer.Address())
-		if err != nil {
-			return fmt.Errorf("set process handle: %w", err)
-		}
-		setProcessTx.Nonce = oracle.GetNonce()
-		stx := &models.SignedTx{}
-		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
-		if err != nil {
-			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
-		}
-		stx.Signature, err = e.Signer.SignVocdoniTx(stx.Tx, e.VochainApp.ChainID())
-		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: %w", err)
-		}
-		txb, err := proto.Marshal(stx)
-		if err != nil {
-			return fmt.Errorf("error marshaling process tx: %w", err)
-		}
-		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
 
-		res, err := e.VochainApp.SendTx(txb)
-		if err != nil || res == nil {
-			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-		}
-		log.Infof("oracle transaction sent, hash: %x", res.Hash)
+		// enqueue transaction
+		e.transactionPool <- &pendingTransaction{tx: &models.Tx_SetProcess{SetProcess: setProcessTx}}
+		log.Debugf("enqueued tx: %s", log.FormatProto(setProcessTx))
 
 	case ethereumEventList["processesCensusUpdated"]:
 		log.Infof("executing CensusUpdate event")
@@ -240,31 +196,10 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 				p.CensusOrigin.String())
 		}
 
-		oracle, err := e.getAccount(e.Signer.Address())
-		if err != nil {
-			return fmt.Errorf("set census handle: %w", err)
-		}
-		setProcessTx.Nonce = oracle.GetNonce()
-		stx := &models.SignedTx{}
-		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: setProcessTx}})
-		if err != nil {
-			return fmt.Errorf("cannot marshal setProcess tx: %w", err)
-		}
-		stx.Signature, err = e.Signer.SignVocdoniTx(stx.Tx, e.VochainApp.ChainID())
-		if err != nil {
-			return fmt.Errorf("cannot sign oracle tx: %w", err)
-		}
-		tx, err := proto.Marshal(stx)
-		if err != nil {
-			return fmt.Errorf("error marshaling process tx: %w", err)
-		}
-		log.Debugf("broadcasting tx: %s", log.FormatProto(setProcessTx))
+		// enqueue transaction
+		e.transactionPool <- &pendingTransaction{tx: &models.Tx_SetProcess{SetProcess: setProcessTx}}
+		log.Debugf("enqueued tx: %s", log.FormatProto(setProcessTx))
 
-		res, err := e.VochainApp.SendTx(tx)
-		if err != nil || res == nil {
-			return fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-		}
-		log.Infof("oracle transaction sent, hash: %x", res.Hash)
 	default:
 		log.Debugf("no event configured for %s", event.Topics[0].Hex())
 	}
@@ -338,15 +273,4 @@ func checkEthereumTxCreator(
 		return fmt.Errorf("recovered address not in ethereum whitelist")
 	}
 	return nil
-}
-
-func (e *EthereumEvents) getAccount(addr common.Address) (*vochain.Account, error) {
-	acc, err := e.VochainApp.State.GetAccount(e.Signer.Address(), false)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get account")
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("account does not exist")
-	}
-	return acc, nil
 }
