@@ -587,25 +587,25 @@ func TestMintTokensTx(t *testing.T) {
 	app.Commit()
 
 	// should mint
-	if err := testMintTokensTx(t, &signer, app, randomEthAccount, 100, 0); err != nil {
+	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, 0); err != nil {
 		t.Fatal(err)
 	}
 
 	// should fail minting if invalid value
-	if err := testMintTokensTx(t, &signer, app, randomEthAccount, 0, 0); err == nil {
+	if err := testMintTokensTx(t, &signer, app, toAccAddr, 0, 0); err == nil {
 		t.Fatal(err)
 	}
 
 	// should fail minting if invalid account
-	if err := testMintTokensTx(t, &signer, app, "0x0", 100, 1); err == nil {
+	if err := testMintTokensTx(t, &signer, app, common.HexToAddress("0x0"), 100, 1); err == nil {
 		t.Fatal(err)
 	}
 	// should fail minting if not treasurer
-	if err := testMintTokensTx(t, &notTreasurer, app, randomEthAccount, 100, 1); err == nil {
+	if err := testMintTokensTx(t, &notTreasurer, app, toAccAddr, 100, 1); err == nil {
 		t.Fatal(err)
 	}
 	// should fail minting if invalid nonce
-	if err := testMintTokensTx(t, &signer, app, randomEthAccount, 100, rand.Uint32()); err == nil {
+	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, rand.Uint32()); err == nil {
 		t.Fatal(err)
 	}
 
@@ -632,12 +632,11 @@ func TestMintTokensTx(t *testing.T) {
 func testMintTokensTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
-	to string,
+	toAddr common.Address,
 	value uint64,
 	nonce uint32) error {
 	var err error
 
-	toAddr := common.HexToAddress(to)
 	// tx
 	tx := &models.MintTokensTx{
 		Txtype: models.TxType_MINT_TOKENS,
@@ -685,20 +684,20 @@ func TestSendTokensTx(t *testing.T) {
 	app.Commit()
 
 	// should send
-	err = testSendTokensTx(t, &signer, app, toAccAddr.String(), 100, 0)
+	err = testSendTokensTx(t, &signer, app, toAccAddr, 100, 0)
 	qt.Assert(t, err, qt.IsNil)
 
 	// should fail sending if incorrect nonce
-	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 0)
+	err = testSendTokensTx(t, &signer, app, toAccAddr, 100, 0)
 	qt.Assert(t, err, qt.IsNotNil)
 	// should fail sending if to acc does not exist
 	noAccount := ethereum.SignKeys{}
 	err = noAccount.Generate()
 	qt.Assert(t, err, qt.IsNil)
-	err = testSendTokensTx(t, &signer, app, noAccount.Address().String(), 100, 1)
+	err = testSendTokensTx(t, &signer, app, noAccount.Address(), 100, 1)
 	qt.Assert(t, err, qt.IsNotNil)
-	// should fail sending if not enought balance
-	err = testSendTokensTx(t, &signer, app, randomEthAccount, 1000, 1)
+	// should fail sending if not enough balance
+	err = testSendTokensTx(t, &signer, app, toAccAddr, 1000, 1)
 	qt.Assert(t, err, qt.IsNotNil)
 	// get to account
 	toAcc, err := app.State.GetAccount(toAccAddr, false)
@@ -715,12 +714,11 @@ func TestSendTokensTx(t *testing.T) {
 func testSendTokensTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
-	to string,
+	toAddr common.Address,
 	value uint64,
 	nonce uint32) error {
 	var err error
 
-	toAddr := common.HexToAddress(to)
 	// tx
 	tx := &models.SendTokensTx{
 		Txtype: models.TxType_SEND_TOKENS,
