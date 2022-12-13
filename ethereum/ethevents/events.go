@@ -58,6 +58,8 @@ type EthereumEvents struct {
 	EthereumLastKnownBlock uint64
 	// block confirm threshold for the network
 	blockConfirmThreshold time.Duration
+	// transactionPool is a channel that receives pending transactions
+	transactionPool chan (*pendingTransaction)
 }
 
 type timedEvent struct {
@@ -130,8 +132,9 @@ func NewEthEvents(
 		ContractsAddress:       contractsAddress,
 		ContractsInfo:          contracts,
 		blockConfirmThreshold:  confirmThreshold,
+		transactionPool:        make(chan *pendingTransaction, 100),
 	}
-
+	go ethev.transactionHandler()
 	return ethev, nil
 }
 
