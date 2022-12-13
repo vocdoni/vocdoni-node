@@ -39,7 +39,10 @@ type SignKeys struct {
 // NewSignKeys creates an ECDSA pair of keys for signing
 // and initializes the map for authorized keys
 func NewSignKeys() *SignKeys {
-	return &SignKeys{Authorized: make(map[ethcommon.Address]bool)}
+	return &SignKeys{
+		Private:    ecdsa.PrivateKey{},
+		Authorized: make(map[ethcommon.Address]bool),
+	}
 }
 
 // Generate generates new keys
@@ -123,7 +126,9 @@ func (k *SignKeys) Address() ethcommon.Address {
 }
 
 // AddressString returns the ethereum Address as string
-func (k *SignKeys) AddressString() string { return ethcrypto.PubkeyToAddress(k.Public).String() }
+func (k *SignKeys) AddressString() string {
+	return ethcrypto.PubkeyToAddress(k.Public).String()
+}
 
 // SignEthereum signs a message. Message is a normal string (no HexString nor a Hash)
 func (k *SignKeys) SignEthereum(message []byte) ([]byte, error) {

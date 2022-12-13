@@ -107,7 +107,7 @@ func main() {
 		}
 	}
 
-	vc, err := vocone.NewVocone(config.dir, &mngKey, config.disableIpfs)
+	vc, err := vocone.NewVocone(config.dir, &mngKey)
 	if err != nil {
 		log.Fatal(err)
 	}
