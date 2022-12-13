@@ -26,8 +26,6 @@ const (
 	ModeSeed = "seed"
 	// ModeGateway starts the vocdoninode as a gateway
 	ModeGateway = "gateway"
-	// ModeEthAPIoracle starts an Ethereum signaling API oracle
-	ModeEthAPIoracle = "ethApiOracle"
 
 	// ProcessIDsize is the size of a process id
 	ProcessIDsize = 32

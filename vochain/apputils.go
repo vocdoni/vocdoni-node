@@ -18,7 +18,6 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtime "github.com/tendermint/tendermint/libs/time"
@@ -28,11 +27,8 @@ import (
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
-func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
-	pv, err := privval.LoadOrGenFilePV(
-		tconfig.PrivValidator.KeyFile(),
-		tconfig.PrivValidator.StateFile(),
-	)
+func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval.FilePV, error) {
+	pv, err := privval.LoadOrGenFilePV(keyFilePath, stateFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,7 +50,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 }
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error) {
+func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 	if tmPrivKey == "" {
 		return nil, fmt.Errorf("nodekey not specified")
 	}
@@ -66,7 +62,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error)
 	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
 	nodeKey.ID = tmtypes.NodeIDFromPubKey(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
-	return nodeKey, nodeKey.SaveAs(tconfig.NodeKeyFile())
+	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
 }
 
 // NewGenesis creates a new genesis and return its bytes

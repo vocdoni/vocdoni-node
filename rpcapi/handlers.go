@@ -14,9 +14,8 @@ import (
 // EnableFileAPI enables the FILE API in the Router
 func (r *RPCAPI) EnableFileAPI(storage data.Storage) error {
 	if storage == nil {
-		return fmt.Errorf("storage cannot be nil for file API")
+		return fmt.Errorf("storage cannot be nil for file RPC")
 	}
-	log.Infof("enabling file API")
 	r.storage = storage
 	r.APIs = append(r.APIs, "file")
 
@@ -35,9 +34,8 @@ func (r *RPCAPI) EnableFileAPI(storage data.Storage) error {
 // EnableCensusAPI enables the Census API in the Router
 func (r *RPCAPI) EnableCensusAPI(cm *census.Manager) error {
 	if cm == nil {
-		return fmt.Errorf("census manager cannot be nil for census API")
+		return fmt.Errorf("census manager cannot be nil for census RPC")
 	}
-	log.Infof("enabling census API")
 	r.APIs = append(r.APIs, "census")
 	r.census = cm
 	if cm.RemoteStorage == nil {
@@ -67,7 +65,6 @@ func (r *RPCAPI) EnableVoteAPI(vocapp *vochain.BaseApplication, vocinfo *vochain
 	if (r.vocapp == nil && vocapp == nil) || (r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or vocdoni Info are nil")
 	}
-	log.Infof("enabling vote API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
@@ -97,7 +94,6 @@ func (r *RPCAPI) EnableResultsAPI(vocapp *vochain.BaseApplication, indexer *inde
 	if (r.vocapp == nil && vocapp == nil) || (r.indexer == nil && indexer == nil) {
 		return fmt.Errorf("vocdoni APP or indexer are nil")
 	}
-	log.Infof("enabling results API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
@@ -128,7 +124,6 @@ func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 		(r.vocinfo == nil && vocinfo == nil) {
 		return fmt.Errorf("vocdoni APP or indexer are nil")
 	}
-	log.Infof("enabling indexer API")
 	if r.vocapp == nil {
 		r.vocapp = vocapp
 	}
@@ -140,7 +135,7 @@ func (r *RPCAPI) EnableIndexerAPI(vocapp *vochain.BaseApplication,
 	}
 
 	if r.indexer == nil {
-		log.Fatal("cannot enable indexer API without indexer")
+		log.Fatal("cannot enable indexer RPC without indexer")
 	}
 	r.APIs = append(r.APIs, "indexer")
 

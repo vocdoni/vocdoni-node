@@ -30,7 +30,7 @@ func TestVocone(t *testing.T) {
 	err = account.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng, true)
+	vc, err := NewVocone(dir, &keymng)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = vc.SetBulkTxCosts(0, true)

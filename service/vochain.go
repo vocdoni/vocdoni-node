@@ -4,42 +4,19 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
-	"go.vocdoni.io/dvote/api/censusdb"
-	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/data"
-	"go.vocdoni.io/dvote/data/downloader"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/indexer"
-	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
-	"go.vocdoni.io/dvote/vochain/processarchive"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-type VochainService struct {
-	Config         *config.VochainCfg
-	App            *vochain.BaseApplication
-	MetricsAgent   *metrics.Agent
-	OffChainData   *offchaindatahandler.OffChainDataHandler
-	DataDownloader *downloader.Downloader
-	CensusDB       *censusdb.CensusDB
-	Indexer        *indexer.Indexer
-	Stats          *vochaininfo.VochainInfo
-	Storage        data.Storage
-}
-
-// NewVochainService initializes the Vochain service.  It takes the service configuration and
-// initializes the missing services of the VochainService struct.  All started services will be
+// Vochain initializes the Vochain service.  It takes the service configuration and
+// initializes the missing services of the VocdoniService struct.  All started services will be
 // respected unless the App, which is the main service and thus overwriten by this function.
-func NewVochainService(vs *VochainService) error {
+func (vs *VocdoniService) Vochain() error {
 	log.Infof("creating vochain service for network %s", vs.Config.Chain)
 	// node + app layer
 	if len(vs.Config.PublicAddr) == 0 {
@@ -64,9 +41,7 @@ func NewVochainService(vs *VochainService) error {
 		}
 		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
-	log.Infof("vochain listening on: %s", vs.Config.P2PListen)
-	log.Infof("vochain exposed IP address: %s", vs.Config.PublicAddr)
-	log.Infof("vochain RPC listening on: %s", vs.Config.RPCListen)
+	log.Infof("vochain listening on: %s:%s", vs.Config.PublicAddr, vs.Config.P2PListen)
 
 	// Genesis file
 	var genesisBytes []byte
@@ -130,62 +105,6 @@ func NewVochainService(vs *VochainService) error {
 	// If seed mode, we are finished
 	if vs.Config.IsSeedNode {
 		return vs.App.Service.Start()
-	}
-
-	// Indexer
-	if vs.Config.Indexer.Enabled && vs.Indexer == nil {
-		log.Info("creating vochain indexer service")
-		if vs.Indexer, err = indexer.NewIndexer(
-			filepath.Join(vs.Config.DataDir, "indexer"),
-			vs.App,
-			!vs.Config.Indexer.IgnoreLiveResults,
-		); err != nil {
-			return err
-		}
-		// Launch the indexer after sync routine (executed when the blockchain is ready)
-		go vs.Indexer.AfterSyncBootstrap()
-	}
-
-	// Data Downloader
-	if vs.Config.OffChainDataDownloader && vs.OffChainData == nil {
-		log.Infof("creating offchain data downloader service")
-		if vs.DataDownloader == nil {
-			vs.DataDownloader = downloader.NewDownloader(vs.Storage)
-			vs.DataDownloader.Start()
-			go vs.DataDownloader.PrintLogInfo(time.Second * 30)
-		}
-		if vs.CensusDB == nil {
-			db, err := metadb.New(db.TypePebble, filepath.Join(vs.Config.DataDir, "censusdb"))
-			if err != nil {
-				return err
-			}
-			vs.CensusDB = censusdb.NewCensusDB(db)
-		}
-		vs.OffChainData = offchaindatahandler.NewOffChainDataHandler(
-			vs.App,
-			vs.DataDownloader,
-			vs.CensusDB,
-			!vs.Config.ImportPreviousCensus,
-		)
-	}
-
-	// Process Archiver
-	if vs.Config.ProcessArchive {
-		if vs.Indexer == nil {
-			err = fmt.Errorf("process archive needs indexer enabled")
-			return err
-		}
-		ipfs, ok := vs.Storage.(*data.IPFSHandle)
-		if !ok {
-			log.Warnf("ipfsStorage is not IPFS, archive publishing disabled")
-		}
-		log.Infof("starting process archiver on %s", vs.Config.ProcessArchiveDataDir)
-		processarchive.NewProcessArchive(
-			vs.Indexer,
-			ipfs,
-			vs.Config.ProcessArchiveDataDir,
-			vs.Config.ProcessArchiveKey,
-		)
 	}
 
 	// Vochain info

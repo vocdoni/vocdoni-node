@@ -1,0 +1,68 @@
+version: "3.4"
+services:
+  traefik:
+    image: "traefik:v2.5"
+    container_name: "traefik"
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.dnschallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_LE_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      - "--log.level=DEBUG"
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - "CLOUDFLARE_EMAIL=${TRAEFIK_CF_EMAIL}"
+      - "CLOUDFLARE_DNS_API_TOKEN=${TRAEFIK_CF_TOKEN}"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  dvotenode:
+    image: "ghcr.io/vocdoni/go-dvote:${VOCDONI_NODE_TAG:-dev}"
+    env_file: env
+    volumes:
+      - "run:/app/run"
+    ports:
+      - "9090:9090"
+      - "9091:9091"
+      - "4001:4001"
+      - "4171:4171"
+      - "5001:5001"
+      - "30303:30303"
+      - "30303:30303/udp"
+      - "9096:9096"
+      - "26656:26656"
+      - "26657:26657"
+      - "26658:26658"
+      - "61000-61100:61000-61100"
+    sysctls:
+      net.core.somaxconn: 8128
+    restart: ${RESTART:-always}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dvotenode.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.dvotenode.entrypoints=websecure"
+      - "traefik.http.routers.dvotenode.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.dvotenode.service=dvotenode"
+      - "traefik.http.services.dvotenode.loadbalancer.server.port=9090"
+
+  watchtower:
+    image: containrrr/watchtower
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - com.centurylinklabs.watchtower.enable="false"
+    command: --interval 30
+
+volumes:
+  run: {}
+

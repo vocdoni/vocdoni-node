@@ -106,10 +106,9 @@ func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
 	return &TenderLogger{Artifact: artifact, Disabled: disabled}
 }
 
-// we need to set init (first time validators and oracles)
+// newTendermint creates a new tendermint node attached to the given ABCI app
 func newTendermint(app *BaseApplication,
 	localConfig *config.VochainCfg, genesis []byte) (service.Service, error) {
-	// create node config
 	var err error
 
 	tconfig := tmcfg.DefaultConfig()
@@ -120,7 +119,6 @@ func newTendermint(app *BaseApplication,
 	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
 		log.Fatal(err)
 	}
-
 	// p2p config
 	tconfig.LogLevel = localConfig.LogLevel
 	if tconfig.LogLevel == "none" {
@@ -141,15 +139,13 @@ func newTendermint(app *BaseApplication,
 	}
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
-	if !localConfig.CreateGenesis {
-		tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-		if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
-			!localConfig.IsSeedNode && ok {
-			tconfig.P2P.BootstrapPeers = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
-		}
-		if len(tconfig.P2P.BootstrapPeers) > 0 {
-			log.Infof("seed nodes: %s", tconfig.P2P.BootstrapPeers)
-		}
+	tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
+	if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
+		!localConfig.IsSeedNode && ok {
+		tconfig.P2P.BootstrapPeers = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
+	}
+	if len(tconfig.P2P.BootstrapPeers) > 0 {
+		log.Infof("seed nodes: %s", tconfig.P2P.BootstrapPeers)
 	}
 
 	if len(localConfig.Peers) > 0 {
@@ -214,19 +210,8 @@ func newTendermint(app *BaseApplication,
 	tconfig.DBBackend = string(tmdbBackend)
 	log.Infof("using db backend %s", tconfig.DBBackend)
 
-	if localConfig.Genesis != "" && !localConfig.CreateGenesis {
-		if isAbs := strings.HasPrefix(localConfig.Genesis, "/"); !isAbs {
-			dir, err := os.Getwd()
-			if err != nil {
-				log.Fatal(err)
-			}
-			tconfig.Genesis = filepath.Join(dir, localConfig.Genesis)
-
-		} else {
-			tconfig.Genesis = localConfig.Genesis
-		}
-	} else {
-		tconfig.Genesis = tconfig.GenesisFile()
+	if localConfig.Genesis != "" {
+		tconfig.Genesis = localConfig.Genesis
 	}
 
 	if err := tconfig.ValidateBasic(); err != nil {
@@ -239,26 +224,28 @@ func newTendermint(app *BaseApplication,
 	}
 
 	// read or create local private validator
-	pv, err := NewPrivateValidator(localConfig.MinerKey, tconfig)
+	pv, err := NewPrivateValidator(
+		localConfig.MinerKey,
+		tconfig.PrivValidator.KeyFile(),
+		tconfig.PrivValidator.StateFile())
 	if err != nil {
 		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
 	pv.Save()
 
-	log.Infof("tendermint validator private key %x", pv.Key.PrivKey)
 	log.Infof("tendermint validator address: %s", pv.Key.Address)
-	aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("amino private key: %s", aminoPrivKey)
-	log.Infof("amino public key: %s", aminoPubKey)
-	log.Infof("using keyfile %s", tconfig.PrivValidator.KeyFile())
+	//aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
+	//if err != nil {
+	//	return nil, err
+	//}
+	//log.Infof("amino private key: %s", aminoPrivKey)
+	//log.Infof("amino public key: %s", aminoPubKey)
+	//log.Infof("using keyfile %s", tconfig.PrivValidator.KeyFile())
 
 	// nodekey is used for the p2p transport layer
 	nodeKey := new(tmtypes.NodeKey)
 	if len(localConfig.NodeKey) > 0 {
-		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig)
+		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig.NodeKeyFile())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create node key: %w", err)
 		}
@@ -271,14 +258,14 @@ func newTendermint(app *BaseApplication,
 	log.Debugf("tendermint p2p config: %+v", tconfig.P2P)
 
 	// read or create genesis file
-	if tmos.FileExists(tconfig.Genesis) {
-		log.Infof("found genesis file %s", tconfig.Genesis)
+	if tmos.FileExists(tconfig.GenesisFile()) {
+		log.Infof("found genesis file %s", tconfig.GenesisFile())
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := os.WriteFile(tconfig.Genesis, genesis, 0o600); err != nil {
+		if err := os.WriteFile(tconfig.GenesisFile(), genesis, 0o600); err != nil {
 			return nil, err
 		}
-		log.Infof("new genesis created, stored at %s", tconfig.Genesis)
+		log.Infof("new genesis created, stored at %s", tconfig.GenesisFile())
 	}
 
 	if localConfig.TendermintMetrics {
@@ -296,7 +283,7 @@ func newTendermint(app *BaseApplication,
 	type genesisChainID struct {
 		ChainID string `json:"chain_id"`
 	}
-	genesisData, err := os.ReadFile(tconfig.Genesis)
+	genesisData, err := os.ReadFile(tconfig.GenesisFile())
 	if err != nil {
 		return nil, fmt.Errorf("cannot read genesis file: %w", err)
 	}
