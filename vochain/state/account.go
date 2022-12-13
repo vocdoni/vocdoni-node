@@ -218,6 +218,11 @@ func SetAccountInfoTxCheck(vtx *models.Tx, txBytes, signature []byte, state *Sta
 	if txSenderAccount == nil {
 		return ErrAccountNotExist
 	}
+	log.Warn("XXXX tx.GetNonce=", tx.GetNonce())
+	if tx.GetNonce() == 0 {
+		*tx.Nonce = txSenderAccount.GetNonce()
+	}
+	log.Warn("XXXY tx.GetNonce=", tx.GetNonce(), "txSenderAccount.GetNonce()=", txSenderAccount.GetNonce())
 	// check txSender nonce
 	if tx.GetNonce() != txSenderAccount.Nonce {
 		return fmt.Errorf(

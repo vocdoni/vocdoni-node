@@ -866,6 +866,9 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 		return 0, err
 	}
 	// check nonce
+	if tx.GetNonce() == 0 {
+		tx.Nonce = treasurer.Nonce
+	}
 	if tx.Nonce != treasurer.Nonce {
 		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
 	}
@@ -1150,6 +1153,9 @@ func MintTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate.
 			txSenderAddress.String(),
 		)
 	}
+	if tx.GetNonce() == 0 {
+		tx.Nonce = treasurer.Nonce
+	}
 	if tx.Nonce != treasurer.Nonce {
 		return fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
 	}
@@ -1211,6 +1217,9 @@ func SendTokensTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate.
 	}
 	if acc == nil {
 		return vstate.ErrAccountNotExist
+	}
+	if tx.GetNonce() == 0 {
+		tx.Nonce = acc.Nonce
 	}
 	if tx.Nonce != acc.Nonce {
 		return fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)

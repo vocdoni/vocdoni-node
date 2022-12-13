@@ -514,10 +514,11 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
 	return abcitypes.ResponseCheckTx{
-		Code: 0,
-		Data: response.Data,
-		Info: fmt.Sprintf("%x", response.TxHash),
-		Log:  response.Log,
+		Code:     0,
+		Data:     response.Data,
+		Info:     fmt.Sprintf("%x", response.TxHash),
+		Log:      response.Log,
+		Priority: 500,
 	}
 }
 

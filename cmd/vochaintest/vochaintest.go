@@ -283,12 +283,12 @@ func (c *testClient) ensureTxCostEquals(signer *ethereum.SignKeys, txType models
 			return fmt.Errorf("cannot get treasurer: %w", err)
 		}
 
-		log.Infof("will set %s txcost=%d (treasurer nonce: %d)", txType, cost, treasurerAccount.Nonce)
+		log.Infof("will set %s txcost=%d (treasurer nonce: %d) with nonce 0", txType, cost, treasurerAccount.Nonce)
 		txhash, err := c.SetTransactionCost(
 			signer,
 			txType,
 			cost,
-			treasurerAccount.Nonce)
+			0)
 		if err != nil {
 			log.Warn(err)
 			time.Sleep(time.Second)

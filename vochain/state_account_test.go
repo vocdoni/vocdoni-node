@@ -687,29 +687,35 @@ func TestSendTokensTx(t *testing.T) {
 	// should send
 	err = testSendTokensTx(t, &signer, app, toAccAddr.String(), 100, 0)
 	qt.Assert(t, err, qt.IsNil)
+	// should send
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 1)
+	qt.Assert(t, err, qt.IsNil)
 
+	// should fail sending if nonce is reused
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 1)
+	qt.Assert(t, err, qt.IsNotNil)
 	// should fail sending if incorrect nonce
-	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 0)
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 100, 1234)
 	qt.Assert(t, err, qt.IsNotNil)
 	// should fail sending if to acc does not exist
 	noAccount := ethereum.SignKeys{}
 	err = noAccount.Generate()
 	qt.Assert(t, err, qt.IsNil)
-	err = testSendTokensTx(t, &signer, app, noAccount.Address().String(), 100, 1)
+	err = testSendTokensTx(t, &signer, app, noAccount.Address().String(), 100, 2)
 	qt.Assert(t, err, qt.IsNotNil)
 	// should fail sending if not enought balance
-	err = testSendTokensTx(t, &signer, app, randomEthAccount, 1000, 1)
+	err = testSendTokensTx(t, &signer, app, randomEthAccount, 1000, 2)
 	qt.Assert(t, err, qt.IsNotNil)
 	// get to account
 	toAcc, err := app.State.GetAccount(toAccAddr, false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, toAcc, qt.IsNotNil)
-	qt.Assert(t, toAcc.Balance, qt.Equals, uint64(100))
+	qt.Assert(t, toAcc.Balance, qt.Equals, uint64(200))
 	// get from acc
 	fromAcc, err := app.State.GetAccount(signer.Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, fromAcc, qt.IsNotNil)
-	qt.Assert(t, fromAcc.Balance, qt.Equals, uint64(890))
+	qt.Assert(t, fromAcc.Balance, qt.Equals, uint64(780))
 }
 
 func testSendTokensTx(t *testing.T,
