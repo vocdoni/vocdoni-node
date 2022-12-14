@@ -25,10 +25,10 @@ import (
 
 func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
-	logLevel := flag.String("logLevel", "info", "log level")
+	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
 	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
-	paralelCount := flag.Int("paralel", 4, "number of paralel requests")
+	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
 	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
 	timeout := flag.Int("timeout", 5, "timeout in minutes")
 	flag.Parse()
@@ -155,7 +155,7 @@ func main() {
 		log.Fatalf("published census size is %d, expected %d", size, *nvotes)
 	}
 
-	// Generate the voting proofs (paralelized)
+	// Generate the voting proofs (parallelized)
 	type voterProof struct {
 		proof   *apiclient.CensusProof
 		address string
@@ -190,7 +190,7 @@ func main() {
 		}
 	}
 
-	pcount := *nvotes / *paralelCount
+	pcount := *nvotes / *parallelCount
 	var wg sync.WaitGroup
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
@@ -259,7 +259,7 @@ func main() {
 	// Wait for the election to start
 	waitUntilElectionStarts(api, electionID)
 
-	// Send the votes (paralelized)
+	// Send the votes (parallelized)
 	startTime := time.Now()
 	wg = sync.WaitGroup{}
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
@@ -306,7 +306,7 @@ func main() {
 		time.Sleep(time.Second * 2)
 	}
 
-	pcount = *nvotes / *paralelCount
+	pcount = *nvotes / *parallelCount
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
 		if end > len(voterAccounts) {
@@ -337,7 +337,7 @@ func main() {
 		}
 	}
 
-	log.Infof("%d votes registered successfully, took %s. At %d votes/second",
+	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
 		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
