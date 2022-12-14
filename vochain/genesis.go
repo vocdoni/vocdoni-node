@@ -394,13 +394,12 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-11-10T16:00:01.055210151Z",
-   "chain_id":"vocdoni-stage-22",
+   "genesis_time":"2022-12-14T09:00:01.055210151Z",
+   "chain_id":"vocdoni-stage-23",
    "consensus_params":{
       "block":{
          "max_bytes":"2048000",
-         "max_gas":"-1",
-         "time_iota_ms":"8000"
+         "max_gas":"-1"
       },
       "evidence":{
          "max_age_num_blocks":"100000",
@@ -495,22 +494,42 @@ var Genesis = map[string]VochainGenesis{
          "0xcf83836eab1a4697bb9f9d07d7fb82aed707d918",
          "0x949a4b6b5dc64cdc2518c15c8dfdead4ebd07df0"
       ],
+      "accounts":[
+         {
+            "address":"0x81ff945dda4b94690a13f49fdc8f0819970b2db0",
+            "balance":100000
+         },
+         {
+            "address":"0xcf83836eab1a4697bb9f9d07d7fb82aed707d918",
+            "balance":100000
+         },
+         {
+            "address":"0x949a4b6b5dc64cdc2518c15c8dfdead4ebd07df0",
+            "balance": 100000
+         },
+         {
+            "address": "0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0",
+            "balance": 1000000
+         }
+      ],
       "treasurer": "0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d",
       "tx_cost": {
-         "Tx_SetProcessStatus": 100,
-         "Tx_SetProcessCensus": 100,
-         "Tx_SetProcessResults": 100,
-         "Tx_SetProcessQuestionIndex": 100,
-         "Tx_RegisterKey": 100,
-         "Tx_NewProcess": 100,
-         "Tx_SendTokens": 100,
-         "Tx_CreateAccount": 100,
-         "Tx_SetAccountInfoURI": 100,
-         "Tx_AddDelegateForAccount": 100,
-         "Tx_DelDelegateForAccount": 100,
-         "Tx_CollectFaucet": 100
+         "Tx_SetProcessStatus": 1,
+         "Tx_SetProcessCensus": 1,
+         "Tx_SetProcessResults": 1,
+         "Tx_SetProcessQuestionIndex": 1,
+         "Tx_RegisterKey": 1,
+         "Tx_NewProcess": 5,
+         "Tx_SendTokens": 1,
+         "Tx_CreateAccount": 1,
+         "Tx_SetAccountInfoURI": 1,
+         "Tx_AddDelegateForAccount": 1,
+         "Tx_DelDelegateForAccount": 1,
+         "Tx_CollectFaucet": 1
        }
    }
+
+
 }
 `,
 	},
