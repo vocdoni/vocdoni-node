@@ -394,8 +394,8 @@ var Genesis = map[string]VochainGenesis{
 		},
 		Genesis: `
 {
-   "genesis_time":"2022-12-14T09:00:01.055210151Z",
-   "chain_id":"vocdoni-stage-23",
+   "genesis_time":"2022-12-14T14:00:01.055210151Z",
+   "chain_id":"vocdoni-stage-24",
    "consensus_params":{
       "block":{
          "max_bytes":"2048000",
@@ -491,8 +491,7 @@ var Genesis = map[string]VochainGenesis{
       ],
       "oracles":[
          "0x81ff945dda4b94690a13f49fdc8f0819970b2db0",
-         "0xcf83836eab1a4697bb9f9d07d7fb82aed707d918",
-         "0x949a4b6b5dc64cdc2518c15c8dfdead4ebd07df0"
+         "0x08acAbAfc667c21a82b07C87A269E701381641FC"
       ],
       "accounts":[
          {
@@ -500,11 +499,7 @@ var Genesis = map[string]VochainGenesis{
             "balance":100000
          },
          {
-            "address":"0xcf83836eab1a4697bb9f9d07d7fb82aed707d918",
-            "balance":100000
-         },
-         {
-            "address":"0x949a4b6b5dc64cdc2518c15c8dfdead4ebd07df0",
+            "address":"0x08acAbAfc667c21a82b07C87A269E701381641FC",
             "balance": 100000
          },
          {
@@ -528,8 +523,6 @@ var Genesis = map[string]VochainGenesis{
          "Tx_CollectFaucet": 1
        }
    }
-
-
 }
 `,
 	},

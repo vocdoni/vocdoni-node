@@ -393,15 +393,14 @@ func main() {
 
 		// Add signing private key if exist in configuration or flags
 		if len(globalCfg.SigningKey) != 32 {
-			log.Infof("adding custom signing key")
 			err := srv.Signer.AddHexKey(globalCfg.SigningKey)
 			if err != nil {
 				log.Fatalf("error adding hex key: (%s)", err)
 			}
-			log.Infof("using custom pubKey %x", srv.Signer.PublicKey())
 		} else {
-			log.Fatal("no private key or wrong key (size != 16 bytes)")
+			log.Fatal("wrong signing key length (32 hexadecomal chars expected)")
 		}
+		log.Infof("signing address %s, pubKey %x", srv.Signer.AddressString(), srv.Signer.PublicKey())
 	}
 
 	// HTTP(s) router for Gateway or Prometheus metrics
@@ -460,14 +459,14 @@ func main() {
 			}
 		}
 
-		if globalCfg.Vochain.ProcessArchive {
-			if err := srv.ProcessArchiver(); err != nil {
+		if globalCfg.Vochain.Indexer.Enabled {
+			if err := srv.VochainIndexer(); err != nil {
 				log.Fatal(err)
 			}
 		}
 
-		if globalCfg.Vochain.Indexer.Enabled {
-			if err := srv.VochainIndexer(); err != nil {
+		if globalCfg.Vochain.ProcessArchive {
+			if err := srv.ProcessArchiver(); err != nil {
 				log.Fatal(err)
 			}
 		}
