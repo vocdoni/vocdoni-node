@@ -9,6 +9,7 @@ services:
     volumes:
       - data-seed:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
 
   miner0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -16,6 +17,7 @@ services:
     volumes:
       - data-miner0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -25,6 +27,7 @@ services:
     volumes:
       - data-miner1:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -34,6 +37,7 @@ services:
     volumes:
       - data-miner2:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -43,6 +47,7 @@ services:
     volumes:
       - data-miner3:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -52,6 +57,7 @@ services:
     volumes:
       - data-miner4:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -61,6 +67,7 @@ services:
     volumes:
       - data-miner5:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -70,6 +77,7 @@ services:
     volumes:
       - data-miner6:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -81,6 +89,7 @@ services:
     volumes:
       - data-oracle:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
 
@@ -92,6 +101,7 @@ services:
     volumes:
       - data-gateway0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/zkCircuits/
     links:
       - seed
   
