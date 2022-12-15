@@ -150,6 +150,10 @@ require (
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
+	github.com/iden3/go-rapidsnark/prover v0.0.9 // indirect
+	github.com/iden3/go-rapidsnark/types v0.0.2 // indirect
+	github.com/iden3/go-rapidsnark/verifier v0.0.3 // indirect
+	github.com/iden3/go-rapidsnark/witness v0.0.3 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
 	github.com/ipfs/go-bitswap v0.9.0 // indirect
@@ -305,6 +309,7 @@ require (
 	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/urfave/cli/v2 v2.10.3 // indirect
 	github.com/wI2L/jsondiff v0.2.0 // indirect
+	github.com/wasmerio/wasmer-go v1.0.4 // indirect
 	github.com/whyrusleeping/base32 v0.0.0-20170828182744-c30ac30633cc // indirect
 	github.com/whyrusleeping/cbor-gen v0.0.0-20221021053955-c138aae13722 // indirect
 	github.com/whyrusleeping/chunker v0.0.0-20181014151217-fe64bd25879f // indirect
