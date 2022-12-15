@@ -1,6 +1,7 @@
 package vocone
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"testing"
@@ -68,7 +69,7 @@ func testCreateAccount(cli *apiclient.HTTPclient) error {
 	if err != nil {
 		return err
 	}
-	if err = cli.EnsureTxIsMined(txhash); err != nil {
+	if _, err = cli.WaitUntilTxIsMined(context.Background(), txhash); err != nil {
 		return err
 	}
 	_, err = cli.Account("")
@@ -117,7 +118,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	if err != nil {
 		return err
 	}
-	cli.WaitUntilHeight(*info.Height + 2)
+	cli.WaitUntilHeight(context.Background(), *info.Height+2)
 
 	// Send the votes
 	for i, k := range voterKeys {
@@ -132,11 +133,8 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	if _, err = cli.SetElectionStatus(processID, "ENDED"); err != nil {
 		return err
 	}
-	if err := cli.WaitUntilElectionStatus(processID, "RESULTS"); err != nil {
-		return err
-	}
 
-	election, err := cli.Election(processID)
+	election, err := cli.WaitUntilElectionStatus(context.Background(), processID, "RESULTS")
 	if err != nil {
 		return err
 	}
