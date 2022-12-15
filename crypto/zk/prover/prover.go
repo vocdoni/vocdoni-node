@@ -22,7 +22,7 @@ import (
 // files.
 func calcWitness(wasmBytes, inputsBytes []byte) (wtns []byte, err error) {
 	// If the inputs its empty or bad formated, it raise a panic. To avoid it,
-	// catch the panic and return an error insted.
+	// catch the panic and return an error instead.
 	defer func() {
 		if perr := recover(); perr != nil {
 			var msg = fmt.Sprintf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json: %v", perr)
