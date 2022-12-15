@@ -87,7 +87,12 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		ensureTxIsMined(api, hash)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
+			log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
+		}
+
 		acc, err = api.Account("")
 		if err != nil {
 			log.Fatal(err)
@@ -107,10 +112,7 @@ func main() {
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate 10 participant accounts
-	voterAccounts, err := generateAccounts(*nvotes)
-	if err != nil {
-		log.Fatal(err)
-	}
+	voterAccounts := util.CreateEthRandomKeysBatch(*nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
@@ -251,13 +253,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	election := ensureElectionCreated(api, electionID)
-	log.Infof("created new election with id %s", electionID.String())
-	log.Debugf("election details: %+v", *election)
+	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
 
 	// Wait for the election to start
-	waitUntilElectionStarts(api, electionID)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	election, err := api.WaitUntilElectionStarts(ctx, electionID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Debugf("election details: %+v", *election)
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
@@ -317,7 +323,7 @@ func main() {
 	}
 
 	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s. At %d votes/second",
+	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
@@ -353,7 +359,12 @@ func main() {
 	}
 
 	// Check the election status is actually ENDED
-	ensureTxIsMined(api, hash)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
+		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
+	}
+
 	election, err = api.Election(electionID)
 	if err != nil {
 		log.Fatal(err)
@@ -364,13 +375,12 @@ func main() {
 	log.Infof("election %s status is ENDED", electionID.String())
 
 	// Wait for the election to be in RESULTS state
-	log.Infof("waiting for election to be in RESULTS state...")
-	waitUntilElectionStatus(api, electionID, "RESULTS")
-	log.Infof("election %s status is RESULTS", electionID.String())
-
-	election, err = api.Election(electionID)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+	election, err = api.WaitUntilElectionStatus(ctx, electionID, "RESULTS")
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Infof("election %s status is RESULTS", electionID.String())
 	log.Infof("election results: %v", election.Results)
 }
