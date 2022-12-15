@@ -21,12 +21,21 @@ import (
 // into the correct way, just read the content of wasm binary and inputs JSON
 // files.
 func calcWitness(wasmBytes, inputsBytes []byte) (wtns []byte, err error) {
+	// If the inputs its empty or bad formated, it raise a panic. To avoid it,
+	// catch the panic and return an error insted.
+	defer func() {
+		if perr := recover(); perr != nil {
+			var msg = fmt.Sprintf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json: %v", perr)
+			err = errors.New(msg)
+		}
+	}()
+
 	// Parse the []byte inputs into a map using the go-rapidsnark/witness
 	// ParseInputs function. Raw JSON Unmarshal result raise an error during
 	// witness calculation.
 	var inputs map[string]interface{}
 	if inputs, err = witness.ParseInputs(inputsBytes); err != nil {
-		var msg = fmt.Sprintf("error parsing provided circuit inputs, it must be the unmarshalled bytes of a json: %v", err)
+		var msg = fmt.Sprintf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json: %v", err)
 		return nil, errors.New(msg)
 	}
 
