@@ -80,7 +80,7 @@ func (ev *EthereumEvents) transactionHandler() {
 				log.Errorf("cannot send transaction: %v (response: %v)", err, res)
 				continue
 			}
-			if err == nil {
+			if res == nil {
 				log.Errorf("no reply from vochain")
 				continue
 			}
