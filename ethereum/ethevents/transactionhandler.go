@@ -78,6 +78,11 @@ func (ev *EthereumEvents) transactionHandler() {
 			res, err := ev.VochainApp.SendTx(payload)
 			if err != nil {
 				log.Errorf("cannot send transaction: %v (response: %v)", err, res)
+				continue
+			}
+			if err == nil {
+				log.Errorf("no reply from vochain")
+				continue
 			}
 			log.Infof("oracle transaction %d sent, hash: %x", lastNonce, res.Hash)
 
