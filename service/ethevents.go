@@ -16,19 +16,14 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 )
 
+const scanLastBlocksOnStart = 3600
+
 // EthEvents service registers on the Ethereum smart contract specified in
 // ethProcDomain, the provided event handlers.
 // w3host and w3port must point to a working web3 websocket endpoint.
 // If endBlock=0 is enabled the service will only subscribe for new blocks
-func EthEvents(
-	ctx context.Context,
-	w3uris []string,
-	networkName string,
-	signer *ethereum.SignKeys,
-	vocapp *vochain.BaseApplication,
-	evh []ethevents.EventHandler,
-	ethereumWhiteList []string,
-) error {
+func EthEvents(ctx context.Context, w3uris []string, networkName string, signer *ethereum.SignKeys,
+	vocapp *vochain.BaseApplication, evh []ethevents.EventHandler, ethereumWhiteList []string) error {
 	log.Infof("creating ethereum events service")
 	specs, err := chain.SpecsFor(networkName)
 	if err != nil {
@@ -64,6 +59,7 @@ func EthEvents(
 	// Once all the resources are freed the Ethereum handler is initialized
 	// again as well as the subscription mechanism
 	go func() {
+		firstExecution := true
 		for {
 			if ctx.Err() != nil {
 				return
@@ -78,12 +74,25 @@ func EthEvents(
 				time.Sleep(time.Second * 2)
 				continue
 			}
+			if firstExecution {
+				// For security, even if subscribe only, force to process
+				// from some past blocks defined by `readBlocksPast`
+				log.Infof("running first execution scan of event logs")
+				if err := ev.ProcessLastEventLogs(ctx, scanLastBlocksOnStart); err != nil {
+					log.Errorf("cannot process event logs: %v", err)
+					continue
+				}
+				firstExecution = false
+			}
 			ctx, cancel := context.WithCancel(ctx)
 			go ev.VotingHandle.PrintInfo(ctx, time.Second*20)
-			ev.SubscribeEthereumEventLogs(ctx)
-			// stop all child goroutines if error on subscription
+			if err := ev.SubscribeEthereumEventLogs(ctx); err != nil {
+				// if there is an error on the subscription, print the error and get the next endpoint
+				log.Warn(err)
+				w3q.Next()
+			}
+			// stop all child goroutines
 			cancel()
-			w3q.Next()
 		}
 	}()
 
@@ -134,8 +143,8 @@ func (w *w3queue) Failures() string {
 		e = strings.TrimPrefix(e, "http://")
 		e = strings.TrimPrefix(e, "wss://")
 		e = strings.TrimPrefix(e, "ws://")
-		if len(e) > 10 {
-			e = e[:10]
+		if len(e) > 20 {
+			e = e[:20]
 		}
 		buf.WriteString(fmt.Sprintf("[%s]:%d ", e, w.failures[i]))
 	}

@@ -145,7 +145,7 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		defer cancel()
 		setProcessTx, err := processStatusUpdatedMeta(tctx,
 			&e.ContractsInfo["processes"].ABI, event.Data, e.VotingHandle)
-		if err != nil {
+		if err != nil || setProcessTx == nil {
 			return fmt.Errorf("cannot obtain update status data for creating the transaction: %w", err)
 		}
 		log.Infof("found process %x status update on ethereum, new status is %s",
@@ -154,7 +154,13 @@ func HandleVochainOracle(ctx context.Context, event *ethtypes.Log, e *EthereumEv
 		if err != nil {
 			return fmt.Errorf("cannot fetch the process from the Vochain: %w", err)
 		}
-		if p.Status == models.ProcessStatus_CANCELED || p.Status == models.ProcessStatus_ENDED {
+		if p.Status == *setProcessTx.Status {
+			log.Infof("process already has the same status %s, skipping", p.Status)
+			return nil
+		}
+		if p.Status == models.ProcessStatus_CANCELED ||
+			p.Status == models.ProcessStatus_ENDED ||
+			p.Status == models.ProcessStatus_RESULTS {
 			log.Infof("process already canceled or ended, skipping")
 			return nil
 		}
