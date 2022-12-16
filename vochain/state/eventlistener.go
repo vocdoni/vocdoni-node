@@ -1,7 +1,7 @@
 package state
 
 import (
-	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
 

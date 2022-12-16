@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
@@ -61,18 +62,18 @@ func (vs *VocdoniService) Vochain() error {
 		if err == nil { // If genesis file found
 			log.Info("found genesis file")
 			// compare genesis
-			if string(genesisBytes) != vochain.Genesis[vs.Config.Chain].Genesis {
+			if string(genesisBytes) != vocdoniGenesis.Genesis[vs.Config.Chain].Genesis {
 				// if using a development chain, restore vochain
-				if vochain.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
+				if vocdoniGenesis.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
 						return err
 					}
-					if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
+					if _, ok := vocdoniGenesis.Genesis[vs.Config.Chain]; !ok {
 						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 						return err
 					}
-					genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
+					genesisBytes = []byte(vocdoniGenesis.Genesis[vs.Config.Chain].Genesis)
 				} else {
 					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
@@ -86,11 +87,11 @@ func (vs *VocdoniService) Vochain() error {
 			// If dev mode enabled, auto-update genesis file
 			log.Debug("genesis does not exist, using hardcoded genesis")
 			err = nil
-			if _, ok := vochain.Genesis[vs.Config.Chain]; !ok {
+			if _, ok := vocdoniGenesis.Genesis[vs.Config.Chain]; !ok {
 				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 				return err
 			}
-			genesisBytes = []byte(vochain.Genesis[vs.Config.Chain].Genesis)
+			genesisBytes = []byte(vocdoniGenesis.Genesis[vs.Config.Chain].Genesis)
 		}
 	}
 

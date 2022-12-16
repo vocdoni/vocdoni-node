@@ -1,4 +1,4 @@
-package vochain
+package transaction
 
 import (
 	"bytes"
@@ -9,6 +9,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/arbo"
+	snarkTypes "github.com/vocdoni/go-snark/types"
 	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -16,72 +17,112 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
+	"go.vocdoni.io/dvote/vochain/processid"
 	vstate "go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-// ErrorAlreadyExistInCache is returned if the transaction has been already processed
-// and stored in the vote cache
-var ErrorAlreadyExistInCache = fmt.Errorf("vote already exist in cache")
+var (
+	// ErrNilTx is returned if the transaction is nil.
+	ErrNilTx = fmt.Errorf("nil transaction")
+	// ErrInvalidURILength is returned if the entity URI length is invalid.
+	ErrInvalidURILength = fmt.Errorf("invalid URI length")
+	// ErrorAlreadyExistInCache is returned if the transaction has been already processed
+	// and stored in the vote cache.
+	ErrorAlreadyExistInCache = fmt.Errorf("vote already exist in cache")
+)
 
-// AddTxResponse is the data returned by AddTx()
-type AddTxResponse struct {
+// TransactionResponse is the response of a transaction check.
+type TransactionResponse struct {
 	TxHash []byte
 	Data   []byte
 	Log    string
 }
 
-// AddTx check the validity of a transaction and adds it to the state if commit=true.
+// TransactionHandler holds the methods for checking the correctness of a transaction.
+type TransactionHandler struct {
+	// state is the state of the vochain
+	state *vstate.State
+	// dataDir is the path for storing some files
+	dataDir string
+	// ZkVKs contains the VerificationKey for each circuit parameters index
+	ZkVKs []*snarkTypes.Vk
+}
+
+// NewTransactionHandler creates a new TransactionHandler.
+func NewTransactionHandler(state *vstate.State, dataDir string) (*TransactionHandler, error) {
+	return &TransactionHandler{
+		state:   state,
+		dataDir: dataDir,
+	}, nil
+}
+
+// LoadZkVerificationKeys loads or downloads the zk Circuits VerificationKey files.
+// It is required for veirying zkSnark proofs.
+func (t *TransactionHandler) LoadZkVerificationKeys() error {
+	// get the zk Circuits VerificationKey files
+	vks, err := LoadZkVerificationKeys(t.dataDir, t.state.ChainID())
+	if err != nil {
+		return fmt.Errorf("could not load zk verification keys: %w", err)
+	}
+	t.ZkVKs = vks
+	return nil
+}
+
+// CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
 // It returns a bytes value which depends on the transaction type:
 //
 //	Tx_Vote: vote nullifier
 //	default: []byte{}
-func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTxResponse, error) {
-	if vtx.Tx == nil || app.State == nil || vtx.Tx.Payload == nil {
-		return nil, fmt.Errorf("transaction, state, and/or transaction payload is nil")
+func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (*TransactionResponse, error) {
+	if vtx.Tx == nil || vtx.Tx.Payload == nil {
+		return nil, fmt.Errorf("transaction is empty")
 	}
-	response := &AddTxResponse{TxHash: vtx.TxID[:]}
+	response := &TransactionResponse{
+		TxHash: vtx.TxID[:],
+	}
 	switch vtx.Tx.Payload.(type) {
 	case *models.Tx_Vote:
 		// get VoteEnvelope from tx
 		txVote := vtx.Tx.GetVote()
-		v, voterID, err := app.VoteEnvelopeCheck(txVote, vtx.SignedBody, vtx.Signature, vtx.TxID, commit)
+		v, voterID, err := t.VoteTxCheck(txVote, vtx.SignedBody, vtx.Signature, vtx.TxID, forCommit)
 		if err != nil || v == nil {
-			return nil, fmt.Errorf("voteTxCheck: %w", err)
+			return nil, fmt.Errorf("voteTxCheck error: %w", err)
 		}
 		response.Data = v.Nullifier
-		if commit {
-			return response, app.State.AddVote(v, voterID)
+		if forCommit {
+			return response, t.state.AddVote(v, voterID)
 		}
 
 	case *models.Tx_Admin:
-		_, err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		_, err := AdminTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("adminTxCheck: %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetAdmin()
 			switch tx.Txtype {
 			case models.TxType_ADD_ORACLE:
-				if err := app.State.AddOracle(common.BytesToAddress(tx.Address)); err != nil {
+				if err := t.state.AddOracle(common.BytesToAddress(tx.Address)); err != nil {
 					return nil, fmt.Errorf("addOracle: %w", err)
 				}
-				return response, app.State.IncrementTreasurerNonce()
+				return response, t.state.IncrementTreasurerNonce()
 			case models.TxType_REMOVE_ORACLE:
-				if err := app.State.RemoveOracle(common.BytesToAddress(tx.Address)); err != nil {
+				if err := t.state.RemoveOracle(common.BytesToAddress(tx.Address)); err != nil {
 					return nil, fmt.Errorf("removeOracle: %w", err)
 				}
-				return response, app.State.IncrementTreasurerNonce()
+				return response, t.state.IncrementTreasurerNonce()
 			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_ADD_PROCESS_KEYS:
-				if err := app.State.AddProcessKeys(tx); err != nil {
+				if err := t.state.AddProcessKeys(tx); err != nil {
 					return nil, fmt.Errorf("addProcessKeys: %w", err)
 				}
 			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_REVEAL_PROCESS_KEYS:
-				if err := app.State.RevealProcessKeys(tx); err != nil {
+				if err := t.state.RevealProcessKeys(tx); err != nil {
 					return nil, fmt.Errorf("revealProcessKeys: %w", err)
 				}
 			default:
@@ -90,92 +131,92 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 		}
 
 	case *models.Tx_NewProcess:
-		p, txSender, err := app.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		p, txSender, err := t.NewProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("newProcess: %w", err)
 		}
 		response.Data = p.ProcessId
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetNewProcess()
 			if tx.Process == nil {
 				return nil, fmt.Errorf("newProcess process is empty")
 			}
-			if err := app.State.AddProcess(p); err != nil {
+			if err := t.state.AddProcess(p); err != nil {
 				return nil, fmt.Errorf("newProcess: addProcess: %w", err)
 			}
 			entityAddr := common.BytesToAddress(p.EntityId)
-			if err := app.State.IncrementAccountProcessIndex(entityAddr); err != nil {
+			if err := t.state.IncrementAccountProcessIndex(entityAddr); err != nil {
 				return nil, fmt.Errorf("newProcess: cannot increment process index: %w", err)
 			}
-			return response, app.State.BurnTxCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
+			return response, t.state.BurnTxCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
 		}
 
 	case *models.Tx_SetProcess:
-		txSender, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		txSender, err := SetProcessTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("setProcess: %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetSetProcess()
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
 					return nil, fmt.Errorf("set process status, status unknown")
 				}
-				if err := app.State.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
+				if err := t.state.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
 			case models.TxType_SET_PROCESS_RESULTS:
 				if tx.GetResults() == nil {
 					return nil, fmt.Errorf("set process results, results is nil")
 				}
-				if err := app.State.SetProcessResults(tx.ProcessId, tx.Results, true); err != nil {
+				if err := t.state.SetProcessResults(tx.ProcessId, tx.Results, true); err != nil {
 					return nil, fmt.Errorf("setProcessResults: %s", err)
 				}
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return nil, fmt.Errorf("set process census, census root is nil")
 				}
-				if err := app.State.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true); err != nil {
+				if err := t.state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true); err != nil {
 					return nil, fmt.Errorf("setProcessCensus: %s", err)
 				}
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return response, app.State.BurnTxCostIncrementNonce(txSender, tx.Txtype)
+			return response, t.state.BurnTxCostIncrementNonce(txSender, tx.Txtype)
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := RegisterKeyTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State,
-			commit); err != nil {
+		if err := RegisterKeyTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state,
+			forCommit); err != nil {
 			return nil, fmt.Errorf("registerKeyTx %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetRegisterKey()
 			weight, ok := new(big.Int).SetString(tx.Weight, 10)
 			if !ok {
 				return nil, fmt.Errorf("cannot parse weight %s", weight)
 			}
-			return response, app.State.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
+			return response, t.state.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
-			err := CreateAccountTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := CreateAccountTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 			if err != nil {
 				return nil, fmt.Errorf("createAccount: %w", err)
 			}
 
 		case models.TxType_SET_ACCOUNT_INFO_URI:
-			err := vstate.SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := vstate.SetAccountInfoTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountInfoTxCheck: %w", err)
 			}
 
 		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-			err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+			err := SetAccountDelegateTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 			if err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTxCheck: %w", err)
 			}
@@ -184,14 +225,14 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 			return nil, fmt.Errorf("setAccount: invalid transaction type")
 		}
 
-		if commit {
+		if forCommit {
 			switch tx.Txtype {
 			case models.TxType_CREATE_ACCOUNT:
 				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
 				if err != nil {
 					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
-				if err := app.State.CreateAccount(
+				if err := t.state.CreateAccount(
 					txSenderAddress,
 					tx.GetInfoURI(),
 					tx.GetDelegates(),
@@ -204,12 +245,12 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 					if err != nil {
 						return nil, fmt.Errorf("createAccountTx: faucetIssuerAddress %w", err)
 					}
-					txCost, err := app.State.TxCost(models.TxType_CREATE_ACCOUNT, false)
+					txCost, err := t.state.TxCost(models.TxType_CREATE_ACCOUNT, false)
 					if err != nil {
 						return nil, fmt.Errorf("createAccountTx: txCost %w", err)
 					}
 					if txCost != 0 {
-						if err := app.State.BurnTxCost(faucetIssuerAddress, txCost); err != nil {
+						if err := t.state.BurnTxCost(faucetIssuerAddress, txCost); err != nil {
 							return nil, fmt.Errorf("setAccountTx: burnTxCost %w", err)
 						}
 					}
@@ -217,14 +258,14 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 					if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
 						return nil, fmt.Errorf("createAccountTx: cannot unmarshal faucetPayload %w", err)
 					}
-					if err := app.State.ConsumeFaucetPayload(
+					if err := t.state.ConsumeFaucetPayload(
 						faucetIssuerAddress,
 						faucetPayload,
 					); err != nil {
 						return nil, fmt.Errorf("setAccountTx: consumeFaucet %w", err)
 					}
 					// transfer balance from faucet package issuer to created account
-					return response, app.State.TransferBalance(
+					return response, t.state.TransferBalance(
 						faucetIssuerAddress,
 						txSenderAddress,
 						faucetPayload.Amount,
@@ -238,7 +279,7 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
 				// consume cost for setAccount
-				if err := app.State.BurnTxCostIncrementNonce(
+				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_SET_ACCOUNT_INFO_URI,
 				); err != nil {
@@ -246,12 +287,12 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 				}
 				txAccount := common.BytesToAddress(tx.GetAccount())
 				if txAccount != (common.Address{}) {
-					return response, app.State.SetAccountInfoURI(
+					return response, t.state.SetAccountInfoURI(
 						txAccount,
 						tx.GetInfoURI(),
 					)
 				}
-				return response, app.State.SetAccountInfoURI(
+				return response, t.state.SetAccountInfoURI(
 					txSenderAddress,
 					tx.GetInfoURI(),
 				)
@@ -261,13 +302,13 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 				if err != nil {
 					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
-				if err := app.State.BurnTxCostIncrementNonce(
+				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
 				}
-				if err := app.State.SetAccountDelegate(
+				if err := t.state.SetAccountDelegate(
 					txSenderAddress,
 					tx.Delegates,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
@@ -279,13 +320,13 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 				if err != nil {
 					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
 				}
-				if err := app.State.BurnTxCostIncrementNonce(
+				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
 				}
-				if err := app.State.SetAccountDelegate(
+				if err := t.state.SetAccountDelegate(
 					txSenderAddress,
 					tx.Delegates,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
@@ -298,64 +339,64 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 		}
 
 	case *models.Tx_SetTransactionCosts:
-		cost, err := SetTransactionCostsTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		cost, err := SetTransactionCostsTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("setTransactionCostsTx: %w", err)
 		}
-		if commit {
-			if err := app.State.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
+		if forCommit {
+			if err := t.state.SetTxCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
 				return nil, fmt.Errorf("setTransactionCosts: %w", err)
 			}
-			return response, app.State.IncrementTreasurerNonce()
+			return response, t.state.IncrementTreasurerNonce()
 		}
 
 	case *models.Tx_MintTokens:
-		err := MintTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := MintTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("mintTokensTx: %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetMintTokens()
-			if err := app.State.MintBalance(common.BytesToAddress(tx.To), tx.Value); err != nil {
+			if err := t.state.MintBalance(common.BytesToAddress(tx.To), tx.Value); err != nil {
 				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
-			return response, app.State.IncrementTreasurerNonce()
+			return response, t.state.IncrementTreasurerNonce()
 		}
 
 	case *models.Tx_SendTokens:
-		err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := SendTokensTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("sendTokensTxCheck: %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetSendTokens()
 			from, to := common.BytesToAddress(tx.From), common.BytesToAddress(tx.To)
-			err := app.State.BurnTxCostIncrementNonce(from, models.TxType_SEND_TOKENS)
+			err := t.state.BurnTxCostIncrementNonce(from, models.TxType_SEND_TOKENS)
 			if err != nil {
 				return nil, fmt.Errorf("sendTokensTx: burnTxCostIncrementNonce %w", err)
 			}
-			return response, app.State.TransferBalance(from, to, tx.Value)
+			return response, t.state.TransferBalance(from, to, tx.Value)
 		}
 
 	case *models.Tx_CollectFaucet:
-		err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, app.State)
+		err := CollectFaucetTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state)
 		if err != nil {
 			return nil, fmt.Errorf("collectFaucetTxCheck: %w", err)
 		}
-		if commit {
+		if forCommit {
 			tx := vtx.Tx.GetCollectFaucet()
 			issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
 			if err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: cannot get issuerAddress %w", err)
 			}
-			if err := app.State.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET); err != nil {
+			if err := t.state.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: burnTxCost %w", err)
 			}
 			faucetPayload := &models.FaucetPayload{}
 			if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
 				return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
 			}
-			if err := app.State.ConsumeFaucetPayload(
+			if err := t.state.ConsumeFaucetPayload(
 				issuerAddress,
 				&models.FaucetPayload{
 					Identifier: faucetPayload.Identifier,
@@ -365,7 +406,7 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 			); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
-			return response, app.State.TransferBalance(issuerAddress,
+			return response, t.state.TransferBalance(issuerAddress,
 				common.BytesToAddress(faucetPayload.To),
 				faucetPayload.Amount,
 			)
@@ -378,33 +419,38 @@ func (app *BaseApplication) AddTx(vtx *vochaintx.VochainTx, commit bool) (*AddTx
 	return response, nil
 }
 
-// VoteEnvelopeCheck is an abstraction of ABCI checkTx for submitting a vote
-// All hexadecimal strings should be already sanitized (without 0x)
-func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, signature []byte,
+// VoteTxCheck performs basic checks on a vote transaction.
+func (t *TransactionHandler) VoteTxCheck(ve *models.VoteEnvelope, txBytes, signature []byte,
 	txID [32]byte, forCommit bool) (*models.Vote, vstate.VoterID, error) {
-	// Perform basic/general checks
+	// Perform basic checks
 	voterID := vstate.VoterID{}
 	if ve == nil {
 		return nil, voterID.Nil(), fmt.Errorf("vote envelope is nil")
 	}
-	process, err := app.State.Process(ve.ProcessId, false)
+	process, err := t.state.Process(ve.ProcessId, false)
 	if err != nil {
 		return nil, voterID.Nil(), fmt.Errorf("cannot fetch processId: %w", err)
 	}
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
 		return nil, voterID.Nil(), fmt.Errorf("process %x malformed", ve.ProcessId)
 	}
-	height := app.State.CurrentHeight()
+	height := t.state.CurrentHeight()
 	endBlock := process.StartBlock + process.BlockCount
 
 	if height < process.StartBlock {
-		return nil, voterID.Nil(), fmt.Errorf("process %x starts at height %d, current height is %d", ve.ProcessId, process.StartBlock, height)
+		return nil, voterID.Nil(), fmt.Errorf(
+			"process %x starts at height %d, current height is %d",
+			ve.ProcessId, process.StartBlock, height)
 	} else if height > endBlock {
-		return nil, voterID.Nil(), fmt.Errorf("process %x finished at height %d, current height is %d", ve.ProcessId, endBlock, height)
+		return nil, voterID.Nil(), fmt.Errorf(
+			"process %x finished at height %d, current height is %d",
+			ve.ProcessId, endBlock, height)
 	}
 
 	if process.Status != models.ProcessStatus_READY {
-		return nil, voterID.Nil(), fmt.Errorf("process %x not in READY state - current state: %s", ve.ProcessId, process.Status.String())
+		return nil, voterID.Nil(), fmt.Errorf(
+			"process %x not in READY state - current state: %s",
+			ve.ProcessId, process.Status.String())
 	}
 
 	// Check in case of keys required, they have been sent by some keykeeper
@@ -416,6 +462,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 
 	var vote *models.Vote
 	if process.EnvelopeType.Anonymous {
+		if t.ZkVKs == nil || len(t.ZkVKs) == 0 {
+			return nil, voterID.Nil(), fmt.Errorf("anonymous voting not supported, missing zk verification keys")
+		}
 		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 		// An element can only be added to the vote cache during checkTx.
 		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
@@ -426,7 +475,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// concurrent reads to the votes in the cache which happen in
 		// in State.CachePurge run via a goroutine in
 		// started in BaseApplication.BeginBlock.
-		vote = app.State.CacheGetCopy(txID)
+		vote = t.state.CacheGetCopy(txID)
 
 		// if vote is in cache, lazy check
 		if vote != nil {
@@ -437,8 +486,8 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			}
 
 			vote.Height = height // update vote height
-			defer app.State.CacheDel(txID)
-			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
+			defer t.state.CacheDel(txID)
+			if exist, err := t.state.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
 					return nil, voterID.Nil(), err
@@ -463,7 +512,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		nullifierBI := arbo.BytesToBigInt(ve.Nullifier)
 
 		// check if vote already exists
-		if exist, err := app.State.EnvelopeExists(ve.ProcessId,
+		if exist, err := t.state.EnvelopeExists(ve.ProcessId,
 			ve.Nullifier, false); err != nil || exist {
 			if err != nil {
 				return nil, voterID.Nil(), err
@@ -472,11 +521,12 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		}
 		log.Debugf("new zk vote %x for process %x", ve.Nullifier, ve.ProcessId)
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(app.ZkVKs) ||
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkVKs) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
-			return nil, voterID.Nil(), fmt.Errorf("invalid CircuitParametersIndex: %d of %d", proofZkSNARK.CircuitParametersIndex, len(app.ZkVKs))
+			return nil, voterID.Nil(), fmt.Errorf("invalid CircuitParametersIndex: %d of %d",
+				proofZkSNARK.CircuitParametersIndex, len(t.ZkVKs))
 		}
-		verificationKey := app.ZkVKs[proofZkSNARK.CircuitParametersIndex]
+		verificationKey := t.ZkVKs[proofZkSNARK.CircuitParametersIndex]
 
 		// prepare the publicInputs that are defined by the process.
 		// publicInputs contains: processId0, processId1, censusRoot,
@@ -537,7 +587,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		// in State.CachePurge run via a goroutine in
 		// started in BaseApplication.BeginBlock.
 		// Warning: vote cache might change during the execution of this function
-		vote = app.State.CacheGetCopy(txID)
+		vote = t.state.CacheGetCopy(txID)
 
 		// if the vote exists in cache
 		if vote != nil {
@@ -548,9 +598,9 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 			}
 
 			// if we are on DeliverTx and the vote is in cache, lazy check
-			defer app.State.CacheDel(txID)
+			defer t.state.CacheDel(txID)
 			vote.Height = height // update vote height
-			if exist, err := app.State.EnvelopeExists(vote.ProcessId,
+			if exist, err := t.state.EnvelopeExists(vote.ProcessId,
 				vote.Nullifier, false); err != nil || exist {
 				if err != nil {
 					return nil, voterID.Nil(), err
@@ -602,7 +652,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 		vote.Nullifier = vstate.GenerateNullifier(addr, vote.ProcessId)
 
 		// check if vote already exists
-		if exist, err := app.State.EnvelopeExists(vote.ProcessId,
+		if exist, err := t.state.EnvelopeExists(vote.ProcessId,
 			vote.Nullifier, false); err != nil || exist {
 			if err != nil {
 				return nil, voterID.Nil(), err
@@ -624,7 +674,7 @@ func (app *BaseApplication) VoteEnvelopeCheck(ve *models.VoteEnvelope, txBytes, 
 	}
 	if !forCommit {
 		// add the vote to cache
-		app.State.CacheAdd(txID, vote)
+		t.state.CacheAdd(txID, vote)
 	}
 	return vote, voterID, nil
 }
@@ -890,7 +940,7 @@ func SetTransactionCostsTxCheck(vtx *models.Tx, txBytes, signature []byte, state
 }
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
+func (t *TransactionHandler) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	signature []byte, state *vstate.State) (*models.Process, common.Address, error) {
 	tx := vtx.GetNewProcess()
 	if tx.Process == nil {
@@ -974,7 +1024,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		if isOracle {
 			tx.Process.EntityId = addr.Bytes()
 		}
-		pid, err := app.BuildProcessID(tx.Process)
+		pid, err := processid.BuildProcessID(tx.Process, t.state)
 		if err != nil {
 			return nil, common.Address{}, fmt.Errorf("cannot build processID: %w", err)
 		}
@@ -1003,14 +1053,14 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		var circuits []artifacts.CircuitConfig
-		if genesis, ok := Genesis[app.chainID]; ok {
+		if genesis, ok := vocdoniGenesis.Genesis[state.ChainID()]; ok {
 			circuits = genesis.CircuitsConfig
 		} else {
-			log.Warn("Using dev network genesis CircuitsConfig")
-			circuits = Genesis["dev"].CircuitsConfig
+			log.Warn("using dev network genesis CircuitsConfig")
+			circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
 		}
 		if len(circuits) == 0 {
-			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", app.chainID)
+			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", state.ChainID())
 		}
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
@@ -1029,7 +1079,7 @@ func (app *BaseApplication) NewProcessTxCheck(vtx *models.Tx, txBytes,
 		return nil, common.Address{}, fmt.Errorf("serial process not yet implemented")
 	}
 
-	if tx.Process.EnvelopeType.EncryptedVotes || tx.Process.EnvelopeType.Anonymous {
+	if tx.Process.EnvelopeType.EncryptedVotes {
 		// We consider the zero value as nil for security
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
@@ -1470,7 +1520,7 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate
 	}
 
 	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:
-	// A. We can skip the proof verification when commiting
+	// A. We can skip the proof verification when forCommiting
 	// B. We can detect invalid key registration (due to no more weight
 	//    available) at mempool tx insertion
 

@@ -11,9 +11,7 @@ import (
 )
 
 var (
-	ErrInvalidURILength = fmt.Errorf("invalid URI length")
-	ErrInvalidAddress   = fmt.Errorf("invalid address")
-	ErrNilTx            = fmt.Errorf("nil transaction")
+	ErrInvalidAddress = fmt.Errorf("invalid address")
 )
 
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases

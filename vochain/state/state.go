@@ -226,6 +226,11 @@ func (v *State) SetChainID(chID string) {
 	v.chainID = chID
 }
 
+// ChainID gets the blockchain identifier.
+func (v *State) ChainID() string {
+	return v.chainID
+}
+
 var exist = []byte{1}
 
 // AddOracle adds a trusted oracle given its address if not exists

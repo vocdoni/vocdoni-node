@@ -14,7 +14,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -319,7 +319,7 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	}
 
 	// check the electionID returned by Vochain is actually valid
-	pid := vochain.ProcessID{}
+	pid := processid.ProcessID{}
 	if err := pid.Unmarshal(resp.ElectionID); err != nil {
 		return fmt.Errorf("received election id after executing transaction is not valid")
 	}

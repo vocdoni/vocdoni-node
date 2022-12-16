@@ -10,7 +10,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -261,10 +261,10 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 	var config artifacts.CircuitConfig
 	index := -1
 	var circuits []artifacts.CircuitConfig
-	if genesis, ok := vochain.Genesis[r.vocapp.ChainID()]; ok {
+	if genesis, ok := vocdoniGenesis.Genesis[r.vocapp.ChainID()]; ok {
 		circuits = genesis.CircuitsConfig
 	} else {
-		circuits = vochain.Genesis["dev"].CircuitsConfig
+		circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
 	}
 	for i, cfg := range circuits {
 		if *process.RollingCensusSize <= uint64(cfg.Parameters[0]) {

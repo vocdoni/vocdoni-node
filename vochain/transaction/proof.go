@@ -1,4 +1,4 @@
-package vochain
+package transaction
 
 import (
 	"bytes"

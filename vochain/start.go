@@ -2,7 +2,6 @@
 package vochain
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/config"
+	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	tmcfg "github.com/tendermint/tendermint/config"
@@ -25,8 +25,6 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-const downloadZkVKsTimeout = 1 * time.Minute
-
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
 	// creating new vochain app
@@ -40,12 +38,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Fatal(err)
 	}
 	app.SetDefaultMethods()
-	// get the zk Circuits VerificationKey files
-	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
-	defer cancel()
-	if err := app.LoadZkVKs(ctx); err != nil {
-		log.Fatal(err)
-	}
 	// Set the vote cache at least as big as the mempool size
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
@@ -140,9 +132,9 @@ func newTendermint(app *BaseApplication,
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
 	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-	if _, ok := Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
+	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
 		!localConfig.IsSeedNode && ok {
-		tconfig.P2P.BootstrapPeers = strings.Join(Genesis[localConfig.Chain].SeedNodes, ",")
+		tconfig.P2P.BootstrapPeers = strings.Join(vocdoniGenesis.Genesis[localConfig.Chain].SeedNodes, ",")
 	}
 	if len(tconfig.P2P.BootstrapPeers) > 0 {
 		log.Infof("seed nodes: %s", tconfig.P2P.BootstrapPeers)
