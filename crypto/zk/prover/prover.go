@@ -15,14 +15,14 @@ import (
 	"github.com/iden3/go-rapidsnark/witness"
 )
 
-const (
-	parsingWitnessErr  = "error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json: %v"
-	initWitnessCalcErr = "error parsing circuit wasm during calculator instance: %v"
-	witnessCalcErr     = "error during witness calculation: %v"
-	proofGenErr        = "error during zksnark proof generation: %v"
-	parseProofDataErr  = "error parsing the proof provided, it must be a valid json, check https://github.com/iden3/go-rapidsnark/blob/73d5784d2aa791dd6646142b0017dbef97240f57/types/proof.go: %v"
-	parsePubSignalsErr = "error during zksnark proof generation, it must be a json with array of strings: %v"
-	verifyProofErr     = "error during zksnark verification: %v"
+var (
+	ErrParsingWitness  = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json")
+	ErrInitWitnessCalc = fmt.Errorf("error parsing circuit wasm during calculator instance")
+	ErrWitnessCalc     = fmt.Errorf("error during witness calculation")
+	ErrProofGen        = fmt.Errorf("error during zksnark proof generation")
+	ErrParseProofData  = fmt.Errorf("error parsing the proof provided, it must be a valid json, check https://github.com/iden3/go-rapidsnark/blob/73d5784d2aa791dd6646142b0017dbef97240f57/types/proof.go")
+	ErrParsePubSignals = fmt.Errorf("error during zksnark proof generation, it must be a json with array of strings")
+	ErrVerifyProof     = fmt.Errorf("error during zksnark verification")
 )
 
 // calcWitness perform the witness calculation using go-rapidsnark library based
@@ -34,7 +34,7 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// catch the panic and return an error instead.
 	defer func() {
 		if p := recover(); p != nil {
-			panicErr = fmt.Errorf(parsingWitnessErr, p)
+			panicErr = ErrParsingWitness
 		}
 	}()
 
@@ -43,19 +43,19 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// witness calculation.
 	inputs, err := witness.ParseInputs(inputsBytes)
 	if err != nil {
-		return nil, fmt.Errorf(parsingWitnessErr, err)
+		return nil, ErrParsingWitness
 	}
 
 	// Instances a go-rapidsnark/witness calculator with the provided wasm []byte
 	calculator, err := witness.NewCircom2WitnessCalculator(wasmBytes, true)
 	if err != nil {
-		return nil, fmt.Errorf(initWitnessCalcErr, err)
+		return nil, ErrInitWitnessCalc
 	}
 
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
-		return nil, fmt.Errorf(witnessCalcErr, err)
+		return nil, ErrWitnessCalc
 	}
 
 	return wtns, nil
@@ -78,7 +78,7 @@ func Prove(zKey, wasm, inputs []byte) ([]byte, []byte, error) {
 	// proving zkey provided.
 	strProof, strPubSignals, err := prover.Groth16ProverRaw(zKey, wtns)
 	if err != nil {
-		return nil, nil, fmt.Errorf(proofGenErr, err)
+		return nil, nil, ErrProofGen
 	}
 
 	// Return the proof and public signals as slices of bytes
@@ -99,11 +99,11 @@ func Verify(vKey, proofData, pubSignals []byte) error {
 	// Read proof and public signals as regular JSON into the instanced proof
 	// struct and try to verify it with go-rapidsnark/verifier.
 	if err := json.Unmarshal(proofData, &proof.Proof); err != nil {
-		return fmt.Errorf(parseProofDataErr, err)
+		return ErrParseProofData
 	} else if err = json.Unmarshal(pubSignals, &proof.PubSignals); err != nil {
-		return fmt.Errorf(parsePubSignalsErr, err)
+		return ErrParsePubSignals
 	} else if err = verifier.VerifyGroth16(proof, vKey); err != nil {
-		return fmt.Errorf(verifyProofErr, err)
+		return ErrVerifyProof
 	}
 
 	// Return nil if everything was ok.
