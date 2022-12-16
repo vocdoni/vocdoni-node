@@ -1,20 +1,11 @@
-package vochain
+package genesis
 
 import (
 	"encoding/hex"
-	"encoding/json"
-	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 )
 
 // VochainGenesis is a struct containing the genesis details
@@ -537,120 +528,4 @@ func hexToBytes(s string) []byte {
 		log.Fatalf("Error decoding hex string %s: %s", s, err)
 	}
 	return b
-}
-
-// NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
-// Also includes an oracle, treasurer and faucet account.
-func NewTemplateGenesisFile(dir string, validators int) error {
-	gd := tmtypes.GenesisDoc{}
-	gd.ChainID = "test-chain-1"
-	gd.GenesisTime = time.Now()
-	gd.InitialHeight = 0
-	gd.ConsensusParams = tmtypes.DefaultConsensusParams()
-	gd.ConsensusParams.Block.MaxBytes = 5242880
-	gd.ConsensusParams.Block.MaxGas = -1
-	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000
-	gd.ConsensusParams.Evidence.MaxAgeDuration = 10000
-	gd.ConsensusParams.Validator.PubKeyTypes = []string{"ed25519"}
-
-	// Create validators
-	gd.Validators = []tmtypes.GenesisValidator{}
-	appStateValidators := []GenesisValidator{}
-	for i := 0; i < validators; i++ {
-		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
-		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
-			return err
-		}
-		privKey := util.RandomHex(64)
-		pv, err := NewPrivateValidator(privKey,
-			filepath.Join(nodeDir, "priv_validator_key.json"),
-			filepath.Join(nodeDir, "priv_validator_state.json"),
-		)
-		if err != nil {
-			return fmt.Errorf("cannot create validator key and state: (%v)", err)
-		}
-		pv.Save()
-		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKey), 0o600); err != nil {
-			return err
-		}
-		gd.Validators = append(gd.Validators, tmtypes.GenesisValidator{
-			Address: pv.Key.Address,
-			PubKey:  pv.Key.PubKey,
-			Power:   10,
-		})
-		appStateValidators = append(appStateValidators, GenesisValidator{
-			Address: pv.Key.Address.Bytes(),
-			PubKey: TendermintPubKey{
-				Type:  "tendermint/PubKeyEd25519",
-				Value: pv.Key.PubKey.Bytes(),
-			},
-			Power: "10",
-		})
-	}
-
-	// Generate oracle, treasurer and faucet accounts
-	oracle := ethereum.SignKeys{}
-	if err := oracle.Generate(); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "oracle_hex_key"),
-		[]byte(fmt.Sprintf("%x", oracle.PrivateKey())), 0o600); err != nil {
-		return err
-	}
-	treasurer := ethereum.SignKeys{}
-	if err := treasurer.Generate(); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "treasurer_hex_key"),
-		[]byte(fmt.Sprintf("%x", treasurer.PrivateKey())), 0o600); err != nil {
-		return err
-	}
-	faucet := ethereum.SignKeys{}
-	if err := faucet.Generate(); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "faucet_hex_key"),
-		[]byte(fmt.Sprintf("%x", faucet.PrivateKey())), 0o600); err != nil {
-		return err
-	}
-
-	// Create seed node
-	seedKey := util.RandomHex(64)
-	seedDir := filepath.Join(dir, "seed")
-	if err := os.MkdirAll(seedDir, 0o700); err != nil {
-		return err
-	}
-	seedNodeKey, err := NewNodeKey(seedKey, filepath.Join(seedDir, "node_key.json"))
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(
-		seedDir, "seed_address"),
-		[]byte(seedNodeKey.ID.AddressString("seed1.foo.bar:26656")),
-		0o600); err != nil {
-		return err
-	}
-	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), []byte(seedKey), 0o600); err != nil {
-		return err
-	}
-
-	// Build genesis app state and create genesis file
-	appState := GenesisAppState{
-		Validators: appStateValidators,
-		Oracles:    []types.HexBytes{oracle.Address().Bytes()},
-		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
-		Accounts: []GenesisAccount{
-			{
-				Address: faucet.Address().Bytes(),
-				Balance: 100000,
-			},
-		},
-		TxCost: TransactionCosts{},
-	}
-	appStateBytes, err := json.Marshal(appState)
-	if err != nil {
-		return err
-	}
-	gd.AppState = appStateBytes
-	return gd.SaveAs(filepath.Join(dir, "genesis.json"))
 }

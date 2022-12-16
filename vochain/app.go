@@ -19,14 +19,12 @@ import (
 	tmcli "github.com/tendermint/tendermint/rpc/client/local"
 	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
-	snarkTypes "github.com/vocdoni/go-snark/types"
-	zkartifacts "go.vocdoni.io/dvote/crypto/zk/artifacts"
 	vstate "go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/dvote/vochain/transaction"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
@@ -36,11 +34,11 @@ import (
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
-	State   *vstate.State
-	Service service.Service
-	Node    *tmcli.Local
-
-	IsSynchronizing func() bool
+	State              *vstate.State
+	Service            service.Service
+	Node               *tmcli.Local
+	TransactionHandler *transaction.TransactionHandler
+	IsSynchronizing    func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
 	isSyncLock sync.Mutex
@@ -62,29 +60,40 @@ type BaseApplication struct {
 	startBlockTimestamp int64
 	chainID             string
 	dataDir             string
-	// ZkVKs contains the VerificationKey for each circuit parameters index
-	ZkVKs []*snarkTypes.Vk
 }
 
 // Ensure that BaseApplication implements abcitypes.Application.
 var _ abcitypes.Application = (*BaseApplication)(nil)
 
 // NewBaseApplication creates a new BaseApplication given a name and a DB backend.
-// Node still needs to be initialized with SetNode
-// Callback functions still need to be initialized
+// Node still needs to be initialized with SetNode.
+// Callback functions still need to be initialized.
 func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	state, err := vstate.NewState(dbType, dbpath)
 	if err != nil {
-		return nil, fmt.Errorf("cannot create vochain state: (%s)", err)
+		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
-
+	// Create the transaction handler for checking and processing transactions
+	transactionHandler, err := transaction.NewTransactionHandler(
+		state,
+		filepath.Join(dbpath, "txHandler"),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create transaction handler: (%v)", err)
+	}
+	// Load or download the zk verification keys
+	if err := transactionHandler.LoadZkVerificationKeys(); err != nil {
+		return nil, fmt.Errorf("cannot load zk verification keys: (%v)", err)
+	}
 	return &BaseApplication{
-		State:      state,
-		blockCache: lru.NewAtomic(32),
-		dataDir:    dbpath,
+		State:              state,
+		TransactionHandler: transactionHandler,
+		blockCache:         lru.NewAtomic(32),
+		dataDir:            dbpath,
 	}, nil
 }
 
+// TestBaseApplication creates a new BaseApplication for testing purposes.
 func TestBaseApplication(tb testing.TB) *BaseApplication {
 	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
 	if err != nil {
@@ -99,40 +108,6 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 		}
 	})
 	return app
-}
-
-// LoadZkVKs loads the Zero Knowledge Verification Keys for the given
-// ChainID into the BaseApplication, downloading them if necessary, and
-// verifying their cryptographic hahes.
-func (app *BaseApplication) LoadZkVKs(ctx context.Context) error {
-	app.ZkVKs = []*snarkTypes.Vk{}
-	var circuits []zkartifacts.CircuitConfig
-	if genesis, ok := Genesis[app.chainID]; ok {
-		circuits = genesis.CircuitsConfig
-	} else {
-		log.Info("using dev genesis zkSnarks circuits")
-		circuits = Genesis["dev"].CircuitsConfig
-	}
-	for i, cc := range circuits {
-		log.Infof("downloading zk-circuits-artifacts index: %d", i)
-
-		// download VKs from CircuitsConfig
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute*1)
-		defer cancel()
-		cc.LocalDir = filepath.Join(app.dataDir, cc.LocalDir)
-		if err := zkartifacts.DownloadVKFile(ctx, cc); err != nil {
-			return err
-		}
-
-		// parse VK and store it into vnode.ZkVKs
-		log.Infof("parse VK from file into memory. CircuitArtifact index: %d", i)
-		vk, err := zk.LoadVkFromFile(filepath.Join(cc.LocalDir, cc.CircuitPath, zkartifacts.FilenameVK))
-		if err != nil {
-			return err
-		}
-		app.ZkVKs = append(app.ZkVKs, vk)
-	}
-	return nil
 }
 
 func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
@@ -496,15 +471,15 @@ func (app *BaseApplication) AdvanceTestBlock() {
 
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	var response *AddTxResponse
+	var response *transaction.TransactionResponse
 	var err error
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0}
 	}
 	tx := new(vochaintx.VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		if response, err = app.AddTx(tx, false); err != nil {
-			if errors.Is(err, ErrorAlreadyExistInCache) {
+		if response, err = app.TransactionHandler.CheckTx(tx, false); err != nil {
+			if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
 				return abcitypes.ResponseCheckTx{Code: 0}
 			}
 			log.Debugf("checkTx error: %v", err)
@@ -523,14 +498,14 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 
 // DeliverTx unmarshals req.Tx and adds it to the State if it is valid
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	var response *AddTxResponse
+	var response *transaction.TransactionResponse
 	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
 	tx := new(vochaintx.VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		log.Debugf("deliver tx: %s", log.FormatProto(tx.Tx))
-		if response, err = app.AddTx(tx, true); err != nil {
+		if response, err = app.TransactionHandler.CheckTx(tx, true); err != nil {
 			log.Debugf("rejected tx: %v", err)
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}

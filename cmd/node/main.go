@@ -29,6 +29,7 @@ import (
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 )
 
@@ -75,7 +76,7 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type (%s, %s)", db.TypePebble, db.TypeBadger))
 	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
-		fmt.Sprintf("vocdoni blockchain to connect with: %q", vochain.GenesisAvailableChains()))
+		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.GenesisAvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
 	globalCfg.PprofPort = *flag.Int("pprof", 0,

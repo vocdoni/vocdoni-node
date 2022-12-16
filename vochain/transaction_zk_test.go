@@ -8,10 +8,11 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/vocdoni/arbo"
 	snarkParsers "github.com/vocdoni/go-snark/parsers"
+	"github.com/vocdoni/go-snark/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
+func TestVoteCheckZkSNARK(t *testing.T) {
 	app := TestBaseApplication(t)
 
 	vkJSON := `
@@ -137,12 +138,13 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	`
 	vk0, err := snarkParsers.ParseVk([]byte(vkJSON))
 	qt.Assert(t, err, qt.IsNil)
-	app.ZkVKs = append(app.ZkVKs, vk0)
+	app.TransactionHandler.ZkVKs = []*types.Vk{vk0}
 
 	processId := sha256.Sum256(big.NewInt(10).Bytes()) // processId is a byte-array of 32 bytes
 	entityId := []byte("entityid-test")
 	censusRootBI, ok := new(big.Int).SetString("13256983273841966279055596043431919350426357891097196583481278449962353221936", 10)
 	qt.Assert(t, ok, qt.IsTrue)
+
 	process := &models.Process{
 		ProcessId: processId[:],
 		EntityId:  entityId,
@@ -206,6 +208,6 @@ func TestVoteEnvelopeCheckCaseZkSNARK(t *testing.T) {
 	txID := [32]byte{}
 	commit := false
 
-	_, _, err = app.VoteEnvelopeCheck(vtx, txBytes, signature, txID, commit)
+	_, _, err = app.TransactionHandler.VoteTxCheck(vtx, txBytes, signature, txID, commit)
 	qt.Assert(t, err, qt.IsNil)
 }

@@ -9,7 +9,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
-	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 )
 
 // TransactionCount returns the number of transactions indexed
