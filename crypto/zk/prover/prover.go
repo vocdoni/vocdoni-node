@@ -21,9 +21,58 @@ var (
 	ErrWitnessCalc     = fmt.Errorf("error during witness calculation")
 	ErrProofGen        = fmt.Errorf("error during zksnark proof generation")
 	ErrParseProofData  = fmt.Errorf("error parsing the proof provided, it must be a valid json, check https://github.com/iden3/go-rapidsnark/blob/73d5784d2aa791dd6646142b0017dbef97240f57/types/proof.go")
-	ErrParsePubSignals = fmt.Errorf("error during zksnark proof generation, it must be a json with array of strings")
+	ErrParsePubSignals = fmt.Errorf("error during zksnark public signals proof generation, it must be a json with array of strings")
+	ErrEncodingProof   = fmt.Errorf("error encoding prove result into a proof struct")
+	ErrDecodingProof   = fmt.Errorf("error decoding prove as []byte")
 	ErrVerifyProof     = fmt.Errorf("error during zksnark verification")
 )
+
+// ProofData struct contains the calculated parameters of a Proof. It allows to
+// encode and decode the go-rapidsnark inputs and outputs easily.
+type ProofData struct {
+	A []string   `json:"pi_a"`
+	B [][]string `json:"pi_b"`
+	C []string   `json:"pi_c"`
+}
+
+// Prove struct envolves the ProofData struct and its associated public signals.
+// Contains all required information to perform a proof verification.
+type Proof struct {
+	Data       ProofData `json:"data"`
+	PubSignals []string  `json:"pubSignals"`
+}
+
+// ParseProof function encoding the provided proof data and public signals into
+// a Proof struct performing an unmarshal operation over them. Returns an error
+// if something was wrong.
+func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
+	data := ProofData{}
+	if err := json.Unmarshal(proofData, &data); err != nil {
+		return nil, ErrEncodingProof
+	}
+
+	signals := []string{}
+	if err := json.Unmarshal(pubSignals, &signals); err != nil {
+		return nil, ErrEncodingProof
+	}
+	return &Proof{Data: data, PubSignals: signals}, nil
+}
+
+// Bytes function returns the current Proof struct parameters Data and
+// PubSignals as []byte. It returns an error if something was wrong.
+func (p *Proof) Bytes() (proofData []byte, pubSignals []byte, err error) {
+	proofData, err = json.Marshal(p.Data)
+	if err != nil {
+		return nil, nil, ErrDecodingProof
+	}
+
+	pubSignals, err = json.Marshal(p.PubSignals)
+	if err != nil {
+		return nil, nil, ErrDecodingProof
+	}
+
+	return proofData, pubSignals, nil
+}
 
 // calcWitness perform the witness calculation using go-rapidsnark library based
 // on wasm version of the circuit and inputs provided. To provide the arguments
@@ -65,44 +114,46 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 // for the input signals using the proving key provided. All the arguments are
 // slices of bytes with the data read from the generated files by Circom (wasm
 // circuit) and SnarkJS (proving zkey). It returns the verifiable proof of the
-// execution with the public signals associated.
-func Prove(zKey, wasm, inputs []byte) ([]byte, []byte, error) {
+// execution with the public signals associated or an error if something was
+// wrong.
+func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// Calculate the witness calling internal function calcWitness with the
 	// provided wasm and inputs.
 	wtns, err := calcWitness(wasm, inputs)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil
 	}
 
 	// Generate the proof and public signals with the witness calculated and the
 	// proving zkey provided.
-	strProof, strPubSignals, err := prover.Groth16ProverRaw(zKey, wtns)
+	strProofData, strPubSignals, err := prover.Groth16ProverRaw(zKey, wtns)
 	if err != nil {
-		return nil, nil, ErrProofGen
+		return nil, ErrProofGen
 	}
 
+	// Parse the components generated into a prover.Proof struct
+	proof, err := ParseProof([]byte(strProofData), []byte(strPubSignals))
+	if err != nil {
+		return nil, err
+	}
 	// Return the proof and public signals as slices of bytes
-	return []byte(strProof), []byte(strPubSignals), nil
+	return proof, nil
 }
 
-// Verify function performs a verification of the provided proof and public
-// signals. It receives the verification key, the proof and the public signals
-// into slices of bytes, result of origin files read. It returns an error if
-// something fails or nil if the verification was ok.
-func Verify(vKey, proofData, pubSignals []byte) error {
-	// Instance a required proof struct to fill it then
+// Verify function performs a verification of the provided proof and its public
+// signals. It receives the verification key and returns an error if something
+// fails or nil if the verification was ok.
+func (p *Proof) Verify(vKey []byte) error {
 	proof := types.ZKProof{
-		Proof:      &types.ProofData{},
-		PubSignals: []string{},
+		Proof: &types.ProofData{
+			A: p.Data.A,
+			B: p.Data.B,
+			C: p.Data.C,
+		},
+		PubSignals: p.PubSignals,
 	}
-
-	// Read proof and public signals as regular JSON into the instanced proof
-	// struct and try to verify it with go-rapidsnark/verifier.
-	if err := json.Unmarshal(proofData, &proof.Proof); err != nil {
-		return ErrParseProofData
-	} else if err = json.Unmarshal(pubSignals, &proof.PubSignals); err != nil {
-		return ErrParsePubSignals
-	} else if err = verifier.VerifyGroth16(proof, vKey); err != nil {
+	// Try to verify the provided proof with go-rapidsnark/verifier.
+	if err := verifier.VerifyGroth16(proof, vKey); err != nil {
 		return ErrVerifyProof
 	}
 
