@@ -32,6 +32,21 @@ func getExampleFile(path string) []byte {
 	return content
 }
 
+func TestParseProof(t *testing.T) {
+	proof, _ := Prove(zkey, wasm, inputs)
+	validProofData, validPubSignals, _ := proof.Bytes()
+
+	result, err := ParseProof(validProofData, validPubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, result.Data, qt.ContentEquals, proof.Data)
+	qt.Assert(t, result.PubSignals, qt.ContentEquals, proof.PubSignals)
+
+	_, err = ParseProof([]byte{}, validPubSignals)
+	qt.Assert(t, err, qt.IsNotNil)
+	_, err = ParseProof(validProofData, []byte{})
+	qt.Assert(t, err, qt.IsNotNil)
+}
+
 func Test_calcWitness(t *testing.T) {
 	// Empty and first set of valid parameters
 	var emptyWasm, emptyInputs = []byte{}, []byte{}
