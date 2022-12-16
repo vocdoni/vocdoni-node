@@ -136,7 +136,7 @@ func newConfig() (*config.Config, config.Error) {
 	globalCfg.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 	globalCfg.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
-		"vohain consensus block time target (in seconds)")
+		"vochain consensus block time target (in seconds)")
 	globalCfg.Vochain.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0,
 		"index slot used by this node if it is a key keeper")
 	globalCfg.Vochain.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
