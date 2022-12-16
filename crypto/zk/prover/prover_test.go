@@ -20,9 +20,8 @@ var (
 	vkey2       = getExampleFile("./test_files/verification_key2.json")
 )
 
-// getExampleFile is a helper function to read local file that is used like a
-// test example. It raise an error if something was wrong that makes that the
-// current test fails.
+// getExampleFile is a helper function to read local files that are used into
+// the tests. It logs an error if something was wrong.
 func getExampleFile(path string) []byte {
 	content, err := os.ReadFile(path)
 	if err != nil {
