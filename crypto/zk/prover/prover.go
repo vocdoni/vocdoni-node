@@ -28,23 +28,23 @@ var (
 )
 
 // ProofData struct contains the calculated parameters of a Proof. It allows to
-// encode and decode the go-rapidsnark inputs and outputs easily.
+// encode and decode go-rapidsnark inputs and outputs easily.
 type ProofData struct {
 	A []string   `json:"pi_a"`
 	B [][]string `json:"pi_b"`
 	C []string   `json:"pi_c"`
 }
 
-// Prove struct envolves the ProofData struct and its associated public signals.
-// Contains all required information to perform a proof verification.
+// Proof struct wraps the ProofData struct and its associated public signals.
+// Contains all the required information to perform a proof verification.
 type Proof struct {
 	Data       ProofData `json:"data"`
 	PubSignals []string  `json:"pubSignals"`
 }
 
-// ParseProof function encoding the provided proof data and public signals into
-// a Proof struct performing an unmarshal operation over them. Returns an error
-// if something was wrong.
+// ParseProof function encodes the provided proof data and public signals into a
+// Proof struct, performing an unmarshal operation over them. Returns an error
+// if something is wrong.
 func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	data := ProofData{}
 	if err := json.Unmarshal(proofData, &data); err != nil {
@@ -59,7 +59,7 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 }
 
 // Bytes function returns the current Proof struct parameters Data and
-// PubSignals as []byte. It returns an error if something was wrong.
+// PubSignals as []byte. It returns an error if something fails.
 func (p *Proof) Bytes() (proofData []byte, pubSignals []byte, err error) {
 	proofData, err = json.Marshal(p.Data)
 	if err != nil {
@@ -95,7 +95,8 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 		return nil, ErrParsingWitness
 	}
 
-	// Instances a go-rapidsnark/witness calculator with the provided wasm []byte
+	// Instances a go-rapidsnark/witness calculator with the provided wasm
+	// []byte
 	calculator, err := witness.NewCircom2WitnessCalculator(wasmBytes, true)
 	if err != nil {
 		return nil, ErrInitWitnessCalc
@@ -114,8 +115,7 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 // for the input signals using the proving key provided. All the arguments are
 // slices of bytes with the data read from the generated files by Circom (wasm
 // circuit) and SnarkJS (proving zkey). It returns the verifiable proof of the
-// execution with the public signals associated or an error if something was
-// wrong.
+// execution with the public signals associated or an error if something fails.
 func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// Calculate the witness calling internal function calcWitness with the
 	// provided wasm and inputs.
@@ -157,6 +157,6 @@ func (p *Proof) Verify(vKey []byte) error {
 		return ErrVerifyProof
 	}
 
-	// Return nil if everything was ok.
+	// Return nil if everything is ok.
 	return nil
 }
