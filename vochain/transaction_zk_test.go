@@ -9,6 +9,7 @@ import (
 	"github.com/vocdoni/arbo"
 	snarkParsers "github.com/vocdoni/go-snark/parsers"
 	"github.com/vocdoni/go-snark/types"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -208,6 +209,11 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	txID := [32]byte{}
 	commit := false
 
-	_, _, err = app.TransactionHandler.VoteTxCheck(vtx, txBytes, signature, txID, commit)
+	_, _, err = app.TransactionHandler.VoteTxCheck(&vochaintx.VochainTx{
+		Tx:         &models.Tx{Payload: &models.Tx_Vote{Vote: vtx}},
+		Signature:  signature,
+		SignedBody: txBytes,
+		TxID:       txID,
+	}, commit)
 	qt.Assert(t, err, qt.IsNil)
 }
