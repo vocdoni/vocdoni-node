@@ -60,13 +60,13 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 
 // Bytes function returns the current Proof struct parameters Data and
 // PubSignals as []byte. It returns an error if something fails.
-func (p *Proof) Bytes() (proofData []byte, pubSignals []byte, err error) {
-	proofData, err = json.Marshal(p.Data)
+func (p *Proof) Bytes() ([]byte, []byte, error) {
+	proofData, err := json.Marshal(p.Data)
 	if err != nil {
 		return nil, nil, ErrDecodingProof
 	}
 
-	pubSignals, err = json.Marshal(p.PubSignals)
+	pubSignals, err := json.Marshal(p.PubSignals)
 	if err != nil {
 		return nil, nil, ErrDecodingProof
 	}

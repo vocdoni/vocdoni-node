@@ -47,6 +47,24 @@ func TestParseProof(t *testing.T) {
 	qt.Assert(t, err, qt.IsNotNil)
 }
 
+func TestBytes(t *testing.T) {
+	expected, _ := Prove(zkey, wasm, inputs)
+
+	validProofData, validPubSignals, err := expected.Bytes()
+	qt.Assert(t, err, qt.IsNil)
+	result, err := ParseProof(validProofData, validPubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, result, qt.DeepEquals, expected)
+
+	expectedProofData, err := json.Marshal(expected.Data)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validProofData, qt.DeepEquals, expectedProofData)
+	expectedPubSignals, err := json.Marshal(expected.PubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validPubSignals, qt.DeepEquals, expectedPubSignals)
+
+}
+
 func Test_calcWitness(t *testing.T) {
 	// Empty and first set of valid parameters
 	var emptyWasm, emptyInputs = []byte{}, []byte{}
