@@ -1,6 +1,7 @@
 package prover
 
 import (
+	"encoding/json"
 	"log"
 	"os"
 	"testing"
@@ -31,6 +32,39 @@ func getExampleFile(path string) []byte {
 	return content
 }
 
+func TestParseProof(t *testing.T) {
+	proof, _ := Prove(zkey, wasm, inputs)
+	validProofData, validPubSignals, _ := proof.Bytes()
+
+	result, err := ParseProof(validProofData, validPubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, result.Data, qt.ContentEquals, proof.Data)
+	qt.Assert(t, result.PubSignals, qt.ContentEquals, proof.PubSignals)
+
+	_, err = ParseProof([]byte{}, validPubSignals)
+	qt.Assert(t, err, qt.IsNotNil)
+	_, err = ParseProof(validProofData, []byte{})
+	qt.Assert(t, err, qt.IsNotNil)
+}
+
+func TestBytes(t *testing.T) {
+	expected, _ := Prove(zkey, wasm, inputs)
+
+	validProofData, validPubSignals, err := expected.Bytes()
+	qt.Assert(t, err, qt.IsNil)
+	result, err := ParseProof(validProofData, validPubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, result, qt.DeepEquals, expected)
+
+	expectedProofData, err := json.Marshal(expected.Data)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validProofData, qt.DeepEquals, expectedProofData)
+	expectedPubSignals, err := json.Marshal(expected.PubSignals)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validPubSignals, qt.DeepEquals, expectedPubSignals)
+
+}
+
 func Test_calcWitness(t *testing.T) {
 	// Empty and first set of valid parameters
 	var emptyWasm, emptyInputs = []byte{}, []byte{}
@@ -59,40 +93,46 @@ func Test_calcWitness(t *testing.T) {
 
 func TestProve(t *testing.T) {
 	// Empty and valid parameters
-	_, _, err := Prove([]byte{}, wasm, inputs)
+	_, err := Prove([]byte{}, wasm, inputs)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	_, resPubSignals, err := Prove(zkey, wasm, inputs)
+	validPubSignals, validPubSignals2 := []string{}, []string{}
+	_ = json.Unmarshal(pubSignals, &validPubSignals)
+	_ = json.Unmarshal(pubSignals2, &validPubSignals2)
+
+	proof, err := Prove(zkey, wasm, inputs)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, resPubSignals, qt.ContentEquals, pubSignals)
+	qt.Assert(t, proof.PubSignals, qt.ContentEquals, validPubSignals)
 
 	// Second set of valid parameters
-	_, resPubSignals, err = Prove(zkey2, wasm2, inputs2)
+	proof, err = Prove(zkey2, wasm2, inputs2)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, resPubSignals, qt.ContentEquals, pubSignals2)
+	qt.Assert(t, proof.PubSignals, qt.ContentEquals, validPubSignals2)
 }
 
 func TestVerify(t *testing.T) {
 	// Check a valid case
-	validProofData, validPublicSignals, _ := Prove(zkey, wasm, inputs)
-	err := Verify(vkey, validProofData, validPublicSignals)
+	proof, _ := Prove(zkey, wasm, inputs)
+	err := proof.Verify(vkey)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Check an invalid case with empty parameters
-	err = Verify([]byte{}, validProofData, validPublicSignals)
+	err = proof.Verify([]byte{})
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = Verify(vkey, []byte{}, validPublicSignals)
+	wrongProof := &Proof{Data: ProofData{}, PubSignals: proof.PubSignals}
+	err = wrongProof.Verify(vkey)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = Verify(vkey, validProofData, []byte{})
+	wrongProof = &Proof{Data: proof.Data, PubSignals: []string{}}
+	err = wrongProof.Verify(vkey)
 	qt.Assert(t, err, qt.IsNotNil)
 
 	// Check a proof generated with a different zkey
-	invalidProofData, invalidPublicSignals, _ := Prove(zkey2, wasm, inputs)
-	err = Verify(vkey, invalidProofData, invalidPublicSignals)
+	wrongProof, _ = Prove(zkey2, wasm, inputs)
+	err = wrongProof.Verify(vkey)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = Verify(vkey2, invalidProofData, invalidPublicSignals)
+	err = wrongProof.Verify(vkey2)
 	qt.Assert(t, err, qt.IsNotNil)
 }
