@@ -147,7 +147,7 @@ func (a *API) censusCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	}
 
 	censusID := util.RandomBytes(32)
-	_, err = a.censusdb.New(censusID, censusType, indexed, false, &token)
+	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token)
 	if err != nil {
 		return err
 	}
@@ -449,25 +449,27 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return err
 	}
 
+	// if the census already exists, return the URI and the root
 	if a.censusdb.Exists(root) {
-		return fmt.Errorf("a published census with root %x already exist", root)
+		ref, err := a.censusdb.Load(root, nil)
+		if err != nil {
+			return err
+		}
+		var data []byte
+		if data, err = json.Marshal(&Census{
+			CensusID: root,
+			URI:      ref.URI,
+		}); err != nil {
+			return err
+		}
+		return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 	}
 
+	// dump the current tree to import them after
 	dump, err := ref.Tree().Dump()
 	if err != nil {
 		return err
 	}
-
-	newRef, err := a.censusdb.New(
-		root, models.Census_Type(ref.CensusType),
-		ref.Indexed, true, nil)
-	if err != nil {
-		return err
-	}
-	if err := newRef.Tree().ImportDump(dump); err != nil {
-		return err
-	}
-	newRef.Tree().Publish()
 
 	// export the tree to the remote storage (IPFS)
 	uri := ""
@@ -490,6 +492,17 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 			uri = a.storage.URIprefix() + cid
 		}
 	}
+
+	newRef, err := a.censusdb.New(
+		root, models.Census_Type(ref.CensusType),
+		ref.Indexed, uri, nil)
+	if err != nil {
+		return err
+	}
+	if err := newRef.Tree().ImportDump(dump); err != nil {
+		return err
+	}
+	newRef.Tree().Publish()
 
 	var data []byte
 	if data, err = json.Marshal(&Census{

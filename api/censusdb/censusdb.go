@@ -9,6 +9,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
+	storagelayer "go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
@@ -38,7 +39,7 @@ type CensusRef struct {
 	AuthToken  *uuid.UUID
 	CensusType int32
 	Indexed    bool
-	IsPublic   bool
+	URI        string
 }
 
 // Tree returns the censustree.Tree object of the census reference.
@@ -73,7 +74,7 @@ func NewCensusDB(db db.Database) *CensusDB {
 
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
-	indexed, public bool, authToken *uuid.UUID) (*CensusRef, error) {
+	indexed bool, uri string, authToken *uuid.UUID) (*CensusRef, error) {
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
@@ -82,12 +83,12 @@ func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 	if err != nil {
 		return nil, err
 	}
-	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, indexed, public)
+	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, indexed, uri)
 	if err != nil {
 		return nil, err
 	}
 	ref.tree = tree
-	if public {
+	if uri != "" {
 		ref.tree.Publish()
 	}
 	return ref, nil
@@ -121,7 +122,7 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 	if err != nil {
 		return nil, err
 	}
-	if ref.IsPublic {
+	if ref.URI != "" {
 		ref.tree.Publish()
 	}
 	log.Debugf("loaded tree %x of type %s", censusID, models.Census_Type_name[ref.CensusType])
@@ -175,7 +176,8 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 	if c.Exists(cdata.RootHash) {
 		return fmt.Errorf("could not import census %x, already exists", cdata.RootHash)
 	}
-	ref, err := c.New(cdata.RootHash, cdata.Type, cdata.Indexed, true, nil)
+	uri := "ipfs://" + storagelayer.CalculateIPFSCIDv1json(data)
+	ref, err := c.New(cdata.RootHash, cdata.Type, cdata.Indexed, uri, nil)
 	if err != nil {
 		return err
 	}
@@ -198,7 +200,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 
 // addCensusRefToDB adds a censusRef to the database.
 func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
-	t models.Census_Type, indexed, public bool) (*CensusRef, error) {
+	t models.Census_Type, indexed bool, uri string) (*CensusRef, error) {
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	refData := bytes.Buffer{}
@@ -207,7 +209,7 @@ func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 		AuthToken:  authToken,
 		CensusType: int32(t),
 		Indexed:    indexed,
-		IsPublic:   public,
+		URI:        uri,
 	}
 	if err := enc.Encode(ref); err != nil {
 		return nil, err
