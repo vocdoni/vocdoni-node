@@ -187,9 +187,8 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 		}
 
 	case *models.Tx_RegisterKey:
-		if err := RegisterKeyTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, t.state,
-			forCommit); err != nil {
-			return nil, fmt.Errorf("registerKeyTx %w", err)
+		if err := t.RegisterKeyTxCheck(vtx.Tx, vtx.SignedBody, vtx.Signature, forCommit); err != nil {
+			return nil, fmt.Errorf("registerKeyTx: %w", err)
 		}
 		if forCommit {
 			tx := vtx.Tx.GetRegisterKey()
@@ -1420,22 +1419,21 @@ func CollectFaucetTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vsta
 }
 
 // RegisterKeyTxCheck validates a registerKeyTx transaction against the state
-func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate.State,
-	forCommit bool) error {
+func (t *TransactionHandler) RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, forCommit bool) error {
 	tx := vtx.GetRegisterKey()
 
 	// Sanity checks
 	if tx == nil {
 		return fmt.Errorf("register key transaction is nil")
 	}
-	process, err := state.Process(tx.ProcessId, false)
+	process, err := t.state.Process(tx.ProcessId, false)
 	if err != nil {
 		return fmt.Errorf("cannot fetch processId: %w", err)
 	}
 	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
 		return fmt.Errorf("process %x malformed", tx.ProcessId)
 	}
-	if state.CurrentHeight() >= process.StartBlock {
+	if t.state.CurrentHeight() >= process.StartBlock {
 		return fmt.Errorf("process %x already started", tx.ProcessId)
 	}
 	if !(process.Mode.PreRegister && process.EnvelopeType.Anonymous) {
@@ -1455,7 +1453,7 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate
 		return fmt.Errorf("newKey wrong size")
 	}
 	// Verify that we are not over maxCensusSize
-	censusSize, err := state.GetRollingCensusSize(tx.ProcessId, false)
+	censusSize, err := t.state.GetRollingCensusSize(tx.ProcessId, false)
 	if err != nil {
 		return err
 	}
@@ -1491,9 +1489,9 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate
 
 	// Validate that this user is not registering more keys than possible
 	// with the users weight.
-	usedWeight, err := state.GetPreRegisterAddrUsedWeight(process.ProcessId, addr)
+	usedWeight, err := t.state.GetPreRegisterAddrUsedWeight(process.ProcessId, addr)
 	if err != nil {
-		return fmt.Errorf("cannot get nullifeir used weight: %w", err)
+		return fmt.Errorf("cannot get address used weight: %w", err)
 	}
 	txWeight, ok := new(big.Int).SetString(tx.Weight, 10)
 	if !ok {
@@ -1507,7 +1505,7 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate
 	// The following check ensures that weight != 1 is not used, once the above is
 	// implemented we can remove it
 	if usedWeight.Cmp(bigOne) != 0 {
-		return fmt.Errorf("weight != 1 is not yet supported, received %s", tx.Weight)
+		return fmt.Errorf("weight != 1 is not yet supported, received %s, used weight: %s", txWeight, usedWeight)
 	}
 
 	if usedWeight.Cmp(weight) > 0 {
@@ -1516,7 +1514,7 @@ func RegisterKeyTxCheck(vtx *models.Tx, txBytes, signature []byte, state *vstate
 			usedWeight, weight)
 	}
 	if forCommit {
-		state.SetPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight)
+		t.state.SetPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight)
 	}
 
 	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:

@@ -60,10 +60,6 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 		return fmt.Errorf("cannot add (%x) to rolling census: %w", key, err)
 	}
 	log.Debugf("added key %x with index %d to rolling census", key, censusLen)
-	// // Store mapping between key -> key index
-	// if err := noState.Set(keyCensusKeyIndex(key), censusLenLE); err != nil {
-	// 	return err
-	// }
 	// Update census size
 	if err := statedb.SetUint64(noState, keyCensusLen, censusLen+1); err != nil {
 		return err
@@ -172,7 +168,8 @@ func (v *State) SetPreRegisterAddrUsedWeight(pid []byte, addr common.Address, we
 
 // GetPreRegisterAddrUsedWeight returns the weight used by the address for a process ID on pre-register census
 func (v *State) GetPreRegisterAddrUsedWeight(pid []byte, addr common.Address) (*big.Int, error) {
-	weightBytes, err := v.Tx.DeepGet(GenerateNullifier(addr, pid),
+	weightBytes, err := v.Tx.DeepGet(
+		GenerateNullifier(addr, pid),
 		StateTreeCfg(TreeProcess),
 		StateChildTreeCfg(ChildTreePreRegisterNullifiers).WithKey(pid))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
