@@ -345,7 +345,9 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 			usedWeight, weight)
 	}
 	if forCommit {
-		t.state.SetPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight)
+		if err := t.state.SetPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight); err != nil {
+			return fmt.Errorf("cannot set address used weight: %w", err)
+		}
 	}
 
 	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:

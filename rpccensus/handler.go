@@ -44,7 +44,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			censusID,
 			r.CensusType,
 			r.CensusType == models.Census_ARBO_POSEIDON,
-			true,
+			"",
 			nil,
 		); err != nil {
 			return nil, err
@@ -263,7 +263,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		}
 		newRef, err := m.cdb.New(
 			root, models.Census_Type(ref.CensusType),
-			ref.Indexed, true, nil)
+			ref.Indexed, "", nil)
 		if err != nil {
 			return nil, err
 		}
