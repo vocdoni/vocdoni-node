@@ -483,7 +483,7 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 				return abcitypes.ResponseCheckTx{Code: 0}
 			}
 			log.Debugf("checkTx error: %v", err)
-			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("addTx " + err.Error())}
+			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}
 		}
 	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}

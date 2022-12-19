@@ -609,7 +609,6 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-
 	if enableBadgerhold {
 		updateFunc := func(record interface{}) error {
 			update, ok := record.(*indexertypes.Process)
