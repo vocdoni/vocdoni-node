@@ -1,14 +1,10 @@
 package apiclient
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"math/big"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -34,8 +30,6 @@ type VoteData struct {
 	ProofCSP    types.HexBytes
 }
 
-var ErrNotAnonymousVoteInfo = fmt.Errorf("the current vote data not contain enought info to perform an anonymous vote")
-
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
 // which contains the electionID, the choices and the proof.  The
 // return value is the voteID (nullifier).
@@ -53,31 +47,9 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		VotePackage: votePackageBytes,
 	}
 
-	// Get census type
-	election, err := c.Election(v.ElectionID)
-	if err != nil {
-		return nil, err
-	}
-
 	// Build the proof
 	switch {
-	case election.VoteMode.Anonymous:
-		if v.ProofMkTree == nil {
-			return nil, ErrNotAnonymousVoteInfo
-		}
-		// zksnark
-		if vote.Proof, err = c.GenerateZkProof(election, v); err != nil {
-			return nil, err
-		}
-	case v.ProofCSP != nil:
-		p := models.ProofCA{}
-		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
-			return nil, fmt.Errorf("could not decode CSP proof: %w", err)
-		}
-		vote.Proof = &models.Proof{
-			Payload: &models.Proof_Ca{Ca: &p},
-		}
-	default:
+	case v.ProofMkTree != nil:
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
@@ -87,6 +59,14 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 					KeyType:  v.ProofMkTree.KeyType,
 				},
 			},
+		}
+	case v.ProofCSP != nil:
+		p := models.ProofCA{}
+		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
+			return nil, fmt.Errorf("could not decode CSP proof: %w", err)
+		}
+		vote.Proof = &models.Proof{
+			Payload: &models.Proof_Ca{Ca: &p},
 		}
 	}
 
@@ -138,59 +118,4 @@ func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-}
-
-func (c *HTTPclient) GenerateZkProof(election *api.Election, v *VoteData) (*models.Proof, error) {
-	var proofInputs = struct {
-		CensusRoot     []byte   `json:"censusRoot"`
-		CensusSiblings []string `json:"censusSiblings"`
-		Weight         string   `json:"weight"`
-		PrivateKey     string   `json:"privateKey"`
-		VoteHash       []string `json:"voteHash"`
-		ProcessId      []string `json:"processId"`
-		Nullifier      string   `json:"nullifier"`
-	}{
-		CensusRoot: election.Census.CensusRoot,
-		Weight:     new(big.Int).SetBytes(v.ProofMkTree.Value).String(),
-	}
-
-	// Get siblings
-	siblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, v.ProofMkTree.Proof)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, sibling := range siblings {
-		strSiblign := arbo.BytesToBigInt(sibling).String()
-		proofInputs.CensusSiblings = append(proofInputs.CensusSiblings, strSiblign)
-	}
-
-	// Private key ?¿
-
-	// Generate vote hash ?¿
-
-	// Generate processId
-	processHash := sha256.Sum256(v.ElectionID)
-	proofInputs.ProcessId = []string{
-		new(big.Int).SetBytes(arbo.SwapEndianness(processHash[:16])).String(),
-		new(big.Int).SetBytes(arbo.SwapEndianness(processHash[16:])).String(),
-	}
-
-	// Nullifier ?¿
-
-	// Marshal inputs
-	inputs, err := json.Marshal(proofInputs)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get artifacts (zkey & wasm)
-	zkey, wasm := []byte{}, []byte{}
-
-	proof, pubSignals, err := prover.Prove(zkey, wasm, inputs)
-	if err != nil {
-		return nil, err
-	}
-
-	return nil, nil
 }
