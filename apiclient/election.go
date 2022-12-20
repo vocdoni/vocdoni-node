@@ -30,6 +30,22 @@ func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) 
 	return election, nil
 }
 
+// ElectionResults returns the election results given its ID.
+func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionSummary, error) {
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "results")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	electionSummary := &api.ElectionSummary{}
+	if err = json.Unmarshal(resp, &electionSummary); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return electionSummary, nil
+}
+
 // NewElectionrRaw creates a new election given the protobuf Process message.
 func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, error) {
 	// get the own account details

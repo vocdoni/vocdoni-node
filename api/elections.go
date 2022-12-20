@@ -66,6 +66,14 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/elections/{electionID}/results",
+		"GET",
+		bearerstdapi.MethodAccessTypePublic,
+		a.electionResultsHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/elections",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -248,6 +256,30 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+}
+
+// /elections/<electionID>/results
+// returns the results of an election
+func (a *API) electionResultsHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	if err != nil || electionID == nil {
+		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
+	}
+	electionResults, err := a.indexer.GetResults(electionID)
+	if err != nil {
+		return fmt.Errorf("cannot get election results: %w", err)
+	}
+	electionSummary := &ElectionSummary{
+		ElectionID:   electionResults.ProcessID,
+		FinalResults: electionResults.Final, // if false the results are not final
+		Results:      electionResults.Votes,
+		VoteCount:    electionResults.EnvelopeHeight,
+	}
+	data, err := json.Marshal(electionSummary)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
 }
 
 // POST elections
