@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
@@ -18,7 +18,7 @@ func (a *API) enableVoteHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/votes",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.submitVoteHandler,
 	); err != nil {
 		return err
@@ -26,7 +26,7 @@ func (a *API) enableVoteHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/votes/{voteID}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.getVoteHandler,
 	); err != nil {
 		return err
@@ -34,7 +34,7 @@ func (a *API) enableVoteHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/votes/verify/{electionID}/{voteID}/",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.verifyVoteHandler,
 	); err != nil {
 		return err
@@ -45,7 +45,7 @@ func (a *API) enableVoteHandlers() error {
 
 // /votes
 // submit a vote
-func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
@@ -73,12 +73,12 @@ func (a *API) submitVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /votes/<voteID>
 // get a vote by its voteID (nullifier)
-func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return fmt.Errorf("cannot decode voteID: %w", err)
@@ -106,12 +106,12 @@ func (a *API) getVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if _, err := json.Marshal(voteData.VotePackage); err != nil {
 		vote.VotePackage = string(voteData.VotePackage)
 	}
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }
 
 // /votes/verify/<electionID>/<voteID>
 // verify a vote (get basic information)
-func (a *API) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return fmt.Errorf("cannot decode voteID: %w", err)
@@ -129,5 +129,5 @@ func (a *API) verifyVoteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if ok, err := a.vocapp.State.EnvelopeExists(electionID, voteID, true); !ok || err != nil {
 		return fmt.Errorf("not registered")
 	}
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }

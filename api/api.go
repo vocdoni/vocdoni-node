@@ -10,7 +10,7 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -27,7 +27,7 @@ type API struct {
 	BaseRoute    string
 
 	router   *httprouter.HTTProuter
-	endpoint *bearerstdapi.BearerStandardAPI
+	endpoint *apirest.API
 	indexer  *indexer.Indexer
 	vocapp   *vochain.BaseApplication
 	storage  data.Storage
@@ -55,7 +55,7 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, err
 		router:    router,
 	}
 	var err error
-	api.endpoint, err = bearerstdapi.NewBearerStandardAPI(router, baseRoute)
+	api.endpoint, err = apirest.NewAPI(router, baseRoute)
 	if err != nil {
 		return nil, err
 	}

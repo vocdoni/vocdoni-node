@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -28,7 +28,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{address}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.accountHandler,
 	); err != nil {
 		return err
@@ -36,7 +36,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.accountSetHandler,
 	); err != nil {
 		return err
@@ -44,7 +44,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/treasurer",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.treasurerHandler,
 	); err != nil {
 		return err
@@ -52,7 +52,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionListHandler,
 	); err != nil {
 		return err
@@ -60,7 +60,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/count",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionCountHandler,
 	); err != nil {
 		return err
@@ -68,7 +68,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/status/{status}/page/{page}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionListHandler,
 	); err != nil {
 		return err
@@ -76,7 +76,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/status/{status}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionListHandler,
 	); err != nil {
 		return err
@@ -84,7 +84,7 @@ func (a *API) enableAccountHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/page/{page}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionListHandler,
 	); err != nil {
 		return err
@@ -95,7 +95,7 @@ func (a *API) enableAccountHandlers() error {
 
 // /account/{address}
 // get the account information
-func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return fmt.Errorf("address malformed")
 	}
@@ -131,12 +131,12 @@ func (a *API) accountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST /account
 // set account information
-func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &AccountSet{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
@@ -220,12 +220,12 @@ func (a *API) accountSetHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // GET /accounts/treasurer
 // get the treasurer address
-func (a *API) treasurerHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	acc, err := a.vocapp.State.Treasurer(true)
 	if err != nil {
 		return err
@@ -240,12 +240,12 @@ func (a *API) treasurerHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /accounts/<organizationID>/elections/status/<status>
 // list the elections of an organization.
-func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
@@ -306,12 +306,12 @@ func (a *API) electionListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /accounts/<organizationID>/elections/count
 // Returns the number of elections for an organization
-func (a *API) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
@@ -331,5 +331,5 @@ func (a *API) electionCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
