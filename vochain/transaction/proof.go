@@ -27,6 +27,18 @@ var (
 	bigOne  = big.NewInt(1)
 )
 
+func GenerateProofPublicSignals(processId, censusRoot, nullifier, vote []byte, weight *big.Int) ([]string, error) {
+	publicInputs := []string{}
+
+	// 1. processId {2}
+	// 2. censusRoot {1}
+	// 3. nullifier {1}
+	// 4. voteHash {2}
+	// 5. weight {1}
+
+	return publicInputs, nil
+}
+
 // VerifyProofFunc is the generic function type to verify a proof of belonging
 // into a census within a process.
 type VerifyProofFunc func(process *models.Process, proof *models.Proof,
