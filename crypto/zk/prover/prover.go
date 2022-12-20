@@ -121,7 +121,7 @@ func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// provided wasm and inputs.
 	wtns, err := calcWitness(wasm, inputs)
 	if err != nil {
-		return nil, nil
+		return nil, err
 	}
 
 	// Generate the proof and public signals with the witness calculated and the
