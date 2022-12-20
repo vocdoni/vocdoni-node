@@ -236,10 +236,11 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	votes := []Vote{}
 	for _, v := range votesRaw {
 		votes = append(votes, Vote{
-			VoteID:      v.Nullifier,
-			VoterID:     v.VoterID,
-			TxHash:      v.TxHash,
-			BlockHeight: v.Height,
+			VoteID:           v.Nullifier,
+			VoterID:          v.VoterID,
+			TxHash:           v.TxHash,
+			BlockHeight:      v.Height,
+			TransactionIndex: &v.TxIndex,
 		})
 	}
 	data, err := json.Marshal(votes)
