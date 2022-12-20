@@ -7,7 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -71,7 +71,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	if err != nil {
 		return nil, err
 	}
-	if code != bearerstdapi.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusCodeOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
@@ -245,7 +245,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	if err != nil {
 		return nil, err
 	}
-	if code != bearerstdapi.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusCodeOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
@@ -316,7 +316,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	if err != nil {
 		return nil, err
 	}
-	if code != bearerstdapi.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusCodeOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	txResp := new(api.Transaction)
@@ -333,7 +333,7 @@ func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error
 	if err != nil {
 		return 0, err
 	}
-	if code != bearerstdapi.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusCodeOK {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	votes := new(struct {

@@ -12,7 +12,7 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -37,7 +37,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{type}",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusCreateHandler,
 	); err != nil {
 		return err
@@ -45,7 +45,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/participants",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusAddHandler,
 	); err != nil {
 		return err
@@ -53,7 +53,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/root",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusRootHandler,
 	); err != nil {
 		return err
@@ -61,7 +61,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/export",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusDumpHandler,
 	); err != nil {
 		return err
@@ -69,7 +69,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/import",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusImportHandler,
 	); err != nil {
 		return err
@@ -77,7 +77,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/weight",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusWeightHandler,
 	); err != nil {
 		return err
@@ -85,7 +85,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/size",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusSizeHandler,
 	); err != nil {
 		return err
@@ -93,7 +93,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/publish",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusPublishHandler,
 	); err != nil {
 		return err
@@ -101,7 +101,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/publish/{root}",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusPublishHandler,
 	); err != nil {
 		return err
@@ -109,7 +109,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}",
 		"DELETE",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusDeleteHandler,
 	); err != nil {
 		return err
@@ -117,7 +117,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/proof/{key}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusProofHandler,
 	); err != nil {
 		return err
@@ -125,7 +125,7 @@ func (a *API) enableCensusHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/verify",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.censusVerifyHandler,
 	); err != nil {
 		return err
@@ -136,7 +136,7 @@ func (a *API) enableCensusHandlers() error {
 
 // POST /censuses/{type}
 // create a new census
-func (a *API) censusCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -158,12 +158,12 @@ func (a *API) censusCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST /censuses/participants/{censusID}
 // Adds one or multiple key/weights to the census
-func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -236,11 +236,11 @@ func (a *API) censusAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 	}
 	log.Infof("added %d keys to census %x", len(keys), censusID)
 
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/root
-func (a *API) censusRootHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -261,11 +261,11 @@ func (a *API) censusRootHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/export
-func (a *API) censusDumpHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -296,11 +296,11 @@ func (a *API) censusDumpHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/import
-func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -342,11 +342,11 @@ func (a *API) censusImportHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return fmt.Errorf("root hash does not match after importing dump")
 	}
 
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/weight
-func (a *API) censusWeightHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -366,11 +366,11 @@ func (a *API) censusWeightHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/size
-func (a *API) censusSizeHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -390,11 +390,11 @@ func (a *API) censusSizeHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/delete
-func (a *API) censusDeleteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -410,12 +410,12 @@ func (a *API) censusDeleteHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err := a.censusdb.Del(censusID); err != nil {
 		return err
 	}
-	return ctx.Send(nil, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }
 
 // POST /censuses/{censusID}/publish/{root}
 // POST /censuses/{censusID}/publish
-func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -462,7 +462,7 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		}); err != nil {
 			return err
 		}
-		return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+		return ctx.Send(data, apirest.HTTPstatusCodeOK)
 	}
 
 	// dump the current tree to import them after
@@ -512,11 +512,11 @@ func (a *API) censusPublishHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/proof/{key}
-func (a *API) censusProofHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -554,11 +554,11 @@ func (a *API) censusProofHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST /censuses/{censusID}/verify
-func (a *API) censusVerifyHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -585,7 +585,7 @@ func (a *API) censusVerifyHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 	if !valid {
-		return ctx.Send(nil, bearerstdapi.HTTPstatusCodeErr)
+		return ctx.Send(nil, apirest.HTTPstatusCodeErr)
 	}
 	response := Census{
 		Valid: valid,
@@ -594,5 +594,5 @@ func (a *API) censusVerifyHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if data, err = json.Marshal(&response); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }

@@ -15,7 +15,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -56,7 +56,7 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	if err != nil {
 		return nil, err
 	}
-	if status != bearerstdapi.HTTPstatusCodeOK {
+	if status != apirest.HTTPstatusCodeOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
 	}
 	info := &api.ChainInfo{}
@@ -106,7 +106,7 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	if err != nil {
 		return err
 	}
-	if status != bearerstdapi.HTTPstatusCodeOK {
+	if status != apirest.HTTPstatusCodeOK {
 		return fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
 	}
 	info := &api.ChainInfo{}
