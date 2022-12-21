@@ -38,6 +38,8 @@ type TransactionHandler struct {
 	dataDir string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
+
+	NewZkVKs [][]byte
 }
 
 // NewTransactionHandler creates a new TransactionHandler.

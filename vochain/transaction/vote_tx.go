@@ -1,12 +1,8 @@
 package transaction
 
 import (
-	"crypto/sha256"
 	"fmt"
-	"math/big"
 
-	"github.com/vocdoni/arbo"
-	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
@@ -97,20 +93,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			return vote, voterID.Nil(), nil
 		}
 
-		// Supports Groth16 proof generated from circom snark compatible
-		// provoteEnveloper
-		proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
-		if proofZkSNARK == nil {
-			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof is empty")
-		}
-		proof, _, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
-		if err != nil {
-			return nil, voterID.Nil(), fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
-		}
-
-		// voteEnvelope.Nullifier is encoded in little-endian
-		nullifierBI := arbo.BytesToBigInt(voteEnvelope.Nullifier)
-
 		// check if vote already exists
 		if exist, err := t.state.EnvelopeExists(voteEnvelope.ProcessId,
 			voteEnvelope.Nullifier, false); err != nil || exist {
@@ -119,36 +101,36 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			}
 			return nil, voterID.Nil(), fmt.Errorf("vote %x already exists", voteEnvelope.Nullifier)
 		}
+
+		// Supports Groth16 proof generated from circom snark compatible
+		// provoteEnveloper
+		proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
+		if proofZkSNARK == nil {
+			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof is empty")
+		}
+
+		// Parse the ZkProof protobuf to prover.Proof
+		proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
+		if err != nil {
+			return nil, voterID.Nil(), fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
+		}
+		// Get vote weight from proof publicSignals
+		voteWeight, err := proof.Weight()
+		if err != nil {
+			return nil, voterID.Nil(), fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
+		}
+
 		log.Debugf("new zk vote %x for process %x", voteEnvelope.Nullifier, voteEnvelope.ProcessId)
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkVKs) ||
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.NewZkVKs) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
 			return nil, voterID.Nil(), fmt.Errorf("invalid CircuitParametersIndex: %d of %d",
-				proofZkSNARK.CircuitParametersIndex, len(t.ZkVKs))
-		}
-		verificationKey := t.ZkVKs[proofZkSNARK.CircuitParametersIndex]
-
-		// prepare the publicInputs that are defined by the process.
-		// publicInputs contains: processId0, processId1, censusRoot,
-		// nullifier, voteHash0, voteHash1.
-		processId0BI := arbo.BytesToBigInt(process.ProcessId[:16])
-		processId1BI := arbo.BytesToBigInt(process.ProcessId[16:])
-		censusRootBI := arbo.BytesToBigInt(process.RollingCensusRoot)
-		// voteHash from the user voteValue to the publicInputs
-		voteValueHash := sha256.Sum256(voteEnvelope.VotePackage)
-		voteHash0 := arbo.BytesToBigInt(voteValueHash[:16])
-		voteHash1 := arbo.BytesToBigInt(voteValueHash[16:])
-		publicInputs := []*big.Int{
-			processId0BI,
-			processId1BI,
-			censusRootBI,
-			nullifierBI,
-			voteHash0,
-			voteHash1,
+				proofZkSNARK.CircuitParametersIndex, len(t.NewZkVKs))
 		}
 
-		// check zkSnark proof
-		if !verifier.Verify(verificationKey, proof, publicInputs) {
+		// Get valid verification key and verify the proof parsed
+		vKey := t.NewZkVKs[proofZkSNARK.CircuitParametersIndex]
+		if err := proof.Verify(vKey); err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof verification failed")
 		}
 
@@ -161,9 +143,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			ProcessId:   voteEnvelope.ProcessId,
 			VotePackage: voteEnvelope.VotePackage,
 			Nullifier:   voteEnvelope.Nullifier,
-			// Anonymous Voting doesn't support weighted voting, so
-			// we assing always 1 to each vote.
-			Weight: big.NewInt(1).Bytes(),
+			Weight:      voteWeight.Bytes(),
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
