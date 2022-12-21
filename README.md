@@ -67,7 +67,7 @@ docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d
 
 All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090`.
 
-If the computer has the port 443 available and mapped to a public IP, you might enable TLS (HTTPS) using letsencrypt by setting the environment variable VOCDONI_TLS=true in the file `dockerfiles/vocdoninode/env`.
+If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the file `dockerfiles/vocdoninode/env`.
 
 To stop the container: 
 
