@@ -14,7 +14,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
@@ -33,7 +33,7 @@ func (a *API) enableWalletHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/wallet/add/{privateKey}",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.walletAddHandler,
 	); err != nil {
 		return err
@@ -41,7 +41,7 @@ func (a *API) enableWalletHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/wallet/bootstrap",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.walletCreateHandler,
 	); err != nil {
 		return err
@@ -49,7 +49,7 @@ func (a *API) enableWalletHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/wallet/transfer/{dstAddress}/{amount}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.walletTransferHandler,
 	); err != nil {
 		return err
@@ -57,7 +57,7 @@ func (a *API) enableWalletHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/wallet/election",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.walletElectionHandler,
 	); err != nil {
 		return err
@@ -138,7 +138,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 
 // /wallet/add/{privateKey}
 // add a new account to the local store
-func (a *API) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
 	wallet := ethereum.SignKeys{}
 	if err := wallet.AddHexKey(ctx.URLParam("privateKey")); err != nil {
@@ -190,12 +190,12 @@ func (a *API) walletAddHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /wallet/bootstrap
 // set a new account
-func (a *API) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
@@ -229,12 +229,12 @@ func (a *API) walletCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /wallet/transfer/{dstAddress}/{amount}
 // transfer balance to another account
-func (a *API) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
@@ -279,12 +279,12 @@ func (a *API) walletTransferHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /wallet/election POST
 // creates an election
-func (a *API) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
 		return err
@@ -452,5 +452,5 @@ func (a *API) walletElectionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 		log.Error(err)
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }

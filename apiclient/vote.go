@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -94,7 +94,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	if err != nil {
 		return nil, err
 	}
-	if code != bearerstdapi.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusCodeOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	err = json.Unmarshal(resp, &voteAPI)

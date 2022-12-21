@@ -11,7 +11,7 @@ import (
 
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -28,7 +28,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionHandler,
 	); err != nil {
 		return err
@@ -36,7 +36,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/keys",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionKeysHandler,
 	); err != nil {
 		return err
@@ -44,7 +44,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionVotesHandler,
 	); err != nil {
 		return err
@@ -52,7 +52,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/count",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionVotesCountHandler,
 	); err != nil {
 		return err
@@ -60,7 +60,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/page/{page}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionVotesHandler,
 	); err != nil {
 		return err
@@ -68,7 +68,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionCreateHandler,
 	); err != nil {
 		return err
@@ -76,7 +76,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/files/cid",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.computeCidHandler,
 	); err != nil {
 		return err
@@ -87,7 +87,7 @@ func (a *API) enableElectionHandlers() error {
 
 // /elections/<electionID>
 // get election information
-func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
 		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
@@ -152,12 +152,12 @@ func (a *API) electionHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *http
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /elections/<electionID>/votes/count
 // get the number of votes for an election
-func (a *API) electionVotesCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
@@ -171,12 +171,12 @@ func (a *API) electionVotesCountHandler(msg *bearerstdapi.BearerStandardAPIdata,
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /elections/<electionID>/keys
 // returns the list of public/private encryption keys
-func (a *API) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
@@ -210,12 +210,12 @@ func (a *API) electionKeysHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // elections/<electionID>/votes/page/<page>
 // returns the list of voteIDs for an election (paginated)
-func (a *API) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
@@ -236,22 +236,23 @@ func (a *API) electionVotesHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	votes := []Vote{}
 	for _, v := range votesRaw {
 		votes = append(votes, Vote{
-			VoteID:      v.Nullifier,
-			VoterID:     v.VoterID,
-			TxHash:      v.TxHash,
-			BlockHeight: v.Height,
+			VoteID:           v.Nullifier,
+			VoterID:          v.VoterID,
+			TxHash:           v.TxHash,
+			BlockHeight:      v.Height,
+			TransactionIndex: &v.TxIndex,
 		})
 	}
 	data, err := json.Marshal(votes)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST elections
 // creates a new election
-func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &ElectionCreate{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
@@ -343,12 +344,12 @@ func (a *API) electionCreateHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST /files/cid
 // helper endpoint to get the IPFS CID hash of a file
-func (a *API) computeCidHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(msg.Data) > MaxOffchainFileSize {
 		return fmt.Errorf("file size exceeds the maximum allowed (%d bytes)", MaxOffchainFileSize)
 	}
@@ -367,5 +368,5 @@ func (a *API) computeCidHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
