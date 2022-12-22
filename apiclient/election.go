@@ -31,7 +31,7 @@ func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) 
 }
 
 // ElectionResults returns the election results given its ID.
-func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionSummary, error) {
+func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ConsensusElectionResults, error) {
 	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "results")
 	if err != nil {
 		return nil, err
@@ -39,11 +39,11 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionSu
 	if code != 200 {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	electionSummary := &api.ElectionSummary{}
-	if err = json.Unmarshal(resp, &electionSummary); err != nil {
+	consensusElectionResults := &api.ConsensusElectionResults{}
+	if err = json.Unmarshal(resp, &consensusElectionResults); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
-	return electionSummary, nil
+	return consensusElectionResults, nil
 }
 
 // NewElectionrRaw creates a new election given the protobuf Process message.

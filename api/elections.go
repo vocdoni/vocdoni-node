@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -9,10 +10,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/proto/build/go/models"
@@ -68,7 +71,7 @@ func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/results",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.electionResultsHandler,
 	); err != nil {
 		return err
@@ -259,27 +262,68 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 }
 
 // /elections/<electionID>/results
-// returns the results of an election
-func (a *API) electionResultsHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+// returns the consensus results of an election
+func (a *API) electionResultsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
 	}
-	electionResults, err := a.indexer.GetResults(electionID)
+	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
 		return fmt.Errorf("cannot get election results: %w", err)
 	}
-	electionSummary := &ElectionSummary{
-		ElectionID:   electionResults.ProcessID,
-		FinalResults: electionResults.Final, // if false the results are not final
-		Results:      electionResults.Votes,
-		VoteCount:    electionResults.EnvelopeHeight,
+	if process == nil {
+		return fmt.Errorf("cannot fetch process %x", electionID)
 	}
-	data, err := json.Marshal(electionSummary)
+	// do not make distinction between live results elections and encrypted results elections
+	// since we fetch the results from the blockchain state, elections must be terminated and
+	// results must be available
+	if process.Status != models.ProcessStatus_RESULTS {
+		return fmt.Errorf("the election is not yet finalized")
+	}
+	// check process results are the same between each other
+	var results [][]*types.BigInt
+	if process.Results == nil || len(process.Results) == 0 {
+		return fmt.Errorf("this election has no results, may be that no votes were cast")
+	}
+	prevProcessResult := process.Results[0]
+	signers := make([]types.HexBytes, 0)
+	for i, processResult := range process.Results {
+		signers = append(signers, processResult.OracleAddress)
+		if i == 0 { // first iteration
+			results = make([][]*types.BigInt, len(processResult.Votes))
+			for k, questionResult := range processResult.Votes {
+				results[k] = make([]*types.BigInt, len(questionResult.Question))
+				for kk, questionOption := range questionResult.Question {
+					results[k][kk] = new(types.BigInt).SetBytes(questionOption)
+				}
+			}
+			continue
+		}
+		// if consensus results do not match, return error
+		for k, questionResult := range processResult.Votes {
+			for kk, questionOption := range questionResult.Question {
+				if !bytes.Equal(questionOption, prevProcessResult.Votes[k].Question[kk]) {
+					log.Debugf("election results missmatch %s != %s, current signer %s prev signer %s",
+						questionResult.String(), prevProcessResult.Votes[k].String(),
+						common.BytesToAddress(processResult.OracleAddress), common.BytesToAddress(prevProcessResult.OracleAddress))
+					return fmt.Errorf("reported election results missmatch")
+				}
+			}
+		}
+		prevProcessResult = processResult
+	}
+	electionResults := &ConsensusElectionResults{
+		ElectionID: process.ProcessId,
+		Results:    results,
+		Signers:    signers,
+		CensusRoot: process.CensusRoot,
+	}
+	data, err := json.Marshal(electionResults)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST elections

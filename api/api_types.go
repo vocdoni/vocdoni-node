@@ -32,6 +32,13 @@ type ElectionSummary struct {
 	Results      [][]*types.BigInt `json:"result,omitempty"`
 }
 
+type ConsensusElectionResults struct {
+	ElectionID types.HexBytes    `json:"electionId"`
+	Results    [][]*types.BigInt `json:"results"`
+	Signers    []types.HexBytes  `json:"signers"`
+	CensusRoot types.HexBytes    `json:"censusRoot"`
+}
+
 type Election struct {
 	ElectionSummary
 	ElectionCount uint32            `json:"electionCount"`
