@@ -412,7 +412,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 			if err != vstate.ErrAccountAlreadyExists {
 				log.Fatalf("cannot create acount %x %v", addr, err)
 			}
-			if err := app.State.MintBalance(addr, acc.Balance); err != nil {
+			if err := app.State.InitChainMintBalance(addr, acc.Balance); err != nil {
 				log.Fatal(err)
 			}
 		}

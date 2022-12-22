@@ -500,4 +500,4 @@ func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
 func (k *KeyKeeper) OnSetAccount(addr []byte, account *state.Account) {}
 
 // OnTransferTokens does nothing
-func (k *KeyKeeper) OnTransferTokens(from, to []byte, amount uint64) {}
+func (k *KeyKeeper) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {}

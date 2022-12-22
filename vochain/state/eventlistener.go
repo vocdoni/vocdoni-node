@@ -28,7 +28,7 @@ type EventListener interface {
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32)
 	OnProcessesStart(pids [][]byte)
 	OnSetAccount(addr []byte, account *Account)
-	OnTransferTokens(from, to []byte, amount uint64)
+	OnTransferTokens(tx *vochaintx.TransferTokensMeta)
 	Commit(height uint32) (err error)
 	Rollback()
 }

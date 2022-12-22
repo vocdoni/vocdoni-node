@@ -10,8 +10,8 @@ import (
 	"database/sql"
 	"time"
 
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/types"
 )
 
 const createVoteReference = `-- name: CreateVoteReference :execresult

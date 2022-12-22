@@ -29,6 +29,12 @@ sql:
         go_type: "go.vocdoni.io/dvote/vochain/state.VoterID"
       - column: "tx_references.hash"
         go_type: "go.vocdoni.io/dvote/types.Hash"
+      - column: "token_transfers.from_account"
+        go_type: "go.vocdoni.io/dvote/types.AccountID"
+      - column: "token_transfers.to_account"
+        go_type: "go.vocdoni.io/dvote/types.AccountID"
+      - column: "token_transfers.tx_hash"
+        go_type: "go.vocdoni.io/dvote/types.Hash"
       
       # These types help remind us that the values are protobuf-encoded.
       - column: "processes.envelope_pb"

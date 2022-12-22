@@ -339,6 +339,15 @@ func (b *BlockMetadata) String() string {
 	return builder.String()
 }
 
+type TokenTransfer struct {
+	Amount    uint64          `json:"amount"`
+	From      types.AccountID `json:"from"`
+	Height    uint64          `json:"height"`
+	TxHash    types.Hash      `json:"txHash"`
+	Timestamp time.Time       `json:"timestamp"`
+	To        types.AccountID `json:"to"`
+}
+
 // ________________________ CALLBACKS DATA STRUCTS ________________________
 
 // IndexerOnProcessData holds the required data for callbacks when

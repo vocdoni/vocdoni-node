@@ -33,6 +33,10 @@ require (
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/golang-lru v0.6.0
 	github.com/iden3/go-iden3-crypto v0.0.13
+	github.com/iden3/go-rapidsnark/prover v0.0.9
+	github.com/iden3/go-rapidsnark/types v0.0.2
+	github.com/iden3/go-rapidsnark/verifier v0.0.3
+	github.com/iden3/go-rapidsnark/witness v0.0.3
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-ipfs-files v0.1.1
 	github.com/ipfs/go-ipfs-keystore v0.0.2

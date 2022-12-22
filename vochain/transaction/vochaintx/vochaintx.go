@@ -3,6 +3,7 @@ package vochaintx
 import (
 	"crypto/sha256"
 
+	"github.com/ethereum/go-ethereum/common"
 	tmtypes "github.com/tendermint/tendermint/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -42,4 +43,13 @@ func (tx *VochainTx) Unmarshal(content []byte, chainID string) error {
 // TxKey computes the checksum of the tx
 func TxKey(tx tmtypes.Tx) [32]byte {
 	return sha256.Sum256(tx)
+}
+
+// TransferTokensMeta wraps useful information about a token transfer
+type TransferTokensMeta struct {
+	FromAddress common.Address
+	ToAddress   common.Address
+	Amount      uint64
+	TxHash      []byte
+	Height      uint64
 }

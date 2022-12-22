@@ -7,8 +7,8 @@ package indexerdb
 import (
 	"time"
 
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/types"
 )
 
 type Process struct {
@@ -43,6 +43,15 @@ type Process struct {
 	CreationTime          time.Time
 	SourceBlockHeight     int64
 	SourceNetworkID       string
+}
+
+type TokenTransfer struct {
+	TxHash       types.Hash
+	Height       int64
+	FromAccount  types.AccountID
+	ToAccount    types.AccountID
+	Amount       int64
+	TransferTime time.Time
 }
 
 type TxReference struct {
