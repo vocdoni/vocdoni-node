@@ -22,6 +22,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
@@ -80,6 +81,8 @@ type Indexer struct {
 	resultsPool []*indexertypes.IndexerOnProcessData
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
+	// tokenTransferPool is the list of token transfers to be indexed
+	tokenTransferPool []*indexertypes.TokenTransfer
 	// lockPool is the lock for all *Pool operations
 	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
@@ -482,6 +485,12 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 	}
+	// index token transfers
+	for _, tt := range idx.tokenTransferPool {
+		if err := idx.newTokenTransfer(tt); err != nil {
+			log.Errorf("commit: cannot create new token transfer: %v", err)
+		}
+	}
 	txn.Discard()
 
 	// Add votes collected by onVote (live results)
@@ -709,7 +718,63 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 
 // NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
-func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)  {}
+func (idx *Indexer) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.tokenTransferPool = append(idx.tokenTransferPool, &indexertypes.TokenTransfer{
+		From:      tx.FromAddress.Bytes(),
+		To:        tx.ToAddress.Bytes(),
+		Amount:    tx.Amount,
+		Height:    tx.Height,
+		TxHash:    tx.TxHash,
+		Timestamp: time.Now(),
+	})
+}
+
+// newTokenTransfer creates a new token transfer and stores it in the database
+func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransfer) error {
+	queries, ctx, cancel := idx.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
+		TxHash:       tt.TxHash,
+		Height:       int64(tt.Height),
+		FromAccount:  tt.From,
+		ToAccount:    tt.To,
+		Amount:       int64(tt.Amount),
+		TransferTime: tt.Timestamp,
+	}); err != nil {
+		return err
+	}
+	log.Debugf("adding new token transfer from %x to %x: %d into the indexer database", tt.From, tt.To, tt.Amount)
+	return nil
+}
+
+// GetTokenTransfersByFromAccount returns all the token transfers made from a given account
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransfer, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
+	defer cancel()
+	ttFromDB, err := queries.GetTokenTransfersByFromAccount(ctx, indexerdb.GetTokenTransfersByFromAccountParams{
+		FromAccount: from,
+		Limit:       maxItems,
+		Offset:      offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := make([]*indexertypes.TokenTransfer, len(ttFromDB))
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenTransfer{
+			Amount:    uint64(t.Amount),
+			From:      t.FromAccount,
+			To:        t.ToAccount,
+			Height:    uint64(t.Height),
+			TxHash:    t.TxHash,
+			Timestamp: t.TransferTime,
+		})
+	}
+	return tt, nil
+}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

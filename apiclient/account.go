@@ -3,6 +3,7 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
@@ -190,4 +191,20 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 
 	return accv.TxHash, nil
+}
+
+// GetTransfers returns the list of token transfers associated with an account
+func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*api.TokenTransfer, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", from.Hex(), "transfers", "page", strconv.Itoa(page))
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	var transfers []*api.TokenTransfer
+	if err := json.Unmarshal(resp, &transfers); err != nil {
+		return nil, err
+	}
+	return transfers, nil
 }

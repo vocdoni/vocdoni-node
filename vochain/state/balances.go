@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -221,43 +222,82 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 // TransferBalance transfers balance from origin address to destination address,
 // and updates the state with the new values (including nonce).
 // If origin address acc is not enough, ErrNotEnoughBalance is returned.
-func (v *State) TransferBalance(from, to common.Address, amount uint64) error {
-	accFrom, err := v.GetAccount(from, false)
+func (v *State) TransferBalance(tx *vochaintx.TransferTokensMeta, burnTxCost bool) error {
+	accFrom, err := v.GetAccount(tx.FromAddress, false)
 	if err != nil {
 		return err
 	}
 	if accFrom == nil {
 		return ErrAccountNotExist
 	}
-	accTo, err := v.GetAccount(to, false)
+	accTo, err := v.GetAccount(tx.ToAddress, false)
 	if err != nil {
 		return err
 	}
 	if accTo == nil {
 		return ErrAccountNotExist
 	}
-	if err := accFrom.Transfer(accTo, amount); err != nil {
+	if err := accFrom.Transfer(accTo, tx.Amount); err != nil {
 		return err
 	}
-	log.Debugf("transferring %d tokens from %s to %s", amount, from.String(), to.String())
-	if err := v.SetAccount(from, accFrom); err != nil {
+	log.Debugf("transferring %d tokens from %s to %s", tx.Amount, tx.FromAddress.String(), tx.ToAddress.String())
+	if err := v.SetAccount(tx.FromAddress, accFrom); err != nil {
 		return err
 	}
-	if err := v.SetAccount(to, accTo); err != nil {
+	if err := v.SetAccount(tx.ToAddress, accTo); err != nil {
 		return err
 	}
-	for _, l := range v.eventListeners {
-		l.OnTransferTokens(from.Bytes(), to.Bytes(), amount)
+	if !burnTxCost {
+		for _, l := range v.eventListeners {
+			l.OnTransferTokens(&vochaintx.TransferTokensMeta{
+				FromAddress: tx.FromAddress,
+				ToAddress:   tx.ToAddress,
+				Amount:      tx.Amount,
+				TxHash:      tx.TxHash,
+				Height:      uint64(v.CurrentHeight()),
+			})
+		}
 	}
 	return nil
 }
 
 // MintBalance increments the existing acc of address by amount
-func (v *State) MintBalance(address common.Address, amount uint64) error {
-	if amount == 0 {
+func (v *State) MintBalance(tx *vochaintx.TransferTokensMeta) error {
+	if tx.Amount == 0 {
 		return fmt.Errorf("cannot mint a zero amount balance")
 	}
-	acc, err := v.GetAccount(address, false)
+	acc, err := v.GetAccount(tx.ToAddress, false)
+	if err != nil {
+		return fmt.Errorf("mintBalance: %w", err)
+	}
+	if acc == nil {
+		return ErrAccountNotExist
+	}
+	if acc.Balance+tx.Amount <= acc.Balance {
+		return ErrBalanceOverflow
+	}
+	acc.Balance += tx.Amount
+	log.Debugf("minting %d tokens to account %s", tx.Amount, tx.ToAddress.String())
+	if err := v.SetAccount(tx.ToAddress, acc); err != nil {
+		return err
+	}
+	for _, l := range v.eventListeners {
+		l.OnTransferTokens(&vochaintx.TransferTokensMeta{
+			FromAddress: tx.FromAddress,
+			ToAddress:   tx.ToAddress,
+			Amount:      tx.Amount,
+			TxHash:      tx.TxHash,
+			Height:      uint64(v.CurrentHeight()),
+		})
+	}
+	return nil
+}
+
+func (v *State) InitChainMintBalance(to common.Address, amount uint64) error {
+	if amount == 0 {
+		return nil
+	}
+	acc, err := v.GetAccount(to, false)
 	if err != nil {
 		return fmt.Errorf("mintBalance: %w", err)
 	}
@@ -268,15 +308,19 @@ func (v *State) MintBalance(address common.Address, amount uint64) error {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
-	log.Debugf("minting %d tokens to account %s", amount, address.String())
-	return v.SetAccount(address, acc)
+	log.Debugf("minting %d tokens to account %s", amount, to.String())
+	return v.SetAccount(to, acc)
 }
 
 // BurnTxCost burns the cost of a transaction
 // if cost is set to 0 just return
 func (v *State) BurnTxCost(from common.Address, cost uint64) error {
 	if cost != 0 {
-		return v.TransferBalance(from, BurnAddress, cost)
+		return v.TransferBalance(&vochaintx.TransferTokensMeta{
+			FromAddress: from,
+			ToAddress:   BurnAddress,
+			Amount:      cost,
+		}, true)
 	}
 	return nil
 }

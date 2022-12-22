@@ -166,6 +166,6 @@ func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int3
 func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)                {}
 func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 }
-func (c *OffChainDataHandler) OnTransferTokens(from, to []byte, amount uint64) {}
+func (c *OffChainDataHandler) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {}
 func (c *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
 }
