@@ -7,8 +7,8 @@ package indexerdb
 import (
 	"time"
 
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 type Process struct {
