@@ -8,7 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
@@ -134,7 +134,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		var circuits []artifacts.CircuitConfig
+		var circuits []circuit.ZkCircuitConfig
 		if genesis, ok := vocdoniGenesis.Genesis[t.state.ChainID()]; ok {
 			circuits = genesis.CircuitsConfig
 		} else {

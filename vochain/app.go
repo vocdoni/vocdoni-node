@@ -82,8 +82,11 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		return nil, fmt.Errorf("cannot create transaction handler: (%v)", err)
 	}
 	// Load or download the zk verification keys
-	if err := transactionHandler.LoadZkVerificationKeys(); err != nil {
-		return nil, fmt.Errorf("cannot load zk verification keys: (%v)", err)
+	// if err := transactionHandler.LoadZkVerificationKeys(); err != nil {
+	// 	return nil, fmt.Errorf("cannot load zk verification keys: (%v)", err)
+	// }
+	if err := transactionHandler.LoadZkCircuit(); err != nil {
+		return nil, fmt.Errorf("cannot load zk circuit: (%v)", err)
 	}
 	return &BaseApplication{
 		State:              state,

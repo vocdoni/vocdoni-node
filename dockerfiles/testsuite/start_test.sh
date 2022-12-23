@@ -42,7 +42,7 @@ tests_to_run=(
 	"tokentransactions"
 	"merkle_vote_encrypted"
 	"cspvoting"
-	"anonvoting"
+	# "anonvoting"
 )
 
 # print help

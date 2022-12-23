@@ -122,15 +122,15 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 		log.Debugf("new zk vote %x for process %x", voteEnvelope.Nullifier, voteEnvelope.ProcessId)
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.NewZkVKs) ||
+		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkCircuits) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
 			return nil, voterID.Nil(), fmt.Errorf("invalid CircuitParametersIndex: %d of %d",
-				proofZkSNARK.CircuitParametersIndex, len(t.NewZkVKs))
+				proofZkSNARK.CircuitParametersIndex, len(t.ZkCircuits))
 		}
 
 		// Get valid verification key and verify the proof parsed
-		vKey := t.NewZkVKs[proofZkSNARK.CircuitParametersIndex]
-		if err := proof.Verify(vKey); err != nil {
+		circuit := t.ZkCircuits[proofZkSNARK.CircuitParametersIndex]
+		if err := proof.Verify(circuit.VerificationKey); err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof verification failed")
 		}
 
