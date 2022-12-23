@@ -32,10 +32,9 @@ type ElectionSummary struct {
 	Results      [][]*types.BigInt `json:"result,omitempty"`
 }
 
-type ConsensusElectionResults struct {
+type ElectionResults struct {
 	ElectionID types.HexBytes    `json:"electionId"`
 	Results    [][]*types.BigInt `json:"results"`
-	Signers    []types.HexBytes  `json:"signers"`
 	CensusRoot types.HexBytes    `json:"censusRoot"`
 }
 

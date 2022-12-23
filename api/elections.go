@@ -69,10 +69,10 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/elections/{electionID}/results",
+		"/elections/{electionID}/scrutiny",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionResultsHandler,
+		a.electionScrutinyHandler,
 	); err != nil {
 		return err
 	}
@@ -96,7 +96,7 @@ func (a *API) enableElectionHandlers() error {
 	return nil
 }
 
-// /elections/<electionID>
+// GET /elections/<electionID>
 // get election information
 func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -166,7 +166,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /elections/<electionID>/votes/count
+// GET /elections/<electionID>/votes/count
 // get the number of votes for an election
 func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -185,7 +185,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /elections/<electionID>/keys
+// GET /elections/<electionID>/keys
 // returns the list of public/private encryption keys
 func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -224,7 +224,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// elections/<electionID>/votes/page/<page>
+// GET elections/<electionID>/votes/page/<page>
 // returns the list of voteIDs for an election (paginated)
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -261,9 +261,9 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /elections/<electionID>/results
+// GET /elections/<electionID>/scrutiny
 // returns the consensus results of an election
-func (a *API) electionResultsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
@@ -279,44 +279,37 @@ func (a *API) electionResultsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	// since we fetch the results from the blockchain state, elections must be terminated and
 	// results must be available
 	if process.Status != models.ProcessStatus_RESULTS {
-		return fmt.Errorf("the election is not yet finalized")
+		return fmt.Errorf("no results yet results for the election")
 	}
-	// check process results are the same between each other
-	var results [][]*types.BigInt
-	if process.Results == nil || len(process.Results) == 0 {
-		return fmt.Errorf("this election has no results, may be that no votes were cast")
-	}
-	prevProcessResult := process.Results[0]
-	signers := make([]types.HexBytes, 0)
-	for i, processResult := range process.Results {
-		signers = append(signers, processResult.OracleAddress)
-		if i == 0 { // first iteration
-			results = make([][]*types.BigInt, len(processResult.Votes))
-			for k, questionResult := range processResult.Votes {
-				results[k] = make([]*types.BigInt, len(questionResult.Question))
-				for kk, questionOption := range questionResult.Question {
-					results[k][kk] = new(types.BigInt).SetBytes(questionOption)
-				}
-			}
-			continue
-		}
+	// check process results are the same
+	for _, processResult := range process.Results {
 		// if consensus results do not match, return error
 		for k, questionResult := range processResult.Votes {
 			for kk, questionOption := range questionResult.Question {
-				if !bytes.Equal(questionOption, prevProcessResult.Votes[k].Question[kk]) {
-					log.Debugf("election results missmatch %s != %s, current signer %s prev signer %s",
-						questionResult.String(), prevProcessResult.Votes[k].String(),
-						common.BytesToAddress(processResult.OracleAddress), common.BytesToAddress(prevProcessResult.OracleAddress))
+				if !bytes.Equal(questionOption, process.Results[0].Votes[k].Question[kk]) {
+					log.Debugf("election results for signer %s missmatch %s != %s",
+						questionResult.String(),
+						process.Results[0].Votes[k].String(),
+						common.BytesToAddress(processResult.OracleAddress),
+					)
 					return fmt.Errorf("reported election results missmatch")
 				}
 			}
 		}
-		prevProcessResult = processResult
 	}
-	electionResults := &ConsensusElectionResults{
+	// cast process results
+	results := make([][]*types.BigInt, len(process.Results))
+	if len(results) != 0 {
+		for k, questionResult := range process.Results[0].Votes {
+			results[k] = make([]*types.BigInt, len(questionResult.Question))
+			for kk, questionOption := range questionResult.Question {
+				results[k][kk] = new(types.BigInt).SetBytes(questionOption)
+			}
+		}
+	}
+	electionResults := &ElectionResults{
 		ElectionID: process.ProcessId,
 		Results:    results,
-		Signers:    signers,
 		CensusRoot: process.CensusRoot,
 	}
 	data, err := json.Marshal(electionResults)
