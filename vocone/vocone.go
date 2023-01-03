@@ -153,14 +153,14 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 }
 
 // EnableAPI starts the HTTP API server. It is not enabled by default.
-func (vc *Vocone) EnableAPI(host string, port int, URLpath string) error {
+func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, error) {
 	var httpRouter httprouter.HTTProuter
 	if err := httpRouter.Init(host, port); err != nil {
-		return err
+		return nil, err
 	}
 	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.dataDir)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	uAPI.Attach(
 		vc.app,
@@ -169,7 +169,7 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) error {
 		vc.storage,
 		vc.censusdb,
 	)
-	return uAPI.EnableHandlers(
+	return uAPI, uAPI.EnableHandlers(
 		api.ElectionHandler,
 		api.VoteHandler,
 		api.ChainHandler,
