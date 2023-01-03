@@ -1,4 +1,4 @@
-# go-dvote
+# vocdoni-node
 
 [![GoDoc](https://godoc.org/go.vocdoni.io/dvote?status.svg)](https://godoc.org/go.vocdoni.io/dvote)
 [![Go Report Card](https://goreportcard.com/badge/go.vocdoni.io/dvote)](https://goreportcard.com/report/go.vocdoni.io/dvote)
@@ -20,7 +20,7 @@ Our main aim is a trustless voting system, where anyone can speak their voice an
 
 We intend the algorithms, systems, and software that we build to be a useful contribution toward making violence in these cryptonetworks impossible by protecting users privacy with cryptography. In particular, our aim is to provide the necessary tooling for the political will of network participants to translate outwardly into real political capital, without sacrificing privacy.
 
-![vocdoni go-dvote team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
+![vocdoni team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
 
 ## vocdoni node
 
@@ -65,7 +65,7 @@ cp env.example env
 docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d 
 ```
 
-All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090`.
+All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090/v2`.
 
 If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the file `dockerfiles/vocdoninode/env`.
 
@@ -77,7 +77,7 @@ docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml down
 
 #### Connecting
 
-Once the node has finished the blockchain fast sync process, you can connect through the API:
+Once the node has finished the blockchain fast sync process, you can connect query the API:
 
 ```
 $ curl http://127.0.0.1:9090/v2/chain/info
