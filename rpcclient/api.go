@@ -1470,8 +1470,8 @@ func (c *Client) GetAccount(accountAddr common.Address) (*state.Account, error) 
 }
 
 // GenerateFaucetPackage generates a faucet package
-func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
-	return vochain.GenerateFaucetPackage(from, to, value, identifier)
+func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
+	return vochain.GenerateFaucetPackage(from, to, value)
 }
 
 // SubmitRawTx signs and sends a vochain transaction

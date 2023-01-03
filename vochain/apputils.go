@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -83,7 +83,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 			Address: val.GetAddress().Bytes(),
 			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
 			Power:   "10",
-			Name:    strconv.Itoa(rand.Int()),
+			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
 		}
 	}
 	for _, os := range oracles {
@@ -134,13 +134,15 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	return genBytes, nil
 }
 
-// GenerateFaucetPackage generates a faucet package
-func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, value, identifier uint64) (*models.FaucetPackage, error) {
-	rand.Seed(time.Now().UnixNano())
+// GenerateFaucetPackage generates a faucet package.
+// The package is signed by the given `from` key (holder of the funds) and sent to the `to` address.
+// The `amount` is the amount of tokens to be sent.
+func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount uint64) (*models.FaucetPackage, error) {
+	nonce := util.RandomInt(0, math.MaxInt32)
 	payload := &models.FaucetPayload{
-		Identifier: identifier,
+		Identifier: uint64(nonce),
 		To:         to.Bytes(),
-		Amount:     value,
+		Amount:     amount,
 	}
 	payloadBytes, err := proto.Marshal(payload)
 	if err != nil {

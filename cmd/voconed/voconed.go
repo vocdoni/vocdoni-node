@@ -10,6 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
+	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -24,6 +25,7 @@ type VoconeConfig struct {
 	txCosts                                             uint64
 	disableIpfs                                         bool
 	fundedAccounts                                      []string
+	enableFaucetWithAmount                              uint64
 }
 
 func main() {
@@ -43,6 +45,7 @@ func main() {
 	flag.IntVar(&config.blockSize, "blockSize", int(vocone.DefaultTxsPerBlock), "max number of transactions per block")
 	setTxCosts := flag.Bool("setTxCosts", false, "if true, transaction costs are set to the value of txCosts flag")
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction costs for all types")
+	flag.Uint64Var(&config.enableFaucetWithAmount, "enableFaucet", 0, "enable faucet API service for the given amount")
 	flag.BoolVar(&config.disableIpfs, "disableIpfs", false, "disable built-in IPFS node")
 	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
 		"list of pre-funded accounts (address:balance,address:balance,...)")
@@ -57,23 +60,45 @@ func main() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set FlagVars first
-	viper.BindPFlag("dir", flag.Lookup("dir"))
+	if err := viper.BindPFlag("dir", flag.Lookup("dir")); err != nil {
+		log.Fatal(err)
+	}
 	config.dir = viper.GetString("dir")
-	viper.BindPFlag("keymanager", flag.Lookup("keymanager"))
+	if err := viper.BindPFlag("keymanager", flag.Lookup("keymanager")); err != nil {
+		log.Fatal(err)
+	}
 	config.keymanager = viper.GetString("keymanager")
-	viper.BindPFlag("chainID", flag.Lookup("chainID"))
+	if err := viper.BindPFlag("chainID", flag.Lookup("chainID")); err != nil {
+		log.Fatal(err)
+	}
 	config.chainID = viper.GetString("chainID")
-	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
+	if err := viper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
+		log.Fatal(err)
+	}
 	config.logLevel = viper.GetString("logLevel")
-	viper.BindPFlag("port", flag.Lookup("port"))
+	if err := viper.BindPFlag("port", flag.Lookup("port")); err != nil {
+		log.Fatal(err)
+	}
 	config.port = viper.GetInt("port")
-	viper.BindPFlag("urlPath", flag.Lookup("urlPath"))
+	if err := viper.BindPFlag("urlPath", flag.Lookup("urlPath")); err != nil {
+		log.Fatal(err)
+	}
 	config.path = viper.GetString("urlPath")
-	viper.BindPFlag("blockPeriod", flag.Lookup("blockPeriod"))
+	if err := viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucet")); err != nil {
+		log.Fatal(err)
+	}
+	config.enableFaucetWithAmount = viper.GetUint64("enableFaucetWithAmount")
+	if err := viper.BindPFlag("blockPeriod", flag.Lookup("blockPeriod")); err != nil {
+		log.Fatal(err)
+	}
 	config.blockSeconds = viper.GetInt("blockPeriod")
-	viper.BindPFlag("blockSize", flag.Lookup("blockSize"))
+	if err := viper.BindPFlag("blockSize", flag.Lookup("blockSize")); err != nil {
+		log.Fatal(err)
+	}
 	config.blockSize = viper.GetInt("blockSize")
-	viper.BindPFlag("txCosts", flag.Lookup("txCosts"))
+	if err := viper.BindPFlag("txCosts", flag.Lookup("txCosts")); err != nil {
+		log.Fatal(err)
+	}
 	config.txCosts = viper.GetUint64("txCosts")
 
 	viper.AddConfigPath(config.dir)
@@ -142,18 +167,48 @@ func main() {
 			}
 			a := common.HexToAddress(data[0])
 			log.Infof("funding account %s with balance %d", a.Hex(), balance)
-			vc.CreateAccount(a, &state.Account{
+			if err := vc.CreateAccount(a, &state.Account{
 				Account: models.Account{
 					Balance: balance,
 				},
-			})
+			}); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}
 
 	vc.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
 	vc.SetBlockSize(config.blockSize)
 	go vc.Start()
-	vc.EnableAPI("0.0.0.0", config.port, config.path)
+	uAPI, err := vc.EnableAPI("0.0.0.0", config.port, config.path)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// enable faucet if requested, this will create a new account and attach the faucet API to the vocone API
+	if config.enableFaucetWithAmount > 0 {
+		faucetAccount := ethereum.SignKeys{}
+		if err := faucetAccount.Generate(); err != nil {
+			log.Fatal(err)
+		}
+		if err := vc.CreateAccount(faucetAccount.Address(), &state.Account{
+			Account: models.Account{
+				Balance: 1000000,
+			},
+		}); err != nil {
+			log.Fatal(err)
+		}
+		log.Infof("faucet account %s, faucet amount %d", faucetAccount.Address().Hex(), config.enableFaucetWithAmount)
+		if err := faucet.AttachFaucetAPI(&faucetAccount,
+			map[string]uint64{
+				config.chainID: config.enableFaucetWithAmount,
+			},
+			uAPI.RouterHandler(),
+			"/faucet",
+		); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	select {}
 }
