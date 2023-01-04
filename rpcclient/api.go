@@ -357,11 +357,11 @@ func testGetZKCensusKey(s *ethereum.SignKeys) ([]byte, []byte) {
 	hasher := arbo.HashPoseidon{}
 	secretKey, err := hasher.Hash(secret[:22], secret[22:44], secret[44:])
 	if err != nil {
-		log.Fatalf("Cannnot calculate pre-register key with Poseidon: %v", err)
+		log.Fatalf("Cannot calculate pre-register key with Poseidon: %v", err)
 	}
 	pubKey, err := hasher.Hash(secretKey)
 	if err != nil {
-		log.Fatalf("Cannnot calculate pre-register key with Poseidon: %v", err)
+		log.Fatalf("Cannot calculate pre-register key with Poseidon: %v", err)
 	}
 	return pubKey, secretKey
 }

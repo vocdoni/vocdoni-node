@@ -39,7 +39,7 @@ func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 	return censusData.CensusID, nil
 }
 
-// CensuAddParticipants adds one or several participants to an existing census.
+// CensusAddParticipants adds one or several participants to an existing census.
 // The Key can be either the public key or address of the voter.
 func (c *HTTPclient) CensusAddParticipants(censusID types.HexBytes, participants *api.CensusParticipants) error {
 	resp, code, err := c.Request("POST", &participants, "censuses", censusID.String(), "participants")
