@@ -131,7 +131,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	return acc.TxHash, nil
 }
 
-// AccountUpdateMetadata updates the metadata associated with the account associated with the client.
+// AccountSetMetadata updates the metadata associated with the account associated with the client.
 func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.HexBytes, error) {
 	var err error
 	var metadataBytes []byte

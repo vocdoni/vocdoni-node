@@ -3,7 +3,7 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -136,7 +136,7 @@ func (c *HTTPclient) EnsureTxIsMined(txHash types.HexBytes) error {
 }
 
 // GetFaucetPackageFromRemoteService returns a faucet package from a remote HTTP faucet service.
-// This service usueally requires a valid bearer token.
+// This service usually requires a valid bearer token.
 // faucetURL usually includes the destination wallet address that will receive the funds.
 func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetPackage, error) {
 	u, err := url.Parse(faucetURL)
@@ -158,7 +158,7 @@ func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetP
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("faucet request failed: %s", resp.Status)
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
