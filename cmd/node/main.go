@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/viper"
 
 	urlapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -105,6 +106,8 @@ func newConfig() (*config.Config, config.Error) {
 		"enable legacy JSON-RPC endpoint (deprecated)")
 	globalCfg.TLS.Domain = *flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
+	globalCfg.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
+		"enable faucet for the current network and the specified amount (testing purposes only)")
 
 	// ipfs
 	globalCfg.Ipfs.ConnectKey = *flag.StringP("ipfsConnectKey", "i", "",
@@ -194,7 +197,7 @@ func newConfig() (*config.Config, config.Error) {
 
 	viper.BindPFlag("enableAPI", flag.Lookup("enableAPI"))
 	viper.BindPFlag("enableRPC", flag.Lookup("enableRPC"))
-
+	viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount"))
 	viper.Set("TLS.DirCert", globalCfg.DataDir+"/tls")
 	viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain"))
 
@@ -542,6 +545,18 @@ func main() {
 				urlapi.CensusHandler,
 			); err != nil {
 				log.Fatal(err)
+			}
+			// attach faucet to the API if enabled
+			if globalCfg.EnableFaucetWithAmount > 0 {
+				if err := faucet.AttachFaucetAPI(srv.Signer,
+					map[string]uint64{
+						globalCfg.Vochain.Chain: globalCfg.EnableFaucetWithAmount,
+					},
+					uAPI.RouterHandler(),
+					"/faucet",
+				); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}

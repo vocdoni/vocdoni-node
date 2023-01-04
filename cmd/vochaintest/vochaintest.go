@@ -19,7 +19,6 @@ import (
 	"go.vocdoni.io/dvote/log"
 	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -1216,7 +1215,7 @@ func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
 
 func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signer2 *ethereum.SignKeys) error {
 	// generate faucet package
-	fp, err := c.GenerateFaucetPackage(keySigner, signer.Address(), 500, rand.Uint64())
+	fp, err := c.GenerateFaucetPackage(keySigner, signer.Address(), 500)
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package: %v", err)
 	}
@@ -1261,7 +1260,7 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 	log.Infof("account %s infoURI successfully changed to %+v", signer.Address(), acc.InfoURI)
 
 	// create account with faucet package
-	faucetPkg, err := c.GenerateFaucetPackage(signer, signer2.Address(), 5000, rand.Uint64())
+	faucetPkg, err := c.GenerateFaucetPackage(signer, signer2.Address(), 5000)
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package %v", err)
 	}
@@ -1454,7 +1453,7 @@ func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
 	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
 
 	// generate faucet pkg
-	faucetPkg, err := c.GenerateFaucetPackage(from, to.Address(), 10, uint64(util.RandomInt(0, 10000000)))
+	faucetPkg, err := c.GenerateFaucetPackage(from, to.Address(), 10)
 	if err != nil {
 		return err
 	}

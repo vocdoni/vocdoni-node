@@ -198,7 +198,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// transaction
-	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
+	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)
