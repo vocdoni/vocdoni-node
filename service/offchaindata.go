@@ -18,7 +18,7 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 	if vs.DataDownloader == nil {
 		vs.DataDownloader = downloader.NewDownloader(vs.Storage)
 		vs.DataDownloader.Start()
-		go vs.DataDownloader.PrintLogInfo(time.Second * 30)
+		go vs.DataDownloader.PrintLogInfo(time.Second * 120)
 	}
 	if vs.CensusDB == nil {
 		db, err := metadb.New(db.TypePebble, filepath.Join(vs.Config.DataDir, "censusdb"))
