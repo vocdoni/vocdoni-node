@@ -1,10 +1,14 @@
 package api
 
 import (
+	"encoding/hex"
 	"fmt"
+	"math/big" // required for evm encoding
 	"reflect"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -52,4 +56,28 @@ func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
 		return false, err
 	}
 	return reflect.TypeOf(tx.Payload) == reflect.TypeOf(t), nil
+}
+
+// encodeEVMResultsArgs encodes the arguments for the EVM mimicking the Solidity built-in abi.encode(args...)
+// in this case we encode the organizationId the censusRoot and the results that will be translated in the EVM
+// contract to the corresponding struct{address, bytes32, uint256[][]}
+func (a *API) encodeEVMResultsArgs(organizationId common.Address,
+	censusRoot common.Hash,
+	sourceContractAddress common.Address,
+	results [][]*big.Int,
+) (string, error) {
+	address, _ := abi.NewType("address", "", nil)
+	bytes32, _ := abi.NewType("bytes32", "", nil)
+	uint256SliceNested, _ := abi.NewType("uint256[][]", "", nil)
+	args := abi.Arguments{
+		{Type: address},
+		{Type: bytes32},
+		{Type: address},
+		{Type: uint256SliceNested},
+	}
+	abiEncodedResultsBytes, err := args.Pack(organizationId, censusRoot, sourceContractAddress, results)
+	if err != nil {
+		return "", fmt.Errorf("error encoding abi: %w", err)
+	}
+	return fmt.Sprintf("0x%s", hex.EncodeToString(abiEncodedResultsBytes)), nil
 }

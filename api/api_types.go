@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -33,9 +34,14 @@ type ElectionSummary struct {
 }
 
 type ElectionResults struct {
-	ElectionID types.HexBytes    `json:"electionId"`
-	Results    [][]*types.BigInt `json:"results"`
-	CensusRoot types.HexBytes    `json:"censusRoot"`
+	// ABIEncoded is the abi encoded election results
+	ABIEncoded string `json:"abiEncoded"`
+
+	CensusRoot types.HexBytes `json:"censusRoot"`
+	// SourceContractAddress is the address of the smart contract containing the census
+	OrganizationID        types.HexBytes `json:"organizationId"`
+	Results               [][]*big.Int   `json:"results"`
+	SourceContractAddress types.HexBytes `json:"sourceContractAddress"`
 }
 
 type Election struct {

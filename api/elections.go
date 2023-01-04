@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big" // required for evm encoding
 	"strconv"
 	"strings"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/proto/build/go/models"
@@ -282,36 +282,59 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return fmt.Errorf("no results yet results for the election")
 	}
 	// check process results are the same
-	for _, processResult := range process.Results {
-		// if consensus results do not match, return error
-		for k, questionResult := range processResult.Votes {
-			for kk, questionOption := range questionResult.Question {
-				if !bytes.Equal(questionOption, process.Results[0].Votes[k].Question[kk]) {
-					log.Debugf("election results for signer %s missmatch %s != %s",
-						questionResult.String(),
-						process.Results[0].Votes[k].String(),
-						common.BytesToAddress(processResult.OracleAddress),
-					)
-					return fmt.Errorf("reported election results missmatch")
+	var results [][]*big.Int
+	if len(process.Results) > 0 {
+		firstResult := process.Results[0]
+		for _, processResult := range process.Results[1:] {
+			if processResult == nil {
+				return fmt.Errorf("invalid process result")
+			}
+			// if consensus results do not match, return error
+			for k, questionResult := range processResult.Votes {
+				if questionResult == nil {
+					return fmt.Errorf("invalid question result")
+				}
+				for kk, questionOption := range questionResult.Question {
+					if len(questionOption) == 0 {
+						return fmt.Errorf("invalid question option")
+					}
+					if !bytes.Equal(questionOption, firstResult.Votes[k].Question[kk]) {
+						log.Debugf("election results for signer %s missmatch %s != %s",
+							questionResult.String(),
+							firstResult.Votes[k].String(),
+							common.BytesToAddress(processResult.OracleAddress),
+						)
+						return fmt.Errorf("reported election results missmatch")
+					}
 				}
 			}
 		}
-	}
-	// cast process results
-	results := make([][]*types.BigInt, len(process.Results))
-	if len(results) != 0 {
-		for k, questionResult := range process.Results[0].Votes {
-			results[k] = make([]*types.BigInt, len(questionResult.Question))
+		// cast process results
+		results = make([][]*big.Int, len(firstResult.Votes))
+		for k, questionResult := range firstResult.Votes {
+			results[k] = make([]*big.Int, len(questionResult.Question))
 			for kk, questionOption := range questionResult.Question {
-				results[k][kk] = new(types.BigInt).SetBytes(questionOption)
+				results[k][kk] = new(big.Int).SetBytes(questionOption)
 			}
 		}
 	}
 	electionResults := &ElectionResults{
-		ElectionID: process.ProcessId,
-		Results:    results,
-		CensusRoot: process.CensusRoot,
+		CensusRoot:            process.CensusRoot,
+		SourceContractAddress: process.SourceNetworkContractAddr,
+		OrganizationID:        process.EntityId,
+		Results:               results,
 	}
+
+	electionResults.ABIEncoded, err = a.encodeEVMResultsArgs(
+		common.BytesToAddress(electionResults.OrganizationID),
+		common.BytesToHash(electionResults.CensusRoot),
+		common.BytesToAddress(electionResults.SourceContractAddress),
+		electionResults.Results,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot abi.encode results: %w", err)
+	}
+
 	data, err := json.Marshal(electionResults)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
