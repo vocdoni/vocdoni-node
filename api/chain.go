@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/httprouter/bearerstdapi"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 )
@@ -26,7 +26,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/organizations",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.organizationListHandler,
 	); err != nil {
 		return err
@@ -34,7 +34,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/organizations/page/{page}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.organizationListHandler,
 	); err != nil {
 		return err
@@ -42,7 +42,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/organizations/count",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.organizationCountHandler,
 	); err != nil {
 		return err
@@ -50,7 +50,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/info",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainInfoHandler,
 	); err != nil {
 		return err
@@ -58,7 +58,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/dateToBlock/{timestamp}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainEstimateHeightHandler,
 	); err != nil {
 		return err
@@ -66,7 +66,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/cost",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainTxCostHandler,
 	); err != nil {
 		return err
@@ -74,7 +74,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/reference/{hash}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainTxbyHashHandler,
 	); err != nil {
 		return err
@@ -82,7 +82,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/reference/index/{index}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainTxByIndexHandler,
 	); err != nil {
 		return err
@@ -90,7 +90,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/{height}/{index}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainTxHandler,
 	); err != nil {
 		return err
@@ -98,7 +98,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions",
 		"POST",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainSendTxHandler,
 	); err != nil {
 		return err
@@ -106,7 +106,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainTxListPaginated,
 	); err != nil {
 		return err
@@ -114,7 +114,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/validators",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainValidatorsHandler,
 	); err != nil {
 		return err
@@ -122,7 +122,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/blocks/{height}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainBlockHandler,
 	); err != nil {
 		return err
@@ -130,7 +130,7 @@ func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/blocks/hash/{hash}",
 		"GET",
-		bearerstdapi.MethodAccessTypePublic,
+		apirest.MethodAccessTypePublic,
 		a.chainBlockByHashHandler,
 	); err != nil {
 		return err
@@ -141,7 +141,7 @@ func (a *API) enableChainHandlers() error {
 
 // /chain/organizations/pages/<page>
 // list the existing organizations
-func (a *API) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	var err error
 	page := 0
 	if ctx.URLParam("page") != "" {
@@ -166,25 +166,25 @@ func (a *API) organizationListHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/organizations/count
 // return the number of organizations
-func (a *API) organizationCountHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.EntityCount()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 
 }
 
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
-func (a *API) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	blockTimes := a.vocinfo.BlockTimes()
 	height := a.vocapp.Height()
 	timestamp := a.vocapp.Timestamp()
@@ -197,12 +197,12 @@ func (a *API) chainInfoHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *htt
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/dateToblock/<timestamp>
 // returns the estimated block height for the timestamp provided
-func (a *API) chainEstimateHeightHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	timestamp, err := strconv.ParseInt(ctx.URLParam("timestamp"), 10, 64)
 	if err != nil {
 		return err
@@ -218,12 +218,12 @@ func (a *API) chainEstimateHeightHandler(msg *bearerstdapi.BearerStandardAPIdata
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // POST /chain/transactions
 // submits a blockchain transaction
-func (a *API) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
@@ -246,12 +246,12 @@ func (a *API) chainSendTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/transaction/cost
 // returns de list of transactions and its cost
-func (a *API) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCosts := &Transaction{
 		Costs: make(map[string]uint64),
 	}
@@ -266,11 +266,11 @@ func (a *API) chainTxCostHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *h
 	if data, err = json.Marshal(txCosts); err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/transactions/page/<page>
-func (a *API) chainTxListPaginated(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page, err := strconv.Atoi(ctx.URLParam("page"))
 	if err != nil {
 		return err
@@ -284,11 +284,11 @@ func (a *API) chainTxListPaginated(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/transactions/reference/<hash>
-func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
@@ -302,11 +302,11 @@ func (a *API) chainTxbyHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx 
 		return err
 	}
 
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /chain/transactions/<height>/<index>
-func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -319,11 +319,11 @@ func (a *API) chainTxHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httpr
 	if err != nil {
 		return fmt.Errorf("cannot get tx: %w", err)
 	}
-	return ctx.Send([]byte(protoFormat(stx.Tx)), bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusCodeOK)
 }
 
 // /chain/transactions/reference/index/<index>
-func (a *API) chainTxByIndexHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
 	if err != nil {
 		return err
@@ -336,12 +336,12 @@ func (a *API) chainTxByIndexHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // GET /chain/validators
 // returns the list of validators
-func (a *API) chainValidatorsHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	stateValidators, err := a.vocapp.State.Validators(true)
 	if err != nil {
 		return err
@@ -359,12 +359,12 @@ func (a *API) chainValidatorsHandler(msg *bearerstdapi.BearerStandardAPIdata, ct
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // GET /chain/blocks/<height>
 // returns the block at the given height
-func (a *API) chainBlockHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -378,12 +378,12 @@ func (a *API) chainBlockHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *ht
 		return err
 	}
 
-	return ctx.Send(convertKeysToCamel(data), bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
 }
 
 // GET /chain/blocks/hash/<hash>
 // returns the block from the given hash
-func (a *API) chainBlockByHashHandler(msg *bearerstdapi.BearerStandardAPIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
@@ -396,5 +396,5 @@ func (a *API) chainBlockByHashHandler(msg *bearerstdapi.BearerStandardAPIdata, c
 	if err != nil {
 		return err
 	}
-	return ctx.Send(convertKeysToCamel(data), bearerstdapi.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
 }

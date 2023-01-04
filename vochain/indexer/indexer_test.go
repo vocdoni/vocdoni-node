@@ -20,7 +20,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/vochaintx"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -983,7 +983,10 @@ func TestTxIndexer(t *testing.T) {
 	const txsPerBlock = 10
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			idx.OnNewTx(&vochaintx.VochainTx{TxID: getTxID(i, j)}, uint32(i), int32(j))
+			idx.OnNewTx(&vochaintx.VochainTx{
+				TxID:        getTxID(i, j),
+				TxModelType: "setAccount",
+			}, uint32(i), int32(j))
 		}
 	}
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
@@ -1000,6 +1003,7 @@ func TestTxIndexer(t *testing.T) {
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
+			qt.Assert(t, ref.TxType, qt.Equals, "setAccount")
 			h := make([]byte, 32)
 			id := getTxID(i, j)
 			copy(h, id[:])
@@ -1018,6 +1022,7 @@ func TestTxIndexer(t *testing.T) {
 		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
 		qt.Assert(t, tx.BlockHeight, qt.Equals, uint32(totalTxs-i-1)/txsPerBlock)
 		qt.Assert(t, tx.TxBlockIndex, qt.Equals, int32(totalTxs-i-1)%txsPerBlock)
+		qt.Assert(t, tx.TxType, qt.Equals, "setAccount")
 	}
 
 	txs, err = idx.GetLastTxReferences(1, 5)

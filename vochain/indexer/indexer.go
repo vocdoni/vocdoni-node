@@ -707,8 +707,15 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
+// OnProcessesStart adds the processes to the updateProcessPool.
+// This is required to update potential changes when a process is started, such as the rolling census.
+func (idx *Indexer) OnProcessesStart(pids [][]byte) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.updateProcessPool = append(idx.updateProcessPool, pids...)
+}
+
 // NOT USED but required for implementing the vochain.EventListener interface
-func (idx *Indexer) OnProcessesStart(pids [][]byte)                   {}
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)  {}
 

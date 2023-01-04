@@ -1,6 +1,10 @@
 # Binaries for programs and plugins
-/vocdoninode
-/dvotecli
+/cli
+/end2endtest
+/node
+/voconed
+/vochaininspector
+/vochaintest
 *.exe
 *.exe~
 *.dll

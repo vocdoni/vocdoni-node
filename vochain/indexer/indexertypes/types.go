@@ -292,6 +292,7 @@ func TxReferenceFromDB(dbtx *indexerdb.TxReference) *TxReference {
 		Hash:         dbtx.Hash,
 		BlockHeight:  uint32(dbtx.BlockHeight),
 		TxBlockIndex: int32(dbtx.TxBlockIndex),
+		TxType:       dbtx.TxType,
 	}
 }
 

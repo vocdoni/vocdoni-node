@@ -186,22 +186,26 @@
          {
            "address":"0x074fcAacb8B01850539eaE7E9fEE8dc94549db96",
            "balance":10000
-         }
+         },
+	 {
+           "address":"0x88a499cEf9D1330111b41360173967c9C1bf703f",
+           "balance":10000
+         }	
       ],
     "treasurer": "0xfe10DAB06D636647f4E40dFd56599da9eF66Db1c",
     "tx_cost": {
-        "Tx_SetProcessStatus": 10,
-        "Tx_SetProcessCensus": 10,
-        "Tx_SetProcessResults": 10,
-        "Tx_SetProcessQuestionIndex": 10,
-        "Tx_RegisterKey": 10,
+        "Tx_SetProcessStatus": 1,
+        "Tx_SetProcessCensus": 1,
+        "Tx_SetProcessResults": 1,
+        "Tx_SetProcessQuestionIndex": 1,
+        "Tx_RegisterKey": 1,
         "Tx_NewProcess": 10,
-        "Tx_SendTokens": 10,
-        "Tx_CreateAccount": 10,
-        "Tx_SetAccountInfoURI": 10,
-        "Tx_AddDelegateForAccount": 10,
-        "Tx_DelDelegateForAccount": 10,
-        "Tx_CollectFaucet": 10
+        "Tx_SendTokens": 2,
+        "Tx_CreateAccount": 2,
+        "Tx_SetAccountInfoURI": 2,
+        "Tx_AddDelegateForAccount": 2,
+        "Tx_DelDelegateForAccount": 2,
+        "Tx_CollectFaucet": 1
       }
   }
 }

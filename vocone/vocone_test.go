@@ -30,7 +30,7 @@ func TestVocone(t *testing.T) {
 	err = account.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng, true)
+	vc, err := NewVocone(dir, &keymng)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = vc.SetBulkTxCosts(0, true)
@@ -39,7 +39,7 @@ func TestVocone(t *testing.T) {
 	vc.SetBlockTimeTarget(time.Millisecond * 500)
 	go vc.Start()
 	port := 13000 + util.RandomInt(0, 2000)
-	err = vc.EnableAPI("127.0.0.1", port, "/api")
+	_, err = vc.EnableAPI("127.0.0.1", port, "/api")
 	qt.Assert(t, err, qt.IsNil)
 
 	time.Sleep(time.Second * 2) // TODO: find a more smart way to wait until everything is ready

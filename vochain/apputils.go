@@ -5,20 +5,22 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
-	cfg "github.com/tendermint/tendermint/config"
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtime "github.com/tendermint/tendermint/libs/time"
@@ -28,11 +30,8 @@ import (
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
-func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV, error) {
-	pv, err := privval.LoadOrGenFilePV(
-		tconfig.PrivValidator.KeyFile(),
-		tconfig.PrivValidator.StateFile(),
-	)
+func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval.FilePV, error) {
+	pv, err := privval.LoadOrGenFilePV(keyFilePath, stateFilePath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -54,7 +53,7 @@ func NewPrivateValidator(tmPrivKey string, tconfig *cfg.Config) (*privval.FilePV
 }
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error) {
+func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 	if tmPrivKey == "" {
 		return nil, fmt.Errorf("nodekey not specified")
 	}
@@ -66,7 +65,7 @@ func NewNodeKey(tmPrivKey string, tconfig *cfg.Config) (*tmtypes.NodeKey, error)
 	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
 	nodeKey.ID = tmtypes.NodeIDFromPubKey(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
-	return nodeKey, nodeKey.SaveAs(tconfig.NodeKeyFile())
+	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
 }
 
 // NewGenesis creates a new genesis and return its bytes
@@ -84,7 +83,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 			Address: val.GetAddress().Bytes(),
 			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
 			Power:   "10",
-			Name:    strconv.Itoa(rand.Int()),
+			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
 		}
 	}
 	for _, os := range oracles {
@@ -135,23 +134,15 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 	return genBytes, nil
 }
 
-// verifySignatureAgainstOracles verifies that a signature match with one of the oracles
-func verifySignatureAgainstOracles(oracles []ethcommon.Address, message,
-	signature []byte) (bool, ethcommon.Address, error) {
-	signKeys := ethereum.NewSignKeys()
-	for _, oracle := range oracles {
-		signKeys.AddAuthKey(oracle)
-	}
-	return signKeys.VerifySender(message, signature)
-}
-
-// GenerateFaucetPackage generates a faucet package
-func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, value, identifier uint64) (*models.FaucetPackage, error) {
-	rand.Seed(time.Now().UnixNano())
+// GenerateFaucetPackage generates a faucet package.
+// The package is signed by the given `from` key (holder of the funds) and sent to the `to` address.
+// The `amount` is the amount of tokens to be sent.
+func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount uint64) (*models.FaucetPackage, error) {
+	nonce := util.RandomInt(0, math.MaxInt32)
 	payload := &models.FaucetPayload{
-		Identifier: identifier,
+		Identifier: uint64(nonce),
 		To:         to.Bytes(),
-		Amount:     value,
+		Amount:     amount,
 	}
 	payloadBytes, err := proto.Marshal(payload)
 	if err != nil {
@@ -165,4 +156,120 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, value,
 		Payload:   payloadBytes,
 		Signature: payloadSignature,
 	}, nil
+}
+
+// NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
+// Also includes an oracle, treasurer and faucet account.
+func NewTemplateGenesisFile(dir string, validators int) error {
+	gd := tmtypes.GenesisDoc{}
+	gd.ChainID = "test-chain-1"
+	gd.GenesisTime = time.Now()
+	gd.InitialHeight = 0
+	gd.ConsensusParams = tmtypes.DefaultConsensusParams()
+	gd.ConsensusParams.Block.MaxBytes = 5242880
+	gd.ConsensusParams.Block.MaxGas = -1
+	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000
+	gd.ConsensusParams.Evidence.MaxAgeDuration = 10000
+	gd.ConsensusParams.Validator.PubKeyTypes = []string{"ed25519"}
+
+	// Create validators
+	gd.Validators = []tmtypes.GenesisValidator{}
+	appStateValidators := []GenesisValidator{}
+	for i := 0; i < validators; i++ {
+		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
+		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
+			return err
+		}
+		privKey := util.RandomHex(64)
+		pv, err := NewPrivateValidator(privKey,
+			filepath.Join(nodeDir, "priv_validator_key.json"),
+			filepath.Join(nodeDir, "priv_validator_state.json"),
+		)
+		if err != nil {
+			return fmt.Errorf("cannot create validator key and state: (%v)", err)
+		}
+		pv.Save()
+		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKey), 0o600); err != nil {
+			return err
+		}
+		gd.Validators = append(gd.Validators, tmtypes.GenesisValidator{
+			Address: pv.Key.Address,
+			PubKey:  pv.Key.PubKey,
+			Power:   10,
+		})
+		appStateValidators = append(appStateValidators, GenesisValidator{
+			Address: pv.Key.Address.Bytes(),
+			PubKey: TendermintPubKey{
+				Type:  "tendermint/PubKeyEd25519",
+				Value: pv.Key.PubKey.Bytes(),
+			},
+			Power: "10",
+		})
+	}
+
+	// Generate oracle, treasurer and faucet accounts
+	oracle := ethereum.SignKeys{}
+	if err := oracle.Generate(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "oracle_hex_key"),
+		[]byte(fmt.Sprintf("%x", oracle.PrivateKey())), 0o600); err != nil {
+		return err
+	}
+	treasurer := ethereum.SignKeys{}
+	if err := treasurer.Generate(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "treasurer_hex_key"),
+		[]byte(fmt.Sprintf("%x", treasurer.PrivateKey())), 0o600); err != nil {
+		return err
+	}
+	faucet := ethereum.SignKeys{}
+	if err := faucet.Generate(); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(dir, "faucet_hex_key"),
+		[]byte(fmt.Sprintf("%x", faucet.PrivateKey())), 0o600); err != nil {
+		return err
+	}
+
+	// Create seed node
+	seedKey := util.RandomHex(64)
+	seedDir := filepath.Join(dir, "seed")
+	if err := os.MkdirAll(seedDir, 0o700); err != nil {
+		return err
+	}
+	seedNodeKey, err := NewNodeKey(seedKey, filepath.Join(seedDir, "node_key.json"))
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(
+		seedDir, "seed_address"),
+		[]byte(seedNodeKey.ID.AddressString("seed1.foo.bar:26656")),
+		0o600); err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), []byte(seedKey), 0o600); err != nil {
+		return err
+	}
+
+	// Build genesis app state and create genesis file
+	appState := GenesisAppState{
+		Validators: appStateValidators,
+		Oracles:    []types.HexBytes{oracle.Address().Bytes()},
+		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
+		Accounts: []GenesisAccount{
+			{
+				Address: faucet.Address().Bytes(),
+				Balance: 100000,
+			},
+		},
+		TxCost: TransactionCosts{},
+	}
+	appStateBytes, err := json.Marshal(appState)
+	if err != nil {
+		return err
+	}
+	gd.AppState = appStateBytes
+	return gd.SaveAs(filepath.Join(dir, "genesis.json"))
 }

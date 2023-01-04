@@ -1,4 +1,4 @@
-package vochain
+package processid
 
 import (
 	"encoding/binary"
@@ -8,6 +8,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -177,9 +178,9 @@ func (p *ProcessID) EnvelopeType() *models.EnvelopeType {
 	}
 }
 
-func (a *BaseApplication) BuildProcessID(proc *models.Process) (*ProcessID, error) {
+func BuildProcessID(proc *models.Process, state *state.State) (*ProcessID, error) {
 	pid := new(ProcessID)
-	pid.SetChainID(a.ChainID())
+	pid.SetChainID(state.ChainID())
 	if err := pid.SetEnvelopeType(proc.EnvelopeType); err != nil {
 		return nil, err
 	}
@@ -187,7 +188,7 @@ func (a *BaseApplication) BuildProcessID(proc *models.Process) (*ProcessID, erro
 		return nil, err
 	}
 	addr := common.BytesToAddress(proc.EntityId)
-	acc, err := a.State.GetAccount(addr, false)
+	acc, err := state.GetAccount(addr, false)
 	if err != nil {
 		return nil, err
 	}

@@ -1,4 +1,4 @@
-# go-dvote
+# vocdoni-node
 
 [![GoDoc](https://godoc.org/go.vocdoni.io/dvote?status.svg)](https://godoc.org/go.vocdoni.io/dvote)
 [![Go Report Card](https://goreportcard.com/badge/go.vocdoni.io/dvote)](https://goreportcard.com/report/go.vocdoni.io/dvote)
@@ -20,7 +20,7 @@ Our main aim is a trustless voting system, where anyone can speak their voice an
 
 We intend the algorithms, systems, and software that we build to be a useful contribution toward making violence in these cryptonetworks impossible by protecting users privacy with cryptography. In particular, our aim is to provide the necessary tooling for the political will of network participants to translate outwardly into real political capital, without sacrificing privacy.
 
-![vocdoni go-dvote team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
+![vocdoni team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
 
 ## vocdoni node
 
@@ -32,7 +32,7 @@ Currently the node can operate in three modes:
 
 - **miner** provides a block validation node (full node), without providing any external service but capable of proposing new blocks.
 
-- **oracle** mode provides special capabilities such as computing election results.
+- **oracle** mode provides special capabilities such as computing election results and storing encryption keys.
 
 The most common mode is the `gateway`, that's probably what you are looking for.
 
@@ -40,39 +40,60 @@ One of the design primitives of vocdoni-node is to run everything as a single pr
 
 vocdoni-node is currently pure GoLang code, so generating a static and reproducible binary that works on most of the Linux and MacOS hosts without any dependence, is possible.
 
-For running vocdoni-node in gateway mode, 8GB of ram is recommended (4GB works but it is risky).
+For running vocdoni-node in gateway mode, 8 GiB of ram memory is recommended (4 GiB works too).
 
 #### Compile and run
 
 Compile from source in a golang environment (Go>1.18 required):
 
-```
+```bash
 git clone https://github.com/vocdoni/vocdoni-node.git
 cd vocdoni-node
 go build ./cmd/node
 ./node --help
+./node --mode=gateway --chain=dev --logLevel=info
 ```
 
 #### Docker
 
-You can run vocdoni node as a standalone container with docker (configuration options can be changed in file `dockerfiles/vocdoninode/env`):
+You can run vocdoni node as a standalone container with docker-compose (recommended).
+It is recommended to also start `watchtower` to automatically update the container when a new version is released.
 
-```
-dockerfiles/vocdoninode
+```bash
+cd dockerfiles/vocdoninode
 cp env.example env
-docker-compose up -d
+docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d 
 ```
 
-All data will be stored in the shared volume `run`.
+All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090/v2`.
+
+If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the file `dockerfiles/vocdoninode/env`.
+
+To stop the container: 
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml down
+```
 
 #### Connecting
 
-Once the node has finished the blockchain fast sync process, you can connect through the API:
+Once the node has finished the blockchain fast sync process, you can connect query the API:
 
-```json
+```
 $ curl http://127.0.0.1:9090/v2/chain/info
 
-{"chainId":"vocdoni-development-71","blockTime":[10000,11320,0,0,0],"height":43544,"blockTimestamp":1669205270}
+{
+  "chainId": "vocdoni-development-71",
+  "blockTime": [
+    10000,
+    11320,
+    0,
+    0,
+    0
+  ],
+  "height": 43544,
+  "blockTimestamp": 1669205270
+}
 ```
 
 API methods, SDK and documentation can be found at [the developer portal](https://developer.vocdoni.io)
@@ -81,7 +102,7 @@ API methods, SDK and documentation can be found at [the developer portal](https:
 
 The test suite is an all-in-one compose file to bootstrap a minimal testing testing environment. To do a voting process test, follow the examples mentioned in the included README:
 
-```
+```bash
 cd dockerfiles/testsuite
 cat README.md
 ```

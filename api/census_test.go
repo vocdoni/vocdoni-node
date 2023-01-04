@@ -21,7 +21,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -213,7 +213,7 @@ func TestCensusProof(t *testing.T) {
 
 	// verify the proof
 	electionID := rnd.RandomBytes(32)
-	valid, weight, err := vochain.VerifyProof(
+	valid, weight, err := transaction.VerifyProof(
 		&models.Process{
 			ProcessId:    electionID,
 			CensusRoot:   censusData.CensusID,
