@@ -223,7 +223,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 		log.Infof("added %d keys to census %x", len(keys), censusID)
 		if len(failed) > 0 {
-			log.Warnf("failed participatns %v", failed)
+			log.Warnf("failed participants %v", failed)
 		}
 	} else {
 		failed, err := ref.Tree().AddBatch(keys, nil)
@@ -231,7 +231,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 			return fmt.Errorf("cannot add key to tree: %w", err)
 		}
 		if len(failed) > 0 {
-			log.Warnf("failed participatns %v", failed)
+			log.Warnf("failed participants %v", failed)
 		}
 	}
 	log.Infof("added %d keys to census %x", len(keys), censusID)
