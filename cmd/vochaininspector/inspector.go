@@ -115,7 +115,7 @@ func main() {
 		for i := uint32(1); i <= height; i++ {
 			blk := vnode.GetBlockByHeight(int64(i))
 			if blk == nil {
-				log.Fatalf("block %d does not exist", blockHeight)
+				panic(fmt.Sprintf("block %d does not exist", blockHeight))
 			}
 			fmt.Printf("block %d AppHash:%s BlkHash:%s txs:%d\n", i, blk.AppHash, blk.Hash(), len(blk.Txs))
 		}
