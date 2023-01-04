@@ -642,7 +642,7 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 
 	// TODO: check results are valid and return an error if not.
 	// This is very dangerous since an Oracle would be able to create a consensus failure,
-	// the validaros (that do not check the results) and the full-nodes (with the indexer enabled)
+	// the validators (that do not check the results) and the full-nodes (with the indexer enabled)
 	// would compute different state hash.
 	// As a temporary solution, lets compare results but just print the error.
 

@@ -108,7 +108,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		}
 	}
 
-	// Max Value, check it only if greather than zero
+	// Max Value, check it only if greater than zero
 	if r.VoteOpts.MaxValue > 0 {
 		for _, v := range voteValues {
 			if uint32(v) > r.VoteOpts.MaxValue {
