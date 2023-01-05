@@ -47,8 +47,27 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		VotePackage: votePackageBytes,
 	}
 
+	// 1. Get de election metadata
+	election, err := c.Election(v.ElectionID)
+	if err != nil {
+		return nil, err
+	}
+	// 2. Use the correct way to generate the proof according of the election type
+
 	// Build the proof
 	switch {
+	case election.VoteMode.Anonymous:
+		// Generate anon proof
+		vote.Proof = &models.Proof{
+			Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:     models.ProofArbo_POSEIDON,
+					Siblings: v.ProofMkTree.Proof,
+					Value:    v.ProofMkTree.Value,
+					KeyType:  v.ProofMkTree.KeyType,
+				},
+			},
+		}
 	case v.ProofMkTree != nil:
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{

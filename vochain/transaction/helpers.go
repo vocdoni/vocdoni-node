@@ -17,7 +17,6 @@ const downloadZkVKsTimeout = 1 * time.Minute
 // LoadZkVKs loads the Zero Knowledge Verification Keys for the given
 // ChainID into the BaseApplication, downloading them if necessary, and
 // verifying their cryptographic hahes.
-
 // func LoadZkVerificationKeys(dataDir, chainID string) ([]*snarkTypes.Vk, error) {
 // 	zkVKs := []*snarkTypes.Vk{}
 // 	var circuits []zkartifacts.CircuitConfig
