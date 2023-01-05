@@ -174,7 +174,7 @@ func mkTreeVoteTest(host string,
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 		defer cancel()
 		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-			log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
+			log.Fatalf("gave up waiting for tx %x to be mined: %s", hash, err)
 		}
 
 		acc, err = api.Account("")
