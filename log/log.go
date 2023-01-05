@@ -2,7 +2,6 @@ package log
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -12,6 +11,13 @@ import (
 	zlog "github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
+)
+
+const (
+	LogLevelDebug = "debug"
+	LogLevelInfo  = "info"
+	LogLevelWarn  = "warn"
+	LogLevelError = "error"
 )
 
 var (
@@ -39,33 +45,30 @@ func Logger() *zerolog.Logger { return &log }
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
 func Init(logLevel string, output string) {
-	var out io.Writer
+	// Assign the global logger to the local logger
 	switch output {
 	case "stdout":
-		out = os.Stdout
+		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
 	case "stderr":
-		out = os.Stderr
+		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
 	default:
 		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			panic(fmt.Sprintf("invalid log output: %v", err))
 		}
-		out = errorLog
+		log = zlog.Output(errorLog).With().Caller().Logger()
 	}
-
-	// Assign the global logger to the local logger
-	log = zlog.Output(zerolog.ConsoleWriter{Out: out}).With().Caller().Logger()
 	// Required to get the correct caller information
 	zerolog.CallerSkipFrameCount = 3
 
 	switch logLevel {
-	case "debug":
+	case LogLevelDebug:
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	case "info":
+	case LogLevelInfo:
 		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	case "warn":
+	case LogLevelWarn:
 		zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	case "error":
+	case LogLevelError:
 		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
 	default:
 		panic("invalid log level")
