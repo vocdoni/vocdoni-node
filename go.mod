@@ -69,6 +69,13 @@ require (
 )
 
 require (
+	github.com/iden3/go-rapidsnark/prover v0.0.9
+	github.com/iden3/go-rapidsnark/types v0.0.2
+	github.com/iden3/go-rapidsnark/verifier v0.0.3
+	github.com/iden3/go-rapidsnark/witness v0.0.3
+)
+
+require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
@@ -150,10 +157,6 @@ require (
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
-	github.com/iden3/go-rapidsnark/prover v0.0.9 // indirect
-	github.com/iden3/go-rapidsnark/types v0.0.2 // indirect
-	github.com/iden3/go-rapidsnark/verifier v0.0.3 // indirect
-	github.com/iden3/go-rapidsnark/witness v0.0.3 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
 	github.com/ipfs/go-bitswap v0.9.0 // indirect

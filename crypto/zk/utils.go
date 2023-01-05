@@ -83,15 +83,35 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 	}, nil
 }
 
-func GetZKProofPublicSignals(vote *models.VoteEnvelope, process *models.Process, weight *big.Int) []string {
+func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
+	vote *models.VoteEnvelope, censusRoot []byte, weight *big.Int) (*models.ProofZkSNARK, error) {
+	proof := &models.ProofZkSNARK{
+		CircuitParametersIndex: index,
+		A:                      p.Data.A,
+		B: []string{
+			p.Data.B[0][0], p.Data.B[0][1],
+			p.Data.B[1][0], p.Data.B[1][1],
+			p.Data.B[2][0], p.Data.B[2][1],
+		},
+		C: p.Data.C,
+	}
+
+	if vote != nil && censusRoot != nil && weight != nil {
+		proof.PublicInputs = GetZKProofPublicSignals(vote, censusRoot, weight)
+	}
+
+	return proof, nil
+}
+
+func GetZKProofPublicSignals(vote *models.VoteEnvelope, censusRoot []byte, weight *big.Int) []string {
 	pubInputs := []string{}
 
 	// 1. processId {2}
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(process.ProcessId[:16]).String())
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(process.ProcessId[16:]).String())
+	pubInputs = append(pubInputs, arbo.BytesToBigInt(vote.ProcessId[:16]).String())
+	pubInputs = append(pubInputs, arbo.BytesToBigInt(vote.ProcessId[16:]).String())
 
 	// 2. censusRoot {1} -> Getting process.CensusRoot instead process.RollingCensusRoot
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(process.CensusRoot).String())
+	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
 
 	// 3. nullifier {1}
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(vote.Nullifier).String())

@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
@@ -258,9 +258,9 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 		return nil, fmt.Errorf("rolling census is not closed yet")
 	}
 	var response api.APIresponse
-	var config artifacts.CircuitConfig
+	var config circuit.ZkCircuitConfig
 	index := -1
-	var circuits []artifacts.CircuitConfig
+	var circuits []circuit.ZkCircuitConfig
 	if genesis, ok := vocdoniGenesis.Genesis[r.vocapp.ChainID()]; ok {
 		circuits = genesis.CircuitsConfig
 	} else {

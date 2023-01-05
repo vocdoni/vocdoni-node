@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:experimental
 
-FROM golang:1.18.8 AS builder
+FROM --platform=linux/amd64 golang:1.18.8 AS builder
 
 ARG BUILDARGS
 
@@ -14,7 +14,7 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
 
-FROM node:lts-bullseye-slim AS test
+FROM --platform=linux/amd64 node:lts-bullseye-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
@@ -23,7 +23,7 @@ COPY --from=builder /src/vochaintest ./
 COPY ./dockerfiles/testsuite/js ./js
 RUN cd js && npm install
 
-FROM debian:11.3-slim
+FROM --platform=linux/amd64 debian:11.3-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app

@@ -3,22 +3,25 @@ package rpcclient
 import (
 	"context"
 	"crypto/sha256"
-	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math"
 	"math/big"
 	"math/rand"
-	"os/exec"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/artifacts"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
@@ -189,7 +192,7 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 	}, nil
 }
 
-func (c *Client) GetCircuitConfig(pid []byte) (*int, *artifacts.CircuitConfig, error) {
+func (c *Client) GetCircuitConfig(pid []byte) (*int, *circuit.ZkCircuitConfig, error) {
 	var req api.APIrequest
 	req.Method = "getProcessCircuitConfig"
 	req.ProcessID = pid
@@ -396,16 +399,14 @@ type GenSNARKData struct {
 	Inputs        SNARKProofInputs         `json:"inputs"`
 }
 
-func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
-	censusRoot, merkleProof []byte, treeSize int64,
-	secretKey, votePackage, processId []byte) (*SNARKProof, []byte, error) {
+func testGenSNARKProof(circuit *circuit.ZkCircuit,
+	censusRoot, merkleProof []byte, treeSize int64, privateKey, votePackage,
+	processId []byte, weight *big.Int) (*prover.Proof, []byte, error) {
 	if len(merkleProof) < 8 {
 		return nil, nil, fmt.Errorf("merkleProof too short")
 	}
-	indexLE := merkleProof[:8]
-	index := binary.LittleEndian.Uint64(indexLE)
-	siblingsBytes := merkleProof[8:]
 
+	siblingsBytes := merkleProof[8:]
 	levels := int(math.Log2(float64(treeSize)))
 	siblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, siblingsBytes)
 	if err != nil {
@@ -420,69 +421,53 @@ func testGenSNARKProof(circuitIndex int, circuitConfig *artifacts.CircuitConfig,
 		siblingsStr = append(siblingsStr, arbo.BytesToBigInt(siblings[i]).String())
 	}
 
-	voteHash := sha256.Sum256(votePackage)
-	voteHash0, voteHash1 := voteHash[:16], voteHash[16:]
+	key := babyjub.PrivateKey{}
+	_, err = hex.Decode(key[:], privateKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating babyjub key")
+	}
 
-	processId0, processId1 := processId[:16], processId[16:]
-	poseidon := arbo.HashPoseidon{}
-	nullifier, err := poseidon.Hash(
-		secretKey,
-		processId0,
-		processId1,
-	)
+	voteHash := sha256.Sum256(votePackage)
+	strVoteHash := []string{
+		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[:16])).String(),
+		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[16:])).String(),
+	}
+
+	intProcessId := []*big.Int{
+		new(big.Int).SetBytes(arbo.SwapEndianness(processId[:16])),
+		new(big.Int).SetBytes(arbo.SwapEndianness(processId[16:])),
+	}
+	strProcessId := []string{intProcessId[0].String(), intProcessId[1].String()}
+
+	nullifier, err := poseidon.Hash([]*big.Int{
+		babyjub.SkToBigInt(&key),
+		intProcessId[0],
+		intProcessId[1],
+	})
 	if err != nil {
 		return nil, nil, fmt.Errorf("poseidon: %w", err)
 	}
+	strNullifier := nullifier.String()
 
-	inputs := SNARKProofInputs{
-		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
-		CensusSiblings: siblingsStr,
-		Index:          new(big.Int).SetUint64(index).String(),
-		SecretKey:      arbo.BytesToBigInt(secretKey).String(),
-		VoteHash: []string{
-			arbo.BytesToBigInt(voteHash0).String(),
-			arbo.BytesToBigInt(voteHash1).String(),
-		},
-		ProcessID: []string{
-			arbo.BytesToBigInt(processId0).String(),
-			arbo.BytesToBigInt(processId1).String(),
-		},
-		Nullifier: arbo.BytesToBigInt(nullifier).String(),
-	}
-	data := GenSNARKData{
-		CircuitIndex:  circuitIndex,
-		CircuitConfig: circuitConfig,
-		Inputs:        inputs,
-	}
-	dataJSON, err := json.Marshal(&data)
+	inputs, err := json.Marshal(map[string]interface{}{
+		"censusRoot":     arbo.BytesToBigInt(censusRoot).String(),
+		"censusSiblings": siblingsStr,
+		"weight":         weight.String(),
+		"privateKey":     babyjub.SkToBigInt(&key).String(),
+		"voteHash":       strVoteHash,
+		"processId":      strProcessId,
+		"nullifier":      strNullifier,
+	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("error encoding prover inputs", err)
 	}
-	log.Debugf("gen-vote-snark.js input: %v", string(dataJSON))
-	cmd := exec.Command("node", "/app/js/gen-vote-snark.js", string(dataJSON))
-	proofJSON, err := cmd.CombinedOutput()
+
+	proof, err := prover.Prove(circuit.ProvingKey, circuit.Wasm, inputs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("node /app/js/gen-vote-snark.js: %w\n%s",
-			err, string(proofJSON))
+		return nil, nil, fmt.Errorf("error generating the proof", err)
 	}
-	log.Debugf("gen-vote-snark.js output: %v", string(proofJSON))
-	var proofCircom SNARKProofCircom
-	if err := json.Unmarshal(proofJSON, &proofCircom); err != nil {
-		return nil, nil, fmt.Errorf("/app/js/gen-vote-snark.js output unmarshal: %w\n%s",
-			err, string(proofJSON))
-	}
-	return &SNARKProof{
-		A: proofCircom.A,
-		B: []string{
-			proofCircom.B[0][0], proofCircom.B[0][1],
-			proofCircom.B[1][0], proofCircom.B[1][1],
-			proofCircom.B[2][0], proofCircom.B[2][1],
-		},
-		C: proofCircom.C,
-		// PublicInputs is not used in the anonymous-voting flow, as
-		// the only needed public input from user's side is the
-		// nullifier, which is already in the VoteEnvelope struct
-	}, nullifier, nil
+
+	return proof, nullifier.Bytes(), nil
 }
 
 func (c *Client) TestPreRegisterKeys(
@@ -912,7 +897,9 @@ func (c *Client) TestSendAnonVotes(
 	circuitConfig.LocalDir = "/tmp"
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
-	if err := artifacts.DownloadCircuitFiles(ctx, *circuitConfig); err != nil {
+
+	circuit, err := circuit.LoadZkCircuit(ctx, *circuitConfig)
+	if err != nil {
 		return 0, err
 	}
 
@@ -934,8 +921,9 @@ func (c *Client) TestSendAnonVotes(
 			return 0, err
 		}
 		_, secretKey := testGetZKCensusKey(s)
-		proof, nullifier, err := testGenSNARKProof(*circuitIndex, circuitConfig,
-			root, proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid)
+		weight := new(big.Int).SetInt64(10)
+		proof, nullifier, err := testGenSNARKProof(circuit, root,
+			proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid, weight)
 		if err != nil {
 			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
 		}
@@ -945,20 +933,13 @@ func (c *Client) TestSendAnonVotes(
 			VotePackage: vpb,
 			Nullifier:   nullifier,
 		}
+
+		model, err := zk.ProverProofToProtobufZKProof(int32(*circuitIndex), proof, v, root, weight)
+		if err != nil {
+			return 0, fmt.Errorf("error encoding the proof to protobuf: %w", err)
+		}
 		v.Proof = &models.Proof{
-			Payload: &models.Proof_ZkSnark{
-				ZkSnark: &models.ProofZkSNARK{
-					CircuitParametersIndex: int32(*circuitIndex),
-					A:                      proof.A,
-					B:                      proof.B,
-					C:                      proof.C,
-					// PublicInputs is not used in the
-					// anonymous-voting flow, as the only
-					// needed public input from user's side
-					// is the nullifier, which is already
-					// in the VoteEnvelope struct
-				},
-			},
+			Payload: &models.Proof_ZkSnark{ZkSnark: model},
 		}
 
 		stx := &models.SignedTx{}
