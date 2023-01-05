@@ -160,6 +160,15 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	}
 }
 
+// GetFaucetPackageFromDefaultDevService returns a faucet package.
+// Needs just the destination wallet address, the URL and bearer token are hardcoded
+func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
+	return GetFaucetPackageFromRemoteService(
+		DefaultDevelopmentFaucetURL+account,
+		DefaultDevelopmentFaucetToken,
+	)
+}
+
 // GetFaucetPackageFromRemoteService returns a faucet package from a remote HTTP faucet service.
 // This service usually requires a valid bearer token.
 // faucetURL usually includes the destination wallet address that will receive the funds.
