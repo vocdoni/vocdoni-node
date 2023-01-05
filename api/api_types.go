@@ -33,15 +33,18 @@ type ElectionSummary struct {
 	Results      [][]*types.BigInt `json:"result,omitempty"`
 }
 
+// ElectionResults is the struct used to wrap the results of an election
 type ElectionResults struct {
 	// ABIEncoded is the abi encoded election results
 	ABIEncoded string `json:"abiEncoded"`
-
+	// CensusRoot is the root of the census tree
 	CensusRoot types.HexBytes `json:"censusRoot"`
+	// OrganizationID is the ID of the organization that created the election
+	OrganizationID types.HexBytes `json:"organizationId"`
+	// Results is the list of votes
+	Results [][]*big.Int `json:"results"`
 	// SourceContractAddress is the address of the smart contract containing the census
-	OrganizationID        types.HexBytes `json:"organizationId"`
-	Results               [][]*big.Int   `json:"results"`
-	SourceContractAddress types.HexBytes `json:"sourceContractAddress"`
+	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty"`
 }
 
 type Election struct {

@@ -279,7 +279,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	// since we fetch the results from the blockchain state, elections must be terminated and
 	// results must be available
 	if process.Status != models.ProcessStatus_RESULTS {
-		return fmt.Errorf("no results yet results for the election")
+		return fmt.Errorf("election results are not available yet")
 	}
 	// check process results are the same
 	var results [][]*big.Int
@@ -287,19 +287,22 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		firstResult := process.Results[0]
 		for _, processResult := range process.Results[1:] {
 			if processResult == nil {
-				return fmt.Errorf("invalid process result")
+				log.Errorf("invalid process result")
+				continue
 			}
 			// if consensus results do not match, return error
 			for k, questionResult := range processResult.Votes {
 				if questionResult == nil {
-					return fmt.Errorf("invalid question result")
+					log.Errorf("invalid question result")
+					continue
 				}
 				for kk, questionOption := range questionResult.Question {
 					if len(questionOption) == 0 {
-						return fmt.Errorf("invalid question option")
+						log.Errorf("invalid question option")
+						continue
 					}
 					if !bytes.Equal(questionOption, firstResult.Votes[k].Question[kk]) {
-						log.Debugf("election results for signer %s missmatch %s != %s",
+						log.Errorf("election results for signer %s missmatch %s != %s",
 							questionResult.String(),
 							firstResult.Votes[k].String(),
 							common.BytesToAddress(processResult.OracleAddress),
