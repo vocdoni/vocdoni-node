@@ -32,7 +32,7 @@ const (
 //
 // The structure of the snapshot encoded file is:
 //
-//  [headerLen][header][tree1][tree2][treeN]
+//	[headerLen][header][tree1][tree2][treeN]
 //
 // - headerlen is a fixed 32 bytes little endian number indicating the size of the header.
 //
@@ -274,7 +274,7 @@ func (s *StateSnapshot) Write(b []byte) (int, error) {
 	return n, err
 }
 
-// snapshot performs a snapshot of the last commited state for all trees.
+// Snapshot performs a snapshot of the last committed state for all trees.
 // The snapshot is stored in disk and the file path is returned.
 func (v *State) Snapshot() (string, error) {
 	t := v.MainTreeView()

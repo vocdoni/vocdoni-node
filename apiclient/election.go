@@ -30,23 +30,7 @@ func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) 
 	return election, nil
 }
 
-// ElectionResults returns the election results given its ID.
-func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionResults, error) {
-	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "scrutiny")
-	if err != nil {
-		return nil, err
-	}
-	if code != 200 {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	electionResults := &api.ElectionResults{}
-	if err = json.Unmarshal(resp, &electionResults); err != nil {
-		return nil, fmt.Errorf("could not unmarshal response: %w", err)
-	}
-	return electionResults, nil
-}
-
-// NewElectionrRaw creates a new election given the protobuf Process message.
+// NewElectionRaw creates a new election given the protobuf Process message.
 func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, error) {
 	// get the own account details
 	acc, err := c.Account("")
@@ -361,4 +345,20 @@ func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error
 		return 0, err
 	}
 	return votes.Count, nil
+}
+
+// ElectionResults returns the election results given its ID.
+func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionResults, error) {
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "scrutiny")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	electionResults := &api.ElectionResults{}
+	if err = json.Unmarshal(resp, &electionResults); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return electionResults, nil
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -456,7 +455,7 @@ func accountSetMetadata(cli *vocdoniCLI) error {
 		return err
 	}
 
-	file, err := ioutil.TempFile("", "accMeta*")
+	file, err := os.CreateTemp("", "accMeta*")
 	if err != nil {
 		return err
 	}
@@ -542,7 +541,7 @@ func electionHandler(cli *vocdoniCLI) error {
 		return err
 	}
 
-	file, err := ioutil.TempFile("", "election*")
+	file, err := os.CreateTemp("", "election*")
 	if err != nil {
 		return err
 	}

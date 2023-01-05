@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -40,7 +39,7 @@ func (c *TestHTTPclient) Request(method string, jsonBody any, urlPath ...string)
 		Body:   io.NopCloser(bytes.NewBuffer(body)),
 	})
 	qt.Assert(c.t, err, qt.IsNil)
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	qt.Assert(c.t, err, qt.IsNil)
 	return data, resp.StatusCode
 }

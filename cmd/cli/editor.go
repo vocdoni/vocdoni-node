@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -60,7 +59,7 @@ func OpenFileInEditor(filename string, resolveEditor PreferredEditorResolver) er
 // CaptureInputFromEditor opens a temporary file in a text editor and returns the written bytes on success or an error
 // on failure. It handles deletion of the temporary file behind the scenes.
 func CaptureInputFromEditor(resolveEditor PreferredEditorResolver) ([]byte, error) {
-	file, err := ioutil.TempFile(os.TempDir(), "*")
+	file, err := os.CreateTemp(os.TempDir(), "*")
 	if err != nil {
 		return []byte{}, err
 	}
@@ -78,7 +77,7 @@ func CaptureInputFromEditor(resolveEditor PreferredEditorResolver) ([]byte, erro
 		return []byte{}, err
 	}
 
-	bytes, err := ioutil.ReadFile(filename)
+	bytes, err := os.ReadFile(filename)
 	if err != nil {
 		return []byte{}, err
 	}

@@ -357,11 +357,11 @@ func testGetZKCensusKey(s *ethereum.SignKeys) ([]byte, []byte) {
 	hasher := arbo.HashPoseidon{}
 	secretKey, err := hasher.Hash(secret[:22], secret[22:44], secret[44:])
 	if err != nil {
-		log.Fatalf("Cannnot calculate pre-register key with Poseidon: %v", err)
+		log.Fatalf("Cannot calculate pre-register key with Poseidon: %v", err)
 	}
 	pubKey, err := hasher.Hash(secretKey)
 	if err != nil {
-		log.Fatalf("Cannnot calculate pre-register key with Poseidon: %v", err)
+		log.Fatalf("Cannot calculate pre-register key with Poseidon: %v", err)
 	}
 	return pubKey, secretKey
 }
@@ -1470,8 +1470,8 @@ func (c *Client) GetAccount(accountAddr common.Address) (*state.Account, error) 
 }
 
 // GenerateFaucetPackage generates a faucet package
-func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value, identifier uint64) (*models.FaucetPackage, error) {
-	return vochain.GenerateFaucetPackage(from, to, value, identifier)
+func (*Client) GenerateFaucetPackage(from *ethereum.SignKeys, to common.Address, value uint64) (*models.FaucetPackage, error) {
+	return vochain.GenerateFaucetPackage(from, to, value)
 }
 
 // SubmitRawTx signs and sends a vochain transaction

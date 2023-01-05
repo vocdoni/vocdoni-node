@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -147,7 +146,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 	if err != nil {
 		return nil, 0, err
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, err
 	}
