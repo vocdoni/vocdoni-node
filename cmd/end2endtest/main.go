@@ -59,7 +59,8 @@ func main() {
 	treasurerPrivKey := flag.String("treasurerPrivKey", "", "treasurer private key")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
 	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
-	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
+	faucet := flag.String("faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	faucetAuthToken := flag.String("faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
 	timeout := flag.Duration("timeout", 5*time.Minute, "timeout duration")
 
 	flag.Usage = func() {
@@ -102,7 +103,8 @@ func main() {
 			accountPrivateKey,
 			*nvotes,
 			*parallelCount,
-			*useDevFaucet,
+			*faucet,
+			*faucetAuthToken,
 			*timeout)
 	case "tokentransactions":
 		accountPrivateKey := hex.EncodeToString(accountKeys[0].PrivateKey())
@@ -118,7 +120,8 @@ func main() {
 func mkTreeVoteTest(host string,
 	accountPrivateKey string,
 	nvotes, parallelCount int,
-	useDevFaucet bool,
+	faucetURL string,
+	faucetAuthToken string,
 	timeout time.Duration,
 ) {
 	// Connect to the API host
@@ -144,13 +147,15 @@ func mkTreeVoteTest(host string,
 	acc, err := api.Account("")
 	if err != nil {
 		var faucetPkg *models.FaucetPackage
-		if useDevFaucet {
+		if faucetURL != "" {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
-				apiclient.DefaultDevelopmentFaucetURL+api.MyAddress().Hex(),
-				apiclient.DefaultDevelopmentFaucetToken,
-			)
+			if faucetURL == "dev" {
+				faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
+			} else {
+				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(faucetURL+api.MyAddress().Hex(), faucetAuthToken)
+			}
+
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -176,7 +181,7 @@ func mkTreeVoteTest(host string,
 		if err != nil {
 			log.Fatal(err)
 		}
-		if useDevFaucet && acc.Balance == 0 {
+		if faucetURL != "" && acc.Balance == 0 {
 			log.Fatal("account balance is 0")
 		}
 	}
