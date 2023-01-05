@@ -61,11 +61,19 @@ require (
 	github.com/vocdoni/arbo v0.0.0-20220903144204-c3e910e2afc6
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
-	go.uber.org/zap v1.21.0
+	go.uber.org/zap v1.21.0 // indirect
 	go.vocdoni.io/proto v1.13.4-0.20221123082854-87f30a047528
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.1.0
 	google.golang.org/protobuf v1.28.1
+)
+
+require (
+	github.com/iden3/go-rapidsnark/prover v0.0.9
+	github.com/iden3/go-rapidsnark/types v0.0.2
+	github.com/iden3/go-rapidsnark/verifier v0.0.3
+	github.com/iden3/go-rapidsnark/witness v0.0.3
+	github.com/rs/zerolog v1.28.0
 )
 
 require (
@@ -150,10 +158,6 @@ require (
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/holiman/uint256 v1.2.1 // indirect
 	github.com/huin/goupnp v1.0.3 // indirect
-	github.com/iden3/go-rapidsnark/prover v0.0.9 // indirect
-	github.com/iden3/go-rapidsnark/types v0.0.2 // indirect
-	github.com/iden3/go-rapidsnark/verifier v0.0.3 // indirect
-	github.com/iden3/go-rapidsnark/witness v0.0.3 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.0.0 // indirect
 	github.com/ipfs/go-bitswap v0.9.0 // indirect
@@ -291,7 +295,6 @@ require (
 	github.com/rjeczalik/notify v0.9.2 // indirect
 	github.com/rogpeppe/go-internal v1.9.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
-	github.com/rs/zerolog v1.28.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
 	github.com/spacemonkeygo/spacelog v0.0.0-20180420211403-2296661a0572 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
