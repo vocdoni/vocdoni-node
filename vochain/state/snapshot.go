@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -392,7 +391,7 @@ type diskSnapshotInfo struct {
 
 // ListSnapshots returns the list of the current state snapshots stored in disk.
 func (v *State) ListSnapshots() []diskSnapshotInfo {
-	files, err := ioutil.ReadDir(filepath.Join(
+	files, err := os.ReadDir(filepath.Join(
 		v.dataDir,
 		storageDirectory,
 		snapshotsDirectory))
@@ -404,11 +403,17 @@ func (v *State) ListSnapshots() []diskSnapshotInfo {
 		if !file.IsDir() {
 			height, err := strconv.Atoi(file.Name())
 			if err != nil {
+				log.Errorw(err, "could not list snapshot file height")
+				continue
+			}
+			fileInfo, err := file.Info()
+			if err != nil {
+				log.Errorw(err, "could not list snapshot file")
 				continue
 			}
 			list = append(list, diskSnapshotInfo{
-				Size:    file.Size(),
-				ModTime: file.ModTime(),
+				Size:    fileInfo.Size(),
+				ModTime: fileInfo.ModTime(),
 				Height:  uint32(height),
 			})
 		}
