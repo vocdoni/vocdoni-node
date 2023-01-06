@@ -97,16 +97,22 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		VoteID:               voteData.Meta.Nullifier,
 		EncryptionKeyIndexes: voteData.EncryptionKeyIndexes,
 		VoteWeight:           voteData.Weight,
-		VoteNumber:           &voteData.Meta.Height,
+		BlockHeight:          voteData.Meta.Height,
 		ElectionID:           voteData.Meta.ProcessId,
 		VoterID:              voteData.Meta.VoterID,
+		TransactionIndex:     &voteData.Meta.TxIndex,
 	}
 
-	// check if votePackage is not encrypted
-	if _, err := json.Marshal(voteData.VotePackage); err != nil {
+	// check if votePackage is not encrypted and if so, return it
+	if _, err := json.Marshal(voteData.VotePackage); err == nil {
 		vote.VotePackage = string(voteData.VotePackage)
 	}
-	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
+
+	var data []byte
+	if data, err = json.Marshal(vote); err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /votes/verify/<electionID>/<voteID>
