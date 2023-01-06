@@ -54,8 +54,14 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 	if err != nil {
 		return nil, err
 	}
+	log.Debugw(fmt.Sprintf("get envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
+		"nullifier": hex.EncodeToString(nullifier),
+		"height":    sqlTxRefInner.Height,
+		"txIndex":   sqlTxRefInner.TxIndex,
+		"weight":    sqlTxRefInner.Weight,
+		"voterId":   hex.EncodeToString(sqlTxRefInner.VoterID),
+	})
 
-	log.Debugf("GetEnvelopeReference sqlite took %s", time.Since(sqlStartTime))
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
 	if enableBadgerhold {
 		if diff := cmp.Diff(txRef, sqlTxRef); diff != "" {
