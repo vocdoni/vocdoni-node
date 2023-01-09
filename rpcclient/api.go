@@ -459,12 +459,12 @@ func testGenSNARKProof(circuit *circuit.ZkCircuit,
 		"nullifier":      strNullifier,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("error encoding prover inputs", err)
+		return nil, nil, fmt.Errorf("error encoding prover inputs: %w", err)
 	}
 
 	proof, err := prover.Prove(circuit.ProvingKey, circuit.Wasm, inputs)
 	if err != nil {
-		return nil, nil, fmt.Errorf("error generating the proof", err)
+		return nil, nil, fmt.Errorf("error generating the proof: %w", err)
 	}
 
 	return proof, nullifier.Bytes(), nil
