@@ -167,6 +167,21 @@ func TestAPIcensusAndVote(t *testing.T) {
 
 	_, code = c.Request("GET", nil, "votes", "verify", election.ElectionID.String(), v.VoteID.String())
 	qt.Assert(t, code, qt.Equals, 200)
+
+	/*
+	   This test is disabled because the indexer is not properly set up in the test environment.
+	   Activate it when the indexer is properly working.
+
+	   resp, code = c.Request("GET", nil, "votes", v.VoteID.String())
+	   qt.Assert(t, code, qt.Equals, 200)
+	   v2 := &api.Vote{}
+	   err = json.Unmarshal(resp, v2)
+	   qt.Assert(t, err, qt.IsNil)
+	   qt.Assert(t, v2.VoteID.String(), qt.Equals, v.VoteID.String())
+	   qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(3))
+	   qt.Assert(t, v2.TransactionIndex, qt.Equals, uint32(0))
+	   qt.Assert(t, v2.VoterID.String(), qt.Equals, voterKey.AddressString())
+	*/
 }
 
 func TestAPIaccount(t *testing.T) {
@@ -198,7 +213,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// transaction
-	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50, 0)
+	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)

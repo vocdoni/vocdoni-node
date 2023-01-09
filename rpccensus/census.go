@@ -12,7 +12,7 @@ type Manager struct {
 	RemoteStorage data.Storage // e.g. IPFS
 }
 
-// NewManager creates a new instance of the RPC census manager
+// NewCensusManager creates a new instance of the RPC census manager
 func NewCensusManager(cdb *censusdb.CensusDB, storage data.Storage) *Manager {
 	return &Manager{
 		cdb:           cdb,

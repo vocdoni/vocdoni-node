@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"time"
@@ -29,7 +28,7 @@ type Config struct {
 }
 
 func (c *Config) Load(filepath string) error {
-	data, err := ioutil.ReadFile(filepath)
+	data, err := os.ReadFile(filepath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
@@ -44,7 +43,7 @@ func (c *Config) Save(filepath string) error {
 	if err != nil {
 		return err
 	}
-	return ioutil.WriteFile(filepath, data, 0o600)
+	return os.WriteFile(filepath, data, 0o600)
 }
 
 type Account struct {

@@ -3,13 +3,14 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -136,7 +137,7 @@ func (c *HTTPclient) EnsureTxIsMined(txHash types.HexBytes) error {
 }
 
 // GetFaucetPackageFromRemoteService returns a faucet package from a remote HTTP faucet service.
-// This service usueally requires a valid bearer token.
+// This service usually requires a valid bearer token.
 // faucetURL usually includes the destination wallet address that will receive the funds.
 func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetPackage, error) {
 	u, err := url.Parse(faucetURL)
@@ -158,41 +159,32 @@ func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetP
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("faucet request failed: %s", resp.Status)
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err
 	}
-	return UnmarshalFaucetPackage(data)
+
+	fresp := faucet.FaucetResponse{}
+	if err := json.Unmarshal(data, &fresp); err != nil {
+		return nil, err
+	}
+	if fresp.Amount == "" {
+		return nil, fmt.Errorf("faucet response is missing amount")
+	}
+	if fresp.FaucetPackage == nil {
+		return nil, fmt.Errorf("faucet response is missing package")
+	}
+	return UnmarshalFaucetPackage(fresp.FaucetPackage)
 }
 
 // UnmarshalFaucetPackage unmarshals a faucet package into a FaucetPackage struct.
 func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
-	type faucetResponse struct {
-		Amount  *types.BigInt `json:"amount"`
-		Package []byte        `json:"faucetPackage"`
-	}
-	type faucetPackage struct {
-		Payload   []byte `json:"faucetPayload"`
-		Signature []byte `json:"signature"`
-	}
-
-	fresp := faucetResponse{}
-	if err := json.Unmarshal(data, &fresp); err != nil {
+	fpackage := faucet.FaucetPackage{}
+	if err := json.Unmarshal(data, &fpackage); err != nil {
 		return nil, err
 	}
-	if fresp.Amount == nil {
-		return nil, fmt.Errorf("faucet response is missing amount")
-	}
-	if fresp.Package == nil {
-		return nil, fmt.Errorf("faucet response is missing package")
-	}
-	fpackage := faucetPackage{}
-	if err := json.Unmarshal(fresp.Package, &fpackage); err != nil {
-		return nil, err
-	}
-
 	return &models.FaucetPackage{
-		Payload:   fpackage.Payload,
+		Payload:   fpackage.FaucetPayload,
 		Signature: fpackage.Signature,
 	}, nil
 

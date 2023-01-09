@@ -62,7 +62,7 @@ func TestSetAccountTx(t *testing.T) {
 	// CREATE ACCOUNT
 
 	// should work is a valid faucet payload and tx.Account is provided and no infoURI is set
-	faucetPkg, err := GenerateFaucetPackage(signers[0], signers[1].Address(), 1000, rand.Uint64())
+	faucetPkg, err := GenerateFaucetPackage(signers[0], signers[1].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[1], signers[1].Address(), faucetPkg, app, "", 0, true),
@@ -83,7 +83,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer1Account.InfoURI, qt.CmpEquals(), "")
 
 	// should work is a valid faucet payload and tx.Account is not provided and no infoURI is set
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[2].Address(), 1000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[2].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[2], common.Address{}, faucetPkg, app, "", 0, true),
@@ -103,7 +103,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer2Account.InfoURI, qt.CmpEquals(), "")
 
 	// should work is a valid faucet payload and tx.Account is provided and infoURI is set
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[3].Address(), 1000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[3].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[3], signers[3].Address(), faucetPkg, app, infoURI, 0, true),
@@ -123,13 +123,13 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer3Account.InfoURI, qt.CmpEquals(), infoURI)
 
 	// should work is a valid faucet payload and tx.Account is not provided and infoURI is set
-	faucetPkgIdentifierToReuse := rand.Uint64()
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[4].Address(), 1000, faucetPkgIdentifierToReuse)
+	faucetPkgToReuse, err := GenerateFaucetPackage(signers[0], signers[4].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
-		signers[4], common.Address{}, faucetPkg, app, infoURI, 0, true),
+		signers[4], common.Address{}, faucetPkgToReuse, app, infoURI, 0, true),
 		qt.IsNil,
 	)
+
 	signer0Account, err = app.State.GetAccount(signers[0].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, signer0Account, qt.IsNotNil)
@@ -191,10 +191,8 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account, qt.IsNil)
 
 	// should not work if already used faucet package
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 1000, faucetPkgIdentifierToReuse)
-	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
-		signers[5], common.Address{}, faucetPkg, app, infoURI, 0, true),
+		signers[5], common.Address{}, faucetPkgToReuse, app, infoURI, 0, true),
 		qt.IsNotNil,
 	)
 	signer0Account, err = app.State.GetAccount(signers[0].Address(), false)
@@ -208,7 +206,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account, qt.IsNil)
 
 	// should not work if faucet package issuer does not have enough balance
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 10000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 10000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[5], common.Address{}, faucetPkg, app, infoURI, 0, true),
@@ -225,7 +223,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account, qt.IsNil)
 
 	// should not work if faucet package issuer account does not exist
-	faucetPkg, err = GenerateFaucetPackage(signers[5], signers[6].Address(), 1000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[5], signers[6].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[6], common.Address{}, faucetPkg, app, infoURI, 0, true),
@@ -239,7 +237,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer6Account, qt.IsNil)
 
 	// should not work if faucet package issuer cannot cover the txs cost + faucet amount
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 20000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 20000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[5], common.Address{}, faucetPkg, app, infoURI, 0, true),
@@ -256,7 +254,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account, qt.IsNil)
 
 	// should not work if faucet package with an invalid amount
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 0, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[5], common.Address{}, faucetPkg, app, infoURI, 0, true),
@@ -273,7 +271,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account, qt.IsNil)
 
 	// should work if random nonce provided
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 10, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[5].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[5], common.Address{}, faucetPkg, app, infoURI, rand.Uint32(), true),
@@ -294,7 +292,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer5Account.DelegateAddrs, qt.DeepEquals, [][]byte(nil))
 
 	// should work if random account provided, the account created is the signer one
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[6].Address(), 10, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[6].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[6], signers[7].Address(), faucetPkg, app, infoURI, rand.Uint32(), true),
@@ -320,7 +318,7 @@ func TestSetAccountTx(t *testing.T) {
 	// should ignore tx cost if tx cost is set to 0
 	qt.Assert(t, app.State.SetTxCost(models.TxType_CREATE_ACCOUNT, 0), qt.IsNil)
 	app.Commit()
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[7].Address(), 10, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[7].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[7], common.Address{}, faucetPkg, app, infoURI, 0, true),
@@ -379,7 +377,7 @@ func TestSetAccountTx(t *testing.T) {
 	// SET ACCOUNT INFO URI
 
 	// should not work for itself with faucet package (the faucet package is ignored) and invalid InfoURI
-	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[0].Address(), 1000, rand.Uint64())
+	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[0].Address(), 1000)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[0], common.Address{}, faucetPkg, app, "", 0, false),

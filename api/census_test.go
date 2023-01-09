@@ -192,7 +192,7 @@ func TestCensusProof(t *testing.T) {
 	_, code = c.Request("POST", &cparts, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
-	// add the last participant and keep the key for veryfing the proof
+	// add the last participant and keep the key for verifying the proof
 	key := rnd.RandomBytes(32)
 	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
 		Key:    key,

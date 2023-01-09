@@ -265,7 +265,7 @@ func (t *Tree) updateCensusWeight(wTx db.WriteTx, w []byte) error {
 	return nil
 }
 
-// updateCensusIndex increements the census tree index by delta and return the previous value.
+// updateCensusIndex increments the census tree index by delta and return the previous value.
 func (t *Tree) updateCensusIndex(wTx db.WriteTx, delta uint32) (uint64, error) {
 	t.updatesLock.Lock()
 	defer t.updatesLock.Unlock()

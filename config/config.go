@@ -44,6 +44,8 @@ type Config struct {
 	EnableAPI bool
 	// EnableRPC enables the HTTP RPC service
 	EnableRPC bool
+	// EnableFaucet enables the faucet API service for the given amounts
+	EnableFaucetWithAmount uint64
 }
 
 // ValidMode checks if the configured mode is valid

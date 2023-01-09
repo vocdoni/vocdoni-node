@@ -106,7 +106,7 @@ func main() {
 	}
 	log.Infof("new census created with id %s", censusID.String())
 
-	// Genreate 10 participant accounts
+	// Generate 10 participant accounts
 	voterAccounts, err := generateAccounts(*nvotes)
 	if err != nil {
 		log.Fatal(err)
@@ -345,7 +345,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// End the election by seting the status to ENDED
+	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
 	hash, err := api.SetElectionStatus(electionID, "ENDED")
 	if err != nil {

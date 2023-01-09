@@ -110,6 +110,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
 	i.retrieveCache = lru.New(RetrievedFileCacheSize)
+
 	return nil
 }
 
@@ -183,20 +184,20 @@ func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
 
-func (i *IPFSHandle) Stats(ctx context.Context) (string, error) {
+func (i *IPFSHandle) Stats(ctx context.Context) map[string]interface{} {
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
-		return "", err
+		return map[string]interface{}{"error": err.Error()}
 	}
 	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
 	if err != nil {
-		return "", err
+		return map[string]interface{}{"error": err.Error()}
 	}
 	pins, err := i.countPins(ctx)
 	if err != nil {
-		return "", err
+		return map[string]interface{}{"error": err.Error()}
 	}
-	return fmt.Sprintf("peers:%d addresses:%d pins:%d", len(peers), len(addresses), pins), nil
+	return map[string]interface{}{"peers": len(peers), "addresses": len(addresses), "pins": pins}
 }
 
 func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
