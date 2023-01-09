@@ -236,8 +236,8 @@ var Genesis = map[string]VochainGenesis{
 		CircuitsConfig: []circuit.ZkCircuitConfig{
 			{ // index: 0, size: 1024
 				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
-				CircuitPath:         "artifacts/zkCensus/10",
+					"zk-franchise-proof-circuit/blob/feature/merging_repos_and_new_tests",
+				CircuitPath:         "artifacts/zkCensus/dev/10",
 				Parameters:          []int64{1024}, // 2^10
 				LocalDir:            "zkCircuits",
 				ProvingKeyHash:      hexToBytes("0x413907b09d50f1ccb5d7aa468bc2106c9f796158d8fdd700573c27e52a7c2379"),
@@ -247,7 +247,7 @@ var Genesis = map[string]VochainGenesis{
 			{ // index: 1, size: 65k
 				URI: "https://raw.githubusercontent.com/vocdoni/" +
 					"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
-				CircuitPath:         "artifacts/zkCensus/16",
+				CircuitPath:         "artifacts/zkCensus/dev/16",
 				Parameters:          []int64{65536}, // 2^16
 				LocalDir:            "zkCircuits",
 				ProvingKeyHash:      hexToBytes("0x96c318c8f75a47069b5d4b22a5d782b79319f666e02f11e49d620d75674f9930"),
