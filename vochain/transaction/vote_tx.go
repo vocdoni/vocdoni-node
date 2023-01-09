@@ -58,9 +58,13 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 	var vote *models.Vote
 	if process.EnvelopeType.Anonymous {
-		if t.ZkVKs == nil || len(t.ZkVKs) == 0 {
-			return nil, voterID.Nil(), fmt.Errorf("anonymous voting not supported, missing zk verification keys")
+		if t.ZkCircuits == nil || len(t.ZkCircuits) == 0 {
+			return nil, voterID.Nil(), fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
+		// if t.ZkVKs == nil || len(t.ZkVKs) == 0 {
+		// 	return nil, voterID.Nil(), fmt.Errorf("anonymous voting not supported, missing zk verification keys")
+		// }
+
 		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 		// An element can only be added to the vote cache during checkTx.
 		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.

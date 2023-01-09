@@ -40,7 +40,7 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 	if err != nil {
 		return nil, nil, "", err
 	}
-	log.Infof("new census created with id %s", censusID.String())
+	log.Infow("new census created", map[string]any{"censusID": censusID.String()})
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
@@ -69,7 +69,10 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 			if err := api.CensusAddParticipants(censusID, participants); err != nil {
 				return nil, nil, "", err
 			}
-			log.Infof("added %d participants to census %s", len(participants.Participants), censusID.String())
+			log.Infow("new participants added to census", map[string]any{
+				"censusID":        censusID.String(),
+				"newParticipants": len(participants.Participants),
+			})
 			participants = &vapi.CensusParticipants{}
 		}
 	}
@@ -82,14 +85,21 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 	if size != uint64(nvotes) {
 		return nil, nil, "", fmt.Errorf("census size is %d, expected %d", size, nvotes)
 	}
-	log.Infof("census %s size is %d", censusID.String(), size)
+	log.Infow("finish census participants registration", map[string]any{
+		"censusID":        censusID.String(),
+		"newParticipants": len(participants.Participants),
+		"censusSize":      size,
+	})
 
 	// Publish the census
 	censusRoot, censusURI, err := api.CensusPublish(censusID)
 	if err != nil {
 		return nil, nil, "", err
 	}
-	log.Infof("census published with root %s", censusRoot.String())
+	log.Infow("census published", map[string]any{
+		"censusID":   censusID.String(),
+		"censusRoot": censusRoot.String(),
+	})
 
 	// Check census size (of the published census)
 	size, err = api.CensusSize(censusRoot)
