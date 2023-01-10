@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -23,7 +24,7 @@ import (
 func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	accountPrivKey := flag.String("accountPrivKey", "0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B", "account private key (optional)")
+	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
 	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
 	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
@@ -51,7 +52,12 @@ func main() {
 	account := *accountPrivKey
 	if account == "" {
 		// Generate the organization account
-		account = util.RandomHex(32)
+		key := ethereum.NewSignKeys()
+		if err := key.AddHexKey(util.RandomHex(32)); err != nil {
+			log.Errorw(err, "cannot create key")
+		}
+
+		account = hex.EncodeToString(key.PrivateKey())
 		log.Infof("new account generated, private key is %s", account)
 	}
 
@@ -70,10 +76,7 @@ func main() {
 		if *useDevFaucet {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
-				apiclient.DefaultDevelopmentFaucetURL+api.MyAddress().Hex(),
-				apiclient.DefaultDevelopmentFaucetToken,
-			)
+			faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
 			if err != nil {
 				log.Errorw(err, "error setting up the faucet package")
 				return

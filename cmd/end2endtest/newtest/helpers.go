@@ -179,7 +179,7 @@ func calcAnonPubKey(account *ethereum.SignKeys) (types.HexBytes, error) {
 	privKey := babyjub.PrivateKey{}
 	_, err := hex.Decode(privKey[:], account.PrivateKey())
 	if err != nil {
-		return nil, fmt.Errorf("error generating babyjub key")
+		return nil, fmt.Errorf("error generating babyjub key: %w", err)
 	}
 
 	pubKey, err := poseidon.Hash([]*big.Int{
@@ -187,7 +187,7 @@ func calcAnonPubKey(account *ethereum.SignKeys) (types.HexBytes, error) {
 		privKey.Public().Y,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error hashing babyjub public key")
+		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
 	}
 
 	bLen := arbo.HashFunctionPoseidon.Len()
