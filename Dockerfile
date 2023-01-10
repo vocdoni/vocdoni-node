@@ -14,7 +14,7 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
 
-FROM --platform=linux/amd64 node:lts-bullseye-slim AS test
+FROM node:lts-bullseye-slim AS test
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
@@ -22,10 +22,16 @@ COPY --from=builder /src/vochaintest ./
 COPY ./dockerfiles/testsuite/js ./js
 RUN cd js && npm install
 
-FROM --platform=linux/amd64 debian:11.3-slim
+FROM debian:11.3-slim
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/node ./
 COPY --from=builder /src/voconed ./
+
+# Support for go-rapidsnark witness calculator (https://github.com/iden3/go-rapidsnark/tree/main/witness)
+COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
+# Support for go-rapidsnark prover (https://github.com/iden3/go-rapidsnark/tree/main/prover)
+RUN apt update && apt install -y build-essential libomp-dev
+
 ENTRYPOINT ["/app/node"]
