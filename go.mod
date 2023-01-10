@@ -68,6 +68,8 @@ require (
 	google.golang.org/protobuf v1.28.1
 )
 
+require github.com/iancoleman/strcase v0.2.0
+
 require (
 	github.com/iden3/go-rapidsnark/prover v0.0.9
 	github.com/iden3/go-rapidsnark/types v0.0.2
