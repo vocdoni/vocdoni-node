@@ -57,45 +57,56 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 type TenderLogger struct {
 	keyvals  []interface{}
 	Artifact string
-	Disabled bool
+	logLevel int // 0:debug 1:info 2:error 3:disabled
 }
 
 var _ tmlog.Logger = (*TenderLogger)(nil)
 
-// TODO(mvdan): use zap's WithCallerSkip so that we show the position
-// information corresponding to where tenderLogger was called, instead of just
-// the pointless positions here.
+func (l *TenderLogger) SetLogLevel(logLevel string) {
+	switch logLevel {
+	case "debug":
+		l.logLevel = 0
+	case "info":
+		l.logLevel = 1
+	case "error":
+		l.logLevel = 2
+	case "disabled", "none":
+		l.logLevel = 3
+	}
+}
 
 func (l *TenderLogger) Debug(msg string, keyvals ...interface{}) {
-	if !l.Disabled {
-		log.Debugw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	if l.logLevel == 0 {
+		log.Logger().Debug().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
 func (l *TenderLogger) Info(msg string, keyvals ...interface{}) {
-	if !l.Disabled {
-		log.Infow(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	if l.logLevel <= 1 {
+		log.Logger().Info().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
 func (l *TenderLogger) Error(msg string, keyvals ...interface{}) {
-	if !l.Disabled {
-		log.Warnw(fmt.Sprintf("[%s] %s", l.Artifact, msg), keyvals...)
+	if l.logLevel <= 2 {
+		log.Logger().Error().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
 func (l *TenderLogger) With(keyvals ...interface{}) tmlog.Logger {
 	// Make sure we copy the values, to avoid modifying the parent.
 	// TODO(mvdan): use zap's With method directly.
-	l2 := &TenderLogger{Artifact: l.Artifact, Disabled: l.Disabled}
+	l2 := &TenderLogger{Artifact: l.Artifact, logLevel: l.logLevel}
 	l2.keyvals = append(l2.keyvals, l.keyvals...)
 	l2.keyvals = append(l2.keyvals, keyvals...)
 	return l2
 }
 
 // NewTenderLogger creates a Tendermint compatible logger for specified artifact
-func NewTenderLogger(artifact string, disabled bool) *TenderLogger {
-	return &TenderLogger{Artifact: artifact, Disabled: disabled}
+func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
+	tl := &TenderLogger{Artifact: artifact}
+	tl.SetLogLevel(logLevel)
+	return tl
 }
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
@@ -210,10 +221,7 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	logger, err := tmlog.NewDefaultLogger("plain", tconfig.LogLevel, false)
-	if err != nil {
-		log.Errorf("failed to parse log level: %v", err)
-	}
+	logger := NewTenderLogger("tendermint", tconfig.LogLevel)
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(

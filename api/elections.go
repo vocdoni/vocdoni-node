@@ -329,7 +329,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		Results:               results,
 	}
 
-	electionResults.ABIEncoded, err = a.encodeEVMResultsArgs(
+	electionResults.ABIEncoded, err = encodeEVMResultsArgs(
 		common.BytesToHash(electionID),
 		common.BytesToAddress(electionResults.OrganizationID),
 		common.BytesToHash(electionResults.CensusRoot),

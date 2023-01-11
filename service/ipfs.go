@@ -24,12 +24,8 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 		for {
 			time.Sleep(time.Second * 120)
 			tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			stats, err := storage.Stats(tctx)
+			log.Monitor("ipfs storage", storage.Stats(tctx))
 			cancel()
-			if err != nil {
-				log.Warnf("IPFS node returned an error: %s", err)
-			}
-			log.Infof("[ipfs info] %s", stats)
 		}
 	}()
 

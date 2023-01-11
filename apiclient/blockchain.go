@@ -44,7 +44,7 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 		return nil, err
 	}
 	if code != 200 {
-		return nil, fmt.Errorf("%d:could not get raw transaction: %s", code, resp)
+		return nil, fmt.Errorf("%d: could not get raw transaction: %s", code, resp)
 	}
 	tx := &models.Tx{}
 	return tx, protojson.Unmarshal(resp, tx)

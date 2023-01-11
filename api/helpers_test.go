@@ -54,14 +54,13 @@ func TestAPIHelpers_encodeEVMResultsArgs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			a := &API{}
-			got, err := a.encodeEVMResultsArgs(tt.args.electionId, tt.args.organizationId, tt.args.censusRoot, tt.args.sourceContractAddress, tt.args.results)
+			got, err := encodeEVMResultsArgs(tt.args.electionId, tt.args.organizationId, tt.args.censusRoot, tt.args.sourceContractAddress, tt.args.results)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("API.encodeEVMResultsArgs() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("encodeEVMResultsArgs() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.want {
-				t.Errorf("API.encodeEVMResultsArgs() = %v, want %v", got, tt.want)
+				t.Errorf("encodeEVMResultsArgs() = %v, want %v", got, tt.want)
 			}
 		})
 	}

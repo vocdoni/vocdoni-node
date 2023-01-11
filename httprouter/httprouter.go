@@ -17,7 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	reuse "github.com/libp2p/go-reuseport"
-	"go.uber.org/zap"
+	"github.com/rs/zerolog"
 	"go.vocdoni.io/dvote/log"
 	"golang.org/x/crypto/acme"
 	"golang.org/x/crypto/acme/autocert"
@@ -313,7 +313,7 @@ func somaxconn() int {
 }
 
 type stdLogger struct {
-	log *zap.SugaredLogger
+	log *zerolog.Logger
 }
 
-func (l stdLogger) Print(v ...interface{}) { l.log.Debug(v...) }
+func (l stdLogger) Print(v ...interface{}) { l.log.Debug().Msg(fmt.Sprint(v...)) }

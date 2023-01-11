@@ -1,12 +1,13 @@
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
-	"os"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/api"
@@ -16,6 +17,8 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
+
+const pollInterval = 4 * time.Second
 
 // ChainInfo returns some information about the chain, such as block height.
 func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
@@ -76,64 +79,94 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	return tx.Hash, tx.Response, nil
 }
 
-// TODO: add contexts to all the Wait* methods
-
-// WaitUntilHeight waits until the given height is reached.
-func (c *HTTPclient) WaitUntilHeight(height uint32) {
+// WaitUntilHeight waits until the given height is reached and returns nil.
+//
+// If ctx.Done() is reached, returns ctx.Err() instead.
+func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 	for {
 		info, err := c.ChainInfo()
 		if err != nil {
 			log.Warn(err)
-		} else {
-			if *info.Height > height {
-				break
-			}
 		}
-		time.Sleep(time.Second * 4)
+		if *info.Height >= height {
+			return nil
+		}
+		select {
+		case <-time.After(pollInterval):
+			continue
+		case <-ctx.Done():
+			return ctx.Err()
+		}
 	}
+}
+
+func (c *HTTPclient) WaitUntilElectionCreated(ctx context.Context,
+	electionID types.HexBytes) (*api.Election, error) {
+	return c.WaitUntilElectionStatus(ctx, electionID, "READY")
 }
 
 // WaitUntilElectionStarts waits until the given election starts.
-func (c *HTTPclient) WaitUntilElectionStarts(electionID types.HexBytes) error {
-	election, err := c.Election(electionID)
+func (c *HTTPclient) WaitUntilElectionStarts(ctx context.Context,
+	electionID types.HexBytes) (*api.Election, error) {
+	election, err := c.WaitUntilElectionCreated(ctx, electionID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	startHeight, err := c.DateToHeight(election.StartDate)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	c.WaitUntilHeight(startHeight + 1) // add a block to be sure
-	return nil
+	// api.DateToHeight() is not exact, wait for 1 additional block
+	return election, c.WaitUntilHeight(ctx, startHeight+1)
 }
 
 // WaitUntilElectionStatus waits until the given election has the given status.
-// If the status is not reached after 10 minutes, it returns os.ErrDeadlineExceeded.
-func (c *HTTPclient) WaitUntilElectionStatus(electionID types.HexBytes, status string) error {
-	for startTime := time.Now(); time.Since(startTime) < time.Second*300; {
+func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
+	electionID types.HexBytes, status string) (*api.Election, error) {
+	log.Infof("waiting for election %s to reach status %s", electionID.String(), status)
+	for {
 		election, err := c.Election(electionID)
 		if err != nil {
-			log.Fatal(err)
+			if !strings.Contains(err.Error(), "No data found for this key") {
+				return nil, err
+			}
 		}
-		if election.Status == status {
-			return nil
+		if election != nil && election.Status == status {
+			return election, nil
 		}
-		time.Sleep(time.Second * 5)
+		select {
+		case <-time.After(pollInterval):
+			continue
+		case <-ctx.Done():
+			return nil, fmt.Errorf("election %v never reached status %s: %w", electionID, status, ctx.Err())
+		}
 	}
-	return os.ErrDeadlineExceeded
 }
 
-// EnsureTxIsMined waits until the given transaction is mined. If the transaction is not mined
-// after 3 minutes, it returns os.ErrDeadlineExceeded.
-func (c *HTTPclient) EnsureTxIsMined(txHash types.HexBytes) error {
-	for startTime := time.Now(); time.Since(startTime) < 180*time.Second; {
-		_, err := c.TransactionReference(txHash)
+// WaitUntilTxIsMined waits until the given transaction is mined (included in a block)
+func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
+	txHash types.HexBytes) (*api.TransactionReference, error) {
+	for {
+		tr, err := c.TransactionReference(txHash)
 		if err == nil {
-			return nil
+			return tr, nil
 		}
-		time.Sleep(4 * time.Second)
+		select {
+		case <-time.After(pollInterval):
+			continue
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
 	}
-	return os.ErrDeadlineExceeded
+}
+
+// GetFaucetPackageFromDefaultDevService returns a faucet package.
+// Needs just the destination wallet address, the URL and bearer token are hardcoded
+func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
+	return GetFaucetPackageFromRemoteService(
+		DefaultDevelopmentFaucetURL+account,
+		DefaultDevelopmentFaucetToken,
+	)
 }
 
 // GetFaucetPackageFromRemoteService returns a faucet package from a remote HTTP faucet service.

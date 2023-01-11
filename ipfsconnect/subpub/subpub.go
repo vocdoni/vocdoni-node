@@ -201,6 +201,13 @@ func (ps *SubPub) String() string {
 		len(ps.Gossip.topic.ListPeers()))
 }
 
+func (ps *SubPub) Stats() map[string]interface{} {
+	return map[string]interface{}{
+		"peers":   len(ps.Host.Network().Peers()),
+		"known":   len(ps.Host.Peerstore().PeersWithAddrs()),
+		"cluster": len(ps.Gossip.topic.ListPeers())}
+}
+
 func (s *SubPub) Address() string {
 	return s.NodeID
 }
@@ -216,6 +223,6 @@ func (s *SubPub) SendUnicast(address string, msg Message) error {
 func (ps *SubPub) printStats() {
 	for {
 		time.Sleep(120 * time.Second)
-		log.Infof("[subPub info] %s", ps)
+		log.Monitor("subpub network", ps.Stats())
 	}
 }

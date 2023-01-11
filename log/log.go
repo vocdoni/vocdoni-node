@@ -7,14 +7,21 @@ import (
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+	"github.com/rs/zerolog"
+	zlog "github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
+const (
+	LogLevelDebug = "debug"
+	LogLevelInfo  = "info"
+	LogLevelWarn  = "warn"
+	LogLevelError = "error"
+)
+
 var (
-	log      *zap.SugaredLogger
+	log      zerolog.Logger
 	errorLog *os.File
 	// panicOnInvalidChars is set based on env LOG_PANIC_ON_INVALIDCHARS (parsed as bool)
 	panicOnInvalidChars bool
@@ -32,20 +39,42 @@ func init() {
 	Init(level, "stderr")
 }
 
-func Logger() *zap.SugaredLogger { return log }
+// Logger provides access to the global logger (zerolog).
+func Logger() *zerolog.Logger { return &log }
 
-// Init initializes the logger. Output can be either "stdout/stderr/filePath"
+// Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
+// Log level can be "debug/info/warn/error".
 func Init(logLevel string, output string) {
-	cfg := newConfig(logLevel, output)
-
-	logger, err := cfg.Build()
-	if err != nil {
-		panic(err)
+	// Assign the global logger to the local logger
+	switch output {
+	case "stdout":
+		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
+	case "stderr":
+		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
+	default:
+		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			panic(fmt.Sprintf("invalid log output: %v", err))
+		}
+		log = zlog.Output(errorLog).With().Caller().Logger()
 	}
-	defer logger.Sync()
-	withOptions := logger.WithOptions(zap.AddCallerSkip(1))
-	log = withOptions.Sugar()
-	log.Infof("logger construction succeeded at level %s with output %s", logLevel, output)
+	// Required to get the correct caller information
+	zerolog.CallerSkipFrameCount = 3
+
+	switch logLevel {
+	case LogLevelDebug:
+		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	case LogLevelInfo:
+		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	case LogLevelWarn:
+		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+	case LogLevelError:
+		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+	default:
+		panic("invalid log level")
+	}
+
+	log.Info().Msgf("logger construction succeeded at level %s with output %s", logLevel, output)
 
 	if s := os.Getenv("LOG_PANIC_ON_INVALIDCHARS"); s != "" {
 		// ignore ParseBool errors, if anything fails panicOnInvalidChars will stay false which is good
@@ -56,58 +85,10 @@ func Init(logLevel string, output string) {
 
 // SetFileErrorLog if set writes the Warning and Error messages to a file.
 func SetFileErrorLog(path string) error {
-	log.Infof("using file %s for logging warning and errors", path)
+	Logger().Info().Msgf("using file %s for logging warning and errors", path)
 	var err error
 	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 	return err
-}
-
-func levelFromString(logLevel string) zapcore.Level {
-	switch logLevel {
-	case "debug":
-		return zap.DebugLevel
-	case "info":
-		return zap.InfoLevel
-	case "warn":
-		return zap.WarnLevel
-	case "error":
-		return zap.ErrorLevel
-	case "fatal":
-		return zap.FatalLevel
-	default:
-		return zap.InfoLevel
-	}
-}
-
-func newConfig(logLevel, output string) zap.Config {
-	encoderCfg := zapcore.EncoderConfig{
-		// Keys can be anything except the empty string.
-		TimeKey:  "ts",
-		LevelKey: "level",
-		//	NameKey:        "logger",
-		CallerKey:     "caller",
-		MessageKey:    "msg",
-		StacktraceKey: "stacktrace",
-		LineEnding:    zapcore.DefaultLineEnding,
-		EncodeLevel:   zapcore.CapitalColorLevelEncoder,
-		EncodeTime: func(ts time.Time, encoder zapcore.PrimitiveArrayEncoder) {
-			encoder.AppendString(ts.Local().Format(time.RFC3339))
-		},
-		EncodeDuration: zapcore.SecondsDurationEncoder,
-		EncodeCaller:   zapcore.ShortCallerEncoder,
-	}
-	cfg := zap.Config{
-		Level:    zap.NewAtomicLevelAt(levelFromString(logLevel)),
-		Encoding: "console",
-		Sampling: &zap.SamplingConfig{
-			Initial:    100,
-			Thereafter: 100,
-		},
-		EncoderConfig:    encoderCfg,
-		OutputPaths:      []string{output},
-		ErrorOutputPaths: []string{output},
-	}
-	return cfg
 }
 
 func writeErrorToFile(msg string) {
@@ -139,33 +120,40 @@ func checkInvalidChars(args ...interface{}) {
 
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
-	log.Debug(args...)
+	log.Debug().Msg(fmt.Sprint(args...))
 	checkInvalidChars(args...)
 }
 
 // Info sends an info level log message
 func Info(args ...interface{}) {
-	log.Info(args...)
+	log.Info().Msg(fmt.Sprint(args...))
 	checkInvalidChars(args...)
+}
+
+// Monitor is a wrapper around Info that allows passing a map of key-value pairs.
+// This is useful for structured logging and monitoring.
+// The caller information is skipped.
+func Monitor(msg string, args map[string]interface{}) {
+	log.Info().CallerSkipFrame(100).Fields(args).Msg(msg)
 }
 
 // Warn sends a warn level log message
 func Warn(args ...interface{}) {
-	log.Warn(args...)
+	log.Warn().Msg(fmt.Sprint(args...))
 	writeErrorToFile(fmt.Sprint(args...))
 	checkInvalidChars(args...)
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
-	log.Error(args...)
+	log.Error().Msg(fmt.Sprint(args...))
 	writeErrorToFile(fmt.Sprint(args...))
 	checkInvalidChars(args...)
 }
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
-	log.Fatal(args...)
+	log.Fatal().Msg(fmt.Sprint(args...))
 	checkInvalidChars(args...)
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
@@ -184,57 +172,55 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
-	log.Debugf(template, args...)
+	Logger().Debug().Msgf(template, args...)
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Infof sends a formatted info level log message
 func Infof(template string, args ...interface{}) {
-	log.Infof(template, args...)
+	Logger().Info().Msgf(template, args...)
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
-	log.Warnf(template, args...)
+	Logger().Warn().Msgf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
-	log.Errorf(template, args...)
+	Logger().Error().Msgf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
-	log.Fatalf(template, args...)
+	Logger().Fatal().Msgf(template, args...)
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
-// Debugw sends a key-value formatted debug level log message
-func Debugw(msg string, keysAndValues ...interface{}) {
-	log.Debugw(msg, keysAndValues...)
+// Debugw sends a debug level log message with key-value pairs.
+func Debugw(msg string, keyvalues map[string]interface{}) {
+	Logger().Debug().Fields(keyvalues).Msg(msg)
+	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
-// Infow sends a key-value formatted info level log message
-func Infow(msg string, keysAndValues ...interface{}) {
-	log.Infow(msg, keysAndValues...)
+// Infow sends an info level log message with key-value pairs.
+func Infow(msg string, keyvalues map[string]interface{}) {
+	Logger().Info().Fields(keyvalues).Msg(msg)
+	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
-// Warnw sends a key-value formatted warn level log message
-func Warnw(msg string, keysAndValues ...interface{}) {
-	log.Warnw(msg, keysAndValues...)
+// Warnw sends a warning level log message with key-value pairs.
+func Warnw(msg string, keyvalues map[string]interface{}) {
+	Logger().Warn().Fields(keyvalues).Msg(msg)
+	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
-// Errorw sends a key-value formatted error level log message
-func Errorw(msg string, keysAndValues ...interface{}) {
-	log.Errorw(msg, keysAndValues...)
-}
-
-// Fatalw sends a key-value formatted fatal level log message
-func Fatalw(msg string, keysAndValues ...interface{}) {
-	log.Fatalw(msg, keysAndValues...)
+// Errorw sends an error level log message with a special format for errors.
+func Errorw(err error, msg string) {
+	Logger().Error().Err(err).Msg(msg)
 }

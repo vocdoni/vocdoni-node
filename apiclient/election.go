@@ -30,7 +30,8 @@ func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) 
 	return election, nil
 }
 
-// NewElectionRaw creates a new election given the protobuf Process message.
+// NewElectionRaw creates a new election given the protobuf Process message
+// and returns the ElectionID
 func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, error) {
 	// get the own account details
 	acc, err := c.Account("")
@@ -83,9 +84,9 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	return electionCreate.ElectionID, nil
 }
 
-// NewElection creates a new election given the election details.
+// NewElection creates a new election given the election details
+// and returns the ElectionID
 func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.HexBytes, error) {
-	var err error
 	if c.account == nil {
 		return nil, fmt.Errorf("no account configured")
 	}

@@ -129,8 +129,12 @@ func (vs *VocdoniService) Vochain() error {
 		for !vs.Stats.Sync() {
 			time.Sleep(time.Second * 1)
 			if i%20 == 0 {
-				log.Infof("[vochain info] fastsync running at height %d (%d blocks/s), peers %d",
-					vs.Stats.Height(), (vs.Stats.Height()-lastHeight)/20, vs.Stats.NPeers())
+				log.Monitor("vochain fastsync", map[string]interface{}{
+					"height":   vs.Stats.Height(),
+					"blocks/s": (vs.Stats.Height() - lastHeight) / 20,
+					"peers":    vs.Stats.NPeers(),
+				})
+
 				lastHeight = vs.Stats.Height()
 			}
 			i++
@@ -175,10 +179,18 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		m = vi.MempoolSize()
 		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
-		log.Infof("[vochain info] height:%d mempool:%d peers:%d "+
-			"processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
-			h, m, vi.NPeers(), p, v, vxm, vc, b.String(),
-		)
+		log.Monitor("vochain status",
+			map[string]interface{}{
+				"height":    h,
+				"mempool":   m,
+				"peers":     vi.NPeers(),
+				"elections": p,
+				"votes":     v,
+				"voteCache": vc,
+				"votes/min": vxm,
+				"blockTime": b.String(),
+			})
+
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
 }
@@ -194,8 +206,10 @@ func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
 			log.Warn(err)
 			continue
 		}
+		peers := make(map[string]interface{})
 		for _, peer := range ni.Peers {
-			log.Debugf("vochain peers: %s", peer.URL)
+			peers[peer.ID.AddressString("")] = peer.URL
 		}
+		log.Monitor("vochain peers", peers)
 	}
 }

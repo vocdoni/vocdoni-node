@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"net/url"
 	"os"
 	"strings"
@@ -23,19 +25,107 @@ import (
 	"go.vocdoni.io/dvote/util"
 )
 
+type operation struct {
+	name, description, example string
+}
+
+var ops = []operation{
+	{
+		name:        "vtest",
+		description: "Performs a complete test, from creating a census to voting and validating votes",
+		example: os.Args[0] + " --operation=vtest --electionSize=1000 " +
+			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
+	},
+	{
+		name:        "tokentransactions",
+		description: "Tests all token related transactions",
+		example: os.Args[0] + " --operation=tokentransactions " +
+			"--host http://127.0.0.1:9090/v2",
+	},
+}
+
+func opNames() (names []string) {
+	for _, op := range ops {
+		names = append(names, op.name)
+	}
+	return names
+}
+
 func main() {
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
+	operation := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opNames()))
+	accountPrivKeys := flag.StringSliceP("accountPrivKey", "k", []string{}, "account private key (optional)")
+	treasurerPrivKey := flag.String("treasurerPrivKey", "", "treasurer private key")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
 	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
-	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
-	timeout := flag.Int("timeout", 5, "timeout in minutes")
+	faucet := flag.String("faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	faucetAuthToken := flag.String("faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
+	timeout := flag.Duration("timeout", 5*time.Minute, "timeout duration")
+
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nSome examples of different operation modes:\n")
+		for _, op := range ops {
+			fmt.Fprintf(os.Stderr, "### %s\n", op.name)
+			fmt.Fprintf(os.Stderr, "\t"+op.description+"\n")
+			fmt.Fprintf(os.Stderr, op.example+"\n")
+			fmt.Fprintf(os.Stderr, "\n")
+		}
+	}
+
+	flag.CommandLine.SortFlags = false
 	flag.Parse()
+
 	log.Init(*logLevel, "stdout")
 
+	rand.Seed(time.Now().UnixNano())
+
+	if len(*accountPrivKeys) == 0 {
+		accountPrivKeys = &[]string{util.RandomHex(32)}
+		log.Infof("new account generated, private key is %s", *accountPrivKeys)
+	}
+
+	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))
+	for i, key := range *accountPrivKeys {
+		ak, err := privKeyToSigner(key)
+		if err != nil {
+			log.Fatal(err)
+		}
+		accountKeys[i] = ak
+	}
+
+	switch *operation {
+	case "vtest":
+		accountPrivateKey := hex.EncodeToString(accountKeys[0].PrivateKey())
+		mkTreeVoteTest(*host,
+			accountPrivateKey,
+			*nvotes,
+			*parallelCount,
+			*faucet,
+			*faucetAuthToken,
+			*timeout)
+	case "tokentransactions":
+		accountPrivateKey := hex.EncodeToString(accountKeys[0].PrivateKey())
+		testTokenTransactions(*host,
+			*treasurerPrivKey,
+			accountPrivateKey)
+	default:
+		log.Fatal("no valid operation mode specified")
+	}
+
+}
+
+func mkTreeVoteTest(host string,
+	accountPrivateKey string,
+	nvotes, parallelCount int,
+	faucetURL string,
+	faucetAuthToken string,
+	timeout time.Duration,
+) {
 	// Connect to the API host
-	hostURL, err := url.Parse(*host)
+	hostURL, err := url.Parse(host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -47,16 +137,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	// Check if account is defined
-	account := *accountPrivKey
-	if account == "" {
-		// Generate the organization account
-		account = util.RandomHex(32)
-		log.Infof("new account generated, private key is %s", account)
-	}
-
 	// Set the account in the API client, so we can sign transactions
-	if err := api.SetAccount(account); err != nil {
+	if err := api.SetAccount(accountPrivateKey); err != nil {
 		log.Fatal(err)
 	}
 
@@ -65,13 +147,15 @@ func main() {
 	acc, err := api.Account("")
 	if err != nil {
 		var faucetPkg *models.FaucetPackage
-		if *useDevFaucet {
+		if faucetURL != "" {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
-				apiclient.DefaultDevelopmentFaucetURL+api.MyAddress().Hex(),
-				apiclient.DefaultDevelopmentFaucetToken,
-			)
+			if faucetURL == "dev" {
+				faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
+			} else {
+				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(faucetURL+api.MyAddress().Hex(), faucetAuthToken)
+			}
+
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -87,12 +171,17 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		ensureTxIsMined(api, hash)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
+			log.Fatalf("gave up waiting for tx %x to be mined: %s", hash, err)
+		}
+
 		acc, err = api.Account("")
 		if err != nil {
 			log.Fatal(err)
 		}
-		if *useDevFaucet && acc.Balance == 0 {
+		if faucetURL != "" && acc.Balance == 0 {
 			log.Fatal("account balance is 0")
 		}
 	}
@@ -107,10 +196,7 @@ func main() {
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate 10 participant accounts
-	voterAccounts, err := generateAccounts(*nvotes)
-	if err != nil {
-		log.Fatal(err)
-	}
+	voterAccounts := util.CreateEthRandomKeysBatch(nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
@@ -124,7 +210,8 @@ func main() {
 			if err := api.CensusAddParticipants(censusID, participants); err != nil {
 				log.Fatal(err)
 			}
-			log.Infof("added %d participants to census %s", len(participants.Participants), censusID.String())
+			log.Infof("added %d participants to census %s",
+				len(participants.Participants), censusID.String())
 			participants = &vapi.CensusParticipants{}
 		}
 	}
@@ -134,8 +221,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(*nvotes) {
-		log.Fatalf("census size is %d, expected %d", size, *nvotes)
+	if size != uint64(nvotes) {
+		log.Fatalf("census size is %d, expected %d", size, nvotes)
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
 
@@ -151,8 +238,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(*nvotes) {
-		log.Fatalf("published census size is %d, expected %d", size, *nvotes)
+	if size != uint64(nvotes) {
+		log.Fatalf("published census size is %d, expected %d", size, nvotes)
 	}
 
 	// Generate the voting proofs (parallelized)
@@ -160,7 +247,7 @@ func main() {
 		proof   *apiclient.CensusProof
 		address string
 	}
-	proofs := make(map[string]*apiclient.CensusProof, *nvotes)
+	proofs := make(map[string]*apiclient.CensusProof, nvotes)
 	proofCh := make(chan *voterProof)
 	stopProofs := make(chan bool)
 	go func() {
@@ -190,7 +277,7 @@ func main() {
 		}
 	}
 
-	pcount := *nvotes / *parallelCount
+	pcount := nvotes / parallelCount
 	var wg sync.WaitGroup
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
@@ -251,13 +338,17 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	election := ensureElectionCreated(api, electionID)
-	log.Infof("created new election with id %s", electionID.String())
-	log.Debugf("election details: %+v", *election)
+	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
 
 	// Wait for the election to start
-	waitUntilElectionStarts(api, electionID)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	election, err := api.WaitUntilElectionStarts(ctx, electionID)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Debugf("election details: %+v", *election)
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
@@ -306,7 +397,7 @@ func main() {
 		time.Sleep(time.Second * 2)
 	}
 
-	pcount = *nvotes / *parallelCount
+	pcount = nvotes / parallelCount
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
 		if end > len(voterAccounts) {
@@ -317,8 +408,8 @@ func main() {
 	}
 
 	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s. At %d votes/second",
-		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
+	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
+		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
@@ -327,21 +418,21 @@ func main() {
 		if err != nil {
 			log.Warn(err)
 		}
-		if count == uint32(*nvotes) {
+		if count == uint32(nvotes) {
 			break
 		}
 		time.Sleep(time.Second * 5)
-		log.Infof("verified %d/%d votes", count, *nvotes)
-		if time.Since(startTime) > time.Duration(*timeout)*time.Minute {
+		log.Infof("verified %d/%d votes", count, nvotes)
+		if time.Since(startTime) > timeout {
 			log.Fatalf("timeout waiting for votes to be registered")
 		}
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
+		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(account); err != nil {
+	if err := api.SetAccount(accountPrivateKey); err != nil {
 		log.Fatal(err)
 	}
 
@@ -353,7 +444,12 @@ func main() {
 	}
 
 	// Check the election status is actually ENDED
-	ensureTxIsMined(api, hash)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
+		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
+	}
+
 	election, err = api.Election(electionID)
 	if err != nil {
 		log.Fatal(err)
@@ -364,13 +460,23 @@ func main() {
 	log.Infof("election %s status is ENDED", electionID.String())
 
 	// Wait for the election to be in RESULTS state
-	log.Infof("waiting for election to be in RESULTS state...")
-	waitUntilElectionStatus(api, electionID, "RESULTS")
-	log.Infof("election %s status is RESULTS", electionID.String())
-
-	election, err = api.Election(electionID)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	defer cancel()
+	election, err = api.WaitUntilElectionStatus(ctx, electionID, "RESULTS")
 	if err != nil {
 		log.Fatal(err)
 	}
+	log.Infof("election %s status is RESULTS", electionID.String())
 	log.Infof("election results: %v", election.Results)
+}
+
+func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
+	var skey *ethereum.SignKeys
+	if len(key) > 0 {
+		skey = ethereum.NewSignKeys()
+		if err := skey.AddHexKey(key); err != nil {
+			return nil, fmt.Errorf("cannot create key %s with err %s", key, err)
+		}
+	}
+	return skey, nil
 }
