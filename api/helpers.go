@@ -61,7 +61,8 @@ func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
 // encodeEVMResultsArgs encodes the arguments for the EVM mimicking the Solidity built-in abi.encode(args...)
 // in this case we encode the organizationId the censusRoot and the results that will be translated in the EVM
 // contract to the corresponding struct{address, bytes32, uint256[][]}
-func (a *API) encodeEVMResultsArgs(organizationId common.Address,
+func (a *API) encodeEVMResultsArgs(electionId common.Hash,
+	organizationId common.Address,
 	censusRoot common.Hash,
 	sourceContractAddress common.Address,
 	results [][]*big.Int,
@@ -70,12 +71,13 @@ func (a *API) encodeEVMResultsArgs(organizationId common.Address,
 	bytes32, _ := abi.NewType("bytes32", "", nil)
 	uint256SliceNested, _ := abi.NewType("uint256[][]", "", nil)
 	args := abi.Arguments{
+		{Type: bytes32},
 		{Type: address},
 		{Type: bytes32},
 		{Type: address},
 		{Type: uint256SliceNested},
 	}
-	abiEncodedResultsBytes, err := args.Pack(organizationId, censusRoot, sourceContractAddress, results)
+	abiEncodedResultsBytes, err := args.Pack(electionId, organizationId, censusRoot, sourceContractAddress, results)
 	if err != nil {
 		return "", fmt.Errorf("error encoding abi: %w", err)
 	}

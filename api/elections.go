@@ -323,12 +323,14 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	}
 	electionResults := &ElectionResults{
 		CensusRoot:            process.CensusRoot,
+		ElectionID:            electionID,
 		SourceContractAddress: process.SourceNetworkContractAddr,
 		OrganizationID:        process.EntityId,
 		Results:               results,
 	}
 
 	electionResults.ABIEncoded, err = a.encodeEVMResultsArgs(
+		common.BytesToHash(electionID),
 		common.BytesToAddress(electionResults.OrganizationID),
 		common.BytesToHash(electionResults.CensusRoot),
 		common.BytesToAddress(electionResults.SourceContractAddress),

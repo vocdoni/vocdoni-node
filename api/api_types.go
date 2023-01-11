@@ -39,6 +39,8 @@ type ElectionResults struct {
 	ABIEncoded string `json:"abiEncoded"`
 	// CensusRoot is the root of the census tree
 	CensusRoot types.HexBytes `json:"censusRoot"`
+	// ElectionID is the ID of the election
+	ElectionID types.HexBytes `json:"electionId"`
 	// OrganizationID is the ID of the organization that created the election
 	OrganizationID types.HexBytes `json:"organizationId"`
 	// Results is the list of votes
