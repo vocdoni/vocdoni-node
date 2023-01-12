@@ -61,53 +61,39 @@ func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
 }
 
 // convertKeysToCamel converts all keys in a JSON object to camelCase.
-func convertKeysToCamel(j json.RawMessage) json.RawMessage {
-	m := make(map[string]json.RawMessage)
-	var a []json.RawMessage
-	// check if its a JSON object of map type '{}'
-	if j[0] == '{' {
-		if err := json.Unmarshal([]byte(j), &m); err != nil {
-			// not a JSON object
-			return j
-		}
-		// check if its a JSON object of array type '[]'
-	} else if j[0] == '[' {
-		if err := json.Unmarshal([]byte(j), &a); err != nil {
-			// not a JSON object
-			return j
-		}
-	} else {
-		// not a JSON object, but an element
-		return j
+// Note that the keys are also sorted.
+func convertKeysToCamel(data []byte) []byte {
+	var m map[string]any
+	if err := json.Unmarshal(data, &m); err != nil {
+		return data // not valid JSON
 	}
-
-	var b []byte
-	var err error
-	if len(a) == 0 {
-		// if its a map, convert all keys recursively
-		for k, v := range m {
-			fixed := strcase.ToLowerCamel(k)
-			delete(m, k)
-			m[fixed] = convertKeysToCamel(v)
-		}
-
-		b, err = json.Marshal(m)
-		if err != nil {
-			return j
-		}
-	} else {
-		// if its an array, convert all elements recursively
-		for i, v := range a {
-			a[i] = convertKeysToCamel(v)
-		}
-
-		b, err = json.Marshal(a)
-		if err != nil {
-			return j
-		}
-
+	m2 := convertKeysToCamelInner(m)
+	data2, err := json.Marshal(m2)
+	if err != nil {
+		panic(err) // should never happen
 	}
-	return json.RawMessage(b)
+	return data2
+}
+
+func convertKeysToCamelInner(val any) any {
+	switch val := val.(type) {
+	case map[string]any: // convert the keys and recurse
+		for k, v := range val {
+			k2 := strcase.ToLowerCamel(k)
+			if k2 != k {
+				if _, ok := val[k2]; ok {
+					panic(fmt.Sprintf("duplicate camel case key: %q", k2))
+				}
+				delete(val, k)
+			}
+			val[k2] = convertKeysToCamelInner(v)
+		}
+	case []any: // recurse
+		for i, v := range val {
+			val[i] = convertKeysToCamelInner(v)
+		}
+	}
+	return val
 }
 
 // encodeEVMResultsArgs encodes the arguments for the EVM mimicking the Solidity built-in abi.encode(args...)
