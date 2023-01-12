@@ -14,7 +14,7 @@ var (
 	ErrInvalidURILength     = fmt.Errorf("invalid URI length")
 
 /*
-	ErrInvalidAddress       = fmt.Errorf("invalid address")
-	ErrNilTx                = fmt.Errorf("nil transaction")
+ErrInvalidAddress       = fmt.Errorf("invalid address")
+ErrNilTx                = fmt.Errorf("nil transaction")
 */
 )
