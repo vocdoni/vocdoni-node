@@ -98,11 +98,10 @@ var snakeCaseJSON = `
 	}
 }`[1:]
 
-// TODO: txs is turned from an array into an object!
 var camelCaseJSON = `
 {
 	"data": {
-		"txs": {}
+		"txs": []
 	},
 	"header": {
 		"version": {
