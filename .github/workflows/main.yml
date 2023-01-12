@@ -28,7 +28,7 @@ jobs:
         run: go mod tidy
       - name: Run gofmt
         # Run gofmt first, as it's quick and issues are common.
-        run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+        run: diff -u <(echo -n) <(gofmt -s -d .)
       - name: Run go vet
         run: go vet ./...
       - name: Download staticcheck
