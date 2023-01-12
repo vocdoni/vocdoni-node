@@ -1,10 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/go-cmp/cmp"
 )
 
 func TestAPIHelpers_encodeEVMResultsArgs(t *testing.T) {
@@ -63,5 +66,87 @@ func TestAPIHelpers_encodeEVMResultsArgs(t *testing.T) {
 				t.Errorf("encodeEVMResultsArgs() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+var snakeCaseJSON = `
+{
+	"header": {
+		"version": {
+			"block": 11,
+			"app": 0
+		}
+	},
+	"data": {
+		"txs": []
+	},
+	"last_commit": {
+		"signatures": [
+			{
+				"block_id_flag": 2,
+				"validator_address": "2DECD25EBDD6E3FAB2F06AC0EE391C16C292DBAD",
+				"timestamp": "2022-12-14T16:40:47.963888306Z",
+				"signature": "ayj6CnGcD1zImfCiSIHNXaAujx4uxZdQ/NgWU/yxQJz/GJAMGIyD3C704cGtx3e2zJaXYDtZvwj5C+/Q/v2FBw=="
+			},
+			{
+				"block_id_flag": 2,
+				"validator_address": "3C6FF3D424901733818B954AA3AB3BC2E3695332",
+				"timestamp": "2022-12-14T16:40:47.972896402Z",
+				"signature": "QVZjYpjyVNjbLWaP552MyU3pRZ4Lw8FF98tsGKO7DAUN/QanEf6QJwK7maCesvgfeISG34tYWDKL/p+fUjYFAQ=="
+			}
+		]
+	}
+}`[1:]
+
+// TODO: txs is turned from an array into an object!
+var camelCaseJSON = `
+{
+	"data": {
+		"txs": {}
+	},
+	"header": {
+		"version": {
+			"app": 0,
+			"block": 11
+		}
+	},
+	"lastCommit": {
+		"signatures": [
+			{
+				"blockIdFlag": 2,
+				"signature": "ayj6CnGcD1zImfCiSIHNXaAujx4uxZdQ/NgWU/yxQJz/GJAMGIyD3C704cGtx3e2zJaXYDtZvwj5C+/Q/v2FBw==",
+				"timestamp": "2022-12-14T16:40:47.963888306Z",
+				"validatorAddress": "2DECD25EBDD6E3FAB2F06AC0EE391C16C292DBAD"
+			},
+			{
+				"blockIdFlag": 2,
+				"signature": "QVZjYpjyVNjbLWaP552MyU3pRZ4Lw8FF98tsGKO7DAUN/QanEf6QJwK7maCesvgfeISG34tYWDKL/p+fUjYFAQ==",
+				"timestamp": "2022-12-14T16:40:47.972896402Z",
+				"validatorAddress": "3C6FF3D424901733818B954AA3AB3BC2E3695332"
+			}
+		]
+	}
+}`[1:]
+
+func TestConvertKeysToCamel(t *testing.T) {
+	want := camelCaseJSON
+	indent := func(data []byte) string {
+		var buf bytes.Buffer
+		if err := json.Indent(&buf, data, "", "\t"); err != nil {
+			t.Fatal(err)
+		}
+		return buf.String()
+	}
+
+	// From snake case to camel case.
+	got := indent(convertKeysToCamel([]byte(snakeCaseJSON)))
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatal(diff)
+	}
+
+	// Camel case should come out the same.
+	got = indent(convertKeysToCamel([]byte(camelCaseJSON)))
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatal(diff)
 	}
 }
