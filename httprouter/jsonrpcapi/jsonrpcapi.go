@@ -16,16 +16,16 @@ import (
 //
 // The basic JSON structure for the RPC is predefined and follows the format:
 //
-// {
-//   "request": {
-//     "id":"randomID",
-//     "method":"methodName",
-//     "timestamp":"currentTS",
-//     <customFields...>
-//     },
-//   "signature":"0x...",
-//   "id":"sameID"
-// }
+//	{
+//	  "request": {
+//	    "id":"randomID",
+//	    "method":"methodName",
+//	    "timestamp":"currentTS",
+//	    <customFields...>
+//	    },
+//	  "signature":"0x...",
+//	  "id":"sameID"
+//	}
 //
 // The handler manages automatically signatures, ids and timestamps.
 // The developer using SignedJRPC only needs to take care of the information within the request field (method and customFields).

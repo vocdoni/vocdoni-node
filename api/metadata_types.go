@@ -12,7 +12,8 @@ type ElectionMetadata struct {
 }
 
 // LanguageString is a wrapper for multi-language strings, specified in metadata.
-//  example {"default": "hello", "en": "hello", "es": "hola"}
+//
+//	example {"default": "hello", "en": "hello", "es": "hola"}
 type LanguageString map[string]string
 
 // ProcessMedia holds the process metadata's header and streamURI

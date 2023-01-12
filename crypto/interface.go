@@ -7,7 +7,7 @@
 // KeyPair implementations will generally expose a top-level function of the
 // form:
 //
-//    FromHex(privHex string) (*T, error)
+//	FromHex(privHex string) (*T, error)
 //
 // These interfaces are meant to encrypt, sign, or hash small chunks of bytes.
 // Working with []byte directly can be simpler. However, be careful to not use

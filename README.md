@@ -44,7 +44,7 @@ For running vocdoni-node in gateway mode, 8 GiB of ram memory is recommended (4 
 
 #### Compile and run
 
-Compile from source in a golang environment (Go>1.18 required):
+Compile from source in a golang environment (Go>1.19 required):
 
 ```bash
 git clone https://github.com/vocdoni/vocdoni-node.git
