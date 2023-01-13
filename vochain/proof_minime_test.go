@@ -32,6 +32,7 @@ func TestMinimeProof(t *testing.T) {
 		StartBlock:        0,
 		EnvelopeType:      &models.EnvelopeType{EncryptedVotes: false},
 		Mode:              new(models.ProcessMode),
+		VoteOptions:       &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1, MaxVoteOverwrites: 0},
 		Status:            models.ProcessStatus_READY,
 		EntityId:          util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:        testMinimeStorageRoot,

@@ -54,8 +54,10 @@ func (v *State) voteCountInc() error {
 }
 
 // AddVote adds a new vote to a process and call the even listeners to OnVote.
-// This method does not check if the vote already exist!
-func (v *State) AddVote(vote *models.Vote, voterID VoterID) error {
+// If the vote already exists it will be overwritten and overwrite counter will be increased.
+// Note that the vote is not committed to the StateDB until the StateDB transaction is committed.
+// Note that the vote is not verified, so it is the caller responsibility to verify the vote.
+func (v *State) AddVote(vote *models.Vote) error {
 	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
 	if err != nil {
 		return err
@@ -66,20 +68,35 @@ func (v *State) AddVote(vote *models.Vote, voterID VoterID) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal vote: %w", err)
 	}
-	// TO-DO (pau): Why are we storing processID and nullifier?
-	sdbVote := models.StateDBVote{
-		VoteHash:  ethereum.HashRaw(voteBytes),
-		ProcessId: vote.ProcessId,
-		Nullifier: vote.Nullifier,
+
+	sdbVote, err := v.Vote(vote.ProcessId, vote.Nullifier, false)
+	if err != nil {
+		if errors.Is(err, ErrVoteNotFound) {
+			sdbVote = &models.StateDBVote{
+				VoteHash:  ethereum.HashRaw(voteBytes),
+				ProcessId: vote.ProcessId,
+				Nullifier: vote.Nullifier,
+			}
+		} else {
+			return err
+		}
+	} else {
+		sdbVote.VoteHash = ethereum.HashRaw(voteBytes)
+		if sdbVote.OverwriteCount != nil {
+			*sdbVote.OverwriteCount++
+		} else {
+			sdbVote.OverwriteCount = new(uint32)
+			*sdbVote.OverwriteCount = 1
+		}
 	}
-	sdbVoteBytes, err := proto.Marshal(&sdbVote)
+	sdbVoteBytes, err := proto.Marshal(sdbVote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
 	v.Tx.Lock()
 	err = func() error {
 		treeCfg := StateChildTreeCfg(ChildTreeVotes)
-		if err := v.Tx.DeepAdd(vid, sdbVoteBytes,
+		if err := v.Tx.DeepSet(vid, sdbVoteBytes,
 			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessId)); err != nil {
 			return err
 		}
@@ -90,7 +107,7 @@ func (v *State) AddVote(vote *models.Vote, voterID VoterID) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnVote(vote, voterID, v.TxCounter())
+		l.OnVote(vote, vote.VoterId, v.TxCounter())
 	}
 	return nil
 }
@@ -111,11 +128,12 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	return vid.Sum(nil), nil
 }
 
-// Envelope returns the hash of a stored vote if exists.
+// Vote returns the stored vote if exists. Returns ErrProcessNotFound if the
+// process does not exist, ErrVoteNotFound if the vote does not exist.
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte, err error) {
+func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.StateDBVote, error) {
 	vid, err := v.voteID(processID, nullifier)
 	if err != nil {
 		return nil, err
@@ -137,7 +155,7 @@ func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte,
 	}
 	sdbVoteBytes, err := votesTree.Get(vid)
 	if errors.Is(err, arbo.ErrKeyNotFound) {
-		return nil, ErrVoteDoesNotExist
+		return nil, ErrVoteNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -145,18 +163,18 @@ func (v *State) Envelope(processID, nullifier []byte, committed bool) (_ []byte,
 	if err := proto.Unmarshal(sdbVoteBytes, &sdbVote); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
 	}
-	return sdbVote.VoteHash, nil
+	return &sdbVote, nil
 }
 
-// EnvelopeExists returns true if the envelope identified with voteID exists
+// VoteExists returns true if the envelope identified with voteID exists
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) EnvelopeExists(processID, nullifier []byte, committed bool) (bool, error) {
-	_, err := v.Envelope(processID, nullifier, committed)
+func (v *State) VoteExists(processID, nullifier []byte, committed bool) (bool, error) {
+	_, err := v.Vote(processID, nullifier, committed)
 	if errors.Is(err, ErrProcessNotFound) {
 		return false, nil
-	} else if errors.Is(err, ErrVoteDoesNotExist) {
+	} else if errors.Is(err, ErrVoteNotFound) {
 		return false, nil
 	} else if err != nil {
 		return false, err

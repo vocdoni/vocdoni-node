@@ -152,11 +152,12 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},
-		Mode:       &models.ProcessMode{},
-		Status:     models.ProcessStatus_READY,
-		CensusRoot: make([]byte, 32), // emtpy hash
-		StartBlock: 1,
-		BlockCount: 3,
+		Mode:        &models.ProcessMode{},
+		VoteOptions: &models.ProcessVoteOptions{MaxCount: 1},
+		Status:      models.ProcessStatus_READY,
+		CensusRoot:  make([]byte, 32), // emtpy hash
+		StartBlock:  1,
+		BlockCount:  3,
 	}
 	err = app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
@@ -209,7 +210,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	txID := [32]byte{}
 	commit := false
 
-	_, _, err = app.TransactionHandler.VoteTxCheck(&vochaintx.VochainTx{
+	_, err = app.TransactionHandler.VoteTxCheck(&vochaintx.VochainTx{
 		Tx:         &models.Tx{Payload: &models.Tx_Vote{Vote: vtx}},
 		Signature:  signature,
 		SignedBody: txBytes,

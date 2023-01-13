@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -68,6 +69,21 @@ func (v *State) AddProcess(p *models.Process) error {
 	if p.CensusURI != nil {
 		censusURI = *p.CensusURI
 	}
+	log.Infow("new election", map[string]interface{}{
+		"processId":     fmt.Sprintf("%x", p.ProcessId),
+		"entityId":      fmt.Sprintf("%x", p.EntityId),
+		"startBlock":    p.StartBlock,
+		"endBlock":      p.BlockCount + p.StartBlock,
+		"mode":          p.Mode,
+		"envelopeType":  p.EnvelopeType,
+		"voteOptions":   p.VoteOptions,
+		"censusRoot":    fmt.Sprintf("%x", p.CensusRoot),
+		"censusOrigin":  models.CensusOrigin_name[int32(p.CensusOrigin)],
+		"maxCensusSize": p.MaxCensusSize,
+		"status":        p.Status,
+		"height":        v.CurrentHeight(),
+		"censusURI":     censusURI,
+	})
 	for _, l := range v.eventListeners {
 		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
 	}

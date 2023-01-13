@@ -74,13 +74,13 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 	}
 	switch vtx.Tx.Payload.(type) {
 	case *models.Tx_Vote:
-		v, voterID, err := t.VoteTxCheck(vtx, forCommit)
+		v, err := t.VoteTxCheck(vtx, forCommit)
 		if err != nil || v == nil {
 			return nil, fmt.Errorf("voteTx: %w", err)
 		}
 		response.Data = v.Nullifier
 		if forCommit {
-			return response, t.state.AddVote(v, voterID)
+			return response, t.state.AddVote(v)
 		}
 
 	case *models.Tx_Admin:

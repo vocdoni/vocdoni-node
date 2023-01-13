@@ -57,7 +57,7 @@ func TestStateBasic(t *testing.T) {
 				Nullifier:   rng.RandomBytes(32),
 				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
-			if err := s.AddVote(v, VoterID{}.Nil()); err != nil {
+			if err := s.AddVote(v); err != nil {
 				t.Error(err)
 			}
 		}
@@ -274,7 +274,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 			Nullifier:   rng.RandomBytes(32),
 			VotePackage: rng.RandomBytes(64),
 		}
-		qt.Assert(t, s.AddVote(v, VoterID{}.Nil()), qt.IsNil)
+		qt.Assert(t, s.AddVote(v), qt.IsNil)
 
 		if i%1_000 == 0 {
 			runtime.GC()
