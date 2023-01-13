@@ -31,6 +31,7 @@ type ZkCircuitConfig struct {
 	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
 	Parameters []int64 `json:"parameters"`
+	Levels     int     `json:"levels"`
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure

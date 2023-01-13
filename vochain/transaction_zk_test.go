@@ -70,7 +70,8 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		VotePackage: weight.Bytes(),
 		Nullifier:   nullifier,
 	}
-	protoProof, err := zk.ProverProofToProtobufZKProof(0, parsedProof, testVote, process.CensusRoot, weight)
+	protoProof, err := zk.ProverProofToProtobufZKProof(0, parsedProof,
+		testVote.ProcessId, process.CensusRoot, testVote.Nullifier, weight)
 	qt.Assert(t, err, qt.IsNil)
 
 	voteValue := big.NewInt(1).Bytes()

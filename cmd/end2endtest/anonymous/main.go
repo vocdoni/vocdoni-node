@@ -29,7 +29,7 @@ func main() {
 	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
 	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
 	timeout := flag.Int("timeout", 5, "timeout in minutes")
-	anonymous := flag.Bool("anonymous", false, "use for test anonymous weighted or only weighted voting")
+	// anonymous := flag.Bool("anonymous", false, "use for test anonymous weighted or only weighted voting")
 
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
@@ -116,81 +116,13 @@ func main() {
 		return
 	}
 
-	_, censusRoot, censusURI, err := buildCensus(api, voterAccounts, *anonymous)
+	_, censusRoot, censusURI, err := buildCensus(api, voterAccounts, true)
 	if err != nil {
 		log.Errorw(err, "error building the census")
 		return
 	}
 
-	// Generate the voting proofs (parallelized)
-	type voterProof struct {
-		proof   *apiclient.CensusProof
-		address string
-	}
-	proofs := make(map[string]*apiclient.CensusProof, *nvotes)
-	proofCh := make(chan *voterProof)
-	stopProofs := make(chan bool)
-	go func() {
-		for {
-			select {
-			case p := <-proofCh:
-				proofs[p.address] = p.proof
-			case <-stopProofs:
-				return
-			}
-		}
-	}()
-
-	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("generating %d voting proofs", len(accounts))
-		for _, acc := range accounts {
-			keyType := models.ProofArbo_ADDRESS
-			key := acc.Address().Bytes()
-			if *anonymous {
-				key, err = calcAnonPubKey(acc)
-				if err != nil {
-					log.Errorw(err, "error calculating PublicKey")
-					return
-				}
-
-				keyType = models.ProofArbo_PUBKEY
-			}
-			pr, err := api.CensusGenProof(censusRoot, key)
-			if err != nil {
-				log.Errorw(err, "error generating census root")
-				return
-			}
-			pr.KeyType = keyType
-			proofCh <- &voterProof{
-				proof:   pr,
-				address: acc.Address().Hex(),
-			}
-		}
-	}
-
-	pcount := *nvotes / *parallelCount
-	var wg sync.WaitGroup
-	for i := 0; i < len(voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(voterAccounts) {
-			end = len(voterAccounts)
-		}
-		wg.Add(1)
-		go addNaccounts(voterAccounts[i:end], &wg)
-	}
-
-	wg.Wait()
-	time.Sleep(time.Second) // wait a grace time for the last proof to be added
-	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(voterAccounts))
-	stopProofs <- true
-
 	// Create a new Election
-	censusType := vapi.CensusTypeWeighted
-	if *anonymous {
-		censusType = vapi.CensusTypeZKWeighted
-	}
-
 	electionID, err := api.NewElection(&vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
 		Description: map[string]string{"default": "Test election description"},
@@ -204,7 +136,7 @@ func main() {
 		ElectionType: vapi.ElectionType{
 			Autostart:         true,
 			Interruptible:     true,
-			Anonymous:         *anonymous,
+			Anonymous:         true,
 			SecretUntilTheEnd: false,
 			DynamicCensus:     false,
 		},
@@ -212,7 +144,7 @@ func main() {
 		Census: vapi.CensusTypeDescription{
 			RootHash: censusRoot,
 			URL:      censusURI,
-			Type:     censusType,
+			Type:     vapi.CensusTypeZKWeighted,
 		},
 
 		Questions: []vapi.Question{
@@ -241,12 +173,31 @@ func main() {
 	log.Infof("created new election with id %s", electionID.String())
 	log.Debugf("election details: %+v", *election)
 
+	proofs := make(map[string]*apiclient.CensusProofZk, *nvotes)
+	for _, acc := range voterAccounts {
+		voterKey, err := calcAnonPubKey(acc)
+		if err != nil {
+			log.Errorw(err, "error calculating PublicKey")
+			return
+		}
+
+		pr, err := api.ZkCensusGenProof(censusRoot, electionID, voterKey)
+		if err != nil {
+			log.Errorw(err, "error generating census root")
+			return
+		}
+		proofs[acc.Address().Hex()] = pr
+	}
+
+	time.Sleep(time.Second) // wait a grace time for the last proof to be added
+	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(voterAccounts))
+
 	// Wait for the election to start
 	waitUntilElectionStarts(api, electionID)
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-	wg = sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("sending %d votes", len(accounts))
@@ -264,7 +215,7 @@ func main() {
 				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
 				_, err := c.Vote(&apiclient.VoteData{
 					ElectionID:  electionID,
-					ProofMkTree: proofs[voterAccount.Address().Hex()],
+					ProofZkTree: proofs[voterAccount.Address().Hex()],
 					Choices:     []int{i % 2},
 				})
 				// if the context deadline is reached, we don't need to print it (let's jus retry)
@@ -291,7 +242,7 @@ func main() {
 		time.Sleep(time.Second * 2)
 	}
 
-	pcount = *nvotes / *parallelCount
+	pcount := *nvotes / *parallelCount
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
 		if end > len(voterAccounts) {

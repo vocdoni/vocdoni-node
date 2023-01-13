@@ -228,7 +228,7 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	case CensusTypeCSP:
 		origin = models.CensusOrigin_OFF_CHAIN_CA
 		root = ctype.PublicKey
-	case CensusTypeWeighted:
+	case CensusTypeWeighted, CensusTypeZKWeighted:
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 		root = ctype.RootHash
 	case CensusTypeZK:

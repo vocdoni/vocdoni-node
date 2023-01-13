@@ -177,7 +177,8 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 
 func calcAnonPubKey(account *ethereum.SignKeys) (types.HexBytes, error) {
 	privKey := babyjub.PrivateKey{}
-	_, err := hex.Decode(privKey[:], account.PrivateKey())
+	_, strKey := account.HexString()
+	_, err := hex.Decode(privKey[:], []byte(strKey))
 	if err != nil {
 		return nil, fmt.Errorf("error generating babyjub key: %w", err)
 	}

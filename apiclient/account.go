@@ -1,10 +1,12 @@
 package apiclient
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/iden3/go-iden3-crypto/babyjub"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
@@ -190,4 +192,14 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 
 	return accv.TxHash, nil
+}
+
+func (c *HTTPclient) GetBabyJubJubKey() (babyjub.PrivateKey, error) {
+	privKey := babyjub.PrivateKey{}
+	_, strKey := c.account.HexString()
+	if _, err := hex.Decode(privKey[:], []byte(strKey)); err != nil {
+		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
+	}
+
+	return privKey, nil
 }

@@ -934,7 +934,7 @@ func (c *Client) TestSendAnonVotes(
 			Nullifier:   nullifier,
 		}
 
-		model, err := zk.ProverProofToProtobufZKProof(int32(*circuitIndex), proof, v, root, weight)
+		model, err := zk.ProverProofToProtobufZKProof(int32(*circuitIndex), proof, v.ProcessId, root, v.Nullifier, weight)
 		if err != nil {
 			return 0, fmt.Errorf("error encoding the proof to protobuf: %w", err)
 		}
