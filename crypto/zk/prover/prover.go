@@ -19,7 +19,7 @@ import (
 var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
 	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
-	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json")
+	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
 	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
 	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
 	ErrProofGen           = fmt.Errorf("error during zksnark proof generation")
