@@ -12,26 +12,26 @@ the same transaction (for a block update).  Database prefixes are used to split
 the storage of each subTree while avoiding collisions.  The structure of
 prefixes is detailed here:
 - subTree: `{KindID}{id}/`
-	- arbo.Tree: `t/`
-	- subTrees: `s/`
-		- contains any number of subTree
-	- nostate: `n/`
-	- metadata: `m/`
-		- versions: `v/` (only in mainTree)
-			- currentVersion: `current` -> {currentVersion}
-			- version to root: `{version}` -> `{root}`
+  - arbo.Tree: `t/`
+  - subTrees: `s/`
+  - contains any number of subTree
+  - nostate: `n/`
+  - metadata: `m/`
+  - versions: `v/` (only in mainTree)
+  - currentVersion: `current` -> {currentVersion}
+  - version to root: `{version}` -> `{root}`
 
 Since the mainTree is unique and doesn't have a parent, the prefixes used in
 the mainTree skip the first element of the path (`{KindID}{id}/`).
 - Example:
-	- mainTree arbo.Tree: `t/`
-	- processTree arbo.Tree (a singleton under mainTree): `s/process/t/`
-	- censusTree arbo.Tree (a non-singleton under processTree):
-	`s/process/s/census{pID}/t/` (we are using pID, the processID as the id
-	of the subTree)
-	- voteTree arbo.Tree (a non-singleton under processTree):
-	`s/process/s/vote{pID}/t/` (we are using pID, the processID as the id
-	of the subTree)
+  - mainTree arbo.Tree: `t/`
+  - processTree arbo.Tree (a singleton under mainTree): `s/process/t/`
+  - censusTree arbo.Tree (a non-singleton under processTree):
+    `s/process/s/census{pID}/t/` (we are using pID, the processID as the id
+    of the subTree)
+  - voteTree arbo.Tree (a non-singleton under processTree):
+    `s/process/s/vote{pID}/t/` (we are using pID, the processID as the id
+    of the subTree)
 
 Each tree has an associated database that can be accessed via the NoState
 method.  These databases are auxiliary key-values that don't belong to the

@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,6 +31,22 @@ type ElectionSummary struct {
 	VoteCount    uint64            `json:"voteCount"`
 	FinalResults bool              `json:"finalResults"`
 	Results      [][]*types.BigInt `json:"result,omitempty"`
+}
+
+// ElectionResults is the struct used to wrap the results of an election
+type ElectionResults struct {
+	// ABIEncoded is the abi encoded election results
+	ABIEncoded string `json:"abiEncoded"`
+	// CensusRoot is the root of the census tree
+	CensusRoot types.HexBytes `json:"censusRoot"`
+	// ElectionID is the ID of the election
+	ElectionID types.HexBytes `json:"electionId"`
+	// OrganizationID is the ID of the organization that created the election
+	OrganizationID types.HexBytes `json:"organizationId"`
+	// Results is the list of votes
+	Results [][]*big.Int `json:"results"`
+	// SourceContractAddress is the address of the smart contract containing the census
+	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty"`
 }
 
 type Election struct {

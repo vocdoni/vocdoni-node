@@ -404,6 +404,7 @@ func toString(v []byte) string {
 // test function useful for debugging.  Prints a dump of the database with path
 // separator awareness (best effort), and allows showing mix of ascii and
 // non-ascii content (again, best effort).
+//
 //lint:ignore U1000 debug function
 func dumpPrint(db db.Database) {
 	fmt.Printf("--- DB Print ---\n")
@@ -415,6 +416,7 @@ func dumpPrint(db db.Database) {
 
 // test function useful for debugging.  Prints the paths and leaf contents of
 // the tree.
+//
 //lint:ignore U1000 debug function
 func treePrint(t *tree.Tree, tx db.ReadTx, name string) {
 	fmt.Printf("--- Tree Print (%s)---\n", name)

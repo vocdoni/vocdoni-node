@@ -1,14 +1,17 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big" // required for evm encoding
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -66,6 +69,14 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/elections/{electionID}/scrutiny",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionScrutinyHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/elections",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -85,7 +96,7 @@ func (a *API) enableElectionHandlers() error {
 	return nil
 }
 
-// /elections/<electionID>
+// GET /elections/<electionID>
 // get election information
 func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -155,7 +166,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /elections/<electionID>/votes/count
+// GET /elections/<electionID>/votes/count
 // get the number of votes for an election
 func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -174,7 +185,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /elections/<electionID>/keys
+// GET /elections/<electionID>/keys
 // returns the list of public/private encryption keys
 func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -213,7 +224,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// elections/<electionID>/votes/page/<page>
+// GET elections/<electionID>/votes/page/<page>
 // returns the list of voteIDs for an election (paginated)
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -244,6 +255,92 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		})
 	}
 	data, err := json.Marshal(votes)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+}
+
+// GET /elections/<electionID>/scrutiny
+// returns the consensus results of an election
+func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	if err != nil || electionID == nil {
+		return fmt.Errorf("electionID (%q) cannot be decoded", ctx.URLParam("electionID"))
+	}
+	process, err := a.vocapp.State.Process(electionID, true)
+	if err != nil {
+		return fmt.Errorf("cannot get election results: %w", err)
+	}
+	if process == nil {
+		return fmt.Errorf("cannot fetch process %x", electionID)
+	}
+	// do not make distinction between live results elections and encrypted results elections
+	// since we fetch the results from the blockchain state, elections must be terminated and
+	// results must be available
+	if process.Status != models.ProcessStatus_RESULTS {
+		return fmt.Errorf("election results are not available yet")
+	}
+	// check process results are the same
+	var results [][]*big.Int
+	if len(process.Results) > 0 {
+		firstResult := process.Results[0]
+		for _, processResult := range process.Results[1:] {
+			if processResult == nil {
+				log.Errorf("invalid process result")
+				continue
+			}
+			// if consensus results do not match, return error
+			for k, questionResult := range processResult.Votes {
+				if questionResult == nil {
+					log.Errorf("invalid question result")
+					continue
+				}
+				for kk, questionOption := range questionResult.Question {
+					if len(questionOption) == 0 {
+						log.Errorf("invalid question option")
+						continue
+					}
+					if !bytes.Equal(questionOption, firstResult.Votes[k].Question[kk]) {
+						log.Errorf("election results for signer %s missmatch %s != %s",
+							questionResult.String(),
+							firstResult.Votes[k].String(),
+							common.BytesToAddress(processResult.OracleAddress),
+						)
+						return fmt.Errorf("reported election results missmatch")
+					}
+				}
+			}
+		}
+		// cast process results
+		results = make([][]*big.Int, len(firstResult.Votes))
+		for k, questionResult := range firstResult.Votes {
+			results[k] = make([]*big.Int, len(questionResult.Question))
+			for kk, questionOption := range questionResult.Question {
+				results[k][kk] = new(big.Int).SetBytes(questionOption)
+			}
+		}
+	}
+	electionResults := &ElectionResults{
+		CensusRoot:            process.CensusRoot,
+		ElectionID:            electionID,
+		SourceContractAddress: process.SourceNetworkContractAddr,
+		OrganizationID:        process.EntityId,
+		Results:               results,
+	}
+
+	electionResults.ABIEncoded, err = encodeEVMResultsArgs(
+		common.BytesToHash(electionID),
+		common.BytesToAddress(electionResults.OrganizationID),
+		common.BytesToHash(electionResults.CensusRoot),
+		common.BytesToAddress(electionResults.SourceContractAddress),
+		electionResults.Results,
+	)
+	if err != nil {
+		return fmt.Errorf("cannot abi.encode results: %w", err)
+	}
+
+	data, err := json.Marshal(electionResults)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
 	}

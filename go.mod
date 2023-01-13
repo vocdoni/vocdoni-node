@@ -1,6 +1,6 @@
 module go.vocdoni.io/dvote
 
-go 1.18
+go 1.19
 
 // For testing purposes while dvote-protobuf becomes stable
 // replace go.vocdoni.io/proto => ../dvote-protobuf

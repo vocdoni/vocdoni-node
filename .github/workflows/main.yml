@@ -22,13 +22,13 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v3
         with:
-          go-version: '1.18.8'
+          go-version: '1.19.5'
           cache: true
       - name: Tidy go cache
         run: go mod tidy
       - name: Run gofmt
         # Run gofmt first, as it's quick and issues are common.
-        run: diff -u <(echo -n) <(gofmt -s -d $(git ls-files '*.go'))
+        run: diff -u <(echo -n) <(gofmt -s -d .)
       - name: Run go vet
         run: go vet ./...
       - name: Download staticcheck
@@ -62,7 +62,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v3
         with:
-          go-version: '1.18.8'
+          go-version: '1.19.5'
           cache: true
       - name: Tidy go cache
         run: go mod tidy
@@ -159,7 +159,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v3
         with:
-          go-version: '1.18.8'
+          go-version: '1.19.5'
           cache: true
       - name: Tidy go cache
         run: go mod tidy
