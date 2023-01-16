@@ -132,7 +132,8 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 
 // CensusGenProofZk function generates the census proof of a election based on
 // ZkSnarks. It uses the current apiclient circuit config to instance the
-// circuit and generates the proof using the censusRoot provided and
+// circuit and generates the proof for the censusRoot, electionId and voter
+// babyjubjub private key provided.
 func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, privVoterKey babyjub.PrivateKey) (*CensusProofZk, error) {
 	// Get BabyJubJub key from current client
 	pubVoterKey, err := c.BabyJubJubPriv2PubKey(privVoterKey)

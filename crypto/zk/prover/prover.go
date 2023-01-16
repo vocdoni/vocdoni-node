@@ -8,7 +8,6 @@ package prover
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/big"
 
 	"github.com/iden3/go-rapidsnark/prover"
@@ -171,7 +170,6 @@ func (p *Proof) Verify(vKey []byte) error {
 	}
 	// Try to verify the provided proof with go-rapidsnark/verifier.
 	if err := verifier.VerifyGroth16(proof, vKey); err != nil {
-		log.Println("prover err:", err)
 		return ErrVerifyProof
 	}
 

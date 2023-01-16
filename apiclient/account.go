@@ -197,16 +197,20 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	return accv.TxHash, nil
 }
 
+// GetBabyJubJubKey returns a private BabyJubJub key generated based on the
+// current apiclient account ethereum.SignKeys.
 func (c *HTTPclient) GetBabyJubJubKey() (babyjub.PrivateKey, error) {
 	privKey := babyjub.PrivateKey{}
-	_, strKey := c.account.HexString()
-	if _, err := hex.Decode(privKey[:], []byte(strKey)); err != nil {
+	_, strPrivKey := c.account.HexString()
+	if _, err := hex.Decode(privKey[:], []byte(strPrivKey)); err != nil {
 		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
 	}
 
 	return privKey, nil
 }
 
+// BabyJubJubPriv2PubKey returns the public key associated to the provided
+// BabuJubJub private key encoded to slice of bytes arbo tree ready.
 func (c *HTTPclient) BabyJubJubPriv2PubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
 	pubKey, err := poseidon.Hash([]*big.Int{
 		privKey.Public().X,

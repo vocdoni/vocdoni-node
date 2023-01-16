@@ -12,6 +12,8 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
+// ProtobufZKProofToProverProof function parses the provided protobuf ready
+// proof struct into a prover ready proof struct.
 func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error) {
 	if len(p.A) != 3 || len(p.B) != 6 || len(p.C) != 3 {
 		return nil, fmt.Errorf("error on zkProof format")
@@ -31,6 +33,13 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 	}, nil
 }
 
+// ProverProofToProtobufZKProof function encodes the proof provided into a
+// protobuf ready struct using including the index of the circuit used. If the
+// provided proof does not contains a defined public signals, the rest of the
+// arguments are required to calculate that parameter. If the provided proof
+// does not contains a defined public signals and any of the rest of the
+// parameters is nil, the resulting struct will not contains any defined
+// PublicInputs value.
 func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
 	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
 	proof := &models.ProofZkSNARK{
@@ -47,29 +56,31 @@ func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
 	if p.PubSignals != nil {
 		proof.PublicInputs = p.PubSignals
 	} else if electionId != nil && censusRoot != nil && nullifier != nil && weight != nil {
-		proof.PublicInputs = GetZKProofPublicSignals(electionId, censusRoot, nullifier, weight)
+		proof.PublicInputs = zkProofPublicInputs(electionId, censusRoot, nullifier, weight)
 	}
 
 	return proof, nil
 }
 
-func GetZKProofPublicSignals(electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) []string {
+// zkProofPublicInputs encodes the provided parameters in the correct order and
+// codification into a slice of string arbo compatible.
+func zkProofPublicInputs(electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) []string {
 	pubInputs := []string{}
 
-	// 1. processId {2}
+	// 1. [2]processId
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[:16]).String())
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[16:]).String())
 
-	// 2. censusRoot {1} -> Getting process.CensusRoot instead process.RollingCensusRoot
+	// 2. censusRoot
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
 
-	// 3. nullifier {1}
+	// 3. nullifier
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(nullifier).String())
 
-	// 4. weight {1} -> Getting from models.VoteEnvelope
+	// 4. weight
 	pubInputs = append(pubInputs, weight.String())
 
-	// 5. voteHash {2}
+	// 5. [2]voteHash
 	voteHash := sha256.Sum256(weight.Bytes())
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[:16]).String())
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[16:]).String())

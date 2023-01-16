@@ -21,10 +21,7 @@ func main() {
 	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
 	accountPrivKey := flag.String("accountPrivKey", "", "account private key (optional)")
 	nvotes := flag.Int("votes", 10, "number of votes to cast")
-	// parallelCount := flag.Int("parallel", 4, "number of parallel requests")
 	useDevFaucet := flag.Bool("devFaucet", true, "use the dev faucet for fetching tokens")
-	// timeout := flag.Int("timeout", 5, "timeout in minutes")
-	// anonymous := flag.Bool("anonymous", false, "use for test anonymous weighted or only weighted voting")
 
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
@@ -64,7 +61,6 @@ func main() {
 	}
 
 	// If the account does not exist, create a new one
-	// TODO: check if the account balance is low and use the faucet
 	acc, err := api.Account("")
 	if err != nil {
 		var faucetPkg *models.FaucetPackage
@@ -203,87 +199,6 @@ func main() {
 		}
 		time.Sleep(time.Second)
 	}
-
-	// // Send the votes (parallelized)
-	// startTime := time.Now()
-	// wg := sync.WaitGroup{}
-	// voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-	// 	defer wg.Done()
-	// 	log.Infof("sending %d votes", len(accounts))
-	// 	// We use maps instead of slices to have the capacity of resending votes
-	// 	// without repeating them.
-	// 	accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
-	// 	for i, acc := range accounts {
-	// 		accountsMap[i] = acc
-	// 	}
-	// 	// Send the votes
-	// 	votesSent := 0
-	// 	for {
-	// 		contextDeadlines := 0
-	// 		for i, voterAccount := range accountsMap {
-	// 			c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
-	// 			_, err := c.Vote(&apiclient.VoteData{
-	// 				ElectionID:  electionID,
-	// 				ProofZkTree: proofs[voterAccount.Address().Hex()],
-	// 				Choices:     []int{i % 2},
-	// 			})
-	// 			// if the context deadline is reached, we don't need to print it (let's jus retry)
-	// 			if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-	// 				contextDeadlines++
-	// 				continue
-	// 			} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-	// 				// if the error is not "vote already exists", we need to print it
-	// 				log.Warn(err)
-	// 				continue
-	// 			}
-	// 			// if the vote was sent successfully or already exists, we remove it from the accounts map
-	// 			votesSent++
-	// 			delete(accountsMap, i)
-
-	// 		}
-	// 		if len(accountsMap) == 0 {
-	// 			break
-	// 		}
-	// 		log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
-	// 		time.Sleep(time.Second * 5)
-	// 	}
-	// 	log.Infof("successfully sent %d votes", votesSent)
-	// 	time.Sleep(time.Second * 2)
-	// }
-
-	// pcount := *nvotes / *parallelCount
-	// for i := 0; i < len(voterAccounts); i += pcount {
-	// 	end := i + pcount
-	// 	if end > len(voterAccounts) {
-	// 		end = len(voterAccounts)
-	// 	}
-	// 	wg.Add(1)
-	// 	go voteAccounts(voterAccounts[i:end], &wg)
-	// }
-
-	// wg.Wait()
-	// log.Infof("%d votes submitted successfully, took %s. At %d votes/second",
-	// 	*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
-
-	// Wait for all the votes to be verified
-	// log.Infof("waiting for all the votes to be registered...")
-	// for {
-	// 	count, err := api.ElectionVoteCount(electionID)
-	// 	if err != nil {
-	// 		log.Errorw(err, "error verificating vote")
-	// 	}
-	// 	if count == uint32(*nvotes) {
-	// 		break
-	// 	}
-	// 	time.Sleep(time.Second * 5)
-	// 	log.Infof("verified %d/%d votes", count, *nvotes)
-	// 	if time.Since(startTime) > time.Duration(*timeout)*time.Minute {
-	// 		log.Fatalf("timeout waiting for votes to be registered")
-	// 	}
-	// }
-
-	// log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-	// 	*nvotes, time.Since(startTime), int(float64(*nvotes)/time.Since(startTime).Seconds()))
 
 	count, err := api.ElectionVoteCount(electionID)
 	if err != nil {
