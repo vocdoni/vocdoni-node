@@ -60,19 +60,6 @@ func (t *TransactionHandler) LoadZkCircuit() error {
 	return nil
 }
 
-// LoadZkVerificationKeys loads or downloads the zk Circuits VerificationKey files.
-// It is required for veirying zkSnark proofs.
-
-// func (t *TransactionHandler) LoadZkVerificationKeys() error {
-// 	// get the zk Circuits VerificationKey files
-// 	vks, err := LoadZkVerificationKeys(t.dataDir, t.state.ChainID())
-// 	if err != nil {
-// 		return fmt.Errorf("could not load zk verification keys: %w", err)
-// 	}
-// 	t.ZkVKs = vks
-// 	return nil
-// }
-
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
 // It returns a bytes value which depends on the transaction type:
 //

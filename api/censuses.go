@@ -204,12 +204,17 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		if ref.Indexed && p.Weight.ToInt().Uint64() != 1 {
 			return fmt.Errorf("indexed census cannot use weight")
 		}
-		// compute the hash, we use it as key for the merkle tree
-		keyHash, err := ref.Tree().Hash(p.Key)
-		if err != nil {
-			return fmt.Errorf("could not compute key hash: %w", err)
+
+		leafKey := p.Key
+		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+			// compute the hash, we use it as key for the merkle tree
+			leafKey, err = ref.Tree().Hash(p.Key)
+			if err != nil {
+				return fmt.Errorf("could not compute key hash: %w", err)
+			}
 		}
-		keys = append(keys, keyHash)
+
+		keys = append(keys, leafKey)
 		if !ref.Indexed {
 			values = append(values, ref.Tree().BigIntToBytes(p.Weight.ToInt()))
 		}
@@ -529,11 +534,16 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.Tree().Hash(key)
-	if err != nil {
-		return err
+
+	leafKey := key
+	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+		leafKey, err = ref.Tree().Hash(key)
+		if err != nil {
+			return err
+		}
 	}
-	leafV, siblings, err := ref.Tree().GenProof(keyHash)
+
+	leafV, siblings, err := ref.Tree().GenProof(leafKey)
 	if err != nil {
 		return err
 	}
@@ -576,11 +586,16 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.Tree().Hash(cdata.Key)
-	if err != nil {
-		return err
+
+	leafKey := cdata.Key
+	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+		leafKey, err = ref.Tree().Hash(cdata.Key)
+		if err != nil {
+			return err
+		}
 	}
-	valid, err := ref.Tree().VerifyProof(keyHash, cdata.Value, cdata.Proof, cdata.Root)
+
+	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
 	if err != nil {
 		return err
 	}

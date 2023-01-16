@@ -4,9 +4,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
@@ -202,4 +205,16 @@ func (c *HTTPclient) GetBabyJubJubKey() (babyjub.PrivateKey, error) {
 	}
 
 	return privKey, nil
+}
+
+func (c *HTTPclient) BabyJubJubPriv2PubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
+	pubKey, err := poseidon.Hash([]*big.Int{
+		privKey.Public().X,
+		privKey.Public().Y,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
+	}
+
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
 }

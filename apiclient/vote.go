@@ -38,10 +38,10 @@ type VoteData struct {
 	ProofZkTree *CensusProofZk
 }
 
-// GetZkNullifier function returns ZkSnark ready vote nullifier and also encodes
+// GetNullifierZk function returns ZkSnark ready vote nullifier and also encodes
 // and returns the electionId into a string slice to be used in other processes
 // such as proof generation.
-func (c *HTTPclient) GetZkNullifier(privKey babyjub.PrivateKey, electionId types.HexBytes) (types.HexBytes, []string, error) {
+func (c *HTTPclient) GetNullifierZk(privKey babyjub.PrivateKey, electionId types.HexBytes) (types.HexBytes, []string, error) {
 	// Encode the electionId -> sha256(electionId)
 	hashedProcessId := sha256.Sum256(electionId)
 	intProcessId := []*big.Int{
@@ -106,6 +106,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			return nil, err
 		}
 
+		vote.Nullifier = v.ProofZkTree.Nullifier
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_ZkSnark{
 				ZkSnark: protoProof,

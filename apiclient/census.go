@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -130,17 +129,20 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 	return &cp, nil
 }
 
-func (c *HTTPclient) ZkCensusGenProof(censusRoot, electionID, voterKey types.HexBytes) (*CensusProofZk, error) {
+// CensusGenProofZk function generates the census proof of a election based on
+// ZkSnarks. It uses the current apiclient circuit config to instance the
+// circuit and generates the proof using the censusRoot provided and
+func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, privVoterKey babyjub.PrivateKey) (*CensusProofZk, error) {
 	// Get BabyJubJub key from current client
-	privKey, err := c.GetBabyJubJubKey()
+	pubVoterKey, err := c.BabyJubJubPriv2PubKey(privVoterKey)
 	if err != nil {
 		return nil, err
 	}
-	strPrivateKey := babyjub.SkToBigInt(&privKey).String()
 
+	strPrivateKey := babyjub.SkToBigInt(&privVoterKey).String()
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", voterKey.String())
+	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubVoterKey.String())
 	if err != nil {
 		return nil, err
 	}
@@ -152,48 +154,34 @@ func (c *HTTPclient) ZkCensusGenProof(censusRoot, electionID, voterKey types.Hex
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
-
 	// Encode census root
 	strCensusRoot := arbo.BytesToBigInt(censusRoot).String()
-
 	// Get vote weight
 	weight := new(big.Int).SetInt64(1)
 	if censusData.Weight != nil {
 		weight = censusData.Weight.ToInt()
 	}
-
 	// Get nullifier and encoded processId
-	nullifier, strProcessId, err := c.GetZkNullifier(privKey, electionID)
+	nullifier, strProcessId, err := c.GetNullifierZk(privVoterKey, electionID)
 	if err != nil {
 		return nil, err
 	}
 	strNullifier := new(big.Int).SetBytes(nullifier).String()
-
 	// Calculate and encode vote hash -> sha256(voteWeight)
 	voteHash := sha256.Sum256(censusData.Value)
 	strVoteHash := []string{
 		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[:16])).String(),
 		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[16:])).String(),
 	}
-
-	// Get circuit config and load the correct circuit
-	circuitParamIndex := int32(1)
-	// By default get circuit config with circuit parameter index 1 (65k parameter size circuit)
-	currentCircuitConfig := genesis.Genesis["dev"].CircuitsConfig[circuitParamIndex]
-	if currentGenesis, ok := genesis.Genesis[c.chainID]; ok {
-		currentCircuitConfig = currentGenesis.CircuitsConfig[circuitParamIndex]
-	}
-
 	// Unpack and encode siblings
 	unpackedSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, censusData.Proof)
 	if err != nil {
 		return nil, fmt.Errorf("error unpacking merkle tree proof: %w", err)
 	}
-
 	// Create a list of siblings with the same number of items that levels
 	// allowed by the circuit (from its config) plus one. Fill with zeros if its
 	// needed.
-	strSiblings := make([]string, currentCircuitConfig.Levels+1)
+	strSiblings := make([]string, c.circuit.levels+1)
 	for i := 0; i < len(strSiblings); i++ {
 		newSibling := "0"
 		if i < len(unpackedSiblings) {
@@ -201,14 +189,12 @@ func (c *HTTPclient) ZkCensusGenProof(censusRoot, electionID, voterKey types.Hex
 		}
 		strSiblings[i] = newSibling
 	}
-
 	// Get artifacts of the current circuit
-	circuit, err := circuit.LoadZkCircuit(context.Background(), currentCircuitConfig)
+	circuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit.conf)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
-
-	// Create the inputs and encode them
+	// Create the inputs and encode them into a JSON
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,
 		"censusSiblings": strSiblings,
@@ -218,24 +204,23 @@ func (c *HTTPclient) ZkCensusGenProof(censusRoot, electionID, voterKey types.Hex
 		"processId":      strProcessId,
 		"nullifier":      strNullifier,
 	}
-	fmt.Printf("%+v\n", rawInputs)
-
 	inputs, err := json.Marshal(rawInputs)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
-
+	// Calculate the proof for the current apiclient circuit config and the
+	// inputs encoded.
 	proof, err := prover.Prove(circuit.ProvingKey, circuit.Wasm, inputs)
 	if err != nil {
 		return nil, err
 	}
-
+	// Encode the results as bytes and return the proof
 	encProof, encPubSignals, err := proof.Bytes()
 	if err != nil {
 		return nil, err
 	}
 	return &CensusProofZk{
-		CircuitParametersIndex: circuitParamIndex,
+		CircuitParametersIndex: ZKCircuitIndex,
 		Proof:                  encProof,
 		PubSignals:             encPubSignals,
 		Weight:                 weight.Uint64(),

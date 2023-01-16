@@ -90,15 +90,11 @@ func waitUntilElectionStatus(api *apiclient.HTTPclient, electionID types.HexByte
 	log.Fatalf("election status %s not reached", status)
 }
 
-func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anonymous bool) (types.HexBytes, types.HexBytes, string, error) {
+func buildCensusZk(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys) (types.HexBytes, types.HexBytes, string, error) {
 	nvotes := len(accounts)
-	censusType := vapi.CensusTypeWeighted
-	if anonymous {
-		censusType = vapi.CensusTypeZKWeighted
-	}
 
 	// Create a new census
-	censusID, err := api.NewCensus(censusType)
+	censusID, err := api.NewCensus(vapi.CensusTypeZKWeighted)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -107,17 +103,11 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
 	for i, voterAccount := range accounts {
-		// By default use the account address as participant key into the arbo
-		// merkle tree
-		censusKey := voterAccount.Address().Bytes()
-		if anonymous {
-			// If the election is anonymous, calculate a BabyJubJub key from the
-			// current voter private key to use the public part of the generated
-			// key as leaf key.
-			censusKey, err = calcAnonPubKey(voterAccount)
-			if err != nil {
-				return nil, nil, "", err
-			}
+		// Calculate a BabyJubJub key from the current voter private key to
+		// use the public part of the generated key as leaf key.
+		censusKey, err := calcAnonPubKey(voterAccount)
+		if err != nil {
+			return nil, nil, "", err
 		}
 
 		// Create the participants with the correct key and a weight and send to
@@ -175,11 +165,20 @@ func buildCensus(api *apiclient.HTTPclient, accounts []*ethereum.SignKeys, anony
 	return censusID, censusRoot, censusURI, nil
 }
 
+func calcAnonPrivKey(account *ethereum.SignKeys) (babyjub.PrivateKey, error) {
+	privKey := babyjub.PrivateKey{}
+	_, strKey := account.HexString()
+	if _, err := hex.Decode(privKey[:], []byte(strKey)); err != nil {
+		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
+	}
+
+	return privKey, nil
+}
+
 func calcAnonPubKey(account *ethereum.SignKeys) (types.HexBytes, error) {
 	privKey := babyjub.PrivateKey{}
 	_, strKey := account.HexString()
-	_, err := hex.Decode(privKey[:], []byte(strKey))
-	if err != nil {
+	if _, err := hex.Decode(privKey[:], []byte(strKey)); err != nil {
 		return nil, fmt.Errorf("error generating babyjub key: %w", err)
 	}
 
@@ -191,6 +190,5 @@ func calcAnonPubKey(account *ethereum.SignKeys) (types.HexBytes, error) {
 		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
 	}
 
-	bLen := arbo.HashFunctionPoseidon.Len()
-	return arbo.BigIntToBytes(bLen, pubKey), nil
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
 }

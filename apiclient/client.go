@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 )
@@ -36,6 +37,10 @@ type HTTPclient struct {
 	addr    *url.URL
 	account *ethereum.SignKeys
 	chainID string
+	circuit struct {
+		conf   circuit.ZkCircuitConfig
+		levels int
+	}
 }
 
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
@@ -63,6 +68,19 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		return nil, fmt.Errorf("cannot get chain ID from API server")
 	}
 	c.chainID = info.ID
+
+	// Get the default circuit config
+	c.circuit = struct {
+		conf   circuit.ZkCircuitConfig
+		levels int
+	}{
+		conf:   CircuitsConfigurations["dev"],
+		levels: 16,
+	}
+
+	if _, ok := CircuitsConfigurations[c.chainID]; ok {
+		c.circuit.conf = CircuitsConfigurations[c.chainID]
+	}
 	return c, nil
 }
 

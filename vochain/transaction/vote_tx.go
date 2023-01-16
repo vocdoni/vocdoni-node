@@ -118,6 +118,8 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		if err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
+		log.Infof("%+v\n", proof.PubSignals)
+
 		// Get vote weight from proof publicSignals
 		voteWeight, err := proof.Weight()
 		if err != nil {
@@ -134,6 +136,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 		// Get valid verification key and verify the proof parsed
 		circuit := t.ZkCircuits[proofZkSNARK.CircuitParametersIndex]
+		log.Infow("using loaded circuit", map[string]interface{}{"verfificationKey": string(circuit.Config.VerificationKeyHash)})
 		if err := proof.Verify(circuit.VerificationKey); err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof verification failed")
 		}
