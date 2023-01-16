@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -154,6 +155,10 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
+
+	log.Debugw("zk census data received, starting to generate the proof inputs...", map[string]interface{}{
+		"censusRoot": censusRoot.String(), "electionId": electionID.String()})
+
 	// Encode census root
 	strCensusRoot := arbo.BytesToBigInt(censusRoot).String()
 	// Get vote weight
@@ -194,6 +199,9 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
+	log.Debugw("zk circuit loaded", map[string]interface{}{
+		"censusRoot": censusRoot.String(), "electionId": electionID.String(),
+		"circuitURI": c.circuit.conf.URI})
 	// Create the inputs and encode them into a JSON
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,
@@ -208,6 +216,9 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
+	log.Debugw("proof inputs generated", map[string]interface{}{
+		"censusRoot": censusRoot.String(), "electionId": electionID.String(),
+		"nullifier": strNullifier})
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(circuit.ProvingKey, circuit.Wasm, inputs)

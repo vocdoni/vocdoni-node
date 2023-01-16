@@ -44,7 +44,9 @@ func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
 		C: p.Data.C,
 	}
 
-	if electionId != nil && censusRoot != nil && nullifier != nil && weight != nil {
+	if p.PubSignals != nil {
+		proof.PublicInputs = p.PubSignals
+	} else if electionId != nil && censusRoot != nil && nullifier != nil && weight != nil {
 		proof.PublicInputs = GetZKProofPublicSignals(electionId, censusRoot, nullifier, weight)
 	}
 

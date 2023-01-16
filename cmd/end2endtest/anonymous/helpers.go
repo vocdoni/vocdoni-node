@@ -82,7 +82,7 @@ func waitUntilElectionStatus(api *apiclient.HTTPclient, electionID types.HexByte
 		if err != nil {
 			log.Fatal(err)
 		}
-		if election.Status == status {
+		if election != nil && election.Status == status {
 			return
 		}
 		time.Sleep(time.Second * 5)

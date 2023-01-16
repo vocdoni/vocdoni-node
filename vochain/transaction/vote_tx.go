@@ -126,7 +126,8 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			return nil, voterID.Nil(), fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}
 
-		log.Debugf("new zk vote %x for process %x", voteEnvelope.Nullifier, voteEnvelope.ProcessId)
+		log.Debugw("new zk vote", map[string]interface{}{
+			"voteNullifier": string(voteEnvelope.Nullifier), "electionId": string(voteEnvelope.ProcessId)})
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkCircuits) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
@@ -136,15 +137,13 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 		// Get valid verification key and verify the proof parsed
 		circuit := t.ZkCircuits[proofZkSNARK.CircuitParametersIndex]
-		log.Infow("using loaded circuit", map[string]interface{}{"verfificationKey": string(circuit.Config.VerificationKeyHash)})
 		if err := proof.Verify(circuit.VerificationKey); err != nil {
 			return nil, voterID.Nil(), fmt.Errorf("zkSNARK proof verification failed")
 		}
 
-		// TODO the next 12 lines of code are the same than a little
-		// further down. TODO: maybe movoteEnvelope them before the 'switch', as
-		// is a logic that must be done evoteEnvelopen if
-		// process.EnvoteEnvelopelopeType.Anonymous==true or not
+		log.Debugw("zk vote proof verified", map[string]interface{}{
+			"voteNullifier": string(voteEnvelope.Nullifier), "electionId": string(voteEnvelope.ProcessId)})
+
 		vote = &models.Vote{
 			Height:      height,
 			ProcessId:   voteEnvelope.ProcessId,

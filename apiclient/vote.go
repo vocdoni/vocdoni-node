@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -90,6 +91,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	// TODO: Change the condition to the type of census origin
 	switch {
 	case election.VoteMode.Anonymous:
+		log.Debugw("zk anonymous voting detected", map[string]interface{}{"electionId": v.ElectionID.String()})
 		if v.ProofZkTree == nil {
 			return nil, fmt.Errorf("no zk proof provided")
 		}
@@ -105,6 +107,8 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, err
 		}
+		log.Debugw("zk vote proof parsed from prover and encoded to protobuf", map[string]interface{}{
+			"electionId": v.ElectionID.String()})
 
 		vote.Nullifier = v.ProofZkTree.Nullifier
 		vote.Proof = &models.Proof{
@@ -112,7 +116,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				ZkSnark: protoProof,
 			},
 		}
-	case v.ProofMkTree != nil:
+	case v.ProofMkTree != nil, election.Census.CensusOrigin == api.CensusTypeWeighted:
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
@@ -123,7 +127,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				},
 			},
 		}
-	case v.ProofCSP != nil:
+	case v.ProofCSP != nil, election.Census.CensusOrigin == api.CensusTypeCSP:
 		p := models.ProofCA{}
 		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
 			return nil, fmt.Errorf("could not decode CSP proof: %w", err)

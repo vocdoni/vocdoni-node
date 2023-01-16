@@ -121,7 +121,7 @@ func main() {
 	electionID, err := api.NewElection(&vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
 		Description: map[string]string{"default": "Test election description"},
-		EndDate:     time.Now().Add(time.Minute * 20),
+		EndDate:     time.Now().Add(time.Minute * 3),
 
 		VoteType: vapi.VoteType{
 			UniqueChoices:     false,
@@ -201,6 +201,7 @@ func main() {
 		if err != nil {
 			log.Warnw(err.Error(), map[string]interface{}{"election": electionID})
 		}
+		time.Sleep(time.Second)
 	}
 
 	// // Send the votes (parallelized)
