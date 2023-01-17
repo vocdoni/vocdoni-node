@@ -1,15 +1,10 @@
 package apiclient
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/types"
@@ -195,30 +190,4 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 
 	return accv.TxHash, nil
-}
-
-// GetBabyJubJubKey returns a private BabyJubJub key generated based on the
-// current apiclient account ethereum.SignKeys.
-func (c *HTTPclient) GetBabyJubJubKey() (babyjub.PrivateKey, error) {
-	privKey := babyjub.PrivateKey{}
-	_, strPrivKey := c.account.HexString()
-	if _, err := hex.Decode(privKey[:], []byte(strPrivKey)); err != nil {
-		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
-	}
-
-	return privKey, nil
-}
-
-// BabyJubJubPriv2PubKey returns the public key associated to the provided
-// BabuJubJub private key encoded to slice of bytes arbo tree ready.
-func (c *HTTPclient) BabyJubJubPriv2PubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
-	pubKey, err := poseidon.Hash([]*big.Int{
-		privKey.Public().X,
-		privKey.Public().Y,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
-	}
-
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
 }

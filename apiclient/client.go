@@ -12,6 +12,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
+	"github.com/iden3/go-iden3-crypto/babyjub"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -41,6 +42,7 @@ type HTTPclient struct {
 		conf   circuit.ZkCircuitConfig
 		levels int
 	}
+	babyjubjubKey babyjub.PrivateKey
 }
 
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
@@ -74,12 +76,12 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		conf   circuit.ZkCircuitConfig
 		levels int
 	}{
-		conf:   CircuitsConfigurations["dev"],
+		conf:   circuit.CircuitsConfigurations["dev"],
 		levels: 16,
 	}
 
-	if _, ok := CircuitsConfigurations[c.chainID]; ok {
-		c.circuit.conf = CircuitsConfigurations[c.chainID]
+	if _, ok := circuit.CircuitsConfigurations[c.chainID]; ok {
+		c.circuit.conf = circuit.CircuitsConfigurations[c.chainID]
 	}
 	return c, nil
 }
@@ -92,7 +94,13 @@ func (c *HTTPclient) ChainID() string {
 // SetAccount sets the Vocdoni account used for signing transactions.
 func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	c.account = new(ethereum.SignKeys)
-	return c.account.AddHexKey(accountPrivateKey)
+	err := c.account.AddHexKey(accountPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	c.babyjubjubKey, err = BabyJubJubPrivKey(c.account)
+	return err
 }
 
 // Clone returns a copy of the HTTPclient with the accountPrivateKey set as the account key.

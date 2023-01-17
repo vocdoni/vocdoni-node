@@ -23,27 +23,6 @@ const (
 	FilenameWasm = "circuit.wasm"
 )
 
-// ZkCircuitConfig defines the configuration of the files to be downloaded
-type ZkCircuitConfig struct {
-	// URI defines the URI from where to download the files
-	URI string `json:"uri"`
-	// CircuitPath defines the path from where the files are downloaded
-	CircuitPath string `json:"circuitPath"`
-	// Parameters used for the circuit build
-	Parameters []int64 `json:"parameters"`
-	// LocalDir defines in which directory will be the files
-	// downloaded, under that directory it will follow the CircuitPath
-	// directories structure
-	LocalDir string `json:"localDir"`
-
-	// WasmHash contains the expected hash for the file filenameWasm
-	WasmHash []byte `json:"wasmHash"` // circuit.wasm
-	// ProvingKeyHash contains the expected hash for the file filenameZKey
-	ProvingKeyHash []byte `json:"zKeyHash"` // proving_key.zkey
-	// VerificationKeyHash contains the expected hash for the file filenameVK
-	VerificationKeyHash []byte `json:"vKHash"` // verification_key.json
-}
-
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)
 type ZkCircuit struct {

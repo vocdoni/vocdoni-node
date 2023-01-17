@@ -2,16 +2,22 @@ package apiclient
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/iden3/go-iden3-crypto/babyjub"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -221,4 +227,30 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 		Signature: fpackage.Signature,
 	}, nil
 
+}
+
+// BabyJubJubPrivKey returns a private BabyJubJub key generated based on the
+// provided account ethereum.SignKeys.
+func BabyJubJubPrivKey(account *ethereum.SignKeys) (babyjub.PrivateKey, error) {
+	privKey := babyjub.PrivateKey{}
+	_, strPrivKey := account.HexString()
+	if _, err := hex.Decode(privKey[:], []byte(strPrivKey)); err != nil {
+		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
+	}
+
+	return privKey, nil
+}
+
+// BabyJubJubPubKey returns the public key associated to the provided
+// BabuJubJub private key encoded to slice of bytes arbo tree ready.
+func BabyJubJubPubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
+	pubKey, err := poseidon.Hash([]*big.Int{
+		privKey.Public().X,
+		privKey.Public().Y,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
+	}
+
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
 }

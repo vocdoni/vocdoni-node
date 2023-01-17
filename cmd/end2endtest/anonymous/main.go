@@ -166,7 +166,7 @@ func main() {
 
 	proofs := make(map[string]*apiclient.CensusProofZk, *nvotes)
 	for _, acc := range voterAccounts {
-		voterPrivKey, err := calcAnonPrivKey(acc)
+		voterPrivKey, err := apiclient.BabyJubJubPrivKey(acc)
 		if err != nil {
 			log.Errorw(err, "error calculating PublicKey")
 			return

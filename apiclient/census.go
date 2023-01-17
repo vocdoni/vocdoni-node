@@ -136,7 +136,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 // babyjubjub private key provided.
 func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, privVoterKey babyjub.PrivateKey) (*CensusProofZk, error) {
 	// Get BabyJubJub key from current client
-	pubVoterKey, err := c.BabyJubJubPriv2PubKey(privVoterKey)
+	pubVoterKey, err := BabyJubJubPubKey(privVoterKey)
 	if err != nil {
 		return nil, err
 	}
@@ -196,7 +196,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		strSiblings[i] = newSibling
 	}
 	// Get artifacts of the current circuit
-	circuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit.conf)
+	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit.conf)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
@@ -222,7 +222,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		"nullifier": strNullifier})
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
-	proof, err := prover.Prove(circuit.ProvingKey, circuit.Wasm, inputs)
+	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +232,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		return nil, err
 	}
 	return &CensusProofZk{
-		CircuitParametersIndex: ZKCircuitIndex,
+		CircuitParametersIndex: circuit.ZKCircuitIndex,
 		Proof:                  encProof,
 		PubSignals:             encPubSignals,
 		Weight:                 weight.Uint64(),
