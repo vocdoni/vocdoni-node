@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -160,7 +161,11 @@ func main() {
 		return
 	}
 
-	election := ensureElectionCreated(api, electionID)
+	election, err := api.WaitUntilElectionCreated(context.Background(), electionID)
+	if err != nil {
+		log.Errorw(err, "error creating the election")
+		return
+	}
 	log.Infof("created new election with id %s", electionID.String())
 	log.Debugf("election details: %+v", *election)
 

@@ -232,11 +232,10 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		return nil, err
 	}
 	return &CensusProofZk{
-		CircuitParametersIndex: circuit.ZKCircuitIndex,
-		Proof:                  encProof,
-		PubSignals:             encPubSignals,
-		Weight:                 weight.Uint64(),
-		KeyType:                models.ProofArbo_PUBKEY,
-		Nullifier:              nullifier,
+		Proof:      encProof,
+		PubSignals: encPubSignals,
+		Weight:     weight.Uint64(),
+		KeyType:    models.ProofArbo_PUBKEY,
+		Nullifier:  nullifier,
 	}, nil
 }

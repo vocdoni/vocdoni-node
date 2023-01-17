@@ -58,7 +58,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 	var vote *vstate.Vote
 	if process.EnvelopeType.Anonymous {
-		if t.ZkCircuits == nil || len(t.ZkCircuits) == 0 {
+		if t.ZkCircuit == nil {
 			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
 
@@ -111,7 +111,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		if err != nil {
 			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
-		log.Infof("%+v\n", proof.PubSignals)
 
 		// Get vote weight from proof publicSignals
 		voteWeight, err := proof.Weight()
@@ -129,23 +128,16 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			"electionID": fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		})
 
-		log.Debugw("new zk vote", map[string]interface{}{
-			"voteNullifier": string(voteEnvelope.Nullifier), "electionId": string(voteEnvelope.ProcessId)})
-
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkCircuits) ||
-			int(proofZkSNARK.CircuitParametersIndex) < 0 {
-			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d",
-				proofZkSNARK.CircuitParametersIndex, len(t.ZkVKs))
-		}
-
 		// Get valid verification key and verify the proof parsed
-		circuit := t.ZkCircuits[proofZkSNARK.CircuitParametersIndex]
-		if err := proof.Verify(circuit.VerificationKey); err != nil {
+		if err := proof.Verify(t.ZkCircuit.VerificationKey); err != nil {
 			return nil, fmt.Errorf("zkSNARK proof verification failed")
 		}
 
-		log.Debugw("zk vote proof verified", map[string]interface{}{
-			"voteNullifier": string(voteEnvelope.Nullifier), "electionId": string(voteEnvelope.ProcessId)})
+		log.Debugw("vote proof verified", map[string]interface{}{
+			"type":       "zkSNARK",
+			"nullifier":  fmt.Sprintf("%x", voteEnvelope.Nullifier),
+			"electionID": fmt.Sprintf("%x", voteEnvelope.ProcessId),
+		})
 
 		// TODO the next 12 lines of code are the same than a little
 		// further down. TODO: maybe movoteEnvelope them before the 'switch', as

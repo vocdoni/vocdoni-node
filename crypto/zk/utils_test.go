@@ -51,7 +51,7 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 		Data:       prover.ProofData{},
 		PubSignals: []string{},
 	}
-	_, err := ProverProofToProtobufZKProof(0, badInput, nil, nil, nil, nil)
+	_, err := ProverProofToProtobufZKProof(badInput, nil, nil, nil, nil)
 	c.Assert(err, qt.IsNotNil)
 
 	input := &prover.Proof{
@@ -66,7 +66,7 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 		},
 		PubSignals: []string{},
 	}
-	_, err = ProverProofToProtobufZKProof(0, input, nil, nil, nil, nil)
+	_, err = ProverProofToProtobufZKProof(input, nil, nil, nil, nil)
 	c.Assert(err, qt.IsNotNil)
 
 	expected := &models.ProofZkSNARK{
@@ -80,7 +80,7 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 		},
 	}
 	mockData := make([]byte, 32)
-	result, err := ProverProofToProtobufZKProof(0, input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
+	result, err := ProverProofToProtobufZKProof(input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
 	c.Assert(err, qt.IsNil)
 	c.Assert(result.A, qt.ContentEquals, expected.A)
 	c.Assert(result.B, qt.ContentEquals, expected.B)
@@ -105,7 +105,7 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 		C:            []string{"0", "1", "2"},
 		PublicInputs: []string{"0", "1", "2", "3", "4", "5", "6"},
 	}
-	result, err = ProverProofToProtobufZKProof(0, input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
+	result, err = ProverProofToProtobufZKProof(input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
 	c.Assert(err, qt.IsNil)
 	c.Assert(result.A, qt.ContentEquals, expected.A)
 	c.Assert(result.B, qt.ContentEquals, expected.B)

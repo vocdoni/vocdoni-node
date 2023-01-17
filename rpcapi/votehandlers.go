@@ -258,24 +258,11 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 		return nil, fmt.Errorf("rolling census is not closed yet")
 	}
 	var response api.APIresponse
-	var config circuit.ZkCircuitConfig
-	index := -1
-	var circuits []circuit.ZkCircuitConfig
+	response.CircuitConfig = &circuit.DefaultCircuitsConfiguration
 	if genesis, ok := vocdoniGenesis.Genesis[r.vocapp.ChainID()]; ok {
-		circuits = genesis.CircuitsConfig
-	} else {
-		circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
-	}
-	for i, cfg := range circuits {
-		if *process.RollingCensusSize <= uint64(cfg.Parameters[0]) {
-			index = i
-			config = cfg
-			break
+		if conf, ok := circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]; ok {
+			response.CircuitConfig = &conf
 		}
-	}
-	response.CircuitIndex = &index
-	if index != -1 {
-		response.CircuitConfig = &config
 	}
 	return &response, nil
 }

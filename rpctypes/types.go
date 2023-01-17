@@ -170,7 +170,6 @@ type APIresponse struct {
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
 	CensusValue          []byte                           `json:"censusValue,omitempty"`
 	ChainID              string                           `json:"chainId,omitempty"`
-	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
 	CircuitConfig        *circuit.ZkCircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	Amount               *uint64                          `json:"amount,omitempty"`

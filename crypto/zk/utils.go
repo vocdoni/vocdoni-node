@@ -40,15 +40,14 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 // does not contains a defined public signals and any of the rest of the
 // parameters is nil, the resulting struct will not contains any defined
 // PublicInputs value.
-func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
+func ProverProofToProtobufZKProof(p *prover.Proof,
 	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
 	if len(p.Data.A) != 3 || len(p.Data.B) != 3 || len(p.Data.C) != 3 {
 		return nil, fmt.Errorf("wrong ZkSnark prover proof format")
 	}
 
 	proof := &models.ProofZkSNARK{
-		CircuitParametersIndex: index,
-		A:                      p.Data.A,
+		A: p.Data.A,
 		B: []string{
 			p.Data.B[0][0], p.Data.B[0][1],
 			p.Data.B[1][0], p.Data.B[1][1],

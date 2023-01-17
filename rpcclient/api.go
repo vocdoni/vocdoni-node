@@ -192,18 +192,18 @@ func (c *Client) GetKeys(pid, eid []byte) (*pkeys, error) {
 	}, nil
 }
 
-func (c *Client) GetCircuitConfig(pid []byte) (*int, *circuit.ZkCircuitConfig, error) {
+func (c *Client) GetCircuitConfig(pid []byte) (*circuit.ZkCircuitConfig, error) {
 	var req api.APIrequest
 	req.Method = "getProcessCircuitConfig"
 	req.ProcessID = pid
 	resp, err := c.Request(req, nil)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	if !resp.Ok {
-		return nil, nil, fmt.Errorf("cannot get circuitConfig for process %x: %s", pid, resp.Message)
+		return nil, fmt.Errorf("cannot get circuitConfig for process %x: %s", pid, resp.Message)
 	}
-	return resp.CircuitIndex, resp.CircuitConfig, nil
+	return resp.CircuitConfig, nil
 }
 
 func (c *Client) GetRollingCensusSize(pid []byte) (int64, error) {
@@ -877,11 +877,11 @@ func (c *Client) TestSendAnonVotes(
 		return 0, err
 	}
 	log.Infof("Requested %v proofs", len(proofs))
-	circuitIndex, circuitConfig, err := c.GetCircuitConfig(pid)
+	circuitConfig, err := c.GetCircuitConfig(pid)
 	if err != nil {
 		return 0, err
 	}
-	log.Infof("CircuitIndex: %v, CircuitPath: %+v", *circuitIndex, circuitConfig.CircuitPath)
+	log.Infof("CircuitPath: %+v", circuitConfig.CircuitPath)
 	// Wait until all gateway connections are ready
 	wg.Done()
 	log.Infof("%s is waiting other gateways to be ready before it can start voting", c.Addr)
@@ -934,7 +934,7 @@ func (c *Client) TestSendAnonVotes(
 			Nullifier:   nullifier,
 		}
 
-		model, err := zk.ProverProofToProtobufZKProof(int32(*circuitIndex), proof, v.ProcessId, root, v.Nullifier, weight)
+		model, err := zk.ProverProofToProtobufZKProof(proof, v.ProcessId, root, v.Nullifier, weight)
 		if err != nil {
 			return 0, fmt.Errorf("error encoding the proof to protobuf: %w", err)
 		}

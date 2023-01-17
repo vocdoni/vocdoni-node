@@ -106,7 +106,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, err
 		}
-		protoProof, err := zk.ProverProofToProtobufZKProof(v.ProofZkTree.CircuitParametersIndex, proof, nil, nil, nil, nil)
+		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil)
 		if err != nil {
 			return nil, err
 		}

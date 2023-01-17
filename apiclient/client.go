@@ -76,7 +76,7 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		conf   circuit.ZkCircuitConfig
 		levels int
 	}{
-		conf:   circuit.CircuitsConfigurations["dev"],
+		conf:   circuit.DefaultCircuitsConfiguration,
 		levels: 16,
 	}
 

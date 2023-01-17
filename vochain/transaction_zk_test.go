@@ -11,7 +11,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -19,9 +18,9 @@ import (
 func TestVoteCheckZkSNARK(t *testing.T) {
 	app := TestBaseApplication(t)
 
-	devCircuit, err := circuit.LoadZkCircuit(context.Background(), genesis.Genesis["dev"].CircuitsConfig[1])
+	devCircuit, err := circuit.LoadZkCircuit(context.Background(), circuit.DefaultCircuitsConfiguration)
 	qt.Assert(t, err, qt.IsNil)
-	app.TransactionHandler.ZkCircuits = []*circuit.ZkCircuit{devCircuit}
+	app.TransactionHandler.ZkCircuit = devCircuit
 
 	processId := sha256.Sum256(big.NewInt(10).Bytes())
 	entityId := []byte("entityid-test")
@@ -71,7 +70,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		VotePackage: weight.Bytes(),
 		Nullifier:   nullifier,
 	}
-	protoProof, err := zk.ProverProofToProtobufZKProof(0, parsedProof,
+	protoProof, err := zk.ProverProofToProtobufZKProof(parsedProof,
 		testVote.ProcessId, process.CensusRoot, testVote.Nullifier, weight)
 	qt.Assert(t, err, qt.IsNil)
 

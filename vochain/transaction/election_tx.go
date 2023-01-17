@@ -140,23 +140,20 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		var circuits []circuit.ZkCircuitConfig
+		circuitConf := circuit.DefaultCircuitsConfiguration
 		if genesis, ok := vocdoniGenesis.Genesis[t.state.ChainID()]; ok {
-			circuits = genesis.CircuitsConfig
+			circuitConf = circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]
 		} else {
 			log.Warn("using dev network genesis CircuitsConfig")
-			circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
 		}
-		if len(circuits) == 0 {
-			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", t.state.ChainID())
-		}
+
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
 		}
-		if tx.Process.GetMaxCensusSize() > uint64(circuits[len(circuits)-1].Parameters[0]) {
+		if tx.Process.GetMaxCensusSize() > uint64(circuitConf.Parameters[0]) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",
-				circuits[len(circuits)-1].Parameters[0])
+				circuitConf.Parameters[0])
 		}
 	}
 

@@ -14,32 +14,24 @@ import (
 
 const downloadZkVKsTimeout = 1 * time.Minute
 
-func LoadZkCircuits(dataDir, chainID string) ([]*circuit.ZkCircuit, error) {
-	zkCircuits := []*circuit.ZkCircuit{}
-	var circuits []circuit.ZkCircuitConfig
+func LoadZkCircuits(dataDir, chainID string) (*circuit.ZkCircuit, error) {
+	circuitConf := circuit.DefaultCircuitsConfiguration
 	if genesis, ok := vocdoniGenesis.Genesis[chainID]; ok {
-		circuits = genesis.CircuitsConfig
+		circuitConf = circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]
 	} else {
 		log.Info("using dev genesis zkSnarks circuits")
-		circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
 	}
 
-	for i, config := range circuits {
-		log.Infof("downloading zk-circuits-artifacts index: %d", i)
+	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
+	defer cancel()
+	circuitConf.LocalDir = filepath.Join(dataDir, circuitConf.LocalDir)
 
-		// download VKs from CircuitsConfig
-		ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)
-		defer cancel()
-		config.LocalDir = filepath.Join(dataDir, config.LocalDir)
-
-		zkCircuit, err := circuit.LoadZkCircuit(ctx, config)
-		if err != nil {
-			return nil, err
-		}
-
-		zkCircuits = append(zkCircuits, zkCircuit)
+	zkCircuit, err := circuit.LoadZkCircuit(ctx, circuitConf)
+	if err != nil {
+		return nil, err
 	}
-	return zkCircuits, nil
+
+	return zkCircuit, nil
 }
 
 // verifySignatureAgainstOracles verifies that a signature match with one of the oracles

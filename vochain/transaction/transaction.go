@@ -40,7 +40,7 @@ type TransactionHandler struct {
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
 
-	ZkCircuits []*circuit.ZkCircuit
+	ZkCircuit *circuit.ZkCircuit
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
@@ -52,11 +52,11 @@ func NewTransactionHandler(state *vstate.State, dataDir string) (*TransactionHan
 }
 
 func (t *TransactionHandler) LoadZkCircuit() error {
-	circuits, err := LoadZkCircuits(t.dataDir, t.state.ChainID())
+	circuit, err := LoadZkCircuits(t.dataDir, t.state.ChainID())
 	if err != nil {
 		return fmt.Errorf("could not load zk verification keys: %w", err)
 	}
-	t.ZkCircuits = circuits
+	t.ZkCircuit = circuit
 	return nil
 }
 
