@@ -11,3 +11,7 @@ INSERT INTO vote_references (
 SELECT * FROM vote_references
 WHERE nullifier = ?
 LIMIT 1;
+
+-- name: GetVoteReferencesByProcessID :many
+SELECT * FROM vote_references
+WHERE process_id = ?;
