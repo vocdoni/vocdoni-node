@@ -142,7 +142,8 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 				defer wg.Done()
 				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
 				if err != nil {
-					log.Errorf("could not get tx: %v", err)
+					log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
+						txRef.Height, txRef.TxIndex))
 					return
 				}
 				tx := &models.Tx{}
@@ -542,12 +543,19 @@ func (s *Indexer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
-		Nullifier:    nullifier,
-		ProcessID:    pid,
-		Height:       int64(blockHeight),
-		Weight:       string(weightStr),
-		TxIndex:      int64(txIndex),
-		VoterID:      voterID,
+		Nullifier: nullifier,
+		ProcessID: pid,
+		Height:    int64(blockHeight),
+		Weight:    string(weightStr),
+		TxIndex:   int64(txIndex),
+		// VoterID has a NOT NULL constraint, so we need to provide
+		// a zero value for it since nil is not allowed
+		VoterID: func() state.VoterID {
+			if voterID == nil {
+				return voterID.Nil()
+			}
+			return voterID
+		}(),
 		CreationTime: creationTime,
 	}); err != nil {
 		return err

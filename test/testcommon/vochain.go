@@ -37,10 +37,10 @@ var (
 
 	// NewVoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
-	NewVoteHardcoded = func() *models.Vote {
+	NewVoteHardcoded = func() *state.Vote {
 		vp, _ := base64.StdEncoding.DecodeString("eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19")
-		return &models.Vote{
-			ProcessId:   testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		return &state.Vote{
+			ProcessID:   testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 			Nullifier:   testutil.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), // nullifier and nonce are the same here
 			VotePackage: vp,
 		}

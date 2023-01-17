@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -108,7 +108,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 		return err
 	}
 	voterKeys := util.CreateEthRandomKeysBatch(censusSize)
-	proofs, err := testutil.GetCSPproofBatch(voterKeys, &cspKey, processID)
+	proofs, err := testvoteproof.GetCSPproofBatch(voterKeys, &cspKey, processID)
 	if err != nil {
 		return err
 	}

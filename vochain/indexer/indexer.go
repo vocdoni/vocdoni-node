@@ -71,7 +71,7 @@ type Indexer struct {
 	// voteIndexPool is the list of votes that will be indexed in the database
 	voteIndexPool []*VoteWithIndex
 	// votePool is the list of votes that should be live counted, grouped by processId
-	votePool map[string][]*models.Vote
+	votePool map[string][]*state.Vote
 	// newProcessPool is the list of new process IDs on the current block
 	newProcessPool []*indexertypes.IndexerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
@@ -123,7 +123,7 @@ type Indexer struct {
 
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
-	vote    *models.Vote
+	vote    *state.Vote
 	voterID state.VoterID
 	txIndex int32
 }
@@ -450,9 +450,9 @@ func (idx *Indexer) Commit(height uint32) error {
 	for _, v := range idx.voteIndexPool {
 		if err := idx.addVoteIndex(
 			v.vote.Nullifier,
-			v.vote.ProcessId,
+			v.vote.ProcessID,
 			height,
-			v.vote.Weight,
+			v.vote.WeightBytes(),
 			v.txIndex,
 			v.voterID,
 			txn); err != nil {
@@ -511,10 +511,10 @@ func (idx *Indexer) Commit(height uint32) error {
 			EnvelopeType: proc.Envelope,
 		}
 		for _, v := range votes {
-			if err := idx.addLiveVote(v.ProcessId,
+			if err := idx.addLiveVote(v.ProcessID,
 				v.VotePackage,
 				// TBD: Not 100% sure what happens if weight=nil
-				new(big.Int).SetBytes(v.GetWeight()),
+				v.Weight,
 				results); err != nil {
 				log.Warnf("vote cannot be added: %v", err)
 			} else {
@@ -547,7 +547,7 @@ func (idx *Indexer) Commit(height uint32) error {
 func (idx *Indexer) Rollback() {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.votePool = make(map[string][]*models.Vote)
+	idx.votePool = make(map[string][]*state.Vote)
 	idx.voteIndexPool = []*VoteWithIndex{}
 	idx.newProcessPool = []*indexertypes.IndexerOnProcessData{}
 	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
@@ -567,13 +567,14 @@ func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txI
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (idx *Indexer) OnVote(v *models.Vote, voterID state.VoterID, txIndex int32) {
+func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessId) {
-		idx.votePool[string(v.ProcessId)] = append(idx.votePool[string(v.ProcessId)], v)
+	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessID) {
+		idx.votePool[string(v.ProcessID)] = append(idx.votePool[string(v.ProcessID)], v)
 	}
-	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, voterID: voterID, txIndex: txIndex})
+	//sVote, err := idx.App.State.Vote(v.ProcessId, v.Nullifier, false)
+	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
 }
 
 // OnCancel indexer stores the processID and entityID

@@ -1,36 +1,31 @@
 package testcommon
 
 import (
-	"fmt"
-	"math/rand"
 	"net/url"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/censusdb"
-	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
 
-// APIserver contains all the required pieces for running an URL api server
+// APIserver contains all the required pieces for running a mock API server.
+// It is used for testing purposes only. The server starts a Vochain instance,
+// the Indexer, the IPFS storage and the API router.
+// The blockchain is advanced by calling the APIserver.VochainAPP.AdvanceTestBlock() method.
 type APIserver struct {
-	Signer     *ethereum.SignKeys
-	VochainCfg *config.VochainCfg
-	CensusDir  string
-	IpfsDir    string
-	IndexerDir string
-	ListenAddr *url.URL
-	Storage    data.Storage
-	IpfsPort   int
-
+	Account     *ethereum.SignKeys
+	ListenAddr  *url.URL
+	Storage     data.Storage
 	VochainAPP  *vochain.BaseApplication
 	Indexer     *indexer.Indexer
 	VochainInfo *vochaininfo.VochainInfo
@@ -38,52 +33,67 @@ type APIserver struct {
 
 // Start starts a basic URL API server for testing
 func (d *APIserver) Start(t testing.TB, apis ...string) {
-	// create signer
-	d.Signer = ethereum.NewSignKeys()
-	if err := d.Signer.Generate(); err != nil {
+	// create the account signer
+	d.Account = ethereum.NewSignKeys()
+	if err := d.Account.Generate(); err != nil {
 		t.Fatal(err)
 	}
 
-	// Create the API router
-	d.IpfsDir = t.TempDir()
-	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
-	ipfs := data.IPFSHandle{}
-	d.IpfsPort = 14000 + rand.Intn(2048)
-	if err := ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", d.IpfsPort)); err != nil {
-		t.Fatal(err)
-	}
-	if err := ipfs.Init(ipfsStore); err != nil {
-		t.Fatal(err)
-	}
-	d.Storage = &ipfs
-	t.Cleanup(func() {
-		if err := d.Storage.Stop(); err != nil {
-			t.Error(err)
-		}
-	})
+	// create the IPFS storage
+	d.Storage = &data.DataMockTest{}
+	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
 
+	/*	ipfsStore := data.IPFSNewConfig(t.TempDir())
+			ipfs := data.IPFSHandle{}
+			port := 14000 + rand.Intn(4096)
+			if err := ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port)); err != nil {
+				t.Fatal(err)
+			}
+			if err := ipfs.Init(ipfsStore); err != nil {
+				t.Fatal(err)
+			}
+			d.Storage = &ipfs
+
+		t.Cleanup(func() {
+			if err := d.Storage.Stop(); err != nil {
+				t.Error(err)
+			}
+		})
+	*/
+
+	// creeate the API router
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + router.Address().String() + "/")
 	qt.Assert(t, err, qt.IsNil)
 	d.ListenAddr = addr
 	t.Logf("address: %s", addr.String())
-
 	api, err := api.NewAPI(&router, "/", t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 
-	d.VochainCfg = new(config.VochainCfg)
-	d.VochainAPP = NewMockVochainNode(t, d.VochainCfg, d.Signer)
+	// create vochain application
+	d.VochainAPP = vochain.TestBaseApplication(t)
+
+	// create and add balance for the pre-created Account
+	err = d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 100000)
+	qt.Assert(t, err, qt.IsNil)
+	d.VochainAPP.Commit()
+
+	// create vochain info (we do not start since it is not required)
 	d.VochainInfo = vochaininfo.NewVochainInfo(d.VochainAPP)
-	go d.VochainInfo.Start(10)
+
+	// create indexer
 	d.Indexer = NewMockIndexer(t, d.VochainAPP)
-	qt.Assert(t, d.VochainAPP.Service.Start(), qt.IsNil)
+
+	// create census database
 	db, err := metadb.New(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
+	// attach all the pieces to the API
 	api.Attach(d.VochainAPP, d.VochainInfo, d.Indexer, d.Storage, censusDB)
 
+	// enable the required handlers
 	err = api.EnableHandlers(apis...)
 	qt.Assert(t, err, qt.IsNil)
 }

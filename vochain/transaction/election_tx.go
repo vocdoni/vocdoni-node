@@ -61,7 +61,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	}
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return nil, common.Address{}, err
+		return nil, common.Address{}, fmt.Errorf("could not get account: %w", err)
 	}
 	if addr == nil {
 		return nil, common.Address{}, fmt.Errorf("cannot get account from vtx.Signature, nil result")
@@ -74,6 +74,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, vstate.ErrAccountNonceInvalid
 	}
 
+	// if organization ID is not set, use the sender address
+	if tx.Process.EntityId == nil {
+		tx.Process.EntityId = addr.Bytes()
+	}
+
+	// check if the sender is an Oracle or a Delegate of the organization
 	isOracle, err := t.state.IsOracle(*addr)
 	if err != nil {
 		return nil, common.Address{}, err
@@ -86,15 +92,15 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		entityAccount, err := t.state.GetAccount(entityAddress, false)
 		if err != nil {
 			return nil, common.Address{}, fmt.Errorf(
-				"cannot get entity account for checking if the sender is a delegate: %w", err,
+				"cannot get organization account for checking if the sender is a delegate: %w", err,
 			)
 		}
 		if entityAccount == nil {
-			return nil, common.Address{}, vstate.ErrAccountNotExist
+			return nil, common.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
 		}
 		if !entityAccount.IsDelegate(*addr) {
 			return nil, common.Address{}, fmt.Errorf(
-				"unauthorized to create a new process, recovered addr is %s", addr.Hex())
+				"account %s unauthorized to create a new election on this organization", addr.Hex())
 		}
 	}
 

@@ -160,7 +160,7 @@ func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) 
 
 // NOT USED but required for implementing the vochain.EventListener interface
 func (c *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                                 {}
-func (c *OffChainDataHandler) OnVote(v *models.Vote, voterID state.VoterID, txindex int32)        {}
+func (c *OffChainDataHandler) OnVote(v *state.Vote, txindex int32)                                {}
 func (c *OffChainDataHandler) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {}
 func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)                {}
 func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)                {}

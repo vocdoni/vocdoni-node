@@ -43,12 +43,15 @@ type BaseApplication struct {
 	// data races when querying about the sync status of the blockchain.
 	isSyncLock sync.Mutex
 
+	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
 	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
 	fnGetTx            func(height uint32, txIndex int32) (*models.SignedTx, error)
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
+	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
+	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
 
 	blockCache *lru.AtomicCache
 	// height of the last ended block
@@ -95,13 +98,25 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 }
 
 // TestBaseApplication creates a new BaseApplication for testing purposes.
+// It initializes the State, TransactionHandler and all the callback functions.
+// Once the application is create, it is the caller's responsibility to call
+// app.AdvanceTestBlock() to advance the block height and commit the state.
 func TestBaseApplication(tb testing.TB) *BaseApplication {
 	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}
 	app.SetTestingMethods()
-
+	genesisDoc, err := NewTemplateGenesisFile(tb.TempDir(), 4)
+	if err != nil {
+		tb.Fatal(err)
+	}
+	app.InitChain(abcitypes.RequestInitChain{
+		Time:          time.Now(),
+		ChainId:       "test",
+		Validators:    []abcitypes.ValidatorUpdate{},
+		AppStateBytes: genesisDoc.AppState,
+	})
 	// TODO: should this be a Close on the entire BaseApplication?
 	tb.Cleanup(func() {
 		if err := app.State.Close(); err != nil {
@@ -128,10 +143,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
 func (app *BaseApplication) SetDefaultMethods() {
-	if app.Node == nil {
-		return
-	}
-
 	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
 		resblock, err := app.Node.BlockByHash(context.Background(), hash)
 		if err != nil {
@@ -157,7 +168,8 @@ func (app *BaseApplication) SetDefaultMethods() {
 		// TODO: find the way to return correctly the mempool size
 		return 0
 	})
-
+	app.SetFnBeginBlock(app.fnBeginBlockDefault)
+	app.SetFnEndBlock(app.fnEndBlockDefault)
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 		return app.Node.BroadcastTxSync(context.Background(), tx)
 	})
@@ -170,7 +182,6 @@ func (app *BaseApplication) SetTestingMethods() {
 	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
 	app.SetFnGetBlockByHeight(mockBlockStore.Get)
 	app.SetFnGetTx(func(height uint32, txIndex int32) (*models.SignedTx, error) {
-		log.Warnf("AQUI")
 		blk := mockBlockStore.Get(int64(height))
 		if blk == nil {
 			return nil, fmt.Errorf("block not found")
@@ -194,8 +205,10 @@ func (app *BaseApplication) SetTestingMethods() {
 		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
 	})
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-		mockBlockStore.Add(&tmtypes.Block{Data: tmtypes.Data{Txs: []tmtypes.Tx{tx}}})
 		resp := app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
+		if resp.Code == 0 {
+			mockBlockStore.AddTxToBlock(tx)
+		}
 		return &ctypes.ResultBroadcastTx{
 			Hash: tmtypes.Tx(tx).Hash(),
 			Code: resp.Code,
@@ -204,16 +217,19 @@ func (app *BaseApplication) SetTestingMethods() {
 	})
 	app.SetFnMempoolSize(func() int { return 0 })
 	app.IsSynchronizing = func() bool { return false }
-
-	// For tests, we begin at block 2.
-	// The last block we finished was 1, and we did so 3s ago.
-	app.height = 0
-	now := time.Now()
-	app.endBlockTimestamp = now.Add(-3 * time.Second).Unix()
-	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
-		Time:   now,
-		Height: 1,
-	}})
+	app.SetFnEndBlock(func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+		height := mockBlockStore.EndBlock()
+		app.endBlock(height, time.Now())
+		//app.State.SetHeight(uint32(height))
+		return abcitypes.ResponseEndBlock{}
+	})
+	app.SetFnBeginBlock(func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+		mockBlockStore.NewBlock(req.Header.Height)
+		app.fnBeginBlockDefault(req)
+		return abcitypes.ResponseBeginBlock{}
+	})
+	app.State.SetHeight(0)
+	app.endBlockTimestamp = time.Now().Unix()
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
@@ -307,13 +323,11 @@ func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*mode
 }
 
 // GetTxHash retrieves a vochain transaction, with its hash, from the blockstore
-func (app *BaseApplication) GetTxHash(height uint32,
-	txIndex int32) (*models.SignedTx, []byte, error) {
+func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	return app.fnGetTxHash(height, txIndex)
 }
 
-func (app *BaseApplication) getTxHashTendermint(height uint32,
-	txIndex int32) (*models.SignedTx, []byte, error) {
+func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
 		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
@@ -332,6 +346,16 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 		return nil, nil
 	}
 	return app.fnSendTx(tx)
+}
+
+// BeginBlock is called at the beginning of every block.
+func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	return app.fnBeginBlock(req)
+}
+
+// EndBlock is called at the end of every block.
+func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	return app.fnEndBlock(req)
 }
 
 // Info Return information about the application state.
@@ -438,12 +462,12 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	return abcitypes.ResponseInitChain{}
 }
 
-// BeginBlock signals the beginning of a new block. Called prior to any DeliverTxs.
+// fnBeginBlockDefault signals the beginning of a new block. Called prior to any DeliverTxs.
 // The header contains the height, timestamp, and more - it exactly matches the
 // Tendermint block header.
 // The LastCommitInfo and ByzantineValidators can be used to determine rewards and
 // punishments for the validators.
-func (app *BaseApplication) BeginBlock(
+func (app *BaseApplication) fnBeginBlockDefault(
 	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	app.State.Rollback()
 	atomic.StoreInt64(&app.startBlockTimestamp, req.Header.GetTime().Unix())
@@ -454,16 +478,17 @@ func (app *BaseApplication) BeginBlock(
 	return abcitypes.ResponseBeginBlock{}
 }
 
+// AdvanceTestBlock commits the current state, ends the current block and starts a new one.
+// Advances the block height and timestamp.
 func (app *BaseApplication) AdvanceTestBlock() {
-	// Each block spans 2 seconds.
-	endingHeight := int64(app.Height()) + 1
-	endingTime := time.Unix(app.TimestampStartBlock(), 0).Add(2 * time.Second)
-	app.endBlock(endingHeight, endingTime)
 	app.Commit()
+	endingHeight := int64(app.Height())
+	app.EndBlock(abcitypes.RequestEndBlock{Height: endingHeight})
 
 	// The next block begins a second later.
 	nextHeight := endingHeight + 1
-	nextStartTime := endingTime.Add(1 * time.Second)
+	nextStartTime := time.Now()
+
 	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
 		Time:   nextStartTime,
 		Height: nextHeight,
@@ -554,8 +579,8 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	return abcitypes.ResponseQuery{}
 }
 
-// EndBlock updates the app height and timestamp at the end of the current block
-func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+// fnEndBlockDefault updates the app height and timestamp at the end of the current block
+func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 	app.endBlock(req.Height, time.Now())
 	return abcitypes.ResponseEndBlock{}
 }
@@ -614,6 +639,14 @@ func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32)
 // SetFnMempoolSize sets the mempool size method method
 func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
 	app.fnMempoolSize = fn
+}
+
+func (app *BaseApplication) SetFnBeginBlock(fn func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock) {
+	app.fnBeginBlock = fn
+}
+
+func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock) {
+	app.fnEndBlock = fn
 }
 
 // SetChainID sets the app and state chainID

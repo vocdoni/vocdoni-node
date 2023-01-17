@@ -42,7 +42,6 @@ func TestMerkleTreeProof(t *testing.T) {
 	err := app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
 
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	var cktx abcitypes.RequestCheckTx
@@ -69,7 +68,6 @@ func TestMerkleTreeProof(t *testing.T) {
 			app.AdvanceTestBlock()
 		}
 	}
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	// send the las vote multiple time, first attempt should be ok. The rest sould fail.
@@ -119,7 +117,6 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatalf("deliverTx returned 0, an error was expected")
 		}
 		if i%2 == 0 {
-			app.Commit()
 			app.AdvanceTestBlock()
 		}
 	}

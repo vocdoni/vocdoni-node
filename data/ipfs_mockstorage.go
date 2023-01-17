@@ -7,11 +7,12 @@ import (
 	qt "github.com/frankban/quicktest"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
+	"go.vocdoni.io/dvote/db/lru"
 )
 
-// MockStorage returns a IPFSHandle with a (offline, nilrepo) IPFS node
+// MockIPFS returns a IPFSHandle with a (offline, nilrepo) IPFS node
 // with a functional CoreAPI
-func MockStorage(t *testing.T) IPFSHandle {
+func MockIPFS(t testing.TB) Storage {
 	storage := IPFSHandle{}
 	n, err := ipfscore.NewNode(context.Background(), &ipfscore.BuildCfg{
 		Online:    false,
@@ -19,8 +20,10 @@ func MockStorage(t *testing.T) IPFSHandle {
 		NilRepo:   false,
 	})
 	qt.Assert(t, err, qt.IsNil)
+	storage.retrieveCache = lru.New(RetrievedFileCacheSize)
+	storage.Node = n
 	api, err := ipfsapi.NewCoreAPI(n)
 	qt.Assert(t, err, qt.IsNil)
 	storage.CoreAPI = api
-	return storage
+	return &storage
 }

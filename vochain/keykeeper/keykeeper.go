@@ -245,7 +245,7 @@ func (k *KeyKeeper) Commit(height uint32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *models.Vote, voterID state.VoterID, txindex int32) {
+func (k *KeyKeeper) OnVote(v *state.Vote, txindex int32) {
 	// do nothing
 }
 

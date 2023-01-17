@@ -117,7 +117,7 @@ func (v *State) AccountFromSignature(message, signature []byte) (*common.Address
 		return &common.Address{}, nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	if acc == nil {
-		return &common.Address{}, nil, ErrAccountNotExist
+		return &common.Address{}, nil, fmt.Errorf("%w %s", ErrAccountNotExist, address.Hex())
 	}
 	return &address, acc, nil
 }
