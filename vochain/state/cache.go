@@ -2,8 +2,6 @@ package state
 
 import (
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -20,7 +18,7 @@ func (v *State) cacheDisabled() bool {
 }
 
 // CacheAdd adds a new vote proof to the local cache
-func (v *State) CacheAdd(id [32]byte, vote *models.Vote) {
+func (v *State) CacheAdd(id [32]byte, vote *Vote) {
 	if v.cacheDisabled() {
 		return
 	}
@@ -43,8 +41,8 @@ func (v *State) CacheDel(id [32]byte) {
 	v.voteCache.Remove(id)
 }
 
-// CacheGet fetch an existing vote from the local cache and returns a copy
-func (v *State) CacheGet(id [32]byte) *models.Vote {
+// CacheGet fetch an existing vote from the local cache and returns it.
+func (v *State) CacheGet(id [32]byte) *Vote {
 	if v.cacheDisabled() {
 		return nil
 	}
@@ -52,22 +50,23 @@ func (v *State) CacheGet(id [32]byte) *models.Vote {
 	if !ok || record == nil {
 		return nil
 	}
-	return record.(*models.Vote)
+	return record.(*Vote)
 }
 
 // CacheGetCopy fetch an existing vote from the local cache and returns a copy
 // which is thread-safe for writing.
-func (v *State) CacheGetCopy(id [32]byte) *models.Vote {
+func (v *State) CacheGetCopy(id [32]byte) *Vote {
 	if v.cacheDisabled() {
 		return nil
 	}
 	if vote := v.CacheGet(id); vote != nil {
-		return proto.Clone(vote).(*models.Vote)
+		// return a deep copy of vote
+		return vote.DeepCopy()
 	}
 	return nil
 }
 
-// CacheHasNullifier fetch an existing vote from the local cache
+// CacheHasNullifier fetch an existing vote from the local cache.
 func (v *State) CacheHasNullifier(nullifier []byte) bool {
 	if v.cacheDisabled() {
 		return false
@@ -93,7 +92,7 @@ func (v *State) CachePurge(height uint32) {
 			// vote have been already deleted?
 			continue
 		}
-		vote, ok := record.(*models.Vote)
+		vote, ok := record.(*Vote)
 		if !ok {
 			continue
 		}

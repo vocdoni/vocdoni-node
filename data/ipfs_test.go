@@ -12,7 +12,7 @@ func TestIPFSCIDv1(t *testing.T) {
 	msg := []byte("{\"test\": { \"hello\": \"world\" }}")
 	expectedCid := "bagaaiera63prsqlm2mptglagfk6ywr4cv3ibcxbpapi2rjzzufnilp52crvq"
 
-	i := MockStorage(t)
+	i := MockIPFS(t)
 	cidFromPublish, err := i.Publish(context.Background(), msg)
 	qt.Assert(t, err, qt.IsNil)
 	cid, err := ipfscid.Decode(cidFromPublish)

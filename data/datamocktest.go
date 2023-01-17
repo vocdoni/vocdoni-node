@@ -2,12 +2,10 @@ package data
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"sync"
 	"time"
 
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -23,7 +21,7 @@ type DataMockTest struct {
 
 func (d *DataMockTest) Init(ds *types.DataStore) error {
 	d.files = make(map[string]string)
-	d.prefix = "mock://"
+	d.prefix = "ipfs://"
 	d.rnd = testutil.NewRandom(0)
 	return nil
 }
@@ -31,9 +29,9 @@ func (d *DataMockTest) Init(ds *types.DataStore) error {
 func (d *DataMockTest) Publish(ctx context.Context, o []byte) (string, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
-	id := fmt.Sprintf("%x", ethereum.HashRaw(o))
-	d.files[id] = string(o)
-	return d.prefix + id, nil
+	cid := CalculateIPFSCIDv1json(o)
+	d.files[cid] = string(o)
+	return d.prefix + cid, nil
 }
 
 func (d *DataMockTest) Retrieve(ctx context.Context, id string, maxSize int64) ([]byte, error) {

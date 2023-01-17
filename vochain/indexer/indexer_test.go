@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -477,19 +478,21 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 
 func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	app.State.SetHeight(3)
 	idx := newTestIndexer(t, app, true)
 
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 30)
 	pid := util.RandomBytes(32)
 	err := app.State.AddProcess(&models.Process{
 		ProcessId:             pid,
 		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
 		Status:                models.ProcessStatus_READY,
 		Mode:                  &models.ProcessMode{AutoStart: true},
-		BlockCount:            10,
+		BlockCount:            40,
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
 		VoteOptions:           &models.ProcessVoteOptions{MaxCount: 4, MaxValue: 1},
+		CensusOrigin:          models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusRoot:            root,
 	})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -508,7 +511,6 @@ func TestResults(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 
-	// Add 100 votes
 	vp, err := json.Marshal(vochain.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
 		Votes: []int{1, 1, 1, 1},
@@ -521,10 +523,16 @@ func TestResults(t *testing.T) {
 	// of 3 and increments via AdvanceTestBlock, and the loop here with
 	// commits of blocks with heights 0-300. The two are parallel and should
 	// probably be joined.
-	for i := int32(0); i < 300; i++ {
+	for i := int32(0); i < 30; i++ {
 		idx.Rollback()
 		vote := &models.VoteEnvelope{
-			Nonce:                util.RandomBytes(32),
+			Nonce: util.RandomBytes(32),
+			Proof: &models.Proof{Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:     models.ProofArbo_BLAKE2B,
+					Siblings: proofs[i],
+					KeyType:  models.ProofArbo_PUBKEY,
+				}}},
 			ProcessId:            pid,
 			VotePackage:          vp,
 			Nullifier:            util.RandomBytes(32),
@@ -532,25 +540,18 @@ func TestResults(t *testing.T) {
 		}
 		voteTx, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
 		qt.Assert(t, err, qt.IsNil)
+		signature, err := keys[i].SignVocdoniTx(voteTx, app.ChainID())
+		qt.Check(t, err, qt.IsNil)
+
 		signedTx, err := proto.Marshal(&models.SignedTx{
 			Tx:        voteTx,
-			Signature: []byte{},
+			Signature: signature,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		_, err = app.SendTx(signedTx)
 		qt.Assert(t, err, qt.IsNil)
 
-		txRef := &VoteWithIndex{
-			vote: &models.Vote{
-				Nullifier: vote.Nullifier,
-				ProcessId: pid,
-				Weight:    big.NewInt(1).Bytes(),
-			},
-			voterID: state.VoterID{}.Nil(),
-			txIndex: 0,
-		}
-		idx.voteIndexPool = append(idx.voteIndexPool, txRef)
-		err = idx.Commit(uint32(i))
+		app.AdvanceTestBlock()
 		qt.Assert(t, err, qt.IsNil)
 	}
 
@@ -564,7 +565,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	err = idx.updateProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
-	err = idx.setResultsHeight(pid, app.State.CurrentHeight())
+	err = idx.setResultsHeight(pid, app.Height())
 	qt.Assert(t, err, qt.IsNil)
 	err = idx.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
@@ -574,7 +575,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	log.Infof("results: %s", GetFriendlyResults(result.Votes))
 	v0 := big.NewInt(0)
-	v300 := big.NewInt(300)
+	v30 := big.NewInt(30)
 	var value *big.Int
 	for q := range result.Votes {
 		for qi := range result.Votes[q] {
@@ -585,8 +586,8 @@ func TestResults(t *testing.T) {
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
-			if qi == 1 && value.Cmp(v300) != 0 {
-				t.Fatalf("result is not correct, %d is not 300 as expected", value.Uint64())
+			if qi == 1 && value.Cmp(v30) != 0 {
+				t.Fatalf("result is not correct, %d is not 30 as expected", value.Uint64())
 			}
 		}
 	}
@@ -598,7 +599,7 @@ func TestResults(t *testing.T) {
 			if qi != 1 && v1 != "0" {
 				t.Fatalf("result is not correct, %s is not 0 as expected", v1)
 			}
-			if qi == 1 && v1 != "300" {
+			if qi == 1 && v1 != "30" {
 				t.Fatalf("result is not correct, %s is not 300 as expected", v1)
 			}
 		}
@@ -941,15 +942,15 @@ func TestCountVotes(t *testing.T) {
 	idx.Rollback()
 	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
-		v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		idx.OnVote(v, state.VoterID{}.Nil(), int32(i))
+		idx.OnVote(v, int32(i))
 	}
 	nullifier := util.RandomBytes(32)
-	v := &models.Vote{ProcessId: pid, VotePackage: vp, Nullifier: nullifier}
+	v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: nullifier}
 	// Add last vote with known nullifier
 	txIndex := int32(100)
-	idx.OnVote(v, state.VoterID{}.Nil(), txIndex)
+	idx.OnVote(v, txIndex)
 
 	// Vote transactions are on imaginary 2000th block
 	blockHeight := uint32(2000)

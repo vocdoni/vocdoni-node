@@ -52,8 +52,8 @@ func TestStateBasic(t *testing.T) {
 		}
 
 		for j := 0; j < 10; j++ {
-			v := &models.Vote{
-				ProcessId:   pids[i],
+			v := &Vote{
+				ProcessID:   pids[i],
 				Nullifier:   rng.RandomBytes(32),
 				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
 			}
@@ -152,7 +152,7 @@ type Listener struct {
 	processStart [][][]byte
 }
 
-func (l *Listener) OnVote(vote *models.Vote, voterID VoterID, txIndex int32)                     {}
+func (l *Listener) OnVote(vote *Vote, txIndex int32)                                             {}
 func (l *Listener) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32)           {}
 func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
 func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
@@ -269,8 +269,8 @@ func TestBlockMemoryUsage(t *testing.T) {
 	var mem runtime.MemStats
 	numVotes := 22_000
 	for i := 0; i < numVotes; i++ {
-		v := &models.Vote{
-			ProcessId:   pid,
+		v := &Vote{
+			ProcessID:   pid,
 			Nullifier:   rng.RandomBytes(32),
 			VotePackage: rng.RandomBytes(64),
 		}

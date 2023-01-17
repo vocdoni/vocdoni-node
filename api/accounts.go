@@ -211,7 +211,7 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
-		if cid != metadataCID {
+		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(metadataCID, "ipfs://") {
 			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
 		}
 	}

@@ -103,7 +103,6 @@ func TestVoteOverwrite(t *testing.T) {
 	}
 	err := app.State.AddProcess(process)
 	qt.Check(t, err, qt.IsNil)
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	var cktx abcitypes.RequestCheckTx
@@ -124,7 +123,6 @@ func TestVoteOverwrite(t *testing.T) {
 	detxresp = app.DeliverTx(detx)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	// Second vote
@@ -140,7 +138,6 @@ func TestVoteOverwrite(t *testing.T) {
 	detxresp = app.DeliverTx(detx)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	// Third vote
@@ -156,7 +153,6 @@ func TestVoteOverwrite(t *testing.T) {
 	detxresp = app.DeliverTx(detx)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
-	app.Commit()
 	app.AdvanceTestBlock()
 
 	// Fourth vote (should fail since we have already voted 1 time + 2 overwrites)
