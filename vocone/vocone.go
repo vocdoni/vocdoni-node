@@ -343,6 +343,8 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 }
 
 func (vc *Vocone) setDefaultMethods() {
+	// first set the default methods, then override some of them
+	vc.app.SetDefaultMethods()
 	vc.app.IsSynchronizing = func() bool { return false }
 	vc.app.SetFnSendTx(vc.addTx)
 	vc.app.SetFnGetTx(vc.getTx)

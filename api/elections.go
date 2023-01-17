@@ -432,8 +432,9 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
-		if cid != metadataCID {
-			log.Errorf("Publish(metadata) returned an unexpected CID, different than metadataURI (%s != %s)", cid, metadataCID)
+		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(metadataCID, "ipfs://") {
+			log.Errorw(fmt.Errorf("metadata do not match: %s != %s", cid, metadataCID),
+				"published metadata returned an unexpected CID")
 		}
 	}
 

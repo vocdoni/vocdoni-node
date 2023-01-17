@@ -13,7 +13,7 @@ import (
 )
 
 // VoteTxCheck performs basic checks on a vote transaction.
-func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (*models.Vote, error) {
+func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (*vstate.Vote, error) {
 	voteEnvelope := vtx.Tx.GetVote()
 	if voteEnvelope == nil {
 		return nil, fmt.Errorf("vote envelope is nil")
@@ -56,7 +56,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		return nil, fmt.Errorf("no keys available, voting is not possible")
 	}
 
-	var vote *models.Vote
+	var vote *vstate.Vote
 	if process.EnvelopeType.Anonymous {
 		if t.ZkCircuits == nil || len(t.ZkCircuits) == 0 {
 			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
@@ -147,12 +147,16 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		log.Debugw("zk vote proof verified", map[string]interface{}{
 			"voteNullifier": string(voteEnvelope.Nullifier), "electionId": string(voteEnvelope.ProcessId)})
 
-		vote = &models.Vote{
+		// TODO the next 12 lines of code are the same than a little
+		// further down. TODO: maybe movoteEnvelope them before the 'switch', as
+		// is a logic that must be done evoteEnvelopen if
+		// process.EnvoteEnvelopelopeType.Anonymous==true or not
+		vote = &vstate.Vote{
 			Height:      height,
-			ProcessId:   voteEnvelope.ProcessId,
+			ProcessID:   voteEnvelope.ProcessId,
 			VotePackage: voteEnvelope.VotePackage,
 			Nullifier:   voteEnvelope.Nullifier,
-			Weight:      voteWeight.Bytes(),
+			Weight:      voteWeight,
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {
@@ -202,9 +206,9 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		// if not in cache, full check
 		// extract pubKey, generate nullifier and check census proof.
 		// add the transaction in the cache
-		vote = &models.Vote{
+		vote = &vstate.Vote{
 			Height:      height,
-			ProcessId:   voteEnvelope.ProcessId,
+			ProcessID:   voteEnvelope.ProcessId,
 			VotePackage: voteEnvelope.VotePackage,
 		}
 
@@ -231,14 +235,14 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		}
 
 		// generate the voterID and assign it to the vote
-		vote.VoterId = append([]byte{vstate.VoterIDTypeECDSA}, pubKey...)
+		vote.VoterID = append([]byte{vstate.VoterIDTypeECDSA}, pubKey...)
 
 		addr, err := ethereum.AddrFromPublicKey(pubKey)
 		if err != nil {
 			return nil, fmt.Errorf("cannot extract address from public key: %w", err)
 		}
 		// assign a nullifier
-		vote.Nullifier = vstate.GenerateNullifier(addr, vote.ProcessId)
+		vote.Nullifier = vstate.GenerateNullifier(addr, vote.ProcessID)
 
 		// check if the vote already exists
 		if err := t.checkVoteAlreadyExists(vote.Nullifier, process); err != nil {
@@ -260,7 +264,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		if !valid {
 			return nil, fmt.Errorf("proof not valid")
 		}
-		vote.Weight = weight.Bytes()
+		vote.Weight = weight
 	}
 	if !forCommit {
 		// add the vote to cache

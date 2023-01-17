@@ -1,10 +1,12 @@
 package state
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -18,6 +20,51 @@ var (
 	// keys; not constants because of []byte
 	voteCountKey = []byte("voteCount")
 )
+
+// Vote represents a vote in the Vochain state.
+type Vote struct {
+	ProcessID            types.HexBytes
+	Nullifier            types.HexBytes
+	Height               uint32
+	VotePackage          []byte
+	EncryptionKeyIndexes []uint32
+	Weight               *big.Int
+	VoterID              VoterID
+	Overwrites           uint32
+}
+
+// WeightBytes returns the vote weight as a byte slice. If the weight is nil, it returns a byte slice of 1.
+func (v *Vote) WeightBytes() []byte {
+	if v.Weight != nil {
+		return v.Weight.Bytes()
+	}
+	return big.NewInt(1).Bytes()
+}
+
+// Hash returns the hash of the vote. Only the fields that are an essential part of the vote are hashed.
+func (v *Vote) Hash() []byte {
+	h := bytes.Buffer{}
+	h.Write(v.ProcessID) // processID includes the chainID encoded in the first bytes
+	h.Write(v.Nullifier)
+	h.Write(v.VotePackage)
+	h.Write(v.WeightBytes())
+	return ethereum.HashRaw(h.Bytes())
+}
+
+// DeepCopy returns a deep copy of the Vote struct.
+func (v *Vote) DeepCopy() *Vote {
+	voteCopy := &Vote{
+		ProcessID:            append([]byte{}, v.ProcessID...),
+		Nullifier:            append([]byte{}, v.Nullifier...),
+		Height:               v.Height,
+		VotePackage:          append([]byte{}, v.VotePackage...),
+		EncryptionKeyIndexes: append([]uint32{}, v.EncryptionKeyIndexes...),
+		Weight:               new(big.Int).Set(v.Weight),
+		VoterID:              v.VoterID,
+		Overwrites:           v.Overwrites,
+	}
+	return voteCopy
+}
 
 // VoteCount return the global vote count.
 // When committed is false, the operation is executed also on not yet commited
@@ -57,31 +104,31 @@ func (v *State) voteCountInc() error {
 // If the vote already exists it will be overwritten and overwrite counter will be increased.
 // Note that the vote is not committed to the StateDB until the StateDB transaction is committed.
 // Note that the vote is not verified, so it is the caller responsibility to verify the vote.
-func (v *State) AddVote(vote *models.Vote) error {
-	vid, err := v.voteID(vote.ProcessId, vote.Nullifier)
+func (v *State) AddVote(vote *Vote) error {
+	vid, err := v.voteID(vote.ProcessID, vote.Nullifier)
 	if err != nil {
 		return err
 	}
 	// save block number
 	vote.Height = v.CurrentHeight()
-	voteBytes, err := proto.Marshal(vote)
-	if err != nil {
-		return fmt.Errorf("cannot marshal vote: %w", err)
-	}
 
-	sdbVote, err := v.Vote(vote.ProcessId, vote.Nullifier, false)
+	sdbVote, err := v.Vote(vote.ProcessID, vote.Nullifier, false)
 	if err != nil {
 		if errors.Is(err, ErrVoteNotFound) {
 			sdbVote = &models.StateDBVote{
-				VoteHash:  ethereum.HashRaw(voteBytes),
-				ProcessId: vote.ProcessId,
-				Nullifier: vote.Nullifier,
+				VoteHash:    vote.Hash(),
+				Nullifier:   vote.Nullifier,
+				Weight:      vote.WeightBytes(),
+				VotePackage: vote.VotePackage,
 			}
 		} else {
 			return err
 		}
 	} else {
-		sdbVote.VoteHash = ethereum.HashRaw(voteBytes)
+		// overwrite vote if it already exists
+		sdbVote.VoteHash = vote.Hash()
+		sdbVote.VotePackage = vote.VotePackage
+		sdbVote.Weight = vote.Weight.Bytes()
 		if sdbVote.OverwriteCount != nil {
 			*sdbVote.OverwriteCount++
 		} else {
@@ -97,7 +144,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 	err = func() error {
 		treeCfg := StateChildTreeCfg(ChildTreeVotes)
 		if err := v.Tx.DeepSet(vid, sdbVoteBytes,
-			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessId)); err != nil {
+			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessID)); err != nil {
 			return err
 		}
 		return v.voteCountInc()
@@ -107,7 +154,7 @@ func (v *State) AddVote(vote *models.Vote) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnVote(vote, vote.VoterId, v.TxCounter())
+		l.OnVote(vote, v.TxCounter())
 	}
 	return nil
 }

@@ -108,7 +108,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	}
 	txb, err := proto.Marshal(&tx)
 	qt.Assert(t, err, qt.IsNil)
-	signedTxb, err := server.Signer.SignVocdoniTx(txb, server.VochainAPP.ChainID())
+	signedTxb, err := server.Account.SignVocdoniTx(txb, server.VochainAPP.ChainID())
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
 	stxb, err := proto.Marshal(&stx)
@@ -165,23 +165,22 @@ func TestAPIcensusAndVote(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 3)
 
+	// Verify the vote
 	_, code = c.Request("GET", nil, "votes", "verify", election.ElectionID.String(), v.VoteID.String())
 	qt.Assert(t, code, qt.Equals, 200)
 
-	/*
-	   This test is disabled because the indexer is not properly set up in the test environment.
-	   Activate it when the indexer is properly working.
+	// Get the vote and check the data
+	resp, code = c.Request("GET", nil, "votes", v.VoteID.String())
+	qt.Assert(t, code, qt.Equals, 200)
+	v2 := &api.Vote{}
+	err = json.Unmarshal(resp, v2)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, v2.VoteID.String(), qt.Equals, v.VoteID.String())
+	qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(2))
+	qt.Assert(t, *v2.TransactionIndex, qt.Equals, int32(0))
 
-	   resp, code = c.Request("GET", nil, "votes", v.VoteID.String())
-	   qt.Assert(t, code, qt.Equals, 200)
-	   v2 := &api.Vote{}
-	   err = json.Unmarshal(resp, v2)
-	   qt.Assert(t, err, qt.IsNil)
-	   qt.Assert(t, v2.VoteID.String(), qt.Equals, v.VoteID.String())
-	   qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(3))
-	   qt.Assert(t, v2.TransactionIndex, qt.Equals, uint32(0))
-	   qt.Assert(t, v2.VoterID.String(), qt.Equals, voterKey.AddressString())
-	*/
+	// TODO (painan): check why the voterID is not present on the reply
+	//qt.Assert(t, v2.VoterID.String(), qt.Equals, voterKey.AddressString())
 }
 
 func TestAPIaccount(t *testing.T) {
@@ -213,7 +212,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// transaction
-	fp, err := vochain.GenerateFaucetPackage(server.Signer, signer.Address(), 50)
+	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)
@@ -244,12 +243,9 @@ func TestAPIaccount(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
-	// TODO: This is not working, should be checked!
-	// reference: https://github.com/vocdoni/vocdoni-node/pull/651#issuecomment-1307191374
-	//
 	// check the account exist
-	//resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
-	//qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+	resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
 
 func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {

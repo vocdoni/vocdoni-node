@@ -38,7 +38,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		VoteOptions: &models.ProcessVoteOptions{MaxCount: 1},
 		Status:      models.ProcessStatus_READY,
 		CensusRoot:  make([]byte, 32), // emtpy hash
-		StartBlock:  1,
+		StartBlock:  0,
 		BlockCount:  3,
 	}
 	err = app.State.AddProcess(process)

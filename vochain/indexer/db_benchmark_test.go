@@ -63,14 +63,14 @@ func benchmarkIndexTx(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		idx.Rollback()
 		for j := int32(0); j < 2000; j++ {
-			vote := &models.Vote{
+			vote := &state.Vote{
 				Height:      uint32(util.RandomInt(10, 10000)),
-				ProcessId:   pid,
+				ProcessID:   pid,
 				Nullifier:   util.RandomBytes(32),
 				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
-				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))).Bytes(),
+				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
 			}
-			idx.OnVote(vote, state.VoterID{}.Nil(), j)
+			idx.OnVote(vote, j)
 		}
 		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)

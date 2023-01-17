@@ -160,7 +160,8 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount
 
 // NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
 // Also includes an oracle, treasurer and faucet account.
-func NewTemplateGenesisFile(dir string, validators int) error {
+// The genesis document is returned.
+func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, error) {
 	gd := tmtypes.GenesisDoc{}
 	gd.ChainID = "test-chain-1"
 	gd.GenesisTime = time.Now()
@@ -178,7 +179,7 @@ func NewTemplateGenesisFile(dir string, validators int) error {
 	for i := 0; i < validators; i++ {
 		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
 		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
-			return err
+			return nil, err
 		}
 		privKey := util.RandomHex(64)
 		pv, err := NewPrivateValidator(privKey,
@@ -186,11 +187,11 @@ func NewTemplateGenesisFile(dir string, validators int) error {
 			filepath.Join(nodeDir, "priv_validator_state.json"),
 		)
 		if err != nil {
-			return fmt.Errorf("cannot create validator key and state: (%v)", err)
+			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 		}
 		pv.Save()
 		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKey), 0o600); err != nil {
-			return err
+			return nil, err
 		}
 		gd.Validators = append(gd.Validators, tmtypes.GenesisValidator{
 			Address: pv.Key.Address,
@@ -210,47 +211,47 @@ func NewTemplateGenesisFile(dir string, validators int) error {
 	// Generate oracle, treasurer and faucet accounts
 	oracle := ethereum.SignKeys{}
 	if err := oracle.Generate(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "oracle_hex_key"),
 		[]byte(fmt.Sprintf("%x", oracle.PrivateKey())), 0o600); err != nil {
-		return err
+		return nil, err
 	}
 	treasurer := ethereum.SignKeys{}
 	if err := treasurer.Generate(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "treasurer_hex_key"),
 		[]byte(fmt.Sprintf("%x", treasurer.PrivateKey())), 0o600); err != nil {
-		return err
+		return nil, err
 	}
 	faucet := ethereum.SignKeys{}
 	if err := faucet.Generate(); err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(dir, "faucet_hex_key"),
 		[]byte(fmt.Sprintf("%x", faucet.PrivateKey())), 0o600); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create seed node
 	seedKey := util.RandomHex(64)
 	seedDir := filepath.Join(dir, "seed")
 	if err := os.MkdirAll(seedDir, 0o700); err != nil {
-		return err
+		return nil, err
 	}
 	seedNodeKey, err := NewNodeKey(seedKey, filepath.Join(seedDir, "node_key.json"))
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(
 		seedDir, "seed_address"),
 		[]byte(seedNodeKey.ID.AddressString("seed1.foo.bar:26656")),
 		0o600); err != nil {
-		return err
+		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), []byte(seedKey), 0o600); err != nil {
-		return err
+		return nil, err
 	}
 
 	// Build genesis app state and create genesis file
@@ -268,8 +269,8 @@ func NewTemplateGenesisFile(dir string, validators int) error {
 	}
 	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	gd.AppState = appStateBytes
-	return gd.SaveAs(filepath.Join(dir, "genesis.json"))
+	return &gd, gd.SaveAs(filepath.Join(dir, "genesis.json"))
 }

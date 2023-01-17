@@ -39,8 +39,8 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.MockStorage(t)
-	api.Attach(nil, nil, nil, data.Storage(&storage), censusDB)
+	storage := data.MockIPFS(t)
+	api.Attach(nil, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -253,8 +253,8 @@ func TestCensusZk(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.MockStorage(t)
-	api.Attach(nil, nil, nil, data.Storage(&storage), censusDB)
+	storage := data.MockIPFS(t)
+	api.Attach(nil, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()

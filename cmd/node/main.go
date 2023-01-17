@@ -327,7 +327,7 @@ func main() {
 			log.Fatal(err)
 		}
 		log.Infof("creating vochain genesis file with %d validators in %s", num, dirWithNodes[0])
-		if err := vochain.NewTemplateGenesisFile(dirWithNodes[0], num); err != nil {
+		if _, err := vochain.NewTemplateGenesisFile(dirWithNodes[0], num); err != nil {
 			log.Fatal(err)
 		}
 		return
