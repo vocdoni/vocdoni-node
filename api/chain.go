@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 )
 
 const (
@@ -185,14 +186,24 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	chainID := a.vocapp.ChainID()
 	blockTimes := a.vocinfo.BlockTimes()
 	height := a.vocapp.Height()
 	timestamp := a.vocapp.Timestamp()
+
+	// Get current circuit tag checking into the genesis according to the
+	// chainID. By default "dev" genesis.
+	circuitConfigTag := "dev"
+	if currentGenesis, ok := genesis.Genesis[chainID]; ok {
+		circuitConfigTag = currentGenesis.CircuitsConfigTag
+	}
+
 	data, err := json.Marshal(ChainInfo{
-		ID:        a.vocapp.ChainID(),
-		BlockTime: blockTimes,
-		Height:    &height,
-		Timestamp: &timestamp,
+		ID:                      chainID,
+		BlockTime:               blockTimes,
+		Height:                  &height,
+		Timestamp:               &timestamp,
+		CircuitConfigurationTag: circuitConfigTag,
 	})
 	if err != nil {
 		return err

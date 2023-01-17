@@ -33,15 +33,12 @@ const (
 
 // HTTPclient is the Vocdoni API HTTP client.
 type HTTPclient struct {
-	c       *http.Client
-	token   *uuid.UUID
-	addr    *url.URL
-	account *ethereum.SignKeys
-	chainID string
-	circuit struct {
-		conf   circuit.ZkCircuitConfig
-		levels int
-	}
+	c             *http.Client
+	token         *uuid.UUID
+	addr          *url.URL
+	account       *ethereum.SignKeys
+	chainID       string
+	circuit       circuit.ZkCircuitConfig
 	babyjubjubKey babyjub.PrivateKey
 }
 
@@ -72,17 +69,7 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	c.chainID = info.ID
 
 	// Get the default circuit config
-	c.circuit = struct {
-		conf   circuit.ZkCircuitConfig
-		levels int
-	}{
-		conf:   circuit.DefaultCircuitsConfiguration,
-		levels: 16,
-	}
-
-	if _, ok := circuit.CircuitsConfigurations[c.chainID]; ok {
-		c.circuit.conf = circuit.CircuitsConfigurations[c.chainID]
-	}
+	c.circuit = circuit.CircuitsConfigurations[info.CircuitConfigurationTag]
 	return c, nil
 }
 

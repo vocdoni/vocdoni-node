@@ -187,7 +187,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 	// Create a list of siblings with the same number of items that levels
 	// allowed by the circuit (from its config) plus one. Fill with zeros if its
 	// needed.
-	strSiblings := make([]string, c.circuit.levels+1)
+	strSiblings := make([]string, c.circuit.Levels+1)
 	for i := 0; i < len(strSiblings); i++ {
 		newSibling := "0"
 		if i < len(unpackedSiblings) {
@@ -196,13 +196,13 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		strSiblings[i] = newSibling
 	}
 	// Get artifacts of the current circuit
-	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit.conf)
+	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
 	log.Debugw("zk circuit loaded", map[string]interface{}{
 		"censusRoot": censusRoot.String(), "electionId": electionID.String(),
-		"circuitURI": c.circuit.conf.URI})
+		"circuitURI": c.circuit.URI})
 	// Create the inputs and encode them into a JSON
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,

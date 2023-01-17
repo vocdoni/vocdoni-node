@@ -159,10 +159,11 @@ type TransactionReference struct {
 }
 
 type ChainInfo struct {
-	ID        string    `json:"chainId,omitempty"`
-	BlockTime *[5]int32 `json:"blockTime,omitempty"`
-	Height    *uint32   `json:"height,omitempty"`
-	Timestamp *int64    `json:"blockTimestamp,omitempty"`
+	ID                      string    `json:"chainId,omitempty"`
+	BlockTime               *[5]int32 `json:"blockTime,omitempty"`
+	Height                  *uint32   `json:"height,omitempty"`
+	Timestamp               *int64    `json:"blockTimestamp,omitempty"`
+	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
 }
 
 type Account struct {
