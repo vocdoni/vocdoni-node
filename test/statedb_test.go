@@ -26,7 +26,7 @@ func TestVochainState(t *testing.T) {
 	defer s.Close()
 
 	// This used to panic due to nil *ImmutableTree fields.
-	exists, err := s.EnvelopeExists(util.RandomBytes(32), util.RandomBytes(32), false)
+	exists, err := s.VoteExists(util.RandomBytes(32), util.RandomBytes(32), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, exists, qt.Equals, false)
 
@@ -144,7 +144,7 @@ func TestAddVote(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
+	err := s.AddVote(testcommon.NewVoteHardcoded())
 	qt.Assert(t, err, qt.IsNil)
 }
 
@@ -152,9 +152,9 @@ func TestGetEnvelope(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
+	err := s.AddVote(testcommon.NewVoteHardcoded())
 	qt.Assert(t, err, qt.IsNil)
-	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+	_, err = s.Vote(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
 	qt.Assert(t, err, qt.IsNil)
 }
@@ -163,9 +163,9 @@ func TestCountVotes(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
+	err := s.AddVote(testcommon.NewVoteHardcoded())
 	qt.Assert(t, err, qt.IsNil)
-	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+	_, err = s.Vote(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
 	qt.Assert(t, err, qt.IsNil)
 	c := s.CountVotes(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), false)
@@ -176,9 +176,9 @@ func TestGetEnvelopeList(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithProcess(t)
-	err := s.AddVote(testcommon.NewVoteHardcoded(), nil)
+	err := s.AddVote(testcommon.NewVoteHardcoded())
 	qt.Assert(t, err, qt.IsNil)
-	_, err = s.Envelope(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+	_, err = s.Vote(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
 	qt.Assert(t, err, qt.IsNil)
 	nullifiers := s.EnvelopeList(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), 0, 1, false)

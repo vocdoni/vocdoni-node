@@ -132,7 +132,7 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if len(voteID) != types.ProcessIDsize {
 		return fmt.Errorf("malformed voteId")
 	}
-	if ok, err := a.vocapp.State.EnvelopeExists(electionID, voteID, true); !ok || err != nil {
+	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
 		return fmt.Errorf("not registered")
 	}
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)

@@ -4,11 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
-	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -17,27 +15,9 @@ import (
 
 func TestMerkleTreeProof(t *testing.T) {
 	app := TestBaseApplication(t)
+	keys, root, proofs := testCreateKeysAndBuildCensus(t, 101)
 
-	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{Name: "testchecktx", ParentDB: db,
-		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keys := util.CreateEthRandomKeysBatch(1001)
-	proofs := []string{}
-	for _, k := range keys {
-		c, err := tr.Hash(k.PublicKey())
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := tr.Add(c, nil); err != nil {
-			t.Fatal(err)
-		}
-		proofs = append(proofs, string(c))
-	}
-	// We save the last key for the next test
+	// we save the last key for the next test and remove it from the lists
 	lastKey := keys[len(keys)-1]
 	keys = keys[:len(keys)-2]
 	lastProof := proofs[len(proofs)-1]
@@ -45,15 +25,13 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
-	root, err := tr.Root()
-	if err != nil {
-		t.Fatal(err)
-	}
+
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode:         &models.ProcessMode{},
+		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:   root,
@@ -61,111 +39,78 @@ func TestMerkleTreeProof(t *testing.T) {
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 		BlockCount:   1024,
 	}
-	t.Logf("adding process %s", log.FormatProto(process))
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
+	err := app.State.AddProcess(process)
+	qt.Assert(t, err, qt.IsNil)
+
+	app.Commit()
+	app.AdvanceTestBlock()
 
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
-
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
-	tr.Publish()
-	var stx models.SignedTx
-	var proof []byte
-	vp := []byte("[1,2,3,4]")
+	// send the votes (but not the last one), should be ok
 	for i, s := range keys {
-		_, proof, err = tr.GenProof([]byte(proofs[i]))
-		if err != nil {
-			t.Fatal(err)
-		}
-		tx := &models.VoteEnvelope{
-			Nonce:     util.RandomBytes(32),
-			ProcessId: pid,
-			Proof: &models.Proof{
-				Payload: &models.Proof_Arbo{
-					Arbo: &models.ProofArbo{
-						Type:     models.ProofArbo_BLAKE2B,
-						Siblings: proof,
-					},
-				},
-			},
-			VotePackage: vp,
-		}
+		stx := testBuildSignedVote(t, pid, s, proofs[i], []int{1, 2, 3, 4}, app.ChainID())
 
-		if stx.Tx, err = proto.Marshal(&models.Tx{
-			Payload: &models.Tx_Vote{Vote: tx},
-		}); err != nil {
-			t.Fatal(err)
-		}
-
-		if stx.Signature, err = s.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-			t.Fatal(err)
-		}
-
-		if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-			t.Fatal(err)
-		}
+		cktx.Tx, err = proto.Marshal(stx)
+		qt.Assert(t, err, qt.IsNil)
 		cktxresp = app.CheckTx(cktx)
-		if cktxresp.Code != 0 {
-			t.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
-		}
-		if detx.Tx, err = proto.Marshal(&stx); err != nil {
-			t.Fatal(err)
-		}
-		detxresp = app.DeliverTx(detx)
-		if detxresp.Code != 0 {
-			t.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
-		}
-		app.Commit()
-	}
+		qt.Assert(t, cktxresp.Code, qt.Equals, uint32(0))
 
-	// Test send the same vote package multiple times with different nonce
-	_, proof, err = tr.GenProof([]byte(lastProof))
-	if err != nil {
-		t.Fatal(err)
+		detx.Tx, err = proto.Marshal(stx)
+		qt.Assert(t, err, qt.IsNil)
+		detxresp = app.DeliverTx(detx)
+		qt.Assert(t, detxresp.Code, qt.Equals, uint32(0))
+
+		if i%5 == 0 {
+			app.Commit()
+			app.AdvanceTestBlock()
+		}
 	}
-	tx := &models.VoteEnvelope{
+	app.Commit()
+	app.AdvanceTestBlock()
+
+	// send the las vote multiple time, first attempt should be ok. The rest sould fail.
+	// we modify the nonce on each attempt to avoid the cache
+	vote := &models.VoteEnvelope{
 		ProcessId: pid,
 		Proof: &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
 					Type:     models.ProofArbo_BLAKE2B,
-					Siblings: proof,
+					Siblings: lastProof,
 				},
 			},
 		},
-		VotePackage: vp,
+		VotePackage: []byte("[1, 2, 3, 4}]"),
 	}
 
-	for i := 0; i < 100; i++ {
-		tx.Nonce = util.RandomBytes(32)
-		if stx.Tx, err = proto.Marshal(&models.Tx{
-			Payload: &models.Tx_Vote{Vote: tx},
-		}); err != nil {
-			t.Fatal(err)
-		}
+	for i := 0; i < 10; i++ {
+		stx := &models.SignedTx{}
+		vote.Nonce = util.RandomBytes(32)
+		stx.Tx, err = proto.Marshal(&models.Tx{
+			Payload: &models.Tx_Vote{Vote: vote},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		stx.Signature, err = lastKey.SignVocdoniTx(stx.Tx, app.chainID)
+		qt.Assert(t, err, qt.IsNil)
 
-		if stx.Signature, err = lastKey.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-			t.Fatal(err)
-		}
+		cktx.Tx, err = proto.Marshal(stx)
+		qt.Assert(t, err, qt.IsNil)
 
-		if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-			t.Fatal(err)
-		}
 		cktxresp = app.CheckTx(cktx)
 		if i == 0 && cktxresp.Code != 0 {
 			t.Fatalf("checkTx returned err on first valid vote: %s", cktxresp.Data)
 		}
 		if i > 0 && cktxresp.Code == 0 {
-			t.Fatalf("checkTx returned 0, an error was expected")
+			t.Fatalf("checkTx returned 0 for vote %d, an error was expected", i)
 		}
 
-		if detx.Tx, err = proto.Marshal(&stx); err != nil {
-			t.Fatal(err)
-		}
+		detx.Tx, err = proto.Marshal(stx)
+		qt.Assert(t, err, qt.IsNil)
+
 		detxresp = app.DeliverTx(detx)
 		if i == 0 && detxresp.Code != 0 {
 			t.Fatalf("devlierTx returned err on first valid vote: %s", detxresp.Data)
@@ -173,16 +118,19 @@ func TestMerkleTreeProof(t *testing.T) {
 		if i > 0 && detxresp.Code == 0 {
 			t.Fatalf("deliverTx returned 0, an error was expected")
 		}
-
+		if i%2 == 0 {
+			app.Commit()
+			app.AdvanceTestBlock()
+		}
 	}
 }
 
-func TestCAProof(t *testing.T) {
+func TestCSPproof(t *testing.T) {
 	app := TestBaseApplication(t)
-	ca := ethereum.SignKeys{}
-	if err := ca.Generate(); err != nil {
-		t.Fatal(err)
-	}
+	csp := ethereum.SignKeys{}
+	err := csp.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -191,14 +139,13 @@ func TestCAProof(t *testing.T) {
 		Mode:         new(models.ProcessMode),
 		Status:       models.ProcessStatus_READY,
 		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   ca.PublicKey(),
+		CensusRoot:   csp.PublicKey(),
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
 		BlockCount:   1024,
 	}
 	t.Logf("adding process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+
 	// Test 20 valid votes
 	vp := []byte("[1,2,3,4]")
 	keys := util.CreateEthRandomKeysBatch(20)
@@ -208,151 +155,43 @@ func TestCAProof(t *testing.T) {
 			Address:   k.Address().Bytes(),
 		}
 		bundleBytes, err := proto.Marshal(bundle)
-		if err != nil {
-			t.Fatal(err)
-		}
-		signature, err := ca.SignEthereum(bundleBytes)
-		if err != nil {
-			t.Fatal(err)
-		}
+		qt.Assert(t, err, qt.IsNil)
+		signature, err := csp.SignEthereum(bundleBytes)
+		qt.Assert(t, err, qt.IsNil)
 
 		proof := &models.ProofCA{
 			Bundle:    bundle,
 			Type:      models.ProofCA_ECDSA,
 			Signature: signature,
 		}
-		testCASendVotes(t, pid, vp, k, proof, app, true)
+		testCSPsendVotes(t, pid, vp, k, proof, app, true)
 	}
 
 	// Test invalid vote
 	k := ethereum.SignKeys{}
-	if err := k.Generate(); err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, k.Generate(), qt.IsNil)
 	bundle := &models.CAbundle{
 		ProcessId: pid,
 		Address:   k.Address().Bytes(),
 	}
 	bundleBytes, err := proto.Marshal(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ca2 := ethereum.SignKeys{}
-	if err := ca2.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	signature, err := ca2.SignEthereum(bundleBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	qt.Assert(t, err, qt.IsNil)
+
+	csp2 := ethereum.SignKeys{}
+	qt.Assert(t, csp2.Generate(), qt.IsNil)
+
+	signature, err := csp2.SignEthereum(bundleBytes)
+	qt.Assert(t, err, qt.IsNil)
+
 	proof := &models.ProofCA{
 		Bundle:    bundle,
 		Type:      models.ProofCA_ECDSA,
 		Signature: signature,
 	}
-	testCASendVotes(t, pid, vp, &k, proof, app, false)
+	testCSPsendVotes(t, pid, vp, &k, proof, app, false)
 }
 
-/*
-func TestCABlindProof(t *testing.T) {
-	app := TestBaseApplication(t)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ca := ethereum.SignKeys{}
-	if err := ca.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	pid := util.RandomBytes(types.ProcessIDsize)
-	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         new(models.ProcessMode),
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   ca.PublicKey(),
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
-		BlockCount:   1024,
-	}
-	t.Logf("adding process %x", process.ProcessId)
-	if err := app.State.AddProcess(process); err != nil {
-		t.Fatal(err)
-	}
-
-	// Create the CA for generating the proofs
-	_, capriv := ca.HexString()
-	bca := new(blindca.BlindCA)
-	if err := bca.Init(capriv, nil); err != nil {
-		t.Fatal(err)
-	}
-
-	// Test 20 valid votes
-	vp := []byte("[1,2,3,4]")
-	keys := util.CreateEthRandomKeysBatch(20)
-	for _, k := range keys {
-		bundle := &models.CAbundle{
-			ProcessId: pid,
-			Address:   k.Address().Bytes(),
-		}
-		bundleBytes, err := proto.Marshal(bundle)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Perform blind signature with CA
-		r := bca.NewBlindRequestKey()
-		m := new(big.Int).SetBytes(ethereum.HashRaw(bundleBytes))
-		if err != nil {
-			t.Fatal(err)
-		}
-		msgBlinded, secret := blind.Blind(m, r)
-		bsig, err := bca.SignBlind(r, msgBlinded.Bytes())
-		if err != nil {
-			t.Error(err)
-		}
-		signature := blind.Unblind(new(big.Int).SetBytes(bsig), secret).Bytes()
-
-		// Pack the proof
-		proof := &models.ProofCA{
-			Bundle:    bundle,
-			Type:      models.ProofCA_ECDSA_BLIND,
-			Signature: signature,
-		}
-		testCASendVotes(t, pid, vp, k, proof, app, true)
-	}
-
-	// Test invalid vote
-	k := ethereum.SignKeys{}
-	if err := k.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	bundle := &models.CAbundle{
-		ProcessId: pid,
-		Address:   k.Address().Bytes(),
-	}
-	bundleBytes, err := proto.Marshal(bundle)
-	if err != nil {
-		t.Fatal(err)
-	}
-	ca2 := ethereum.SignKeys{}
-	if err := ca2.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	signature, err := ca2.Sign(bundleBytes)
-	if err != nil {
-		t.Fatal(err)
-	}
-	proof := &models.ProofCA{
-		Bundle:    bundle,
-		Type:      models.ProofCA_ECDSA,
-		Signature: signature,
-	}
-	testCASendVotes(t, pid, vp, &k, proof, app, false)
-}
-*/
-
-func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
+func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
 	var cktx abcitypes.RequestCheckTx
 	var detx abcitypes.RequestDeliverTx
@@ -361,7 +200,6 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 	var stx models.SignedTx
 	var err error
 
-	t.Logf("voting %s", signer.AddressString())
 	tx := &models.VoteEnvelope{
 		Nonce:       util.RandomBytes(32),
 		ProcessId:   pid,
@@ -369,24 +207,19 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 		VotePackage: vp,
 	}
 
-	pub, _ := signer.HexString()
-	t.Logf("addr: %s pubKey: %s", signer.Address(), pub)
-
-	if stx.Tx, err = proto.Marshal(&models.Tx{
+	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_Vote{
 			Vote: tx,
 		},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	})
+	qt.Assert(t, err, qt.IsNil)
 
-	if stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		t.Fatal(err)
-	}
+	stx.Signature, err = signer.SignVocdoniTx(stx.Tx, app.chainID)
+	qt.Assert(t, err, qt.IsNil)
 
-	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
+	cktx.Tx, err = proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
 	cktxresp = app.CheckTx(cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
@@ -397,9 +230,8 @@ func testCASendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignK
 			t.Fatalf("checkTx success, but expected result is fail")
 		}
 	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
-		t.Fatal(err)
-	}
+	detx.Tx, err = proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
 	detxresp = app.DeliverTx(detx)
 	if detxresp.Code != 0 {
 		if expectedResult {

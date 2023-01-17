@@ -89,12 +89,12 @@ func (t *Tree) Set(wTx db.WriteTx, key, value []byte) error {
 	err := t.tree.UpdateWithTx(wTx, key, value)
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// key does not exist, use Add
-		return t.Add(wTx, key, value)
-	}
-	if err != nil {
+		if err := t.tree.AddWithTx(wTx, key, value); err != nil {
+			return err
+		}
+	} else if err != nil {
 		return err
 	}
-
 	if !givenTx {
 		if err := wTx.Commit(); err != nil {
 			return err
