@@ -1,12 +1,5 @@
 package genesis
 
-import (
-	"encoding/hex"
-	"strings"
-
-	"go.vocdoni.io/dvote/log"
-)
-
 // VochainGenesis is a struct containing the genesis details
 type VochainGenesis struct {
 	AutoUpdateGenesis bool
@@ -443,15 +436,4 @@ var Genesis = map[string]VochainGenesis{
 }
 `,
 	},
-}
-
-// hexToBytes parses a hex string and returns the byte array from it. Warning,
-// in case of error it will panic.
-func hexToBytes(s string) []byte {
-	s = strings.TrimPrefix(s, "0x")
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		log.Fatalf("Error decoding hex string %s: %s", s, err)
-	}
-	return b
 }
