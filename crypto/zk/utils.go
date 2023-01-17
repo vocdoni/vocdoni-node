@@ -16,7 +16,7 @@ import (
 // proof struct into a prover ready proof struct.
 func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error) {
 	if len(p.A) != 3 || len(p.B) != 6 || len(p.C) != 3 {
-		return nil, fmt.Errorf("error on zkProof format")
+		return nil, fmt.Errorf("wrong ZkSnark protobuf format")
 	}
 
 	return &prover.Proof{
@@ -42,6 +42,10 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 // PublicInputs value.
 func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
 	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
+	if len(p.Data.A) != 3 || len(p.Data.B) != 3 || len(p.Data.C) != 3 {
+		return nil, fmt.Errorf("wrong ZkSnark prover proof format")
+	}
+
 	proof := &models.ProofZkSNARK{
 		CircuitParametersIndex: index,
 		A:                      p.Data.A,
@@ -53,10 +57,16 @@ func ProverProofToProtobufZKProof(index int32, p *prover.Proof,
 		C: p.Data.C,
 	}
 
-	if p.PubSignals != nil {
+	if p.PubSignals != nil && len(p.PubSignals) > 0 {
+		if len(p.PubSignals) != 7 {
+			return nil, fmt.Errorf("wrong ZkSnark prover public signals format")
+		}
+
 		proof.PublicInputs = p.PubSignals
 	} else if electionId != nil && censusRoot != nil && nullifier != nil && weight != nil {
 		proof.PublicInputs = zkProofPublicInputs(electionId, censusRoot, nullifier, weight)
+	} else {
+		return nil, fmt.Errorf("no enought arguments to generate the calc signals")
 	}
 
 	return proof, nil
