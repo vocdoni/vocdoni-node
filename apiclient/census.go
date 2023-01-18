@@ -27,12 +27,11 @@ type CensusProof struct {
 }
 
 type CensusProofZk struct {
-	CircuitParametersIndex int32
-	Proof                  types.HexBytes
-	PubSignals             types.HexBytes
-	Weight                 uint64
-	KeyType                models.ProofArbo_KeyType
-	Nullifier              types.HexBytes
+	Proof      types.HexBytes
+	PubSignals types.HexBytes
+	Weight     uint64
+	KeyType    models.ProofArbo_KeyType
+	Nullifier  types.HexBytes
 }
 
 // NewCensus creates a new census and returns its ID. The censusType can be

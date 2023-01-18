@@ -193,6 +193,8 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 	// Get current circuit tag checking into the genesis according to the
 	// chainID. By default "dev" genesis.
+	// TODO: Move the circuit config tag to a vocapp getter, to prevent
+	// duplicated code blocks to get it.
 	circuitConfigTag := "dev"
 	if currentGenesis, ok := genesis.Genesis[chainID]; ok {
 		circuitConfigTag = currentGenesis.CircuitsConfigTag
