@@ -260,12 +260,3 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	}
 	return origin, root, nil
 }
-
-type TokenTransfer struct {
-	TxHash    types.Hash     `json:"txHash"`
-	From      types.HexBytes `json:"from"`
-	To        types.HexBytes `json:"to"`
-	Amount    uint64         `json:"amount"`
-	Timestamp time.Time      `json:"timestamp"`
-	Height    uint64         `json:"height"`
-}

@@ -45,8 +45,8 @@ func TxKey(tx tmtypes.Tx) [32]byte {
 	return sha256.Sum256(tx)
 }
 
-// TransferTokensMeta wraps useful information about a token transfer
-type TransferTokensMeta struct {
+// TokenTransfer wraps information about a token transfer.
+type TokenTransfer struct {
 	FromAddress common.Address
 	ToAddress   common.Address
 	Amount      uint64

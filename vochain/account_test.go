@@ -682,7 +682,7 @@ func TestSendTokensTx(t *testing.T) {
 	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.MintBalance(&vochaintx.TransferTokensMeta{
+	err = app.State.MintBalance(&vochaintx.TokenTransfer{
 		ToAddress: signer.Address(),
 		Amount:    1000,
 	})
@@ -775,12 +775,12 @@ func TestSetAccountDelegateTx(t *testing.T) {
 	err = app.State.CreateAccount(signer2.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.MintBalance(&vochaintx.TransferTokensMeta{
+	err = app.State.MintBalance(&vochaintx.TokenTransfer{
 		ToAddress: signer.Address(),
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	err = app.State.MintBalance(&vochaintx.TransferTokensMeta{
+	err = app.State.MintBalance(&vochaintx.TokenTransfer{
 		ToAddress: signer2.Address(),
 		Amount:    1000,
 	})
@@ -877,7 +877,7 @@ func TestCollectFaucetTx(t *testing.T) {
 	err = app.State.CreateAccount(toSigner.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.MintBalance(&vochaintx.TransferTokensMeta{
+	err = app.State.MintBalance(&vochaintx.TokenTransfer{
 		ToAddress: signer.Address(),
 		Amount:    1000,
 	})

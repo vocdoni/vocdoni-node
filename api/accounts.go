@@ -91,7 +91,15 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/accounts/{organizationID}/transfers/page/{page}",
+		"/accounts/{accountID}/transfers/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.tokenTransfersHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/accounts/{accountID}/transfers",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenTransfersHandler,
@@ -343,32 +351,35 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /accounts/<organizationID>/transfers/page/<page>
+// /accounts/<accountID>/transfers/page/<page>
 // Returns the token transfers for an organization
 func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
-	if err != nil || organizationID == nil {
-		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	if err != nil || accountID == nil {
+		return fmt.Errorf("accountID (%q) cannot be decoded", ctx.URLParam("accountID"))
 	}
-	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
+	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
 	if acc == nil {
-		return fmt.Errorf("organization not found")
+		return fmt.Errorf("account not found")
 	}
 	if err != nil {
 		return err
 	}
-	page, err := strconv.Atoi(ctx.URLParam("page"))
-	if err != nil {
-		return fmt.Errorf("cannot parse page number")
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return fmt.Errorf("cannot parse page number")
+		}
 	}
 	page = page * MaxPageSize
-	transfers, err := a.indexer.GetTokenTransfersByFromAccount(organizationID, int32(page), MaxPageSize)
+	transfers, err := a.indexer.GetTokenTransfersByFromAccount(accountID, int32(page), MaxPageSize)
 	if err != nil {
 		return fmt.Errorf("cannot fetch token transfers: %w", err)
 	}
 	data, err := json.Marshal(
 		struct {
-			Transfers []*indexertypes.TokenTransfer `json:"transfers"`
+			Transfers []*indexertypes.TokenTransferMeta `json:"transfers"`
 		}{Transfers: transfers},
 	)
 	if err != nil {
