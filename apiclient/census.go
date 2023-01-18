@@ -10,6 +10,7 @@ import (
 	"github.com/iden3/go-iden3-crypto/babyjub"
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
@@ -130,21 +131,59 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 	return &cp, nil
 }
 
+// CensusAddParticipantsZk adds one or several participants to an existing
+// zkweighted census wrapping the method CensusAddParticipants transforming
+// each participant private key into a babyjubjub first.
+func (c *HTTPclient) CensusAddParticipantsZk(censusID types.HexBytes, participants *api.CensusParticipants) error {
+	// TODO: Check the census type before continue. The endpoint is not
+	// implemented.
+
+	// Transform the participants key to babyjubjub key
+	zkParticipants := &api.CensusParticipants{}
+	for _, participant := range participants.Participants {
+		ethSignKey := ethereum.NewSignKeys()
+		if err := ethSignKey.AddHexKey(participant.Key.String()); err != nil {
+			return err
+		}
+		privKey, err := BabyJubJubPrivKey(ethSignKey)
+		if err != nil {
+			return err
+		}
+		censusKey, err := BabyJubJubPubKey(privKey)
+		if err != nil {
+			return err
+		}
+
+		zkParticipants.Participants = append(zkParticipants.Participants,
+			api.CensusParticipant{Key: censusKey, Weight: participant.Weight})
+	}
+
+	return c.CensusAddParticipants(censusID, zkParticipants)
+}
+
 // CensusGenProofZk function generates the census proof of a election based on
 // ZkSnarks. It uses the current apiclient circuit config to instance the
 // circuit and generates the proof for the censusRoot, electionId and voter
 // babyjubjub private key provided.
-func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, privVoterKey babyjub.PrivateKey) (*CensusProofZk, error) {
+func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types.HexBytes) (*CensusProofZk, error) {
 	// Get BabyJubJub key from current client
-	pubVoterKey, err := BabyJubJubPubKey(privVoterKey)
+	ethSignKey := ethereum.NewSignKeys()
+	if err := ethSignKey.AddHexKey(privVoterKey.String()); err != nil {
+		return nil, err
+	}
+	privKey, err := BabyJubJubPrivKey(ethSignKey)
+	if err != nil {
+		return nil, err
+	}
+	pubKey, err := BabyJubJubPubKey(privKey)
 	if err != nil {
 		return nil, err
 	}
 
-	strPrivateKey := babyjub.SkToBigInt(&privVoterKey).String()
+	strPrivateKey := babyjub.SkToBigInt(&privKey).String()
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubVoterKey.String())
+	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubKey.String())
 	if err != nil {
 		return nil, err
 	}
@@ -168,7 +207,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID types.HexBytes, pri
 		weight = censusData.Weight.ToInt()
 	}
 	// Get nullifier and encoded processId
-	nullifier, strProcessId, err := c.GetNullifierZk(privVoterKey, electionID)
+	nullifier, strProcessId, err := c.GetNullifierZk(privKey, electionID)
 	if err != nil {
 		return nil, err
 	}
