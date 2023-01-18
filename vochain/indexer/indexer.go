@@ -124,7 +124,6 @@ type Indexer struct {
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
 	vote    *state.Vote
-	voterID state.VoterID
 	txIndex int32
 }
 
@@ -448,15 +447,8 @@ func (idx *Indexer) Commit(height uint32) error {
 	startTime := time.Now()
 	txn := idx.db.Badger().NewTransaction(true)
 	for _, v := range idx.voteIndexPool {
-		if err := idx.addVoteIndex(
-			v.vote.Nullifier,
-			v.vote.ProcessID,
-			height,
-			v.vote.WeightBytes(),
-			v.txIndex,
-			v.voterID,
-			txn); err != nil {
-			log.Warn(err)
+		if err := idx.addVoteIndex(v.vote, v.txIndex, txn); err != nil {
+			log.Errorw(err, "could not index vote")
 		}
 	}
 	if len(idx.voteIndexPool) > 0 {
@@ -573,7 +565,6 @@ func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessID) {
 		idx.votePool[string(v.ProcessID)] = append(idx.votePool[string(v.ProcessID)], v)
 	}
-	//sVote, err := idx.App.State.Vote(v.ProcessId, v.Nullifier, false)
 	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
 }
 

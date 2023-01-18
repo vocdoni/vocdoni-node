@@ -519,10 +519,6 @@ func TestResults(t *testing.T) {
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
 
-	// TODO: note how we have the TestBaseApplication with an initial height
-	// of 3 and increments via AdvanceTestBlock, and the loop here with
-	// commits of blocks with heights 0-300. The two are parallel and should
-	// probably be joined.
 	for i := int32(0); i < 30; i++ {
 		idx.Rollback()
 		vote := &models.VoteEnvelope{
@@ -939,29 +935,27 @@ func TestCountVotes(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	idx.Rollback()
-	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
 		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		idx.OnVote(v, int32(i))
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 	}
+
+	// Add last vote with known nullifier
 	nullifier := util.RandomBytes(32)
 	v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: nullifier}
-	// Add last vote with known nullifier
-	txIndex := int32(100)
-	idx.OnVote(v, txIndex)
+	qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 
-	// Vote transactions are on imaginary 2000th block
-	blockHeight := uint32(2000)
-	err = idx.Commit(blockHeight)
-	qt.Assert(t, err, qt.IsNil)
+	// save the block height for comparing later
+	blockHeight := uint32(app.Height())
+	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID
 	height, err := idx.GetEnvelopeHeight(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
-	// Test global envelope height
+
+	// Test global envelope height (number of votes)
 	height, err = idx.GetEnvelopeHeight([]byte{})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
@@ -969,7 +963,108 @@ func TestCountVotes(t *testing.T) {
 	ref, err := idx.GetEnvelopeReference(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
-	qt.Assert(t, ref.TxIndex, qt.CmpEquals(), txIndex)
+
+	// Note that txIndex is 0, because the votes are added directly to the sate,
+	// while the txCounter only increments on DeliverTx() execution.
+}
+
+func TestOverwriteVotes(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+	pid := util.RandomBytes(32)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
+
+	err := app.State.AddProcess(&models.Process{
+		CensusRoot:   root,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		BlockCount:   10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:          5,
+			MaxValue:          2,
+			MaxTotalCost:      8,
+			CostExponent:      1,
+			MaxVoteOverwrites: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// Send the first vote
+	vp, err := json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote := &models.VoteEnvelope{
+		Nonce: util.RandomBytes(32),
+		Proof: &models.Proof{Payload: &models.Proof_Arbo{
+			Arbo: &models.ProofArbo{
+				Type:     models.ProofArbo_BLAKE2B,
+				Siblings: proofs[0],
+				KeyType:  models.ProofArbo_PUBKEY,
+			}}},
+		ProcessId:   pid,
+		VotePackage: vp,
+	}
+	voteTx, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err := keys[0].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+
+	signedTx, err := proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err := app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	nullifier := response.Data.Bytes()
+	qt.Assert(t, nullifier, qt.DeepEquals, state.GenerateNullifier(keys[0].Address(), pid))
+
+	app.AdvanceTestBlock()
+
+	// Send the second
+	vp, err = json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{2, 2, 2},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote.VotePackage = vp
+	vote.Nonce = util.RandomBytes(32)
+
+	voteTx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err = keys[0].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+	signedTx, err = proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err = app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, response.Code, qt.Equals, uint32(0))
+
+	app.AdvanceTestBlock()
+
+	// check envelope height for this PID
+	height, err := idx.GetEnvelopeHeight(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, height, qt.CmpEquals(), uint64(2))
+
+	// check overwrite count is correct
+	ref, err := idx.GetEnvelopeReference(nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, ref.OverwriteCount, qt.CmpEquals(), uint32(1))
+
+	// check vote package is updated
+	envelope, err := idx.GetEnvelope(nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelope.VotePackage, qt.DeepEquals, vp)
 }
 
 func TestTxIndexer(t *testing.T) {

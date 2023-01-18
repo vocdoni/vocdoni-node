@@ -54,21 +54,17 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 	if err != nil {
 		return nil, err
 	}
-	log.Debugw(fmt.Sprintf("get envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
-		"nullifier": hex.EncodeToString(nullifier),
-		"height":    sqlTxRefInner.Height,
-		"txIndex":   sqlTxRefInner.TxIndex,
-		"weight":    sqlTxRefInner.Weight,
-		"voterId":   hex.EncodeToString(sqlTxRefInner.VoterID),
+	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
+		"nullifier":      hex.EncodeToString(nullifier),
+		"height":         sqlTxRefInner.Height,
+		"txIndex":        sqlTxRefInner.TxIndex,
+		"weight":         sqlTxRefInner.Weight,
+		"processId":      hex.EncodeToString(sqlTxRefInner.ProcessID),
+		"overwriteCount": sqlTxRefInner.OverwriteCount,
+		"voterId":        hex.EncodeToString(sqlTxRefInner.VoterID),
 	})
 
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
-	if enableBadgerhold {
-		if diff := cmp.Diff(txRef, sqlTxRef); diff != "" {
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", nullifier, diff)
-		}
-	}
-
 	return sqlTxRef, nil
 }
 
@@ -94,12 +90,14 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 	if envelope == nil {
 		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
+
 	log.Debugf("getEnvelope took %s", time.Since(t))
 	envelopePackage := &indexertypes.EnvelopePackage{
 		Nonce:                envelope.Nonce,
 		VotePackage:          envelope.VotePackage,
 		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
+		OverwriteCount:       voteRef.OverwriteCount,
 		Signature:            stx.Signature,
 		Meta: indexertypes.EnvelopeMetadata{
 			ProcessId: envelope.ProcessId,
@@ -507,61 +505,74 @@ func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (s *Indexer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, voterID state.VoterID, txn *badger.Txn) error {
-	weightInt := new(types.BigInt).SetBytes(weight)
-	weightStr, err := weightInt.MarshalText()
-	if err != nil {
-		panic(err) // should never happen
-	}
+func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32, txn *badger.Txn) error {
 	creationTime := time.Now()
 	if enableBadgerhold {
 		bhVoteRef := &indexertypes.VoteReference{
-			Nullifier:    nullifier,
-			ProcessID:    pid,
-			VoterID:      voterID,
-			Height:       blockHeight,
-			Weight:       weightInt,
+			Nullifier:      vote.Nullifier,
+			ProcessID:      vote.ProcessID,
+			VoterID:        nonNullBytes(vote.VoterID),
+			OverwriteCount: vote.Overwrites,
+			Height:         vote.Height,
+			Weight: func() *types.BigInt {
+				if vote.Weight == nil {
+					return new(types.BigInt).SetUint64(1)
+				}
+				return (*types.BigInt)(vote.Weight)
+			}(),
 			TxIndex:      txIndex,
 			CreationTime: creationTime,
 		}
 		if txn != nil {
-			if err := s.db.TxInsert(txn, nullifier, bhVoteRef); err != nil {
+			if err := s.db.TxUpsert(txn, vote.Nullifier, bhVoteRef); err != nil {
 				return err
 			}
 		} else {
 			if err := s.queryWithRetries(func() error {
-				return s.db.Insert(nullifier, bhVoteRef)
+				return s.db.Upsert(vote.Nullifier, bhVoteRef)
 			}); err != nil {
 				return err
 			}
 		}
 	}
 
+	weightStr := []byte("1")
+	if vote.Weight != nil {
+		var err error
+		weightStr, err = vote.Weight.MarshalText()
+		if err != nil {
+			panic(err) // should never happen
+		}
+	}
 	sqlStartTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
-		Nullifier: nullifier,
-		ProcessID: pid,
-		Height:    int64(blockHeight),
-		Weight:    string(weightStr),
-		TxIndex:   int64(txIndex),
+		Nullifier:      vote.Nullifier,
+		ProcessID:      vote.ProcessID,
+		Height:         int64(vote.Height),
+		Weight:         string(weightStr),
+		TxIndex:        int64(txIndex),
+		OverwriteCount: int64(vote.Overwrites),
 		// VoterID has a NOT NULL constraint, so we need to provide
 		// a zero value for it since nil is not allowed
-		VoterID: func() state.VoterID {
-			if voterID == nil {
-				return voterID.Nil()
-			}
-			return voterID
-		}(),
+		VoterID:      nonNullBytes(vote.VoterID),
 		CreationTime: creationTime,
 	}); err != nil {
 		return err
 	}
 
-	log.Debugf("addVoteIndex sqlite took %s", time.Since(sqlStartTime))
+	log.Debugw("addVoteIndex sqlite", map[string]interface{}{
+		"nullifier":   vote.Nullifier,
+		"pid":         vote.ProcessID,
+		"blockHeight": vote.Height,
+		"weight":      weightStr,
+		"voterID":     hex.EncodeToString(vote.VoterID),
+		"txIndex":     txIndex,
+		"overwrites":  vote.Overwrites,
+		"duration":    time.Since(sqlStartTime).String(),
+	})
 	return nil
 }
 
@@ -584,8 +595,7 @@ func (s *Indexer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (s *Indexer) commitVotes(pid []byte,
-	partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotes(pid []byte, partialResults *indexertypes.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -596,8 +606,7 @@ func (s *Indexer) commitVotes(pid []byte,
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (s *Indexer) commitVotesUnsafe(pid []byte,
-	partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Results, height uint32) error {
 
 	if enableBadgerhold {
 		update := func(record interface{}) error {
@@ -707,7 +716,10 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 		}
 		atomic.AddUint64(&nvotes, 1)
 	}); err == nil {
-		log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
+		log.Infow("computed results", map[string]interface{}{
+			"process": p.ID.String(),
+			"votes":   nvotes,
+		})
 		log.Debugf("results: %s", results)
 	}
 	results.EnvelopeHeight = nvotes

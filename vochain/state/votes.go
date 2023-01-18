@@ -104,15 +104,15 @@ func (v *State) voteCountInc() error {
 // If the vote already exists it will be overwritten and overwrite counter will be increased.
 // Note that the vote is not committed to the StateDB until the StateDB transaction is committed.
 // Note that the vote is not verified, so it is the caller responsibility to verify the vote.
-func (v *State) AddVote(vote *Vote) error {
-	vid, err := v.voteID(vote.ProcessID, vote.Nullifier)
+func (s *State) AddVote(vote *Vote) error {
+	vid, err := s.voteID(vote.ProcessID, vote.Nullifier)
 	if err != nil {
 		return err
 	}
 	// save block number
-	vote.Height = v.CurrentHeight()
+	vote.Height = s.CurrentHeight()
 
-	sdbVote, err := v.Vote(vote.ProcessID, vote.Nullifier, false)
+	sdbVote, err := s.Vote(vote.ProcessID, vote.Nullifier, false)
 	if err != nil {
 		if errors.Is(err, ErrVoteNotFound) {
 			sdbVote = &models.StateDBVote{
@@ -128,7 +128,7 @@ func (v *State) AddVote(vote *Vote) error {
 		// overwrite vote if it already exists
 		sdbVote.VoteHash = vote.Hash()
 		sdbVote.VotePackage = vote.VotePackage
-		sdbVote.Weight = vote.Weight.Bytes()
+		sdbVote.Weight = vote.WeightBytes()
 		if sdbVote.OverwriteCount != nil {
 			*sdbVote.OverwriteCount++
 		} else {
@@ -140,21 +140,24 @@ func (v *State) AddVote(vote *Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
-	v.Tx.Lock()
+	s.Tx.Lock()
 	err = func() error {
 		treeCfg := StateChildTreeCfg(ChildTreeVotes)
-		if err := v.Tx.DeepSet(vid, sdbVoteBytes,
+		if err := s.Tx.DeepSet(vid, sdbVoteBytes,
 			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessID)); err != nil {
 			return err
 		}
-		return v.voteCountInc()
+		return s.voteCountInc()
 	}()
-	v.Tx.Unlock()
+	s.Tx.Unlock()
 	if err != nil {
 		return err
 	}
-	for _, l := range v.eventListeners {
-		l.OnVote(vote, v.TxCounter())
+	if sdbVote.OverwriteCount != nil {
+		vote.Overwrites = *sdbVote.OverwriteCount
+	}
+	for _, l := range s.eventListeners {
+		l.OnVote(vote, s.TxCounter())
 	}
 	return nil
 }

@@ -214,13 +214,14 @@ type VotePackage struct {
 
 // VoteReference holds the db reference for a single vote
 type VoteReference struct {
-	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
-	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
-	VoterID      state.VoterID
-	Height       uint32
-	Weight       *types.BigInt
-	TxIndex      int32
-	CreationTime time.Time
+	Nullifier      types.HexBytes `badgerholdKey:"Nullifier"`
+	ProcessID      types.HexBytes `badgerholdIndex:"ProcessID"`
+	VoterID        state.VoterID
+	Height         uint32
+	Weight         *types.BigInt
+	TxIndex        int32
+	CreationTime   time.Time
+	OverwriteCount uint32
 }
 
 func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
@@ -229,13 +230,14 @@ func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 		panic(err) // should never happen
 	}
 	return &VoteReference{
-		Nullifier:    dbvote.Nullifier,
-		ProcessID:    dbvote.ProcessID,
-		VoterID:      nonEmptyBytes(state.VoterID{}),
-		Height:       uint32(dbvote.Height),
-		Weight:       weightInt,
-		TxIndex:      int32(dbvote.TxIndex),
-		CreationTime: dbvote.CreationTime,
+		Nullifier:      dbvote.Nullifier,
+		ProcessID:      dbvote.ProcessID,
+		VoterID:        dbvote.VoterID,
+		Height:         uint32(dbvote.Height),
+		Weight:         weightInt,
+		TxIndex:        int32(dbvote.TxIndex),
+		CreationTime:   dbvote.CreationTime,
+		OverwriteCount: uint32(dbvote.OverwriteCount),
 	}
 }
 
@@ -257,6 +259,7 @@ type EnvelopePackage struct {
 	Signature            types.HexBytes   `json:"signature"`
 	VotePackage          []byte           `json:"votePackage"`
 	Weight               string           `json:"weight"`
+	OverwriteCount       uint32           `json:"overwriteCount"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api

@@ -1,5 +1,6 @@
 -- +goose Up
 ALTER TABLE vote_references ADD voter_id BLOB NOT NULL DEFAULT X'';
+ALTER TABLE vote_references ADD overwrite_count INTEGER NOT NULL;
 
 -- results columns; in badgerhold these were a separate table
 ALTER TABLE processes ADD results_votes TEXT NOT NULL DEFAULT '';

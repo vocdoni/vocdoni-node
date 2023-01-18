@@ -54,11 +54,12 @@ type TxReference struct {
 }
 
 type VoteReference struct {
-	Nullifier    types.Nullifier
-	ProcessID    types.ProcessID
-	Height       int64
-	Weight       string
-	TxIndex      int64
-	CreationTime time.Time
-	VoterID      state.VoterID
+	Nullifier      types.Nullifier
+	ProcessID      types.ProcessID
+	Height         int64
+	Weight         string
+	TxIndex        int64
+	CreationTime   time.Time
+	VoterID        state.VoterID
+	OverwriteCount int64
 }
