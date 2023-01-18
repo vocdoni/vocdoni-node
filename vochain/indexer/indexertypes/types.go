@@ -339,7 +339,9 @@ func (b *BlockMetadata) String() string {
 	return builder.String()
 }
 
-type TokenTransfer struct {
+// TokenTransferMeta contains the information of a token transfer and some extra useful information.
+// The types are compatible with the SQL defined schema.
+type TokenTransferMeta struct {
 	Amount    uint64          `json:"amount"`
 	From      types.AccountID `json:"from"`
 	Height    uint64          `json:"height"`

@@ -82,7 +82,7 @@ type Indexer struct {
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
 	// tokenTransferPool is the list of token transfers to be indexed
-	tokenTransferPool []*indexertypes.TokenTransfer
+	tokenTransferPool []*indexertypes.TokenTransferMeta
 	// lockPool is the lock for all *Pool operations
 	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
@@ -718,10 +718,10 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 
 // NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
-func (idx *Indexer) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {
+func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.tokenTransferPool = append(idx.tokenTransferPool, &indexertypes.TokenTransfer{
+	idx.tokenTransferPool = append(idx.tokenTransferPool, &indexertypes.TokenTransferMeta{
 		From:      tx.FromAddress.Bytes(),
 		To:        tx.ToAddress.Bytes(),
 		Amount:    tx.Amount,
@@ -732,7 +732,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {
 }
 
 // newTokenTransfer creates a new token transfer and stores it in the database
-func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransfer) error {
+func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
 	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
@@ -751,7 +751,7 @@ func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransfer) error {
 
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
 // from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransfer, error) {
+func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
 	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	ttFromDB, err := queries.GetTokenTransfersByFromAccount(ctx, indexerdb.GetTokenTransfersByFromAccountParams{
@@ -762,9 +762,9 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 	if err != nil {
 		return nil, err
 	}
-	tt := make([]*indexertypes.TokenTransfer, len(ttFromDB))
+	tt := make([]*indexertypes.TokenTransferMeta, len(ttFromDB))
 	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenTransfer{
+		tt = append(tt, &indexertypes.TokenTransferMeta{
 			Amount:    uint64(t.Amount),
 			From:      t.FromAccount,
 			To:        t.ToAccount,

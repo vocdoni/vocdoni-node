@@ -249,7 +249,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 					); err != nil {
 						return nil, fmt.Errorf("setAccountTx: consumeFaucet %w", err)
 					}
-					if err := t.state.TransferBalance(&vochaintx.TransferTokensMeta{
+					if err := t.state.TransferBalance(&vochaintx.TokenTransfer{
 						FromAddress: faucetIssuerAddress,
 						ToAddress:   txSenderAddress,
 						Amount:      faucetPayload.Amount,
@@ -351,7 +351,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			if err != nil {
 				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
-			if err := t.state.MintBalance(&vochaintx.TransferTokensMeta{
+			if err := t.state.MintBalance(&vochaintx.TokenTransfer{
 				FromAddress: common.BytesToAddress(treasurer.Address),
 				ToAddress:   common.BytesToAddress(tx.To),
 				Amount:      tx.Value,
@@ -375,7 +375,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			if err != nil {
 				return nil, fmt.Errorf("sendTokensTx: burnTxCostIncrementNonce %w", err)
 			}
-			if err := t.state.TransferBalance(&vochaintx.TransferTokensMeta{
+			if err := t.state.TransferBalance(&vochaintx.TokenTransfer{
 				FromAddress: from,
 				ToAddress:   to,
 				Amount:      tx.Value,
@@ -415,7 +415,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}
-			if err := t.state.TransferBalance(&vochaintx.TransferTokensMeta{
+			if err := t.state.TransferBalance(&vochaintx.TokenTransfer{
 				FromAddress: issuerAddress,
 				ToAddress:   common.BytesToAddress(faucetPayload.To),
 				Amount:      faucetPayload.Amount,

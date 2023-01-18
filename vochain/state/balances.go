@@ -222,7 +222,7 @@ func (v *State) ConsumeFaucetPayload(from common.Address, faucetPayload *models.
 // TransferBalance transfers balance from origin address to destination address,
 // and updates the state with the new values (including nonce).
 // If origin address acc is not enough, ErrNotEnoughBalance is returned.
-func (v *State) TransferBalance(tx *vochaintx.TransferTokensMeta, burnTxCost bool) error {
+func (v *State) TransferBalance(tx *vochaintx.TokenTransfer, burnTxCost bool) error {
 	accFrom, err := v.GetAccount(tx.FromAddress, false)
 	if err != nil {
 		return err
@@ -249,7 +249,7 @@ func (v *State) TransferBalance(tx *vochaintx.TransferTokensMeta, burnTxCost boo
 	}
 	if !burnTxCost {
 		for _, l := range v.eventListeners {
-			l.OnTransferTokens(&vochaintx.TransferTokensMeta{
+			l.OnTransferTokens(&vochaintx.TokenTransfer{
 				FromAddress: tx.FromAddress,
 				ToAddress:   tx.ToAddress,
 				Amount:      tx.Amount,
@@ -262,7 +262,7 @@ func (v *State) TransferBalance(tx *vochaintx.TransferTokensMeta, burnTxCost boo
 }
 
 // MintBalance increments the existing acc of address by amount
-func (v *State) MintBalance(tx *vochaintx.TransferTokensMeta) error {
+func (v *State) MintBalance(tx *vochaintx.TokenTransfer) error {
 	if tx.Amount == 0 {
 		return fmt.Errorf("cannot mint a zero amount balance")
 	}
@@ -282,7 +282,7 @@ func (v *State) MintBalance(tx *vochaintx.TransferTokensMeta) error {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnTransferTokens(&vochaintx.TransferTokensMeta{
+		l.OnTransferTokens(&vochaintx.TokenTransfer{
 			FromAddress: tx.FromAddress,
 			ToAddress:   tx.ToAddress,
 			Amount:      tx.Amount,
@@ -316,7 +316,7 @@ func (v *State) InitChainMintBalance(to common.Address, amount uint64) error {
 // if cost is set to 0 just return
 func (v *State) BurnTxCost(from common.Address, cost uint64) error {
 	if cost != 0 {
-		return v.TransferBalance(&vochaintx.TransferTokensMeta{
+		return v.TransferBalance(&vochaintx.TokenTransfer{
 			FromAddress: from,
 			ToAddress:   BurnAddress,
 			Amount:      cost,

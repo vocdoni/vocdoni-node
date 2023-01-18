@@ -121,7 +121,7 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))
 
-	err = s.TransferBalance(&vochaintx.TransferTokensMeta{
+	err = s.TransferBalance(&vochaintx.TokenTransfer{
 		FromAddress: addr1.Address(),
 		ToAddress:   addr2.Address(),
 		Amount:      20,
@@ -132,21 +132,21 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(20))
 
-	err = s.TransferBalance(&vochaintx.TransferTokensMeta{
+	err = s.TransferBalance(&vochaintx.TokenTransfer{
 		FromAddress: addr1.Address(),
 		ToAddress:   addr2.Address(),
 		Amount:      40,
 	}, false)
 	qt.Assert(t, err, qt.IsNotNil)
 
-	err = s.TransferBalance(&vochaintx.TransferTokensMeta{
+	err = s.TransferBalance(&vochaintx.TokenTransfer{
 		FromAddress: addr2.Address(),
 		ToAddress:   addr1.Address(),
 		Amount:      10,
 	}, false)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = s.TransferBalance(&vochaintx.TransferTokensMeta{
+	err = s.TransferBalance(&vochaintx.TokenTransfer{
 		FromAddress: addr2.Address(),
 		ToAddress:   addr1.Address(),
 		Amount:      5,
@@ -179,7 +179,7 @@ func (l *Listener) OnProcessResults(pid []byte, results *models.ProcessResult, t
 }
 func (l *Listener) OnSetAccount(addr []byte, account *Account) {
 }
-func (l *Listener) OnTransferTokens(tx *vochaintx.TransferTokensMeta) {
+func (l *Listener) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 }
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)

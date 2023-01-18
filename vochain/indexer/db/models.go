@@ -45,7 +45,7 @@ type Process struct {
 	SourceNetworkID       string
 }
 
-type TokenTransfer struct {
+type TokenTransferMeta struct {
 	TxHash       types.Hash
 	Height       int64
 	FromAccount  types.AccountID
