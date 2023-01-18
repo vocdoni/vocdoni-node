@@ -566,6 +566,41 @@ func TestResults(t *testing.T) {
 	err = idx.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
 
+	// GetEnvelopes with a limit
+	envelopes, err := idx.GetEnvelopes(pid, 10, 0, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 10)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, uint32(1))
+	qt.Assert(t, envelopes[4].Height, qt.Equals, uint32(5))
+	qt.Assert(t, envelopes[9].Height, qt.Equals, uint32(10))
+
+	matchNullifier := fmt.Sprintf("%x", envelopes[9].Nullifier)
+	matchHeight := envelopes[9].Height
+
+	// GetEnvelopes with a limit and offset
+	envelopes, err = idx.GetEnvelopes(pid, 5, 27, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 3)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, uint32(28))
+	qt.Assert(t, envelopes[2].Height, qt.Equals, uint32(30))
+
+	// GetEnvelopes without a match
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, fmt.Sprintf("%x", util.RandomBytes(32)))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 0)
+
+	// GetEnvelopes with one match by full nullifier
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 1)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
+
+	// GetEnvelopes with one match by partial nullifier
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier[:29])
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 1)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
+
 	// Test results
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)

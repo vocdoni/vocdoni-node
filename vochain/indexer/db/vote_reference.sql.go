@@ -69,3 +69,39 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 	)
 	return i, err
 }
+
+const getVoteReferencesByProcessID = `-- name: GetVoteReferencesByProcessID :many
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id FROM vote_references
+WHERE process_id = ?
+`
+
+func (q *Queries) GetVoteReferencesByProcessID(ctx context.Context, processID types.ProcessID) ([]VoteReference, error) {
+	rows, err := q.db.QueryContext(ctx, getVoteReferencesByProcessID, processID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []VoteReference
+	for rows.Next() {
+		var i VoteReference
+		if err := rows.Scan(
+			&i.Nullifier,
+			&i.ProcessID,
+			&i.Height,
+			&i.Weight,
+			&i.TxIndex,
+			&i.CreationTime,
+			&i.VoterID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

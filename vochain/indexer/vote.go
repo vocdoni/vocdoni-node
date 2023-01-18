@@ -131,44 +131,97 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	const limitConcurrentProcessing = 20
 	semaphore := make(chan bool, limitConcurrentProcessing)
 
-	// TODO(sqlite): reimplement
-	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
-		func(txRef *indexertypes.VoteReference) error {
-			wg.Add(1)
-			processVote := func() {
-				defer wg.Done()
-				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
-				if err != nil {
-					log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
-						txRef.Height, txRef.TxIndex))
-					return
+	if enableBadgerhold {
+		err := s.db.ForEach(
+			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+			func(txRef *indexertypes.VoteReference) error {
+				wg.Add(1)
+				processVote := func() {
+					defer wg.Done()
+					stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+					if err != nil {
+						log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
+							txRef.Height, txRef.TxIndex))
+						return
+					}
+					tx := &models.Tx{}
+					if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+						log.Warnf("could not unmarshal tx: %v", err)
+						return
+					}
+					envelope := tx.GetVote()
+					if envelope == nil {
+						log.Errorf("transaction is not an Envelope")
+						return
+					}
+					callback(envelope, txRef.Weight.ToInt())
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					log.Warnf("could not unmarshal tx: %v", err)
-					return
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					log.Errorf("transaction is not an Envelope")
-					return
-				}
-				callback(envelope, txRef.Weight.ToInt())
-			}
-			if async {
-				go func() {
-					semaphore <- true
+				if async {
+					go func() {
+						semaphore <- true
+						processVote()
+						<-semaphore
+					}()
+				} else {
 					processVote()
-					<-semaphore
-				}()
-			} else {
-				processVote()
+				}
+				return nil
+			})
+		wg.Wait()
+		return err
+	}
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	// TODO(sqlite): getting all votes as a single slice is not scalable.
+	txRefs, err := queries.GetVoteReferencesByProcessID(ctx, processId)
+	if err != nil {
+		return err
+	}
+	for _, txRef := range txRefs {
+		wg.Add(1)
+		// TODO(mvdan): we copied this code from the badgerhold query;
+		// it only logs errors, which isn't great.
+		processVote := func() {
+			defer wg.Done()
+			// TODO(sqlite): should we store the needed info in sqlite to avoid
+			// App.GetTx calls?
+			stx, err := s.App.GetTx(uint32(txRef.Height), int32(txRef.TxIndex))
+			if err != nil {
+				log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
+					txRef.Height, txRef.TxIndex))
+				return
 			}
-			return nil
-		})
+			tx := &models.Tx{}
+			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+				log.Warnf("could not unmarshal tx: %v", err)
+				return
+			}
+			envelope := tx.GetVote()
+			if envelope == nil {
+				log.Errorf("transaction is not an Envelope")
+				return
+			}
+			weightInt := new(big.Int)
+			if err := weightInt.UnmarshalText([]byte(txRef.Weight)); err != nil {
+				log.Warnf("could not unmarshal weight: %v", err)
+				return
+			}
+			callback(envelope, weightInt)
+		}
+		if async {
+			go func() {
+				semaphore <- true
+				processVote()
+				<-semaphore
+			}()
+		} else {
+			processVote()
+		}
+	}
+
 	wg.Wait()
-	return err
+	return nil
 }
 
 // GetEnvelopes retrieves all Envelopes of a ProcessId from the Blockchain block store
