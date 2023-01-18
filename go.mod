@@ -363,3 +363,13 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.1.7 // indirect
 )
+
+// Use Informal System's fork of Tendermint Core
+//
+// It seems that the official repo is being abandoned and now Informal is
+// taking over the development with their fork:
+// https://github.com/tendermint/tendermint/issues/9972
+//
+// Twitter thread:
+// https://twitter.com/informalinc/status/1613580954383040512
+replace github.com/tendermint/tendermint => github.com/informalsystems/tendermint v0.35.9
