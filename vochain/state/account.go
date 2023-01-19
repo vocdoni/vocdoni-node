@@ -43,7 +43,7 @@ func (a *Account) Transfer(dest *Account, amount uint64) error {
 	if a.Balance < amount {
 		return ErrNotEnoughBalance
 	}
-	if dest.Balance+amount <= dest.Balance {
+	if dest.Balance+amount < dest.Balance {
 		return ErrBalanceOverflow
 	}
 	dest.Balance += amount
