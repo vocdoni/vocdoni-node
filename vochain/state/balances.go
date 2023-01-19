@@ -273,7 +273,7 @@ func (v *State) MintBalance(tx *vochaintx.TokenTransfer) error {
 	if acc == nil {
 		return ErrAccountNotExist
 	}
-	if acc.Balance+tx.Amount <= acc.Balance {
+	if acc.Balance+tx.Amount < acc.Balance {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += tx.Amount
@@ -304,7 +304,7 @@ func (v *State) InitChainMintBalance(to common.Address, amount uint64) error {
 	if acc == nil {
 		return ErrAccountNotExist
 	}
-	if acc.Balance+amount <= acc.Balance {
+	if acc.Balance+amount < acc.Balance {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
