@@ -195,13 +195,14 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string, txi
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
+	if !p.EnvelopeType.EncryptedVotes {
 		return
 	}
 	// If keys already exist, do nothing (this happens on the start-up block replay)
-	if len(p.EncryptionPublicKeys[k.myIndex]) > 0 {
+	if len(p.EncryptionPublicKeys)-1 >= int(k.myIndex) && len(p.EncryptionPublicKeys[k.myIndex]) > 0 {
 		return
 	}
+
 	log.Debugf("generating key for process %x", pid)
 	// Check if already created on this block process
 	if _, exist := k.keyPool[string(pid)]; exist {
@@ -226,11 +227,11 @@ func (k *KeyKeeper) OnCancel(pid []byte, txindex int32) { // LEGACY
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
+	if !p.EnvelopeType.EncryptedVotes {
 		return
 	}
 
-	if p.EncryptionPublicKeys[k.myIndex] != "" {
+	if len(p.EncryptionPublicKeys)-1 >= int(k.myIndex) && p.EncryptionPublicKeys[k.myIndex] != "" {
 		log.Infof("process canceled, scheduling reveal keys for next block")
 		k.blockPool[string(pid)] = int64(k.vochain.State.CurrentHeight()) + 1
 	}
@@ -262,10 +263,10 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 		log.Errorf("cannot get process from state: (%s)", err)
 		return
 	}
-	if !(p.EnvelopeType.Anonymous || p.EnvelopeType.EncryptedVotes) {
+	if !p.EnvelopeType.EncryptedVotes {
 		return
 	}
-	if p.EncryptionPublicKeys[k.myIndex] != "" {
+	if len(p.EncryptionPublicKeys)-1 >= int(k.myIndex) && p.EncryptionPublicKeys[k.myIndex] != "" {
 		if status == models.ProcessStatus_ENDED {
 			log.Infof("process ended, scheduling reveal keys for next block")
 			k.blockPool[string(pid)] = int64(k.vochain.State.CurrentHeight()) + 1
@@ -366,10 +367,10 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 			log.Errorf("cannot get process from state: (%s)", err)
 			continue
 		}
-		if !(process.EnvelopeType.Anonymous || process.EnvelopeType.EncryptedVotes) {
+		if !process.EnvelopeType.EncryptedVotes {
 			return
 		}
-		if process.EncryptionPublicKeys[k.myIndex] != "" {
+		if len(process.EncryptionPublicKeys)-1 >= int(k.myIndex) && process.EncryptionPublicKeys[k.myIndex] != "" {
 			log.Infof("revealing keys for process %x on block %d", p, height)
 			if err := k.revealKeys(string(p)); err != nil {
 				log.Errorf("cannot reveal process keys for %x: (%s)", p, err)
