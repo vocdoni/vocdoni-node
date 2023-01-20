@@ -32,6 +32,7 @@ COPY --from=builder /src/voconed ./
 # Support for go-rapidsnark witness calculator (https://github.com/iden3/go-rapidsnark/tree/main/witness)
 COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
 # Support for go-rapidsnark prover (https://github.com/iden3/go-rapidsnark/tree/main/prover)
-RUN apt update && apt install -y build-essential libomp-dev
+RUN apt update 
+RUN apt install -y libc6-dev libomp-dev openmpi-common libgomp1
 
 ENTRYPOINT ["/app/node"]
