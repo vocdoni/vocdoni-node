@@ -20,6 +20,11 @@ type Process struct {
 	ResultsHeight         int64
 	HaveResults           bool
 	FinalResults          bool
+	ResultsVotes          string
+	ResultsWeight         string
+	ResultsEnvelopeHeight int64
+	ResultsSignatures     string
+	ResultsBlockHeight    int64
 	CensusRoot            types.CensusRoot
 	RollingCensusRoot     types.CensusRoot
 	RollingCensusSize     int64
@@ -38,11 +43,6 @@ type Process struct {
 	CreationTime          time.Time
 	SourceBlockHeight     int64
 	SourceNetworkID       string
-	ResultsVotes          string
-	ResultsWeight         string
-	ResultsEnvelopeHeight int64
-	ResultsSignatures     string
-	ResultsBlockHeight    int64
 }
 
 type TxReference struct {

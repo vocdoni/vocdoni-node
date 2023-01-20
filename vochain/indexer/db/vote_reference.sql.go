@@ -71,7 +71,7 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 }
 
 const getVoteReferencesByProcessID = `-- name: GetVoteReferencesByProcessID :many
-SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id FROM vote_references
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
 WHERE process_id = ?
 `
 
@@ -92,6 +92,7 @@ func (q *Queries) GetVoteReferencesByProcessID(ctx context.Context, processID ty
 			&i.TxIndex,
 			&i.CreationTime,
 			&i.VoterID,
+			&i.OverwriteCount,
 		); err != nil {
 			return nil, err
 		}

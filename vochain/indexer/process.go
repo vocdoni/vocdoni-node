@@ -24,7 +24,7 @@ import (
 var zeroBytes = []byte("")
 
 func nonNullBytes(p []byte) []byte {
-	if len(p) == 0 {
+	if p == nil {
 		return zeroBytes
 	}
 	return p
