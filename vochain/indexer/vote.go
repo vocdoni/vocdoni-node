@@ -234,7 +234,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	var err error
 	// TODO(sqlite): reimplement
 	// check pid
-	if len(processId) == types.ProcessIDsize {
+	if len(processId) > 0 {
 		err = s.db.ForEach(
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
 				And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
@@ -256,7 +256,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				}
 				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: processId,
+					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
@@ -293,7 +293,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				}
 				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: processId,
+					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
