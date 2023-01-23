@@ -154,13 +154,15 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
 
-	log.Infof("indexer initialization took %s, stored %d "+
-		"transactions, %d envelopes, %d processes and %d entities",
-		time.Since(startTime),
-		countMap[indexertypes.CountStoreTransactions],
-		countMap[indexertypes.CountStoreEnvelopes],
-		countMap[indexertypes.CountStoreProcesses],
-		countMap[indexertypes.CountStoreEntities])
+	log.Infow("indexer initialization", map[string]interface{}{
+		"took":         time.Since(startTime),
+		"dataDir":      dbPath,
+		"liveResults":  countLiveResults,
+		"transactions": countMap[indexertypes.CountStoreTransactions],
+		"envelopes":    countMap[indexertypes.CountStoreEnvelopes],
+		"processes":    countMap[indexertypes.CountStoreProcesses],
+		"entities":     countMap[indexertypes.CountStoreEntities],
+	})
 
 	sqlPath := dbPath + "-sqlite"
 	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
@@ -345,6 +347,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	// Find those processes which do not have yet final results,
 	// they are considered live so we need to compute the temporary
 	// results (or only its weight in case of Encrypted)
+	//prcs, err := idx.ProcessList(nil, 0, 0, "", 0, "", "READY", true)
 	prcs := [][]byte{}
 	err := idx.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
@@ -352,6 +355,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			prcs = append(prcs, p.ID)
 			return nil
 		})
+
 	if err != nil {
 		log.Error(err)
 	}
@@ -363,7 +367,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		// to reset the existing Results and count them again from scratch.
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
-		log.Infof("recovering live process %x", p)
+		log.Debugf("recovering live process %x", p)
 		process, err := idx.App.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
@@ -381,7 +385,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 				Signatures:   []types.HexBytes{},
 			})
 		}); err != nil {
-			log.Errorf("cannot upsert results to db: %v", err)
+			log.Errorw(err, "cannot upsert results to db")
 			continue
 		}
 
@@ -391,20 +395,23 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
-		if err := idx.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
-			if err := idx.addLiveVote(vote.ProcessId, vote.VotePackage,
-				weight, results); err != nil {
-				log.Warn(err)
+		// Get the votes from the state
+		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
+			if err := idx.addLiveVote(p, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
+				log.Errorw(err, "could not add live vote")
 			}
-		}); err != nil {
-			log.Error(err)
-			continue
-		}
+			return false
+		})
 		// Store the results on the persisten database
 		if err := idx.commitVotesUnsafe(p, results, idx.App.Height()); err != nil {
-			log.Errorf("cannot commit live votes: (%v)", err)
+			log.Errorw(err, "could not commit live votes")
 			continue
 		}
+		log.Infow("partial results recovered", map[string]interface{}{
+			"electionID": fmt.Sprintf("%x", p),
+			"weight":     results.Weight,
+			"votes":      len(results.Votes),
+		})
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}

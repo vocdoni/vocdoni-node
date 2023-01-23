@@ -11,6 +11,7 @@ import (
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -214,6 +215,32 @@ func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 		return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
 	}
 	return &sdbVote, nil
+}
+
+// IterateVotes iterates over all the votes of a process. The callback function is executed for each vote.
+// Once the callback returns true, the iteration stops.
+func (v *State) IterateVotes(processID []byte, committed bool, callback func(vote *models.StateDBVote) bool) error {
+	if !committed {
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
+	}
+	treeCfg := StateChildTreeCfg(ChildTreeVotes)
+	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		return ErrProcessNotFound
+	} else if err != nil {
+		return err
+	}
+	votesTree.Iterate(func(_, v []byte) bool {
+		var sdbVote models.StateDBVote
+		if err := proto.Unmarshal(v, &sdbVote); err != nil {
+			log.Errorw(err, "cannot unmarshal vote")
+			return false
+		}
+		return callback(&sdbVote)
+	})
+	return nil
 }
 
 // VoteExists returns true if the envelope identified with voteID exists
