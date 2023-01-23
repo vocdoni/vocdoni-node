@@ -1,37 +1,39 @@
-version: 1
-packages:
-  - path: "db"
-    name: "indexerdb"
-    engine: "mysql" # TODO: sqlite
-    schema: "migrations"
-    queries: "queries"
-overrides:
-  # Defaults to int32 for integers, which is a bit small.
-  - db_type: "int"
-    go_type: "int64"
-
-  # Force these blobs to be our "bytes" types.
-  - column: "processes.id"
-    go_type: "go.vocdoni.io/dvote/types.ProcessID"
-  - column: "vote_references.process_id"
-    go_type: "go.vocdoni.io/dvote/types.ProcessID"
-  - column: "processes.entity_id"
-    go_type: "go.vocdoni.io/dvote/types.EntityID"
-  - column: "processes.census_root"
-    go_type: "go.vocdoni.io/dvote/types.CensusRoot"
-  - column: "processes.rolling_census_root"
-    go_type: "go.vocdoni.io/dvote/types.CensusRoot"
-  - column: "vote_references.nullifier"
-    go_type: "go.vocdoni.io/dvote/types.Nullifier"
-  - column: "vote_references.voter_id"
-    go_type: "go.vocdoni.io/dvote/vochain/state.VoterID"
-  - column: "tx_references.hash"
-    go_type: "go.vocdoni.io/dvote/types.Hash"
-
-  # These types help remind us that the values are protobuf-encoded.
-  - column: "processes.envelope_pb"
-    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
-  - column: "processes.mode_pb"
-    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
-  - column: "processes.vote_opts_pb"
-    go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+version: 2
+sql:
+- schema: "migrations"
+  queries: "queries"
+  engine: "mysql" # TODO: sqlite
+  gen:
+    go:
+      package: "indexerdb"
+      out: "db"
+      overrides:
+      # Defaults to int32 for integers, which is a bit small.
+      - db_type: "int"
+        go_type: "int64"
+      
+      # Force these blobs to be our "bytes" types.
+      - column: "processes.id"
+        go_type: "go.vocdoni.io/dvote/types.ProcessID"
+      - column: "vote_references.process_id"
+        go_type: "go.vocdoni.io/dvote/types.ProcessID"
+      - column: "processes.entity_id"
+        go_type: "go.vocdoni.io/dvote/types.EntityID"
+      - column: "processes.census_root"
+        go_type: "go.vocdoni.io/dvote/types.CensusRoot"
+      - column: "processes.rolling_census_root"
+        go_type: "go.vocdoni.io/dvote/types.CensusRoot"
+      - column: "vote_references.nullifier"
+        go_type: "go.vocdoni.io/dvote/types.Nullifier"
+      - column: "vote_references.voter_id"
+        go_type: "go.vocdoni.io/dvote/vochain/state.VoterID"
+      - column: "tx_references.hash"
+        go_type: "go.vocdoni.io/dvote/types.Hash"
+      
+      # These types help remind us that the values are protobuf-encoded.
+      - column: "processes.envelope_pb"
+        go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+      - column: "processes.mode_pb"
+        go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
+      - column: "processes.vote_opts_pb"
+        go_type: "go.vocdoni.io/dvote/types.EncodedProtoBuf"
