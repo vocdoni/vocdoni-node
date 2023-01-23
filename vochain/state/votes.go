@@ -166,8 +166,12 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("wrong processID size %d", len(pid))
 	}
-	if len(nullifier) != types.VoteNullifierSize {
-		return nil, fmt.Errorf("wrong nullifier size %d", len(nullifier))
+	// The vote nullifier generated during anonymous voting with zksnarks could
+	// have 31 or 32 bytes of lenght. Now, here only check that the nullifier is
+	// not empty and then, if it is wrong, the verification will be fail.
+	// TODO: (lucas) Set a minimun and maximun length for the nullifier and check it.
+	if len(nullifier) == 0 {
+		return nil, fmt.Errorf("empty or nil nullifier")
 	}
 	vid := sha256.New()
 	vid.Write(pid)

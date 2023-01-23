@@ -20,7 +20,6 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -662,15 +661,11 @@ func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock)
 func (app *BaseApplication) SetChainID(chainId string) {
 	app.chainID = chainId
 	app.State.SetChainID(chainId)
+}
 
-	// Update the circuit config tag based on the genesis of the current chainID
-	app.circuitConfigTag = circuit.DefaultCircuitConfigurationTag
-	if currentGenesis, ok := genesis.Genesis[chainId]; ok {
-		app.circuitConfigTag = currentGenesis.CircuitsConfigTag
-	}
-
+func (app *BaseApplication) SetCircuitConfigTag(tag string) {
 	// Update the loaded circuit of the current app transactionHandler
-	if err := app.TransactionHandler.LoadZkCircuit(app.circuitConfigTag); err != nil {
+	if err := app.TransactionHandler.LoadZkCircuit(tag); err != nil {
 		app.circuitConfigTag = circuit.DefaultCircuitConfigurationTag
 		app.TransactionHandler.LoadZkCircuit(app.circuitConfigTag)
 	}
