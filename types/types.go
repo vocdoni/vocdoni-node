@@ -20,4 +20,4 @@ type Nullifier = []byte
 
 type Hash = []byte
 
-type AccountID = []byte
+type AccountID = HexBytes
