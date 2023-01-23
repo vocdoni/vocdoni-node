@@ -8,10 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/processid"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -140,20 +138,13 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		circuitConf := circuit.DefaultCircuitsConfiguration
-		if genesis, ok := vocdoniGenesis.Genesis[t.state.ChainID()]; ok {
-			circuitConf = circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]
-		} else {
-			log.Warn("using dev network genesis CircuitsConfig")
-		}
-
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
 		}
-		if tx.Process.GetMaxCensusSize() > uint64(circuitConf.Parameters[0]) {
+		if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Parameters) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the parameter for the biggest circuit (%v)",
-				circuitConf.Parameters[0])
+				t.ZkCircuit.Config.Parameters)
 		}
 	}
 

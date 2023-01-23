@@ -18,7 +18,8 @@ import (
 func TestVoteCheckZkSNARK(t *testing.T) {
 	app := TestBaseApplication(t)
 
-	devCircuit, err := circuit.LoadZkCircuit(context.Background(), circuit.DefaultCircuitsConfiguration)
+	devConfig := circuit.CircuitsConfigurations[circuit.DefaultCircuitConfigurationTag]
+	devCircuit, err := circuit.LoadZkCircuit(context.Background(), devConfig)
 	qt.Assert(t, err, qt.IsNil)
 	app.TransactionHandler.ZkCircuit = devCircuit
 

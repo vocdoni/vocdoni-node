@@ -10,7 +10,6 @@ import (
 	"go.vocdoni.io/dvote/log"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
-	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -258,12 +257,8 @@ func (r *RPCAPI) getProcessCircuitConfig(request *api.APIrequest) (*api.APIrespo
 		return nil, fmt.Errorf("rolling census is not closed yet")
 	}
 	var response api.APIresponse
-	response.CircuitConfig = &circuit.DefaultCircuitsConfiguration
-	if genesis, ok := vocdoniGenesis.Genesis[r.vocapp.ChainID()]; ok {
-		if conf, ok := circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]; ok {
-			response.CircuitConfig = &conf
-		}
-	}
+	devConfig := circuit.CircuitsConfigurations[r.vocapp.CircuitConfigurationTag()]
+	response.CircuitConfig = &devConfig
 	return &response, nil
 }
 

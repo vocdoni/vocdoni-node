@@ -9,17 +9,16 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
-	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 )
 
 const downloadZkVKsTimeout = 1 * time.Minute
 
-func LoadZkCircuits(dataDir, chainID string) (*circuit.ZkCircuit, error) {
-	circuitConf := circuit.DefaultCircuitsConfiguration
-	if genesis, ok := vocdoniGenesis.Genesis[chainID]; ok {
-		circuitConf = circuit.CircuitsConfigurations[genesis.CircuitsConfigTag]
+func GetZkCircuitByConfigTag(dataDir, configTag string) (*circuit.ZkCircuit, error) {
+	circuitConf := circuit.CircuitsConfigurations[circuit.DefaultCircuitConfigurationTag]
+	if conf, ok := circuit.CircuitsConfigurations[configTag]; ok {
+		circuitConf = conf
 	} else {
-		log.Info("using dev genesis zkSnarks circuits")
+		log.Info("using default zkSnarks circuit")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), downloadZkVKsTimeout)

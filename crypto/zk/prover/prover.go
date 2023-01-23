@@ -14,6 +14,7 @@ import (
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/iden3/go-rapidsnark/witness"
+	"go.vocdoni.io/dvote/log"
 )
 
 var (
@@ -121,6 +122,7 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
+		log.Warnw(ErrWitnessCalc.Error(), map[string]interface{}{"error": err})
 		return nil, ErrWitnessCalc
 	}
 

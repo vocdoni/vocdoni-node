@@ -60,7 +60,6 @@ func (c *HTTPclient) GetNullifierZk(privKey babyjub.PrivateKey, electionId types
 	if err != nil {
 		return nil, nil, fmt.Errorf("error generating nullifier: %w", err)
 	}
-
 	return nullifier.Bytes(), strProcessId, nil
 }
 

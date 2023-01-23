@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+var DefaultCircuitConfigurationTag = "dev"
+
 // ZkCircuitConfig defines the configuration of the files to be downloaded
 type ZkCircuitConfig struct {
 	// URI defines the URI from where to download the files
@@ -13,8 +15,8 @@ type ZkCircuitConfig struct {
 	// CircuitPath defines the path from where the files are downloaded
 	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
-	Parameters []int64 `json:"parameters"`
-	Levels     int     `json:"levels"`
+	Parameters int `json:"parameters"`
+	Levels     int `json:"levels"`
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure
@@ -37,7 +39,7 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
 		CircuitPath:         "zkcensusproof/dev/65536",
-		Parameters:          []int64{65536},
+		Parameters:          65536,
 		Levels:              16,
 		LocalDir:            "zkCircuits",
 		ProvingKeyHash:      hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
@@ -48,7 +50,7 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
 		CircuitPath:         "artifacts/zkCensus/dev/16",
-		Parameters:          []int64{65536}, // 2^16
+		Parameters:          65536, // 2^16
 		Levels:              16,
 		LocalDir:            "zkCircuits",
 		ProvingKeyHash:      hexToBytes("0x96c318c8f75a47069b5d4b22a5d782b79319f666e02f11e49d620d75674f9930"),
@@ -59,7 +61,7 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
 		CircuitPath:         "zkcensusproof/dev/1024",
-		Parameters:          []int64{1024},
+		Parameters:          1024,
 		Levels:              10,
 		LocalDir:            "./circuits",
 		ProvingKeyHash:      hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
@@ -67,8 +69,6 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		WasmHash:            hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
 	},
 }
-
-var DefaultCircuitsConfiguration = CircuitsConfigurations["dev"]
 
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
 // in case of error it will panic.

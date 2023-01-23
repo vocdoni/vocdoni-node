@@ -400,7 +400,7 @@ type GenSNARKData struct {
 }
 
 func testGenSNARKProof(circuit *circuit.ZkCircuit,
-	censusRoot, merkleProof []byte, treeSize int64, privateKey, votePackage,
+	censusRoot, merkleProof []byte, treeSize int, privateKey, votePackage,
 	processId []byte, weight *big.Int) (*prover.Proof, []byte, error) {
 	if len(merkleProof) < 8 {
 		return nil, nil, fmt.Errorf("merkleProof too short")
@@ -923,7 +923,7 @@ func (c *Client) TestSendAnonVotes(
 		_, secretKey := testGetZKCensusKey(s)
 		weight := new(big.Int).SetInt64(10)
 		proof, nullifier, err := testGenSNARKProof(circuit, root,
-			proofs[i].Siblings, circuitConfig.Parameters[0], secretKey, vpb, pid, weight)
+			proofs[i].Siblings, circuitConfig.Parameters, secretKey, vpb, pid, weight)
 		if err != nil {
 			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
 		}
