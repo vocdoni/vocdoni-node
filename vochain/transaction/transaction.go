@@ -254,7 +254,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 						ToAddress:   txSenderAddress,
 						Amount:      faucetPayload.Amount,
 						TxHash:      vtx.TxID[:],
-						Height:      uint64(t.state.CurrentHeight()),
 					}, false); err != nil {
 						return nil, fmt.Errorf("setAccountTx: transferBalance %w", err)
 					}
@@ -356,7 +355,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 				ToAddress:   common.BytesToAddress(tx.To),
 				Amount:      tx.Value,
 				TxHash:      vtx.TxID[:],
-				Height:      uint64(t.state.CurrentHeight()),
 			}); err != nil {
 				return nil, fmt.Errorf("mintTokensTx: %w", err)
 			}
@@ -380,7 +378,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 				ToAddress:   to,
 				Amount:      tx.Value,
 				TxHash:      vtx.TxID[:],
-				Height:      uint64(t.state.CurrentHeight()),
 			}, false); err != nil {
 				return nil, fmt.Errorf("sendTokensTx: %w", err)
 			}
@@ -420,7 +417,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 				ToAddress:   common.BytesToAddress(faucetPayload.To),
 				Amount:      faucetPayload.Amount,
 				TxHash:      vtx.TxID[:],
-				Height:      uint64(t.state.CurrentHeight()),
 			}, false); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: %w", err)
 			}

@@ -240,7 +240,11 @@ func (v *State) TransferBalance(tx *vochaintx.TokenTransfer, burnTxCost bool) er
 	if err := accFrom.Transfer(accTo, tx.Amount); err != nil {
 		return err
 	}
-	log.Debugf("transferring %d tokens from %s to %s", tx.Amount, tx.FromAddress.String(), tx.ToAddress.String())
+	log.Debugw("transferring balance", map[string]interface{}{
+		"from":   fmt.Sprintf("%x", tx.FromAddress),
+		"to":     fmt.Sprintf("%x", tx.ToAddress),
+		"amount": fmt.Sprintf("%d", tx.Amount),
+	})
 	if err := v.SetAccount(tx.FromAddress, accFrom); err != nil {
 		return err
 	}
@@ -254,7 +258,6 @@ func (v *State) TransferBalance(tx *vochaintx.TokenTransfer, burnTxCost bool) er
 				ToAddress:   tx.ToAddress,
 				Amount:      tx.Amount,
 				TxHash:      tx.TxHash,
-				Height:      uint64(v.CurrentHeight()),
 			})
 		}
 	}
@@ -277,6 +280,10 @@ func (v *State) MintBalance(tx *vochaintx.TokenTransfer) error {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += tx.Amount
+	log.Debugw("minting tokens", map[string]interface{}{
+		"to":     fmt.Sprintf("%x", tx.ToAddress),
+		"amount": fmt.Sprintf("%d", tx.Amount),
+	})
 	log.Debugf("minting %d tokens to account %s", tx.Amount, tx.ToAddress.String())
 	if err := v.SetAccount(tx.ToAddress, acc); err != nil {
 		return err
@@ -287,7 +294,6 @@ func (v *State) MintBalance(tx *vochaintx.TokenTransfer) error {
 			ToAddress:   tx.ToAddress,
 			Amount:      tx.Amount,
 			TxHash:      tx.TxHash,
-			Height:      uint64(v.CurrentHeight()),
 		})
 	}
 	return nil

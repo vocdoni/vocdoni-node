@@ -488,7 +488,7 @@ func (idx *Indexer) Commit(height uint32) error {
 	// index token transfers
 	for _, tt := range idx.tokenTransferPool {
 		if err := idx.newTokenTransfer(tt); err != nil {
-			log.Errorf("commit: cannot create new token transfer: %v", err)
+			log.Errorw(err, "commit: cannot create new token transfer")
 		}
 	}
 	txn.Discard()
@@ -725,7 +725,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 		From:      tx.FromAddress.Bytes(),
 		To:        tx.ToAddress.Bytes(),
 		Amount:    tx.Amount,
-		Height:    tx.Height,
+		Height:    uint64(idx.App.Height()),
 		TxHash:    tx.TxHash,
 		Timestamp: time.Now(),
 	})
@@ -745,7 +745,11 @@ func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
 	}); err != nil {
 		return err
 	}
-	log.Debugf("adding new token transfer from %x to %x: %d into the indexer database", tt.From, tt.To, tt.Amount)
+	log.Debugw("new token transfer", map[string]interface{}{
+		"from":   fmt.Sprintf("%x", tt.From),
+		"to":     fmt.Sprintf("%x", tt.To),
+		"amount": fmt.Sprintf("%d", tt.Amount),
+	})
 	return nil
 }
 

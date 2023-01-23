@@ -51,5 +51,4 @@ type TokenTransfer struct {
 	ToAddress   common.Address
 	Amount      uint64
 	TxHash      []byte
-	Height      uint64
 }
