@@ -38,3 +38,8 @@ type EventListener interface {
 func (v *State) AddEventListener(l EventListener) {
 	v.eventListeners = append(v.eventListeners, l)
 }
+
+// CleanEventListeners removes all event listeners.
+func (v *State) CleanEventListeners() {
+	v.eventListeners = nil
+}

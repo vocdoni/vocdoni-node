@@ -45,6 +45,15 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResult
 	return idx
 }
 
+func newTestIndexerNoCleanup(dataDir string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
+	idx, err := NewIndexer(dataDir, app, true)
+	if err != nil {
+		return nil, err
+	}
+	idx.skipTargetHeightSleeps = true
+	return idx, nil
+}
+
 func TestEntityList(t *testing.T) {
 	for _, count := range []int{2, 100, 155} {
 		t.Run(fmt.Sprintf("count=%03d", count), func(t *testing.T) {
@@ -639,7 +648,6 @@ func TestResults(t *testing.T) {
 
 func TestLiveResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-
 	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
@@ -943,6 +951,65 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	qt.Assert(t, votes[4], qt.DeepEquals, []string{"3", "0"})
 }
 
+func TestAfterSyncBootStrap(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	dataDir := t.TempDir()
+	idx, err := newTestIndexerNoCleanup(dataDir, app, true)
+	qt.Assert(t, err, qt.IsNil)
+	pid := util.RandomBytes(32)
+	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
+
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		StartBlock:   1,
+		BlockCount:   10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 5,
+			MaxValue: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock() // block 1
+
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.FinalResults, qt.IsFalse)
+
+	// Stop the indexer
+	qt.Assert(t, idx.Close(), qt.IsNil)
+	app.State.CleanEventListeners()
+
+	// Add 10 votes to the election
+	vp, err := json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	for i := 0; i < 10; i++ {
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+	}
+
+	// Save the current state with the 10 new votes
+	app.State.Save()
+
+	// Start the indexer again
+	idx, err = newTestIndexerNoCleanup(dataDir, app, true)
+	qt.Assert(t, err, qt.IsNil)
+	results, err := idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(0))
+
+	// Run the AfterSyncBootstrap, which should update the results
+	idx.AfterSyncBootstrap()
+	results, err = idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(10))
+}
+
 func TestCountVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app, true)
@@ -1166,7 +1233,6 @@ func TestTxIndexer(t *testing.T) {
 // into "database is locked" errors.
 func TestIndexerConcurrentDB(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-
 	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
