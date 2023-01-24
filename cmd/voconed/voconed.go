@@ -125,7 +125,11 @@ func main() {
 	log.Infof("using data directory at %s", config.dir)
 
 	mngKey := ethereum.SignKeys{}
-	mngKey.Generate()
+	err = mngKey.Generate()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	if config.keymanager != "" {
 		if err := mngKey.AddHexKey(config.keymanager); err != nil {
 			log.Fatal(err)
