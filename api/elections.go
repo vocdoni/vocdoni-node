@@ -290,15 +290,27 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 				log.Errorf("invalid process result")
 				continue
 			}
+			if len(firstResult.Votes) != len(processResult.Votes) {
+				log.Error("votes length do not match")
+				continue
+			}
 			// if consensus results do not match, return error
 			for k, questionResult := range processResult.Votes {
 				if questionResult == nil {
 					log.Errorf("invalid question result")
 					continue
 				}
+				if len(questionResult.Question) != len(firstResult.Votes[k].Question) {
+					log.Errorf("question length do not match")
+					continue
+				}
 				for kk, questionOption := range questionResult.Question {
 					if len(questionOption) == 0 {
 						log.Errorf("invalid question option")
+						continue
+					}
+					if len(firstResult.Votes[k].Question[kk]) != len(questionOption) {
+						log.Errorf("question option length do not match")
 						continue
 					}
 					if !bytes.Equal(questionOption, firstResult.Votes[k].Question[kk]) {
