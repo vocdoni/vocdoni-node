@@ -2,11 +2,9 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"math/big"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -203,20 +201,27 @@ func mkTreeAnonVoteTest(host string,
 	log.Debugf("election details: %+v", *election)
 	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
 
-	// Generate the voting proofs (parallelized)
-	type voterProof struct {
-		proof   *apiclient.CensusProofZk
-		address string
+	// Wait for the election to start
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	election, err = api.WaitUntilElectionStarts(ctx, electionID)
+	if err != nil {
+		log.Fatal(err)
 	}
-	proofs := make(map[string]*apiclient.CensusProofZk, nvotes)
-	proofCh := make(chan *voterProof)
-	stopProofs := make(chan bool)
+
+	log.Debugf("election details: %+v", *election)
+
+	startTime := time.Now()
+	successProofs, successVotes := 0, 0
+	proofCh, voteCh, stopCh := make(chan bool), make(chan bool), make(chan bool)
 	go func() {
 		for {
 			select {
-			case p := <-proofCh:
-				proofs[p.address] = p.proof
-			case <-stopProofs:
+			case <-proofCh:
+				successProofs++
+			case <-voteCh:
+				successVotes++
+			case <-stopCh:
 				return
 			}
 		}
@@ -225,15 +230,35 @@ func mkTreeAnonVoteTest(host string,
 	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
-		for _, acc := range accounts {
+		for i, acc := range accounts {
 			pr, err := api.CensusGenProofZk(root, electionID, acc.PrivateKey())
 			if err != nil {
-				log.Fatal(err)
+				log.Warnw(err.Error(), map[string]interface{}{"current": i, "total": nvotes})
+				continue
 			}
-			proofCh <- &voterProof{
-				proof:   pr,
-				address: acc.Address().Hex(),
+
+			log.Debugw("vote proof generated", map[string]interface{}{
+				"current": i, "total": len(accounts)})
+			proofCh <- true
+
+			_, err = api.Vote(&apiclient.VoteData{
+				ElectionID:  electionID,
+				ProofZkTree: pr,
+				Choices:     []int{i % 2},
+			})
+
+			if err != nil && !strings.Contains(err.Error(), "already exists") {
+				// if the error is not "vote already exists", we need to print it
+				log.Warnw(err.Error(), map[string]interface{}{
+					"nullifier":    pr.Nullifier.String(),
+					"lenNullifier": len(pr.Nullifier),
+				})
+				continue
 			}
+			log.Debugw("vote sent", map[string]interface{}{
+				"current": i, "total": len(accounts)})
+			voteCh <- true
+			pr = nil
 		}
 	}
 
@@ -250,79 +275,83 @@ func mkTreeAnonVoteTest(host string,
 
 	wg.Wait()
 	time.Sleep(time.Second) // wait a grace time for the last proof to be added
-	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(voterAccounts))
-	stopProofs <- true
+	log.Debugf("%d/%d voting proofs generated successfully", successProofs, len(voterAccounts))
+	log.Debugf("%d/%d votes sent successfully", successVotes, len(voterAccounts))
+	stopCh <- true
 
-	// Wait for the election to start
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	election, err = api.WaitUntilElectionStarts(ctx, electionID)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// // Wait for the election to start
+	// ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
+	// defer cancel()
+	// election, err = api.WaitUntilElectionStarts(ctx, electionID)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	log.Debugf("election details: %+v", *election)
+	// log.Debugf("election details: %+v", *election)
 
-	// Send the votes (parallelized)
-	startTime := time.Now()
-	wg = sync.WaitGroup{}
-	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("sending %d votes", len(accounts))
-		// We use maps instead of slices to have the capacity of resending votes
-		// without repeating them.
-		accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
-		for i, acc := range accounts {
-			accountsMap[i] = acc
-		}
-		// Send the votes
-		votesSent := 0
-		for {
-			contextDeadlines := 0
-			for i, voterAccount := range accountsMap {
-				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
-				_, err := c.Vote(&apiclient.VoteData{
-					ElectionID:  electionID,
-					ProofZkTree: proofs[voterAccount.Address().Hex()],
-					Choices:     []int{i % 2},
-				})
-				// if the context deadline is reached, we don't need to print it (let's jus retry)
-				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-					contextDeadlines++
-					continue
-				} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-					// if the error is not "vote already exists", we need to print it
-					log.Warn(err)
-					continue
-				}
-				// if the vote was sent successfully or already exists, we remove it from the accounts map
-				votesSent++
-				delete(accountsMap, i)
+	// // Send the votes (parallelized)
+	// wg = sync.WaitGroup{}
+	// voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
+	// 	defer wg.Done()
+	// 	log.Infof("sending %d votes", len(accounts))
+	// 	// We use maps instead of slices to have the capacity of resending votes
+	// 	// without repeating them.
+	// 	accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
+	// 	for i, acc := range accounts {
+	// 		accountsMap[i] = acc
+	// 	}
+	// 	// Send the votes
+	// 	votesSent := 0
+	// 	for {
+	// 		contextDeadlines := 0
+	// 		for i, voterAccount := range accountsMap {
+	// 			c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+	// 			accountProof := proofs[voterAccount.Address().Hex()]
+	// 			_, err := c.Vote(&apiclient.VoteData{
+	// 				ElectionID:  electionID,
+	// 				ProofZkTree: accountProof,
+	// 				Choices:     []int{i % 2},
+	// 			})
+	// 			// if the context deadline is reached, we don't need to print it (let's jus retry)
+	// 			if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+	// 				contextDeadlines++
+	// 				continue
+	// 			} else if err != nil && !strings.Contains(err.Error(), "already exists") {
+	// 				// if the error is not "vote already exists", we need to print it
+	// 				log.Warnw(err.Error(), map[string]interface{}{
+	// 					"nullifier":    accountProof.Nullifier.String(),
+	// 					"lenNullifier": len(accountProof.Nullifier),
+	// 				})
+	// 				continue
+	// 			}
+	// 			// if the vote was sent successfully or already exists, we remove it from the accounts map
+	// 			votesSent++
+	// 			delete(accountsMap, i)
 
-			}
-			if len(accountsMap) == 0 {
-				break
-			}
-			log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
-			time.Sleep(time.Second * 5)
-		}
-		log.Infof("successfully sent %d votes", votesSent)
-		time.Sleep(time.Second * 2)
-	}
+	// 		}
+	// 		if len(accountsMap) == 0 {
+	// 			break
+	// 		}
+	// 		log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
+	// 		time.Sleep(time.Second * 5)
+	// 	}
+	// 	log.Infof("successfully sent %d votes", votesSent)
+	// 	time.Sleep(time.Second * 2)
+	// }
 
-	pcount = nvotes / parallelCount
-	for i := 0; i < len(voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(voterAccounts) {
-			end = len(voterAccounts)
-		}
-		wg.Add(1)
-		go voteAccounts(voterAccounts[i:end], &wg)
-	}
+	// pcount = nvotes / parallelCount
+	// for i := 0; i < len(voterAccounts); i += pcount {
+	// 	end := i + pcount
+	// 	if end > len(voterAccounts) {
+	// 		end = len(voterAccounts)
+	// 	}
+	// 	wg.Add(1)
+	// 	go voteAccounts(voterAccounts[i:end], &wg)
+	// }
 
-	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
+	// wg.Wait()
+	// log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
+	// 	nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
