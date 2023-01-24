@@ -101,6 +101,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		ElectionID:           voteData.Meta.ProcessId,
 		VoterID:              voteData.Meta.VoterID,
 		TransactionIndex:     &voteData.Meta.TxIndex,
+		OverwriteCount:       &voteData.OverwriteCount,
 	}
 
 	// check if votePackage is not encrypted and if so, return it

@@ -28,7 +28,7 @@ type EventListener interface {
 	OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32)
 	OnProcessesStart(pids [][]byte)
 	OnSetAccount(addr []byte, account *Account)
-	OnTransferTokens(from, to []byte, amount uint64)
+	OnTransferTokens(tx *vochaintx.TokenTransfer)
 	Commit(height uint32) (err error)
 	Rollback()
 }
@@ -37,4 +37,9 @@ type EventListener interface {
 // events as documented in EventListener.
 func (v *State) AddEventListener(l EventListener) {
 	v.eventListeners = append(v.eventListeners, l)
+}
+
+// CleanEventListeners removes all event listeners.
+func (v *State) CleanEventListeners() {
+	v.eventListeners = nil
 }

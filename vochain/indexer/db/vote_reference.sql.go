@@ -15,23 +15,24 @@ import (
 )
 
 const createVoteReference = `-- name: CreateVoteReference :execresult
-INSERT INTO vote_references (
+REPLACE INTO vote_references (
 	nullifier, process_id, height, weight,
-	tx_index, voter_id, creation_time
+	tx_index, voter_id, overwrite_count, creation_time
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?
+	?, ?, ?, ?
 )
 `
 
 type CreateVoteReferenceParams struct {
-	Nullifier    types.Nullifier
-	ProcessID    types.ProcessID
-	Height       int64
-	Weight       string
-	TxIndex      int64
-	VoterID      state.VoterID
-	CreationTime time.Time
+	Nullifier      types.Nullifier
+	ProcessID      types.ProcessID
+	Height         int64
+	Weight         string
+	TxIndex        int64
+	VoterID        state.VoterID
+	OverwriteCount int64
+	CreationTime   time.Time
 }
 
 func (q *Queries) CreateVoteReference(ctx context.Context, arg CreateVoteReferenceParams) (sql.Result, error) {
@@ -42,12 +43,13 @@ func (q *Queries) CreateVoteReference(ctx context.Context, arg CreateVoteReferen
 		arg.Weight,
 		arg.TxIndex,
 		arg.VoterID,
+		arg.OverwriteCount,
 		arg.CreationTime,
 	)
 }
 
 const getVoteReference = `-- name: GetVoteReference :one
-SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id FROM vote_references
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
 WHERE nullifier = ?
 LIMIT 1
 `
@@ -63,6 +65,44 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 		&i.TxIndex,
 		&i.CreationTime,
 		&i.VoterID,
+		&i.OverwriteCount,
 	)
 	return i, err
+}
+
+const getVoteReferencesByProcessID = `-- name: GetVoteReferencesByProcessID :many
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
+WHERE process_id = ?
+`
+
+func (q *Queries) GetVoteReferencesByProcessID(ctx context.Context, processID types.ProcessID) ([]VoteReference, error) {
+	rows, err := q.db.QueryContext(ctx, getVoteReferencesByProcessID, processID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []VoteReference
+	for rows.Next() {
+		var i VoteReference
+		if err := rows.Scan(
+			&i.Nullifier,
+			&i.ProcessID,
+			&i.Height,
+			&i.Weight,
+			&i.TxIndex,
+			&i.CreationTime,
+			&i.VoterID,
+			&i.OverwriteCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

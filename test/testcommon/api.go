@@ -43,24 +43,6 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	d.Storage = &data.DataMockTest{}
 	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
 
-	/*	ipfsStore := data.IPFSNewConfig(t.TempDir())
-			ipfs := data.IPFSHandle{}
-			port := 14000 + rand.Intn(4096)
-			if err := ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", port)); err != nil {
-				t.Fatal(err)
-			}
-			if err := ipfs.Init(ipfsStore); err != nil {
-				t.Fatal(err)
-			}
-			d.Storage = &ipfs
-
-		t.Cleanup(func() {
-			if err := d.Storage.Stop(); err != nil {
-				t.Error(err)
-			}
-		})
-	*/
-
 	// creeate the API router
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)

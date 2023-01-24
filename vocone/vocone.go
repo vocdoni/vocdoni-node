@@ -287,7 +287,7 @@ func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.MintBalance(to, amount); err != nil {
+	if err := vc.app.State.InitChainMintBalance(to, amount); err != nil {
 		return err
 	}
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {

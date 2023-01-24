@@ -214,13 +214,14 @@ type VotePackage struct {
 
 // VoteReference holds the db reference for a single vote
 type VoteReference struct {
-	Nullifier    types.HexBytes `badgerholdKey:"Nullifier"`
-	ProcessID    types.HexBytes `badgerholdIndex:"ProcessID"`
-	VoterID      state.VoterID
-	Height       uint32
-	Weight       *types.BigInt
-	TxIndex      int32
-	CreationTime time.Time
+	Nullifier      types.HexBytes `badgerholdKey:"Nullifier"`
+	ProcessID      types.HexBytes `badgerholdIndex:"ProcessID"`
+	VoterID        state.VoterID
+	Height         uint32
+	Weight         *types.BigInt
+	TxIndex        int32
+	CreationTime   time.Time
+	OverwriteCount uint32
 }
 
 func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
@@ -229,13 +230,14 @@ func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 		panic(err) // should never happen
 	}
 	return &VoteReference{
-		Nullifier:    dbvote.Nullifier,
-		ProcessID:    dbvote.ProcessID,
-		VoterID:      nonEmptyBytes(state.VoterID{}),
-		Height:       uint32(dbvote.Height),
-		Weight:       weightInt,
-		TxIndex:      int32(dbvote.TxIndex),
-		CreationTime: dbvote.CreationTime,
+		Nullifier:      dbvote.Nullifier,
+		ProcessID:      dbvote.ProcessID,
+		VoterID:        dbvote.VoterID,
+		Height:         uint32(dbvote.Height),
+		Weight:         weightInt,
+		TxIndex:        int32(dbvote.TxIndex),
+		CreationTime:   dbvote.CreationTime,
+		OverwriteCount: uint32(dbvote.OverwriteCount),
 	}
 }
 
@@ -257,6 +259,7 @@ type EnvelopePackage struct {
 	Signature            types.HexBytes   `json:"signature"`
 	VotePackage          []byte           `json:"votePackage"`
 	Weight               string           `json:"weight"`
+	OverwriteCount       uint32           `json:"overwriteCount"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api
@@ -334,6 +337,17 @@ func (b *BlockMetadata) String() string {
 	}
 	builder.WriteString("}")
 	return builder.String()
+}
+
+// TokenTransferMeta contains the information of a token transfer and some extra useful information.
+// The types are compatible with the SQL defined schema.
+type TokenTransferMeta struct {
+	Amount    uint64          `json:"amount"`
+	From      types.AccountID `json:"from"`
+	Height    uint64          `json:"height"`
+	TxHash    types.Hash      `json:"txHash"`
+	Timestamp time.Time       `json:"timestamp"`
+	To        types.AccountID `json:"to"`
 }
 
 // ________________________ CALLBACKS DATA STRUCTS ________________________

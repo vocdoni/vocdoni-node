@@ -108,6 +108,7 @@ type Vote struct {
 	VoterID              types.HexBytes `json:"voterID,omitempty"`
 	BlockHeight          uint32         `json:"blockHeight,omitempty"`
 	TransactionIndex     *int32         `json:"transactionIndex,omitempty"`
+	OverwriteCount       *uint32        `json:"overwriteCount,omitempty"`
 }
 
 type CensusTypeDescription struct {

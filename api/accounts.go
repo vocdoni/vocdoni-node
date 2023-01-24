@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -86,6 +87,22 @@ func (a *API) enableAccountHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/accounts/{accountID}/transfers/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.tokenTransfersHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/accounts/{accountID}/transfers",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.tokenTransfersHandler,
 	); err != nil {
 		return err
 	}
@@ -327,6 +344,43 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		struct {
 			Count uint32 `json:"count"`
 		}{Count: acc.GetProcessIndex()},
+	)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+}
+
+// /accounts/<accountID>/transfers/page/<page>
+// Returns the token transfers for an organization
+func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	if err != nil || accountID == nil {
+		return fmt.Errorf("accountID (%q) cannot be decoded", ctx.URLParam("accountID"))
+	}
+	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
+	if acc == nil {
+		return fmt.Errorf("account not found")
+	}
+	if err != nil {
+		return err
+	}
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return fmt.Errorf("cannot parse page number")
+		}
+	}
+	page = page * MaxPageSize
+	transfers, err := a.indexer.GetTokenTransfersByFromAccount(accountID, int32(page), MaxPageSize)
+	if err != nil {
+		return fmt.Errorf("cannot fetch token transfers: %w", err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Transfers []*indexertypes.TokenTransferMeta `json:"transfers"`
+		}{Transfers: transfers},
 	)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)

@@ -20,6 +20,11 @@ type Process struct {
 	ResultsHeight         int64
 	HaveResults           bool
 	FinalResults          bool
+	ResultsVotes          string
+	ResultsWeight         string
+	ResultsEnvelopeHeight int64
+	ResultsSignatures     string
+	ResultsBlockHeight    int64
 	CensusRoot            types.CensusRoot
 	RollingCensusRoot     types.CensusRoot
 	RollingCensusSize     int64
@@ -38,11 +43,15 @@ type Process struct {
 	CreationTime          time.Time
 	SourceBlockHeight     int64
 	SourceNetworkID       string
-	ResultsVotes          string
-	ResultsWeight         string
-	ResultsEnvelopeHeight int64
-	ResultsSignatures     string
-	ResultsBlockHeight    int64
+}
+
+type TokenTransferMeta struct {
+	TxHash       types.Hash
+	Height       int64
+	FromAccount  types.AccountID
+	ToAccount    types.AccountID
+	Amount       int64
+	TransferTime time.Time
 }
 
 type TxReference struct {
@@ -54,11 +63,12 @@ type TxReference struct {
 }
 
 type VoteReference struct {
-	Nullifier    types.Nullifier
-	ProcessID    types.ProcessID
-	Height       int64
-	Weight       string
-	TxIndex      int64
-	CreationTime time.Time
-	VoterID      state.VoterID
+	Nullifier      types.Nullifier
+	ProcessID      types.ProcessID
+	Height         int64
+	Weight         string
+	TxIndex        int64
+	CreationTime   time.Time
+	VoterID        state.VoterID
+	OverwriteCount int64
 }

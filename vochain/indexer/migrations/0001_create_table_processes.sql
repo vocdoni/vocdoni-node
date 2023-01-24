@@ -6,9 +6,14 @@ CREATE TABLE processes (
   start_block  INTEGER NOT NULL,
   end_block    INTEGER NOT NULL,
 
-  results_height      INTEGER NOT NULL, -- formerly "rheight"
-  have_results        BOOLEAN NOT NULL,
-  final_results       BOOLEAN NOT NULL, -- formerly also results.final, now deduplicated
+  results_height          INTEGER NOT NULL, -- formerly "rheight"
+  have_results            BOOLEAN NOT NULL,
+  final_results           BOOLEAN NOT NULL, -- formerly also results.final, now deduplicated
+  results_votes           TEXT NOT NULL DEFAULT '',
+  results_weight          TEXT NOT NULL DEFAULT '',
+  results_envelope_height INTEGER NOT NULL DEFAULT 0,
+  results_signatures      TEXT NOT NULL DEFAULT '',
+  results_block_height    INTEGER NOT NULL DEFAULT 0,
 
   census_root         BLOB NOT NULL,
   rolling_census_root BLOB NOT NULL,
@@ -31,7 +36,6 @@ CREATE TABLE processes (
   creation_time       DATETIME NOT NULL,
   source_block_height INTEGER NOT NULL,
   source_network_id   TEXT NOT NULL -- TODO: integer?
-
 );
 
 CREATE INDEX index_processes_entity_id

@@ -163,8 +163,8 @@ var Genesis = map[string]VochainGenesis{
 		CircuitsConfigTag: "dev",
 		Genesis: `
 {
-   "genesis_time":"2022-12-20T10:33:52.180295926Z",
-   "chain_id":"vocdoni-development-73",
+   "genesis_time":"2023-01-24T09:33:52.180295926Z",
+   "chain_id":"vocdoni-development-74",
    "consensus_params":{
       "block":{
          "max_bytes":"5120000",

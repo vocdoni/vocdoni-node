@@ -45,6 +45,15 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResult
 	return idx
 }
 
+func newTestIndexerNoCleanup(dataDir string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
+	idx, err := NewIndexer(dataDir, app, true)
+	if err != nil {
+		return nil, err
+	}
+	idx.skipTargetHeightSleeps = true
+	return idx, nil
+}
+
 func TestEntityList(t *testing.T) {
 	for _, count := range []int{2, 100, 155} {
 		t.Run(fmt.Sprintf("count=%03d", count), func(t *testing.T) {
@@ -519,10 +528,6 @@ func TestResults(t *testing.T) {
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
 
-	// TODO: note how we have the TestBaseApplication with an initial height
-	// of 3 and increments via AdvanceTestBlock, and the loop here with
-	// commits of blocks with heights 0-300. The two are parallel and should
-	// probably be joined.
 	for i := int32(0); i < 30; i++ {
 		idx.Rollback()
 		vote := &models.VoteEnvelope{
@@ -570,6 +575,41 @@ func TestResults(t *testing.T) {
 	err = idx.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
 
+	// GetEnvelopes with a limit
+	envelopes, err := idx.GetEnvelopes(pid, 10, 0, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 10)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, uint32(1))
+	qt.Assert(t, envelopes[4].Height, qt.Equals, uint32(5))
+	qt.Assert(t, envelopes[9].Height, qt.Equals, uint32(10))
+
+	matchNullifier := fmt.Sprintf("%x", envelopes[9].Nullifier)
+	matchHeight := envelopes[9].Height
+
+	// GetEnvelopes with a limit and offset
+	envelopes, err = idx.GetEnvelopes(pid, 5, 27, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 3)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, uint32(28))
+	qt.Assert(t, envelopes[2].Height, qt.Equals, uint32(30))
+
+	// GetEnvelopes without a match
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, fmt.Sprintf("%x", util.RandomBytes(32)))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 0)
+
+	// GetEnvelopes with one match by full nullifier
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 1)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
+
+	// GetEnvelopes with one match by partial nullifier
+	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier[:29])
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 1)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
+
 	// Test results
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
@@ -608,7 +648,6 @@ func TestResults(t *testing.T) {
 
 func TestLiveResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-
 	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)
@@ -912,6 +951,65 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	qt.Assert(t, votes[4], qt.DeepEquals, []string{"3", "0"})
 }
 
+func TestAfterSyncBootStrap(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	dataDir := t.TempDir()
+	idx, err := newTestIndexerNoCleanup(dataDir, app, true)
+	qt.Assert(t, err, qt.IsNil)
+	pid := util.RandomBytes(32)
+	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
+
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		StartBlock:   1,
+		BlockCount:   10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 5,
+			MaxValue: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock() // block 1
+
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.FinalResults, qt.IsFalse)
+
+	// Stop the indexer
+	qt.Assert(t, idx.Close(), qt.IsNil)
+	app.State.CleanEventListeners()
+
+	// Add 10 votes to the election
+	vp, err := json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	for i := 0; i < 10; i++ {
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+	}
+
+	// Save the current state with the 10 new votes
+	app.State.Save()
+
+	// Start the indexer again
+	idx, err = newTestIndexerNoCleanup(dataDir, app, true)
+	qt.Assert(t, err, qt.IsNil)
+	results, err := idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(0))
+
+	// Run the AfterSyncBootstrap, which should update the results
+	idx.AfterSyncBootstrap()
+	results, err = idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(10))
+}
+
 func TestCountVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app, true)
@@ -939,29 +1037,27 @@ func TestCountVotes(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	idx.Rollback()
-	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
 		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
 		// Add votes to votePool with i as txIndex
-		idx.OnVote(v, int32(i))
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 	}
+
+	// Add last vote with known nullifier
 	nullifier := util.RandomBytes(32)
 	v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: nullifier}
-	// Add last vote with known nullifier
-	txIndex := int32(100)
-	idx.OnVote(v, txIndex)
+	qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 
-	// Vote transactions are on imaginary 2000th block
-	blockHeight := uint32(2000)
-	err = idx.Commit(blockHeight)
-	qt.Assert(t, err, qt.IsNil)
+	// save the block height for comparing later
+	blockHeight := uint32(app.Height())
+	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID
 	height, err := idx.GetEnvelopeHeight(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
-	// Test global envelope height
+
+	// Test global envelope height (number of votes)
 	height, err = idx.GetEnvelopeHeight([]byte{})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
@@ -969,7 +1065,108 @@ func TestCountVotes(t *testing.T) {
 	ref, err := idx.GetEnvelopeReference(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
-	qt.Assert(t, ref.TxIndex, qt.CmpEquals(), txIndex)
+
+	// Note that txIndex is 0, because the votes are added directly to the sate,
+	// while the txCounter only increments on DeliverTx() execution.
+}
+
+func TestOverwriteVotes(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+	pid := util.RandomBytes(32)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
+
+	err := app.State.AddProcess(&models.Process{
+		CensusRoot:   root,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true},
+		BlockCount:   10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:          5,
+			MaxValue:          2,
+			MaxTotalCost:      8,
+			CostExponent:      1,
+			MaxVoteOverwrites: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// Send the first vote
+	vp, err := json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{1, 1, 1},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote := &models.VoteEnvelope{
+		Nonce: util.RandomBytes(32),
+		Proof: &models.Proof{Payload: &models.Proof_Arbo{
+			Arbo: &models.ProofArbo{
+				Type:     models.ProofArbo_BLAKE2B,
+				Siblings: proofs[0],
+				KeyType:  models.ProofArbo_PUBKEY,
+			}}},
+		ProcessId:   pid,
+		VotePackage: vp,
+	}
+	voteTx, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err := keys[0].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+
+	signedTx, err := proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err := app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	nullifier := response.Data.Bytes()
+	qt.Assert(t, nullifier, qt.DeepEquals, state.GenerateNullifier(keys[0].Address(), pid))
+
+	app.AdvanceTestBlock()
+
+	// Send the second
+	vp, err = json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{2, 2, 2},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote.VotePackage = vp
+	vote.Nonce = util.RandomBytes(32)
+
+	voteTx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err = keys[0].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+	signedTx, err = proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err = app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, response.Code, qt.Equals, uint32(0))
+
+	app.AdvanceTestBlock()
+
+	// check envelope height for this PID
+	height, err := idx.GetEnvelopeHeight(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, height, qt.CmpEquals(), uint64(2))
+
+	// check overwrite count is correct
+	ref, err := idx.GetEnvelopeReference(nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, ref.OverwriteCount, qt.CmpEquals(), uint32(1))
+
+	// check vote package is updated
+	envelope, err := idx.GetEnvelope(nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelope.VotePackage, qt.DeepEquals, vp)
 }
 
 func TestTxIndexer(t *testing.T) {
@@ -1036,7 +1233,6 @@ func TestTxIndexer(t *testing.T) {
 // into "database is locked" errors.
 func TestIndexerConcurrentDB(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-
 	idx := newTestIndexer(t, app, true)
 
 	pid := util.RandomBytes(32)

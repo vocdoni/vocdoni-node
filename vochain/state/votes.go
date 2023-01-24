@@ -11,6 +11,7 @@ import (
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -104,22 +105,24 @@ func (v *State) voteCountInc() error {
 // If the vote already exists it will be overwritten and overwrite counter will be increased.
 // Note that the vote is not committed to the StateDB until the StateDB transaction is committed.
 // Note that the vote is not verified, so it is the caller responsibility to verify the vote.
-func (v *State) AddVote(vote *Vote) error {
-	vid, err := v.voteID(vote.ProcessID, vote.Nullifier)
+func (s *State) AddVote(vote *Vote) error {
+	vid, err := s.voteID(vote.ProcessID, vote.Nullifier)
 	if err != nil {
 		return err
 	}
 	// save block number
-	vote.Height = v.CurrentHeight()
+	vote.Height = s.CurrentHeight()
 
-	sdbVote, err := v.Vote(vote.ProcessID, vote.Nullifier, false)
+	// get the vote from state database
+	sdbVote, err := s.Vote(vote.ProcessID, vote.Nullifier, false)
 	if err != nil {
 		if errors.Is(err, ErrVoteNotFound) {
 			sdbVote = &models.StateDBVote{
-				VoteHash:    vote.Hash(),
-				Nullifier:   vote.Nullifier,
-				Weight:      vote.WeightBytes(),
-				VotePackage: vote.VotePackage,
+				VoteHash:             vote.Hash(),
+				Nullifier:            vote.Nullifier,
+				Weight:               vote.WeightBytes(),
+				VotePackage:          vote.VotePackage,
+				EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 			}
 		} else {
 			return err
@@ -128,7 +131,8 @@ func (v *State) AddVote(vote *Vote) error {
 		// overwrite vote if it already exists
 		sdbVote.VoteHash = vote.Hash()
 		sdbVote.VotePackage = vote.VotePackage
-		sdbVote.Weight = vote.Weight.Bytes()
+		sdbVote.Weight = vote.WeightBytes()
+		sdbVote.EncryptionKeyIndexes = vote.EncryptionKeyIndexes
 		if sdbVote.OverwriteCount != nil {
 			*sdbVote.OverwriteCount++
 		} else {
@@ -140,21 +144,24 @@ func (v *State) AddVote(vote *Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
-	v.Tx.Lock()
+	s.Tx.Lock()
 	err = func() error {
 		treeCfg := StateChildTreeCfg(ChildTreeVotes)
-		if err := v.Tx.DeepSet(vid, sdbVoteBytes,
+		if err := s.Tx.DeepSet(vid, sdbVoteBytes,
 			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessID)); err != nil {
 			return err
 		}
-		return v.voteCountInc()
+		return s.voteCountInc()
 	}()
-	v.Tx.Unlock()
+	s.Tx.Unlock()
 	if err != nil {
 		return err
 	}
-	for _, l := range v.eventListeners {
-		l.OnVote(vote, v.TxCounter())
+	if sdbVote.OverwriteCount != nil {
+		vote.Overwrites = *sdbVote.OverwriteCount
+	}
+	for _, l := range s.eventListeners {
+		l.OnVote(vote, s.TxCounter())
 	}
 	return nil
 }
@@ -215,6 +222,32 @@ func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 		return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
 	}
 	return &sdbVote, nil
+}
+
+// IterateVotes iterates over all the votes of a process. The callback function is executed for each vote.
+// Once the callback returns true, the iteration stops.
+func (v *State) IterateVotes(processID []byte, committed bool, callback func(vote *models.StateDBVote) bool) error {
+	if !committed {
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
+	}
+	treeCfg := StateChildTreeCfg(ChildTreeVotes)
+	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		return ErrProcessNotFound
+	} else if err != nil {
+		return err
+	}
+	votesTree.Iterate(func(_, v []byte) bool {
+		var sdbVote models.StateDBVote
+		if err := proto.Unmarshal(v, &sdbVote); err != nil {
+			log.Errorw(err, "cannot unmarshal vote")
+			return false
+		}
+		return callback(&sdbVote)
+	})
+	return nil
 }
 
 // VoteExists returns true if the envelope identified with voteID exists

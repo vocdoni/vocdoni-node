@@ -22,6 +22,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
@@ -80,6 +81,8 @@ type Indexer struct {
 	resultsPool []*indexertypes.IndexerOnProcessData
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
+	// tokenTransferPool is the list of token transfers to be indexed
+	tokenTransferPool []*indexertypes.TokenTransferMeta
 	// lockPool is the lock for all *Pool operations
 	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
@@ -124,7 +127,6 @@ type Indexer struct {
 // VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
 type VoteWithIndex struct {
 	vote    *state.Vote
-	voterID state.VoterID
 	txIndex int32
 }
 
@@ -152,13 +154,15 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
 
-	log.Infof("indexer initialization took %s, stored %d "+
-		"transactions, %d envelopes, %d processes and %d entities",
-		time.Since(startTime),
-		countMap[indexertypes.CountStoreTransactions],
-		countMap[indexertypes.CountStoreEnvelopes],
-		countMap[indexertypes.CountStoreProcesses],
-		countMap[indexertypes.CountStoreEntities])
+	log.Infow("indexer initialization", map[string]interface{}{
+		"took":         time.Since(startTime),
+		"dataDir":      dbPath,
+		"liveResults":  countLiveResults,
+		"transactions": countMap[indexertypes.CountStoreTransactions],
+		"envelopes":    countMap[indexertypes.CountStoreEnvelopes],
+		"processes":    countMap[indexertypes.CountStoreProcesses],
+		"entities":     countMap[indexertypes.CountStoreEntities],
+	})
 
 	sqlPath := dbPath + "-sqlite"
 	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
@@ -343,6 +347,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	// Find those processes which do not have yet final results,
 	// they are considered live so we need to compute the temporary
 	// results (or only its weight in case of Encrypted)
+	//prcs, err := idx.ProcessList(nil, 0, 0, "", 0, "", "READY", true)
 	prcs := [][]byte{}
 	err := idx.db.ForEach(
 		badgerhold.Where("FinalResults").Eq(false),
@@ -350,6 +355,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			prcs = append(prcs, p.ID)
 			return nil
 		})
+
 	if err != nil {
 		log.Error(err)
 	}
@@ -361,7 +367,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		// to reset the existing Results and count them again from scratch.
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
-		log.Infof("recovering live process %x", p)
+		log.Debugf("recovering live process %x", p)
 		process, err := idx.App.State.Process(p, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
@@ -379,7 +385,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 				Signatures:   []types.HexBytes{},
 			})
 		}); err != nil {
-			log.Errorf("cannot upsert results to db: %v", err)
+			log.Errorw(err, "cannot upsert results to db")
 			continue
 		}
 
@@ -389,20 +395,24 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
 		}
-		if err := idx.WalkEnvelopes(p, false, func(vote *models.VoteEnvelope, weight *big.Int) {
-			if err := idx.addLiveVote(vote.ProcessId, vote.VotePackage,
-				weight, results); err != nil {
-				log.Warn(err)
+		// Get the votes from the state
+		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
+			if err := idx.addLiveVote(p, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
+				log.Errorw(err, "could not add live vote")
 			}
-		}); err != nil {
-			log.Error(err)
-			continue
-		}
+			return false
+		})
 		// Store the results on the persisten database
 		if err := idx.commitVotesUnsafe(p, results, idx.App.Height()); err != nil {
-			log.Errorf("cannot commit live votes: (%v)", err)
+			log.Errorw(err, "could not commit live votes")
 			continue
 		}
+		log.Infow("partial results recovered", map[string]interface{}{
+			"electionID": fmt.Sprintf("%x", p),
+			"weight":     results.Weight,
+			"votes":      len(results.Votes),
+			"results":    results.String(),
+		})
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}
@@ -448,15 +458,8 @@ func (idx *Indexer) Commit(height uint32) error {
 	startTime := time.Now()
 	txn := idx.db.Badger().NewTransaction(true)
 	for _, v := range idx.voteIndexPool {
-		if err := idx.addVoteIndex(
-			v.vote.Nullifier,
-			v.vote.ProcessID,
-			height,
-			v.vote.WeightBytes(),
-			v.txIndex,
-			v.voterID,
-			txn); err != nil {
-			log.Warn(err)
+		if err := idx.addVoteIndex(v.vote, v.txIndex, txn); err != nil {
+			log.Errorw(err, "could not index vote")
 		}
 	}
 	if len(idx.voteIndexPool) > 0 {
@@ -488,6 +491,12 @@ func (idx *Indexer) Commit(height uint32) error {
 			); err != nil {
 				log.Errorf("could not get envelope count: %v", err)
 			}
+		}
+	}
+	// index token transfers
+	for _, tt := range idx.tokenTransferPool {
+		if err := idx.newTokenTransfer(tt); err != nil {
+			log.Errorw(err, "commit: cannot create new token transfer")
 		}
 	}
 	txn.Discard()
@@ -573,7 +582,6 @@ func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessID) {
 		idx.votePool[string(v.ProcessID)] = append(idx.votePool[string(v.ProcessID)], v)
 	}
-	//sVote, err := idx.App.State.Vote(v.ProcessId, v.Nullifier, false)
 	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
 }
 
@@ -718,7 +726,67 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 
 // NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
-func (idx *Indexer) OnTransferTokens(from, to []byte, amount uint64)  {}
+func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.tokenTransferPool = append(idx.tokenTransferPool, &indexertypes.TokenTransferMeta{
+		From:      tx.FromAddress.Bytes(),
+		To:        tx.ToAddress.Bytes(),
+		Amount:    tx.Amount,
+		Height:    uint64(idx.App.Height()),
+		TxHash:    tx.TxHash,
+		Timestamp: time.Now(),
+	})
+}
+
+// newTokenTransfer creates a new token transfer and stores it in the database
+func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
+	queries, ctx, cancel := idx.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
+		TxHash:       tt.TxHash,
+		Height:       int64(tt.Height),
+		FromAccount:  tt.From,
+		ToAccount:    tt.To,
+		Amount:       int64(tt.Amount),
+		TransferTime: tt.Timestamp,
+	}); err != nil {
+		return err
+	}
+	log.Debugw("new token transfer", map[string]interface{}{
+		"from":   fmt.Sprintf("%x", tt.From),
+		"to":     fmt.Sprintf("%x", tt.To),
+		"amount": fmt.Sprintf("%d", tt.Amount),
+	})
+	return nil
+}
+
+// GetTokenTransfersByFromAccount returns all the token transfers made from a given account
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
+	defer cancel()
+	ttFromDB, err := queries.GetTokenTransfersByFromAccount(ctx, indexerdb.GetTokenTransfersByFromAccountParams{
+		FromAccount: from,
+		Limit:       maxItems,
+		Offset:      offset,
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := make([]*indexertypes.TokenTransferMeta, len(ttFromDB))
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenTransferMeta{
+			Amount:    uint64(t.Amount),
+			From:      t.FromAccount,
+			To:        t.ToAccount,
+			Height:    uint64(t.Height),
+			TxHash:    t.TxHash,
+			Timestamp: t.TransferTime,
+		})
+	}
+	return tt, nil
+}
 
 // GetFriendlyResults translates votes into a matrix of strings
 func GetFriendlyResults(votes [][]*types.BigInt) [][]string {

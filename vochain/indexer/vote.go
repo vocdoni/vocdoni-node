@@ -16,7 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -54,21 +53,17 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 	if err != nil {
 		return nil, err
 	}
-	log.Debugw(fmt.Sprintf("get envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
-		"nullifier": hex.EncodeToString(nullifier),
-		"height":    sqlTxRefInner.Height,
-		"txIndex":   sqlTxRefInner.TxIndex,
-		"weight":    sqlTxRefInner.Weight,
-		"voterId":   hex.EncodeToString(sqlTxRefInner.VoterID),
+	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
+		"nullifier":      hex.EncodeToString(nullifier),
+		"height":         sqlTxRefInner.Height,
+		"txIndex":        sqlTxRefInner.TxIndex,
+		"weight":         sqlTxRefInner.Weight,
+		"processId":      hex.EncodeToString(sqlTxRefInner.ProcessID),
+		"overwriteCount": sqlTxRefInner.OverwriteCount,
+		"voterId":        hex.EncodeToString(sqlTxRefInner.VoterID),
 	})
 
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
-	if enableBadgerhold {
-		if diff := cmp.Diff(txRef, sqlTxRef); diff != "" {
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", nullifier, diff)
-		}
-	}
-
 	return sqlTxRef, nil
 }
 
@@ -82,27 +77,24 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 	if err != nil {
 		return nil, err
 	}
-	stx, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
+	vote, err := s.App.State.Vote(voteRef.ProcessID, nullifier, true)
 	if err != nil {
 		return nil, err
 	}
-	tx := &models.Tx{}
-	if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+	// TODO: get the txHash from another place, not the blockstore
+	_, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
+	if err != nil {
 		return nil, err
 	}
-	envelope := tx.GetVote()
-	if envelope == nil {
-		return nil, fmt.Errorf("transaction is not an Envelope")
-	}
+
 	log.Debugf("getEnvelope took %s", time.Since(t))
 	envelopePackage := &indexertypes.EnvelopePackage{
-		Nonce:                envelope.Nonce,
-		VotePackage:          envelope.VotePackage,
-		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
+		VotePackage:          vote.VotePackage,
+		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
-		Signature:            stx.Signature,
+		OverwriteCount:       voteRef.OverwriteCount,
 		Meta: indexertypes.EnvelopeMetadata{
-			ProcessId: envelope.ProcessId,
+			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
 			TxIndex:   voteRef.TxIndex,
 			Height:    voteRef.Height,
@@ -122,7 +114,7 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 // The callback function is executed async (in a goroutine) if async=true.
 // The method will return once all goroutines have finished the work.
 func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
-	callback func(*models.VoteEnvelope, *big.Int)) error {
+	callback func(*models.StateDBVote)) error {
 	wg := sync.WaitGroup{}
 
 	// There might be tens of thousands of votes.
@@ -133,47 +125,69 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	const limitConcurrentProcessing = 20
 	semaphore := make(chan bool, limitConcurrentProcessing)
 
-	// TODO(sqlite): reimplement
-	err := s.db.ForEach(
-		badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
-		func(txRef *indexertypes.VoteReference) error {
-			wg.Add(1)
-			processVote := func() {
-				defer wg.Done()
-				stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
-				if err != nil {
-					log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
-						txRef.Height, txRef.TxIndex))
-					return
+	if enableBadgerhold {
+		err := s.db.ForEach(
+			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
+			func(txRef *indexertypes.VoteReference) error {
+				wg.Add(1)
+				processVote := func() {
+					defer wg.Done()
+					v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
+					if err != nil {
+						log.Errorw(err, "cannot get vote from state")
+						return
+					}
+					callback(v)
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					log.Warnf("could not unmarshal tx: %v", err)
-					return
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					log.Errorf("transaction is not an Envelope")
-					return
-				}
-				callback(envelope, txRef.Weight.ToInt())
-			}
-			if async {
-				go func() {
-					semaphore <- true
+				if async {
+					go func() {
+						semaphore <- true
+						processVote()
+						<-semaphore
+					}()
+				} else {
 					processVote()
-					<-semaphore
-				}()
-			} else {
-				processVote()
+				}
+				return nil
+			})
+		wg.Wait()
+		return err
+	}
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	// TODO(sqlite): getting all votes as a single slice is not scalable.
+	txRefs, err := queries.GetVoteReferencesByProcessID(ctx, processId)
+	if err != nil {
+		return err
+	}
+	for _, txRef := range txRefs {
+		wg.Add(1)
+		processVote := func() {
+			defer wg.Done()
+			v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
+			if err != nil {
+				log.Errorw(err, "cannot get vote from state")
+				return
 			}
-			return nil
-		})
+			callback(v)
+		}
+		if async {
+			go func() {
+				semaphore <- true
+				processVote()
+				<-semaphore
+			}()
+		} else {
+			processVote()
+		}
+	}
+
 	wg.Wait()
-	return err
+	return nil
 }
 
-// GetEnvelopes retrieves all Envelopes of a ProcessId from the Blockchain block store
+// GetEnvelopes retrieves all envelope metadata for a ProcessId.
 func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
@@ -182,8 +196,9 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	envelopes := []*indexertypes.EnvelopeMetadata{}
 	var err error
 	// TODO(sqlite): reimplement
-	// check pid
-	if len(processId) == types.ProcessIDsize {
+	// TODO: check pid
+	// TODO: get the TxHash from the Database (not from the blockstore)
+	if len(processId) > 0 {
 		err = s.db.ForEach(
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
 				And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
@@ -191,21 +206,12 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				Skip(from).
 				Limit(max),
 			func(txRef *indexertypes.VoteReference) error {
-				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					return err
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					return err
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					return fmt.Errorf("transaction is not an Envelope")
-				}
-				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: processId,
+					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
@@ -228,21 +234,12 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				Skip(from).
 				Limit(max),
 			func(txRef *indexertypes.VoteReference) error {
-				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					return err
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					return err
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					return fmt.Errorf("transaction is not an Envelope")
-				}
-				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: processId,
+					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
 					TxIndex:   txRef.TxIndex,
 					Height:    txRef.Height,
@@ -507,61 +504,74 @@ func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (s *Indexer) addVoteIndex(nullifier, pid []byte, blockHeight uint32,
-	weight []byte, txIndex int32, voterID state.VoterID, txn *badger.Txn) error {
-	weightInt := new(types.BigInt).SetBytes(weight)
-	weightStr, err := weightInt.MarshalText()
-	if err != nil {
-		panic(err) // should never happen
-	}
+func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32, txn *badger.Txn) error {
 	creationTime := time.Now()
 	if enableBadgerhold {
 		bhVoteRef := &indexertypes.VoteReference{
-			Nullifier:    nullifier,
-			ProcessID:    pid,
-			VoterID:      voterID,
-			Height:       blockHeight,
-			Weight:       weightInt,
+			Nullifier:      vote.Nullifier,
+			ProcessID:      vote.ProcessID,
+			VoterID:        nonNullBytes(vote.VoterID),
+			OverwriteCount: vote.Overwrites,
+			Height:         vote.Height,
+			Weight: func() *types.BigInt {
+				if vote.Weight == nil {
+					return new(types.BigInt).SetUint64(1)
+				}
+				return (*types.BigInt)(vote.Weight)
+			}(),
 			TxIndex:      txIndex,
 			CreationTime: creationTime,
 		}
 		if txn != nil {
-			if err := s.db.TxInsert(txn, nullifier, bhVoteRef); err != nil {
+			if err := s.db.TxUpsert(txn, vote.Nullifier, bhVoteRef); err != nil {
 				return err
 			}
 		} else {
 			if err := s.queryWithRetries(func() error {
-				return s.db.Insert(nullifier, bhVoteRef)
+				return s.db.Upsert(vote.Nullifier, bhVoteRef)
 			}); err != nil {
 				return err
 			}
 		}
 	}
 
+	weightStr := []byte("1")
+	if vote.Weight != nil {
+		var err error
+		weightStr, err = vote.Weight.MarshalText()
+		if err != nil {
+			panic(err) // should never happen
+		}
+	}
 	sqlStartTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
-		Nullifier: nullifier,
-		ProcessID: pid,
-		Height:    int64(blockHeight),
-		Weight:    string(weightStr),
-		TxIndex:   int64(txIndex),
+		Nullifier:      vote.Nullifier,
+		ProcessID:      vote.ProcessID,
+		Height:         int64(vote.Height),
+		Weight:         string(weightStr),
+		TxIndex:        int64(txIndex),
+		OverwriteCount: int64(vote.Overwrites),
 		// VoterID has a NOT NULL constraint, so we need to provide
 		// a zero value for it since nil is not allowed
-		VoterID: func() state.VoterID {
-			if voterID == nil {
-				return voterID.Nil()
-			}
-			return voterID
-		}(),
+		VoterID:      nonNullBytes(vote.VoterID),
 		CreationTime: creationTime,
 	}); err != nil {
 		return err
 	}
 
-	log.Debugf("addVoteIndex sqlite took %s", time.Since(sqlStartTime))
+	log.Debugw("addVoteIndex sqlite", map[string]interface{}{
+		"nullifier":   vote.Nullifier,
+		"pid":         vote.ProcessID,
+		"blockHeight": vote.Height,
+		"weight":      weightStr,
+		"voterID":     hex.EncodeToString(vote.VoterID),
+		"txIndex":     txIndex,
+		"overwrites":  vote.Overwrites,
+		"duration":    time.Since(sqlStartTime).String(),
+	})
 	return nil
 }
 
@@ -584,8 +594,7 @@ func (s *Indexer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (s *Indexer) commitVotes(pid []byte,
-	partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotes(pid []byte, partialResults *indexertypes.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
@@ -596,8 +605,7 @@ func (s *Indexer) commitVotes(pid []byte,
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (s *Indexer) commitVotesUnsafe(pid []byte,
-	partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Results, height uint32) error {
 
 	if enableBadgerhold {
 		update := func(record interface{}) error {
@@ -671,13 +679,12 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 	var err error
 	lock := sync.Mutex{}
 
-	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
-		weight *big.Int) {
+	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.StateDBVote) {
 		var vp *vochain.VotePackage
 		var err error
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
-				log.Errorf("encryptionKeyIndexes has too many fields")
+				log.Error("encryptionKeyIndexes has too many fields")
 				return
 			}
 			keys := []string{}
@@ -701,14 +708,17 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 			return
 		}
 
-		if err = results.AddVote(vp.Votes, weight, &lock); err != nil {
+		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.GetWeight()), &lock); err != nil {
 			log.Warnf("addVote failed: %v", err)
 			return
 		}
 		atomic.AddUint64(&nvotes, 1)
 	}); err == nil {
-		log.Infof("computed results for process %x with %d votes", p.ID, nvotes)
-		log.Debugf("results: %s", results)
+		log.Infow("computed results", map[string]interface{}{
+			"process": p.ID.String(),
+			"votes":   nvotes,
+			"results": results.String(),
+		})
 	}
 	results.EnvelopeHeight = nvotes
 	return results, err
