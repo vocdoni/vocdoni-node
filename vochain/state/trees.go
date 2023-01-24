@@ -174,7 +174,7 @@ var (
 	}
 )
 
-// StateTree returns the state merkle tree with name.
+// StateTreeCfg returns the state merkle tree with name.
 func StateTreeCfg(name string) statedb.TreeConfig {
 	t, ok := MainTrees[name]
 	if !ok {
@@ -183,7 +183,7 @@ func StateTreeCfg(name string) statedb.TreeConfig {
 	return t
 }
 
-// StateChildTree returns the state merkle child tree with name.
+// StateChildTreeCfg returns the state merkle child tree with name.
 func StateChildTreeCfg(name string) *statedb.TreeNonSingletonConfig {
 	t, ok := ChildTrees[name]
 	if !ok {
@@ -192,7 +192,7 @@ func StateChildTreeCfg(name string) *statedb.TreeNonSingletonConfig {
 	return t
 }
 
-// StateParentChildTree returns the parent and its child tree under the key leaf.
+// StateParentChildTreeCfg returns the parent and its child tree under the key leaf.
 func StateParentChildTreeCfg(parent, child string, key []byte) (statedb.TreeConfig, statedb.TreeConfig) {
 	parentTree := StateTreeCfg(parent)
 	childTree := StateChildTreeCfg(child)
