@@ -46,7 +46,7 @@ type Cipher interface {
 	Decrypt(cipher []byte) ([]byte, error)
 }
 
-// Cipher represents a private key which can sign messages.
+// Signer represents a private key which can sign messages.
 type Signer interface {
 	PrivateKey
 

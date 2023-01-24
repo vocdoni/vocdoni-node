@@ -113,7 +113,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	}
 }
 
-// VerifyProofOffChainCA verifies a proof with census origin OFF_CHAIN_CA.
+// VerifyProofOffChainCSP verifies a proof with census origin OFF_CHAIN_CA.
 // Returns verification result and weight.
 func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
