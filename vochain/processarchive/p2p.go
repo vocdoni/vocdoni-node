@@ -17,11 +17,11 @@ const (
 
 // AddKey adds a base64 encoded ECDSA 256bit private key or generates
 // a new one.
-func (p *ProcessArchive) AddKey(b64key string) error {
+func (pa *ProcessArchive) AddKey(b64key string) error {
 	var ipnsPk []byte
 	if b64key == "" {
 		// if key already exist, just return
-		if _, err := p.GetKey(); err == nil {
+		if _, err := pa.GetKey(); err == nil {
 			return nil
 		}
 		// else generate a new key
@@ -33,13 +33,13 @@ func (p *ProcessArchive) AddKey(b64key string) error {
 			return err
 		}
 	}
-	return p.ipfs.AddKeyToKeystore(ipnsKeyAlias, ipnsPk)
+	return pa.ipfs.AddKeyToKeystore(ipnsKeyAlias, ipnsPk)
 }
 
 // GetKey fetch the base64 encoded IPFS private key used to
 // publish the IPNS record.
-func (p *ProcessArchive) GetKey() (string, error) {
-	pk, err := p.ipfs.Node.Repo.Keystore().Get(ipnsKeyAlias)
+func (pa *ProcessArchive) GetKey() (string, error) {
+	pk, err := pa.ipfs.Node.Repo.Keystore().Get(ipnsKeyAlias)
 	if err != nil {
 		return "", err
 	}
@@ -53,20 +53,20 @@ func (p *ProcessArchive) GetKey() (string, error) {
 // Publish is a blocking routine that reads ProcessArchive.publish channel
 // in order to trigger a new IPNS record announcement publishing the
 // process archive directory.
-func (p *ProcessArchive) publishLoop() {
+func (pa *ProcessArchive) publishLoop() {
 	log.Infof("starting process archive IPNS publish daemon with interval %s",
 		publishInterval)
 	for {
 		select {
-		case <-p.publish:
-			if time.Since(p.lastUpdate) < publishInterval {
+		case <-pa.publish:
+			if time.Since(pa.lastUpdate) < publishInterval {
 				break
 			}
-			p.lastUpdate = time.Now()
+			pa.lastUpdate = time.Now()
 			log.Infof("publishing process archive")
 			start := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), publishInterval)
-			ipnsentry, err := p.ipfs.PublishIPNSpath(ctx, p.storage.datadir, ipnsKeyAlias)
+			ipnsentry, err := pa.ipfs.PublishIPNSpath(ctx, pa.storage.datadir, ipnsKeyAlias)
 			defer cancel()
 			if err != nil {
 				log.Warnf("could not publish to IPFS: %v", err)
@@ -74,7 +74,7 @@ func (p *ProcessArchive) publishLoop() {
 			}
 			log.Infof("published to /ipns/%s with value %s, took %s",
 				ipnsentry.Name(), ipnsentry.Value(), time.Since(start))
-		case <-p.close:
+		case <-pa.close:
 			return
 		}
 	}
