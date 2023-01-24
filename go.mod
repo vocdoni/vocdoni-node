@@ -66,7 +66,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.21.0 // indirect
-	go.vocdoni.io/proto v1.13.4-0.20230117100158-5cb6dd43f510
+	go.vocdoni.io/proto v1.14.1-0.20230124095055-c3e02490cdfe
 	golang.org/x/crypto v0.1.0
 	golang.org/x/net v0.1.0
 	google.golang.org/protobuf v1.28.1
@@ -74,13 +74,7 @@ require (
 
 require github.com/iancoleman/strcase v0.2.0
 
-require (
-	github.com/iden3/go-rapidsnark/prover v0.0.9
-	github.com/iden3/go-rapidsnark/types v0.0.2
-	github.com/iden3/go-rapidsnark/verifier v0.0.3
-	github.com/iden3/go-rapidsnark/witness v0.0.3
-	github.com/rs/zerolog v1.28.0
-)
+require github.com/rs/zerolog v1.28.0
 
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect

@@ -16,7 +16,6 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -78,29 +77,24 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 	if err != nil {
 		return nil, err
 	}
-	stx, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
+	vote, err := s.App.State.Vote(voteRef.ProcessID, nullifier, true)
 	if err != nil {
 		return nil, err
 	}
-	tx := &models.Tx{}
-	if err := proto.Unmarshal(stx.Tx, tx); err != nil {
+	// TODO: get the txHash from another place, not the blockstore
+	_, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
+	if err != nil {
 		return nil, err
-	}
-	envelope := tx.GetVote()
-	if envelope == nil {
-		return nil, fmt.Errorf("transaction is not an Envelope")
 	}
 
 	log.Debugf("getEnvelope took %s", time.Since(t))
 	envelopePackage := &indexertypes.EnvelopePackage{
-		Nonce:                envelope.Nonce,
-		VotePackage:          envelope.VotePackage,
-		EncryptionKeyIndexes: envelope.EncryptionKeyIndexes,
+		VotePackage:          vote.VotePackage,
+		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
 		OverwriteCount:       voteRef.OverwriteCount,
-		Signature:            stx.Signature,
 		Meta: indexertypes.EnvelopeMetadata{
-			ProcessId: envelope.ProcessId,
+			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
 			TxIndex:   voteRef.TxIndex,
 			Height:    voteRef.Height,
@@ -120,7 +114,7 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 // The callback function is executed async (in a goroutine) if async=true.
 // The method will return once all goroutines have finished the work.
 func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
-	callback func(*models.VoteEnvelope, *big.Int)) error {
+	callback func(*models.StateDBVote)) error {
 	wg := sync.WaitGroup{}
 
 	// There might be tens of thousands of votes.
@@ -138,23 +132,12 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 				wg.Add(1)
 				processVote := func() {
 					defer wg.Done()
-					stx, err := s.App.GetTx(txRef.Height, txRef.TxIndex)
+					v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
 					if err != nil {
-						log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
-							txRef.Height, txRef.TxIndex))
+						log.Errorw(err, "cannot get vote from state")
 						return
 					}
-					tx := &models.Tx{}
-					if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-						log.Warnf("could not unmarshal tx: %v", err)
-						return
-					}
-					envelope := tx.GetVote()
-					if envelope == nil {
-						log.Errorf("transaction is not an Envelope")
-						return
-					}
-					callback(envelope, txRef.Weight.ToInt())
+					callback(v)
 				}
 				if async {
 					go func() {
@@ -180,34 +163,14 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	}
 	for _, txRef := range txRefs {
 		wg.Add(1)
-		// TODO(mvdan): we copied this code from the badgerhold query;
-		// it only logs errors, which isn't great.
 		processVote := func() {
 			defer wg.Done()
-			// TODO(sqlite): should we store the needed info in sqlite to avoid
-			// App.GetTx calls?
-			stx, err := s.App.GetTx(uint32(txRef.Height), int32(txRef.TxIndex))
+			v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
 			if err != nil {
-				log.Errorw(err, fmt.Sprintf("could not get tx at height %d, txIndex %d",
-					txRef.Height, txRef.TxIndex))
+				log.Errorw(err, "cannot get vote from state")
 				return
 			}
-			tx := &models.Tx{}
-			if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-				log.Warnf("could not unmarshal tx: %v", err)
-				return
-			}
-			envelope := tx.GetVote()
-			if envelope == nil {
-				log.Errorf("transaction is not an Envelope")
-				return
-			}
-			weightInt := new(big.Int)
-			if err := weightInt.UnmarshalText([]byte(txRef.Weight)); err != nil {
-				log.Warnf("could not unmarshal weight: %v", err)
-				return
-			}
-			callback(envelope, weightInt)
+			callback(v)
 		}
 		if async {
 			go func() {
@@ -224,7 +187,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	return nil
 }
 
-// GetEnvelopes retrieves all Envelopes of a ProcessId from the Blockchain block store
+// GetEnvelopes retrieves all envelope metadata for a ProcessId.
 func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
@@ -233,7 +196,8 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	envelopes := []*indexertypes.EnvelopeMetadata{}
 	var err error
 	// TODO(sqlite): reimplement
-	// check pid
+	// TODO: check pid
+	// TODO: get the TxHash from the Database (not from the blockstore)
 	if len(processId) > 0 {
 		err = s.db.ForEach(
 			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
@@ -242,19 +206,10 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				Skip(from).
 				Limit(max),
 			func(txRef *indexertypes.VoteReference) error {
-				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					return err
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					return err
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					return fmt.Errorf("transaction is not an Envelope")
-				}
-				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
 					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
@@ -279,19 +234,10 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 				Skip(from).
 				Limit(max),
 			func(txRef *indexertypes.VoteReference) error {
-				stx, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
+				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
 				if err != nil {
 					return err
 				}
-				tx := &models.Tx{}
-				if err := proto.Unmarshal(stx.Tx, tx); err != nil {
-					return err
-				}
-				envelope := tx.GetVote()
-				if envelope == nil {
-					return fmt.Errorf("transaction is not an Envelope")
-				}
-				envelope.Nullifier = txRef.Nullifier
 				envelopeMetadata := &indexertypes.EnvelopeMetadata{
 					ProcessId: txRef.ProcessID,
 					Nullifier: txRef.Nullifier,
@@ -733,13 +679,12 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 	var err error
 	lock := sync.Mutex{}
 
-	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.VoteEnvelope,
-		weight *big.Int) {
+	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.StateDBVote) {
 		var vp *vochain.VotePackage
 		var err error
 		if p.Envelope.GetEncryptedVotes() {
 			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
-				log.Errorf("encryptionKeyIndexes has too many fields")
+				log.Error("encryptionKeyIndexes has too many fields")
 				return
 			}
 			keys := []string{}
@@ -763,7 +708,7 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 			return
 		}
 
-		if err = results.AddVote(vp.Votes, weight, &lock); err != nil {
+		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.GetWeight()), &lock); err != nil {
 			log.Warnf("addVote failed: %v", err)
 			return
 		}
@@ -772,8 +717,8 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 		log.Infow("computed results", map[string]interface{}{
 			"process": p.ID.String(),
 			"votes":   nvotes,
+			"results": results.String(),
 		})
-		log.Debugf("results: %s", results)
 	}
 	results.EnvelopeHeight = nvotes
 	return results, err
