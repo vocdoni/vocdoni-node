@@ -239,8 +239,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
 	log.Debugw("zk circuit loaded", map[string]interface{}{
-		"censusRoot": censusRoot.String(), "electionId": electionID.String(),
-		"circuitURI": c.circuit.URI})
+		"censusRoot": censusRoot.String(), "electionId": electionID.String()})
 	// Create the inputs and encode them into a JSON
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,
