@@ -113,14 +113,16 @@ func (s *State) AddVote(vote *Vote) error {
 	// save block number
 	vote.Height = s.CurrentHeight()
 
+	// get the vote from state database
 	sdbVote, err := s.Vote(vote.ProcessID, vote.Nullifier, false)
 	if err != nil {
 		if errors.Is(err, ErrVoteNotFound) {
 			sdbVote = &models.StateDBVote{
-				VoteHash:    vote.Hash(),
-				Nullifier:   vote.Nullifier,
-				Weight:      vote.WeightBytes(),
-				VotePackage: vote.VotePackage,
+				VoteHash:             vote.Hash(),
+				Nullifier:            vote.Nullifier,
+				Weight:               vote.WeightBytes(),
+				VotePackage:          vote.VotePackage,
+				EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 			}
 		} else {
 			return err
@@ -130,6 +132,7 @@ func (s *State) AddVote(vote *Vote) error {
 		sdbVote.VoteHash = vote.Hash()
 		sdbVote.VotePackage = vote.VotePackage
 		sdbVote.Weight = vote.WeightBytes()
+		sdbVote.EncryptionKeyIndexes = vote.EncryptionKeyIndexes
 		if sdbVote.OverwriteCount != nil {
 			*sdbVote.OverwriteCount++
 		} else {

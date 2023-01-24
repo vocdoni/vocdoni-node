@@ -411,6 +411,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			"electionID": fmt.Sprintf("%x", p),
 			"weight":     results.Weight,
 			"votes":      len(results.Votes),
+			"results":    results.String(),
 		})
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)

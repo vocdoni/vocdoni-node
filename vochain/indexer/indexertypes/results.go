@@ -34,7 +34,7 @@ type Results struct {
 func (r *Results) String() string {
 	results := bytes.Buffer{}
 	for _, q := range r.Votes {
-		results.WriteString(" [")
+		results.WriteString("[")
 		for j, o := range q {
 			results.WriteString(o.String())
 			if j < len(q)-1 {
