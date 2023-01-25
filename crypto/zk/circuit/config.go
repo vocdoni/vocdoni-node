@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-var DefaultCircuitConfigurationTag = "dev"
+// TODO: (lucasmenendez) Comment this constant
+const DefaultCircuitConfigurationTag = "dev"
 
 // ZkCircuitConfig defines the configuration of the files to be downloaded
 type ZkCircuitConfig struct {
@@ -16,7 +17,8 @@ type ZkCircuitConfig struct {
 	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
 	Parameters int `json:"parameters"`
-	Levels     int `json:"levels"`
+	// TODO: (lucasmenendez) Comment why the number of levels must be here
+	Levels int `json:"levels"`
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath
 	// directories structure

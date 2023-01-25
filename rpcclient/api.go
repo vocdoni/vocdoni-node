@@ -19,7 +19,6 @@ import (
 	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
@@ -395,7 +394,7 @@ type SNARKProofInputs struct {
 
 type GenSNARKData struct {
 	CircuitIndex  int                      `json:"circuitIndex"`
-	CircuitConfig *artifacts.CircuitConfig `json:"circuitConfig"`
+	CircuitConfig *circuit.ZkCircuitConfig `json:"circuitConfig"`
 	Inputs        SNARKProofInputs         `json:"inputs"`
 }
 

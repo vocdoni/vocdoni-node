@@ -225,14 +225,15 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	// Create a list of siblings with the same number of items that levels
 	// allowed by the circuit (from its config) plus one. Fill with zeros if its
 	// needed.
-	strSiblings := make([]string, c.circuit.Levels+1)
-	for i := 0; i < len(strSiblings); i++ {
-		newSibling := "0"
-		if i < len(unpackedSiblings) {
-			newSibling = arbo.BytesToBigInt(unpackedSiblings[i]).String()
-		}
-		strSiblings[i] = newSibling
+	strSiblings := []string{}
+	for i := 0; i < len(unpackedSiblings); i++ {
+		strSiblings = append(strSiblings, arbo.BytesToBigInt(unpackedSiblings[i]).String())
 	}
+	paddingSiblings := (c.circuit.Levels + 1) - len(strSiblings)
+	for j := 0; j < paddingSiblings; j++ {
+		strSiblings = append(strSiblings, "0")
+	}
+
 	// Get artifacts of the current circuit
 	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {
@@ -254,9 +255,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
-	log.Debugw("proof inputs generated", map[string]interface{}{
-		"censusRoot": censusRoot.String(), "electionId": electionID.String(),
-		"nullifier": strNullifier})
+	log.Debugw("proof inputs generated", rawInputs)
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
