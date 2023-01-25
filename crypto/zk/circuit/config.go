@@ -6,7 +6,10 @@ import (
 	"strings"
 )
 
-// TODO: (lucasmenendez) Comment this constant
+// DefaultCircuitConfigurationTag constant contains the tag value that points
+// to the default ZkSnark circuit configuration. It ensures that at least one
+// circuit configuration is available so the configuration refered by this tag
+// must be defined.
 const DefaultCircuitConfigurationTag = "dev"
 
 // ZkCircuitConfig defines the configuration of the files to be downloaded

@@ -17,6 +17,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
+// TODO: Refactor the error handling to include the trace of the original error
+// into the error returned.
 var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
 	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
@@ -78,12 +80,17 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	return proofData, pubSignals, nil
 }
 
+// Weight function decodes the vote weight value from the current proof public
+// signals and return it as a big.Int.
 func (p *Proof) Weight() (*big.Int, error) {
+	// Check if the current proof contains public signals and it contains the
+	// correct number of positions.
 	if p.PubSignals == nil || len(p.PubSignals) < 5 {
 		return nil, ErrPublicSignalFormat
 	}
-
+	// Get the weight from the fourth public signal of the proof
 	strWeight := p.PubSignals[4]
+	// Parse it into a big.Int
 	weight, ok := new(big.Int).SetString(strWeight, 10)
 	if !ok {
 		return nil, ErrParsingWeight
@@ -122,6 +129,7 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
+		// TODO: Remove the following logger trace
 		log.Warnw(ErrWitnessCalc.Error(), map[string]interface{}{"error": err})
 		return nil, ErrWitnessCalc
 	}
