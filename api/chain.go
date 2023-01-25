@@ -11,7 +11,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/genesis"
 )
 
 const (
@@ -190,15 +189,8 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	blockTimes := a.vocinfo.BlockTimes()
 	height := a.vocapp.Height()
 	timestamp := a.vocapp.Timestamp()
-
-	// Get current circuit tag checking into the genesis according to the
-	// chainID. By default "dev" genesis.
-	// TODO: Move the circuit config tag to a vocapp getter, to prevent
-	// duplicated code blocks to get it.
-	circuitConfigTag := "dev"
-	if currentGenesis, ok := genesis.Genesis[chainID]; ok {
-		circuitConfigTag = currentGenesis.CircuitsConfigTag
-	}
+	// Get current circuit tag
+	circuitConfigTag := a.vocapp.CircuitConfigurationTag()
 
 	data, err := json.Marshal(ChainInfo{
 		ID:                      chainID,
