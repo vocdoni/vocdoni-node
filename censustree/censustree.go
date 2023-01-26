@@ -32,7 +32,7 @@ type Tree struct {
 	tree *tree.Tree
 
 	sync.Mutex
-	public            uint32
+	public            atomic.Bool
 	censusType        models.Census_Type
 	hashFunc          func(...[]byte) ([]byte, error)
 	hashLen           int
@@ -172,19 +172,13 @@ func (t *Tree) FromRoot(root []byte) (*Tree, error) {
 
 // Publish makes a merkle tree available for queries.  Application layer should
 // call Publish() before considering the Tree available.
-func (t *Tree) Publish() {
-	atomic.StoreUint32(&t.public, 1)
-}
+func (t *Tree) Publish() { t.public.Store(true) }
 
 // Unpublish makes a merkle tree not available for queries.
-func (t *Tree) Unpublish() {
-	atomic.StoreUint32(&t.public, 0)
-}
+func (t *Tree) Unpublish() { t.public.Store(false) }
 
 // IsPublic returns true if the tree is available.
-func (t *Tree) IsPublic() bool {
-	return atomic.LoadUint32(&t.public) == 1
-}
+func (t *Tree) IsPublic() bool { return t.public.Load() }
 
 // Root wraps tree.Tree.Root.
 func (t *Tree) Root() ([]byte, error) {

@@ -14,7 +14,7 @@ func cacheGetNullifierKey(nullifier []byte) string {
 }
 
 func (v *State) cacheDisabled() bool {
-	return v.DisableVoteCache.Load().(bool)
+	return v.DisableVoteCache.Load()
 }
 
 // CacheAdd adds a new vote proof to the local cache

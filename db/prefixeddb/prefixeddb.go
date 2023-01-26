@@ -4,6 +4,7 @@ import (
 	"bytes"
 
 	"go.vocdoni.io/dvote/db"
+	"golang.org/x/exp/slices"
 )
 
 // PrefixedDatabase wraps a db.Database prefixing all keys with `prefix`.
@@ -21,7 +22,7 @@ func prefixSlice(prefix, v []byte) []byte {
 	jointPrefix = append(jointPrefix, prefix...)
 	jointPrefix = append(jointPrefix, v...)
 	// Make sure the prefix's capacity is fixed, to prevent future appends from sharing memory.
-	return jointPrefix[:len(jointPrefix):len(jointPrefix)]
+	return slices.Clip(jointPrefix)
 }
 
 // NewPrefixedDatabase creates a new PrefixedDatabase.  If the db is already a
