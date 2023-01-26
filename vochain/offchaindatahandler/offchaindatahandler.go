@@ -58,30 +58,30 @@ func NewOffChainDataHandler(v *vochain.BaseApplication, d *downloader.Downloader
 	return &od
 }
 
-func (c *OffChainDataHandler) Rollback() {
-	c.queueLock.Lock()
-	c.queue = make([]importItem, 0)
-	c.isFastSync = c.vochain.IsSynchronizing()
-	c.queueLock.Unlock()
+func (d *OffChainDataHandler) Rollback() {
+	d.queueLock.Lock()
+	d.queue = make([]importItem, 0)
+	d.isFastSync = d.vochain.IsSynchronizing()
+	d.queueLock.Unlock()
 }
 
 // Commit is called when a new block is committed, so we execute the import actions
 // enqueued by the event handlers (else the queues are reverted by calling Rollback).
-func (c *OffChainDataHandler) Commit(height uint32) error {
-	c.queueLock.Lock()
-	defer c.queueLock.Unlock()
-	for _, item := range c.queue {
+func (d *OffChainDataHandler) Commit(height uint32) error {
+	d.queueLock.Lock()
+	defer d.queueLock.Unlock()
+	for _, item := range d.queue {
 		switch item.itemType {
 		case itemTypeExternalCensus:
 			log.Infof("importing external census %s", item.uri)
 			// AddToQueue() writes to a channel that might be full, so we don't want to block the main thread.
-			go c.enqueueOffchainCensus(item.censusRoot, item.uri)
+			go d.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
 			log.Infof("importing metadata from %s", item.uri)
-			go c.enqueueMetadata(item.uri)
+			go d.enqueueMetadata(item.uri)
 		case itemTypeRollingCensus:
 			log.Infof("importing rolling census for process %x", item.pid)
-			c.importRollingCensus(item.pid)
+			d.importRollingCensus(item.pid)
 		default:
 			log.Errorf("unknown item %d", item.itemType)
 		}
@@ -91,12 +91,12 @@ func (c *OffChainDataHandler) Commit(height uint32) error {
 
 // OnProcess is triggered when a new election is created. It checks if the election contains offchain data
 // that needs to be imported and enqueues it for being handled by Commit.
-func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
+func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
 	censusRoot = util.TrimHex(censusRoot)
-	c.queueLock.Lock()
-	defer c.queueLock.Unlock()
-	if !c.importOnlyNew || !c.isFastSync {
-		p, err := c.vochain.State.Process(pid, false)
+	d.queueLock.Lock()
+	defer d.queueLock.Unlock()
+	if !d.importOnlyNew || !d.isFastSync {
+		p, err := d.vochain.State.Process(pid, false)
 		if err != nil || p == nil {
 			log.Errorf("could get process from state: %v", err)
 			return
@@ -104,7 +104,7 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		// enqueue for import election metadata information
 		if m := p.GetMetadata(); m != "" {
 			log.Debugf("adding election metadata %s to queue", m)
-			c.queue = append(c.queue, importItem{
+			d.queue = append(d.queue, importItem{
 				uri:      m,
 				itemType: itemTypeElectionMetadata,
 			})
@@ -112,7 +112,7 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		// enqueue for download external census if needs to be imported
 		if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
 			log.Infof("adding external census %s to queue", censusURI)
-			c.queue = append(c.queue, importItem{
+			d.queue = append(d.queue, importItem{
 				censusRoot: censusRoot,
 				uri:        censusURI,
 				itemType:   itemTypeExternalCensus,
@@ -121,36 +121,36 @@ func (c *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 	}
 }
 
-// OnProcessStart is triggered when a process starts. It checks if the process contains a rolling census.
-func (c *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
+// OnProcessesStart is triggered when a process starts. It checks if the process contains a rolling census.
+func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 	for _, pid := range pids {
-		process, err := c.vochain.State.Process(pid, true)
+		process, err := d.vochain.State.Process(pid, true)
 		if err != nil {
 			log.Errorf("could find process with pid %x: %v", pid, err)
 			continue
 		}
 		// enqueue for import rolling census (zkSnarks voting with preregister enabled)
 		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
-			c.queueLock.Lock()
+			d.queueLock.Lock()
 			log.Infof("adding rolling census for process %x to queue", pid)
-			c.queue = append(c.queue, importItem{
+			d.queue = append(d.queue, importItem{
 				itemType: itemTypeRollingCensus,
 				pid:      pid,
 			})
-			c.queueLock.Unlock()
+			d.queueLock.Unlock()
 		}
 	}
 }
 
 // OnSetAccount is triggered when a new account is created or modifyied. If metadata info is present, it is enqueued.
-func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) {
-	c.queueLock.Lock()
-	defer c.queueLock.Unlock()
-	if !c.importOnlyNew || !c.isFastSync {
+func (d *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) {
+	d.queueLock.Lock()
+	defer d.queueLock.Unlock()
+	if !d.importOnlyNew || !d.isFastSync {
 		// enqueue for import account metadata information
 		if m := account.GetInfoURI(); m != "" {
 			log.Debugf("adding account info metadata %s to queue", m)
-			c.queue = append(c.queue, importItem{
+			d.queue = append(d.queue, importItem{
 				uri:      m,
 				itemType: itemTypeAccountMetadata,
 			})
@@ -159,13 +159,13 @@ func (c *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) 
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (c *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                                 {}
-func (c *OffChainDataHandler) OnVote(v *state.Vote, txindex int32)                                {}
-func (c *OffChainDataHandler) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {}
-func (c *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)                {}
-func (c *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)                {}
-func (c *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
+func (d *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                                 {}
+func (d *OffChainDataHandler) OnVote(v *state.Vote, txindex int32)                                {}
+func (d *OffChainDataHandler) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {}
+func (d *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)                {}
+func (d *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)                {}
+func (d *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
 }
-func (c *OffChainDataHandler) OnTransferTokens(tx *vochaintx.TokenTransfer) {}
-func (c *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
+func (d *OffChainDataHandler) OnTransferTokens(tx *vochaintx.TokenTransfer) {}
+func (d *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
 }
