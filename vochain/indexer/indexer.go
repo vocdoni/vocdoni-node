@@ -499,6 +499,8 @@ func (idx *Indexer) Commit(height uint32) error {
 			log.Errorw(err, "commit: cannot create new token transfer")
 		}
 	}
+	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
+
 	txn.Discard()
 
 	// Add votes collected by onVote (live results)
@@ -562,6 +564,7 @@ func (idx *Indexer) Rollback() {
 	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	idx.updateProcessPool = [][]byte{}
 	idx.newTxPool = []*indexertypes.TxReference{}
+	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 }
 
 // OnProcess indexer stores the processID and entityID
@@ -774,7 +777,7 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 	if err != nil {
 		return nil, err
 	}
-	tt := make([]*indexertypes.TokenTransferMeta, len(ttFromDB))
+	tt := []*indexertypes.TokenTransferMeta{}
 	for _, t := range ttFromDB {
 		tt = append(tt, &indexertypes.TokenTransferMeta{
 			Amount:    uint64(t.Amount),
