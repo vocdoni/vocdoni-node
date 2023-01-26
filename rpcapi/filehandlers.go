@@ -66,7 +66,7 @@ func (r *RPCAPI) addJSONfile(request *api.APIrequest) (*api.APIresponse, error) 
 	if len(request.Content) > maxJSONsize {
 		return nil, fmt.Errorf("JSON file too big: %d bytes", len(request.Content))
 	}
-	if !isJSON(request.Content) {
+	if !json.Valid(request.Content) {
 		return nil, fmt.Errorf("not a JSON file")
 	}
 	return r.addFile(request)
@@ -113,9 +113,4 @@ func (r *RPCAPI) unpinFile(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	response.URI = request.URI
 	return &response, nil
-}
-
-func isJSON(c []byte) bool {
-	var js interface{}
-	return json.Unmarshal(c, &js) == nil
 }
