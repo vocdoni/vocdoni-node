@@ -221,6 +221,34 @@ func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{
 	return sum, err
 }
 
+const getProcessByFinalResults = `-- name: GetProcessByFinalResults :many
+SELECT id FROM processes
+WHERE final_results = ?
+`
+
+func (q *Queries) GetProcessByFinalResults(ctx context.Context, finalResults bool) ([][]byte, error) {
+	rows, err := q.db.QueryContext(ctx, getProcessByFinalResults, finalResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var prcs []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		prcs = append(prcs, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return prcs, nil
+}
+
 const searchEntities = `-- name: SearchEntities :many
 SELECT entity_id FROM processes
 WHERE (? = '' OR (INSTR(LOWER(HEX(entity_id)), ?) > 0))
