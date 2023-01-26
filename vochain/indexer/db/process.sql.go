@@ -197,6 +197,34 @@ func (q *Queries) GetProcessEnvelopeHeight(ctx context.Context, id types.Process
 	return results_envelope_height, err
 }
 
+const getProcessIDsByFinalResults = `-- name: GetProcessIDsByFinalResults :many
+SELECT id FROM processes
+WHERE final_results = ?
+`
+
+func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
+	rows, err := q.db.QueryContext(ctx, getProcessIDsByFinalResults, finalResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProcessStatus = `-- name: GetProcessStatus :one
 SELECT status FROM processes
 WHERE id = ?
@@ -219,34 +247,6 @@ func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{
 	var sum interface{}
 	err := row.Scan(&sum)
 	return sum, err
-}
-
-const getProcessByFinalResults = `-- name: GetProcessByFinalResults :many
-SELECT id FROM processes
-WHERE final_results = ?
-`
-
-func (q *Queries) GetProcessByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
-	rows, err := q.db.QueryContext(ctx, getProcessByFinalResults, finalResults)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var prcs []types.ProcessID
-	for rows.Next() {
-		var id types.ProcessID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		prcs = append(prcs, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return prcs, nil
 }
 
 const searchEntities = `-- name: SearchEntities :many
@@ -455,6 +455,36 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.Metadata,
 		arg.RollingCensusSize,
 		arg.Status,
+		arg.ID,
+	)
+}
+
+const updateProcessResultByID = `-- name: UpdateProcessResultByID :execresult
+UPDATE processes
+SET results_votes  = ?,
+    results_weight = ?,
+    vote_opts_pb = ?,
+    envelope_pb = ?,
+    results_signatures = ?
+WHERE id = ?
+`
+
+type UpdateProcessResultByIDParams struct {
+	Votes             string
+	Weight            string
+	VoteOptsPb        types.EncodedProtoBuf
+	EnvelopePb        types.EncodedProtoBuf
+	ResultsSignatures string
+	ID                types.ProcessID
+}
+
+func (q *Queries) UpdateProcessResultByID(ctx context.Context, arg UpdateProcessResultByIDParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateProcessResultByID,
+		arg.Votes,
+		arg.Weight,
+		arg.VoteOptsPb,
+		arg.EnvelopePb,
+		arg.ResultsSignatures,
 		arg.ID,
 	)
 }
