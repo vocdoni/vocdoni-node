@@ -48,7 +48,7 @@ type treeTxWithMutex struct {
 // MainTreeView is a thread-safe function to obtain a pointer to the last
 // opened mainTree as a TreeView.
 func (v *State) MainTreeView() *statedb.TreeView {
-	return v.mainTreeViewValue.Load().(*statedb.TreeView)
+	return v.mainTreeViewValue.Load()
 }
 
 // setMainTreeView is a thread-safe function to store a pointer to the last

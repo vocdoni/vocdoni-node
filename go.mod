@@ -32,6 +32,7 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
 	github.com/hashicorp/golang-lru v0.6.0
+	github.com/iancoleman/strcase v0.2.0
 	github.com/iden3/go-iden3-crypto v0.0.13
 	github.com/iden3/go-rapidsnark/prover v0.0.9
 	github.com/iden3/go-rapidsnark/types v0.0.2
@@ -56,6 +57,7 @@ require (
 	github.com/multiformats/go-multicodec v0.5.0
 	github.com/pressly/goose/v3 v3.3.1
 	github.com/prometheus/client_golang v1.13.1
+	github.com/rs/zerolog v1.28.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.13.0
@@ -68,13 +70,10 @@ require (
 	go.uber.org/zap v1.21.0 // indirect
 	go.vocdoni.io/proto v1.14.1-0.20230124095055-c3e02490cdfe
 	golang.org/x/crypto v0.1.0
+	golang.org/x/exp v0.0.0-20230125214544-b3c2aaf6208d
 	golang.org/x/net v0.1.0
 	google.golang.org/protobuf v1.28.1
 )
-
-require github.com/iancoleman/strcase v0.2.0
-
-require github.com/rs/zerolog v1.28.0
 
 require (
 	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
@@ -341,7 +340,6 @@ require (
 	go.uber.org/fx v1.17.1 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect
-	golang.org/x/exp v0.0.0-20221031165847-c99f073a8326 // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/oauth2 v0.1.0 // indirect
 	golang.org/x/sync v0.1.0 // indirect

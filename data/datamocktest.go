@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -71,11 +73,7 @@ func (d *DataMockTest) Unpin(ctx context.Context, path string) error {
 func (d *DataMockTest) ListPins(ctx context.Context) (map[string]string, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
-	filesCopy := make(map[string]string, len(d.files))
-	for k, v := range d.files {
-		filesCopy[k] = v
-	}
-	return filesCopy, nil
+	return maps.Clone(d.files), nil
 }
 
 func (d *DataMockTest) URIprefix() string {

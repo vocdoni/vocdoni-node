@@ -675,7 +675,7 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 		BlockHeight:  s.App.Height(),
 	}
 
-	var nvotes uint64
+	var nvotes atomic.Uint64
 	var err error
 	lock := sync.Mutex{}
 
@@ -712,15 +712,15 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 			log.Warnf("addVote failed: %v", err)
 			return
 		}
-		atomic.AddUint64(&nvotes, 1)
+		nvotes.Add(1)
 	}); err == nil {
 		log.Infow("computed results", map[string]interface{}{
 			"process": p.ID.String(),
-			"votes":   nvotes,
+			"votes":   nvotes.Load(),
 			"results": results.String(),
 		})
 	}
-	results.EnvelopeHeight = nvotes
+	results.EnvelopeHeight = nvotes.Load()
 	return results, err
 }
 

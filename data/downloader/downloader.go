@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"golang.org/x/exp/maps"
+
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 )
@@ -33,12 +35,12 @@ type Downloader struct {
 	RemoteStorage data.Storage
 
 	importQueue     chan DownloadItem
-	queueSize       int32
+	queueSize       atomic.Int32
 	failedQueueLock sync.RWMutex
 	failedQueue     map[string]*DownloadItem
 	cancel          context.CancelFunc
 	wgQueueDaemons  sync.WaitGroup
-	addedItems      int32
+	addedItems      atomic.Int32
 }
 
 // DownloadItem is a remote file to be downloaded.
@@ -97,7 +99,7 @@ func (d *Downloader) AddToQueue(URI string, callback func(string, []byte), pin b
 
 // QueueSize returns the size of the import census queue.
 func (d *Downloader) QueueSize() int32 {
-	return atomic.LoadInt32(&d.queueSize)
+	return d.queueSize.Load()
 }
 
 // ImportFailedQueueSize is the size of the list of remote census imported that failed.
@@ -109,7 +111,7 @@ func (d *Downloader) ImportFailedQueueSize() int {
 
 // TotalItemsAdded is the number of items that has been added to the queue on this instance.
 func (d *Downloader) TotalItemsAdded() int32 {
-	return atomic.LoadInt32(&d.addedItems)
+	return d.addedItems.Load()
 }
 
 // handleImport fetches and imports a remote file. If the download fails, the file
@@ -159,9 +161,9 @@ func (d *Downloader) importQueueDaemon(ctx context.Context) {
 
 // queueAddDelta adds or substracts a delta to the queue size.
 func (d *Downloader) queueAddDelta(i int32) {
-	atomic.AddInt32(&d.queueSize, i)
+	d.queueSize.Add(i)
 	if i > 0 {
-		atomic.AddInt32(&d.addedItems, i)
+		d.addedItems.Add(i)
 	}
 }
 
@@ -169,11 +171,7 @@ func (d *Downloader) queueAddDelta(i int32) {
 func (d *Downloader) importFailedQueue() map[string]*DownloadItem {
 	d.failedQueueLock.RLock()
 	defer d.failedQueueLock.RUnlock()
-	fq := make(map[string]*DownloadItem, len(d.failedQueue))
-	for k, v := range d.failedQueue {
-		fq[k] = v
-	}
-	return fq
+	return maps.Clone(d.failedQueue)
 }
 
 // handleImportFailedQueue tries to import files that failed.
