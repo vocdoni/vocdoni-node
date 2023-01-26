@@ -116,10 +116,10 @@ func newTendermint(app *BaseApplication,
 
 	tconfig := tmcfg.DefaultConfig()
 	tconfig.SetRoot(localConfig.DataDir)
-	if err = os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0o755); err != nil {
 		log.Fatal(err)
 	}
-	if err = os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
 		log.Fatal(err)
 	}
 	// p2p config
@@ -217,7 +217,7 @@ func newTendermint(app *BaseApplication,
 		tconfig.Genesis = localConfig.Genesis
 	}
 
-	if err = tconfig.ValidateBasic(); err != nil {
+	if err := tconfig.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
@@ -262,7 +262,7 @@ func newTendermint(app *BaseApplication,
 		log.Infof("found genesis file %s", tconfig.GenesisFile())
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
-		if err = os.WriteFile(tconfig.GenesisFile(), genesis, 0o600); err != nil {
+		if err := os.WriteFile(tconfig.GenesisFile(), genesis, 0o600); err != nil {
 			return nil, err
 		}
 		log.Infof("new genesis created, stored at %s", tconfig.GenesisFile())

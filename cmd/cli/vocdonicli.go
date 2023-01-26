@@ -114,8 +114,7 @@ func (v *vocdoniCLI) setHost(host string) error {
 	if err != nil {
 		return err
 	}
-	err = v.api.SetHostAddr(u)
-	if err != nil {
+	if err := v.api.SetHostAddr(u); err != nil {
 		return err
 	}
 

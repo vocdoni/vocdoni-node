@@ -112,8 +112,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		err = viper.ReadInConfig()
-		if err != nil {
+		if err := viper.ReadInConfig(); err != nil {
 			panic(err)
 		}
 	}
@@ -125,8 +124,7 @@ func main() {
 	log.Infof("using data directory at %s", config.dir)
 
 	mngKey := ethereum.SignKeys{}
-	err = mngKey.Generate()
-	if err != nil {
+	if err := mngKey.Generate(); err != nil {
 		log.Fatal(err)
 	}
 
