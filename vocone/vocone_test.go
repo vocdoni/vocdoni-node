@@ -33,6 +33,7 @@ func TestVocone(t *testing.T) {
 
 	vc, err := NewVocone(dir, &keymng)
 	qt.Assert(t, err, qt.IsNil)
+	t.Cleanup(func() { vc.storage.Stop() })
 
 	err = vc.SetBulkTxCosts(0, true)
 	qt.Assert(t, err, qt.IsNil)
