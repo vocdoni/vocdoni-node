@@ -226,7 +226,7 @@ SELECT id FROM processes
 WHERE final_results = ?
 `
 
-func (q *Queries) GetProcessByFinalResults(ctx context.Context, finalResults bool) ([][]byte, error) {
+func (q *Queries) GetProcessByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
 	rows, err := q.db.QueryContext(ctx, getProcessByFinalResults, finalResults)
 	if err != nil {
 		return nil, err
