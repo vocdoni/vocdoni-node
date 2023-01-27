@@ -5,12 +5,8 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-func testTokenTransactions(
-	host,
-	treasurerPrivKey string,
-	keySigner string,
-) {
-	treasurerSigner, err := privKeyToSigner(treasurerPrivKey)
+func testTokenTransactions(c config) {
+	treasurerSigner, err := privKeyToSigner(c.treasurerPrivKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -26,7 +22,7 @@ func testTokenTransactions(
 		log.Fatal(err)
 	}
 
-	log.Infof("connecting to main gateway %s", host)
+	log.Infof("connecting to main gateway %s", c.host)
 	log.Fatal("wip, not yet implemented",
 		treasurerSigner)
 }
