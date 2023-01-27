@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
 	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
@@ -20,13 +19,8 @@ func New(typ, dir string) (db.Database, error) {
 		if err != nil {
 			return nil, err
 		}
-	case db.TypeBadger:
-		database, err = badgerdb.New(opts)
-		if err != nil {
-			return nil, err
-		}
 	default:
-		return nil, fmt.Errorf("invalid dbType: %q. Available types: %q, %q", typ, db.TypePebble, db.TypeBadger)
+		return nil, fmt.Errorf("invalid dbType: %q. Available types: %q", typ, db.TypePebble)
 	}
 	return database, nil
 }

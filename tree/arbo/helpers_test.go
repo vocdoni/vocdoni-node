@@ -8,8 +8,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 )
 
 //lint:file-ignore U1000 TODO(mvdan): remove once staticcheck removes its testing.T.Skip false positives
@@ -87,14 +86,12 @@ func TestReadTreeDBG(t *testing.T) {
 
 	c := qt.New(t)
 
-	database1, err := badgerdb.New(db.Options{Path: c.TempDir()})
-	c.Assert(err, qt.IsNil)
+	database1 := metadb.NewTest(t)
 	tree1, err := NewTree(Config{Database: database1, MaxLevels: 100,
 		HashFunction: HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 
-	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
-	c.Assert(err, qt.IsNil)
+	database2 := metadb.NewTest(t)
 	tree2, err := NewTree(Config{Database: database2, MaxLevels: 100,
 		HashFunction: HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)

@@ -7,15 +7,13 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 func TestGenerator(t *testing.T) {
 	c := qt.New(t)
-	database, err := badgerdb.New(db.Options{Path: c.TempDir()})
-	c.Assert(err, qt.IsNil)
+	database := metadb.NewTest(t)
 	tree, err := arbo.NewTree(arbo.Config{Database: database, MaxLevels: 4,
 		HashFunction: arbo.HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)

@@ -9,7 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/db/pebbledb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -96,7 +96,7 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 		signer:  signer,
 	}
 	var err error
-	k.storage, err = badgerdb.New(db.Options{Path: dbPath})
+	k.storage, err = pebbledb.New(db.Options{Path: dbPath})
 	if err != nil {
 		return nil, err
 	}
