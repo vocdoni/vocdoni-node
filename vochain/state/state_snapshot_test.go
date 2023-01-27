@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/tree"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 func TestStateSnapshot(t *testing.T) {

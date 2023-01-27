@@ -9,11 +9,11 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/prefixeddb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 )
 

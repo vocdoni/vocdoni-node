@@ -58,10 +58,10 @@ import (
 	"path"
 	"sync"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/prefixeddb"
 	"go.vocdoni.io/dvote/tree"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 const (

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	iden3cryptoutils "github.com/iden3/go-iden3-crypto/utils"
-	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/tree/arbo"
 
 	"go.vocdoni.io/dvote/util"
 )

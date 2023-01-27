@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // Tree defines the struct that implements the MerkleTree functionalities

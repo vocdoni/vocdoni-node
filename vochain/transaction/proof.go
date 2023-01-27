@@ -15,10 +15,10 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
 	"github.com/vocdoni/storage-proofs-eth-go/token/minime"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 )
 

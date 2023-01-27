@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 const (

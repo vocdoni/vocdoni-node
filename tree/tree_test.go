@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // NOTE: most of the methods of Tree are just wrappers over
-// https://github.com/vocdoni/arbo.  The proper tests are in arbo's repo, here
+// https://go.vocdoni.io/dvote/tree/arbo.  The proper tests are in arbo's repo, here
 // there are tests that check the added code in the Tree wrapper
 
 func TestSet(t *testing.T) {

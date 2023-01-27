@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
 	snarkParsers "github.com/vocdoni/go-snark/parsers"
 	"github.com/vocdoni/go-snark/types"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
