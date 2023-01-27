@@ -308,7 +308,7 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 		return nil, fmt.Errorf("This error should not be reached."+
 			" len(subRoots) != nCPU, len(subRoots)=%d, nCPU=%d."+
 			" Please report it in a new issue:"+
-			" https://github.com/vocdoni/arbo/issues/new", len(subRoots), nCPU)
+			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", len(subRoots), nCPU)
 	}
 
 	invalidsInBucket := make([][]Invalid, nCPU)
@@ -666,7 +666,7 @@ func (t *Tree) down(rTx db.ReadTx, newKey, currKey []byte, siblings [][]byte,
 			" above should avoid reaching this point. This panic is temporary" +
 			" for reporting purposes, will be deleted in future versions." +
 			" Please paste this log (including the previous log lines) in a" +
-			" new issue: https://github.com/vocdoni/arbo/issues/new") // TMP
+			" new issue: https://go.vocdoni.io/dvote/tree/arbo/issues/new") // TMP
 	case PrefixValueLeaf: // leaf
 		if !bytes.Equal(currValue, emptyValue) {
 			if getLeaf {

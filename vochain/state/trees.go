@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )

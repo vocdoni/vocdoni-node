@@ -174,7 +174,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]Invalid, error) {
 		return nil, fmt.Errorf("This error should not be reached."+
 			" len(nodesAtL) != nCPU, len(nodesAtL)=%d, nCPU=%d."+
 			" Please report it in a new issue:"+
-			" https://github.com/vocdoni/arbo/issues/new", len(nodesAtL), nCPU)
+			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", len(nodesAtL), nCPU)
 	}
 
 	subRoots := make([]*node, nCPU)
@@ -242,7 +242,7 @@ func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
 		return nil, fmt.Errorf("This error should not be reached."+
 			" currLvl >= l, currLvl=%d, l=%d."+
 			" Please report it in a new issue:"+
-			" https://github.com/vocdoni/arbo/issues/new", currLvl, l)
+			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", currLvl, l)
 	}
 
 	var nodes []*node

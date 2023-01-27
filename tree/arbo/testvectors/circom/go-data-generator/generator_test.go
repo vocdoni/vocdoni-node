@@ -7,9 +7,9 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/badgerdb"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 func TestGenerator(t *testing.T) {
