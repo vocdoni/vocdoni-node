@@ -78,7 +78,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	var keys, values [][]byte
@@ -102,7 +102,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 	tree2.dbgInit()
 
 	start = time.Now()
@@ -130,7 +130,7 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	for i := 0; i < nLeafs; i++ {
@@ -146,7 +146,7 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
@@ -179,14 +179,14 @@ func TestAddBatchTestVector1(t *testing.T) {
 	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	// leafs in 2nd level subtrees: [ 6, 0, 1, 1]
 	testvectorKeys := []string{
@@ -221,14 +221,14 @@ func TestAddBatchTestVector1(t *testing.T) {
 	tree1, err = NewTree(Config{database1, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err = badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err = NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	testvectorKeys = []string{
 		"1c7c2265e368314ca58ed2e1f33a326f1220e234a566d55c3605439dbe411642",
@@ -271,14 +271,14 @@ func TestAddBatchTestVector2(t *testing.T) {
 	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	bLen := tree1.HashFunction().Len()
 	var keys, values [][]byte
@@ -318,14 +318,14 @@ func TestAddBatchTestVector3(t *testing.T) {
 	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	bLen := tree1.HashFunction().Len()
 	var keys, values [][]byte
@@ -369,14 +369,14 @@ func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err := badgerdb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
@@ -721,7 +721,7 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 	tree2.dbgInit()
 
 	var keys, values [][]byte
@@ -799,7 +799,7 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	start := time.Now()
 	for i := 0; i < len(ks); i++ {
@@ -820,7 +820,7 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	tree.dbgInit()
 
@@ -854,7 +854,7 @@ func TestDbgStats(t *testing.T) {
 	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	tree1.dbgInit()
 
@@ -869,7 +869,7 @@ func TestDbgStats(t *testing.T) {
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	tree2.dbgInit()
 
@@ -883,7 +883,7 @@ func TestDbgStats(t *testing.T) {
 	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree3.db.Close() //nolint:errcheck
+	defer tree3.db.Close()
 
 	tree3.dbgInit()
 
@@ -919,7 +919,7 @@ func TestLoadVT(t *testing.T) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	var keys, values [][]byte
 	for i := 0; i < nLeafs; i++ {
@@ -956,7 +956,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	var keys, values [][]byte
@@ -978,7 +978,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 	tree2.dbgInit()
 
 	invalids, err := tree2.AddBatch(keys, values)
@@ -993,7 +993,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
 		HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree3.db.Close() //nolint:errcheck
+	defer tree3.db.Close()
 
 	invalids, err = tree3.AddBatch(keys, nil)
 	c.Assert(err, qt.IsNil)
@@ -1043,21 +1043,21 @@ func TestAddBatchThresholdInDisk(t *testing.T) {
 	tree1, err := NewTree(Config{database1, 256, testThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	database2, err := pebbledb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree2, err := NewTree(Config{database2, 256, testThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	database3, err := pebbledb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)
 	tree3, err := NewTree(Config{database3, 256, testThresholdNLeafs,
 		HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
-	defer tree3.db.Close() //nolint:errcheck
+	defer tree3.db.Close()
 
 	var keys, values [][]byte
 	for i := 0; i < 3*testThresholdNLeafs; i++ {
@@ -1164,8 +1164,8 @@ func testUpFromSubRoots(c *qt.C, tree1, tree2 *Tree, preSubRoots [][]byte) {
 
 func testUpFromSubRootsWithEmpties(c *qt.C, preSubRoots [][]byte, indexEmpties []int) {
 	tree1, tree2 := initTestUpFromSubRoots(c)
-	defer tree1.db.Close() //nolint:errcheck
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
+	defer tree2.db.Close()
 
 	testPreSubRoots := make([][]byte, len(preSubRoots))
 	copy(testPreSubRoots[:], preSubRoots[:])

@@ -14,6 +14,8 @@ import (
 	"sync"
 )
 
+//lint:file-ignore U1000 this code is for debugging
+
 type node struct {
 	l    *node
 	r    *node
@@ -171,7 +173,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]Invalid, error) {
 		}
 	}
 	if len(nodesAtL) != nCPU {
-		return nil, fmt.Errorf("This error should not be reached."+
+		return nil, fmt.Errorf("this error should not be reached."+
 			" len(nodesAtL) != nCPU, len(nodesAtL)=%d, nCPU=%d."+
 			" Please report it in a new issue:"+
 			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", len(nodesAtL), nCPU)
@@ -215,7 +217,7 @@ func (t *vt) addBatch(ks, vs [][]byte) ([]Invalid, error) {
 func (t *vt) getNodesAtLevel(l int) ([]*node, error) {
 	if t.root == nil {
 		var r []*node
-		nChilds := int(math.Pow(2, float64(l))) //nolint:gomnd
+		nChilds := int(math.Pow(2, float64(l)))
 		for i := 0; i < nChilds; i++ {
 			r = append(r, nil)
 		}
@@ -227,7 +229,7 @@ func (t *vt) getNodesAtLevel(l int) ([]*node, error) {
 func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
 	if n == nil {
 		var r []*node
-		nChilds := int(math.Pow(2, float64(l-currLvl))) //nolint:gomnd
+		nChilds := int(math.Pow(2, float64(l-currLvl)))
 		for i := 0; i < nChilds; i++ {
 			r = append(r, nil)
 		}
@@ -239,7 +241,7 @@ func (n *node) getNodesAtLevel(currLvl, l int) ([]*node, error) {
 		return []*node{n}, nil
 	}
 	if currLvl >= l {
-		return nil, fmt.Errorf("This error should not be reached."+
+		return nil, fmt.Errorf("this error should not be reached."+
 			" currLvl >= l, currLvl=%d, l=%d."+
 			" Please report it in a new issue:"+
 			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", currLvl, l)
@@ -537,14 +539,14 @@ func keyToBucket(k []byte, nBuckets int) int {
 		b[i] = i
 	}
 	r := b
-	mid := len(r) / 2 //nolint:gomnd
+	mid := len(r) / 2
 	for i := 0; i < nLevels; i++ {
 		if int(k[i/8]&(1<<(i%8))) != 0 {
 			r = r[mid:]
-			mid = len(r) / 2 //nolint:gomnd
+			mid = len(r) / 2
 		} else {
 			r = r[:mid]
-			mid = len(r) / 2 //nolint:gomnd
+			mid = len(r) / 2
 		}
 	}
 	return r[0]
@@ -625,7 +627,6 @@ func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) 
 	return pairs, nil
 }
 
-//nolint:unused
 func (t *vt) graphviz(w io.Writer) error {
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
@@ -637,7 +638,6 @@ node [fontname=Monospace,fontsize=10,shape=box]
 	return nil
 }
 
-//nolint:unused
 func (n *node) graphviz(w io.Writer, p *params, nEmpties int) (int, error) {
 	if n == nil {
 		return nEmpties, nil
@@ -704,7 +704,6 @@ func (n *node) graphviz(w io.Writer, p *params, nEmpties int) (int, error) {
 	return nEmpties, nil
 }
 
-//nolint:unused
 func (t *vt) printGraphviz() error {
 	w := bytes.NewBufferString("")
 	fmt.Fprintf(w,

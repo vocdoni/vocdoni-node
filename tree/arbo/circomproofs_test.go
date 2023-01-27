@@ -17,7 +17,7 @@ func TestCircomVerifierProof(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 4,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	testVector := [][]int64{
 		{1, 11},

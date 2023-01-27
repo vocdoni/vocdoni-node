@@ -77,7 +77,7 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: hashFunc})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
@@ -110,7 +110,7 @@ func TestAddBatch(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	for i := 0; i < 1000; i++ {
@@ -129,7 +129,7 @@ func TestAddBatch(t *testing.T) {
 	tree2, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
@@ -153,7 +153,7 @@ func TestAddDifferentOrder(t *testing.T) {
 	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	bLen := 32
 	for i := 0; i < 16; i++ {
@@ -169,7 +169,7 @@ func TestAddDifferentOrder(t *testing.T) {
 	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	for i := 16 - 1; i >= 0; i-- {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
@@ -195,7 +195,7 @@ func TestAddRepeatedIndex(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
@@ -214,7 +214,7 @@ func TestUpdate(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
@@ -268,7 +268,7 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(1)))
@@ -308,7 +308,7 @@ func TestGet(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	for i := 0; i < 10; i++ {
@@ -433,7 +433,7 @@ func TestGenProofAndVerify(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	for i := 0; i < 10; i++ {
@@ -474,7 +474,7 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree1.db.Close() //nolint:errcheck
+	defer tree1.db.Close()
 
 	bLen := 32
 	for i := 0; i < 16; i++ {
@@ -503,7 +503,7 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree2.db.Close() //nolint:errcheck
+	defer tree2.db.Close()
 
 	if inFile {
 		f, err := os.Open(filepath.Clean(fileName))
@@ -531,7 +531,7 @@ func TestRWMutex(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	var keys, values [][]byte
@@ -784,7 +784,7 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
 		HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	bLen := 32
 	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
@@ -841,7 +841,7 @@ func TestKeyLen(t *testing.T) {
 		HashFunction: HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 
-	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8))) //nolint:gomnd
+	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
 	k = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
 	v = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
 
@@ -954,7 +954,7 @@ func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 	tree, err := NewTree(Config{Database: database, MaxLevels: 140,
 		HashFunction: hashFunc})
 	c.Assert(err, qt.IsNil)
-	defer tree.db.Close() //nolint:errcheck
+	defer tree.db.Close()
 
 	for i := 0; i < len(ks); i++ {
 		if err := tree.Add(ks[i], vs[i]); err != nil {

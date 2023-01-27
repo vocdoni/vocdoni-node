@@ -51,7 +51,7 @@ func (f HashSha256) Type() []byte {
 
 // Len returns the length of the Hash output
 func (f HashSha256) Len() int {
-	return 32 //nolint:gomnd
+	return 32
 }
 
 // Hash implements the hash method for the HashFunction HashSha256
@@ -74,7 +74,7 @@ func (f HashPoseidon) Type() []byte {
 
 // Len returns the length of the Hash output
 func (f HashPoseidon) Len() int {
-	return 32 //nolint:gomnd
+	return 32
 }
 
 // Hash implements the hash method for the HashFunction HashPoseidon. It
@@ -104,7 +104,7 @@ func (f HashBlake2b) Type() []byte {
 
 // Len returns the length of the Hash output
 func (f HashBlake2b) Len() int {
-	return 32 //nolint:gomnd
+	return 32
 }
 
 // Hash implements the hash method for the HashFunction HashBlake2b

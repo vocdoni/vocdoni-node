@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"math/big"
+	"os"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -42,7 +42,7 @@ func TestGenerator(t *testing.T) {
 	jCvp, err := json.Marshal(cvp)
 	c.Assert(err, qt.IsNil)
 	// store the data into a file that will be used at the circom test
-	err = ioutil.WriteFile("go-smt-verifier-inputs.json", jCvp, 0600)
+	err = os.WriteFile("go-smt-verifier-inputs.json", jCvp, 0600)
 	c.Assert(err, qt.IsNil)
 
 	// proof of non-existence
@@ -52,6 +52,6 @@ func TestGenerator(t *testing.T) {
 	jCvp, err = json.Marshal(cvp)
 	c.Assert(err, qt.IsNil)
 	// store the data into a file that will be used at the circom test
-	err = ioutil.WriteFile("go-smt-verifier-non-existence-inputs.json", jCvp, 0600)
+	err = os.WriteFile("go-smt-verifier-non-existence-inputs.json", jCvp, 0600)
 	c.Assert(err, qt.IsNil)
 }

@@ -49,7 +49,7 @@ func TestVirtualTreeTestVectors(t *testing.T) {
 	c := qt.New(t)
 
 	maxLevels := 32
-	keyLen := int(math.Ceil(float64(maxLevels) / float64(8))) //nolint:gomnd
+	keyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
 	keys := [][]byte{
 		BigIntToBytes(keyLen, big.NewInt(1)),
 		BigIntToBytes(keyLen, big.NewInt(33)),

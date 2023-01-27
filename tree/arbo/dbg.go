@@ -2,6 +2,8 @@ package arbo
 
 import "fmt"
 
+//lint:file-ignore U1000 this code is for debugging
+
 // dbgStats is for debug purposes
 type dbgStats struct {
 	hash  int // TODO use atomics for all ints in dbgStats
@@ -28,7 +30,6 @@ func (d *dbgStats) incHash() {
 	d.hash++
 }
 
-//nolint:unused
 func (d *dbgStats) incDbGet() {
 	if d == nil {
 		return
@@ -36,7 +37,6 @@ func (d *dbgStats) incDbGet() {
 	d.dbGet++
 }
 
-//nolint:unused
 func (d *dbgStats) incDbPut() {
 	if d == nil {
 		return
@@ -63,7 +63,7 @@ func (d *dbgStats) print(prefix string) {
 
 func formatK(v int) string {
 	if v/1000 > 0 {
-		return fmt.Sprintf("%.3fk", float64(v)/1000) //nolint:gomnd
+		return fmt.Sprintf("%.3fk", float64(v)/1000)
 	}
 	return fmt.Sprintf("%d", v)
 }

@@ -305,7 +305,7 @@ func (t *Tree) addBatchInDisk(wTx db.WriteTx, keys, values [][]byte) ([]Invalid,
 	}
 
 	if len(subRoots) != nCPU {
-		return nil, fmt.Errorf("This error should not be reached."+
+		return nil, fmt.Errorf("this error should not be reached."+
 			" len(subRoots) != nCPU, len(subRoots)=%d, nCPU=%d."+
 			" Please report it in a new issue:"+
 			" https://go.vocdoni.io/dvote/tree/arbo/issues/new", len(subRoots), nCPU)
@@ -569,14 +569,14 @@ func (t *Tree) addWithTx(wTx db.WriteTx, k, v []byte) error {
 // tree, two different keys that their difference is at the end, will collision
 // in the same leaf of the tree (at the max depth).
 func keyPathFromKey(maxLevels int, k []byte) ([]byte, error) {
-	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8))) //nolint:gomnd
+	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
 	if len(k) > maxKeyLen {
 		return nil, fmt.Errorf("len(k) can not be bigger than ceil(maxLevels/8), where"+
 			" len(k): %d, maxLevels: %d, max key len=ceil(maxLevels/8): %d. Might need"+
 			" a bigger tree depth (maxLevels>=%d) in order to input keys of length %d",
-			len(k), maxLevels, maxKeyLen, len(k)*8, len(k)) //nolint:gomnd
+			len(k), maxLevels, maxKeyLen, len(k)*8, len(k))
 	}
-	keyPath := make([]byte, maxKeyLen) //nolint:gomnd
+	keyPath := make([]byte, maxKeyLen)
 	copy(keyPath[:], k)
 	return keyPath, nil
 }
@@ -999,7 +999,7 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) ([]byte, error) {
 		return nil, fmt.Errorf("PackSiblings: bitmapBytes length > %v", maxUint16)
 	}
 
-	fullLen := 4 + l + len(b) //nolint:gomnd
+	fullLen := 4 + l + len(b)
 	if fullLen > maxUint16 {
 		return nil, fmt.Errorf("PackSiblings: fullLen > %v", maxUint16)
 	}
@@ -1042,7 +1042,7 @@ func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
 }
 
 func bitmapToBytes(bitmap []bool) []byte {
-	bitmapBytesLen := int(math.Ceil(float64(len(bitmap)) / 8)) //nolint:gomnd
+	bitmapBytesLen := int(math.Ceil(float64(len(bitmap)) / 8))
 	b := make([]byte, bitmapBytesLen)
 	for i := 0; i < len(bitmap); i++ {
 		if bitmap[i] {
@@ -1111,7 +1111,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 		return false, err
 	}
 
-	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8)))) //nolint:gomnd
+	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8))))
 	copy(keyPath[:], k)
 
 	key, _, err := newLeafValue(hashFunc, k, v)
