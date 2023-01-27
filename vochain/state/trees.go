@@ -20,6 +20,7 @@ import (
 //     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
 //     - Nullifiers (key: pre-census user nullifier, value: weight used)
 //     - Votes (key: VoteId, value: models.StateDBVote)
+//   - FaucetNonce (key: hash(address + identifier), value: nil)
 
 const (
 	TreeProcess                    = "Processes"
