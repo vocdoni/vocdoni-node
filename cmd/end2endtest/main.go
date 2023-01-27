@@ -26,17 +26,21 @@ import (
 )
 
 type operation struct {
+	fn func(c config)
+
 	name, description, example string
 }
 
 var ops = []operation{
 	{
+		fn:          mkTreeVoteTest,
 		name:        "vtest",
 		description: "Performs a complete test, from creating a census to voting and validating votes",
 		example: os.Args[0] + " --operation=vtest --electionSize=1000 " +
 			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
 	},
 	{
+		fn:          testTokenTransactions,
 		name:        "tokentransactions",
 		description: "Tests all token related transactions",
 		example: os.Args[0] + " --operation=tokentransactions " +
@@ -51,17 +55,36 @@ func opNames() (names []string) {
 	return names
 }
 
+type config struct {
+	host             string
+	logLevel         string
+	operation        string
+	accountPrivKeys  []string
+	accountKeys      []*ethereum.SignKeys
+	treasurerPrivKey string
+	nvotes           int
+	parallelCount    int
+	faucet           string
+	faucetAuthToken  string
+	timeout          time.Duration
+}
+
 func main() {
-	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
-	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	operation := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opNames()))
-	accountPrivKeys := flag.StringSliceP("accountPrivKey", "k", []string{}, "account private key (optional)")
-	treasurerPrivKey := flag.String("treasurerPrivKey", "", "treasurer private key")
-	nvotes := flag.Int("votes", 10, "number of votes to cast")
-	parallelCount := flag.Int("parallel", 4, "number of parallel requests")
-	faucet := flag.String("faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
-	faucetAuthToken := flag.String("faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
-	timeout := flag.Duration("timeout", 5*time.Minute, "timeout duration")
+	c := config{}
+	flag.StringVar(&c.host, "host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
+	flag.StringVar(&c.logLevel, "logLevel", "info", "log level (debug, info, warn, error, fatal)")
+	flag.StringVar(&c.operation, "operation", "vtest",
+		fmt.Sprintf("set operation mode: %v", opNames()))
+	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{},
+		"account private key (optional)")
+	flag.StringVar(&c.treasurerPrivKey, "treasurerPrivKey", "", "treasurer private key")
+	flag.IntVar(&c.nvotes, "votes", 10, "number of votes to cast")
+	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
+	flag.StringVar(&c.faucet, "faucet", "dev",
+		"faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "",
+		"(optional) token passed as Bearer when fetching faucetURL")
+	flag.DurationVar(&c.timeout, "timeout", 5*time.Minute, "timeout duration")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
@@ -78,54 +101,42 @@ func main() {
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
-	log.Init(*logLevel, "stdout")
+	log.Init(c.logLevel, "stdout")
 
 	rand.Seed(time.Now().UnixNano())
 
-	if len(*accountPrivKeys) == 0 {
-		accountPrivKeys = &[]string{util.RandomHex(32)}
-		log.Infof("new account generated, private key is %s", *accountPrivKeys)
+	if len(c.accountPrivKeys) == 0 {
+		c.accountPrivKeys = []string{util.RandomHex(32)}
+		log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
 	}
 
-	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))
-	for i, key := range *accountPrivKeys {
+	c.accountKeys = make([]*ethereum.SignKeys, len(c.accountPrivKeys))
+	for i, key := range c.accountPrivKeys {
 		ak, err := privKeyToSigner(key)
 		if err != nil {
 			log.Fatal(err)
 		}
-		accountKeys[i] = ak
+		c.accountKeys[i] = ak
+		log.Infof("privkey %x = account %s", ak.PrivateKey(), ak.AddressString())
 	}
 
-	switch *operation {
-	case "vtest":
-		accountPrivateKey := hex.EncodeToString(accountKeys[0].PrivateKey())
-		mkTreeVoteTest(*host,
-			accountPrivateKey,
-			*nvotes,
-			*parallelCount,
-			*faucet,
-			*faucetAuthToken,
-			*timeout)
-	case "tokentransactions":
-		accountPrivateKey := hex.EncodeToString(accountKeys[0].PrivateKey())
-		testTokenTransactions(*host,
-			*treasurerPrivKey,
-			accountPrivateKey)
-	default:
+	found := false
+	for _, op := range ops {
+		if op.name == c.operation {
+			op.fn(c)
+			found = true
+		}
+	}
+
+	if !found {
 		log.Fatal("no valid operation mode specified")
 	}
 
 }
 
-func mkTreeVoteTest(host string,
-	accountPrivateKey string,
-	nvotes, parallelCount int,
-	faucetURL string,
-	faucetAuthToken string,
-	timeout time.Duration,
-) {
+func mkTreeVoteTest(c config) {
 	// Connect to the API host
-	hostURL, err := url.Parse(host)
+	hostURL, err := url.Parse(c.host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -138,7 +149,7 @@ func mkTreeVoteTest(host string,
 	}
 
 	// Set the account in the API client, so we can sign transactions
-	if err := api.SetAccount(accountPrivateKey); err != nil {
+	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
 		log.Fatal(err)
 	}
 
@@ -147,13 +158,13 @@ func mkTreeVoteTest(host string,
 	acc, err := api.Account("")
 	if err != nil {
 		var faucetPkg *models.FaucetPackage
-		if faucetURL != "" {
+		if c.faucet != "" {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			if faucetURL == "dev" {
+			if c.faucet == "dev" {
 				faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
 			} else {
-				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(faucetURL+api.MyAddress().Hex(), faucetAuthToken)
+				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(c.faucet+api.MyAddress().Hex(), c.faucetAuthToken)
 			}
 
 			if err != nil {
@@ -181,7 +192,7 @@ func mkTreeVoteTest(host string,
 		if err != nil {
 			log.Fatal(err)
 		}
-		if faucetURL != "" && acc.Balance == 0 {
+		if c.faucet != "" && acc.Balance == 0 {
 			log.Fatal("account balance is 0")
 		}
 	}
@@ -196,7 +207,7 @@ func mkTreeVoteTest(host string,
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate 10 participant accounts
-	voterAccounts := util.CreateEthRandomKeysBatch(nvotes)
+	voterAccounts := util.CreateEthRandomKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
@@ -221,8 +232,8 @@ func mkTreeVoteTest(host string,
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(nvotes) {
-		log.Fatalf("census size is %d, expected %d", size, nvotes)
+	if size != uint64(c.nvotes) {
+		log.Fatalf("census size is %d, expected %d", size, c.nvotes)
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
 
@@ -238,8 +249,8 @@ func mkTreeVoteTest(host string,
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(nvotes) {
-		log.Fatalf("published census size is %d, expected %d", size, nvotes)
+	if size != uint64(c.nvotes) {
+		log.Fatalf("published census size is %d, expected %d", size, c.nvotes)
 	}
 
 	// Generate the voting proofs (parallelized)
@@ -247,7 +258,7 @@ func mkTreeVoteTest(host string,
 		proof   *apiclient.CensusProof
 		address string
 	}
-	proofs := make(map[string]*apiclient.CensusProof, nvotes)
+	proofs := make(map[string]*apiclient.CensusProof, c.nvotes)
 	proofCh := make(chan *voterProof)
 	stopProofs := make(chan bool)
 	go func() {
@@ -277,7 +288,7 @@ func mkTreeVoteTest(host string,
 		}
 	}
 
-	pcount := nvotes / parallelCount
+	pcount := c.nvotes / c.parallelCount
 	var wg sync.WaitGroup
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
@@ -397,7 +408,7 @@ func mkTreeVoteTest(host string,
 		time.Sleep(time.Second * 2)
 	}
 
-	pcount = nvotes / parallelCount
+	pcount = c.nvotes / c.parallelCount
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
 		if end > len(voterAccounts) {
@@ -409,7 +420,7 @@ func mkTreeVoteTest(host string,
 
 	wg.Wait()
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
+		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
@@ -418,21 +429,21 @@ func mkTreeVoteTest(host string,
 		if err != nil {
 			log.Warn(err)
 		}
-		if count == uint32(nvotes) {
+		if count == uint32(c.nvotes) {
 			break
 		}
 		time.Sleep(time.Second * 5)
-		log.Infof("verified %d/%d votes", count, nvotes)
-		if time.Since(startTime) > timeout {
+		log.Infof("verified %d/%d votes", count, c.nvotes)
+		if time.Since(startTime) > c.timeout {
 			log.Fatalf("timeout waiting for votes to be registered")
 		}
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
+		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(accountPrivateKey); err != nil {
+	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
 		log.Fatal(err)
 	}
 
