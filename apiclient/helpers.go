@@ -79,6 +79,23 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	return tx.Hash, tx.Response, nil
 }
 
+func (c *HTTPclient) WaitUntilNBlocks(ctx context.Context, n uint32) {
+	for {
+		info, err := c.ChainInfo()
+		if err != nil {
+			log.Error(err)
+			time.Sleep(pollInterval)
+			continue
+		}
+		c.WaitUntilHeight(ctx, *info.Height+n)
+		return
+	}
+}
+
+func (c *HTTPclient) WaitUntilNextBlock(ctx context.Context) {
+	c.WaitUntilNBlocks(ctx, 1)
+}
+
 // WaitUntilHeight waits until the given height is reached and returns nil.
 //
 // If ctx.Done() is reached, returns ctx.Err() instead.

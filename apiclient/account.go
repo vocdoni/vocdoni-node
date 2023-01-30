@@ -43,6 +43,39 @@ func (c *HTTPclient) Treasurer() (*api.Account, error) {
 	return acc, nil
 }
 
+// MintTokens sends a mint tokens transaction
+//
+// This tx needs to be signed by the treasurer private key
+// so first use api.SetAccount(treasurer) or api.Clone(treasurer)
+// before calling this method
+func (c *HTTPclient) MintTokens(
+	toAddr common.Address,
+	amount uint64,
+) (err error) {
+	acct, err := c.Account("")
+	if err != nil {
+		return err
+	}
+
+	tx := &models.MintTokensTx{
+		Txtype: models.TxType_MINT_TOKENS,
+		Nonce:  acct.Nonce,
+		To:     toAddr.Bytes(),
+		Value:  amount,
+	}
+
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}})
+	if err != nil {
+		return err
+	}
+	_, _, err = c.SignAndSendTx(&stx)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 // Account returns the information about a Vocdoni account. If address is empty, it returns the information
 // about the account associated with the client.
 func (c *HTTPclient) Account(address string) (*api.Account, error) {

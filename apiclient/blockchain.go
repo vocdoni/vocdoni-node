@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -71,33 +70,54 @@ func (c *HTTPclient) TransactionCost(txType models.TxType) (uint32, error) {
 	}
 }
 
-// SetTransactionCost sets the transaction cost of a given transaction
-// and returns the txHash of the transaction, or nil and the error
-func (c *HTTPclient) SetTransactionCost(
-	signer *ethereum.SignKeys,
-	txType models.TxType,
-	cost uint64,
-	nonce uint32,
-) (txHash types.HexBytes, err error) {
-	tx := &models.SetTransactionCostsTx{
-		Txtype: txType,
-		Nonce:  nonce,
-		Value:  cost,
-	}
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(
-		&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}})
+// // SetTransactionCost sets the transaction cost of a given transaction
+// // and returns the txHash of the transaction, or nil and the error
+// func (c *HTTPclient) SetTransactionCost(
+// 	signer *ethereum.SignKeys,
+// 	txType models.TxType,
+// 	cost uint32,
+// 	nonce uint32,
+// ) (txHash types.HexBytes, err error) {
+// 	tx := &models.SetTransactionCostsTx{
+// 		Txtype: txType,
+// 		Nonce:  nonce,
+// 		Value:  uint64(cost),
+// 	}
+// 	stx := models.SignedTx{}
+// 	stx.Tx, err = proto.Marshal(
+// 		&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}})
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	_, resp, err := c.SignAndSendTx(signer, &stx)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+// 	if !resp.Ok {
+// 		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
+// 	}
+// 	return resp.Hash, nil
+// }
+
+// SubmitTx POSTs the given tx to the API, and returns txHash and response
+func (c *HTTPclient) SubmitTx(stx *models.SignedTx) (types.HexBytes, []byte, error) {
+	txData, err := proto.Marshal(stx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	resp, err := c.SubmitRawTx(signer, &stx)
+
+	tx := &api.Transaction{Payload: txData}
+	resp, code, err := c.Request(HTTPPOST, tx, "chain", "transactions")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	if !resp.Ok {
-		return nil, fmt.Errorf("submitRawTx failed: %s", resp.Message)
+	if code != 200 {
+		return nil, nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	return resp.Hash, nil
+	if err := json.Unmarshal(resp, tx); err != nil {
+		return nil, nil, fmt.Errorf("could not decode response: %w", err)
+	}
+	return tx.Hash, tx.Response, nil
 }
 
 // TransactionReference returns the reference of a transaction given its hash.
