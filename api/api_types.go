@@ -194,6 +194,8 @@ type Census struct {
 	Size     uint64         `json:"size,omitempty"`
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
+	// TODO: Test circom siblings
+	Siblings []string `json:"siblings,omitempty"`
 }
 
 type File struct {

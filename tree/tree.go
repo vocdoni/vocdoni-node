@@ -273,3 +273,16 @@ func (t *Tree) ImportDump(b []byte) error {
 func (t *Tree) PrintGraphviz() error {
 	return t.tree.PrintGraphviz(nil)
 }
+
+// TODO: Test circom siblings
+func (t *Tree) GetCircomSiblings(k []byte) ([]string, error) {
+	proof, err := t.tree.GenerateCircomVerifierProof(k)
+	if err != nil {
+		return nil, err
+	}
+	siblings := []string{}
+	for _, bSibling := range proof.Siblings {
+		siblings = append(siblings, arbo.BytesToBigInt(bSibling).String())
+	}
+	return siblings, nil
+}

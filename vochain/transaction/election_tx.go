@@ -141,11 +141,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
 		}
-		if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Parameters) {
-			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
-				"cannot be bigger than the parameter for the biggest circuit (%v)",
-				t.ZkCircuit.Config.Parameters)
-		}
+		// TODO: (lucasmenendez) change this check to circuit levels
+		// if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Parameters) {
+		// 	return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
+		// 		"cannot be bigger than the parameter for the biggest circuit (%v)",
+		// 		t.ZkCircuit.Config.Parameters)
+		// }
 	}
 
 	// TODO: Enable support for PreRegiser without Anonymous.  Figure out

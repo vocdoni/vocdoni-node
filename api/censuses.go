@@ -548,9 +548,16 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 
+	circomSiblings, err := ref.Tree().GetCircomSiblings(leafKey)
+	if err != nil {
+		return err
+	}
+
 	response := Census{
 		Proof: siblings,
 		Value: leafV,
+		// TODO: Test circom siblings
+		Siblings: circomSiblings,
 	}
 	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
 		// return the string representation of the census value (weight)

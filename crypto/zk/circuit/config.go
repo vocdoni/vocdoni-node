@@ -19,7 +19,7 @@ type ZkCircuitConfig struct {
 	// CircuitPath defines the path from where the files are downloaded
 	CircuitPath string `json:"circuitPath"`
 	// Parameters used for the circuit build
-	Parameters int `json:"parameters"`
+	// Parameters int `json:"parameters"`
 	// TODO: (lucasmenendez) Comment why the number of levels must be here
 	Levels int `json:"levels"`
 	// LocalDir defines in which directory will be the files
@@ -43,9 +43,9 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	"bizono": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-		CircuitPath:         "zkcensusproof/dev/65536",
-		Parameters:          65536, // 2^Levels
-		Levels:              16,    // ZkCircuit number of levels
+		CircuitPath: "zkcensusproof/dev/65536",
+		// Parameters:          65536,
+		Levels:              16, // ZkCircuit number of levels
 		LocalDir:            "zkCircuits",
 		ProvingKeyHash:      hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
 		VerificationKeyHash: hexToBytes("0x50029154e81a2078eff83751454bb3ece2cf9391103cc17306d47f7d4461b0b6"),
@@ -54,20 +54,20 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
-		CircuitPath:         "artifacts/zkCensus/dev/16",
-		Parameters:          65536, // 2^Levels
-		Levels:              16,    // ZkCircuit number of levels
+		CircuitPath: "artifacts/zkCensus/dev/250",
+		// Parameters:          65536,
+		Levels:              250, // ZkCircuit number of levels
 		LocalDir:            "zkCircuits",
-		ProvingKeyHash:      hexToBytes("0x96c318c8f75a47069b5d4b22a5d782b79319f666e02f11e49d620d75674f9930"),
-		VerificationKeyHash: hexToBytes("0x591cec6d8ef71a6b45b495acba413d44d263557e48194428ab706bedf14624cc"),
-		WasmHash:            hexToBytes("0xc1bad9e7ff7f6700ea4a38956168b2114328c7e12a9fee1f0b05f25a0f62e3d2"),
+		ProvingKeyHash:      hexToBytes("0xc0784e19e43bcfc09f65a86ae109b214f33f57bb8f91350f704b117605fb82de"),
+		VerificationKeyHash: hexToBytes("0x5884112617d8068677d2b7389513de37f3c696b45fdbdef7745f1023fa1bd364"),
+		WasmHash:            hexToBytes("0x5fb13debf5c2a28880aa280c9e5e557d3b3230e0798849a0966062e02776a644"),
 	},
 	"stage": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-		CircuitPath:         "zkcensusproof/dev/1024",
-		Parameters:          1024, // 2^Levels
-		Levels:              10,   // ZkCircuit number of levels
+		CircuitPath: "zkcensusproof/dev/1024",
+		// Parameters:          1024,
+		Levels:              10, // ZkCircuit number of levels
 		LocalDir:            "./circuits",
 		ProvingKeyHash:      hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
 		VerificationKeyHash: hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),

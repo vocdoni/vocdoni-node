@@ -51,7 +51,7 @@ type Options struct {
 }
 
 // TMP to be defined the production circuit nLevels
-const nLevels = 256
+const nLevels = 251
 
 // DeleteCensusTreeFromDatabase removes all the database entries for the census identified by name.
 // Caller must take care of potential data races, the census must be closed before calling this method.
@@ -525,4 +525,9 @@ func (t *Tree) fillKeyToIndex(tx db.WriteTx) error {
 		return err
 	}
 	return nil
+}
+
+// TODO: Test circom siblings
+func (t *Tree) GetCircomSiblings(key []byte) ([]string, error) {
+	return t.tree.GetCircomSiblings(key)
 }

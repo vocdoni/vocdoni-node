@@ -244,7 +244,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	// Create the inputs and encode them into a JSON
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,
-		"censusSiblings": strSiblings,
+		"censusSiblings": censusData.Siblings,
 		"weight":         weight.String(),
 		"privateKey":     strPrivateKey,
 		"voteHash":       strVoteHash,
@@ -255,7 +255,6 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
-	log.Debugw("proof inputs generated", rawInputs)
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)

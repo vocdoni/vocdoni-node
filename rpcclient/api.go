@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math"
 	"math/big"
 	"math/rand"
 	"strings"
@@ -399,14 +398,14 @@ type GenSNARKData struct {
 }
 
 func testGenSNARKProof(circuit *circuit.ZkCircuit,
-	censusRoot, merkleProof []byte, treeSize int, privateKey, votePackage,
+	censusRoot, merkleProof []byte, privateKey, votePackage,
 	processId []byte, weight *big.Int) (*prover.Proof, []byte, error) {
 	if len(merkleProof) < 8 {
 		return nil, nil, fmt.Errorf("merkleProof too short")
 	}
 
 	siblingsBytes := merkleProof[8:]
-	levels := int(math.Log2(float64(treeSize)))
+	levels := circuit.Config.Levels
 	siblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, siblingsBytes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot arbo.UnpackSiblings: %w", err)
@@ -922,7 +921,7 @@ func (c *Client) TestSendAnonVotes(
 		_, secretKey := testGetZKCensusKey(s)
 		weight := new(big.Int).SetInt64(10)
 		proof, nullifier, err := testGenSNARKProof(circuit, root,
-			proofs[i].Siblings, circuitConfig.Parameters, secretKey, vpb, pid, weight)
+			proofs[i].Siblings, secretKey, vpb, pid, weight)
 		if err != nil {
 			return 0, fmt.Errorf("cannot generate test SNARK proof: %w", err)
 		}
