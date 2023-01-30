@@ -25,6 +25,11 @@ import (
 	"go.vocdoni.io/dvote/util"
 )
 
+// how many times to retry flaky transactions
+// * amount of blocks to wait for a transaction to be mined before giving up
+// * how many times to retry opening a connection to an endpoint before giving up
+const retries = 10
+
 type operation struct {
 	fn func(c config)
 
