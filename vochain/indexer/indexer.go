@@ -111,7 +111,7 @@ type Indexer struct {
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
 
-	liveGoroutines int64 // atomic
+	liveGoroutines atomic.Int64
 
 	// In the tests, the extra 5s sleeps can make CI really slow at times, to
 	// the point that it times out. Skip that in the tests.
@@ -222,7 +222,7 @@ func (idx *Indexer) WaitIdle() {
 		const debounce = 100 * time.Millisecond
 		time.Sleep(debounce)
 		slept += debounce
-		if atomic.LoadInt64(&idx.liveGoroutines) == 0 {
+		if idx.liveGoroutines.Load() == 0 {
 			break
 		}
 		if slept > 10*time.Second {
@@ -442,7 +442,7 @@ func (idx *Indexer) Commit(height uint32) error {
 	}
 
 	// Index new transactions
-	atomic.AddInt64(&idx.liveGoroutines, 1)
+	idx.liveGoroutines.Add(1)
 	go idx.indexNewTxs(idx.newTxPool)
 
 	// Schedule results computation
@@ -499,6 +499,8 @@ func (idx *Indexer) Commit(height uint32) error {
 			log.Errorw(err, "commit: cannot create new token transfer")
 		}
 	}
+	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
+
 	txn.Discard()
 
 	// Add votes collected by onVote (live results)
@@ -546,7 +548,7 @@ func (idx *Indexer) Commit(height uint32) error {
 	// an initial results height of 0, and we don't want to compute results
 	// for such an initial height.
 	if height > 0 {
-		atomic.AddInt64(&idx.liveGoroutines, 1)
+		idx.liveGoroutines.Add(1)
 		go idx.computePendingProcesses(height)
 	}
 	return nil
@@ -562,6 +564,7 @@ func (idx *Indexer) Rollback() {
 	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	idx.updateProcessPool = [][]byte{}
 	idx.newTxPool = []*indexertypes.TxReference{}
+	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 }
 
 // OnProcess indexer stores the processID and entityID
@@ -774,7 +777,7 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 	if err != nil {
 		return nil, err
 	}
-	tt := make([]*indexertypes.TokenTransferMeta, len(ttFromDB))
+	tt := []*indexertypes.TokenTransferMeta{}
 	for _, t := range ttFromDB {
 		tt = append(tt, &indexertypes.TokenTransferMeta{
 			Amount:    uint64(t.Amount),

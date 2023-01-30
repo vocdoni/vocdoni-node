@@ -38,7 +38,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	qt "github.com/frankban/quicktest"
-	"github.com/vocdoni/arbo"
+	"go.vocdoni.io/dvote/tree/arbo"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	client "go.vocdoni.io/dvote/rpcclient"

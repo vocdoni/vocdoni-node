@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"fmt"
-	"sync/atomic"
 
 	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
@@ -99,7 +98,7 @@ func (s *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex i
 // indexNewTxs indexes the txs pending in the newTxPool and updates the transaction count
 // this function should only be called within Commit(), on a new block.
 func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
-	defer atomic.AddInt64(&s.liveGoroutines, -1)
+	defer s.liveGoroutines.Add(-1)
 	if len(txList) == 0 {
 		return
 	}

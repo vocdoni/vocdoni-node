@@ -30,8 +30,8 @@ func (d *OffChainDataHandler) enqueueOffchainCensus(root, uri string) {
 }
 
 // importRollingCensus imports a rolling census (zkIndexed) from a remote URI into the censusDB storage.
-func (s *OffChainDataHandler) importRollingCensus(pid []byte) {
-	rcensus, err := s.vochain.State.DumpRollingCensus(pid)
+func (d *OffChainDataHandler) importRollingCensus(pid []byte) {
+	rcensus, err := d.vochain.State.DumpRollingCensus(pid)
 	if err != nil {
 		log.Errorf("cannot dump census with pid %x: %v", pid, err)
 		return
@@ -42,7 +42,7 @@ func (s *OffChainDataHandler) importRollingCensus(pid []byte) {
 		log.Errorf("cannot build census dump for process %x: %v", pid, err)
 		return
 	}
-	if err := s.census.ImportAsPublic(dump); err != nil {
+	if err := d.census.ImportAsPublic(dump); err != nil {
 		if errors.Is(err, censusdb.ErrCensusAlreadyExists) {
 			// If namespace exists it means the census is already loaded, so
 			// no need to show an error message.

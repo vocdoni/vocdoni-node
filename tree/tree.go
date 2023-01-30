@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // Tree defines the struct that implements the MerkleTree functionalities
@@ -167,7 +167,7 @@ func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) err
 	return t.tree.IterateWithStopWithTx(rTx, root, callbackWrapper)
 }
 
-// ItrateLeaves iterates over all leafs of the tree.  When callback returns true,
+// IterateLeaves iterates over all leafs of the tree.  When callback returns true,
 // the iteration is stopped and this function returns.
 func (t *Tree) IterateLeaves(rTx db.ReadTx, callback func(key, value []byte) bool) error {
 	return t.Iterate(rTx, func(key, value []byte) bool {

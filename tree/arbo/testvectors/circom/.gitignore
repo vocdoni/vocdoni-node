@@ -1,0 +1,3 @@
+node_modules
+dist
+go-data-generator/*.json

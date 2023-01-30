@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -20,6 +20,7 @@ import (
 //     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
 //     - Nullifiers (key: pre-census user nullifier, value: weight used)
 //     - Votes (key: VoteId, value: models.StateDBVote)
+//   - FaucetNonce (key: hash(address + identifier), value: nil)
 
 const (
 	TreeProcess                    = "Processes"
@@ -48,7 +49,7 @@ type treeTxWithMutex struct {
 // MainTreeView is a thread-safe function to obtain a pointer to the last
 // opened mainTree as a TreeView.
 func (v *State) MainTreeView() *statedb.TreeView {
-	return v.mainTreeViewValue.Load().(*statedb.TreeView)
+	return v.mainTreeViewValue.Load()
 }
 
 // setMainTreeView is a thread-safe function to store a pointer to the last
@@ -174,7 +175,7 @@ var (
 	}
 )
 
-// StateTree returns the state merkle tree with name.
+// StateTreeCfg returns the state merkle tree with name.
 func StateTreeCfg(name string) statedb.TreeConfig {
 	t, ok := MainTrees[name]
 	if !ok {
@@ -183,7 +184,7 @@ func StateTreeCfg(name string) statedb.TreeConfig {
 	return t
 }
 
-// StateChildTree returns the state merkle child tree with name.
+// StateChildTreeCfg returns the state merkle child tree with name.
 func StateChildTreeCfg(name string) *statedb.TreeNonSingletonConfig {
 	t, ok := ChildTrees[name]
 	if !ok {
@@ -192,7 +193,7 @@ func StateChildTreeCfg(name string) *statedb.TreeNonSingletonConfig {
 	return t
 }
 
-// StateParentChildTree returns the parent and its child tree under the key leaf.
+// StateParentChildTreeCfg returns the parent and its child tree under the key leaf.
 func StateParentChildTreeCfg(parent, child string, key []byte) (statedb.TreeConfig, statedb.TreeConfig) {
 	parentTree := StateTreeCfg(parent)
 	childTree := StateChildTreeCfg(child)

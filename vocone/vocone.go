@@ -52,7 +52,7 @@ type Vocone struct {
 	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
 	dataDir         string
-	height          int64
+	height          atomic.Int64
 	appInfo         *vochaininfo.VochainInfo
 	app             *vochain.BaseApplication
 	storage         data.Storage
@@ -82,14 +82,14 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	if err != nil {
 		return nil, err
 	}
-	vc.height = int64(version)
+	vc.height.Store(int64(version))
 	if vc.blockStore, err = metadb.New(db.TypePebble,
 		filepath.Join(dataDir, "blockstore")); err != nil {
 		return nil, err
 	}
 
 	vc.setDefaultMethods()
-	vc.app.State.SetHeight(uint32(vc.height))
+	vc.app.State.SetHeight(uint32(vc.height.Load()))
 
 	// Create burn account
 	if err := vc.CreateAccount(state.BurnAddress, &state.Account{}); err != nil {
@@ -190,7 +190,7 @@ func (vc *Vocone) Start() {
 		bblock := abcitypes.RequestBeginBlock{
 			Header: tmprototypes.Header{
 				Time:   time.Now(),
-				Height: atomic.LoadInt64(&vc.height),
+				Height: vc.height.Load(),
 			},
 		}
 		vc.app.BeginBlock(bblock)
@@ -207,7 +207,7 @@ func (vc *Vocone) Start() {
 			time.Sleep(vc.blockTimeTarget - sinceLast)
 		}
 		vc.lastBlockTime = time.Now()
-		atomic.AddInt64(&vc.height, 1)
+		vc.height.Add(1)
 	}
 }
 
@@ -389,7 +389,7 @@ txLoop:
 		resp := vc.app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
 		if resp.Code == 0 {
 			blockStoreTx.Set(
-				[]byte(fmt.Sprintf("%d_%d", vc.height, txCount)),
+				[]byte(fmt.Sprintf("%d_%d", vc.height.Load(), txCount)),
 				tx,
 			)
 			txCount++
@@ -399,7 +399,7 @@ txLoop:
 		}
 	}
 	if txCount > 0 {
-		log.Infof("stored %d transactions on block %d", txCount, vc.height)
+		log.Infof("stored %d transactions on block %d", txCount, vc.height.Load())
 		if err := blockStoreTx.Commit(); err != nil {
 			log.Errorf("cannot commit to blockstore: %v", err)
 		}

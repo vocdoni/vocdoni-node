@@ -56,12 +56,12 @@ type BaseApplication struct {
 
 	blockCache *lru.AtomicCache
 	// height of the last ended block
-	height uint32
+	height atomic.Uint32
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
-	endBlockTimestamp int64
+	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
 	// abcitypes.RequestBeginBlock.Header.Time
-	startBlockTimestamp int64
+	startBlockTimestamp atomic.Int64
 	chainID             string
 	circuitConfigTag    string
 	dataDir             string
@@ -232,7 +232,7 @@ func (app *BaseApplication) SetTestingMethods() {
 		return abcitypes.ResponseBeginBlock{}
 	})
 	app.State.SetHeight(0)
-	app.endBlockTimestamp = time.Now().Unix()
+	app.endBlockTimestamp.Store(time.Now().Unix())
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
@@ -249,17 +249,17 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 
 // Height returns the current blockchain height
 func (app *BaseApplication) Height() uint32 {
-	return atomic.LoadUint32(&app.height)
+	return app.height.Load()
 }
 
 // Timestamp returns the last block end timestamp
 func (app *BaseApplication) Timestamp() int64 {
-	return atomic.LoadInt64(&app.endBlockTimestamp)
+	return app.endBlockTimestamp.Load()
 }
 
 // TimestampStartBlock returns the current block start timestamp
 func (app *BaseApplication) TimestampStartBlock() int64 {
-	return atomic.LoadInt64(&app.startBlockTimestamp)
+	return app.startBlockTimestamp.Load()
 }
 
 // TimestampFromBlock returns the timestamp for a specific block height
@@ -478,7 +478,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 func (app *BaseApplication) fnBeginBlockDefault(
 	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	app.State.Rollback()
-	atomic.StoreInt64(&app.startBlockTimestamp, req.Header.GetTime().Unix())
+	app.startBlockTimestamp.Store(req.Header.GetTime().Unix())
 	height := uint32(req.Header.GetHeight())
 	app.State.SetHeight(height)
 	go app.State.CachePurge(height)
@@ -594,8 +594,8 @@ func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abc
 }
 
 func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
-	atomic.StoreUint32(&app.height, uint32(height))
-	atomic.StoreInt64(&app.endBlockTimestamp, timestamp.Unix())
+	app.height.Store(uint32(height))
+	app.endBlockTimestamp.Store(timestamp.Unix())
 	return abcitypes.ResponseEndBlock{}
 }
 

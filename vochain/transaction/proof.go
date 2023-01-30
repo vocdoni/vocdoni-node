@@ -15,10 +15,10 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 
-	"github.com/vocdoni/arbo"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"github.com/vocdoni/storage-proofs-eth-go/token/mapbased"
 	"github.com/vocdoni/storage-proofs-eth-go/token/minime"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -113,7 +113,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	}
 }
 
-// VerifyProofOffChainCA verifies a proof with census origin OFF_CHAIN_CA.
+// VerifyProofOffChainCSP verifies a proof with census origin OFF_CHAIN_CA.
 // Returns verification result and weight.
 func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,

@@ -84,6 +84,17 @@ jobs:
       || (startsWith(github.ref, 'refs/pull/') && endsWith(github.ref, '/merge') )
       || github.ref == 'refs/heads/main'
     steps:
+      - name: Set non-root owner to dockerfiles/testsuite folder
+        run: |
+          dir="${{ github.workspace }}/dockerfiles/testsuite/"
+          if [ -d "$dir" ]; then
+            ls -la $dir
+            sudo chown -R $USER:sudo $dir
+            echo "Checking again permissions/owner"
+            ls -la $dir
+          else
+            echo "Seems the $dir folder doesn't exist"
+          fi
       - name: Check out the repo
         uses: actions/checkout@v3
       - name: Run compose script

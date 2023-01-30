@@ -13,11 +13,11 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru"
-	"github.com/vocdoni/arbo"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/tree/arbo"
 
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -87,12 +87,12 @@ type State struct {
 	// CheckTx happen (which read the temporary state kept in the Tx to
 	// validate Vochain transactions).
 	Tx                treeTxWithMutex
-	mainTreeViewValue atomic.Value
-	DisableVoteCache  atomic.Value
+	mainTreeViewValue atomic.Pointer[statedb.TreeView]
+	DisableVoteCache  atomic.Bool
 	voteCache         *lru.Cache
-	txCounter         int32
+	txCounter         atomic.Int32
 	// currentHeight is the height of the current started block
-	currentHeight uint32
+	currentHeight atomic.Uint32
 	// chainID identifies the blockchain
 	chainID string
 }
@@ -555,7 +555,7 @@ func (v *State) Rollback() {
 	if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
 		log.Fatalf("cannot begin statedb tx: %s", err)
 	}
-	atomic.StoreInt32(&v.txCounter, 0)
+	v.txCounter.Store(0)
 }
 
 func (v *State) Close() error {
@@ -574,12 +574,12 @@ func (v *State) LastHeight() (uint32, error) {
 
 // CurrentHeight returns the current state height (block count).
 func (v *State) CurrentHeight() uint32 {
-	return atomic.LoadUint32(&v.currentHeight)
+	return v.currentHeight.Load()
 }
 
 // SetHeight sets the height for the current block.
 func (v *State) SetHeight(height uint32) {
-	atomic.StoreUint32(&v.currentHeight, height)
+	v.currentHeight.Store(height)
 }
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
@@ -595,10 +595,10 @@ func (v *State) WorkingHash() []byte {
 
 // TxCounterAdd adds to the atomic transaction counter
 func (v *State) TxCounterAdd() {
-	atomic.AddInt32(&v.txCounter, 1)
+	v.txCounter.Add(1)
 }
 
 // TxCounter returns the current tx count
 func (v *State) TxCounter() int32 {
-	return atomic.LoadInt32(&v.txCounter)
+	return v.txCounter.Load()
 }
