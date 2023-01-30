@@ -30,7 +30,7 @@ var errUnsupportedVoterIDType error = errors.New("voterID type not supported")
 
 // Type returns the VoterID type defined in VoterIDTypeName
 func (v VoterID) Type() VoterIDType {
-	return VoterIDType(v[0])
+	return v[0]
 }
 
 // VoterIDTypeToString returns the string representation of the VoterIDType

@@ -98,9 +98,9 @@ func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint32, error) {
 		if blockDiff > currentHeight {
 			return 0, fmt.Errorf("target time %v is before origin", target)
 		}
-		return currentHeight - uint32(blockDiff), nil
+		return currentHeight - blockDiff, nil
 	}
-	return currentHeight + uint32(blockDiff), nil
+	return currentHeight + blockDiff, nil
 }
 
 // HeightTime estimates the UTC time for a future height or returns the

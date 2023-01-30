@@ -16,7 +16,7 @@ func (r *RPCAPI) getStats(request *api.APIrequest) (*api.APIresponse, error) {
 	var err error
 	stats := new(api.VochainStats)
 	height := r.vocapp.Height()
-	stats.BlockHeight = uint32(height)
+	stats.BlockHeight = height
 	block := r.vocapp.GetBlockByHeight(int64(height))
 
 	if block == nil {
