@@ -26,17 +26,21 @@ import (
 )
 
 type operation struct {
+	fn func(c config)
+
 	name, description, example string
 }
 
 var ops = []operation{
 	{
+		fn:          mkTreeVoteTest,
 		name:        "vtest",
 		description: "Performs a complete test, from creating a census to voting and validating votes",
 		example: os.Args[0] + " --operation=vtest --electionSize=1000 " +
 			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
 	},
 	{
+		fn:          testTokenTransactions,
 		name:        "tokentransactions",
 		description: "Tests all token related transactions",
 		example: os.Args[0] + " --operation=tokentransactions " +
@@ -111,12 +115,15 @@ func main() {
 		c.accountKeys[i] = ak
 	}
 
-	switch c.operation {
-	case "vtest":
-		mkTreeVoteTest(c)
-	case "tokentransactions":
-		testTokenTransactions(c)
-	default:
+	found := false
+	for _, op := range ops {
+		if op.name == c.operation {
+			op.fn(c)
+			found = true
+		}
+	}
+
+	if !found {
 		log.Fatal("no valid operation mode specified")
 	}
 
