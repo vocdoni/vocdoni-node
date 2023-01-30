@@ -158,6 +158,23 @@ type TransactionReference struct {
 	Height uint32 `json:"blockHeight"`
 	Index  uint32 `json:"transactionIndex"`
 }
+type TransactionsCost struct {
+	Costs transactionCosts `json:"costs,omitempty"`
+}
+type transactionCosts struct {
+	SetProcessStatus        uint32 `json:"SetProcessStatus"`
+	SetProcessCensus        uint32 `json:"SetProcessCensus"`
+	SetProcessResults       uint32 `json:"SetProcessResults"`
+	SetProcessQuestionIndex uint32 `json:"SetProcessQuestionIndex"`
+	RegisterKey             uint32 `json:"RegisterKey"`
+	NewProcess              uint32 `json:"NewProcess"`
+	SendTokens              uint32 `json:"SendTokens"`
+	SetAccountInfoURI       uint32 `json:"SetAccountInfoURI"`
+	CreateAccount           uint32 `json:"CreateAccount"`
+	AddDelegateForAccount   uint32 `json:"AddDelegateForAccount"`
+	DelDelegateForAccount   uint32 `json:"DelDelegateForAccount"`
+	CollectFaucet           uint32 `json:"CollectFaucet"`
+}
 
 type ChainInfo struct {
 	ID        string    `json:"chainId,omitempty"`
