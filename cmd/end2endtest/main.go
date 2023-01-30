@@ -73,13 +73,17 @@ func main() {
 	c := config{}
 	flag.StringVar(&c.host, "host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	flag.StringVar(&c.logLevel, "logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	flag.StringVar(&c.operation, "operation", "vtest", fmt.Sprintf("set operation mode: %v", opNames()))
-	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{}, "account private key (optional)")
+	flag.StringVar(&c.operation, "operation", "vtest",
+		fmt.Sprintf("set operation mode: %v", opNames()))
+	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{},
+		"account private key (optional)")
 	flag.StringVar(&c.treasurerPrivKey, "treasurerPrivKey", "", "treasurer private key")
 	flag.IntVar(&c.nvotes, "votes", 10, "number of votes to cast")
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
-	flag.StringVar(&c.faucet, "faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
-	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
+	flag.StringVar(&c.faucet, "faucet", "dev",
+		"faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "",
+		"(optional) token passed as Bearer when fetching faucetURL")
 	flag.DurationVar(&c.timeout, "timeout", 5*time.Minute, "timeout duration")
 
 	flag.Usage = func() {
