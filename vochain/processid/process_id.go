@@ -41,7 +41,7 @@ func (p *ProcessID) Marshal() []byte {
 	chainID := ethereum.HashRaw([]byte(p.chainID))
 
 	nonce := make([]byte, 4)
-	binary.BigEndian.PutUint32(nonce, uint32(p.nonce))
+	binary.BigEndian.PutUint32(nonce, p.nonce)
 
 	proofType := make([]byte, 2)
 	binary.BigEndian.PutUint16(proofType, uint16(p.censusOrigin))

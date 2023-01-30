@@ -68,7 +68,7 @@ type Process struct {
 func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
-		EntityID:          nonEmptyBytes([]byte(dbproc.EntityID)),
+		EntityID:          nonEmptyBytes(dbproc.EntityID),
 		EntityIndex:       uint32(dbproc.EntityIndex),
 		StartBlock:        uint32(dbproc.StartBlock),
 		EndBlock:          uint32(dbproc.EndBlock),

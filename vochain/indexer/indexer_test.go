@@ -1049,7 +1049,7 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 
 	// save the block height for comparing later
-	blockHeight := uint32(app.Height())
+	blockHeight := app.Height()
 	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID
