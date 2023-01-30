@@ -25,6 +25,11 @@ import (
 	"go.vocdoni.io/dvote/util"
 )
 
+// how many times to retry flaky transactions
+// * amount of blocks to wait for a transaction to be mined before giving up
+// * how many times to retry opening a connection to an endpoint before giving up
+const retries = 10
+
 type operation struct {
 	fn func(c config)
 
@@ -490,4 +495,16 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 		}
 	}
 	return skey, nil
+}
+
+func getFaucetPackage(c config, account string) (*models.FaucetPackage, error) {
+	if c.faucet == "" {
+		return nil, fmt.Errorf("need to pass a valid --faucet")
+	}
+	if c.faucet == "dev" {
+		return apiclient.GetFaucetPackageFromDevService(account)
+	} else {
+		return apiclient.GetFaucetPackageFromRemoteService(c.faucet+account,
+			c.faucetAuthToken)
+	}
 }
