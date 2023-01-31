@@ -319,10 +319,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	if idx.ignoreLiveResults {
 		return
 	}
-	if !enableBadgerhold {
-		// TODO(sqlite): needs to be reimplemented
-		return
-	}
+
 	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
 	// the chain is not synchronizing since it still does not have any peer and do not know the
 	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
@@ -344,25 +341,33 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	// Block the new votes addition until the recovery finishes.
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
-	// Find those processes which do not have yet final results,
-	// they are considered live so we need to compute the temporary
-	// results (or only its weight in case of Encrypted)
-	//prcs, err := idx.ProcessList(nil, 0, 0, "", 0, "", "READY", true)
-	prcs := [][]byte{}
-	err := idx.db.ForEach(
-		badgerhold.Where("FinalResults").Eq(false),
-		func(p *indexertypes.Process) error {
-			prcs = append(prcs, p.ID)
-			return nil
-		})
 
+	queries, ctx, cancel := idx.timeoutQueries()
+	defer cancel()
+
+	prcIDs, err := queries.GetProcessIDsByFinalResults(ctx, false)
 	if err != nil {
 		log.Error(err)
 	}
-	log.Infof("recovered %d live results processes", len(prcs))
+
+	if enableBadgerhold {
+		prcIDs = []types.ProcessID{}
+		err := idx.db.ForEach(
+			badgerhold.Where("FinalResults").Eq(false),
+			func(p *indexertypes.Process) error {
+				prcIDs = append(prcIDs, p.ID)
+				return nil
+			})
+
+		if err != nil {
+			log.Error(err)
+		}
+	}
+
+	log.Infof("recovered %d live results processes", len(prcIDs))
 	log.Infof("starting live results recovery computation")
 	startTime := time.Now()
-	for _, p := range prcs {
+	for _, p := range prcIDs {
 		// In order to recover the full list of live results, we need
 		// to reset the existing Results and count them again from scratch.
 		// Since we cannot be sure if there are votes missing, we need to
@@ -374,18 +379,35 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			continue
 		}
 		options := process.GetVoteOptions()
-		if err := idx.queryWithRetries(func() error {
-			return idx.db.Upsert(p, &indexertypes.Results{
-				ProcessID: p,
-				// MaxValue requires +1 since 0 is also an option
-				Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-				Weight:       new(types.BigInt).SetUint64(0),
-				VoteOpts:     options,
-				EnvelopeType: process.GetEnvelopeType(),
-				Signatures:   []types.HexBytes{},
-			})
+
+		indxR := &indexertypes.Results{
+			ProcessID: p,
+			// MaxValue requires +1 since 0 is also an option
+			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Weight:       new(types.BigInt).SetUint64(0),
+			VoteOpts:     options,
+			EnvelopeType: process.GetEnvelopeType(),
+			Signatures:   []types.HexBytes{},
+		}
+
+		if enableBadgerhold {
+			if err := idx.queryWithRetries(func() error {
+				return idx.db.Upsert(p, indxR)
+			}); err != nil {
+				log.Errorw(err, "cannot upsert results to db")
+				continue
+			}
+		}
+
+		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
+			ID:                indxR.ProcessID,
+			Votes:             encodeVotes(indxR.Votes),
+			Weight:            indxR.Weight.String(),
+			VoteOptsPb:        encodedPb(indxR.VoteOpts),
+			EnvelopePb:        encodedPb(indxR.EnvelopeType),
+			ResultsSignatures: joinHexBytes(indxR.Signatures),
 		}); err != nil {
-			log.Errorw(err, "cannot upsert results to db")
+			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
 		}
 
@@ -402,7 +424,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			}
 			return false
 		})
-		// Store the results on the persisten database
+		// Store the results on the persistent database
 		if err := idx.commitVotesUnsafe(p, results, idx.App.Height()); err != nil {
 			log.Errorw(err, "could not commit live votes")
 			continue

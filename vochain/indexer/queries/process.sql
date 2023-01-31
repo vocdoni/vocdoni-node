@@ -124,3 +124,16 @@ ORDER BY creation_time ASC, ID ASC
 LIMIT ?
 OFFSET ?
 ;
+
+-- name: GetProcessIDsByFinalResults :many
+SELECT id FROM processes
+WHERE final_results = ?;
+
+-- name: UpdateProcessResultByID :execresult
+UPDATE processes
+SET results_votes  = sqlc.arg(votes),
+    results_weight = sqlc.arg(weight),
+    vote_opts_pb = sqlc.arg(vote_opts_pb),
+    envelope_pb = sqlc.arg(envelope_pb),
+    results_signatures = sqlc.arg(results_signatures)
+WHERE id = sqlc.arg(id);
