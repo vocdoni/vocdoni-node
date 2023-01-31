@@ -343,58 +343,82 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if process.Status != models.ProcessStatus_RESULTS {
 		return fmt.Errorf("election results are not available yet")
 	}
-	// check process results are the same
-	var results [][]*big.Int
-	if len(process.Results) > 0 {
-		firstResult := process.Results[0]
-		for _, processResult := range process.Results[1:] {
-			if processResult == nil {
-				log.Errorf("invalid process result")
+	if process.Results == nil {
+		return fmt.Errorf("no results available")
+	}
+
+	// intermediateResults is an array of the results that are signed
+	// by oracles. There can be void results see vochain/state/process.go#L330
+	// but we want to ignore them. The way we can know if a result is void is
+	// by checking if the oracle address is empty.
+	intermediateResults := []*models.ProcessResult{}
+	for _, processResult := range process.Results {
+		if processResult == nil {
+			log.Warn("invalid process result (nil)")
+			continue
+		}
+		if len(processResult.OracleAddress) == 0 { // check oracle sent the results otherwise ignore
+			continue
+		}
+		intermediateResults = append(intermediateResults, processResult)
+	} // now we have an array of non void results set by a set of oracles via SetProcessResults
+
+	if len(intermediateResults) == 0 {
+		return fmt.Errorf("no results available")
+	}
+	firstResult := intermediateResults[0]
+
+	// Results are being compared because we want to make sure that
+	// all oracles are sending the same results.
+	equalResults := func(baseResult, otherResult *models.ProcessResult) bool {
+		// if the number of votes is different, the results are different
+		if len(baseResult.Votes) != len(otherResult.Votes) {
+			log.Warnf("different number of votes")
+			return false
+		}
+		for k, vote1 := range otherResult.Votes {
+			vote2 := baseResult.Votes[k]
+			if vote1 == nil {
+				log.Warnf("invalid question result")
 				continue
 			}
-			if len(firstResult.Votes) != len(processResult.Votes) {
-				log.Error("votes length do not match")
+			if len(vote1.Question) != len(vote2.Question) {
+				log.Warnf("question length do not match")
 				continue
 			}
-			// if consensus results do not match, return error
-			for k, questionResult := range processResult.Votes {
-				if questionResult == nil {
-					log.Errorf("invalid question result")
+			for kk, question1 := range vote1.Question {
+				question2 := vote2.Question[kk]
+				if question1 == nil {
+					log.Warnf("invalid question option")
 					continue
 				}
-				if len(questionResult.Question) != len(firstResult.Votes[k].Question) {
-					log.Errorf("question length do not match")
-					continue
-				}
-				for kk, questionOption := range questionResult.Question {
-					if len(questionOption) == 0 {
-						log.Errorf("invalid question option")
-						continue
-					}
-					if len(firstResult.Votes[k].Question[kk]) != len(questionOption) {
-						log.Errorf("question option length do not match")
-						continue
-					}
-					if !bytes.Equal(questionOption, firstResult.Votes[k].Question[kk]) {
-						log.Errorf("election results for signer %s missmatch %s != %s",
-							questionResult.String(),
-							firstResult.Votes[k].String(),
-							common.BytesToAddress(processResult.OracleAddress),
-						)
-						return fmt.Errorf("reported election results missmatch")
-					}
+				if !bytes.Equal(question1, question2) {
+					log.Warn("question option bytes do not match")
+					return false
 				}
 			}
 		}
-		// cast process results
-		results = make([][]*big.Int, len(firstResult.Votes))
-		for k, questionResult := range firstResult.Votes {
-			results[k] = make([]*big.Int, len(questionResult.Question))
-			for kk, questionOption := range questionResult.Question {
-				results[k][kk] = new(big.Int).SetBytes(questionOption)
+		return true
+	}
+
+	// compare only if there are more than one result
+	if len(intermediateResults) > 1 {
+		for _, processResult := range intermediateResults[1:] {
+			if !equalResults(firstResult, processResult) {
+				return fmt.Errorf("reported election results missmatch")
 			}
+		}
+	} // at this point results are equal
+
+	// cast results to big.Int
+	results := make([][]*big.Int, len(firstResult.Votes))
+	for k, questionResult := range firstResult.Votes {
+		results[k] = make([]*big.Int, len(questionResult.Question))
+		for kk, questionOption := range questionResult.Question {
+			results[k][kk] = new(big.Int).SetBytes(questionOption)
 		}
 	}
+
 	electionResults := &ElectionResults{
 		CensusRoot:            process.CensusRoot,
 		ElectionID:            electionID,
@@ -403,6 +427,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		Results:               results,
 	}
 
+	// add the abi encoded results
 	electionResults.ABIEncoded, err = encodeEVMResultsArgs(
 		common.BytesToHash(electionID),
 		common.BytesToAddress(electionResults.OrganizationID),
