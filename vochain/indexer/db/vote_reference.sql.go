@@ -106,3 +106,58 @@ func (q *Queries) GetVoteReferencesByProcessID(ctx context.Context, processID ty
 	}
 	return items, nil
 }
+
+const searchVoteReferences = `-- name: SearchVoteReferences :many
+SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
+WHERE (? = '' OR process_id = ?)
+	AND (? = '' OR (INSTR(LOWER(HEX(nullifier)), ?) > 0))
+ORDER BY height ASC, nullifier ASC
+LIMIT ?
+OFFSET ?
+`
+
+type SearchVoteReferencesParams struct {
+	ProcessID       types.ProcessID
+	NullifierSubstr string
+	Limit           int32
+	Offset          int32
+}
+
+func (q *Queries) SearchVoteReferences(ctx context.Context, arg SearchVoteReferencesParams) ([]VoteReference, error) {
+	rows, err := q.db.QueryContext(ctx, searchVoteReferences,
+		arg.ProcessID,
+		arg.ProcessID,
+		arg.NullifierSubstr,
+		arg.NullifierSubstr,
+		arg.Limit,
+		arg.Offset,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []VoteReference
+	for rows.Next() {
+		var i VoteReference
+		if err := rows.Scan(
+			&i.Nullifier,
+			&i.ProcessID,
+			&i.Height,
+			&i.Weight,
+			&i.TxIndex,
+			&i.CreationTime,
+			&i.VoterID,
+			&i.OverwriteCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

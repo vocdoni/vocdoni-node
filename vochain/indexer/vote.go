@@ -191,9 +191,47 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
-		return nil, fmt.Errorf("envelopeList: invalid value: from is invalid value %d", from)
+		return nil, fmt.Errorf("GetEnvelopes: invalid value: from is invalid value %d", from)
+	}
+	if max <= 0 {
+		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
+	if !enableBadgerhold {
+		queries, ctx, cancel := s.timeoutQueries()
+		defer cancel()
+		txRefs, err := queries.SearchVoteReferences(ctx, indexerdb.SearchVoteReferencesParams{
+			ProcessID:       processId,
+			NullifierSubstr: searchTerm,
+			Limit:           int32(max),
+			Offset:          int32(from),
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, txRef := range txRefs {
+			_, txHash, err := s.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
+			if err != nil {
+				return nil, err
+			}
+			envelopeMetadata := &indexertypes.EnvelopeMetadata{
+				ProcessId: txRef.ProcessID,
+				Nullifier: txRef.Nullifier,
+				TxIndex:   int32(txRef.TxIndex),
+				Height:    uint32(txRef.Height),
+				TxHash:    txHash,
+			}
+			if len(txRef.VoterID) > 0 {
+				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+				if err != nil {
+					return nil, fmt.Errorf("cannot get voterID from pubkey: %w", err)
+				}
+			}
+			envelopes = append(envelopes, envelopeMetadata)
+		}
+		return envelopes, nil
+
+	}
 	var err error
 	// TODO(sqlite): reimplement
 	// TODO: check pid
