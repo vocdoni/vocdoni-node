@@ -11,12 +11,6 @@ replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 
 // as it dropped support for GOOS=darwin.
 // If you change its version, ensure that "GOOS=darwin go build ./..." still works.
 
-// Unfortunately, the warning above was ignored at some point,
-// and we now cannot downgrade due to a circular module dep with arbo.
-// TODO(mvdan): remove once arbo is no longer a circular dep.
-
-replace bazil.org/fuse => bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512
-
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
@@ -75,7 +69,7 @@ require (
 )
 
 require (
-	bazil.org/fuse v0.0.0-20200524192727-fb710f7dfd05 // indirect
+	bazil.org/fuse v0.0.0-20200407214033-5883e5a4b512 // indirect
 	contrib.go.opencensus.io/exporter/prometheus v0.4.2 // indirect
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/DataDog/zstd v1.4.8 // indirect
