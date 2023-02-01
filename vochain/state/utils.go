@@ -31,6 +31,18 @@ func GetFriendlyResults(results []*models.QuestionResult) [][]string {
 	return r
 }
 
+// ResultsToBigIntMatrix converts the results of a process to a big.Int matrix.
+func ResultsToBigIntMatrix(results []*models.QuestionResult) [][]*big.Int {
+	r := make([][]*big.Int, len(results))
+	for k, questionResult := range results {
+		r[k] = make([]*big.Int, len(questionResult.Question))
+		for kk, questionOption := range questionResult.Question {
+			r[k][kk] = new(big.Int).SetBytes(questionOption)
+		}
+	}
+	return r
+}
+
 // CheckDuplicateDelegates checks if the given delegates are not duplicated
 // if addr is not nill will check if the addr is present in the delegates
 func CheckDuplicateDelegates(delegates [][]byte, addr *ethcommon.Address) error {

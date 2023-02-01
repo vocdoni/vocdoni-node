@@ -5,8 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"math/big" // required for evm encoding
+	"fmt" // required for evm encoding
 	"strconv"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/processid"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -352,9 +352,13 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	// but we want to ignore them. The way we can know if a result is void is
 	// by checking if the oracle address is empty.
 	intermediateResults := []*models.ProcessResult{}
-	for _, processResult := range process.Results {
+	for k, processResult := range process.Results {
 		if processResult == nil {
-			log.Warn("invalid process result (nil)")
+			log.Warnw("nil process result",
+				map[string]interface{}{
+					"electionID":    fmt.Sprintf("%x", electionID),
+					"results index": k,
+				})
 			continue
 		}
 		if len(processResult.OracleAddress) == 0 { // check oracle sent the results otherwise ignore
@@ -366,34 +370,51 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if len(intermediateResults) == 0 {
 		return fmt.Errorf("no results available")
 	}
-	firstResult := intermediateResults[0]
 
 	// Results are being compared because we want to make sure that
 	// all oracles are sending the same results.
 	equalResults := func(baseResult, otherResult *models.ProcessResult) bool {
 		// if the number of votes is different, the results are different
 		if len(baseResult.Votes) != len(otherResult.Votes) {
-			log.Warnf("different number of votes")
+			log.Warnw("different number of votes",
+				map[string]interface{}{
+					"baseResult number of votes":  len(baseResult.Votes),
+					"otherResult number of votes": len(otherResult.Votes),
+				})
 			return false
 		}
 		for k, vote1 := range otherResult.Votes {
 			vote2 := baseResult.Votes[k]
 			if vote1 == nil {
-				log.Warnf("invalid question result")
+				log.Warnw("invalid question result (nil)",
+					map[string]interface{}{
+						"question result index": k,
+					})
 				continue
 			}
 			if len(vote1.Question) != len(vote2.Question) {
-				log.Warnf("question length do not match")
+				log.Warnw("question length do not match",
+					map[string]interface{}{
+						"baseResult question length":  len(vote2.Question),
+						"otherResult question length": len(vote1.Question),
+					})
 				continue
 			}
 			for kk, question1 := range vote1.Question {
 				question2 := vote2.Question[kk]
 				if question1 == nil {
-					log.Warnf("invalid question option")
+					log.Warnw("invalid question option (nil)",
+						map[string]interface{}{
+							"question option index": kk,
+						})
 					continue
 				}
 				if !bytes.Equal(question1, question2) {
-					log.Warn("question option bytes do not match")
+					log.Warnw("question option bytes do not match",
+						map[string]interface{}{
+							"baseResult question option":  fmt.Sprintf("%x", question2),
+							"otherResult question option": fmt.Sprintf("%x", question1),
+						})
 					return false
 				}
 			}
@@ -401,6 +422,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return true
 	}
 
+	firstResult := intermediateResults[0]
 	// compare only if there are more than one result
 	if len(intermediateResults) > 1 {
 		for _, processResult := range intermediateResults[1:] {
@@ -410,21 +432,13 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		}
 	} // at this point results are equal
 
-	// cast results to big.Int
-	results := make([][]*big.Int, len(firstResult.Votes))
-	for k, questionResult := range firstResult.Votes {
-		results[k] = make([]*big.Int, len(questionResult.Question))
-		for kk, questionOption := range questionResult.Question {
-			results[k][kk] = new(big.Int).SetBytes(questionOption)
-		}
-	}
-
 	electionResults := &ElectionResults{
 		CensusRoot:            process.CensusRoot,
 		ElectionID:            electionID,
 		SourceContractAddress: process.SourceNetworkContractAddr,
 		OrganizationID:        process.EntityId,
-		Results:               results,
+		// cast results to big.Int
+		Results: state.ResultsToBigIntMatrix(firstResult.Votes),
 	}
 
 	// add the abi encoded results
