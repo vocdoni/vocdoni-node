@@ -162,20 +162,12 @@ func mkTreeVoteTest(c config) {
 	// TODO: check if the account balance is low and use the faucet
 	acc, err := api.Account("")
 	if err != nil {
-		var faucetPkg *models.FaucetPackage
-		if c.faucet != "" {
-			// Get the faucet package of bootstrap tokens
-			log.Infof("getting faucet package")
-			if c.faucet == "dev" {
-				faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
-			} else {
-				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(c.faucet+api.MyAddress().Hex(), c.faucetAuthToken)
-			}
-
-			if err != nil {
-				log.Fatal(err)
-			}
+		log.Infof("getting faucet package")
+		faucetPkg, err := getFaucetPackage(c, api.MyAddress().Hex())
+		if err != nil {
+			log.Fatal(err)
 		}
+
 		// Create the organization account and bootstraping with the faucet package
 		log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
 		log.Debugf("faucetPackage is %x", faucetPkg)
