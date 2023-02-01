@@ -134,8 +134,24 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 // zkweighted census wrapping the method CensusAddParticipants transforming
 // each participant private key into a babyjubjub first.
 func (c *HTTPclient) CensusAddParticipantsZk(censusID types.HexBytes, participants *api.CensusParticipants) error {
-	// TODO: Check the census type before continue. The endpoint is not
-	// implemented.
+	// Perform a request to get the type of the current census and check if it
+	// is a zk census.
+	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "type")
+	if err != nil {
+		return err
+	}
+	if code != 200 {
+		return fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	censusData := &api.Census{}
+	err = json.Unmarshal(resp, censusData)
+	if err != nil {
+		return fmt.Errorf("could not unmarshal response: %w", err)
+	}
+
+	if censusData.Type != api.CensusTypeZKWeighted {
+		return fmt.Errorf("current census is not a zk census")
+	}
 
 	// Transform the participants key to babyjubjub key
 	zkParticipants := &api.CensusParticipants{}
@@ -165,6 +181,25 @@ func (c *HTTPclient) CensusAddParticipantsZk(censusID types.HexBytes, participan
 // circuit and generates the proof for the censusRoot, electionId and voter
 // babyjubjub private key provided.
 func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types.HexBytes) (*CensusProofZk, error) {
+	// Perform a request to get the type of the current census and check if it
+	// is a zk census.
+	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "type")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	censusData := &api.Census{}
+	err = json.Unmarshal(resp, censusData)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+
+	if censusData.Type != api.CensusTypeZKWeighted {
+		return nil, fmt.Errorf("current census is not a zk census")
+	}
+
 	// Get BabyJubJub key from current client
 	ethSignKey := ethereum.NewSignKeys()
 	if err := ethSignKey.AddHexKey(privVoterKey.String()); err != nil {
@@ -182,14 +217,14 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	strPrivateKey := babyjub.SkToBigInt(&privKey).String()
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubKey.String())
+	resp, code, err = c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubKey.String())
 	if err != nil {
 		return nil, err
 	}
 	if code != 200 {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	censusData := &api.Census{}
+	censusData = &api.Census{}
 	err = json.Unmarshal(resp, censusData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)

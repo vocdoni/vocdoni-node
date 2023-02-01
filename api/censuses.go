@@ -26,6 +26,7 @@ const (
 	CensusTypeZKWeighted = "zkweighted"
 	CensusTypeZK         = "zkindexed" // Will be deprecated soon
 	CensusTypeCSP        = "csp"
+	CensusTypeUnknown    = "unknown"
 
 	MaxCensusAddBatchSize = 8192
 
@@ -47,6 +48,14 @@ func (a *API) enableCensusHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.censusAddHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/censuses/{censusID}/type",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.censusTypeHandler,
 	); err != nil {
 		return err
 	}
@@ -242,6 +251,39 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	log.Infof("added %d keys to census %x", len(keys), censusID)
 
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
+}
+
+// /censuses/{censusID}/type
+func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	censusID, err := censusIDparse(ctx.URLParam("censusID"))
+	if err != nil {
+		return err
+	}
+
+	// Get the current census type from the disk
+	ref, err := a.censusdb.Load(censusID, nil)
+	if err != nil {
+		return err
+	}
+
+	// Set unknown as default type and check other available types
+	censusType := CensusTypeUnknown
+	switch ref.CensusType {
+	case int32(models.Census_ARBO_POSEIDON):
+		censusType = CensusTypeZKWeighted
+	case int32(models.Census_ARBO_BLAKE2B):
+		censusType = CensusTypeWeighted
+	case int32(models.Census_CA):
+		censusType = CensusTypeCSP
+	}
+
+	// Envolves the type into the Census struct and return it as JSON
+	data, err := json.Marshal(Census{Type: censusType})
+	if err != nil {
+		return err
+	}
+
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/root

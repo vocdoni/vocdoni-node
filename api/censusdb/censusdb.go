@@ -75,6 +75,8 @@ func NewCensusDB(db db.Database) *CensusDB {
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 	indexed bool, uri string, authToken *uuid.UUID) (*CensusRef, error) {
+	// TODO: (lucasmenendez) add new parameter with the max number of levels
+	// and store it.
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
@@ -117,6 +119,8 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 			return nil, ErrWrongAuthenticationToken
 		}
 	}
+
+	// TODO: (lucasmenendez) Get the max number of levels from the DB and add here its value
 	ref.tree, err = censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
 		MaxLevels: 256, CensusType: models.Census_Type(ref.CensusType)})
 	if err != nil {

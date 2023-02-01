@@ -186,6 +186,7 @@ type AccountSet struct {
 
 type Census struct {
 	CensusID types.HexBytes `json:"censusID,omitempty"`
+	Type     string         `json:"type,omitempty"`
 	Root     types.HexBytes `json:"root,omitempty"`
 	Weight   *types.BigInt  `json:"weight,omitempty"`
 	Key      types.HexBytes `json:"key,omitempty"`
@@ -194,8 +195,7 @@ type Census struct {
 	Size     uint64         `json:"size,omitempty"`
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
-	// TODO: Test circom siblings
-	Siblings []string `json:"siblings,omitempty"`
+	Siblings []string       `json:"siblings,omitempty"`
 }
 
 type File struct {
