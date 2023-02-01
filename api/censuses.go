@@ -548,15 +548,16 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 
+	// Get the leaf siblings from arbo based on the key received and include
+	// them into the response
 	circomSiblings, err := ref.Tree().GetCircomSiblings(leafKey)
 	if err != nil {
 		return err
 	}
 
 	response := Census{
-		Proof: siblings,
-		Value: leafV,
-		// TODO: Test circom siblings
+		Proof:    siblings,
+		Value:    leafV,
 		Siblings: circomSiblings,
 	}
 	if len(leafV) > 0 && !ref.Tree().IsIndexed() {

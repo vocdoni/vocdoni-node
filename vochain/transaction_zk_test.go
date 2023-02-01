@@ -46,9 +46,6 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	_, err = app.State.Process(processId[:], false)
 	qt.Assert(t, err, qt.IsNil)
 
-	// TODO: Are the following lines still required? If they're not, remove the
-	// commented block.
-
 	process, err = app.State.Process(processId[:], false)
 	qt.Assert(t, err, qt.IsNil)
 	process.CensusRoot = arbo.BigIntToBytes(32, censusRoot)

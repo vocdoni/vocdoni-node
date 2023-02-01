@@ -18,9 +18,8 @@ type ZkCircuitConfig struct {
 	URI string `json:"uri"`
 	// CircuitPath defines the path from where the files are downloaded
 	CircuitPath string `json:"circuitPath"`
-	// Parameters used for the circuit build
-	// Parameters int `json:"parameters"`
-	// TODO: (lucasmenendez) Comment why the number of levels must be here
+	// Levels refers the number of levels that the merkle tree associated to the
+	// current circuit configuration artifacts has
 	Levels int `json:"levels"`
 	// LocalDir defines in which directory will be the files
 	// downloaded, under that directory it will follow the CircuitPath

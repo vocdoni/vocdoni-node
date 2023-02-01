@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -251,6 +252,28 @@ func BabyJubJubPubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
 	}
-
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
+}
+
+// GetNullifierZk function returns ZkSnark ready vote nullifier and also encodes
+// and returns the electionId into a string slice to be used in other processes
+// such as proof generation.
+func GetNullifierZk(privKey babyjub.PrivateKey, electionId types.HexBytes) (types.HexBytes, []string, error) {
+	// Encode the electionId -> sha256(electionId)
+	hashedElectionId := sha256.Sum256(electionId)
+	intElectionId := []*big.Int{
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[:16])),
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[16:])),
+	}
+	strElectionId := []string{intElectionId[0].String(), intElectionId[1].String()}
+	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(ElectionId))
+	nullifier, err := poseidon.Hash([]*big.Int{
+		babyjub.SkToBigInt(&privKey),
+		intElectionId[0],
+		intElectionId[1],
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("error generating nullifier: %w", err)
+	}
+	return nullifier.Bytes(), strElectionId, nil
 }

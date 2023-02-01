@@ -206,34 +206,17 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 		weight = censusData.Weight.ToInt()
 	}
 	// Get nullifier and encoded processId
-	nullifier, strProcessId, err := c.GetNullifierZk(privKey, electionID)
+	nullifier, strProcessId, err := GetNullifierZk(privKey, electionID)
 	if err != nil {
 		return nil, err
 	}
 	strNullifier := new(big.Int).SetBytes(nullifier).String()
 	// Calculate and encode vote hash -> sha256(voteWeight)
-	voteHash := sha256.Sum256(censusData.Value)
+	voteHash := sha256.Sum256(weight.Bytes())
 	strVoteHash := []string{
 		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[:16])).String(),
 		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[16:])).String(),
 	}
-	// Unpack and encode siblings
-	unpackedSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, censusData.Proof)
-	if err != nil {
-		return nil, fmt.Errorf("error unpacking merkle tree proof: %w", err)
-	}
-	// Create a list of siblings with the same number of items that levels
-	// allowed by the circuit (from its config) plus one. Fill with zeros if its
-	// needed.
-	strSiblings := []string{}
-	for i := 0; i < len(unpackedSiblings); i++ {
-		strSiblings = append(strSiblings, arbo.BytesToBigInt(unpackedSiblings[i]).String())
-	}
-	paddingSiblings := (c.circuit.Levels + 1) - len(strSiblings)
-	for j := 0; j < paddingSiblings; j++ {
-		strSiblings = append(strSiblings, "0")
-	}
-
 	// Get artifacts of the current circuit
 	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {

@@ -1,19 +1,14 @@
 package apiclient
 
 import (
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"math/big"
 
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -37,30 +32,6 @@ type VoteData struct {
 	ProofMkTree *CensusProof
 	ProofCSP    types.HexBytes
 	ProofZkTree *CensusProofZk
-}
-
-// GetNullifierZk function returns ZkSnark ready vote nullifier and also encodes
-// and returns the electionId into a string slice to be used in other processes
-// such as proof generation.
-func (c *HTTPclient) GetNullifierZk(privKey babyjub.PrivateKey, electionId types.HexBytes) (types.HexBytes, []string, error) {
-	// Encode the electionId -> sha256(electionId)
-	hashedProcessId := sha256.Sum256(electionId)
-	intProcessId := []*big.Int{
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedProcessId[:16])),
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedProcessId[16:])),
-	}
-	strProcessId := []string{intProcessId[0].String(), intProcessId[1].String()}
-
-	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(processId))
-	nullifier, err := poseidon.Hash([]*big.Int{
-		babyjub.SkToBigInt(&privKey),
-		intProcessId[0],
-		intProcessId[1],
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error generating nullifier: %w", err)
-	}
-	return nullifier.Bytes(), strProcessId, nil
 }
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
