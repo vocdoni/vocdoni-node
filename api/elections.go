@@ -29,6 +29,14 @@ const (
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
+		"/elections",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -96,12 +104,17 @@ func (a *API) enableElectionHandlers() error {
 	return nil
 }
 
+// GET /elections
 // GET /elections/<electionID>
 // get election information
 func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
-	if err != nil {
-		return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
+	var electionID []byte
+	if paramElectionID := ctx.URLParam("electionID"); paramElectionID != "" {
+		var err error
+		electionID, err = hex.DecodeString(util.TrimHex(paramElectionID))
+		if err != nil {
+			return fmt.Errorf("electionID (%s) cannot be decoded", ctx.URLParam("electionID"))
+		}
 	}
 	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
