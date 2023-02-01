@@ -87,6 +87,7 @@ func New(opts Options) (*Tree, error) {
 	}
 
 	kv := prefixeddb.NewPrefixedDatabase(opts.ParentDB, []byte(opts.Name))
+	// TODO: (lucasmenendez) get the number of levels from options provided
 	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: nLevels, HashFunc: hashFunc})
 	if err != nil {
 		return nil, err
@@ -521,7 +522,7 @@ func (t *Tree) fillKeyToIndex(tx db.WriteTx) error {
 	return nil
 }
 
-// TODO: Test circom siblings
+// GetCircomSiblings function wraps the Arbo tree GetCircomSiblings function
 func (t *Tree) GetCircomSiblings(key []byte) ([]string, error) {
 	return t.tree.GetCircomSiblings(key)
 }

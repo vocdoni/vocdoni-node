@@ -40,6 +40,7 @@ type CensusRef struct {
 	CensusType int32
 	Indexed    bool
 	URI        string
+	// TODO: (lucasmenendez) create new parameter to store the number of levels
 }
 
 // Tree returns the censustree.Tree object of the census reference.
