@@ -594,18 +594,18 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, envelopes[2].Height, qt.Equals, uint32(30))
 
 	// GetEnvelopes without a match
-	envelopes, err = idx.GetEnvelopes(pid, 0, 0, fmt.Sprintf("%x", util.RandomBytes(32)))
+	envelopes, err = idx.GetEnvelopes(pid, 10, 0, fmt.Sprintf("%x", util.RandomBytes(32)))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, envelopes, qt.HasLen, 0)
 
 	// GetEnvelopes with one match by full nullifier
-	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier)
+	envelopes, err = idx.GetEnvelopes(pid, 10, 0, matchNullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, envelopes, qt.HasLen, 1)
 	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
 
 	// GetEnvelopes with one match by partial nullifier
-	envelopes, err = idx.GetEnvelopes(pid, 0, 0, matchNullifier[:29])
+	envelopes, err = idx.GetEnvelopes(pid, 10, 0, matchNullifier[:29])
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, envelopes, qt.HasLen, 1)
 	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
@@ -1049,7 +1049,7 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 
 	// save the block height for comparing later
-	blockHeight := uint32(app.Height())
+	blockHeight := app.Height()
 	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID

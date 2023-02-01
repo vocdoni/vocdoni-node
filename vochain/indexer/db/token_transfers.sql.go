@@ -47,9 +47,9 @@ WHERE tx_hash = ?
 LIMIT 1
 `
 
-func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (TokenTransferMeta, error) {
+func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (TokenTransfer, error) {
 	row := q.db.QueryRowContext(ctx, getTokenTransfer, txHash)
-	var i TokenTransferMeta
+	var i TokenTransfer
 	err := row.Scan(
 		&i.TxHash,
 		&i.Height,
@@ -78,15 +78,15 @@ type GetTokenTransfersByFromAccountParams struct {
 // the column and parameter; see sqlc.yaml
 // TODO(jordipainan): use sqlc.arg once limit/offset support it:
 // https://github.com/kyleconroy/sqlc/issues/1025
-func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTokenTransfersByFromAccountParams) ([]TokenTransferMeta, error) {
+func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTokenTransfersByFromAccountParams) ([]TokenTransfer, error) {
 	rows, err := q.db.QueryContext(ctx, getTokenTransfersByFromAccount, arg.FromAccount, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TokenTransferMeta
+	var items []TokenTransfer
 	for rows.Next() {
-		var i TokenTransferMeta
+		var i TokenTransfer
 		if err := rows.Scan(
 			&i.TxHash,
 			&i.Height,

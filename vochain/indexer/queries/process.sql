@@ -33,7 +33,7 @@ WHERE id = ?
 LIMIT 1;
 
 -- name: SearchProcesses :many
-SELECT ID FROM processes
+SELECT id FROM processes
 -- TODO(mvdan): when sqlc's parser is better, and does not get confused with
 -- string types, use:
 -- WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
@@ -44,7 +44,7 @@ WHERE (sqlc.arg(entity_id_len) = 0 OR entity_id = sqlc.arg(entity_id))
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
-ORDER BY creation_time ASC, ID ASC
+ORDER BY creation_time ASC, id ASC
 -- TODO(mvdan): use sqlc.arg once limit/offset support it:
 -- https://github.com/kyleconroy/sqlc/issues/1025
 -- LIMIT sqlc.arg(limit)
@@ -120,7 +120,20 @@ SELECT COUNT(DISTINCT entity_id) FROM processes;
 -- name: SearchEntities :many
 SELECT entity_id FROM processes
 WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
-ORDER BY creation_time ASC, ID ASC
+ORDER BY creation_time ASC, id ASC
 LIMIT ?
 OFFSET ?
 ;
+
+-- name: GetProcessIDsByFinalResults :many
+SELECT id FROM processes
+WHERE final_results = ?;
+
+-- name: UpdateProcessResultByID :execresult
+UPDATE processes
+SET results_votes  = sqlc.arg(votes),
+    results_weight = sqlc.arg(weight),
+    vote_opts_pb = sqlc.arg(vote_opts_pb),
+    envelope_pb = sqlc.arg(envelope_pb),
+    results_signatures = sqlc.arg(results_signatures)
+WHERE id = sqlc.arg(id);

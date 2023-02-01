@@ -29,6 +29,22 @@ const (
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
+		"/elections",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionFullListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/elections/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionFullListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -94,6 +110,52 @@ func (a *API) enableElectionHandlers() error {
 	}
 
 	return nil
+}
+
+// GET /elections
+// GET /elections/page/<page>
+func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	page := 0
+	if ctx.URLParam("page") != "" {
+		var err error
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return fmt.Errorf("page (%s) cannot be decoded", ctx.URLParam("page"))
+		}
+	}
+	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, "", "", false)
+	if err != nil {
+		return fmt.Errorf("cannot fetch election list: %w", err)
+	}
+	if len(elections) == 0 {
+		return ctx.Send(nil, apirest.HTTPstatusCodeNotFound)
+	}
+
+	var list []ElectionSummary
+	for _, eid := range elections {
+		e, err := a.indexer.ProcessInfo(eid)
+		if err != nil {
+			return fmt.Errorf("cannot fetch electionID %x: %w", eid, err)
+		}
+		count, err := a.indexer.GetEnvelopeHeight(eid)
+		if err != nil {
+			return fmt.Errorf("cannot get envelope height: %w", err)
+		}
+		list = append(list, ElectionSummary{
+			ElectionID:   eid,
+			Status:       models.ProcessStatus_name[e.Status],
+			StartDate:    a.vocinfo.HeightTime(int64(e.StartBlock)),
+			EndDate:      a.vocinfo.HeightTime(int64(e.EndBlock)),
+			FinalResults: e.FinalResults,
+			VoteCount:    count,
+		})
+	}
+
+	data, err := json.Marshal(list)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // GET /elections/<electionID>
