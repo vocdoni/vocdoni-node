@@ -21,6 +21,7 @@ import (
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
@@ -342,6 +343,10 @@ func main() {
 	} else if !cfgErr.Critical && cfgErr.Message == "" {
 		log.Infof("config file loaded successfully. Reminder: CLI flags have preference")
 	}
+
+	// Overwrite the default path to download the zksnarks circuits artifacts
+	// using the global datadir as parent folder.
+	circuit.SetBaseDir(filepath.Join(globalCfg.DataDir, *circuit.BaseDir))
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active

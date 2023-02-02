@@ -10,7 +10,24 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"time"
+
+	"go.vocdoni.io/dvote/log"
 )
+
+// By default set the circuit base dir empty which means that the artifacts will
+// be downloaded or loaded from the LocalDir path associated to the circuit config
+var circuitsBaseDir = ""
+var BaseDir = &circuitsBaseDir
+
+// SetBaseDir allows to modify the default base dir to download and load the
+// circuits artifacts. They will be dowloaded or loaded from the LocalDir path
+// associated to the circuit config but inside of BaseDir folder path.
+func SetBaseDir(dir string) {
+	BaseDir = &dir
+}
+
+var downloadCircuitsTimeout = time.Minute * 5
 
 const (
 	// FilenameProvingKey defines the name of the file of the circom ProvingKey
@@ -33,10 +50,35 @@ type ZkCircuit struct {
 	Config ZkCircuitConfig
 }
 
+// LoadZkCircuitByTag gets the circuit configuration associated to the provided
+// tag or gets the default one and load its artifacts to prepare the circuit to
+// be used.
+func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
+	circuitConf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
+	if conf, ok := CircuitsConfigurations[configTag]; ok {
+		circuitConf = conf
+	} else {
+		log.Info("using default zkSnarks circuit")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), downloadCircuitsTimeout)
+	defer cancel()
+
+	zkCircuit, err := LoadZkCircuit(ctx, circuitConf)
+	if err != nil {
+		return nil, err
+	}
+
+	return zkCircuit, nil
+}
+
 // LoadZkCircuit function load the circuit artifacts based on the configuration
 // provided. First, tries to load the artifacts from local storage, if they are
 // not available, tries to download from their remote location. Then,
 func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, error) {
+	// Join the local base path with the local dir set up into the circuit
+	// configuration
+	config.LocalDir = filepath.Join(*BaseDir, config.LocalDir)
 	circuit := &ZkCircuit{Config: config}
 
 	// load the artifacts of the provided circuit from the local storage
@@ -71,6 +113,9 @@ func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, err
 func (circuit *ZkCircuit) LoadLocal() error {
 	var err error
 
+	log.Infow("Loading circuit locally...", map[string]interface{}{
+		"localDir": circuit.Config.LocalDir})
+
 	// compose files localpath
 	provingKeyLocalPath := filepath.Join(circuit.Config.LocalDir,
 		circuit.Config.CircuitPath, FilenameProvingKey)
@@ -101,6 +146,9 @@ func (circuit *ZkCircuit) LoadLocal() error {
 // LoadRemote downloads the content of the current circuit artifacts from its
 // remote location. If any of the downloads fails, returns an error.
 func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
+	log.Infow("Not already downloaded. Downloading circuit...", map[string]interface{}{
+		"localDir": circuit.Config.LocalDir})
+
 	baseUri, err := url.Parse(circuit.Config.URI)
 	if err != nil {
 		return err
@@ -126,7 +174,8 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	circuit.ProvingKey, err = downloadFile(ctx, provingKeyUri)
 	if err != nil {
 		return fmt.Errorf("error downloading provingKey: %w", err)
-	} else if err := storeFile(circuit.ProvingKey, provingKeyLocalPath); err != nil {
+	}
+	if err := storeFile(circuit.ProvingKey, provingKeyLocalPath); err != nil {
 		return fmt.Errorf("error storing provingKey: %w", err)
 	}
 
@@ -134,7 +183,8 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	circuit.VerificationKey, err = downloadFile(ctx, verificationKeyUri)
 	if err != nil {
 		return fmt.Errorf("error downloading verificationKey: %w", err)
-	} else if err := storeFile(circuit.VerificationKey, verificationKeyLocalPath); err != nil {
+	}
+	if err := storeFile(circuit.VerificationKey, verificationKeyLocalPath); err != nil {
 		return fmt.Errorf("error storing verificationKey: %w", err)
 	}
 
@@ -142,7 +192,9 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	circuit.Wasm, err = downloadFile(ctx, wasmUri)
 	if err != nil {
 		return fmt.Errorf("error downloading wasm circuit: %w", err)
-	} else if err := storeFile(circuit.Wasm, wasmLocalPath); err != nil {
+	}
+
+	if err := storeFile(circuit.Wasm, wasmLocalPath); err != nil {
 		return fmt.Errorf("error storing wasm circuit: %w", err)
 	}
 

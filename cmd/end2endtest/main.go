@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"time"
 
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
@@ -41,6 +43,12 @@ func opNames() (names []string) {
 }
 
 func main() {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	circuit.SetBaseDir(filepath.Join(home, ".vochain", *circuit.BaseDir))
+
 	host := flag.String("host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	logLevel := flag.String("logLevel", "info", "log level (debug, info, warn, error, fatal)")
 	operation := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opNames()))
@@ -51,6 +59,7 @@ func main() {
 	faucet := flag.String("faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
 	faucetAuthToken := flag.String("faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
 	timeout := flag.Duration("timeout", 5*time.Minute, "timeout duration")
+	// dataDir := flag.String("dataDir", home+"/.vocdoni", "")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])

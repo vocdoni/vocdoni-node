@@ -52,7 +52,7 @@ func NewTransactionHandler(state *vstate.State, dataDir string) (*TransactionHan
 }
 
 func (t *TransactionHandler) LoadZkCircuit(configTag string) error {
-	circuit, err := GetZkCircuitByConfigTag(t.dataDir, configTag)
+	circuit, err := circuit.LoadZkCircuitByTag(configTag)
 	if err != nil {
 		return fmt.Errorf("could not load zk verification keys: %w", err)
 	}
