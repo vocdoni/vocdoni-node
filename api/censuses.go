@@ -201,7 +201,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}
-		if ref.Indexed && p.Weight.ToInt().Uint64() != 1 {
+		if ref.Indexed && p.Weight.ToStdBigInt().Uint64() != 1 {
 			return fmt.Errorf("indexed census cannot use weight")
 		}
 		// compute the hash, we use it as key for the merkle tree
@@ -211,7 +211,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 		keys = append(keys, keyHash)
 		if !ref.Indexed {
-			values = append(values, ref.Tree().BigIntToBytes(p.Weight.ToInt()))
+			values = append(values, ref.Tree().BigIntToBytes(p.Weight.ToStdBigInt()))
 		}
 	}
 

@@ -437,8 +437,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		ElectionID:            electionID,
 		SourceContractAddress: process.SourceNetworkContractAddr,
 		OrganizationID:        process.EntityId,
-		// cast results to big.Int
-		Results: state.ResultsToBigIntMatrix(firstResult.Votes),
+		Results:               state.GetFriendlyResults(firstResult.Votes),
 	}
 
 	// add the abi encoded results

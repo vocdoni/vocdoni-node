@@ -153,11 +153,20 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 
 	// add the signature to the results and own address
 	setprocessTxArgs.Results.OracleAddress = o.signer.Address().Bytes()
+	resultsBigInt := state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes())
+	// convert results to string matrix
+	resultsString := make([][]string, len(resultsBigInt))
+	for i, v := range resultsBigInt {
+		resultsString[i] = make([]string, len(v))
+		for j, w := range v {
+			resultsString[i][j] = w.String()
+		}
+	}
 	signedResultsPayload := OracleResults{
 		ChainID:   o.VochainApp.ChainID(),
 		EntityID:  vocProcessData.EntityId,
 		ProcessID: results.ProcessID,
-		Results:   state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
+		Results:   resultsString,
 	}
 	resultsPayload, err := json.Marshal(signedResultsPayload)
 	if err != nil {

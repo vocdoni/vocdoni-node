@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +43,7 @@ type ElectionResults struct {
 	// OrganizationID is the ID of the organization that created the election
 	OrganizationID types.HexBytes `json:"organizationId"`
 	// Results is the list of votes
-	Results [][]*big.Int `json:"results"`
+	Results [][]*types.BigInt `json:"results"`
 	// SourceContractAddress is the address of the smart contract containing the census
 	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty"`
 }

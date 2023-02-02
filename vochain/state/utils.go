@@ -3,10 +3,10 @@ package state
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/types"
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
@@ -20,24 +20,12 @@ func GenerateNullifier(address ethcommon.Address, processID []byte) []byte {
 }
 
 // GetFriendlyResults returns the results of a process in a human friendly format.
-func GetFriendlyResults(results []*models.QuestionResult) [][]string {
-	r := [][]string{}
+func GetFriendlyResults(results []*models.QuestionResult) [][]*types.BigInt {
+	r := [][]*types.BigInt{}
 	for i := range results {
-		r = append(r, []string{})
+		r = append(r, []*types.BigInt{})
 		for j := range results[i].Question {
-			r[i] = append(r[i], new(big.Int).SetBytes(results[i].Question[j]).String())
-		}
-	}
-	return r
-}
-
-// ResultsToBigIntMatrix converts the results of a process to a big.Int matrix.
-func ResultsToBigIntMatrix(results []*models.QuestionResult) [][]*big.Int {
-	r := make([][]*big.Int, len(results))
-	for k, questionResult := range results {
-		r[k] = make([]*big.Int, len(questionResult.Question))
-		for kk, questionOption := range questionResult.Question {
-			r[k][kk] = new(big.Int).SetBytes(questionOption)
+			r[i] = append(r[i], new(types.BigInt).SetBytes(results[i].Question[j]))
 		}
 	}
 	return r

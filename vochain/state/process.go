@@ -359,7 +359,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 }
 
 // GetProcessResults returns a friendly representation of the results stored in the State (if any).
-func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
+func (v *State) GetProcessResults(pid []byte) ([][]*types.BigInt, error) {
 	// TO-DO (pau): use a LRU cache for results
 	process, err := v.Process(pid, true)
 	if err != nil {

@@ -3,14 +3,15 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
-	"math/big" // required for evm encoding
+	"fmt" // required for evm encoding
+	"math/big"
 	"reflect"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -103,7 +104,7 @@ func encodeEVMResultsArgs(electionId common.Hash,
 	organizationId common.Address,
 	censusRoot common.Hash,
 	sourceContractAddress common.Address,
-	results [][]*big.Int,
+	results [][]*types.BigInt,
 ) (string, error) {
 	address, _ := abi.NewType("address", "", nil)
 	bytes32, _ := abi.NewType("bytes32", "", nil)
@@ -115,7 +116,15 @@ func encodeEVMResultsArgs(electionId common.Hash,
 		{Type: address},
 		{Type: uint256SliceNested},
 	}
-	abiEncodedResultsBytes, err := args.Pack(electionId, organizationId, censusRoot, sourceContractAddress, results)
+	// change results from *types.BigInt to *bigInt as args.Pack requires math/big.Int type
+	resultsStd := make([][]*big.Int, len(results))
+	for i, r := range results {
+		resultsStd[i] = make([]*big.Int, len(r))
+		for j, v := range r {
+			resultsStd[i][j] = v.ToStdBigInt()
+		}
+	}
+	abiEncodedResultsBytes, err := args.Pack(electionId, organizationId, censusRoot, sourceContractAddress, resultsStd)
 	if err != nil {
 		return "", fmt.Errorf("error encoding abi: %w", err)
 	}
