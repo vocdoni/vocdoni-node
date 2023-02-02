@@ -47,9 +47,12 @@ func TestLoadZkCircuit(t *testing.T) {
 	defer server.Close()
 
 	config := ZkCircuitConfig{
-		URI:         server.URL,
-		CircuitPath: "/test/",
-		LocalDir:    "./test-files",
+		URI:                     server.URL,
+		CircuitPath:             "/test/",
+		LocalDir:                "./test-files",
+		ProvingKeyFilename:      filenameProvingKey,
+		VerificationKeyFilename: filenameVerificationKey,
+		WasmFilename:            filenameWasm,
 	}
 
 	hashFn := sha256.New()
@@ -89,8 +92,11 @@ func TestLoadLocal(t *testing.T) {
 
 	circuit := &ZkCircuit{
 		Config: ZkCircuitConfig{
-			CircuitPath: "/test/",
-			LocalDir:    "./test-files",
+			CircuitPath:             "/test/",
+			LocalDir:                "./test-files",
+			ProvingKeyFilename:      filenameProvingKey,
+			VerificationKeyFilename: filenameVerificationKey,
+			WasmFilename:            filenameWasm,
 		},
 	}
 
@@ -132,9 +138,12 @@ func TestLoadRemote(t *testing.T) {
 
 	circuit := &ZkCircuit{
 		Config: ZkCircuitConfig{
-			URI:         server.URL,
-			CircuitPath: "/test/",
-			LocalDir:    "./test-files",
+			URI:                     server.URL,
+			CircuitPath:             "/test/",
+			LocalDir:                "./test-files",
+			ProvingKeyFilename:      filenameProvingKey,
+			VerificationKeyFilename: filenameVerificationKey,
+			WasmFilename:            filenameWasm,
 		},
 	}
 
