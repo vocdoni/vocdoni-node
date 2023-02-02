@@ -38,13 +38,13 @@ type VerifyProofFunc func(process *models.Process, proof *models.Proof,
 func VerifyProof(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
 	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
-	log.Debugw("verify proof", map[string]interface{}{
-		"censusOrigin": censusOrigin,
-		"electionID":   fmt.Sprintf("%x", processID),
-		"pubKey":       fmt.Sprintf("%x", pubKey),
-		"addr":         addr.Hex(),
-		"censusRoot":   fmt.Sprintf("%x", censusRoot),
-	})
+	log.Debugw("verify proof",
+		"censusOrigin", censusOrigin,
+		"electionID", fmt.Sprintf("%x", processID),
+		"pubKey", fmt.Sprintf("%x", pubKey),
+		"addr", addr.Hex(),
+		"censusRoot", fmt.Sprintf("%x", censusRoot),
+	)
 	// check census origin and compute vote digest identifier
 	var verifyProof VerifyProofFunc
 	switch process.CensusOrigin {

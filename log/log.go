@@ -203,19 +203,19 @@ func Fatalf(template string, args ...interface{}) {
 }
 
 // Debugw sends a debug level log message with key-value pairs.
-func Debugw(msg string, keyvalues map[string]interface{}) {
-	Logger().Debug().Fields(keyvalues).Msg(msg)
+func Debugw(msg string, keyvalues ...interface{}) {
+	Logger().Debug().Fields(keyvalues)
 	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Infow sends an info level log message with key-value pairs.
-func Infow(msg string, keyvalues map[string]interface{}) {
+func Infow(msg string, keyvalues ...interface{}) {
 	Logger().Info().Fields(keyvalues).Msg(msg)
 	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Warnw sends a warning level log message with key-value pairs.
-func Warnw(msg string, keyvalues map[string]interface{}) {
+func Warnw(msg string, keyvalues ...interface{}) {
 	Logger().Warn().Fields(keyvalues).Msg(msg)
 	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }

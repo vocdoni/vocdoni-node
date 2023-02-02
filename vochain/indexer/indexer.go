@@ -154,15 +154,15 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
 
-	log.Infow("indexer initialization", map[string]interface{}{
-		"took":         time.Since(startTime),
-		"dataDir":      dbPath,
-		"liveResults":  countLiveResults,
-		"transactions": countMap[indexertypes.CountStoreTransactions],
-		"envelopes":    countMap[indexertypes.CountStoreEnvelopes],
-		"processes":    countMap[indexertypes.CountStoreProcesses],
-		"entities":     countMap[indexertypes.CountStoreEntities],
-	})
+	log.Infow("indexer initialization",
+		"took", time.Since(startTime),
+		"dataDir", dbPath,
+		"liveResults", countLiveResults,
+		"transactions", countMap[indexertypes.CountStoreTransactions],
+		"envelopes", countMap[indexertypes.CountStoreEnvelopes],
+		"processes", countMap[indexertypes.CountStoreProcesses],
+		"entities", countMap[indexertypes.CountStoreEntities],
+	)
 
 	sqlPath := dbPath + "-sqlite"
 	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
@@ -429,12 +429,12 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
-		log.Infow("partial results recovered", map[string]interface{}{
-			"electionID": fmt.Sprintf("%x", p),
-			"weight":     results.Weight,
-			"votes":      len(results.Votes),
-			"results":    results.String(),
-		})
+		log.Infow("partial results recovered",
+			"electionID", fmt.Sprintf("%x", p),
+			"weight", results.Weight,
+			"votes", len(results.Votes),
+			"results", results.String(),
+		)
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}
@@ -778,11 +778,11 @@ func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
 	}); err != nil {
 		return err
 	}
-	log.Debugw("new token transfer", map[string]interface{}{
-		"from":   fmt.Sprintf("%x", tt.From),
-		"to":     fmt.Sprintf("%x", tt.To),
-		"amount": fmt.Sprintf("%d", tt.Amount),
-	})
+	log.Debugw("new token transfer",
+		"from", fmt.Sprintf("%x", tt.From),
+		"to", fmt.Sprintf("%x", tt.To),
+		"amount", fmt.Sprintf("%d", tt.Amount),
+	)
 	return nil
 }
 

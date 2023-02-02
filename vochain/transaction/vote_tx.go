@@ -111,11 +111,11 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		if err := t.checkVoteAlreadyExists(voteEnvelope.Nullifier, process); err != nil {
 			return nil, err
 		}
-		log.Infow("new vote", map[string]interface{}{
-			"type":       "zkSNARK",
-			"nullifier":  fmt.Sprintf("%x", voteEnvelope.Nullifier),
-			"electionID": fmt.Sprintf("%x", voteEnvelope.ProcessId),
-		})
+		log.Infow("new vote",
+			"type", "zkSNARK",
+			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
+			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
+		)
 
 		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkVKs) ||
 			int(proofZkSNARK.CircuitParametersIndex) < 0 {
@@ -251,12 +251,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 		if err := t.checkVoteAlreadyExists(vote.Nullifier, process); err != nil {
 			return nil, err
 		}
-		log.Infow("new vote", map[string]interface{}{
-			"type":       "signature",
-			"nullifier":  fmt.Sprintf("%x", vote.Nullifier),
-			"address":    addr.Hex(),
-			"electionID": fmt.Sprintf("%x", voteEnvelope.ProcessId),
-		})
+		log.Infow("new vote",
+			"type", "signature",
+			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
+			"address", addr.Hex(),
+			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
+			"height", height)
 
 		valid, weight, err := VerifyProof(process, voteEnvelope.Proof,
 			process.CensusOrigin, process.CensusRoot, process.ProcessId,

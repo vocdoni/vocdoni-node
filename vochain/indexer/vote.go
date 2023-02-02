@@ -53,15 +53,15 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 	if err != nil {
 		return nil, err
 	}
-	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)), map[string]interface{}{
-		"nullifier":      hex.EncodeToString(nullifier),
-		"height":         sqlTxRefInner.Height,
-		"txIndex":        sqlTxRefInner.TxIndex,
-		"weight":         sqlTxRefInner.Weight,
-		"processId":      hex.EncodeToString(sqlTxRefInner.ProcessID),
-		"overwriteCount": sqlTxRefInner.OverwriteCount,
-		"voterId":        hex.EncodeToString(sqlTxRefInner.VoterID),
-	})
+	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)),
+		"nullifier", hex.EncodeToString(nullifier),
+		"height", sqlTxRefInner.Height,
+		"txIndex", sqlTxRefInner.TxIndex,
+		"weight", sqlTxRefInner.Weight,
+		"processId", hex.EncodeToString(sqlTxRefInner.ProcessID),
+		"overwriteCount", sqlTxRefInner.OverwriteCount,
+		"voterId", hex.EncodeToString(sqlTxRefInner.VoterID),
+	)
 
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
 	return sqlTxRef, nil
@@ -600,16 +600,16 @@ func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32, txn *badger.Txn)
 		return err
 	}
 
-	log.Debugw("addVoteIndex sqlite", map[string]interface{}{
-		"nullifier":   vote.Nullifier,
-		"pid":         vote.ProcessID,
-		"blockHeight": vote.Height,
-		"weight":      weightStr,
-		"voterID":     hex.EncodeToString(vote.VoterID),
-		"txIndex":     txIndex,
-		"overwrites":  vote.Overwrites,
-		"duration":    time.Since(sqlStartTime).String(),
-	})
+	log.Debugw("addVoteIndex sqlite",
+		"nullifier", vote.Nullifier,
+		"pid", vote.ProcessID,
+		"blockHeight", vote.Height,
+		"weight", weightStr,
+		"voterID", hex.EncodeToString(vote.VoterID),
+		"txIndex", txIndex,
+		"overwrites", vote.Overwrites,
+		"duration", time.Since(sqlStartTime).String(),
+	)
 	return nil
 }
 
@@ -752,11 +752,11 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 		}
 		nvotes.Add(1)
 	}); err == nil {
-		log.Infow("computed results", map[string]interface{}{
-			"process": p.ID.String(),
-			"votes":   nvotes.Load(),
-			"results": results.String(),
-		})
+		log.Infow("computed results",
+			"process", p.ID.String(),
+			"votes", nvotes.Load(),
+			"results", results.String(),
+		)
 	}
 	results.EnvelopeHeight = nvotes.Load()
 	return results, err
