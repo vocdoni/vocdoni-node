@@ -16,10 +16,16 @@ import (
 	qt "github.com/frankban/quicktest"
 )
 
+const (
+	filenameProvingKey      = "proving_key.zkey"
+	filenameVerificationKey = "verification_key.json"
+	filenameWasm            = "circuit.wasm"
+)
+
 var testFiles = map[string][]byte{
-	FilenameProvingKey:      []byte("proving_key_content"),
-	FilenameVerificationKey: []byte("verification_key_content"),
-	FilenameWasm:            []byte("wasm_content"),
+	filenameProvingKey:      []byte("proving_key_content"),
+	filenameVerificationKey: []byte("verification_key_content"),
+	filenameWasm:            []byte("wasm_content"),
 }
 
 func testFileServer(files map[string][]byte) *httptest.Server {
@@ -47,15 +53,15 @@ func TestLoadZkCircuit(t *testing.T) {
 	}
 
 	hashFn := sha256.New()
-	hashFn.Write(testFiles[FilenameProvingKey])
+	hashFn.Write(testFiles[filenameProvingKey])
 	config.ProvingKeyHash = hashFn.Sum(nil)
 
 	hashFn.Reset()
-	hashFn.Write(testFiles[FilenameVerificationKey])
+	hashFn.Write(testFiles[filenameVerificationKey])
 	config.VerificationKeyHash = hashFn.Sum(nil)
 
 	hashFn.Reset()
-	hashFn.Write(testFiles[FilenameWasm])
+	hashFn.Write(testFiles[filenameWasm])
 	config.WasmHash = hashFn.Sum(nil)
 
 	testCircuits := filepath.Join(config.LocalDir, config.CircuitPath)
@@ -63,19 +69,19 @@ func TestLoadZkCircuit(t *testing.T) {
 
 	circuit, err := LoadZkCircuit(context.Background(), config)
 	c.Assert(err, qt.IsNil)
-	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[FilenameProvingKey])
-	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[FilenameVerificationKey])
-	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[FilenameWasm])
+	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[filenameProvingKey])
+	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[filenameVerificationKey])
+	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[filenameWasm])
 
-	localProvingKey, err := os.ReadFile(filepath.Join(testCircuits, FilenameProvingKey))
+	localProvingKey, err := os.ReadFile(filepath.Join(testCircuits, filenameProvingKey))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localProvingKey, qt.DeepEquals, testFiles[FilenameProvingKey])
-	localVerificationKey, err := os.ReadFile(filepath.Join(testCircuits, FilenameVerificationKey))
+	c.Assert(localProvingKey, qt.DeepEquals, testFiles[filenameProvingKey])
+	localVerificationKey, err := os.ReadFile(filepath.Join(testCircuits, filenameVerificationKey))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localVerificationKey, qt.DeepEquals, testFiles[FilenameVerificationKey])
-	localWasm, err := os.ReadFile(filepath.Join(testCircuits, FilenameWasm))
+	c.Assert(localVerificationKey, qt.DeepEquals, testFiles[filenameVerificationKey])
+	localWasm, err := os.ReadFile(filepath.Join(testCircuits, filenameWasm))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localWasm, qt.DeepEquals, testFiles[FilenameWasm])
+	c.Assert(localWasm, qt.DeepEquals, testFiles[filenameWasm])
 }
 
 func TestLoadLocal(t *testing.T) {
@@ -99,23 +105,23 @@ func TestLoadLocal(t *testing.T) {
 	c.Assert(err, qt.IsNotNil)
 
 	// Write example files
-	localProvingKey := filepath.Join(testCircuits, FilenameProvingKey)
-	err = os.WriteFile(localProvingKey, testFiles[FilenameProvingKey], os.ModePerm)
+	localProvingKey := filepath.Join(testCircuits, filenameProvingKey)
+	err = os.WriteFile(localProvingKey, testFiles[filenameProvingKey], os.ModePerm)
 	c.Assert(err, qt.IsNil)
-	localVerificationKey := filepath.Join(testCircuits, FilenameVerificationKey)
-	err = os.WriteFile(localVerificationKey, testFiles[FilenameVerificationKey], os.ModePerm)
+	localVerificationKey := filepath.Join(testCircuits, filenameVerificationKey)
+	err = os.WriteFile(localVerificationKey, testFiles[filenameVerificationKey], os.ModePerm)
 	c.Assert(err, qt.IsNil)
-	localWasm := filepath.Join(testCircuits, FilenameWasm)
-	err = os.WriteFile(localWasm, testFiles[FilenameWasm], os.ModePerm)
+	localWasm := filepath.Join(testCircuits, filenameWasm)
+	err = os.WriteFile(localWasm, testFiles[filenameWasm], os.ModePerm)
 	c.Assert(err, qt.IsNil)
 
 	// Try to get local again
 	err = circuit.LoadLocal()
 	defer os.RemoveAll(testCircuits)
 	c.Assert(err, qt.IsNil)
-	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[FilenameProvingKey])
-	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[FilenameVerificationKey])
-	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[FilenameWasm])
+	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[filenameProvingKey])
+	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[filenameVerificationKey])
+	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[filenameWasm])
 }
 
 func TestLoadRemote(t *testing.T) {
@@ -136,21 +142,21 @@ func TestLoadRemote(t *testing.T) {
 	ctx := context.Background()
 	err := circuit.LoadRemote(ctx)
 	c.Assert(err, qt.IsNil)
-	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[FilenameProvingKey])
-	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[FilenameVerificationKey])
-	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[FilenameWasm])
+	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[filenameProvingKey])
+	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[filenameVerificationKey])
+	c.Assert(circuit.Wasm, qt.DeepEquals, testFiles[filenameWasm])
 
 	// Compare with the local copies
 	testCircuits := filepath.Join(circuit.Config.LocalDir, circuit.Config.CircuitPath)
-	localProvingKey, err := os.ReadFile(filepath.Join(testCircuits, FilenameProvingKey))
+	localProvingKey, err := os.ReadFile(filepath.Join(testCircuits, filenameProvingKey))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localProvingKey, qt.DeepEquals, testFiles[FilenameProvingKey])
-	localVerificationKey, err := os.ReadFile(filepath.Join(testCircuits, FilenameVerificationKey))
+	c.Assert(localProvingKey, qt.DeepEquals, testFiles[filenameProvingKey])
+	localVerificationKey, err := os.ReadFile(filepath.Join(testCircuits, filenameVerificationKey))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localVerificationKey, qt.DeepEquals, testFiles[FilenameVerificationKey])
-	localWasm, err := os.ReadFile(filepath.Join(testCircuits, FilenameWasm))
+	c.Assert(localVerificationKey, qt.DeepEquals, testFiles[filenameVerificationKey])
+	localWasm, err := os.ReadFile(filepath.Join(testCircuits, filenameWasm))
 	c.Assert(err, qt.IsNil)
-	c.Assert(localWasm, qt.DeepEquals, testFiles[FilenameWasm])
+	c.Assert(localWasm, qt.DeepEquals, testFiles[filenameWasm])
 
 	// Clean stored files
 	err = os.RemoveAll(testCircuits)
@@ -166,7 +172,7 @@ func TestLoadRemote(t *testing.T) {
 	for k, v := range testFiles {
 		newFiles[k] = v
 	}
-	delete(newFiles, FilenameProvingKey)
+	delete(newFiles, filenameProvingKey)
 	server = testFileServer(newFiles)
 	defer server.Close()
 
@@ -184,9 +190,9 @@ func TestVerifiedCircuitArtifacts(t *testing.T) {
 	c.Assert(res, qt.IsFalse)
 
 	circuit = &ZkCircuit{
-		ProvingKey:      testFiles[FilenameProvingKey],
-		VerificationKey: testFiles[FilenameVerificationKey],
-		Wasm:            testFiles[FilenameWasm],
+		ProvingKey:      testFiles[filenameProvingKey],
+		VerificationKey: testFiles[filenameVerificationKey],
+		Wasm:            testFiles[filenameWasm],
 		Config:          ZkCircuitConfig{},
 	}
 
@@ -249,8 +255,8 @@ func Test_downloadFile(t *testing.T) {
 	server := testFileServer(testFiles)
 
 	// Success case
-	fileUrl := fmt.Sprintf("%s/%s", server.URL, FilenameProvingKey)
-	expected := testFiles[FilenameProvingKey]
+	fileUrl := fmt.Sprintf("%s/%s", server.URL, filenameProvingKey)
+	expected := testFiles[filenameProvingKey]
 	res, err := downloadFile(ctx, fileUrl)
 	c.Assert(err, qt.IsNil)
 	c.Assert(res, qt.DeepEquals, expected)

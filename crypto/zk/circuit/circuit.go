@@ -29,17 +29,6 @@ func SetBaseDir(dir string) {
 
 var downloadCircuitsTimeout = time.Minute * 5
 
-const (
-	// FilenameProvingKey defines the name of the file of the circom ProvingKey
-	FilenameProvingKey = "proving_key.zkey"
-	// FilenameVerificationKey defines the name of the file of the circom
-	// VerificationKey
-	FilenameVerificationKey = "verification_key.json"
-	// FilenameWasm defines the name of the file of the circuit wasm compiled
-	//version
-	FilenameWasm = "circuit.wasm"
-)
-
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)
 type ZkCircuit struct {
@@ -54,12 +43,7 @@ type ZkCircuit struct {
 // tag or gets the default one and load its artifacts to prepare the circuit to
 // be used.
 func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
-	circuitConf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
-	if conf, ok := CircuitsConfigurations[configTag]; ok {
-		circuitConf = conf
-	} else {
-		log.Info("using default zkSnarks circuit")
-	}
+	circuitConf := GetCircuitConfiguration(configTag)
 
 	ctx, cancel := context.WithTimeout(context.Background(), downloadCircuitsTimeout)
 	defer cancel()
@@ -118,11 +102,11 @@ func (circuit *ZkCircuit) LoadLocal() error {
 
 	// compose files localpath
 	provingKeyLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, FilenameProvingKey)
+		circuit.Config.CircuitPath, circuit.Config.ProvingKeyFilename)
 	verificationKeyLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, FilenameVerificationKey)
+		circuit.Config.CircuitPath, circuit.Config.VerificationKeyFilename)
 	wasmLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, FilenameWasm)
+		circuit.Config.CircuitPath, circuit.Config.WasmFilename)
 
 	// read file contents into circuit parameters
 	circuit.ProvingKey, err = os.ReadFile(provingKeyLocalPath)
@@ -161,14 +145,14 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	}
 
 	// Compose provingKey remote and local locations
-	provingKeyUri := fmt.Sprintf("%s/%s", remotePath, FilenameProvingKey)
-	provingKeyLocalPath := filepath.Join(localPath, FilenameProvingKey)
+	provingKeyUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.ProvingKeyFilename)
+	provingKeyLocalPath := filepath.Join(localPath, circuit.Config.ProvingKeyFilename)
 	// Compose verificationKey remote and local locations
-	verificationKeyUri := fmt.Sprintf("%s/%s", remotePath, FilenameVerificationKey)
-	verificationKeyLocalPath := filepath.Join(localPath, FilenameVerificationKey)
+	verificationKeyUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.VerificationKeyFilename)
+	verificationKeyLocalPath := filepath.Join(localPath, circuit.Config.VerificationKeyFilename)
 	// Compose wasm remote and local locations
-	wasmUri := fmt.Sprintf("%s/%s", remotePath, FilenameWasm)
-	wasmLocalPath := filepath.Join(localPath, FilenameWasm)
+	wasmUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.WasmFilename)
+	wasmLocalPath := filepath.Join(localPath, circuit.Config.WasmFilename)
 
 	// Download and store locally provingKey
 	circuit.ProvingKey, err = downloadFile(ctx, provingKeyUri)
