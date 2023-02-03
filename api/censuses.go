@@ -155,8 +155,9 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return fmt.Errorf("census type is unknown")
 	}
 
+	maxLevels := a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
 	censusID := util.RandomBytes(32)
-	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token)
+	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token, maxLevels)
 	if err != nil {
 		return err
 	}
@@ -526,6 +527,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 			dump,
 			models.Census_Type(ref.CensusType),
 			ref.Indexed,
+			ref.MaxLevels,
 		)
 		if err != nil {
 			return err
@@ -542,7 +544,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 	newRef, err := a.censusdb.New(
 		root, models.Census_Type(ref.CensusType),
-		ref.Indexed, uri, nil)
+		ref.Indexed, uri, nil, ref.MaxLevels)
 	if err != nil {
 		return err
 	}

@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // importExternalCensus imports a census from a remote URI into the censusDB storage.
@@ -36,8 +38,12 @@ func (d *OffChainDataHandler) importRollingCensus(pid []byte) {
 		log.Errorf("cannot dump census with pid %x: %v", pid, err)
 		return
 	}
+	maxLevels := censustree.DefaultMaxLevels
+	if rcensus.Type == models.Census_ARBO_POSEIDON {
+		maxLevels = d.vochain.TransactionHandler.ZkCircuit.Config.Levels
+	}
 	log.Infof("snapshoting rolling census %s", rcensus.CensusID)
-	dump, err := censusdb.BuildExportDump(rcensus.DumpRoot, rcensus.DumpData, rcensus.Type, true)
+	dump, err := censusdb.BuildExportDump(rcensus.DumpRoot, rcensus.DumpData, rcensus.Type, true, maxLevels)
 	if err != nil {
 		log.Errorf("cannot build census dump for process %x: %v", pid, err)
 		return

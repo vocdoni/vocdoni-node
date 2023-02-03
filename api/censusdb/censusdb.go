@@ -41,6 +41,7 @@ type CensusRef struct {
 	Indexed    bool
 	URI        string
 	// TODO: (lucasmenendez) create new parameter to store the number of levels
+	MaxLevels int
 }
 
 // Tree returns the censustree.Tree object of the census reference.
@@ -56,10 +57,11 @@ func (cr *CensusRef) SetTree(tree *censustree.Tree) {
 // CensusDump is a struct that contains the data of a census. It is used
 // for import/export operations.
 type CensusDump struct {
-	Type     models.Census_Type `json:"type"`
-	RootHash []byte             `json:"rootHash"`
-	Data     []byte             `json:"data"`
-	Indexed  bool               `json:"indexed"`
+	Type      models.Census_Type `json:"type"`
+	RootHash  []byte             `json:"rootHash"`
+	Data      []byte             `json:"data"`
+	Indexed   bool               `json:"indexed"`
+	MaxLevels int                `json:"maxLevels"`
 }
 
 // CensusDB is a safe and persistent database of census trees.  It allows
@@ -75,18 +77,18 @@ func NewCensusDB(db db.Database) *CensusDB {
 
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
-	indexed bool, uri string, authToken *uuid.UUID) (*CensusRef, error) {
+	indexed bool, uri string, authToken *uuid.UUID, maxLevels int) (*CensusRef, error) {
 	// TODO: (lucasmenendez) add new parameter with the max number of levels
 	// and store it.
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
 	tree, err := censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
-		MaxLevels: 256, CensusType: censusType, IndexAsKeysCensus: indexed})
+		MaxLevels: maxLevels, CensusType: censusType, IndexAsKeysCensus: indexed})
 	if err != nil {
 		return nil, err
 	}
-	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, indexed, uri)
+	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, indexed, uri, maxLevels)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +125,7 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 
 	// TODO: (lucasmenendez) Get the max number of levels from the DB and add here its value
 	ref.tree, err = censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
-		MaxLevels: 256, CensusType: models.Census_Type(ref.CensusType)})
+		MaxLevels: ref.MaxLevels, CensusType: models.Census_Type(ref.CensusType)})
 	if err != nil {
 		return nil, err
 	}
@@ -154,12 +156,13 @@ func (c *CensusDB) Del(censusID []byte) error {
 }
 
 // BuildExportDump builds a census serialization that can be used for import.
-func BuildExportDump(root, data []byte, typ models.Census_Type, isIndexed bool) ([]byte, error) {
+func BuildExportDump(root, data []byte, typ models.Census_Type, isIndexed bool, maxLevels int) ([]byte, error) {
 	export := CensusDump{
-		Type:     typ,
-		Indexed:  isIndexed,
-		RootHash: root,
-		Data:     compressor.NewCompressor().CompressBytes(data),
+		Type:      typ,
+		Indexed:   isIndexed,
+		RootHash:  root,
+		Data:      compressor.NewCompressor().CompressBytes(data),
+		MaxLevels: maxLevels,
 	}
 	exportData, err := json.Marshal(export)
 	if err != nil {
@@ -182,7 +185,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 		return fmt.Errorf("could not import census %x, already exists", cdata.RootHash)
 	}
 	uri := "ipfs://" + storagelayer.CalculateIPFSCIDv1json(data)
-	ref, err := c.New(cdata.RootHash, cdata.Type, cdata.Indexed, uri, nil)
+	ref, err := c.New(cdata.RootHash, cdata.Type, cdata.Indexed, uri, nil, cdata.MaxLevels)
 	if err != nil {
 		return err
 	}
@@ -205,7 +208,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 
 // addCensusRefToDB adds a censusRef to the database.
 func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
-	t models.Census_Type, indexed bool, uri string) (*CensusRef, error) {
+	t models.Census_Type, indexed bool, uri string, maxLevels int) (*CensusRef, error) {
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	refData := bytes.Buffer{}
@@ -215,6 +218,7 @@ func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 		CensusType: int32(t),
 		Indexed:    indexed,
 		URI:        uri,
+		MaxLevels:  maxLevels,
 	}
 	if err := enc.Encode(ref); err != nil {
 		return nil, err

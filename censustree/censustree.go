@@ -51,7 +51,7 @@ type Options struct {
 }
 
 // TMP to be defined the production circuit nLevels
-const nLevels = 161
+const DefaultMaxLevels = 256
 
 // DeleteCensusTreeFromDatabase removes all the database entries for the census identified by name.
 // Caller must take care of potential data races, the census must be closed before calling this method.
@@ -76,11 +76,15 @@ func DeleteCensusTreeFromDatabase(kv db.Database, name string) (int, error) {
 // New returns a new Tree, if there already is a Tree in the
 // database, it will load it.
 func New(opts Options) (*Tree, error) {
+	var maxLevels = DefaultMaxLevels
 	var hashFunc arbo.HashFunction
 	switch opts.CensusType {
 	case models.Census_ARBO_BLAKE2B:
 		hashFunc = arbo.HashFunctionBlake2b
 	case models.Census_ARBO_POSEIDON:
+		if opts.MaxLevels < maxLevels {
+			maxLevels = opts.MaxLevels + 1
+		}
 		hashFunc = arbo.HashFunctionPoseidon
 	default:
 		return nil, fmt.Errorf("unrecognized census type (%d)", opts.CensusType)
@@ -88,7 +92,7 @@ func New(opts Options) (*Tree, error) {
 
 	kv := prefixeddb.NewPrefixedDatabase(opts.ParentDB, []byte(opts.Name))
 	// TODO: (lucasmenendez) get the number of levels from options provided
-	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: nLevels, HashFunc: hashFunc})
+	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: maxLevels, HashFunc: hashFunc})
 	if err != nil {
 		return nil, err
 	}

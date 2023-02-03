@@ -46,6 +46,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			r.CensusType == models.Census_ARBO_POSEIDON,
 			"",
 			nil,
+			160,
 		); err != nil {
 			return nil, err
 		}
@@ -263,7 +264,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		}
 		newRef, err := m.cdb.New(
 			root, models.Census_Type(ref.CensusType),
-			ref.Indexed, "", nil)
+			ref.Indexed, "", nil, ref.MaxLevels)
 		if err != nil {
 			return nil, err
 		}
@@ -280,6 +281,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 				dump,
 				models.Census_Type(ref.CensusType),
 				ref.Indexed,
+				ref.MaxLevels,
 			)
 			if err != nil {
 				return nil, err
