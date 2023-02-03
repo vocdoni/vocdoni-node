@@ -51,7 +51,7 @@ type Options struct {
 }
 
 // TMP to be defined the production circuit nLevels
-const nLevels = 251
+const nLevels = 161
 
 // DeleteCensusTreeFromDatabase removes all the database entries for the census identified by name.
 // Caller must take care of potential data races, the census must be closed before calling this method.

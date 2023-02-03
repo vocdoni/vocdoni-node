@@ -41,6 +41,12 @@ type ZkCircuitConfig struct {
 	WasmFilename string `json:"wasmFilename"` // circuit.wasm
 }
 
+// KeySize returns the maximun number of bytes of a leaf key according to the
+// number of levels of the current circuit (nBytes = nLevels / 8).
+func (config ZkCircuitConfig) KeySize() int {
+	return config.Levels / 8
+}
+
 // CircuitsConfiguration stores the relation between the different vochain nets
 // and the associated circuit configuration. Any circuit configuration must have
 // the remote and local location of the circuits artifacts and their metadata
@@ -62,14 +68,14 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
-		CircuitPath:             "artifacts/zkCensus/dev/250",
-		Levels:                  250, // ZkCircuit number of levels
+		CircuitPath:             "artifacts/zkCensus/dev/160",
+		Levels:                  160, // ZkCircuit number of levels
 		LocalDir:                "zkCircuits",
-		ProvingKeyHash:          hexToBytes("0xc0784e19e43bcfc09f65a86ae109b214f33f57bb8f91350f704b117605fb82de"),
+		ProvingKeyHash:          hexToBytes("0x1a2aaa89ebc0278fa381115fd4b6edd574d1e992fa0cd52acb17293d4fdbec0b"),
 		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0x5884112617d8068677d2b7389513de37f3c696b45fdbdef7745f1023fa1bd364"),
+		VerificationKeyHash:     hexToBytes("0x639a0533ddac1004bd7662b9f3bd74a5b236958fbb30465e9e3a966c15e3271d"),
 		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0x5fb13debf5c2a28880aa280c9e5e557d3b3230e0798849a0966062e02776a644"),
+		WasmHash:                hexToBytes("0xd58d4eaeabdc0bedd78cbcd6aca71f893c6dff9cf76a65d85ec106d45dc138da"),
 		WasmFilename:            "circuit.wasm",
 	},
 	"stage": {

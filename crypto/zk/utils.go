@@ -96,3 +96,38 @@ func zkProofPublicInputs(electionId, censusRoot, nullifier types.HexBytes, weigh
 
 	return pubInputs
 }
+
+// TruncateIntToBytes function truncates the provided big.Int (dividing by 10
+// recursively) until it size in bytes not be equal to the number of bytes
+// provided. The function also returns the number of places shifted to achive
+// that number of bytes.
+func TruncateIntToBytes(input *big.Int, newSize int64) (*big.Int, int64) {
+	var nBytes = NumberSizeInBytes(input)
+	if nBytes <= newSize {
+		return input, 0
+	}
+
+	var timesShifted int64 = 0
+	var bTen = new(big.Int).SetInt64(10)
+	for nBytes != newSize {
+		input = input.Div(input, bTen)
+		nBytes = NumberSizeInBytes(input)
+		timesShifted++
+	}
+
+	return input, timesShifted
+}
+
+// NumberSizeInBytes calculates the number of bytes required to store the
+// big.Int provided.
+func NumberSizeInBytes(input *big.Int) int64 {
+	var nBits int64 = 0
+	base := new(big.Int).SetInt64(2)
+	candidate := new(big.Int).Exp(base, big.NewInt(nBits), nil)
+	for input.Cmp(candidate) == 1 {
+		nBits++
+		candidate = candidate.Exp(base, big.NewInt(nBits), nil)
+	}
+
+	return nBits/8 + 1
+}

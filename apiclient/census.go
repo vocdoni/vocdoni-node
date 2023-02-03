@@ -164,7 +164,7 @@ func (c *HTTPclient) CensusAddParticipantsZk(censusID types.HexBytes, participan
 		if err != nil {
 			return err
 		}
-		censusKey, err := BabyJubJubPubKey(privKey)
+		censusKey, _, err := BabyJubJubPubKey(privKey, c.circuit.Levels/8)
 		if err != nil {
 			return err
 		}
@@ -209,10 +209,12 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	if err != nil {
 		return nil, err
 	}
-	pubKey, err := BabyJubJubPubKey(privKey)
+	// Get the publicKey with the correct size according to the circuit config.
+	pubKey, shifted, err := BabyJubJubPubKey(privKey, c.circuit.KeySize())
 	if err != nil {
 		return nil, err
 	}
+	strShifted := fmt.Sprint(shifted)
 
 	strPrivateKey := babyjub.SkToBigInt(&privKey).String()
 	// Get merkle proof associated to the voter key provided, that will contains
@@ -268,6 +270,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 		"voteHash":       strVoteHash,
 		"processId":      strProcessId,
 		"nullifier":      strNullifier,
+		"shifted":        strShifted,
 	}
 	inputs, err := json.Marshal(rawInputs)
 	if err != nil {

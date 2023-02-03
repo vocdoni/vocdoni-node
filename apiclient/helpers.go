@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
@@ -244,15 +245,17 @@ func BabyJubJubPrivKey(account *ethereum.SignKeys) (babyjub.PrivateKey, error) {
 
 // BabyJubJubPubKey returns the public key associated to the provided
 // BabuJubJub private key encoded to slice of bytes arbo tree ready.
-func BabyJubJubPubKey(privKey babyjub.PrivateKey) (types.HexBytes, error) {
+func BabyJubJubPubKey(privKey babyjub.PrivateKey, size int) (types.HexBytes, int64, error) {
 	pubKey, err := poseidon.Hash([]*big.Int{
 		privKey.Public().X,
 		privKey.Public().Y,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error hashing babyjub public key: %w", err)
+		return nil, 0, fmt.Errorf("error hashing babyjub public key: %w", err)
 	}
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), pubKey), nil
+
+	truncatedPubKey, shifted := zk.TruncateIntToBytes(pubKey, int64(size))
+	return arbo.BigIntToBytes(size, truncatedPubKey), shifted, nil
 }
 
 // GetNullifierZk function returns ZkSnark ready vote nullifier and also encodes
