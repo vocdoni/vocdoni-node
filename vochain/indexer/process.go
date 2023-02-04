@@ -434,7 +434,21 @@ func (s *Indexer) computePendingProcesses(height uint32) {
 			log.Warn(err)
 		}
 	}
-	// TODO(sqlite): rewrite
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	procIDs, err := queries.GetProcessIDsByResultsHeight(ctx, int64(height))
+	if err != nil {
+		log.Warn(err)
+		return
+	}
+	for _, pid := range procIDs {
+		start := time.Now()
+		if err := s.ComputeResult(pid); err != nil {
+			log.Warnf("cannot compute results for %x: (%v)", pid, err)
+			continue
+		}
+		log.Infof("results computation on %x took %s", pid, time.Since(start).String())
+	}
 }
 
 // newEmptyProcess creates a new empty process and stores it into the database.

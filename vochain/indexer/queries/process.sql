@@ -125,6 +125,10 @@ LIMIT ?
 OFFSET ?
 ;
 
+-- name: GetProcessIDsByResultsHeight :many
+SELECT id FROM processes
+WHERE results_height = ?;
+
 -- name: GetProcessIDsByFinalResults :many
 SELECT id FROM processes
 WHERE final_results = ?;
