@@ -29,7 +29,7 @@ const (
 
 // CountStore holds the count of envelopes, processes, entities, or transactions
 type CountStore struct {
-	Type  uint8 `badgerholdKey:"Type"`
+	Type  uint8
 	Count uint64
 }
 
@@ -37,19 +37,19 @@ type CountStore struct {
 // The indexer Process data type is different from the vochain state data type
 // since it is optimized for querying purposes and not for keeping a shared consensus state.
 type Process struct {
-	ID                types.HexBytes             `badgerholdKey:"ID" json:"processId"`
-	EntityID          types.HexBytes             `badgerholdIndex:"EntityID" json:"entityId"`
+	ID                types.HexBytes             `json:"processId"`
+	EntityID          types.HexBytes             `json:"entityId"`
 	EntityIndex       uint32                     `json:"entityIndex"`
 	StartBlock        uint32                     `json:"startBlock"`
-	EndBlock          uint32                     `badgerholdIndex:"EndBlock" json:"endBlock"`
-	Rheight           uint32                     `badgerholdIndex:"Rheight" json:"-"`
+	EndBlock          uint32                     `json:"endBlock"`
+	Rheight           uint32                     `json:"-"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
-	Status            int32                      `badgerholdIndex:"Status" json:"status"`
-	Namespace         uint32                     `badgerholdIndex:"Namespace" json:"namespace"`
+	Status            int32                      `json:"status"`
+	Namespace         uint32                     `json:"namespace"`
 	Envelope          *models.EnvelopeType       `json:"envelopeType"`
 	Mode              *models.ProcessMode        `json:"processMode"`
 	VoteOpts          *models.ProcessVoteOptions `json:"voteOptions"`
@@ -60,7 +60,7 @@ type Process struct {
 	HaveResults       bool                       `json:"haveResults"`
 	FinalResults      bool                       `json:"finalResults"`
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
-	SourceNetworkId   string                     `badgerholdIndex:"SourceNetworkId" json:"sourceNetworkId"`
+	SourceNetworkId   string                     `json:"sourceNetworkId"`
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 }
@@ -201,7 +201,7 @@ func (p Process) String() string {
 
 // Entity holds the db reference for an entity
 type Entity struct {
-	ID           types.HexBytes `badgerholdKey:"ID"`
+	ID           types.HexBytes
 	ProcessCount uint32
 	CreationTime time.Time
 }
@@ -214,8 +214,8 @@ type VotePackage struct {
 
 // VoteReference holds the db reference for a single vote
 type VoteReference struct {
-	Nullifier      types.HexBytes `badgerholdKey:"Nullifier"`
-	ProcessID      types.HexBytes `badgerholdIndex:"ProcessID"`
+	Nullifier      types.HexBytes
+	ProcessID      types.HexBytes
 	VoterID        state.VoterID
 	Height         uint32
 	Weight         *types.BigInt
@@ -282,8 +282,8 @@ type TxMetadata struct {
 
 // TxReference holds the db reference for a single transaction
 type TxReference struct {
-	Index        uint64         `badgerholdKey:"Index" json:"transactionNumber"`
-	Hash         types.HexBytes `badgerholdIndex:"Hash" json:"transactionHash"`
+	Index        uint64         `json:"transactionNumber"`
+	Hash         types.HexBytes `json:"transactionHash"`
 	BlockHeight  uint32         `json:"blockHeight"`
 	TxBlockIndex int32          `json:"transactionIndex"`
 	TxType       string         `json:"transactionType"`

@@ -8,8 +8,6 @@ import (
 const (
 	// TypePebble defines the type of db that uses PebbleDB
 	TypePebble = "pebble"
-	// TypeBadger defines the type of db that uses BadgerDB
-	TypeBadger = "badger"
 )
 
 // ErrKeysNotFound is used to indicate that a key does not exist in the db.

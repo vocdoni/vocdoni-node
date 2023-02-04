@@ -5,8 +5,6 @@ go 1.19
 // For testing purposes while dvote-protobuf becomes stable
 // replace go.vocdoni.io/proto => ../dvote-protobuf
 
-replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f
-
 // Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
 // as it dropped support for GOOS=darwin.
 // If you change its version, ensure that "GOOS=darwin go build ./..." still works.

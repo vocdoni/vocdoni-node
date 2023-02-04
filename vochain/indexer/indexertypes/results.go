@@ -19,7 +19,7 @@ const (
 
 // Results holds the final results and relevant process info for a vochain process
 type Results struct {
-	ProcessID      types.HexBytes             `badgerholdKey:"ProcessID" json:"processId"`
+	ProcessID      types.HexBytes             `json:"processId"`
 	Votes          [][]*types.BigInt          `json:"votes"`
 	Weight         *types.BigInt              `json:"weight"`
 	EnvelopeHeight uint64                     `json:"envelopeHeight"`
