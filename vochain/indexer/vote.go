@@ -3,7 +3,6 @@ package indexer
 import (
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -11,10 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	badger "github.com/dgraph-io/badger/v3"
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -30,21 +25,9 @@ import (
 // it does not have yet reuslts
 var ErrNoResultsYet = fmt.Errorf("no results yet")
 
-// ErrNotFoundIndatabase is raised if a database query returns no results
-var ErrNotFoundInDatabase = badgerhold.ErrNotFound
-
 // Getindexertypes.VoteReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
-	bhStartTime := time.Now()
-	txRef := &indexertypes.VoteReference{}
-	if enableBadgerhold {
-		if err := s.db.FindOne(txRef, badgerhold.Where(badgerhold.Key).Eq(nullifier)); err != nil {
-			return nil, err
-		}
-		log.Debugf("GetEnvelopeReference badgerhold took %s", time.Since(bhStartTime))
-	}
-
 	sqlStartTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
@@ -125,35 +108,6 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	const limitConcurrentProcessing = 20
 	semaphore := make(chan bool, limitConcurrentProcessing)
 
-	if enableBadgerhold {
-		err := s.db.ForEach(
-			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID"),
-			func(txRef *indexertypes.VoteReference) error {
-				wg.Add(1)
-				processVote := func() {
-					defer wg.Done()
-					v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
-					if err != nil {
-						log.Errorw(err, "cannot get vote from state")
-						return
-					}
-					callback(v)
-				}
-				if async {
-					go func() {
-						semaphore <- true
-						processVote()
-						<-semaphore
-					}()
-				} else {
-					processVote()
-				}
-				return nil
-			})
-		wg.Wait()
-		return err
-	}
-
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	// TODO(sqlite): getting all votes as a single slice is not scalable.
@@ -197,146 +151,52 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		txRefs, err := queries.SearchVoteReferences(ctx, indexerdb.SearchVoteReferencesParams{
-			ProcessID:       processId,
-			NullifierSubstr: searchTerm,
-			Limit:           int32(max),
-			Offset:          int32(from),
-		})
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	txRefs, err := queries.SearchVoteReferences(ctx, indexerdb.SearchVoteReferencesParams{
+		ProcessID:       processId,
+		NullifierSubstr: searchTerm,
+		Limit:           int32(max),
+		Offset:          int32(from),
+	})
+	if err != nil {
+		return nil, err
+	}
+	for _, txRef := range txRefs {
+		_, txHash, err := s.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
 		if err != nil {
 			return nil, err
 		}
-		for _, txRef := range txRefs {
-			_, txHash, err := s.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
-			if err != nil {
-				return nil, err
-			}
-			envelopeMetadata := &indexertypes.EnvelopeMetadata{
-				ProcessId: txRef.ProcessID,
-				Nullifier: txRef.Nullifier,
-				TxIndex:   int32(txRef.TxIndex),
-				Height:    uint32(txRef.Height),
-				TxHash:    txHash,
-			}
-			if len(txRef.VoterID) > 0 {
-				envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-				if err != nil {
-					return nil, fmt.Errorf("cannot get voterID from pubkey: %w", err)
-				}
-			}
-			envelopes = append(envelopes, envelopeMetadata)
+		envelopeMetadata := &indexertypes.EnvelopeMetadata{
+			ProcessId: txRef.ProcessID,
+			Nullifier: txRef.Nullifier,
+			TxIndex:   int32(txRef.TxIndex),
+			Height:    uint32(txRef.Height),
+			TxHash:    txHash,
 		}
-		return envelopes, nil
+		if len(txRef.VoterID) > 0 {
+			envelopeMetadata.VoterID, err = txRef.VoterID.Address()
+			if err != nil {
+				return nil, fmt.Errorf("cannot get voterID from pubkey: %w", err)
+			}
+		}
+		envelopes = append(envelopes, envelopeMetadata)
+	}
+	return envelopes, nil
 
-	}
-	var err error
-	// TODO(sqlite): reimplement
-	// TODO: check pid
-	// TODO: get the TxHash from the Database (not from the blockstore)
-	if len(processId) > 0 {
-		err = s.db.ForEach(
-			badgerhold.Where("ProcessID").Eq(processId).Index("ProcessID").
-				And("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("Height").
-				Skip(from).
-				Limit(max),
-			func(txRef *indexertypes.VoteReference) error {
-				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
-				if err != nil {
-					return err
-				}
-				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: txRef.ProcessID,
-					Nullifier: txRef.Nullifier,
-					TxIndex:   txRef.TxIndex,
-					Height:    txRef.Height,
-					TxHash:    txHash,
-				}
-				if len(txRef.VoterID) > 0 {
-					envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-					if err != nil {
-						return fmt.Errorf("cannot get voterID from pubkey: %w", err)
-					}
-				}
-				envelopes = append(envelopes, envelopeMetadata)
-				return nil
-			})
-	} else if len(searchTerm) > 0 { // Search nullifiers without process id
-		err = s.db.ForEach(
-			badgerhold.
-				Where("Nullifier").MatchFunc(searchMatchFunc(searchTerm)).
-				SortBy("Height").
-				Skip(from).
-				Limit(max),
-			func(txRef *indexertypes.VoteReference) error {
-				_, txHash, err := s.App.GetTxHash(txRef.Height, txRef.TxIndex)
-				if err != nil {
-					return err
-				}
-				envelopeMetadata := &indexertypes.EnvelopeMetadata{
-					ProcessId: txRef.ProcessID,
-					Nullifier: txRef.Nullifier,
-					TxIndex:   txRef.TxIndex,
-					Height:    txRef.Height,
-					TxHash:    txHash,
-				}
-				if len(txRef.VoterID) > 0 {
-					envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-					if err != nil {
-						return fmt.Errorf("cannot get voterID from pubkey: %w", err)
-					}
-				}
-				envelopes = append(envelopes, envelopeMetadata)
-				return nil
-			})
-	} else {
-		return nil, fmt.Errorf("cannot get envelope status: (malformed processId)")
-	}
-	return envelopes, err
 }
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		if len(processID) == 0 {
-			height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
-			return uint64(height.(int64)), err
-		}
-		height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
-		return uint64(height), err
-	}
-
-	startTime := time.Now()
-	defer func() { log.Debugf("GetEnvelopeHeight took %s", time.Since(startTime)) }()
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
 	if len(processID) == 0 {
-		// If no processID is provided, count all envelopes
-		envelopeCountStore := &indexertypes.CountStore{}
-		if err := s.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
-			return 0, err
-		}
-		return envelopeCountStore.Count, nil
+		height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
+		return uint64(height.(int64)), err
 	}
-	// Check if the envelope height is cached
-	val := s.envelopeHeightCache.Get(string(processID))
-	if val != nil {
-		return val.(uint64), nil
-	}
-	// If not cached, make the expensive query
-	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
-		return 0, err
-	}
-	// If final, store them in cache (won't change anymore)
-	if results.Final {
-		s.envelopeHeightCache.Add(string(processID), results.EnvelopeHeight)
-	}
-	return results.EnvelopeHeight, nil
+	height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
+	return uint64(height), err
 }
 
 // ComputeResult process a finished voting, compute the results and saves it in the Storage.
@@ -358,28 +218,6 @@ func (s *Indexer) ComputeResult(processID []byte) error {
 		return err
 	}
 
-	if enableBadgerhold {
-		// We need to use UpdateMatching here because of a race condition between ComputeResult and
-		// updateProcess. If we fetch the process, compute the results, then update the process,
-		// ComputeResult can override the process status set by updateProcess. UpdateMatching
-		// gets rid of the time between fetching and updating the process, eliminating this race.
-		if err := s.queryWithRetries(func() error {
-			return s.db.UpdateMatching(&indexertypes.Process{},
-				badgerhold.Where(badgerhold.Key).Eq(processID),
-				func(record interface{}) error {
-					update, ok := record.(*indexertypes.Process)
-					if !ok {
-						return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-					}
-					update.HaveResults = true
-					update.FinalResults = true
-					return nil
-				},
-			)
-		}); err != nil {
-			return fmt.Errorf("computeResult: cannot update processID %x: %v", processID, err)
-		}
-	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
@@ -392,14 +230,6 @@ func (s *Indexer) ComputeResult(processID []byte) error {
 	}); err != nil {
 		return err
 	}
-	if enableBadgerhold {
-		s.addVoteLock.Lock()
-		defer s.addVoteLock.Unlock()
-		if err := s.queryWithRetries(func() error { return s.db.Upsert(processID, results) }); err != nil {
-			return err
-		}
-	}
-
 	// Execute callbacks
 	for _, l := range s.eventOnResults {
 		go l.OnComputeResults(results, p, height)
@@ -417,33 +247,6 @@ func joinHexBytes(list []types.HexBytes) string {
 
 // GetResults returns the current result for a processId
 func (s *Indexer) GetResults(processID []byte) (*indexertypes.Results, error) {
-	results := &indexertypes.Results{}
-	if enableBadgerhold {
-		startTime := time.Now()
-		defer func() { log.Debugf("GetResults took %s", time.Since(startTime)) }()
-		// Check if results are in cache and return them.
-		// Note that we don't use an atomic cache,
-		// since that would mean always inserting into the cache.
-		// TODO: remove this cache once we replace badgerhold
-		val := s.resultsCache.Get(string(processID))
-		if val != nil {
-			return val.(*indexertypes.Results), nil
-		}
-		// If not in cache, execute the expensive query
-		s.addVoteLock.RLock()
-		defer s.addVoteLock.RUnlock()
-		if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).
-			Eq(processID)); err != nil {
-			if errors.Is(err, badgerhold.ErrNotFound) {
-				return nil, ErrNoResultsYet
-			}
-			return nil, err
-		}
-		// If results are final, store in cache for next queries
-		if results.Final {
-			s.resultsCache.Add(string(processID), results)
-		}
-	}
 	startTime := time.Now()
 	defer func() { log.Debugf("GetResults sqlite took %s", time.Since(startTime)) }()
 
@@ -457,29 +260,13 @@ func (s *Indexer) GetResults(processID []byte) (*indexertypes.Results, error) {
 	}
 	sqlResults := indexertypes.ResultsFromDB(&sqlProcInner)
 
-	if enableBadgerhold {
-		if diff := cmp.Diff(results, sqlResults, cmpopts.IgnoreUnexported(
-			models.EnvelopeType{},
-			models.ProcessVoteOptions{},
-		)); diff != "" {
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", processID, diff)
-		}
-		sqlResults = results // do not rely on sqlite yet
-	}
 	return sqlResults, nil
 }
 
 // GetResultsWeight returns the current weight of cast votes for a processId.
 func (s *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("GetResultsWeight took %s", time.Since(startTime)) }()
-	s.addVoteLock.RLock()
-	defer s.addVoteLock.RUnlock()
-	results := &indexertypes.Results{}
-	if err := s.db.FindOne(results, badgerhold.Where(badgerhold.Key).Eq(processID)); err != nil {
-		return nil, err
-	}
-	return results.Weight.ToInt(), nil
+	// TODO(mvdan): implement on sqlite if needed
+	return nil, nil
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
@@ -542,37 +329,8 @@ func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32, txn *badger.Txn) error {
+func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
 	creationTime := time.Now()
-	if enableBadgerhold {
-		bhVoteRef := &indexertypes.VoteReference{
-			Nullifier:      vote.Nullifier,
-			ProcessID:      vote.ProcessID,
-			VoterID:        nonNullBytes(vote.VoterID),
-			OverwriteCount: vote.Overwrites,
-			Height:         vote.Height,
-			Weight: func() *types.BigInt {
-				if vote.Weight == nil {
-					return new(types.BigInt).SetUint64(1)
-				}
-				return (*types.BigInt)(vote.Weight)
-			}(),
-			TxIndex:      txIndex,
-			CreationTime: creationTime,
-		}
-		if txn != nil {
-			if err := s.db.TxUpsert(txn, vote.Nullifier, bhVoteRef); err != nil {
-				return err
-			}
-		} else {
-			if err := s.queryWithRetries(func() error {
-				return s.db.Upsert(vote.Nullifier, bhVoteRef)
-			}); err != nil {
-				return err
-			}
-		}
-	}
-
 	weightStr := []byte("1")
 	if vote.Weight != nil {
 		var err error
@@ -583,6 +341,8 @@ func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32, txn *badger.Txn)
 	}
 	sqlStartTime := time.Now()
 
+	// TODO(mvdan): badgerhold shared a transaction via a parameter, consider
+	// doing the same with sqlite
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
@@ -636,38 +396,11 @@ func (s *Indexer) commitVotes(pid []byte, partialResults *indexertypes.Results, 
 	// If the recovery bootstrap is running, wait
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
-	// The next lock avoid Transaction Conflicts
-	s.addVoteLock.Lock()
-	defer s.addVoteLock.Unlock()
 	return s.commitVotesUnsafe(pid, partialResults, height)
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
 func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Results, height uint32) error {
-
-	if enableBadgerhold {
-		update := func(record interface{}) error {
-			stored, ok := record.(*indexertypes.Results)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-			}
-			// If already final, don't update.
-			if stored.Final {
-				return nil
-			}
-			return stored.Add(partialResults)
-		}
-
-		if err := s.queryWithRetries(func() error {
-			return s.db.UpdateMatching(&indexertypes.Results{},
-				badgerhold.Where(badgerhold.Key).Eq(pid), update)
-		}); err != nil {
-			log.Debugf("saved %d votes with total weight of %s on process %x", len(partialResults.Votes),
-				partialResults.Weight, pid)
-			return err
-		}
-	}
-
 	// TODO(sqlite): use a tx
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end

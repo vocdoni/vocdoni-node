@@ -1,15 +1,11 @@
 package indexer
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
@@ -79,15 +75,6 @@ func sqliteWarnf(format string, args ...interface{}) {
 
 // ProcessInfo returns the available information regarding an election process id
 func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	proc := &indexertypes.Process{}
-	if enableBadgerhold {
-		bhStartTime := time.Now()
-		if err := s.db.FindOne(proc, badgerhold.Where(badgerhold.Key).Eq(pid)); err != nil {
-			return nil, err
-		}
-		log.Debugf("ProcessInfo badgerhold took %s", time.Since(bhStartTime))
-	}
-
 	sqlStartTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
@@ -99,15 +86,6 @@ func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
 	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
 
-	if enableBadgerhold {
-		if diff := cmp.Diff(proc, sqlProc, cmpopts.IgnoreUnexported(
-			models.EnvelopeType{},
-			models.ProcessMode{},
-			models.ProcessVoteOptions{},
-		)); diff != "" {
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %x\ndiff (-badger +sql):\n%s", pid, diff)
-		}
-	}
 	return sqlProc, nil
 }
 
@@ -135,114 +113,15 @@ func (s *Indexer) ProcessList(entityID []byte,
 			return nil, fmt.Errorf("processList: status %s is unknown", status)
 		}
 	}
-	statusMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if statusnum == 0 {
-			return true, nil
-		}
-		if r.Field().(int32) == statusnum {
-			return true, nil
-		}
-		return false, nil
-	}
 	// Filter match function for source network Id
 	if srcNetworkIdstr != "" {
 		if _, ok := models.SourceNetworkId_value[srcNetworkIdstr]; !ok {
 			return nil, fmt.Errorf("sourceNetworkId is unknown %s", srcNetworkIdstr)
 		}
 	}
-	netIdMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if srcNetworkIdstr == "" {
-			return true, nil
-		}
-		if r.Field().(string) == srcNetworkIdstr {
-			return true, nil
-		}
-		return false, nil
-	}
-	// For filtering on withResults we use also a match function
-	wResultsMatchFunc := func(r *badgerhold.RecordAccess) (bool, error) {
-		if !withResults {
-			return true, nil
-		}
-		return r.Field().(bool), nil
-	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 
-	var procs [][]byte
-	if enableBadgerhold {
-		bhStartTime := time.Now()
-
-		// For EntityID and Namespace we use different queries, since they are indexes and the
-		// performance improvement is quite relevant.
-		var err error
-		switch {
-		case namespace == 0 && len(entityID) > 0:
-			err = s.db.ForEach(
-				badgerhold.Where("EntityID").Eq(entityID).
-					Index("EntityID").
-					And("Status").MatchFunc(statusMatchFunc).
-					And("SourceNetworkId").MatchFunc(netIdMatchFunc).
-					And("HaveResults").MatchFunc(wResultsMatchFunc).
-					And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-					SortBy("CreationTime", "ID").
-					Skip(from).
-					Limit(max),
-				func(p *indexertypes.Process) error {
-					procs = append(procs, p.ID)
-					return nil
-				})
-		case namespace > 0 && len(entityID) == 0:
-			err = s.db.ForEach(
-				badgerhold.Where("Namespace").Eq(namespace).
-					Index("Namespace").
-					And("Status").MatchFunc(statusMatchFunc).
-					And("SourceNetworkId").MatchFunc(netIdMatchFunc).
-					And("HaveResults").MatchFunc(wResultsMatchFunc).
-					And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-					SortBy("CreationTime", "ID").
-					Skip(from).
-					Limit(max),
-				func(p *indexertypes.Process) error {
-					procs = append(procs, p.ID)
-					return nil
-				})
-		case namespace == 0 && len(entityID) == 0:
-			err = s.db.ForEach(
-				badgerhold.Where("Status").MatchFunc(statusMatchFunc).
-					Index("Status").
-					And("SourceNetworkId").MatchFunc(netIdMatchFunc).
-					And("HaveResults").MatchFunc(wResultsMatchFunc).
-					And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-					SortBy("CreationTime", "ID").
-					Skip(from).
-					Limit(max),
-				func(p *indexertypes.Process) error {
-					procs = append(procs, p.ID)
-					return nil
-				})
-		default:
-			err = s.db.ForEach(
-				badgerhold.Where("EntityID").Eq(entityID).
-					Index("EntityID").
-					And("Namespace").Eq(namespace).
-					And("SourceNetworkId").MatchFunc(netIdMatchFunc).
-					And("Status").MatchFunc(statusMatchFunc).
-					And("HaveResults").MatchFunc(wResultsMatchFunc).
-					And("ID").MatchFunc(searchMatchFunc(searchTerm)).
-					SortBy("CreationTime", "ID").
-					Skip(from).
-					Limit(max),
-				func(p *indexertypes.Process) error {
-					procs = append(procs, p.ID)
-					return nil
-				})
-		}
-		log.Debugf("ProcessList badgerhold took %s", time.Since(bhStartTime))
-		if err != nil {
-			return nil, err
-		}
-	}
 	sqlStartTime := time.Now()
 	sqlProcs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
@@ -259,138 +138,76 @@ func (s *Indexer) ProcessList(entityID []byte,
 	if err != nil {
 		return nil, err
 	}
-	if enableBadgerhold {
-		// []string in hex form is easier to debug when we get mismatches
-		if diff := cmp.Diff(procs, sqlProcs); diff != "" {
-			params := []interface{}{
-				entityID, from, max,
-				searchTerm, namespace,
-				srcNetworkIdstr, status, withResults,
-			}
-			sqliteWarnf("ping mvdan to fix the bug with the information below:\nparams: %#v\ndiff (-badger +sql):\n%s", params, diff)
-		}
-	}
-
 	return sqlProcs, nil
 }
 
 // ProcessCount returns the number of processes indexed
 func (s *Indexer) ProcessCount(entityID []byte) uint64 {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
 
-		if len(entityID) == 0 {
-			count, err := queries.GetProcessCount(ctx)
-			if err != nil {
-				log.Errorf("could not get the process count: %v", err)
-				return 0
-			}
-			return uint64(count)
-		}
-		count, err := s.EntityProcessCount(entityID)
+	if len(entityID) == 0 {
+		count, err := queries.GetProcessCount(ctx)
 		if err != nil {
-			log.Errorf("processCount: cannot fetch entity process count: %v", err)
+			log.Errorf("could not get the process count: %v", err)
 			return 0
 		}
 		return uint64(count)
 	}
-	startTime := time.Now()
-	defer func() { log.Debugf("ProcessCount took %s", time.Since(startTime)) }()
-	var c uint32
-	var err error
-	if len(entityID) == 0 {
-		// If no entity ID, return the stored count of all processes
-		processCountStore := &indexertypes.CountStore{}
-		if err = s.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
-			log.Errorf("could not get the process count: %v", err)
-			return 0
-		}
-		return processCountStore.Count
-	}
-	if c, err = s.EntityProcessCount(entityID); err != nil {
+	count, err := s.EntityProcessCount(entityID)
+	if err != nil {
 		log.Errorf("processCount: cannot fetch entity process count: %v", err)
 		return 0
 	}
-	return uint64(c)
+	return uint64(count)
 }
 
 // EntityList returns the list of entities indexed by the indexer
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
 func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
 
-		entityIDs, err := queries.SearchEntities(ctx, indexerdb.SearchEntitiesParams{
-			EntityIDSubstr: searchTerm,
-			Offset:         int32(from),
-			Limit:          int32(max),
-		})
-		if err != nil {
-			log.Errorf("error listing entities: %v", err)
-			return nil
-		}
-		hexIDs := make([]types.HexBytes, len(entityIDs))
-		for i, id := range entityIDs {
-			hexIDs[i] = types.HexBytes(id)
-		}
-		return hexIDs
-	}
-	entities := []types.HexBytes{}
-	if err := s.db.ForEach(
-		badgerhold.Where("ID").MatchFunc(searchMatchFunc(searchTerm)).
-			SortBy("CreationTime", "ID").
-			Skip(from).
-			Limit(max),
-		func(e *indexertypes.Entity) error {
-			entities = append(entities, e.ID)
-			return nil
-		}); err != nil {
+	entityIDs, err := queries.SearchEntities(ctx, indexerdb.SearchEntitiesParams{
+		EntityIDSubstr: searchTerm,
+		Offset:         int32(from),
+		Limit:          int32(max),
+	})
+	if err != nil {
 		log.Errorf("error listing entities: %v", err)
+		return nil
 	}
-	return entities
+	hexIDs := make([]types.HexBytes, len(entityIDs))
+	for i, id := range entityIDs {
+		hexIDs[i] = types.HexBytes(id)
+	}
+	return hexIDs
 }
 
 // EntityProcessCount returns the number of processes that an entity holds
 func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
 
-		count, err := queries.GetEntityProcessCount(ctx, entityId)
-		if err != nil {
-			return 0, err
-		}
-		return uint32(count), nil
-	}
-	entity := &indexertypes.Entity{}
-	if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(entityId)); err != nil {
+	count, err := queries.GetEntityProcessCount(ctx, entityId)
+	if err != nil {
 		return 0, err
 	}
-	return entity.ProcessCount, nil
+	return uint32(count), nil
 }
 
 // EntityCount return the number of entities indexed by the indexer
 func (s *Indexer) EntityCount() uint64 {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
 
-		count, err := queries.GetEntityCount(ctx)
-		if err != nil {
-			log.Errorf("could not get the entity count: %v", err)
-			return 0
-		}
-		return uint64(count)
-	}
-	entityCountStore := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
+	count, err := queries.GetEntityCount(ctx)
+	if err != nil {
 		log.Errorf("could not get the entity count: %v", err)
 		return 0
 	}
-	return entityCountStore.Count
+	return uint64(count)
 }
 
 // Return whether a process must have live results or not
@@ -419,20 +236,6 @@ func (s *Indexer) computePendingProcesses(height uint32) {
 			break
 		}
 		time.Sleep(5 * time.Second)
-	}
-	if enableBadgerhold {
-		if err := s.db.ForEach(badgerhold.Where("Rheight").Eq(height).Index("Rheight"),
-			func(p *indexertypes.Process) error {
-				initT := time.Now()
-				if err := s.ComputeResult(p.ID); err != nil {
-					log.Warnf("cannot compute results for %x: (%v)", p.ID, err)
-					return nil
-				}
-				log.Infof("results computation on %x took %s", p.ID, time.Since(initT).String())
-				return nil
-			}); err != nil {
-			log.Warn(err)
-		}
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
@@ -475,66 +278,6 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
 
-	if enableBadgerhold {
-		// Create results in the indexer database
-		s.addVoteLock.Lock()
-		if err := s.queryWithRetries(func() error {
-			return s.db.Insert(pid, &indexertypes.Results{
-				ProcessID: pid,
-				// MaxValue requires +1 since 0 is also an option
-				Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
-				Weight:       new(types.BigInt).SetUint64(0),
-				Signatures:   []types.HexBytes{},
-				VoteOpts:     p.GetVoteOptions(),
-				EnvelopeType: p.GetEnvelopeType(),
-			})
-		}); err != nil {
-			s.addVoteLock.Unlock()
-			return err
-		}
-		s.addVoteLock.Unlock()
-
-		// Increment the total process count storage
-		s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).
-			Eq(indexertypes.CountStoreProcesses), func(record interface{}) error {
-			update, ok := record.(*indexertypes.CountStore)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
-			}
-			update.Count++
-			return nil
-		},
-		)
-
-		// Add the entity to the indexer database
-		entity := &indexertypes.Entity{}
-		// If entity is not registered in db, add to entity count cache and insert to db
-		if err := s.db.FindOne(entity, badgerhold.Where(badgerhold.Key).Eq(eid)); err != nil {
-			if err != badgerhold.ErrNotFound {
-				return err
-			}
-			entity.ID = eid
-			entity.CreationTime = currentBlockTime
-			entity.ProcessCount = 0
-			// Increment the total entity count storage
-			s.db.UpdateMatching(&indexertypes.CountStore{}, badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEntities), func(record interface{}) error {
-				update, ok := record.(*indexertypes.CountStore)
-				if !ok {
-					return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
-				}
-				update.Count++
-				return nil
-			})
-		}
-		// Increase the entity process count (and create new entity if does not exist)
-		entity.ProcessCount++
-		if err := s.queryWithRetries(func() error {
-			return s.db.Upsert(eid, entity)
-		}); err != nil {
-			return err
-		}
-	}
-
 	compResultsHeight := uint32(0)
 	if live, err := s.isOpenProcess(pid); err != nil {
 		return fmt.Errorf("cannot check if process is live: %w", err)
@@ -572,12 +315,6 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		RollingCensusSize: p.GetRollingCensusSize(),
 	}
 	log.Debugf("new indexer process %s", proc.String())
-
-	if enableBadgerhold {
-		if err := s.queryWithRetries(func() error { return s.db.Insert(pid, proc) }); err != nil {
-			return err
-		}
-	}
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
@@ -621,57 +358,6 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
-	}
-	if enableBadgerhold {
-		updateFunc := func(record interface{}) error {
-			update, ok := record.(*indexertypes.Process)
-			if !ok {
-				return fmt.Errorf("record isn't the correct type! Wanted Process, got %T", record)
-			}
-			update.EndBlock = p.GetBlockCount() + p.GetStartBlock()
-			update.CensusRoot = p.GetCensusRoot()
-			update.RollingCensusRoot = p.GetRollingCensusRoot()
-			update.CensusURI = p.GetCensusURI()
-			update.PrivateKeys = p.EncryptionPrivateKeys
-			update.PublicKeys = p.EncryptionPublicKeys
-			update.Metadata = p.GetMetadata()
-			update.RollingCensusSize = p.GetRollingCensusSize()
-			// If the process is transacting to CANCELED, ensure results are not computed and remove
-			// them from the KV database.
-			if update.Status != int32(models.ProcessStatus_CANCELED) &&
-				p.GetStatus() == models.ProcessStatus_CANCELED {
-				update.HaveResults = false
-				update.FinalResults = true
-				update.Rheight = 0
-				if err := s.db.UpdateMatching(&indexertypes.Results{},
-					badgerhold.Where(badgerhold.Key).Eq(pid), func(record interface{}) error {
-						results, ok := record.(*indexertypes.Results)
-						if !ok {
-							return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-						}
-						// On cancelled process, remove all results except for envelope height, weight, pid
-						results.Votes = [][]*types.BigInt{}
-						results.EnvelopeType = &models.EnvelopeType{}
-						results.VoteOpts = &models.ProcessVoteOptions{}
-						results.Signatures = []types.HexBytes{}
-						results.Final = false
-						results.BlockHeight = 0
-						return nil
-					}); err != nil {
-					if err != badgerhold.ErrNotFound {
-						log.Warnf("cannot remove CANCELED results: %v", err)
-					}
-				}
-			}
-			update.Status = int32(p.GetStatus())
-			return nil
-		}
-		if err := s.queryWithRetries(func() error {
-			return s.db.UpdateMatching(&indexertypes.Process{},
-				badgerhold.Where(badgerhold.Key).Eq(pid), updateFunc)
-		}); err != nil {
-			return err
-		}
 	}
 	// TODO: remove from results table
 	// TODO: hold a sql db transaction for multiple queries
@@ -726,21 +412,6 @@ func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-	if enableBadgerhold {
-		if err := s.queryWithRetries(func() error {
-			return s.db.UpdateMatching(&indexertypes.Process{}, badgerhold.Where(badgerhold.Key).Eq(pid),
-				func(record interface{}) error {
-					update, ok := record.(*indexertypes.Process)
-					if !ok {
-						return fmt.Errorf("record isn't the correct type! Wanted Result, got %T", record)
-					}
-					update.Rheight = height
-					return nil
-				})
-		}); err != nil {
-			return err
-		}
-	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
@@ -750,19 +421,4 @@ func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
 		return err
 	}
 	return nil
-}
-
-// searchMatchFunc generates a function which compares a badgerhold record against searchTerm.
-// The record should be types.HexBytes, and is encoded as a string to compare to searchTerm.
-func searchMatchFunc(searchTerm string) func(r *badgerhold.RecordAccess) (bool, error) {
-	return func(r *badgerhold.RecordAccess) (bool, error) {
-		if searchTerm == "" {
-			return true, nil
-		}
-		// TODO search without having to convert each field to strings
-		if strings.Contains(hex.EncodeToString(r.Field().(types.HexBytes)), searchTerm) {
-			return true, nil
-		}
-		return false, nil
-	}
 }

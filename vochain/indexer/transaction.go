@@ -3,7 +3,6 @@ package indexer
 import (
 	"fmt"
 
-	"github.com/timshannon/badgerhold/v3"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
@@ -13,55 +12,32 @@ import (
 
 // TransactionCount returns the number of transactions indexed
 func (s *Indexer) TransactionCount() (uint64, error) {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		count, err := queries.CountTxReferences(ctx)
-		return uint64(count), err
-	}
-	txCountStore := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
-		return txCountStore.Count, err
-	}
-	return txCountStore.Count, nil
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	count, err := queries.CountTxReferences(ctx)
+	return uint64(count), err
 }
 
 // GetTxReference fetches the txReference for the given tx height
 func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		sqlTxRef, err := queries.GetTxReference(ctx, int64(height))
-		if err != nil {
-			return nil, fmt.Errorf("tx height %d not found: %v", height, err)
-		}
-		return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
-	}
-	txReference := &indexertypes.TxReference{}
-	err := s.db.FindOne(txReference, badgerhold.Where(badgerhold.Key).Eq(height))
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlTxRef, err := queries.GetTxReference(ctx, int64(height))
 	if err != nil {
 		return nil, fmt.Errorf("tx height %d not found: %v", height, err)
 	}
-	return txReference, nil
+	return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
 }
 
 // GetTxReference fetches the txReference for the given tx hash
 func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
-	if !enableBadgerhold {
-		queries, ctx, cancel := s.timeoutQueries()
-		defer cancel()
-		sqlTxRef, err := queries.GetTxReferenceByHash(ctx, hash)
-		if err != nil {
-			return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
-		}
-		return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
-	}
-	txReference := &indexertypes.TxReference{}
-	err := s.db.FindOne(txReference, badgerhold.Where("Hash").Eq(hash).Index("Hash"))
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	sqlTxRef, err := queries.GetTxReferenceByHash(ctx, hash)
 	if err != nil {
 		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
 	}
-	return txReference, nil
+	return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
 }
 
 // GetLastTxReferences fetches a number of the latest indexed transactions.
@@ -122,32 +98,5 @@ func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
 			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
 			return
 		}
-	}
-
-	if !enableBadgerhold {
-		return
-	}
-	s.txIndexLock.Lock()
-	defer s.txIndexLock.Unlock()
-	txCount := &indexertypes.CountStore{}
-	if err := s.db.Get(indexertypes.CountStoreTransactions, txCount); err != nil {
-		log.Errorf("could not get tx count: %v", err)
-		return
-	}
-	for i, tx := range txList {
-		if s.cancelCtx.Err() != nil {
-			return // closing
-		}
-		// Add confirmed txs to transaction count
-		tx.Index = txCount.Count + uint64(i) + 1 // Start indexing at 1
-		if err := s.db.Insert(tx.Index, tx); err != nil {
-			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
-			return
-		}
-	}
-	// Store new transaction count
-	txCount.Count += uint64(len(txList))
-	if err := s.db.Upsert(indexertypes.CountStoreTransactions, txCount); err != nil {
-		log.Errorf("could not update tx count: %v", err)
 	}
 }
