@@ -225,6 +225,34 @@ func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults 
 	return items, nil
 }
 
+const getProcessIDsByResultsHeight = `-- name: GetProcessIDsByResultsHeight :many
+SELECT id FROM processes
+WHERE results_height = ?
+`
+
+func (q *Queries) GetProcessIDsByResultsHeight(ctx context.Context, resultsHeight int64) ([]types.ProcessID, error) {
+	rows, err := q.db.QueryContext(ctx, getProcessIDsByResultsHeight, resultsHeight)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProcessStatus = `-- name: GetProcessStatus :one
 SELECT status FROM processes
 WHERE id = ?
