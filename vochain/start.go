@@ -207,9 +207,7 @@ func newTendermint(app *BaseApplication,
 	log.Infof("mempool config: %+v", tconfig.Mempool)
 
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
-	// -tags=cleveldb is used, and switches to badgerdb if -tags=badger is
-	// used. See tmdb_*.go.
-	// TODO: probably switch to just badger after some benchmarking.
+	// -tags=cleveldb is used. See tmdb_*.go.
 	tconfig.DBBackend = string(tmdbBackend)
 	log.Infof("using db backend %s", tconfig.DBBackend)
 

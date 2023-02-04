@@ -39,9 +39,6 @@ const (
 	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
 	// 8.3M seems enough for now
 	MaxEnvelopeListSize = 32 << 18
-
-	countEnvelopeCacheSize = 1024
-	resultsCacheSize       = 512
 )
 
 // EventListener is an interface used for executing custom functions during the

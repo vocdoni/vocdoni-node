@@ -267,9 +267,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	qt.Assert(t, idx.ProcessCount(eidOneProcess), qt.Equals, uint64(1))
 	qt.Assert(t, idx.ProcessCount(eidProcsCount), qt.Equals, uint64(procsCount))
 	qt.Assert(t, idx.ProcessCount(nil), qt.Equals, uint64(10+procsCount))
-	// TODO(mvdan): our badgerhold code errors out unnecessarily in this case.
-	// Reenable this test once we've dropped badgerhold.
-	// qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
+	qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
 }
 
 func TestProcessSearch(t *testing.T) {

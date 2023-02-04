@@ -70,8 +70,6 @@ func (c *VochainCfg) ValidDBType() bool {
 	switch c.DBType {
 	case db.TypePebble:
 		break
-	case db.TypeBadger:
-		break
 	default:
 		return false
 	}

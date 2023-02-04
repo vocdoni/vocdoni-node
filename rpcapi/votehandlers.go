@@ -75,9 +75,10 @@ func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, e
 	response.Registered = types.False
 	vr, err := r.indexer.GetEnvelopeReference(request.Nullifier)
 	if err != nil {
-		if errors.Is(err, indexer.ErrNotFoundInDatabase) {
-			return &response, nil
-		}
+		// TODO: support such an error code with sqlite if we want to
+		// if errors.Is(err, indexer.ErrNotFoundInDatabase) {
+		// 	return &response, nil
+		// }
 		return nil, fmt.Errorf("cannot get envelope status: %w", err)
 	}
 	response.Registered = types.True
