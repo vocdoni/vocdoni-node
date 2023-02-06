@@ -68,7 +68,7 @@ jobs:
         run: go mod tidy
       - name: Run Go test
         if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
-        run: go test ./...
+        run: go test -coverprofile=covprofile ./...
       - name: Run Go test race
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
         run: |
@@ -76,6 +76,12 @@ jobs:
           export LOG_PANIC_ON_INVALIDCHARS=true
           # -race can easily make the crypto stuff 10x slower
           go test -vet=off -timeout=15m -race ./...
+      - name: Send coverage to coverall.io
+        env:
+          COVERALLS_TOKEN: ${{ secrets.github_token }}
+        run: |
+          go install github.com/mattn/goveralls@latest
+          goveralls -coverprofile=covprofile -service=github
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
