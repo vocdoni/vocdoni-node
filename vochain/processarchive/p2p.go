@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"time"
 
-	ipfscrypto "github.com/libp2p/go-libp2p-core/crypto"
+	ipfscrypto "github.com/libp2p/go-libp2p/core/crypto"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 )

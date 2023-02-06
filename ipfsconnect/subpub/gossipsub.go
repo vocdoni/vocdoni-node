@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"git.sr.ht/~sircmpwn/go-bare"
-	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"go.vocdoni.io/dvote/log"
 )
 

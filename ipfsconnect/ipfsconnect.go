@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
 	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/proto/build/go/models"

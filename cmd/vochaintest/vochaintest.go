@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,8 +110,6 @@ func main() {
 	flag.Parse()
 	log.Init(*loglevel, "stdout")
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
-
-	rand.Seed(time.Now().UnixNano())
 
 	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))
 	for i, key := range *accountPrivKeys {

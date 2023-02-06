@@ -15,6 +15,7 @@ func TestPublicIP(t *testing.T) {
 
 	for _, version := range []uint{4, 6, 0} {
 		t.Run(fmt.Sprintf("protocol-%d", version), func(t *testing.T) {
+			version := version // avoid capturing loop variable
 			t.Parallel()
 			start := time.Now()
 
