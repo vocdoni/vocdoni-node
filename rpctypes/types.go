@@ -206,7 +206,7 @@ type APIresponse struct {
 	ProcessNonce         *uint32                          `json:"processNonce,omitempty"`
 	Registered           *bool                            `json:"registered,omitempty"`
 	Request              string                           `json:"request"`
-	Results              [][]string                       `json:"results,omitempty"`
+	Results              [][]*types.BigInt                `json:"results,omitempty"`
 	Root                 types.HexBytes                   `json:"root,omitempty"`
 	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
 	Size                 *int64                           `json:"size,omitempty"`

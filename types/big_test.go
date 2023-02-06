@@ -16,7 +16,7 @@ func TestBigInt(t *testing.T) {
 	a.Add(a, b)
 	qt.Assert(t, a.String(), qt.DeepEquals, "300")
 
-	a.ToInt().Add(a.ToInt(), b.ToInt())
+	a.MathBigInt().Add(a.MathBigInt(), b.MathBigInt())
 	qt.Assert(t, a.String(), qt.DeepEquals, "500")
 
 	// Test single text Marshaling

@@ -620,7 +620,7 @@ func TestResults(t *testing.T) {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].ToInt()
+			value = result.Votes[q][qi].MathBigInt()
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -700,7 +700,7 @@ func TestLiveResults(t *testing.T) {
 			if qi > 100 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].ToInt()
+			value = result.Votes[q][qi].MathBigInt()
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}

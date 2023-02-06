@@ -361,7 +361,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	if vr == nil {
 		return nil, fmt.Errorf("cannot get results: (unknown error fetching results)")
 	}
-	response.Results = indexer.GetFriendlyResults(vr.Votes)
+	response.Results = vr.Votes
 	response.Final = &vr.Final
 	h := uint32(vr.EnvelopeHeight)
 	response.Height = &h

@@ -154,7 +154,7 @@ func TestCensusRPC(t *testing.T) {
 
 	// CheckProof valid
 	req.ProofData = siblings
-	req.CensusValue = arbo.BigIntToBytes(32, req.Weight.ToInt())
+	req.CensusValue = arbo.BigIntToBytes(32, req.Weight.MathBigInt())
 	resp = doRequest("checkProof", nil)
 	qt.Assert(t, *resp.ValidProof, qt.IsTrue)
 
@@ -189,5 +189,5 @@ func TestCensusRPC(t *testing.T) {
 
 	// getCensusWeight
 	resp = doRequest("getCensusWeight", nil)
-	qt.Assert(t, resp.Weight.ToInt().Int64(), qt.Equals, int64(*censusSize)*int64(*censusWeight))
+	qt.Assert(t, resp.Weight.MathBigInt().Int64(), qt.Equals, int64(*censusSize)*int64(*censusWeight))
 }
