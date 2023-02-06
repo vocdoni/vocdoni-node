@@ -192,9 +192,11 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
+	electionCount := a.indexer.ProcessCount(nil)
 	data, err := json.Marshal(ChainInfo{
 		ID:               a.vocapp.ChainID(),
 		BlockTime:        blockTimes,
+		ElectionCount:    &electionCount,
 		Height:           &height,
 		Timestamp:        &timestamp,
 		TransactionCount: &transactionCount,

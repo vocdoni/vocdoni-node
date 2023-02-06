@@ -161,6 +161,7 @@ type TransactionReference struct {
 type ChainInfo struct {
 	ID               string    `json:"chainId,omitempty"`
 	BlockTime        *[5]int32 `json:"blockTime,omitempty"`
+	ElectionCount    *uint64   `json:"electionCount,omitempty"`
 	Height           *uint32   `json:"height,omitempty"`
 	Timestamp        *int64    `json:"blockTimestamp,omitempty"`
 	TransactionCount *uint64   `json:"transactionCount,omitempty"`

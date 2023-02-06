@@ -93,14 +93,6 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/elections/count",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionsCountHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/elections",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -248,20 +240,6 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 		struct {
 			Count uint32 `json:"count"`
 		}{Count: count},
-	)
-	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
-}
-
-// GET /elections/count
-// get the total number of elections
-func (a *API) electionsCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	data, err := json.Marshal(
-		struct {
-			Count uint64 `json:"count"`
-		}{Count: a.indexer.ProcessCount([]byte{})},
 	)
 	if err != nil {
 		return fmt.Errorf("error marshaling JSON: %w", err)
