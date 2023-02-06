@@ -363,3 +363,21 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 	}
 	return electionResults, nil
 }
+
+// ElectionsCount returns the total number of elections
+func (c *HTTPclient) ElectionsCount() (uint64, error) {
+	resp, code, err := c.Request("GET", nil, "elections", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != apirest.HTTPstatusCodeOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	electionCount := new(struct {
+		Count uint64 `json:"count"`
+	})
+	if err = json.Unmarshal(resp, electionCount); err != nil {
+		return 0, err
+	}
+	return electionCount.Count, nil
+}

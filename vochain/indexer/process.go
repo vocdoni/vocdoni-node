@@ -123,7 +123,8 @@ func (s *Indexer) ProcessList(entityID []byte,
 	return sqlProcs, nil
 }
 
-// ProcessCount returns the number of processes indexed
+// ProcessCount returns the number of processes of a given entityID indexed.
+// If entityID is zero-value, returns the total number of processes of all entities.
 func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
