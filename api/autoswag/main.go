@@ -172,7 +172,7 @@ func UpdateRouterTags(fset *token.FileSet, parsedFile *ast.File, fmap map[string
 
 				for _, pm := range pms {
 					line := &ast.Comment{
-						Text:  fmt.Sprintf(`//	@Router %s [%s]`, pm.path, pm.method),
+						Text:  fmt.Sprintf("//\t@Router %s [%s]", pm.path, pm.method),
 						Slash: token.Pos(int(x.Pos() - 1)),
 					}
 					list = append(list, line)

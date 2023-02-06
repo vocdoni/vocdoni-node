@@ -3,9 +3,7 @@ package test
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"testing"
-	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
@@ -16,10 +14,6 @@ import (
 
 	"go.vocdoni.io/dvote/test/testcommon"
 )
-
-// The init function and flags are shared with the other benchmark files.
-// These globals can only be read, not modified.
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 var (
 	hostFlag   = flag.String("host", "", "alternative host to run against, e.g. ws[s]://<HOST>[:9090]/dvote)")

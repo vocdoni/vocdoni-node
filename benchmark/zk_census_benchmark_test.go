@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"net/url"
 	"path"
 	"testing"
-	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
@@ -28,8 +26,6 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 )
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 var zkCircuitTest = circuit.CircuitsConfigurations["dev"]
 

@@ -31,9 +31,7 @@ Run it executing `go test -v test/census_test.go`
 import (
 	"encoding/hex"
 	"flag"
-	"math/rand"
 	"testing"
-	"time"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -52,8 +50,6 @@ import (
 
 var censusSize = flag.Int("censusSize", 100, "number of claims to add in the census")
 var censusWeight = flag.Int("censusWeight", 20, "weight of each census entry")
-
-func init() { rand.Seed(time.Now().UnixNano()) }
 
 func TestCensusRPC(t *testing.T) {
 	t.Parallel()

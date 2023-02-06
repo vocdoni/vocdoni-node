@@ -13,12 +13,12 @@ import (
 	eth "github.com/ethereum/go-ethereum/crypto"
 	ipfslog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p"
-	connmanager "github.com/libp2p/go-libp2p-connmgr"
-	crypto "github.com/libp2p/go-libp2p-core/crypto"
-	"github.com/libp2p/go-libp2p-core/host"
-	libpeer "github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	crypto "github.com/libp2p/go-libp2p/core/crypto"
+	"github.com/libp2p/go-libp2p/core/host"
+	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
+	connmanager "github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 )
@@ -123,7 +123,7 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 	}
 
 	var c libp2p.Config
-	libp2p.Defaults(&c)
+	c.Apply(libp2p.Defaults)
 
 	// libp2p will listen on any interface device (both on IPv4 and IPv6)
 	c.ListenAddrs = nil
@@ -142,7 +142,11 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 	if ps.Private {
 		c.PSK = ps.GroupKey[:32]
 	}
-	c.ConnManager = connmanager.NewConnManager(ps.MaxDHTpeers/2, ps.MaxDHTpeers, time.Second*10)
+	c.ConnManager, err = connmanager.NewConnManager(ps.MaxDHTpeers/2, ps.MaxDHTpeers,
+		connmanager.WithGracePeriod(time.Second*10))
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Debugf("libp2p config: %+v", c)
 	// Note that we don't use ctx here, since we stop via the Close method.

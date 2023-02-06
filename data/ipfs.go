@@ -8,8 +8,8 @@ import (
 	"time"
 
 	ipfscid "github.com/ipfs/go-cid"
-	files "github.com/ipfs/go-ipfs-files"
 	keystore "github.com/ipfs/go-ipfs-keystore"
+	files "github.com/ipfs/go-libipfs/files"
 	ipfslog "github.com/ipfs/go-log"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
@@ -19,7 +19,7 @@ import (
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/ipfs/kubo/core/corerepo"
 	"github.com/ipfs/kubo/repo/fsrepo"
-	ipfscrypto "github.com/libp2p/go-libp2p-core/crypto"
+	ipfscrypto "github.com/libp2p/go-libp2p/core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multicodec"

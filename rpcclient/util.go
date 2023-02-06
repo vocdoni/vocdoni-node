@@ -1,10 +1,11 @@
 package rpcclient
 
 import (
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/rand"
+	"math/big"
 	"os"
 	"time"
 
@@ -269,7 +270,11 @@ func genVote(encrypted bool, keys []string) ([]byte, error) {
 					return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
 				}
 				if first {
-					vp.Nonce = RandomHex(rand.Intn(16) + 16)
+					randInt, err := rand.Int(rand.Reader, big.NewInt(16))
+					if err != nil {
+						return nil, err
+					}
+					vp.Nonce = RandomHex(int(randInt.Int64()) + 16)
 					vpBytes, err = json.Marshal(vp)
 					if err != nil {
 						return nil, err

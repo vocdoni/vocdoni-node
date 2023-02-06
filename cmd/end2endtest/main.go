@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -121,8 +120,6 @@ func main() {
 
 	log.Init(c.logLevel, "stdout")
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
-
-	rand.Seed(time.Now().UnixNano())
 
 	if len(c.accountPrivKeys) == 0 {
 		c.accountPrivKeys = []string{util.RandomHex(32)}

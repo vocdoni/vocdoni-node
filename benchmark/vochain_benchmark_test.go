@@ -12,7 +12,6 @@ import (
 	client "go.vocdoni.io/dvote/rpcclient"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/test/testcommon"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -47,7 +46,6 @@ func BenchmarkVochainBatchProof(b *testing.B) {
 
 	// setup the basic parties
 	entityID := dvoteServer.Signer.Address().Bytes()
-	processID := testutil.Hex2byte(b, hexProcessID)
 
 	// create census and process
 	censusRoot, _, processID := createCensusAndProcess(b, cl, dvoteServer, keySet, entityID)
@@ -103,7 +101,6 @@ func BenchmarkVochainSingleProof(b *testing.B) {
 
 	// setup the basic parties
 	entityID := dvoteServer.Signer.Address().Bytes()
-	processID := testutil.Hex2byte(b, hexProcessID)
 
 	// create census and process
 	censusRoot, _, processID := createCensusAndProcess(b, cl, dvoteServer, keySet, entityID)
