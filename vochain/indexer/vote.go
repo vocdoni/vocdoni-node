@@ -117,6 +117,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	}
 	for _, txRef := range txRefs {
 		wg.Add(1)
+		txRef := txRef // do not reuse the range var in case async==true
 		processVote := func() {
 			defer wg.Done()
 			v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
