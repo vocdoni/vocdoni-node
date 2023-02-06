@@ -94,7 +94,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		var batchValues [][]byte
 		if len(r.Weights) > 0 {
 			for _, v := range r.Weights {
-				batchValues = append(batchValues, ref.Tree().BigIntToBytes(v.ToStdBigInt()))
+				batchValues = append(batchValues, ref.Tree().BigIntToBytes(v.MathBigInt()))
 			}
 		} else {
 			// If no weights specified, assume al weight values are equal to 1
@@ -128,7 +128,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		}
 		value := ref.Tree().BigIntToBytes(big.NewInt(1))
 		if r.Weight != nil {
-			value = ref.Tree().BigIntToBytes(r.Weight.ToStdBigInt())
+			value = ref.Tree().BigIntToBytes(r.Weight.MathBigInt())
 		}
 		err := ref.Tree().Add(key, value)
 		if err != nil {

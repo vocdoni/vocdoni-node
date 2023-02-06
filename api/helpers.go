@@ -121,7 +121,7 @@ func encodeEVMResultsArgs(electionId common.Hash,
 	for i, r := range results {
 		resultsStd[i] = make([]*big.Int, len(r))
 		for j, v := range r {
-			resultsStd[i][j] = v.ToStdBigInt()
+			resultsStd[i][j] = v.MathBigInt()
 		}
 	}
 	abiEncodedResultsBytes, err := args.Pack(electionId, organizationId, censusRoot, sourceContractAddress, resultsStd)

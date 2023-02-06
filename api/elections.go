@@ -355,10 +355,9 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	for k, processResult := range process.Results {
 		if processResult == nil {
 			log.Warnw("nil process result",
-				map[string]interface{}{
-					"electionID":    fmt.Sprintf("%x", electionID),
-					"results index": k,
-				})
+				"electionID", fmt.Sprintf("%x", electionID),
+				"results index", k,
+			)
 			continue
 		}
 		if len(processResult.OracleAddress) == 0 { // check oracle sent the results otherwise ignore
@@ -377,44 +376,35 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		// if the number of votes is different, the results are different
 		if len(baseResult.Votes) != len(otherResult.Votes) {
 			log.Warnw("different number of votes",
-				map[string]interface{}{
-					"baseResult number of votes":  len(baseResult.Votes),
-					"otherResult number of votes": len(otherResult.Votes),
-				})
+				"baseResult", len(baseResult.Votes),
+				"otherResult", len(otherResult.Votes),
+			)
 			return false
 		}
 		for k, vote1 := range otherResult.Votes {
 			vote2 := baseResult.Votes[k]
 			if vote1 == nil {
-				log.Warnw("invalid question result (nil)",
-					map[string]interface{}{
-						"question result index": k,
-					})
+				log.Warnw("invalid question result (nil) at index", k)
 				continue
 			}
 			if len(vote1.Question) != len(vote2.Question) {
 				log.Warnw("question length do not match",
-					map[string]interface{}{
-						"baseResult question length":  len(vote2.Question),
-						"otherResult question length": len(vote1.Question),
-					})
+					"baseResult", len(vote2.Question),
+					"otherResult", len(vote1.Question),
+				)
 				continue
 			}
 			for kk, question1 := range vote1.Question {
 				question2 := vote2.Question[kk]
 				if question1 == nil {
-					log.Warnw("invalid question option (nil)",
-						map[string]interface{}{
-							"question option index": kk,
-						})
+					log.Warnw("invalid question option (nil) at index", kk)
 					continue
 				}
 				if !bytes.Equal(question1, question2) {
 					log.Warnw("question option bytes do not match",
-						map[string]interface{}{
-							"baseResult question option":  fmt.Sprintf("%x", question2),
-							"otherResult question option": fmt.Sprintf("%x", question1),
-						})
+						"baseResult", fmt.Sprintf("%x", question2),
+						"otherResult", fmt.Sprintf("%x", question1),
+					)
 					return false
 				}
 			}

@@ -22,11 +22,11 @@ type Oracle struct {
 }
 
 type OracleResults struct {
-	ChainID       string         `json:"chainId"`
-	EntityID      types.HexBytes `json:"entityId"`
-	OracleAddress common.Address `json:"oracleAddress"`
-	ProcessID     types.HexBytes `json:"processId"`
-	Results       [][]string     `json:"results"`
+	ChainID       string            `json:"chainId"`
+	EntityID      types.HexBytes    `json:"entityId"`
+	OracleAddress common.Address    `json:"oracleAddress"`
+	ProcessID     types.HexBytes    `json:"processId"`
+	Results       [][]*types.BigInt `json:"results"`
 }
 
 func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle, error) {
@@ -153,20 +153,11 @@ func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexerty
 
 	// add the signature to the results and own address
 	setprocessTxArgs.Results.OracleAddress = o.signer.Address().Bytes()
-	resultsBigInt := state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes())
-	// convert results to string matrix
-	resultsString := make([][]string, len(resultsBigInt))
-	for i, v := range resultsBigInt {
-		resultsString[i] = make([]string, len(v))
-		for j, w := range v {
-			resultsString[i][j] = w.String()
-		}
-	}
 	signedResultsPayload := OracleResults{
 		ChainID:   o.VochainApp.ChainID(),
 		EntityID:  vocProcessData.EntityId,
 		ProcessID: results.ProcessID,
-		Results:   resultsString,
+		Results:   state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
 	}
 	resultsPayload, err := json.Marshal(signedResultsPayload)
 	if err != nil {
