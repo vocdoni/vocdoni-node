@@ -186,7 +186,6 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	blockTimes := a.vocinfo.BlockTimes()
 	height := a.vocapp.Height()
 	timestamp := a.vocapp.Timestamp()
 	transactionCount, err := a.indexer.TransactionCount()
@@ -201,28 +200,36 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	numValidators := new(uint32)
 	*numValidators = uint32(len(validators))
 	isSyncing := a.vocapp.IsSynchronizing()
-	tctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	defer cancel()
-	genesis, err := a.vocapp.Node.Genesis(tctx)
-	if err != nil {
-		return err
-	}
 	voteCount, err := a.indexer.GetEnvelopeHeight(nil)
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(ChainInfo{
+	chainInfo := &ChainInfo{
 		ID:               a.vocapp.ChainID(),
-		BlockTime:        blockTimes,
+		BlockTime:        a.vocinfo.BlockTimes(),
 		ElectionCount:    &electionCount,
-		GenesisTime:      genesis.Genesis.GenesisTime,
 		Height:           &height,
 		Syncing:          &isSyncing,
-		Timestamp:        &timestamp,
 		TransactionCount: &transactionCount,
 		ValidatorCount:   numValidators,
+		Timestamp:        &timestamp,
 		VoteCount:        &voteCount,
-	})
+	}
+	tctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
+	defer cancel()
+	if a.vocapp.Node != nil {
+		genesis, err := a.vocapp.Node.Genesis(tctx)
+		if err != nil {
+			return err
+		}
+		if genesis != nil {
+			if genesis.Genesis != nil {
+				chainInfo.GenesisTime = genesis.Genesis.GenesisTime
+			}
+		}
+	}
+
+	data, err := json.Marshal(chainInfo)
 	if err != nil {
 		return err
 	}
