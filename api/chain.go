@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -200,10 +201,17 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	numValidators := new(uint32)
 	*numValidators = uint32(len(validators))
 	isSyncing := a.vocapp.IsSynchronizing()
+	tctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
+	defer cancel()
+	genesis, err := a.vocapp.Node.Genesis(tctx)
+	if err != nil {
+		return err
+	}
 	data, err := json.Marshal(ChainInfo{
 		ID:               a.vocapp.ChainID(),
 		BlockTime:        blockTimes,
 		ElectionCount:    &electionCount,
+		GenesisTime:      genesis.Genesis.GenesisTime,
 		Height:           &height,
 		Syncing:          &isSyncing,
 		Timestamp:        &timestamp,
