@@ -185,18 +185,14 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height := a.vocapp.Height()
-	timestamp := a.vocapp.Timestamp()
 	transactionCount, err := a.indexer.TransactionCount()
 	if err != nil {
 		return err
 	}
-	electionCount := a.indexer.ProcessCount(nil)
 	validators, err := a.vocapp.State.Validators(true)
 	if err != nil {
 		return err
 	}
-	isSyncing := a.vocapp.IsSynchronizing()
 	voteCount, err := a.indexer.GetEnvelopeHeight(nil)
 	if err != nil {
 		return err
@@ -204,12 +200,12 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	data, err := json.Marshal(&ChainInfo{
 		ID:               a.vocapp.ChainID(),
 		BlockTime:        *a.vocinfo.BlockTimes(),
-		ElectionCount:    electionCount,
-		Height:           height,
-		Syncing:          isSyncing,
+		ElectionCount:    a.indexer.ProcessCount(nil),
+		Height:           a.vocapp.Height(),
+		Syncing:          a.vocapp.IsSynchronizing(),
 		TransactionCount: transactionCount,
 		ValidatorCount:   uint32(len(validators)),
-		Timestamp:        timestamp,
+		Timestamp:        a.vocapp.Timestamp(),
 		VoteCount:        voteCount,
 		GenesisTime:      a.vocapp.Genesis().GenesisTime,
 	})
