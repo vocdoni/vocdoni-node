@@ -159,16 +159,16 @@ type TransactionReference struct {
 }
 
 type ChainInfo struct {
-	ID               string    `json:"chainId,omitempty"`
-	BlockTime        *[5]int32 `json:"blockTime,omitempty"`
-	ElectionCount    *uint64   `json:"electionCount,omitempty"`
-	GenesisTime      time.Time `json:"genesisTime,omitempty"`
-	Height           *uint32   `json:"height,omitempty"`
-	Syncing          *bool     `json:"syncing,omitempty"`
-	Timestamp        *int64    `json:"blockTimestamp,omitempty"`
-	TransactionCount *uint64   `json:"transactionCount,omitempty"`
-	ValidatorCount   *uint32   `json:"validatorCount,omitempty"`
-	VoteCount        *uint64   `json:"voteCount,omitempty"`
+	ID               string    `json:"chainId"`
+	BlockTime        [5]int32  `json:"blockTime"`
+	ElectionCount    uint64    `json:"electionCount"`
+	GenesisTime      time.Time `json:"genesisTime"`
+	Height           uint32    `json:"height"`
+	Syncing          bool      `json:"syncing"`
+	Timestamp        int64     `json:"blockTimestamp"`
+	TransactionCount uint64    `json:"transactionCount"`
+	ValidatorCount   uint32    `json:"validatorCount"`
+	VoteCount        uint64    `json:"voteCount"`
 }
 
 type Account struct {

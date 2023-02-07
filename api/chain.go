@@ -197,8 +197,6 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	numValidators := new(uint32)
-	*numValidators = uint32(len(validators))
 	isSyncing := a.vocapp.IsSynchronizing()
 	voteCount, err := a.indexer.GetEnvelopeHeight(nil)
 	if err != nil {
@@ -206,14 +204,14 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 	chainInfo := &ChainInfo{
 		ID:               a.vocapp.ChainID(),
-		BlockTime:        a.vocinfo.BlockTimes(),
-		ElectionCount:    &electionCount,
-		Height:           &height,
-		Syncing:          &isSyncing,
-		TransactionCount: &transactionCount,
-		ValidatorCount:   numValidators,
-		Timestamp:        &timestamp,
-		VoteCount:        &voteCount,
+		BlockTime:        *a.vocinfo.BlockTimes(),
+		ElectionCount:    electionCount,
+		Height:           height,
+		Syncing:          isSyncing,
+		TransactionCount: transactionCount,
+		ValidatorCount:   uint32(len(validators)),
+		Timestamp:        timestamp,
+		VoteCount:        voteCount,
 	}
 	tctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
 	defer cancel()
