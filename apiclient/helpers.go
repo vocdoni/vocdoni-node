@@ -144,7 +144,7 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 	for {
 		election, err := c.Election(electionID)
 		if err != nil {
-			if !strings.Contains(err.Error(), "No data found for this key") {
+			if !strings.Contains(err.Error(), "no rows in result set") {
 				return nil, err
 			}
 		}
