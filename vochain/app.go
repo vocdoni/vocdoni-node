@@ -63,6 +63,7 @@ type BaseApplication struct {
 	startBlockTimestamp atomic.Int64
 	chainID             string
 	dataDir             string
+	genesisInfo         *tmtypes.GenesisDoc
 }
 
 // Ensure that BaseApplication implements abcitypes.Application.
@@ -653,4 +654,9 @@ func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock)
 func (app *BaseApplication) SetChainID(chainId string) {
 	app.chainID = chainId
 	app.State.SetChainID(chainId)
+}
+
+// Genesis returns the tendermint genesis information
+func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
+	return app.genesisInfo
 }

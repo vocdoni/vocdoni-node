@@ -1,7 +1,6 @@
 package api
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -202,7 +201,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	chainInfo := &ChainInfo{
+	data, err := json.Marshal(&ChainInfo{
 		ID:               a.vocapp.ChainID(),
 		BlockTime:        *a.vocinfo.BlockTimes(),
 		ElectionCount:    electionCount,
@@ -212,22 +211,8 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		ValidatorCount:   uint32(len(validators)),
 		Timestamp:        timestamp,
 		VoteCount:        voteCount,
-	}
-	tctx, cancel := context.WithTimeout(context.TODO(), 2*time.Second)
-	defer cancel()
-	if a.vocapp.Node != nil {
-		genesis, err := a.vocapp.Node.Genesis(tctx)
-		if err != nil {
-			return err
-		}
-		if genesis != nil {
-			if genesis.Genesis != nil {
-				chainInfo.GenesisTime = genesis.Genesis.GenesisTime
-			}
-		}
-	}
-
-	data, err := json.Marshal(chainInfo)
+		GenesisTime:      a.vocapp.Genesis().GenesisTime,
+	})
 	if err != nil {
 		return err
 	}

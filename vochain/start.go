@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -42,6 +43,11 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
 	}
+	nodeGenesis, err := app.Node.Genesis(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.genesisInfo = nodeGenesis.Genesis
 	return app
 }
 
