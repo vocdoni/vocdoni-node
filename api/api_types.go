@@ -165,6 +165,7 @@ type ChainInfo struct {
 	Height           *uint32   `json:"height,omitempty"`
 	Timestamp        *int64    `json:"blockTimestamp,omitempty"`
 	TransactionCount *uint64   `json:"transactionCount,omitempty"`
+	ValidatorCount   *uint32   `json:"validatorCount,omitempty"`
 }
 
 type Account struct {
