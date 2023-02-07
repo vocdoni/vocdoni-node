@@ -194,7 +194,13 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	defer cancel()
 	if len(processID) == 0 {
 		height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
-		return uint64(height.(int64)), err
+		if err != nil {
+			return 0, err
+		}
+		if height == nil {
+			return 0, nil
+		}
+		return uint64(height.(int64)), nil
 	}
 	height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
 	return uint64(height), err
