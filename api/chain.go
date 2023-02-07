@@ -199,11 +199,13 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 	numValidators := new(uint32)
 	*numValidators = uint32(len(validators))
+	isSyncing := a.vocapp.IsSynchronizing()
 	data, err := json.Marshal(ChainInfo{
 		ID:               a.vocapp.ChainID(),
 		BlockTime:        blockTimes,
 		ElectionCount:    &electionCount,
 		Height:           &height,
+		Syncing:          &isSyncing,
 		Timestamp:        &timestamp,
 		TransactionCount: &transactionCount,
 		ValidatorCount:   numValidators,
