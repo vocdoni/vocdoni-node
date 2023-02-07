@@ -143,7 +143,7 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 	censusType, indexed := censusType(ctx.URLParam("type"))
 	if censusType == models.Census_UNKNOWN {
-		return fmt.Errorf("census type is unknown")
+		return ErrCensusTypeUnknown
 	}
 
 	censusID := util.RandomBytes(32)
@@ -178,10 +178,10 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 	if len(cdata.Participants) == 0 {
-		return fmt.Errorf("missing participant parameters")
+		return ErrParamParticipantsMissing
 	}
 	if len(cdata.Participants) > MaxCensusAddBatchSize {
-		return fmt.Errorf("maximum number of participants per call is %d (received %d)",
+		return fmt.Errorf("%w (%d, got %d)", ErrParamParticipantsTooBig,
 			MaxCensusAddBatchSize, len(cdata.Participants))
 	}
 
@@ -195,19 +195,19 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	values := [][]byte{}
 	for i, p := range cdata.Participants {
 		if p.Key == nil {
-			return fmt.Errorf("missing participant key number %d", i)
+			return fmt.Errorf("%w (number %d)", ErrParticipantKeyMissing, i)
 		}
 		// check the weight parameter
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}
 		if ref.Indexed && p.Weight.MathBigInt().Uint64() != 1 {
-			return fmt.Errorf("indexed census cannot use weight")
+			return ErrIndexedCensusCantUseWeight
 		}
 		// compute the hash, we use it as key for the merkle tree
 		keyHash, err := ref.Tree().Hash(p.Key)
 		if err != nil {
-			return fmt.Errorf("could not compute key hash: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantComputeKeyHash, err)
 		}
 		keys = append(keys, keyHash)
 		if !ref.Indexed {
@@ -219,7 +219,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if !ref.Indexed {
 		failed, err := ref.Tree().AddBatch(keys, values)
 		if err != nil {
-			return fmt.Errorf("cannot add key and value to tree: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantAddKeyAndValueToTree, err)
 		}
 		log.Infof("added %d keys to census %x", len(keys), censusID)
 		if len(failed) > 0 {
@@ -228,7 +228,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	} else {
 		failed, err := ref.Tree().AddBatch(keys, nil)
 		if err != nil {
-			return fmt.Errorf("cannot add key to tree: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantAddKeyToTree, err)
 		}
 		if len(failed) > 0 {
 			log.Warnf("failed participants %v", failed)
@@ -315,7 +315,7 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 	if cdata.Data == nil || cdata.RootHash == nil {
-		return fmt.Errorf("missing dump or root parameters")
+		return ErrParamDumpOrRootMissing
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)
@@ -323,10 +323,10 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 	if ref.CensusType != int32(cdata.Type) {
-		return fmt.Errorf("census type does not match")
+		return ErrCensusTypeMismatch
 	}
 	if ref.Indexed != cdata.Indexed {
-		return fmt.Errorf("indexed flag does not match")
+		return ErrCensusIndexedFlagMismatch
 	}
 
 	if err := ref.Tree().ImportDump(compressor.NewCompressor().DecompressBytes(cdata.Data)); err != nil {
@@ -339,7 +339,7 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 
 	if !bytes.Equal(root, cdata.RootHash) {
-		return fmt.Errorf("root hash does not match after importing dump")
+		return ErrCensusRootHashMismatch
 	}
 
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
@@ -433,7 +433,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if root := ctx.URLParam("root"); root != "" {
 		fromRoot, err := hex.DecodeString(root)
 		if err != nil {
-			return fmt.Errorf("could not decode root")
+			return ErrParamRootInvalid
 		}
 		t, err := ref.Tree().FromRoot(fromRoot)
 		if err != nil {
@@ -569,7 +569,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 	if cdata.Key == nil || cdata.Proof == nil {
-		return fmt.Errorf("missing key or proof parameters")
+		return ErrParamKeyOrProofMissing
 	}
 
 	ref, err := a.censusdb.Load(censusID, nil)

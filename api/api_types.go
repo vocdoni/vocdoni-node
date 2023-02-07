@@ -259,10 +259,10 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		origin = models.CensusOrigin_OFF_CHAIN_TREE
 		root = ctype.RootHash
 	default:
-		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)
+		return 0, nil, fmt.Errorf("%w: %q", ErrCensusTypeUnknown, ctype)
 	}
 	if root == nil {
-		return 0, nil, fmt.Errorf("census root is not correctyl specified")
+		return 0, nil, ErrCensusRootIsNil
 	}
 	return origin, root, nil
 }

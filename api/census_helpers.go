@@ -23,7 +23,8 @@ func censusType(t string) (models.Census_Type, bool) {
 func censusIDparse(censusID string) ([]byte, error) {
 	censusID = util.TrimHex(censusID)
 	if len(censusID) != censusIDsize*2 {
-		return nil, fmt.Errorf("invalid censusID format")
+		return nil, fmt.Errorf("%w (%d != %d)", ErrCensusIDLengthInvalid, len(censusID), censusIDsize*2)
+
 	}
 	return hex.DecodeString(censusID)
 }

@@ -19,10 +19,6 @@ const (
 	ChainHandler = "chain"
 )
 
-var (
-	ErrBlockNotFound = fmt.Errorf("block not found")
-)
-
 func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/chain/organizations",
@@ -148,7 +144,7 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("cannot parse page number")
+			return ErrCantParsePageNumber
 		}
 	}
 	page = page * MaxPageSize
@@ -242,17 +238,17 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrCantParseDataAsJSON, err)
 	}
 	res, err := a.vocapp.SendTx(req.Payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrVochainSendTxFailed, err)
 	}
 	if res == nil {
-		return fmt.Errorf("no reply from vochain")
+		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%s", string(res.Data))
+		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
 	}
 	var data []byte
 	if data, err = json.Marshal(Transaction{
@@ -339,7 +335,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ctx.Send(nil, apirest.HTTPstatusNoContent)
 		}
-		return fmt.Errorf("cannot get tx: %w", err)
+		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
 	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusCodeOK)
 }
@@ -355,7 +351,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ctx.Send(nil, apirest.HTTPstatusNoContent)
 		}
-		return fmt.Errorf("cannot get tx: %w", err)
+		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {
