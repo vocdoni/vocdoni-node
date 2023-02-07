@@ -95,6 +95,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		blockCache:         lru.NewAtomic(32),
 		dataDir:            dbpath,
 		chainID:            "test",
+		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil
 }
 
@@ -138,6 +139,11 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if app.Node, err = tmcli.New(app.Service.(tmcli.NodeService)); err != nil {
 		return fmt.Errorf("could not start tendermint node client: %w", err)
 	}
+	nodeGenesis, err := app.Node.Genesis(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.genesisInfo = nodeGenesis.Genesis
 	return nil
 }
 
