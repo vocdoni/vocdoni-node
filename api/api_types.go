@@ -168,6 +168,7 @@ type ChainInfo struct {
 	Timestamp        *int64    `json:"blockTimestamp,omitempty"`
 	TransactionCount *uint64   `json:"transactionCount,omitempty"`
 	ValidatorCount   *uint32   `json:"validatorCount,omitempty"`
+	VoteCount        *uint64   `json:"voteCount,omitempty"`
 }
 
 type Account struct {
