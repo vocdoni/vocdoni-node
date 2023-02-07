@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -47,12 +48,12 @@ func (f *FaucetAPI) faucetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	network := ctx.URLParam("network")
 	amount, ok := f.networks[network]
 	if !ok || amount == 0 {
-		return fmt.Errorf("invalid network")
+		return api.ErrParamNetworkInvalid
 	}
 	// get TO address
 	toStr := ctx.URLParam("to")
 	if !common.IsHexAddress(toStr) {
-		return fmt.Errorf("invalid address")
+		return api.ErrParamToInvalid
 	}
 	to := common.HexToAddress(toStr)
 
@@ -60,7 +61,7 @@ func (f *FaucetAPI) faucetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	log.Debugf("faucet request from %s for network %s", to.String(), network)
 	fpackage, err := vochain.GenerateFaucetPackage(f.signingKey, to, amount)
 	if err != nil {
-		return fmt.Errorf("could not generate faucet package: %w", err)
+		return fmt.Errorf("%w: %v", api.ErrCantGenerateFaucetPkg, err)
 	}
 	fpackageBytes, err := json.Marshal(FaucetPackage{
 		FaucetPayload: fpackage.Payload,

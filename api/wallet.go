@@ -69,7 +69,7 @@ func (a *API) enableWalletHandlers() error {
 func (a *API) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	token, err := uuid.Parse(authToken)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing bearer token")
+		return nil, ErrCantParseBearerToken
 	}
 
 	// generate the index from the token hash
@@ -77,7 +77,7 @@ func (a *API) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	// using the index, get the encrypted private key
 	privKeyEncrypted, err := a.db.ReadTx().Get(append([]byte(walletDBprefixEncryptedPrivateKey), index...))
 	if err != nil {
-		return nil, fmt.Errorf("wallet not found")
+		return nil, ErrWalletNotFound
 	}
 	// generate the decryption key
 	encryptKey := ethereum.HashRaw(append([]byte(privateKeyHashPrefix), token[:]...))
@@ -104,7 +104,7 @@ func (a *API) walletCheckKeyExists(privKey []byte) error {
 	if err != nil {
 		return err
 	}
-	return fmt.Errorf("key already exist")
+	return ErrWalletPrivKeyAlreadyExists
 }
 
 func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKeys) (*Transaction, error) {
@@ -123,10 +123,10 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 	}
 
 	if resp == nil {
-		return nil, fmt.Errorf("no reply from vochain")
+		return nil, ErrVochainEmptyReply
 	}
 	if resp.Code != 0 {
-		return nil, fmt.Errorf("%s", string(resp.Data))
+		return nil, fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, resp.Code, string(resp.Data))
 	}
 
 	return &Transaction{
@@ -202,7 +202,7 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 
 	if acc, _ := a.vocapp.State.GetAccount(wallet.Address(), true); acc != nil {
-		return fmt.Errorf("account %s already exist", wallet.AddressString())
+		return fmt.Errorf("%w (%s)", ErrAccountAlreadyExists, wallet.AddressString())
 	}
 
 	stx := models.SignedTx{}
@@ -245,11 +245,11 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return err
 	}
 	if len(util.TrimHex(ctx.URLParam("dstAddress"))) != common.AddressLength*2 {
-		return fmt.Errorf("destination address malformed")
+		return ErrDstAddressMalformed
 	}
 	dst := common.HexToAddress(ctx.URLParam("dstAddress"))
 	if dstAcc, err := a.vocapp.State.GetAccount(dst, true); dstAcc == nil || err != nil {
-		return fmt.Errorf("destination account is unknown")
+		return ErrDstAccountUnknown
 	}
 	amount, err := strconv.ParseUint(ctx.URLParam("amount"), 10, 64)
 	if err != nil {
@@ -296,7 +296,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 	description := &ElectionDescription{}
 	if err := json.Unmarshal(msg.Data, description); err != nil {
-		return fmt.Errorf("could not unmarshal JSON: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantParseDataAsJSON, err)
 	}
 
 	// Set startBlock and endBlock
@@ -305,21 +305,21 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// election immediately. Otherwise, ensure the startBlock is in the future
 	if !description.StartDate.IsZero() {
 		if startBlock, err = a.vocinfo.EstimateBlockHeight(description.StartDate); err != nil {
-			return fmt.Errorf("unable to estimate startDate block height: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantEstimateBlockHeight, err)
 		}
 	} else {
 		description.StartDate = time.Now().Add(time.Minute * 10)
 	}
 
 	if description.EndDate.Before(time.Now()) {
-		return fmt.Errorf("election end date cannot be in the past")
+		return ErrElectionEndDateInThePast
 	}
 	endBlock, err := a.vocinfo.EstimateBlockHeight(description.EndDate)
 	if err != nil {
-		return fmt.Errorf("unable to estimate endDate block height: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantEstimateBlockHeight, err)
 	}
 	if description.EndDate.Before(description.StartDate) {
-		return fmt.Errorf("end date must be after start date")
+		return ErrElectionEndDateBeforeStart
 	}
 
 	// Calculate block count
@@ -399,13 +399,13 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// Publish the metadata to IPFS
 	metadataBytes, err := json.Marshal(&metadata)
 	if err != nil {
-		return fmt.Errorf("cannot format metadata: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantMarshalMetadata, err)
 	}
 	storageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	metadataURI, err := a.storage.Publish(storageCtx, metadataBytes)
 	cancel()
 	if err != nil {
-		return fmt.Errorf("cannot publish metadata file: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantPublishMetadata, err)
 	}
 	metadataURI = "ipfs://" + metadataURI
 
