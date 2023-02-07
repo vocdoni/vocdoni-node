@@ -2,13 +2,13 @@ package log
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
-	zlog "github.com/rs/zerolog/log"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
@@ -45,20 +45,29 @@ func Logger() *zerolog.Logger { return &log }
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
 func Init(logLevel string, output string) {
-	// Assign the global logger to the local logger
+	var out io.Writer
 	switch output {
 	case "stdout":
-		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
+		out = os.Stdout
 	case "stderr":
-		log = zlog.Output(zerolog.ConsoleWriter{Out: os.Stdout}).With().Caller().Logger()
+		out = os.Stderr
 	default:
 		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			panic(fmt.Sprintf("invalid log output: %v", err))
 		}
-		log = zlog.Output(errorLog).With().Caller().Logger()
+		out = errorLog
 	}
-	// Required to get the correct caller information
+
+	// Init the global logger var, with millisecond timestamps
+	log = zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
+		w.Out = out
+		w.TimeFormat = time.RFC3339Nano
+	})).With().Timestamp().Logger()
+	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
+
+	// Include caller, increasing SkipFrameCount to account for this log package wrapper
+	log = log.With().Caller().Logger()
 	zerolog.CallerSkipFrameCount = 3
 
 	switch logLevel {
