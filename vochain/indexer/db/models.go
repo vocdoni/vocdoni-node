@@ -42,7 +42,7 @@ type Process struct {
 	QuestionIndex         int64
 	CreationTime          time.Time
 	SourceBlockHeight     int64
-	SourceNetworkID       string
+	SourceNetworkID       int64
 }
 
 type TokenTransfer struct {

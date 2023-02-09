@@ -95,7 +95,7 @@ func (c *Client) GetProof(pubkey, root []byte, digested bool) ([]byte, []byte, e
 	return resp.Siblings, resp.CensusValue, nil
 }
 
-func (c *Client) GetResults(pid []byte) ([][]string, string, bool, error) {
+func (c *Client) GetResults(pid []byte) ([][]*types.BigInt, string, bool, error) {
 	var req api.APIrequest
 	req.Method = "getResults"
 	req.ProcessID = pid
@@ -230,10 +230,10 @@ func (c *Client) GetRollingCensusVoterWeight(pid []byte, address common.Address)
 	if !resp.Ok {
 		return nil, fmt.Errorf("cannot get pre register voter weight for process %x: %s", pid, resp.Message)
 	}
-	return resp.Weight.ToInt(), nil
+	return resp.Weight.MathBigInt(), nil
 }
 
-func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) (results [][]string, err error) {
+func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) (results [][]*types.BigInt, err error) {
 	log.Infof("waiting for results...")
 	var final bool
 	for {
@@ -247,11 +247,11 @@ func (c *Client) TestResults(pid []byte, totalVotes int, withWeight uint64) (res
 		}
 		log.Infof("no results yet")
 	}
-	total := fmt.Sprintf("%d", uint64(totalVotes)*withWeight)
-	if results[0][1] != total ||
-		results[1][2] != total ||
-		results[2][3] != total ||
-		results[3][4] != total {
+	total := new(types.BigInt).SetUint64(uint64(totalVotes) * withWeight)
+	if !results[0][1].Equal(total) ||
+		!results[1][2].Equal(total) ||
+		!results[2][3].Equal(total) ||
+		!results[3][4].Equal(total) {
 		return nil, fmt.Errorf("invalid results: %v", results)
 	}
 	return results, nil

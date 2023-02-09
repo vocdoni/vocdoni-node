@@ -26,8 +26,8 @@ func checkRootBIString(c *qt.C, tree *Tree, expected string) {
 func TestDBTx(t *testing.T) {
 	c := qt.New(t)
 
-	dbBadger := metadb.NewTest(t)
-	testDBTx(c, dbBadger)
+	tdb := metadb.NewTest(t)
+	testDBTx(c, tdb)
 
 	dbPebble, err := pebbledb.New(db.Options{Path: c.TempDir()})
 	c.Assert(err, qt.IsNil)

@@ -6,6 +6,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -14,6 +15,38 @@ var (
 	//ErrTransactionDoesNotExist is returned when the transaction does not exist
 	ErrTransactionDoesNotExist = fmt.Errorf("transaction does not exist")
 )
+
+// TransactionsCost returns a map with the current cost for all transactions
+func (c *HTTPclient) TransactionsCost() (map[string]uint64, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", "cost")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	txscost := &api.Transaction{
+		Costs: make(map[string]uint64),
+	}
+	err = json.Unmarshal(resp, txscost)
+	if err != nil {
+		return nil, err
+	}
+	return txscost.Costs, nil
+}
+
+// TransactionCost returns the current cost for the given transaction type
+func (c *HTTPclient) TransactionCost(txType models.TxType) (uint64, error) {
+	txscost, err := c.TransactionsCost()
+	if err != nil {
+		return 0, err
+	}
+	txcost, found := txscost[vochain.TxTypeToCostName(txType)]
+	if !found {
+		return 0, fmt.Errorf("transaction type not found")
+	}
+	return txcost, nil
+}
 
 // TransactionReference returns the reference of a transaction given its hash.
 func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.TransactionReference, error) {

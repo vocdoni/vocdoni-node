@@ -211,7 +211,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}
-		if ref.Indexed && p.Weight.ToInt().Uint64() != 1 {
+		if ref.Indexed && p.Weight.MathBigInt().Uint64() != 1 {
 			return fmt.Errorf("indexed census cannot use weight")
 		}
 
@@ -226,7 +226,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 		keys = append(keys, leafKey)
 		if !ref.Indexed {
-			values = append(values, ref.Tree().BigIntToBytes(p.Weight.ToInt()))
+			values = append(values, ref.Tree().BigIntToBytes(p.Weight.MathBigInt()))
 		}
 	}
 

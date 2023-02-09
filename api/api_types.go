@@ -2,7 +2,6 @@ package api
 
 import (
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,7 +43,7 @@ type ElectionResults struct {
 	// OrganizationID is the ID of the organization that created the election
 	OrganizationID types.HexBytes `json:"organizationId"`
 	// Results is the list of votes
-	Results [][]*big.Int `json:"results"`
+	Results [][]*types.BigInt `json:"results"`
 	// SourceContractAddress is the address of the smart contract containing the census
 	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty"`
 }
@@ -162,8 +161,10 @@ type TransactionReference struct {
 type ChainInfo struct {
 	ID                      string    `json:"chainId,omitempty"`
 	BlockTime               *[5]int32 `json:"blockTime,omitempty"`
+	ElectionCount           *uint64   `json:"electionCount,omitempty"`
 	Height                  *uint32   `json:"height,omitempty"`
 	Timestamp               *int64    `json:"blockTimestamp,omitempty"`
+	TransactionCount        *uint64   `json:"transactionCount,omitempty"`
 	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
 }
 

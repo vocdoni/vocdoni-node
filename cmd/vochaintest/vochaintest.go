@@ -407,30 +407,6 @@ func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, ho
 	return nil
 }
 
-func (c *testClient) ensureAccountInfoEquals(account *ethereum.SignKeys, infoURI string) error {
-	for i := 0; i < retries; i++ {
-		// if account InfoURI is as expected, we're done
-		acct, err := c.GetAccount(account.Address())
-		if err != nil {
-			log.Debugf("GetAccount try %d: %v", i, err)
-		}
-		if acct != nil && acct.InfoURI == infoURI {
-			return nil
-		}
-
-		// else, set it
-		// CreateOrSetAccount can return OK and then the tx be rejected anyway later.
-		// So, don't panic on errors, we only care about GetAccount in the next loop
-		err = c.SetAccount(account, common.Address{}, infoURI, acct.Nonce, nil, false)
-		if err != nil {
-			log.Debugf("CreateOrSetAccount try %d: %v", i, err)
-		}
-
-		c.WaitUntilNextBlock()
-	}
-	return fmt.Errorf("tried to set account %s InfoURI=%s, yet didn't happen after %d blocks", account.Address(), infoURI, retries)
-}
-
 func (c *testClient) ensureAccountExists(account *ethereum.SignKeys, faucetPkg *models.FaucetPackage) error {
 	for i := 0; i < retries; i++ {
 		acct, err := c.GetAccount(account.Address())
@@ -1159,11 +1135,6 @@ func testTokenTransactions(
 		log.Fatal(err)
 	}
 
-	// check send tokens
-	if err := mainClient.testSendTokens(treasurerSigner, mainSigner, otherSigner); err != nil {
-		log.Fatal(err)
-	}
-
 	// check set account delegate
 	if err := mainClient.testSetAccountDelegate(mainSigner, otherSigner); err != nil {
 		log.Fatal(err)
@@ -1240,25 +1211,6 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 	}
 	log.Infof("account %s successfully created: %+v", signer.Address(), acc)
 
-	// now try set own account info
-	err = c.ensureAccountInfoEquals(signer, "ipfs://XXX")
-	if err != nil {
-		return err
-	}
-
-	// check account info changed
-	acc, err = c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	if acc.InfoURI != "ipfs://XXX" {
-		return fmt.Errorf("expected account infoURI to be %s got %s", "ipfs://XXX", acc.InfoURI)
-	}
-	log.Infof("account %s infoURI successfully changed to %+v", signer.Address(), acc.InfoURI)
-
 	// create account with faucet package
 	faucetPkg, err := c.GenerateFaucetPackage(signer, signer2.Address(), 5000)
 	if err != nil {
@@ -1282,62 +1234,6 @@ func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signe
 		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 5000, acc2.Balance)
 	}
 	log.Infof("account %s (%+v) successfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
-	return nil
-}
-
-func (c *testClient) testSendTokens(treasurerSigner, signer, signer2 *ethereum.SignKeys) error {
-	txCost, err := c.GetTransactionCost(models.TxType_SEND_TOKENS)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s is %d", models.TxType_SEND_TOKENS, txCost)
-	acc, err := c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc.Nonce, acc.Balance)
-	// try send tokens
-	txhash, err := c.SendTokens(signer,
-		signer2.Address(),
-		acc.Nonce,
-		100)
-	if err != nil {
-		return fmt.Errorf("cannot send tokens: %v", err)
-	}
-
-	err = c.WaitUntilTxMined(txhash)
-	if err != nil {
-		return err
-	}
-
-	acc2, err := c.GetAccount(signer2.Address())
-	if err != nil {
-		return err
-	}
-	if acc2 == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched to account %s with nonce %d and balance %d", signer2.Address(), acc2.Nonce, acc2.Balance)
-	if acc2.Balance != 5100 {
-		log.Fatalf("expected %s to have balance %d got %d", signer2.Address(), 5100, acc2.Balance)
-	}
-	acc3, err := c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc3 == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched from account %s with nonce %d and balance %d", signer.Address(), acc3.Nonce, acc3.Balance)
-	if acc.Balance-(100+txCost) != acc3.Balance {
-		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Balance-(100+txCost), acc3.Balance)
-	}
-	if acc.Nonce+1 != acc3.Nonce {
-		log.Fatalf("expected %s to have balance %d got %d", signer.Address(), acc.Nonce+1, acc3.Nonce)
-	}
 	return nil
 }
 

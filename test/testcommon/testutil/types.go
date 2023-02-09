@@ -28,7 +28,7 @@ func (b *MockBlockStore) Height() int64 {
 
 func (b *MockBlockStore) AddTxToBlock(tx []byte) {
 	count := b.count.Load()
-	log.Infow("add tx to block", map[string]interface{}{"height": count})
+	log.Infow("add tx to block", "height", count)
 	b.Get(count).Data.Txs = append(b.Get(count).Data.Txs, tx)
 }
 
@@ -36,7 +36,7 @@ func (b *MockBlockStore) NewBlock(height int64) {
 	if count := b.count.Load(); height != count {
 		panic(fmt.Sprintf("height is not the expected one (got:%d expected:%d)", height, count))
 	}
-	log.Infow("new block", map[string]interface{}{"height": height})
+	log.Infow("new block", "height", height)
 	b.set(height, &tmtypes.Block{
 		Header: tmtypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
 		Data:   tmtypes.Data{Txs: make([]tmtypes.Tx, 0)}},
@@ -44,7 +44,7 @@ func (b *MockBlockStore) NewBlock(height int64) {
 }
 
 func (b *MockBlockStore) EndBlock() int64 {
-	log.Infow("end block", map[string]interface{}{"height": b.count.Load()})
+	log.Infow("end block", "height", b.count.Load())
 	return b.count.Add(1)
 }
 

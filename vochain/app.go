@@ -538,12 +538,12 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	defer app.State.TxCounterAdd()
 	tx := new(vochaintx.VochainTx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		log.Debugw("deliver tx", map[string]interface{}{
-			"hash":   fmt.Sprintf("%x", tx.TxID),
-			"type":   tx.TxModelType,
-			"height": app.Height(),
-			"tx":     tx.Tx,
-		})
+		log.Debugw("deliver tx",
+			"hash", fmt.Sprintf("%x", tx.TxID),
+			"type", tx.TxModelType,
+			"height", app.Height(),
+			"tx", tx.Tx,
+		)
 		if response, err = app.TransactionHandler.CheckTx(tx, true); err != nil {
 			log.Errorw(err, "rejected tx")
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}

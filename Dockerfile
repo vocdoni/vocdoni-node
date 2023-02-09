@@ -19,6 +19,7 @@ FROM node:lts-bullseye-slim AS test
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 WORKDIR /app
 COPY --from=builder /src/vochaintest ./
+COPY --from=builder /src/end2endtest ./
 COPY ./dockerfiles/testsuite/js ./js
 RUN cd js && npm install
 

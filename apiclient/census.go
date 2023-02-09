@@ -121,7 +121,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		Value: censusData.Value,
 	}
 	if censusData.Weight != nil {
-		cp.Weight = censusData.Weight.ToInt().Uint64()
+		cp.Weight = censusData.Weight.MathBigInt().Uint64()
 	} else {
 		cp.Weight = 1
 	}

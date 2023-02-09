@@ -194,18 +194,23 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // /chain/info
 // returns the chain ID, blocktimes, timestamp and height of the blockchain
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	chainID := a.vocapp.ChainID()
 	blockTimes := a.vocinfo.BlockTimes()
 	height := a.vocapp.Height()
 	timestamp := a.vocapp.Timestamp()
-	// Get current circuit tag
-	circuitConfigTag := a.vocapp.CircuitConfigurationTag()
+	transactionCount, err := a.indexer.TransactionCount()
+	if err != nil {
+		return err
+	}
 
+	circuitConfigTag := a.vocapp.CircuitConfigurationTag()
+	electionCount := a.indexer.ProcessCount(nil)
 	data, err := json.Marshal(ChainInfo{
-		ID:                      chainID,
+		ID:                      a.vocapp.ChainID(),
 		BlockTime:               blockTimes,
+		ElectionCount:           &electionCount,
 		Height:                  &height,
 		Timestamp:               &timestamp,
+		TransactionCount:        &transactionCount,
 		CircuitConfigurationTag: circuitConfigTag,
 	})
 	if err != nil {

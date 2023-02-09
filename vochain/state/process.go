@@ -69,21 +69,20 @@ func (v *State) AddProcess(p *models.Process) error {
 	if p.CensusURI != nil {
 		censusURI = *p.CensusURI
 	}
-	log.Infow("new election", map[string]interface{}{
-		"processId":     fmt.Sprintf("%x", p.ProcessId),
-		"entityId":      fmt.Sprintf("%x", p.EntityId),
-		"startBlock":    p.StartBlock,
-		"endBlock":      p.BlockCount + p.StartBlock,
-		"mode":          p.Mode,
-		"envelopeType":  p.EnvelopeType,
-		"voteOptions":   p.VoteOptions,
-		"censusRoot":    fmt.Sprintf("%x", p.CensusRoot),
-		"censusOrigin":  models.CensusOrigin_name[int32(p.CensusOrigin)],
-		"maxCensusSize": p.MaxCensusSize,
-		"status":        p.Status,
-		"height":        v.CurrentHeight(),
-		"censusURI":     censusURI,
-	})
+	log.Infow("new election",
+		"processId", fmt.Sprintf("%x", p.ProcessId),
+		"entityId", fmt.Sprintf("%x", p.EntityId),
+		"startBlock", p.StartBlock,
+		"endBlock", p.BlockCount+p.StartBlock,
+		"mode", p.Mode,
+		"envelopeType", p.EnvelopeType,
+		"voteOptions", p.VoteOptions,
+		"censusRoot", fmt.Sprintf("%x", p.CensusRoot),
+		"censusOrigin", models.CensusOrigin_name[int32(p.CensusOrigin)],
+		"maxCensusSize", p.MaxCensusSize,
+		"status", p.Status,
+		"height", v.CurrentHeight(),
+		"censusURI", censusURI)
 	for _, l := range v.eventListeners {
 		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
 	}
@@ -360,7 +359,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 }
 
 // GetProcessResults returns a friendly representation of the results stored in the State (if any).
-func (v *State) GetProcessResults(pid []byte) ([][]string, error) {
+func (v *State) GetProcessResults(pid []byte) ([][]*types.BigInt, error) {
 	// TO-DO (pau): use a LRU cache for results
 	process, err := v.Process(pid, true)
 	if err != nil {

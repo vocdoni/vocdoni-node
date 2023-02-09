@@ -8,14 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/dgraph-io/badger/v3"
-	"github.com/timshannon/badgerhold/v3"
-	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -32,9 +28,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// enableBadgerhold is true by default;
-// badgerhold can be disabled via DISABLE_BADGERHOLD=true.
-var enableBadgerhold = os.Getenv("DISABLE_BADGERHOLD") != "true"
+//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.16.0 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -47,9 +41,6 @@ const (
 	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
 	// 8.3M seems enough for now
 	MaxEnvelopeListSize = 32 << 18
-
-	countEnvelopeCacheSize = 1024
-	resultsCacheSize       = 512
 )
 
 // EventListener is an interface used for executing custom functions during the
@@ -89,22 +80,7 @@ type Indexer struct {
 	liveResultsProcs sync.Map
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
-	db             *badgerhold.Store
 	sqlDB          *sql.DB
-	// envelopeHeightCache and countTotalEnvelopes are in memory counters that helps reducing the
-	// access time when GenEnvelopeHeight() is called.
-	envelopeHeightCache *lru.Cache
-	// resultsCache is a memory cache for final results results, stores processId:<results>
-	resultsCache *lru.Cache
-	// addVoteLock is used to avoid Transaction Conflicts on the KV database.
-	// It is not critical and the code should be able to recover from a Conflict, but we
-	// try to minimize this situations in order to improve performance on the KV.
-	// TODO (pau): remove this mutex and relay on the KV layer
-	addVoteLock sync.RWMutex
-	// voteTxLock is used to avoid Transaction Conflicts on the vote index KV database.
-	voteTxLock sync.RWMutex
-	// txIndexLock is used to avoid Transaction Conflicts on the transaction index KV database.
-	txIndexLock sync.Mutex
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
 	recoveryBootLock sync.RWMutex
@@ -141,11 +117,6 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
 	}
-	var err error
-	s.db, err = InitDB(dbPath)
-	if err != nil {
-		return nil, err
-	}
 
 	startTime := time.Now()
 
@@ -154,15 +125,15 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
 
-	log.Infow("indexer initialization", map[string]interface{}{
-		"took":         time.Since(startTime),
-		"dataDir":      dbPath,
-		"liveResults":  countLiveResults,
-		"transactions": countMap[indexertypes.CountStoreTransactions],
-		"envelopes":    countMap[indexertypes.CountStoreEnvelopes],
-		"processes":    countMap[indexertypes.CountStoreProcesses],
-		"entities":     countMap[indexertypes.CountStoreEntities],
-	})
+	log.Infow("indexer initialization",
+		"took", time.Since(startTime),
+		"dataDir", dbPath,
+		"liveResults", countLiveResults,
+		"transactions", countMap[indexertypes.CountStoreTransactions],
+		"envelopes", countMap[indexertypes.CountStoreEnvelopes],
+		"processes", countMap[indexertypes.CountStoreProcesses],
+		"entities", countMap[indexertypes.CountStoreEntities],
+	)
 
 	sqlPath := dbPath + "-sqlite"
 	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
@@ -191,22 +162,14 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 	// Subscrive to events
 	s.App.State.AddEventListener(s)
-	s.envelopeHeightCache = lru.New(countEnvelopeCacheSize)
-	s.resultsCache = lru.New(resultsCacheSize)
 	return s, nil
 }
 
 func (idx *Indexer) Close() error {
 	idx.cancelFunc()
 	idx.WaitIdle()
-	// Try closing both before reporting errors.
-	err1 := idx.db.Close()
-	err2 := idx.sqlDB.Close()
-	if err1 != nil {
-		return err1
-	}
-	if err2 != nil {
-		return err2
+	if err := idx.sqlDB.Close(); err != nil {
+		return err
 	}
 	return nil
 }
@@ -242,65 +205,11 @@ func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, conte
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
 // If no CountStore model is stored for the type, it counts all db entries of that type.
 func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
-	var err error
 	txCountStore := new(indexertypes.CountStore)
 	envelopeCountStore := new(indexertypes.CountStore)
 	processCountStore := new(indexertypes.CountStore)
 	entityCountStore := new(indexertypes.CountStore)
-	if enableBadgerhold {
-		if err = idx.db.Get(indexertypes.CountStoreTransactions, txCountStore); err != nil {
-			count, err := idx.db.Count(&indexertypes.TxReference{}, &badgerhold.Query{})
-			if err != nil {
-				if err != badger.ErrKeyNotFound {
-					return nil, fmt.Errorf("could not count total transactions: %v", err)
-				}
-				// If keyNotFound error, ensure count is 0
-				count = 0
-			}
-			// Store new countStore value
-			txCountStore.Count = uint64(count)
-			txCountStore.Type = indexertypes.CountStoreTransactions
-			if err := idx.db.Upsert(txCountStore.Type, txCountStore); err != nil {
-				return nil, fmt.Errorf("could not store transaction count: %v", err)
-			}
-		}
-		if err = idx.db.Get(indexertypes.CountStoreEnvelopes, envelopeCountStore); err != nil {
-			count, err := idx.db.Count(&indexertypes.VoteReference{}, &badgerhold.Query{})
-			if err != nil && err != badger.ErrKeyNotFound {
-				return nil, fmt.Errorf("could not count total envelopes: %v", err)
-			}
-			// Store new countStore value
-			envelopeCountStore.Count = uint64(count)
-			envelopeCountStore.Type = indexertypes.CountStoreEnvelopes
-			if err := idx.db.Upsert(envelopeCountStore.Type, envelopeCountStore); err != nil {
-				return nil, fmt.Errorf("could not store envelope count: %v", err)
-			}
-		}
-		if err = idx.db.Get(indexertypes.CountStoreProcesses, processCountStore); err != nil {
-			count, err := idx.db.Count(&indexertypes.Process{}, &badgerhold.Query{})
-			if err != nil && err != badger.ErrKeyNotFound {
-				return nil, fmt.Errorf("could not count total processes: %v", err)
-			}
-			// Store new countStore value
-			processCountStore.Count = uint64(count)
-			processCountStore.Type = indexertypes.CountStoreProcesses
-			if err := idx.db.Upsert(processCountStore.Type, processCountStore); err != nil {
-				return nil, fmt.Errorf("could not store process count: %v", err)
-			}
-		}
-		if err = idx.db.Get(indexertypes.CountStoreEntities, entityCountStore); err != nil {
-			count, err := idx.db.Count(&indexertypes.Entity{}, &badgerhold.Query{})
-			if err != nil && err != badger.ErrKeyNotFound {
-				return nil, fmt.Errorf("could not count total entities: %v", err)
-			}
-			// Store new countStore value
-			entityCountStore.Count = uint64(count)
-			entityCountStore.Type = indexertypes.CountStoreEntities
-			if err := idx.db.Upsert(entityCountStore.Type, entityCountStore); err != nil {
-				return nil, fmt.Errorf("could not store entity count: %v", err)
-			}
-		}
-	}
+	// TODO(mvdan): implement on sqlite if needed
 	return map[uint8]uint64{
 		indexertypes.CountStoreTransactions: txCountStore.Count,
 		indexertypes.CountStoreEnvelopes:    envelopeCountStore.Count,
@@ -350,20 +259,6 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		log.Error(err)
 	}
 
-	if enableBadgerhold {
-		prcIDs = []types.ProcessID{}
-		err := idx.db.ForEach(
-			badgerhold.Where("FinalResults").Eq(false),
-			func(p *indexertypes.Process) error {
-				prcIDs = append(prcIDs, p.ID)
-				return nil
-			})
-
-		if err != nil {
-			log.Error(err)
-		}
-	}
-
 	log.Infof("recovered %d live results processes", len(prcIDs))
 	log.Infof("starting live results recovery computation")
 	startTime := time.Now()
@@ -388,15 +283,6 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			VoteOpts:     options,
 			EnvelopeType: process.GetEnvelopeType(),
 			Signatures:   []types.HexBytes{},
-		}
-
-		if enableBadgerhold {
-			if err := idx.queryWithRetries(func() error {
-				return idx.db.Upsert(p, indxR)
-			}); err != nil {
-				log.Errorw(err, "cannot upsert results to db")
-				continue
-			}
 		}
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
@@ -429,12 +315,12 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
-		log.Infow("partial results recovered", map[string]interface{}{
-			"electionID": fmt.Sprintf("%x", p),
-			"weight":     results.Weight,
-			"votes":      len(results.Votes),
-			"results":    results.String(),
-		})
+		log.Infow("partial results recovered",
+			"electionID", fmt.Sprintf("%x", p),
+			"weight", results.Weight,
+			"votes", len(results.Votes),
+			"results", results.String(),
+		)
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}
@@ -478,42 +364,14 @@ func (idx *Indexer) Commit(height uint32) error {
 	}
 
 	startTime := time.Now()
-	txn := idx.db.Badger().NewTransaction(true)
 	for _, v := range idx.voteIndexPool {
-		if err := idx.addVoteIndex(v.vote, v.txIndex, txn); err != nil {
+		if err := idx.addVoteIndex(v.vote, v.txIndex); err != nil {
 			log.Errorw(err, "could not index vote")
 		}
 	}
 	if len(idx.voteIndexPool) > 0 {
-		idx.voteTxLock.Lock()
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		txn.CommitWith(func(err error) {
-			if err != nil {
-				log.Error(err)
-			}
-			wg.Done()
-		})
-		wg.Wait()
-		idx.voteTxLock.Unlock()
 		log.Infof("indexed %d new envelopes, took %s",
 			len(idx.voteIndexPool), time.Since(startTime))
-
-		if enableBadgerhold {
-			if err := idx.db.UpdateMatching(&indexertypes.CountStore{},
-				badgerhold.Where(badgerhold.Key).Eq(indexertypes.CountStoreEnvelopes),
-				func(record interface{}) error {
-					update, ok := record.(*indexertypes.CountStore)
-					if !ok {
-						return fmt.Errorf("record isn't the correct type! Wanted CountStore, got %T", record)
-					}
-					update.Count += uint64(len(idx.voteIndexPool))
-					return nil
-				},
-			); err != nil {
-				log.Errorf("could not get envelope count: %v", err)
-			}
-		}
 	}
 	// index token transfers
 	for _, tt := range idx.tokenTransferPool {
@@ -522,8 +380,6 @@ func (idx *Indexer) Commit(height uint32) error {
 		}
 	}
 	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
-
-	txn.Discard()
 
 	// Add votes collected by onVote (live results)
 	nvotes := 0
@@ -778,11 +634,11 @@ func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
 	}); err != nil {
 		return err
 	}
-	log.Debugw("new token transfer", map[string]interface{}{
-		"from":   fmt.Sprintf("%x", tt.From),
-		"to":     fmt.Sprintf("%x", tt.To),
-		"amount": fmt.Sprintf("%d", tt.Amount),
-	})
+	log.Debugw("new token transfer",
+		"from", fmt.Sprintf("%x", tt.From),
+		"to", fmt.Sprintf("%x", tt.To),
+		"amount", fmt.Sprintf("%d", tt.Amount),
+	)
 	return nil
 }
 

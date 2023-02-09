@@ -5,8 +5,6 @@ go 1.19
 // For testing purposes while dvote-protobuf becomes stable
 // replace go.vocdoni.io/proto => ../dvote-protobuf
 
-replace github.com/timshannon/badgerhold/v3 => github.com/vocdoni/badgerhold/v3 v3.0.0-20210514115050-2d704df3456f
-
 // Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
 // as it dropped support for GOOS=darwin.
 // If you change its version, ensure that "GOOS=darwin go build ./..." still works.
@@ -16,7 +14,6 @@ require (
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
 	github.com/cockroachdb/pebble v0.0.0-20221021145029-f34af25a0187
-	github.com/dgraph-io/badger/v3 v3.2103.4
 	github.com/ethereum/go-ethereum v1.10.26
 	github.com/fatih/color v1.13.0
 	github.com/frankban/quicktest v1.14.3
@@ -57,7 +54,6 @@ require (
 	github.com/spf13/viper v1.13.0
 	github.com/tendermint/tendermint v0.35.9
 	github.com/tendermint/tm-db v0.6.7
-	github.com/timshannon/badgerhold/v3 v3.0.0
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.uber.org/zap v1.21.0 // indirect
@@ -136,7 +132,6 @@ require (
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/btree v1.0.1 // indirect
-	github.com/google/flatbuffers v2.0.8+incompatible // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/orderedcode v0.0.1 // indirect
 	github.com/gopherjs/gopherjs v0.0.0-20190812055157-5d271430af9f // indirect

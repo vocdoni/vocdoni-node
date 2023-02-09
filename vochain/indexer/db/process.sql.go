@@ -69,7 +69,7 @@ type CreateProcessParams struct {
 	QuestionIndex     int64
 	CreationTime      time.Time
 	SourceBlockHeight int64
-	SourceNetworkID   string
+	SourceNetworkID   int64
 	ResultsVotes      string
 }
 
@@ -225,6 +225,34 @@ func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults 
 	return items, nil
 }
 
+const getProcessIDsByResultsHeight = `-- name: GetProcessIDsByResultsHeight :many
+SELECT id FROM processes
+WHERE results_height = ?
+`
+
+func (q *Queries) GetProcessIDsByResultsHeight(ctx context.Context, resultsHeight int64) ([]types.ProcessID, error) {
+	rows, err := q.db.QueryContext(ctx, getProcessIDsByResultsHeight, resultsHeight)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProcessStatus = `-- name: GetProcessStatus :one
 SELECT status FROM processes
 WHERE id = ?
@@ -296,7 +324,7 @@ SELECT id FROM processes
 WHERE (? = 0 OR entity_id = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
-	AND (? = '' OR source_network_id = ?)
+	AND (? = 0 OR source_network_id = ?)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
@@ -310,7 +338,7 @@ type SearchProcessesParams struct {
 	EntityID        types.EntityID
 	Namespace       int64
 	Status          int64
-	SourceNetworkID string
+	SourceNetworkID int64
 	IDSubstr        string
 	WithResults     interface{}
 	Limit           int32

@@ -243,7 +243,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	procs := make(map[string]bool)
 	last := 0
 	for len(procs) < procsCount {
-		list, err := idx.ProcessList(eidProcsCount, last, 10, "", 0, "", "", false)
+		list, err := idx.ProcessList(eidProcsCount, last, 10, "", 0, 0, "", false)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -261,15 +261,13 @@ func testProcessList(t *testing.T, procsCount int) {
 	}
 	qt.Assert(t, procs, qt.HasLen, procsCount)
 
-	_, err := idx.ProcessList(nil, 0, 64, "", 0, "", "", false)
+	_, err := idx.ProcessList(nil, 0, 64, "", 0, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 
 	qt.Assert(t, idx.ProcessCount(eidOneProcess), qt.Equals, uint64(1))
 	qt.Assert(t, idx.ProcessCount(eidProcsCount), qt.Equals, uint64(procsCount))
 	qt.Assert(t, idx.ProcessCount(nil), qt.Equals, uint64(10+procsCount))
-	// TODO(mvdan): our badgerhold code errors out unnecessarily in this case.
-	// Reenable this test once we've dropped badgerhold.
-	// qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
+	qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
 }
 
 func TestProcessSearch(t *testing.T) {
@@ -354,7 +352,7 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, err := idx.ProcessList(eidTest, 0, 10, pidExact, 0, "", "", false)
+	list, err := idx.ProcessList(eidTest, 0, 10, pidExact, 0, 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -363,7 +361,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Exact process search, with it being encrypted.
 	// This once caused a sqlite bug due to a mistake in the SQL query.
-	list, err = idx.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, "", "", false)
+	list, err = idx.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -372,7 +370,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Search for nonexistent process
 	list, err = idx.ProcessList(eidTest, 0, 10,
-		"4011d50537fa164b6fef261141797bbe4014526f", 0, "", "", false)
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +379,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Search containing part of all manually-defined processes
 	list, err = idx.ProcessList(eidTest, 0, 10,
-		"011d50537fa164b6fef261141797bbe4014526e", 0, "", "", false)
+		"011d50537fa164b6fef261141797bbe4014526e", 0, 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +388,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	list, err = idx.ProcessList(eidTest, 0, 100,
-		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, "", "ENDED", false)
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, 0, "ENDED", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -400,7 +398,7 @@ func TestProcessSearch(t *testing.T) {
 
 	// Search with an exact Entity ID, but starting with a null byte.
 	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
-	list, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, "", "", false)
+	list, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, 0, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -409,12 +407,12 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// list all processes, with a max of 10
-	list, err = idx.ProcessList(nil, 0, 10, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 10, "", 0, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 10)
 
 	// list all processes, with a max of 1000
-	list, err = idx.ProcessList(nil, 0, 1000, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 1000, "", 0, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 21)
 }
@@ -461,25 +459,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Get the process list for namespace 123
-	list, err := idx.ProcessList(eid20, 0, 100, "", 123, "", "", false)
+	list, err := idx.ProcessList(eid20, 0, 100, "", 123, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = idx.ProcessList(nil, 0, 100, "", 0, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 0, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = idx.ProcessList(nil, 0, 100, "", 10, "", "", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 10, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = idx.ProcessList(nil, 0, 100, "", 0, "", "READY", false)
+	list, err = idx.ProcessList(nil, 0, 100, "", 0, 0, "READY", false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
@@ -622,7 +620,7 @@ func TestResults(t *testing.T) {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].ToInt()
+			value = result.Votes[q][qi].MathBigInt()
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -702,7 +700,7 @@ func TestLiveResults(t *testing.T) {
 			if qi > 100 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].ToInt()
+			value = result.Votes[q][qi].MathBigInt()
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}

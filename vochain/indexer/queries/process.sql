@@ -40,7 +40,7 @@ SELECT id FROM processes
 WHERE (sqlc.arg(entity_id_len) = 0 OR entity_id = sqlc.arg(entity_id))
 	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
-	AND (sqlc.arg(source_network_id) = '' OR source_network_id = sqlc.arg(source_network_id))
+	AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
@@ -124,6 +124,10 @@ ORDER BY creation_time ASC, id ASC
 LIMIT ?
 OFFSET ?
 ;
+
+-- name: GetProcessIDsByResultsHeight :many
+SELECT id FROM processes
+WHERE results_height = ?;
 
 -- name: GetProcessIDsByFinalResults :many
 SELECT id FROM processes

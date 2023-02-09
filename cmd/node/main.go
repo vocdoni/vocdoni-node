@@ -76,7 +76,7 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.vocdoni",
 		"directory where data is stored")
 	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
-		fmt.Sprintf("key-value db type (%s, %s)", db.TypePebble, db.TypeBadger))
+		fmt.Sprintf("key-value db type (%s)", db.TypePebble))
 	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.GenesisAvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
@@ -362,7 +362,7 @@ func main() {
 	}
 	// Check the dbType is valid
 	if !globalCfg.Vochain.ValidDBType() {
-		log.Fatalf("dbType %s is invalid. Valid ones: %s, %s", globalCfg.Vochain.DBType, db.TypePebble, db.TypeBadger)
+		log.Fatalf("dbType %s is invalid. Valid ones: %s", globalCfg.Vochain.DBType, db.TypePebble)
 	}
 
 	// If dev enabled, expose debugging profiles under an http server

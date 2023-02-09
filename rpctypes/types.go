@@ -74,7 +74,7 @@ type APIrequest struct {
 	RootHash     types.HexBytes                 `json:"rootHash,omitempty"`
 	SearchTerm   string                         `json:"searchTerm,omitempty"`
 	Signature    types.HexBytes                 `json:"signature,omitempty"`
-	SrcNetId     string                         `json:"sourceNetworkId,omitempty"`
+	SrcNetId     int32                          `json:"sourceNetworkId,omitempty"`
 	Status       string                         `json:"status,omitempty"`
 	Timestamp    int32                          `json:"timestamp"`
 	TxIndex      int32                          `json:"txIndex,omitempty"`
@@ -205,7 +205,7 @@ type APIresponse struct {
 	ProcessNonce         *uint32                          `json:"processNonce,omitempty"`
 	Registered           *bool                            `json:"registered,omitempty"`
 	Request              string                           `json:"request"`
-	Results              [][]string                       `json:"results,omitempty"`
+	Results              [][]*types.BigInt                `json:"results,omitempty"`
 	Root                 types.HexBytes                   `json:"root,omitempty"`
 	Siblings             types.HexBytes                   `json:"siblings,omitempty"`
 	Size                 *int64                           `json:"size,omitempty"`

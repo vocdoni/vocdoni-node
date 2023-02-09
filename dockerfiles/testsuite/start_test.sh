@@ -24,6 +24,8 @@ be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
 cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d"
 ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
+APIHOST="http://gateway0:9090/v2"
+FAUCET="$APIHOST/faucet/dev/"
 . env.oracle0key # contains var VOCDONI_SIGNINGKEY, import into current env
 ORACLE_KEY="$VOCDONI_SIGNINGKEY"
 [ -n "$TESTSUITE_ORACLE_KEY" ] && ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
@@ -43,6 +45,7 @@ tests_to_run=(
 	"merkle_vote_encrypted"
 	"cspvoting"
 	# "anonvoting"
+	"e2etest_tokentxs"
 )
 
 # print help
@@ -125,6 +128,13 @@ tokentransactions() {
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
 }
 
+e2etest_tokentxs() {
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
+		./end2endtest --host $APIHOST \
+		  --logLevel=$LOGLEVEL \
+		  --operation=tokentransactions \
+		  --faucet=$FAUCET
+}
 ### end tests definition
 
 # useful for debugging bash flow

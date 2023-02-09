@@ -22,11 +22,11 @@ type Oracle struct {
 }
 
 type OracleResults struct {
-	ChainID       string         `json:"chainId"`
-	EntityID      types.HexBytes `json:"entityId"`
-	OracleAddress common.Address `json:"oracleAddress"`
-	ProcessID     types.HexBytes `json:"processId"`
-	Results       [][]string     `json:"results"`
+	ChainID       string            `json:"chainId"`
+	EntityID      types.HexBytes    `json:"entityId"`
+	OracleAddress common.Address    `json:"oracleAddress"`
+	ProcessID     types.HexBytes    `json:"processId"`
+	Results       [][]*types.BigInt `json:"results"`
 }
 
 func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle, error) {
