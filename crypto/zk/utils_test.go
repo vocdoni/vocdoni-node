@@ -112,3 +112,27 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 	c.Assert(result.C, qt.ContentEquals, expected.C)
 	c.Assert(result.PublicInputs, qt.ContentEquals, expected.PublicInputs)
 }
+
+func TestLittleEndianToNBytes(t *testing.T) {
+	c := qt.New(t)
+	
+	input, _ := new(big.Int).SetString("1000", 10)
+	expected, _ := new(big.Int).SetString("232", 10)
+	c.Assert(LittleEndianToNBytes(input, 1).Bytes(), qt.DeepEquals, expected.Bytes())
+
+	input, _ = new(big.Int).SetString("12019150563308728469741609856876966791119787897175240651244842581859372505224", 10)
+	expected, _ = new(big.Int).SetString("873432238408170128747103711248787244651366455432", 10)
+	c.Assert(LittleEndianToNBytes(input, 20).Bytes(), qt.DeepEquals, expected.Bytes())
+}
+
+func TestBytesToArboStr(t *testing.T) {
+	c := qt.New(t)
+
+	input := new(big.Int).SetInt64(1233)
+	encoded := BytesToArboStr(input.Bytes())
+	expected := []string{
+		"145749485520268040037154566173721592631",
+		"243838562910071029186006881148627719363",
+	}
+	c.Assert(encoded, qt.DeepEquals, expected)
+}

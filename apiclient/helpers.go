@@ -2,25 +2,17 @@ package apiclient
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
-	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -229,54 +221,4 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 		Signature: fpackage.Signature,
 	}, nil
 
-}
-
-// BabyJubJubPrivKey returns a private BabyJubJub key generated based on the
-// provided account ethereum.SignKeys.
-func BabyJubJubPrivKey(account *ethereum.SignKeys) (babyjub.PrivateKey, error) {
-	privKey := babyjub.PrivateKey{}
-	_, strPrivKey := account.HexString()
-	if _, err := hex.Decode(privKey[:], []byte(strPrivKey)); err != nil {
-		return babyjub.PrivateKey{}, fmt.Errorf("error generating babyjub key: %w", err)
-	}
-
-	return privKey, nil
-}
-
-// BabyJubJubPubKey returns the public key associated to the provided
-// BabuJubJub private key encoded to slice of bytes arbo tree ready.
-func BabyJubJubPubKey(privKey babyjub.PrivateKey, size int) (types.HexBytes, int64, error) {
-	pubKey, err := poseidon.Hash([]*big.Int{
-		privKey.Public().X,
-		privKey.Public().Y,
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("error hashing babyjub public key: %w", err)
-	}
-
-	truncatedPubKey, shifted := zk.TruncateIntToBytes(pubKey, int64(size))
-	return arbo.BigIntToBytes(size, truncatedPubKey), shifted, nil
-}
-
-// GetNullifierZk function returns ZkSnark ready vote nullifier and also encodes
-// and returns the electionId into a string slice to be used in other processes
-// such as proof generation.
-func GetNullifierZk(privKey babyjub.PrivateKey, electionId types.HexBytes) (types.HexBytes, []string, error) {
-	// Encode the electionId -> sha256(electionId)
-	hashedElectionId := sha256.Sum256(electionId)
-	intElectionId := []*big.Int{
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[:16])),
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[16:])),
-	}
-	strElectionId := []string{intElectionId[0].String(), intElectionId[1].String()}
-	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(ElectionId))
-	nullifier, err := poseidon.Hash([]*big.Int{
-		babyjub.SkToBigInt(&privKey),
-		intElectionId[0],
-		intElectionId[1],
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error generating nullifier: %w", err)
-	}
-	return nullifier.Bytes(), strElectionId, nil
 }

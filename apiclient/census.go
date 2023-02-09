@@ -2,14 +2,12 @@ package apiclient
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
-	"github.com/iden3/go-iden3-crypto/babyjub"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
@@ -130,57 +128,11 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 	return &cp, nil
 }
 
-// CensusAddParticipantsZk adds one or several participants to an existing
-// zkweighted census wrapping the method CensusAddParticipants transforming
-// each participant private key into a babyjubjub first.
-func (c *HTTPclient) CensusAddParticipantsZk(censusID types.HexBytes, participants *api.CensusParticipants) error {
-	// Perform a request to get the type of the current census and check if it
-	// is a zk census.
-	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "type")
-	if err != nil {
-		return err
-	}
-	if code != 200 {
-		return fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	censusData := &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
-		return fmt.Errorf("could not unmarshal response: %w", err)
-	}
-
-	if censusData.Type != api.CensusTypeZKWeighted {
-		return fmt.Errorf("current census is not a zk census")
-	}
-
-	// Transform the participants key to babyjubjub key
-	zkParticipants := &api.CensusParticipants{}
-	for _, participant := range participants.Participants {
-		ethSignKey := ethereum.NewSignKeys()
-		if err := ethSignKey.AddHexKey(participant.Key.String()); err != nil {
-			return err
-		}
-		privKey, err := BabyJubJubPrivKey(ethSignKey)
-		if err != nil {
-			return err
-		}
-		censusKey, _, err := BabyJubJubPubKey(privKey, c.circuit.Levels/8)
-		if err != nil {
-			return err
-		}
-
-		zkParticipants.Participants = append(zkParticipants.Participants,
-			api.CensusParticipant{Key: censusKey, Weight: participant.Weight})
-	}
-
-	return c.CensusAddParticipants(censusID, zkParticipants)
-}
-
 // CensusGenProofZk function generates the census proof of a election based on
 // ZkSnarks. It uses the current apiclient circuit config to instance the
 // circuit and generates the proof for the censusRoot, electionId and voter
 // babyjubjub private key provided.
-func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types.HexBytes) (*CensusProofZk, error) {
+func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*CensusProofZk, error) {
 	// Perform a request to get the type of the current census and check if it
 	// is a zk census.
 	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "type")
@@ -200,26 +152,9 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 		return nil, fmt.Errorf("current census is not a zk census")
 	}
 
-	// Get BabyJubJub key from current client
-	ethSignKey := ethereum.NewSignKeys()
-	if err := ethSignKey.AddHexKey(privVoterKey.String()); err != nil {
-		return nil, err
-	}
-	privKey, err := BabyJubJubPrivKey(ethSignKey)
-	if err != nil {
-		return nil, err
-	}
-	// Get the publicKey with the correct size according to the circuit config.
-	pubKey, shifted, err := BabyJubJubPubKey(privKey, c.circuit.KeySize())
-	if err != nil {
-		return nil, err
-	}
-	strShifted := fmt.Sprint(shifted)
-
-	strPrivateKey := babyjub.SkToBigInt(&privKey).String()
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-	resp, code, err = c.Request("GET", nil, "censuses", censusRoot.String(), "proof", pubKey.String())
+	resp, code, err = c.Request("GET", nil, "censuses", censusRoot.String(), "proof", c.zkAddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +168,16 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	}
 
 	log.Debugw("zk census data received, starting to generate the proof inputs...", map[string]interface{}{
-		"censusRoot": censusRoot.String(), "electionId": electionID.String()})
+		"censusRoot": censusRoot.String(),
+		"electionId": electionId.String(),
+		"zkAddress":  c.zkAddr.String(),
+	})
+
+	// get nullifier
+	nullifier, err := c.zkAddr.Nullifier(electionId)
+	if err != nil {
+		return nil, err
+	}
 
 	// Encode census root
 	strCensusRoot := arbo.BytesToBigInt(censusRoot).String()
@@ -242,40 +186,38 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 	if censusData.Weight != nil {
 		weight = censusData.Weight.ToInt()
 	}
-	// Get nullifier and encoded processId
-	nullifier, strProcessId, err := GetNullifierZk(privKey, electionID)
-	if err != nil {
-		return nil, err
-	}
-	strNullifier := new(big.Int).SetBytes(nullifier).String()
+
 	// Calculate and encode vote hash -> sha256(voteWeight)
-	voteHash := sha256.Sum256(weight.Bytes())
-	strVoteHash := []string{
-		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[:16])).String(),
-		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[16:])).String(),
+	encElectionId := zk.BytesToArboStr(electionId)
+	voteHash := zk.BytesToArboStr(weight.Bytes())
+
+	// Create the inputs and encode them into a JSON
+	rawInputs := map[string]interface{}{
+		"censusRoot":     strCensusRoot,
+		"censusSiblings": censusData.Siblings,
+		"weight":         weight.String(),
+		"privateKey":     c.zkAddr.PrivKey.String(),
+		"voteHash":       voteHash,
+		"processId":      encElectionId,
+		"nullifier":      nullifier.String(),
 	}
+	inputs, err := json.Marshal(rawInputs)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding inputs: %w", err)
+	}
+	log.Debugw("zk circuit proof inputs generated", rawInputs)
+
 	// Get artifacts of the current circuit
 	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
 	log.Debugw("zk circuit loaded", map[string]interface{}{
-		"censusRoot": censusRoot.String(), "electionId": electionID.String()})
-	// Create the inputs and encode them into a JSON
-	rawInputs := map[string]interface{}{
-		"censusRoot":     strCensusRoot,
-		"censusSiblings": censusData.Siblings,
-		"weight":         weight.String(),
-		"privateKey":     strPrivateKey,
-		"voteHash":       strVoteHash,
-		"processId":      strProcessId,
-		"nullifier":      strNullifier,
-		"shifted":        strShifted,
-	}
-	inputs, err := json.Marshal(rawInputs)
-	if err != nil {
-		return nil, fmt.Errorf("error encoding inputs: %w", err)
-	}
+		"censusRoot": censusRoot.String(),
+		"electionId": electionId.String(),
+		"zkAddress":  c.zkAddr.String(),
+	})
+
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
@@ -292,6 +234,6 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionID, privVoterKey types
 		PubSignals: encPubSignals,
 		Weight:     weight.Uint64(),
 		KeyType:    models.ProofArbo_PUBKEY,
-		Nullifier:  nullifier,
+		Nullifier:  nullifier.Bytes(),
 	}, nil
 }

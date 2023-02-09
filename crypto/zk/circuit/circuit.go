@@ -97,7 +97,7 @@ func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, err
 func (circuit *ZkCircuit) LoadLocal() error {
 	var err error
 
-	log.Infow("Loading circuit locally...", map[string]interface{}{
+	log.Debugw("loading circuit locally...", map[string]interface{}{
 		"localDir": circuit.Config.LocalDir})
 
 	// compose files localpath
@@ -130,7 +130,7 @@ func (circuit *ZkCircuit) LoadLocal() error {
 // LoadRemote downloads the content of the current circuit artifacts from its
 // remote location. If any of the downloads fails, returns an error.
 func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
-	log.Infow("Not already downloaded. Downloading circuit...", map[string]interface{}{
+	log.Debugw("circuit not downloaded yet, downloading...", map[string]interface{}{
 		"localDir": circuit.Config.LocalDir})
 
 	baseUri, err := url.Parse(circuit.Config.URI)

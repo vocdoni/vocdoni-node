@@ -14,7 +14,6 @@ import (
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/iden3/go-rapidsnark/witness"
-	"go.vocdoni.io/dvote/log"
 )
 
 // TODO: Refactor the error handling to include the trace of the original error
@@ -129,8 +128,6 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
-		// TODO: Remove the following logger trace
-		log.Warnw(ErrWitnessCalc.Error(), map[string]interface{}{"error": err})
 		return nil, ErrWitnessCalc
 	}
 

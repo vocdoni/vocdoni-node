@@ -13,6 +13,7 @@ import (
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -103,13 +104,18 @@ func mkTreeAnonVoteTest(host string,
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
 	for i, voterAccount := range voterAccounts {
+		zkAddr, err := zk.AddressFromSignKeys(voterAccount)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 		participants.Participants = append(participants.Participants,
 			vapi.CensusParticipant{
-				Key:    voterAccount.PrivateKey(),
+				Key:    zkAddr.Bytes(),
 				Weight: (*types.BigInt)(new(big.Int).SetUint64(10)),
 			})
 		if i == len(voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
-			if err := api.CensusAddParticipantsZk(censusID, participants); err != nil {
+			if err := api.CensusAddParticipants(censusID, participants); err != nil {
 				log.Fatal(err)
 			}
 			log.Infof("added %d participants to census %s",
@@ -227,11 +233,21 @@ func mkTreeAnonVoteTest(host string,
 		}
 	}()
 
+	apiClientMtx := &sync.Mutex{}
 	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
 		for i, acc := range accounts {
-			pr, err := api.CensusGenProofZk(root, electionID, acc.PrivateKey())
+			apiClientMtx.Lock()
+
+			privKey := acc.PrivateKey()
+			if err = api.SetAccount(privKey.String()); err != nil {
+				apiClientMtx.Unlock()
+				log.Fatal(err)
+				return
+			}
+			pr, err := api.CensusGenProofZk(root, electionID)
+			apiClientMtx.Unlock()
 			if err != nil {
 				log.Warnw(err.Error(), map[string]interface{}{"current": i, "total": nvotes})
 				continue
@@ -297,7 +313,7 @@ func mkTreeAnonVoteTest(host string,
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		nvotes, time.Since(startTime), int(float64(nvotes)/time.Since(startTime).Seconds()))
+		nvotes, time.Since(startTime), float64(nvotes)/time.Since(startTime).Seconds())
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(accountPrivateKey); err != nil {

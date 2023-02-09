@@ -71,11 +71,11 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
 		LocalDir:                "zkCircuits",
-		ProvingKeyHash:          hexToBytes("0x1a2aaa89ebc0278fa381115fd4b6edd574d1e992fa0cd52acb17293d4fdbec0b"),
+		ProvingKeyHash:          hexToBytes("0x29b5d4ebfe673794fea376922355de538c52423689098f1e10d10e92987fbef6"),
 		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0x639a0533ddac1004bd7662b9f3bd74a5b236958fbb30465e9e3a966c15e3271d"),
+		VerificationKeyHash:     hexToBytes("0x1d6818b479f80211feb19a68fb9dff78e94d0aa0e32e1df8e6ede61beb75c0ce"),
 		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0xd58d4eaeabdc0bedd78cbcd6aca71f893c6dff9cf76a65d85ec106d45dc138da"),
+		WasmHash:                hexToBytes("0x0b25bd8ac0861f3d3843fc9a9c635afc21b100404037bc47d31e173c3cc67791"),
 		WasmFilename:            "circuit.wasm",
 	},
 	"stage": {

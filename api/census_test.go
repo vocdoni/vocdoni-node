@@ -11,17 +11,13 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/crypto/zk"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/transaction"
@@ -274,17 +270,11 @@ func TestCensusZk(t *testing.T) {
 	id1 := censusData.CensusID.String()
 
 	// add a bunch of keys and values (weights)
-	devConfig := circuit.GetCircuitConfiguration(app.CircuitConfigurationTag())
 	keys := [][]byte{}
 	for i := 1; i < 11; i++ {
-		k := babyjub.NewRandPrivKey()
-		publicKeyHash, err := poseidon.Hash([]*big.Int{
-			k.Public().X,
-			k.Public().Y,
-		})
+		zkAddr, err := zk.NewRandAddress()
 		qt.Assert(t, err, qt.IsNil)
-		publicKeyHash, _ = zk.TruncateIntToBytes(publicKeyHash, int64(devConfig.KeySize()))
-		keys = append(keys, arbo.BigIntToBytes(devConfig.KeySize(), publicKeyHash))
+		keys = append(keys, zkAddr.Bytes())
 	}
 
 	weight := 0

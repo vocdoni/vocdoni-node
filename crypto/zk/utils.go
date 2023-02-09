@@ -97,37 +97,24 @@ func zkProofPublicInputs(electionId, censusRoot, nullifier types.HexBytes, weigh
 	return pubInputs
 }
 
-// TruncateIntToBytes function truncates the provided big.Int (dividing by 10
-// recursively) until it size in bytes not be equal to the number of bytes
-// provided. The function also returns the number of places shifted to achive
-// that number of bytes.
-func TruncateIntToBytes(input *big.Int, newSize int64) (*big.Int, int64) {
-	var nBytes = NumberSizeInBytes(input)
-	if nBytes <= newSize {
-		return input, 0
-	}
-
-	var timesShifted int64 = 0
-	var bTen = new(big.Int).SetInt64(10)
-	for nBytes != newSize {
-		input = input.Div(input, bTen)
-		nBytes = NumberSizeInBytes(input)
-		timesShifted++
-	}
-
-	return input, timesShifted
+// LittleEndianToNBytes truncate the most significant n bytes of the provided
+// little endian number provided and returns into a new big.Int.
+func LittleEndianToNBytes(num *big.Int, n int) *big.Int {
+	// To take the n most significant bytes of a little endian number its needed
+	// to discard the first m bytes, where m = len(numBytes) - n
+	numBytes := num.Bytes()
+	m := len(numBytes) - n
+	return new(big.Int).SetBytes(numBytes[m:])
 }
 
-// NumberSizeInBytes calculates the number of bytes required to store the
-// big.Int provided.
-func NumberSizeInBytes(input *big.Int) int64 {
-	var nBits int64 = 0
-	base := new(big.Int).SetInt64(2)
-	candidate := new(big.Int).Exp(base, big.NewInt(nBits), nil)
-	for input.Cmp(candidate) == 1 {
-		nBits++
-		candidate = candidate.Exp(base, big.NewInt(nBits), nil)
+// BytesToArboStr function calculates the sha256 hash (32 bytes) of the slice
+// of bytes provided. Then, splits the hash into a two parts of 16 bytes, swap
+// the endianess of that parts, encodes they into a two big.Ints and return both
+// as strings into a []string.
+func BytesToArboStr(input []byte) []string {
+	hash := sha256.Sum256(input)
+	return []string{
+		new(big.Int).SetBytes(arbo.SwapEndianness(hash[:16])).String(),
+		new(big.Int).SetBytes(arbo.SwapEndianness(hash[16:])).String(),
 	}
-
-	return nBits/8 + 1
 }

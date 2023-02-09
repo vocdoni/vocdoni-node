@@ -12,9 +12,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
-	"github.com/iden3/go-iden3-crypto/babyjub"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
@@ -33,13 +33,13 @@ const (
 
 // HTTPclient is the Vocdoni API HTTP client.
 type HTTPclient struct {
-	c             *http.Client
-	token         *uuid.UUID
-	addr          *url.URL
-	account       *ethereum.SignKeys
-	chainID       string
-	circuit       circuit.ZkCircuitConfig
-	babyjubjubKey babyjub.PrivateKey
+	c       *http.Client
+	token   *uuid.UUID
+	addr    *url.URL
+	account *ethereum.SignKeys
+	chainID string
+	circuit circuit.ZkCircuitConfig
+	zkAddr  *zk.ZkAddress
 }
 
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
@@ -86,7 +86,7 @@ func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 		return err
 	}
 
-	c.babyjubjubKey, err = BabyJubJubPrivKey(c.account)
+	c.zkAddr, err = zk.AddressFromString(accountPrivateKey)
 	return err
 }
 
