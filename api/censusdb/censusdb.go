@@ -40,7 +40,8 @@ type CensusRef struct {
 	CensusType int32
 	Indexed    bool
 	URI        string
-	// TODO: (lucasmenendez) create new parameter to store the number of levels
+	// MaxLevels is required to load the census with the original size because
+	// it could be different according to the election (and census) type.
 	MaxLevels int
 }
 
@@ -57,11 +58,13 @@ func (cr *CensusRef) SetTree(tree *censustree.Tree) {
 // CensusDump is a struct that contains the data of a census. It is used
 // for import/export operations.
 type CensusDump struct {
-	Type      models.Census_Type `json:"type"`
-	RootHash  []byte             `json:"rootHash"`
-	Data      []byte             `json:"data"`
-	Indexed   bool               `json:"indexed"`
-	MaxLevels int                `json:"maxLevels"`
+	Type     models.Census_Type `json:"type"`
+	RootHash []byte             `json:"rootHash"`
+	Data     []byte             `json:"data"`
+	Indexed  bool               `json:"indexed"`
+	// MaxLevels is required to load the census with the original size because
+	// it could be different according to the election (and census) type.
+	MaxLevels int `json:"maxLevels"`
 }
 
 // CensusDB is a safe and persistent database of census trees.  It allows
@@ -78,8 +81,6 @@ func NewCensusDB(db db.Database) *CensusDB {
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 	indexed bool, uri string, authToken *uuid.UUID, maxLevels int) (*CensusRef, error) {
-	// TODO: (lucasmenendez) add new parameter with the max number of levels
-	// and store it.
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
@@ -123,7 +124,6 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 		}
 	}
 
-	// TODO: (lucasmenendez) Get the max number of levels from the DB and add here its value
 	ref.tree, err = censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
 		MaxLevels: ref.MaxLevels, CensusType: models.Census_Type(ref.CensusType)})
 	if err != nil {

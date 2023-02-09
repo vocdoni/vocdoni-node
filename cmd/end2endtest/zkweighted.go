@@ -20,15 +20,9 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func mkTreeAnonVoteTest(host string,
-	accountPrivateKey string,
-	nvotes, parallelCount int,
-	faucetURL string,
-	faucetAuthToken string,
-	timeout time.Duration,
-) {
+func mkTreeAnonVoteTest(c config) {
 	// Connect to the API host
-	hostURL, err := url.Parse(host)
+	hostURL, err := url.Parse(c.host)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,7 +35,7 @@ func mkTreeAnonVoteTest(host string,
 	}
 
 	// Set the account in the API client, so we can sign transactions
-	if err := api.SetAccount(accountPrivateKey); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		log.Fatal(err)
 	}
 
@@ -50,13 +44,13 @@ func mkTreeAnonVoteTest(host string,
 	acc, err := api.Account("")
 	if err != nil {
 		var faucetPkg *models.FaucetPackage
-		if faucetURL != "" {
+		if c.faucet != "" {
 			// Get the faucet package of bootstrap tokens
 			log.Infof("getting faucet package")
-			if faucetURL == "dev" {
+			if c.faucet == "dev" {
 				faucetPkg, err = apiclient.GetFaucetPackageFromDevService(api.MyAddress().Hex())
 			} else {
-				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(faucetURL+api.MyAddress().Hex(), faucetAuthToken)
+				faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(c.faucet+api.MyAddress().Hex(), c.faucetAuthToken)
 			}
 
 			if err != nil {
@@ -84,7 +78,7 @@ func mkTreeAnonVoteTest(host string,
 		if err != nil {
 			log.Fatal(err)
 		}
-		if faucetURL != "" && acc.Balance == 0 {
+		if c.faucet != "" && acc.Balance == 0 {
 			log.Fatal("account balance is 0")
 		}
 	}
@@ -99,7 +93,7 @@ func mkTreeAnonVoteTest(host string,
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate 10 participant accounts
-	voterAccounts := util.CreateEthRandomKeysBatch(nvotes)
+	voterAccounts := util.CreateEthRandomKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
@@ -129,8 +123,8 @@ func mkTreeAnonVoteTest(host string,
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(nvotes) {
-		log.Fatalf("census size is %d, expected %d", size, nvotes)
+	if size != uint64(c.nvotes) {
+		log.Fatalf("census size is %d, expected %d", size, c.nvotes)
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
 
@@ -146,8 +140,8 @@ func mkTreeAnonVoteTest(host string,
 	if err != nil {
 		log.Fatal(err)
 	}
-	if size != uint64(nvotes) {
-		log.Fatalf("published census size is %d, expected %d", size, nvotes)
+	if size != uint64(c.nvotes) {
+		log.Fatalf("published census size is %d, expected %d", size, c.nvotes)
 	}
 
 	// Create a new Election
@@ -249,7 +243,7 @@ func mkTreeAnonVoteTest(host string,
 			pr, err := api.CensusGenProofZk(root, electionID)
 			apiClientMtx.Unlock()
 			if err != nil {
-				log.Warnw(err.Error(), map[string]interface{}{"current": i, "total": nvotes})
+				log.Warnw(err.Error(), map[string]interface{}{"current": i, "total": c.nvotes})
 				continue
 			}
 
@@ -278,7 +272,7 @@ func mkTreeAnonVoteTest(host string,
 		}
 	}
 
-	pcount := nvotes / parallelCount
+	pcount := c.nvotes / c.parallelCount
 	var wg sync.WaitGroup
 	for i := 0; i < len(voterAccounts); i += pcount {
 		end := i + pcount
@@ -302,21 +296,21 @@ func mkTreeAnonVoteTest(host string,
 		if err != nil {
 			log.Warn(err)
 		}
-		if count == uint32(nvotes) {
+		if count == uint32(c.nvotes) {
 			break
 		}
 		time.Sleep(time.Second * 5)
-		log.Infof("verified %d/%d votes", count, nvotes)
-		if time.Since(startTime) > timeout {
+		log.Infof("verified %d/%d votes", count, c.nvotes)
+		if time.Since(startTime) > c.timeout {
 			log.Fatalf("timeout waiting for votes to be registered")
 		}
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%f votes/second)",
-		nvotes, time.Since(startTime), float64(nvotes)/time.Since(startTime).Seconds())
+		c.nvotes, time.Since(startTime), float64(c.nvotes)/time.Since(startTime).Seconds())
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(accountPrivateKey); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		log.Fatal(err)
 	}
 

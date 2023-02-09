@@ -126,7 +126,7 @@ func genProofZk(b *testing.B, electionID []byte, privKey *babyjub.PrivateKey, pu
 	// Get vote weight
 	weight := new(big.Int).SetInt64(1)
 	if censusData.Weight != nil {
-		weight = censusData.Weight.ToInt()
+		weight = censusData.Weight.MathBigInt()
 	}
 	// Get nullifier and encoded processId
 	nullifier, strProcessId, err := getNullifierZk(privKey, electionID)

@@ -24,6 +24,12 @@ type CensusProof struct {
 	KeyType models.ProofArbo_KeyType
 }
 
+// CensusProofZk represents the proof for a voter in a zk census. It contains
+// the encoded proof and the circuit public tokens to verify it. It also keeps
+// the weight of the vote and the key type of the merkle tree, and also includes
+// the voter's nullifier. This last parameter is necessary because now, to
+// compute the nullifier, the private key of the ZkAddress is required, so it
+// cannot be computed by anyone but the voter.
 type CensusProofZk struct {
 	Proof      types.HexBytes
 	PubSignals types.HexBytes
@@ -184,7 +190,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	// Get vote weight
 	weight := new(big.Int).SetInt64(1)
 	if censusData.Weight != nil {
-		weight = censusData.Weight.ToInt()
+		weight = censusData.Weight.MathBigInt()
 	}
 
 	// Calculate and encode vote hash -> sha256(voteWeight)

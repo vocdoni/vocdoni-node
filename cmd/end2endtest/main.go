@@ -41,7 +41,7 @@ var ops = []operation{
 		fn:          mkTreeVoteTest,
 		name:        "vtest",
 		description: "Performs a complete test, from creating a census to voting and validating votes",
-		example: os.Args[0] + " --operation=vtest --electionSize=1000 " +
+		example: os.Args[0] + " --operation=vtest --votes=1000 " +
 			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
 	},
 	{
@@ -50,6 +50,13 @@ var ops = []operation{
 		description: "Tests all token related transactions",
 		example: os.Args[0] + " --operation=tokentransactions " +
 			"--host http://127.0.0.1:9090/v2",
+	},
+	{
+		fn:          mkTreeAnonVoteTest,
+		name:        "anonvoting",
+		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
+		example: os.Args[0] + " --operation=anonvoting --votes=1000 " +
+			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
 	},
 }
 
