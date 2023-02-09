@@ -2,7 +2,6 @@
 CREATE TABLE processes (
   id           BLOB NOT NULL PRIMARY KEY,
   entity_id    BLOB NOT NULL,
-  entity_index INTEGER NOT NULL,
   start_block  INTEGER NOT NULL,
   end_block    INTEGER NOT NULL,
 

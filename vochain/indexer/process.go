@@ -17,6 +17,7 @@ import (
 
 var zeroBytes = []byte("")
 
+// nonNullBytes helps for sql CREATE queries, as most columns are NOT NULL.
 func nonNullBytes(p []byte) []byte {
 	if p == nil {
 		return zeroBytes
@@ -274,7 +275,6 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		EntityID:          eid,
 		StartBlock:        p.StartBlock,
 		EndBlock:          p.BlockCount + p.StartBlock,
-		Rheight:           compResultsHeight,
 		HaveResults:       compResultsHeight > 0,
 		CensusRoot:        p.CensusRoot,
 		RollingCensusRoot: p.RollingCensusRoot,
@@ -291,7 +291,6 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: p.GetSourceBlockHeight(),
 		SourceNetworkId:   p.SourceNetworkId.String(),
 		Metadata:          p.GetMetadata(),
-		// EntityIndex: entity.ProcessCount, // TODO(sqlite): replace with a COUNT
 		MaxCensusSize:     p.GetMaxCensusSize(),
 		RollingCensusSize: p.GetRollingCensusSize(),
 	}
@@ -300,9 +299,8 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateProcess(ctx, indexerdb.CreateProcessParams{
-		ID:       pid,
-		EntityID: nonNullBytes(eid),
-		// EntityIndex: int64(entity.ProcessCount), // TODO(sqlite): replace with a COUNT
+		ID:                pid,
+		EntityID:          nonNullBytes(eid),
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		ResultsHeight:     int64(compResultsHeight),
