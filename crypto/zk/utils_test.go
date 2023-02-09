@@ -115,7 +115,7 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 
 func TestLittleEndianToNBytes(t *testing.T) {
 	c := qt.New(t)
-	
+
 	input, _ := new(big.Int).SetString("1000", 10)
 	expected, _ := new(big.Int).SetString("232", 10)
 	c.Assert(LittleEndianToNBytes(input, 1).Bytes(), qt.DeepEquals, expected.Bytes())
