@@ -1,4 +1,4 @@
-package api
+package test
 
 import (
 	"context"
@@ -13,6 +13,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -34,14 +35,14 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 var zkCircuitTest = circuit.CircuitsConfigurations["dev"]
 
 // go test -v -run=- -bench=BenchmarkCensus -benchmem -count=100 .
-func BenchmarkCensus(b *testing.B) {
+func BenchmarkZkCensus(b *testing.B) {
 	b.ReportAllocs()
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(b, err, qt.IsNil)
 
-	api, err := NewAPI(&router, "/", b.TempDir())
+	vocApi, err := api.NewAPI(&router, "/", b.TempDir())
 	qt.Assert(b, err, qt.IsNil)
 
 	// Create local key value database
@@ -52,16 +53,16 @@ func BenchmarkCensus(b *testing.B) {
 	storage := data.MockIPFS(b)
 
 	vocapp := vochain.TestBaseApplication(b)
-	api.Attach(vocapp, nil, nil, storage, censusDB)
-	qt.Assert(b, api.EnableHandlers(CensusHandler), qt.IsNil)
+	vocApi.Attach(vocapp, nil, nil, storage, censusDB)
+	qt.Assert(b, vocApi.EnableHandlers(api.CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
 	c := testutil.NewTestHTTPclient(b, addr, &token1)
 
 	// create a new zk census
-	resp, code := c.Request("POST", nil, CensusTypeZKWeighted)
+	resp, code := c.Request("POST", nil, api.CensusTypeZKWeighted)
 	qt.Assert(b, code, qt.Equals, 200)
-	censusData := &Census{}
+	censusData := &api.Census{}
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	censusID := censusData.CensusID.String()
 	electionID := util.RandomBytes(32)
@@ -77,8 +78,8 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	zkAddr, err := zk.NewRandAddress()
 	qt.Assert(b, err, qt.IsNil)
 
-	cparts := CensusParticipants{}
-	cparts.Participants = append(cparts.Participants, CensusParticipant{
+	cparts := api.CensusParticipants{}
+	cparts.Participants = append(cparts.Participants, api.CensusParticipant{
 		Key:    zkAddr.Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	})
@@ -87,7 +88,7 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	qt.Assert(b, code, qt.Equals, 200)
 
 	var resp []byte
-	censusData := &Census{}
+	censusData := &api.Census{}
 	resp, code = cl.Request("GET", nil, censusID, "root")
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -109,7 +110,7 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	genProofZk(b, electionID, zkAddr, censusData)
 }
 
-func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusData *Census) {
+func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusData *api.Census) {
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
 
