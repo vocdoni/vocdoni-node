@@ -42,7 +42,6 @@ type Process struct {
 	EntityIndex       uint32                     `json:"entityIndex"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
-	Rheight           uint32                     `json:"-"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
@@ -67,12 +66,15 @@ type Process struct {
 
 func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
-		ID:                dbproc.ID,
-		EntityID:          nonEmptyBytes(dbproc.EntityID),
-		EntityIndex:       uint32(dbproc.EntityIndex),
+		ID:       dbproc.ID,
+		EntityID: nonEmptyBytes(dbproc.EntityID),
+
+		// TODO(mvdan): badgerhold used to keep this counter separately.
+		// If we still need it on sqlite, it can be implemented
+		EntityIndex: 0,
+
 		StartBlock:        uint32(dbproc.StartBlock),
 		EndBlock:          uint32(dbproc.EndBlock),
-		Rheight:           uint32(dbproc.ResultsHeight),
 		HaveResults:       dbproc.HaveResults,
 		FinalResults:      dbproc.FinalResults,
 		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
