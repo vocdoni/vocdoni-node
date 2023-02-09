@@ -273,7 +273,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
-		options := process.GetVoteOptions()
+		options := process.VoteOptions
 
 		indxR := &indexertypes.Results{
 			ProcessID: p,
@@ -281,7 +281,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
-			EnvelopeType: process.GetEnvelopeType(),
+			EnvelopeType: process.EnvelopeType,
 			Signatures:   []types.HexBytes{},
 		}
 
@@ -564,12 +564,12 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 			return
 		}
 
-		myVotes := BuildProcessResult(myResults, results.EntityId).GetVotes()
+		myVotes := BuildProcessResult(myResults, results.EntityId).Votes
 		correct := len(myVotes) == len(results.Votes)
 		if !correct {
 			log.Errorf("results validation failed: wrong number of votes")
 		}
-		for i, q := range results.GetVotes() {
+		for i, q := range results.Votes {
 			if !correct {
 				break
 			}

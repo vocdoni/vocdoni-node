@@ -242,7 +242,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
-	options := p.GetVoteOptions()
+	options := p.VoteOptions
 	if options == nil {
 		return fmt.Errorf("newEmptyProcess: vote options is nil")
 	}
@@ -255,7 +255,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 
-	eid := p.GetEntityId()
+	eid := p.EntityId
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
 
@@ -264,7 +264,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("cannot check if process is live: %w", err)
 	} else {
 		if live {
-			compResultsHeight = p.GetBlockCount() + p.GetStartBlock() + 1
+			compResultsHeight = p.BlockCount + p.StartBlock + 1
 		}
 	}
 
@@ -272,21 +272,21 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	proc := &indexertypes.Process{
 		ID:                pid,
 		EntityID:          eid,
-		StartBlock:        p.GetStartBlock(),
-		EndBlock:          p.GetBlockCount() + p.GetStartBlock(),
+		StartBlock:        p.StartBlock,
+		EndBlock:          p.BlockCount + p.StartBlock,
 		Rheight:           compResultsHeight,
 		HaveResults:       compResultsHeight > 0,
-		CensusRoot:        p.GetCensusRoot(),
-		RollingCensusRoot: p.GetRollingCensusRoot(),
+		CensusRoot:        p.CensusRoot,
+		RollingCensusRoot: p.RollingCensusRoot,
 		CensusURI:         p.GetCensusURI(),
-		CensusOrigin:      int32(p.GetCensusOrigin()),
-		Status:            int32(p.GetStatus()),
-		Namespace:         p.GetNamespace(),
+		CensusOrigin:      int32(p.CensusOrigin),
+		Status:            int32(p.Status),
+		Namespace:         p.Namespace,
 		PrivateKeys:       p.EncryptionPrivateKeys,
 		PublicKeys:        p.EncryptionPublicKeys,
-		Envelope:          p.GetEnvelopeType(),
-		Mode:              p.GetMode(),
-		VoteOpts:          p.GetVoteOptions(),
+		Envelope:          p.EnvelopeType,
+		Mode:              p.Mode,
+		VoteOpts:          p.VoteOptions,
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: p.GetSourceBlockHeight(),
 		SourceNetworkId:   p.SourceNetworkId.String(),
@@ -303,21 +303,21 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		ID:       pid,
 		EntityID: nonNullBytes(eid),
 		// EntityIndex: int64(entity.ProcessCount), // TODO(sqlite): replace with a COUNT
-		StartBlock:        int64(p.GetStartBlock()),
-		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
+		StartBlock:        int64(p.StartBlock),
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		ResultsHeight:     int64(compResultsHeight),
 		HaveResults:       compResultsHeight > 0,
-		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
-		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		CensusRoot:        nonNullBytes(p.CensusRoot),
+		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),
 		CensusUri:         p.GetCensusURI(),
-		CensusOrigin:      int64(p.GetCensusOrigin()),
-		Status:            int64(p.GetStatus()),
-		Namespace:         int64(p.GetNamespace()),
-		EnvelopePb:        encodedPb(p.GetEnvelopeType()),
-		ModePb:            encodedPb(p.GetMode()),
-		VoteOptsPb:        encodedPb(p.GetVoteOptions()),
+		CensusOrigin:      int64(p.CensusOrigin),
+		Status:            int64(p.Status),
+		Namespace:         int64(p.Namespace),
+		EnvelopePb:        encodedPb(p.EnvelopeType),
+		ModePb:            encodedPb(p.Mode),
+		VoteOptsPb:        encodedPb(p.VoteOptions),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
 		CreationTime:      currentBlockTime,
@@ -350,20 +350,20 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	}
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
 		ID:                pid,
-		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
-		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
-		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
+		CensusRoot:        nonNullBytes(p.CensusRoot),
+		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		CensusUri:         p.GetCensusURI(),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
 		Metadata:          p.GetMetadata(),
-		Status:            int64(p.GetStatus()),
+		Status:            int64(p.Status),
 	}); err != nil {
 		return err
 	}
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
-		p.GetStatus() == models.ProcessStatus_CANCELED {
+		p.Status == models.ProcessStatus_CANCELED {
 
 		// We use two SQL queries, so use a transaction to apply them together.
 		tx, err := s.sqlDB.Begin()
