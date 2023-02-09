@@ -123,7 +123,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			return fmt.Errorf("page (%s) cannot be decoded", ctx.URLParam("page"))
 		}
 	}
-	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, "", "", false)
+	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
 	if err != nil {
 		return fmt.Errorf("cannot fetch election list: %w", err)
 	}

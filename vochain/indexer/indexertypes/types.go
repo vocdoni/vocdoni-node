@@ -60,7 +60,7 @@ type Process struct {
 	HaveResults       bool                       `json:"haveResults"`
 	FinalResults      bool                       `json:"finalResults"`
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
-	SourceNetworkId   string                     `json:"sourceNetworkId"`
+	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 }
@@ -87,8 +87,13 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		PublicKeys:        nonEmptySplit(dbproc.PublicKeys, ","),
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
-		SourceNetworkId:   dbproc.SourceNetworkID,
 		Metadata:          dbproc.Metadata,
+	}
+
+	if _, ok := models.SourceNetworkId_name[int32(dbproc.SourceNetworkID)]; !ok {
+		log.Errorf("unknown SourceNetworkId: %d", dbproc.SourceNetworkID)
+	} else {
+		proc.SourceNetworkId = models.SourceNetworkId(dbproc.SourceNetworkID).String()
 	}
 	// Note that the old DB does not seem to keep a nil Envelope.
 	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.

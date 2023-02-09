@@ -69,7 +69,7 @@ type CreateProcessParams struct {
 	QuestionIndex     int64
 	CreationTime      time.Time
 	SourceBlockHeight int64
-	SourceNetworkID   string
+	SourceNetworkID   int64
 	ResultsVotes      string
 }
 
@@ -324,7 +324,7 @@ SELECT id FROM processes
 WHERE (? = 0 OR entity_id = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
-	AND (? = '' OR source_network_id = ?)
+	AND (? = 0 OR source_network_id = ?)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
@@ -338,7 +338,7 @@ type SearchProcessesParams struct {
 	EntityID        types.EntityID
 	Namespace       int64
 	Status          int64
-	SourceNetworkID string
+	SourceNetworkID int64
 	IDSubstr        string
 	WithResults     interface{}
 	Limit           int32

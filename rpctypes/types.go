@@ -74,7 +74,7 @@ type APIrequest struct {
 	RootHash     types.HexBytes                 `json:"rootHash,omitempty"`
 	SearchTerm   string                         `json:"searchTerm,omitempty"`
 	Signature    types.HexBytes                 `json:"signature,omitempty"`
-	SrcNetId     string                         `json:"sourceNetworkId,omitempty"`
+	SrcNetId     int32                          `json:"sourceNetworkId,omitempty"`
 	Status       string                         `json:"status,omitempty"`
 	Timestamp    int32                          `json:"timestamp"`
 	TxIndex      int32                          `json:"txIndex,omitempty"`

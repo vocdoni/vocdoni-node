@@ -280,32 +280,32 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	var pids [][]byte
 	switch ctx.URLParam("status") {
 	case "ready":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "READY", false)
+		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 	case "paused":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "PAUSED", false)
+		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 	case "canceled":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "CANCELED", false)
+		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 	case "ended", "results":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "RESULTS", false)
+		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
-		pids2, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "ENDED", false)
+		pids2, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}
 		pids = append(pids, pids2...)
 	case "":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, "", "", false)
+		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
 		if err != nil {
 			return fmt.Errorf("cannot fetch election list: %w", err)
 		}

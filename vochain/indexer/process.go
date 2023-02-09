@@ -80,7 +80,7 @@ func (s *Indexer) ProcessList(entityID []byte,
 	max int,
 	searchTerm string,
 	namespace uint32,
-	srcNetworkIdstr,
+	srcNetworkId int32,
 	status string,
 	withResults bool) ([][]byte, error) {
 	if from < 0 {
@@ -96,10 +96,8 @@ func (s *Indexer) ProcessList(entityID []byte,
 		}
 	}
 	// Filter match function for source network Id
-	if srcNetworkIdstr != "" {
-		if _, ok := models.SourceNetworkId_value[srcNetworkIdstr]; !ok {
-			return nil, fmt.Errorf("sourceNetworkId is unknown %s", srcNetworkIdstr)
-		}
+	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
+		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
@@ -110,7 +108,7 @@ func (s *Indexer) ProcessList(entityID []byte,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
-		SourceNetworkID: srcNetworkIdstr,
+		SourceNetworkID: int64(srcNetworkId),
 		IDSubstr:        searchTerm,
 		Offset:          int32(from),
 		Limit:           int32(max),
@@ -324,7 +322,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
-		SourceNetworkID:   p.SourceNetworkId.String(), // TODO: store the integer?
+		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
 
 		ResultsVotes: encodeVotes(indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
