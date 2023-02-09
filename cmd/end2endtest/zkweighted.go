@@ -312,7 +312,7 @@ func mkTreeAnonVoteTest(host string,
 		}
 	}
 
-	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
+	log.Infof("%d votes registered successfully, took %s (%f votes/second)",
 		nvotes, time.Since(startTime), float64(nvotes)/time.Since(startTime).Seconds())
 
 	// Set the account back to the organization account
