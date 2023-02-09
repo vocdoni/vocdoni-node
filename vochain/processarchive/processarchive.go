@@ -211,19 +211,19 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 	startTime := time.Now()
 	// Processes with on-chain results
 	pids, err := pa.indexer.ProcessList(nil, fromBlock,
-		int(pa.indexer.ProcessCount(nil)), "", 0, "", "RESULTS", true)
+		int(pa.indexer.ProcessCount(nil)), "", 0, 0, "RESULTS", true)
 	if err != nil {
 		return err
 	}
 	// Processes finished by transaction without (yet?) on-chain results
 	pids2, err := pa.indexer.ProcessList(nil, fromBlock,
-		int(pa.indexer.ProcessCount(nil)), "", 0, "", "ENDED", true)
+		int(pa.indexer.ProcessCount(nil)), "", 0, 0, "ENDED", true)
 	if err != nil {
 		return err
 	}
 	// Processes finished by endBlock without (yet?) on-chain results
 	pids3, err := pa.indexer.ProcessList(nil, fromBlock,
-		int(pa.indexer.ProcessCount(nil)), "", 0, "", "READY", true)
+		int(pa.indexer.ProcessCount(nil)), "", 0, 0, "READY", true)
 	if err != nil {
 		return err
 	}
