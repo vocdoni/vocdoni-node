@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -14,9 +13,8 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/data"
@@ -28,6 +26,7 @@ import (
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 )
 
 func init() { rand.Seed(time.Now().UnixNano()) }
@@ -51,7 +50,9 @@ func BenchmarkCensus(b *testing.B) {
 	censusDB := censusdb.NewCensusDB(db)
 
 	storage := data.MockIPFS(b)
-	api.Attach(nil, nil, nil, storage, censusDB)
+
+	vocapp := vochain.TestBaseApplication(b)
+	api.Attach(vocapp, nil, nil, storage, censusDB)
 	qt.Assert(b, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -73,17 +74,12 @@ func BenchmarkCensus(b *testing.B) {
 }
 
 func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID string, electionID []byte) {
-	k := babyjub.NewRandPrivKey()
-	publicKeyHash, err := poseidon.Hash([]*big.Int{
-		k.Public().X,
-		k.Public().Y,
-	})
+	zkAddr, err := zk.NewRandAddress()
 	qt.Assert(b, err, qt.IsNil)
-	pubkey := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), publicKeyHash)
 
 	cparts := CensusParticipants{}
 	cparts.Participants = append(cparts.Participants, CensusParticipant{
-		Key:    pubkey,
+		Key:    zkAddr.Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	})
 
@@ -104,17 +100,16 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	b.Logf("root: %x | size: %d", root, censusData.Size)
 
 	// generate a proof
-	resp, code = cl.Request("GET", nil, censusID, "proof", fmt.Sprintf("%x", pubkey))
+	resp, code = cl.Request("GET", nil, censusID, "proof", zkAddr.String())
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(b, censusData.Weight.String(), qt.Equals, "1")
 
 	censusData.Root = root
-	genProofZk(b, electionID, &k, pubkey, censusData)
+	genProofZk(b, electionID, zkAddr, censusData)
 }
 
-func genProofZk(b *testing.B, electionID []byte, privKey *babyjub.PrivateKey, pubKey []byte, censusData *Census) {
-	strPrivateKey := babyjub.SkToBigInt(privKey).String()
+func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusData *Census) {
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
 
@@ -129,16 +124,13 @@ func genProofZk(b *testing.B, electionID []byte, privKey *babyjub.PrivateKey, pu
 		weight = censusData.Weight.MathBigInt()
 	}
 	// Get nullifier and encoded processId
-	nullifier, strProcessId, err := getNullifierZk(privKey, electionID)
+	nullifier, err := zkAddr.Nullifier(electionID)
 	qt.Assert(b, err, qt.IsNil)
 
-	strNullifier := new(big.Int).SetBytes(nullifier).String()
-	// Calculate and encode vote hash -> sha256(voteWeight)
-	voteHash := sha256.Sum256(censusData.Value)
-	strVoteHash := []string{
-		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[:16])).String(),
-		new(big.Int).SetBytes(arbo.SwapEndianness(voteHash[16:])).String(),
-	}
+	// Calculate and encode vote hash and the encoded version of the electionID
+	strVoteHash := zk.BytesToArboStr(censusData.Value)
+	strProcessId := zk.BytesToArboStr(electionID)
+
 	// Unpack and encode siblings
 	unpackedSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, censusData.Proof)
 	qt.Assert(b, err, qt.IsNil)
@@ -163,16 +155,16 @@ func genProofZk(b *testing.B, electionID []byte, privKey *babyjub.PrivateKey, pu
 		"censusRoot":     strCensusRoot,
 		"censusSiblings": strSiblings,
 		"weight":         weight.String(),
-		"privateKey":     strPrivateKey,
+		"privateKey":     zkAddr.PrivKey.String(),
 		"voteHash":       strVoteHash,
 		"processId":      strProcessId,
-		"nullifier":      strNullifier,
+		"nullifier":      nullifier.String(),
 	}
 	inputs, err := json.Marshal(rawInputs)
 	qt.Assert(b, err, qt.IsNil)
 
 	log.Infow("proof inputs generated", map[string]interface{}{
-		"censusRoot": censusData.Root.String(), "nullifier": strNullifier})
+		"censusRoot": censusData.Root.String(), "nullifier": nullifier.String()})
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
@@ -183,25 +175,4 @@ func genProofZk(b *testing.B, electionID []byte, privKey *babyjub.PrivateKey, pu
 	qt.Assert(b, err, qt.IsNil)
 	qt.Assert(b, encProof, qt.Not(qt.IsNil))
 	qt.Assert(b, encPubSignals, qt.Not(qt.IsNil))
-}
-
-func getNullifierZk(privKey *babyjub.PrivateKey, electionId []byte) (types.HexBytes, []string, error) {
-	// Encode the electionId -> sha256(electionId)
-	hashedProcessId := sha256.Sum256(electionId)
-	intProcessId := []*big.Int{
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedProcessId[:16])),
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedProcessId[16:])),
-	}
-	strProcessId := []string{intProcessId[0].String(), intProcessId[1].String()}
-
-	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(processId))
-	nullifier, err := poseidon.Hash([]*big.Int{
-		babyjub.SkToBigInt(privKey),
-		intProcessId[0],
-		intProcessId[1],
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("error generating nullifier: %w", err)
-	}
-	return nullifier.Bytes(), strProcessId, nil
 }
