@@ -21,6 +21,16 @@ WORKDIR /app
 COPY --from=builder /src/vochaintest ./
 COPY --from=builder /src/end2endtest ./
 COPY ./dockerfiles/testsuite/js ./js
+
+# Support for go-rapidsnark witness calculator (https://github.com/iden3/go-rapidsnark/tree/main/witness)
+COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
+# Support for go-rapidsnark prover (https://github.com/iden3/go-rapidsnark/tree/main/prover)
+RUN apt-get update && \
+	apt-get install -y libc6-dev libomp-dev openmpi-common libgomp1 && \
+	apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN cd js && npm install
 
 FROM debian:11.6-slim
