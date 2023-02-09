@@ -246,7 +246,6 @@ func (r APIresponse) String() string {
 type ProcessSummary struct {
 	BlockCount      uint32               `json:"blockCount,omitempty"`
 	EntityID        string               `json:"entityId,omitempty"`
-	EntityIndex     uint32               `json:"entityIndex,omitempty"`
 	EnvelopeHeight  *uint32              `json:"envelopeHeight,omitempty"`
 	Metadata        string               `json:"metadata,omitempty"`
 	SourceNetworkID string               `json:"sourceNetworkID,omitempty"`
