@@ -39,7 +39,6 @@ type CountStore struct {
 type Process struct {
 	ID                types.HexBytes             `json:"processId"`
 	EntityID          types.HexBytes             `json:"entityId"`
-	EntityIndex       uint32                     `json:"entityIndex"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
@@ -66,13 +65,8 @@ type Process struct {
 
 func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
-		ID:       dbproc.ID,
-		EntityID: nonEmptyBytes(dbproc.EntityID),
-
-		// TODO(mvdan): badgerhold used to keep this counter separately.
-		// If we still need it on sqlite, it can be implemented
-		EntityIndex: 0,
-
+		ID:                dbproc.ID,
+		EntityID:          nonEmptyBytes(dbproc.EntityID),
 		StartBlock:        uint32(dbproc.StartBlock),
 		EndBlock:          uint32(dbproc.EndBlock),
 		HaveResults:       dbproc.HaveResults,
