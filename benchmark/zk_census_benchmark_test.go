@@ -34,7 +34,7 @@ func init() { rand.Seed(time.Now().UnixNano()) }
 
 var zkCircuitTest = circuit.CircuitsConfigurations["dev"]
 
-// go test -v -run=- -bench=BenchmarkCensus -benchmem -count=100 .
+// go test -v -run=- -bench=BenchmarkZkCensus -benchmem -count=100 .
 func BenchmarkZkCensus(b *testing.B) {
 	b.ReportAllocs()
 	router := httprouter.HTTProuter{}
