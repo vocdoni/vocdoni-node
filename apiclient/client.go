@@ -69,7 +69,12 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	c.chainID = info.ID
 
 	// Get the default circuit config
-	c.circuit = circuit.CircuitsConfigurations[info.CircuitConfigurationTag]
+	circuitConf, exists := circuit.CircuitsConfigurations[info.CircuitConfigurationTag]
+	if !exists {
+		return nil, fmt.Errorf("empty or wrong circui configuration tag provided")
+	}
+	c.circuit = circuitConf
+
 	return c, nil
 }
 

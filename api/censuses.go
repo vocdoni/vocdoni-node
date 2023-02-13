@@ -579,6 +579,12 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 
+	// If the census type is zkweighted (that means that it uses Poseidon hash
+	// with Arbo merkle tree), skip to perform a hash function over the census
+	// key. It is because the zk friendly key of any census leaf is the
+	// ZkAddress which follows a specific transformation process that must be
+	// implemented into the circom circuit also, and it is already hashed.
+	// Otherwhise, hash the key before get the proof.
 	leafKey := key
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
 		leafKey, err = ref.Tree().Hash(key)
@@ -591,18 +597,18 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
-
-	// Get the leaf siblings from arbo based on the key received and include
-	// them into the response
-	circomSiblings, err := ref.Tree().GetCircomSiblings(leafKey)
-	if err != nil {
-		return err
+	response := Census{
+		Proof: siblings,
+		Value: leafV,
 	}
 
-	response := Census{
-		Proof:    siblings,
-		Value:    leafV,
-		Siblings: circomSiblings,
+	// Get the leaf siblings from arbo based on the key received and include
+	// them into the response, only if it is zkweighted.
+	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
+		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
+		if err != nil {
+			return err
+		}
 	}
 	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
 		// return the string representation of the census value (weight)
@@ -639,6 +645,12 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 
+	// If the census type is zkweighted (that means that it uses Poseidon hash
+	// with Arbo merkle tree), skip to perform a hash function over the census
+	// key. It is because the zk friendly key of any census leaf is the
+	// ZkAddress which follows a specific transformation process that must be
+	// implemented into the circom circuit also, and it is already hashed.
+	// Otherwhise, hash the key before verify the proof.
 	leafKey := cdata.Key
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
 		leafKey, err = ref.Tree().Hash(cdata.Key)
