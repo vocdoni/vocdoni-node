@@ -253,9 +253,9 @@ func networkInfo(cli *vocdoniCLI) error {
 	}
 	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ API host"), valuesPrint.Sprintf(cli.config.Host.Host))
 	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ chainID"), valuesPrint.Sprintf(info.ID))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ height"), valuesPrint.Sprintf("%d", *info.Height))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ block time"), valuesPrint.Sprintf("%v", *info.BlockTime))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ timestamp"), valuesPrint.Sprintf("%d", *info.Timestamp))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ height"), valuesPrint.Sprintf("%d", info.Height))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ block time"), valuesPrint.Sprintf("%v", info.BlockTime))
+	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ timestamp"), valuesPrint.Sprintf("%d", info.Timestamp))
 	return nil
 }
 

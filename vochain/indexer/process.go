@@ -18,6 +18,7 @@ import (
 
 var zeroBytes = []byte("")
 
+// nonNullBytes helps for sql CREATE queries, as most columns are NOT NULL.
 func nonNullBytes(p []byte) []byte {
 	if p == nil {
 		return zeroBytes
@@ -58,18 +59,16 @@ func encodeVotes(votes [][]*types.BigInt) string {
 
 // ProcessInfo returns the available information regarding an election process id
 func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	sqlStartTime := time.Now()
+	startTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	procInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
-	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
-
-	return sqlProc, nil
+	log.Debugf("ProcessInfo sqlite took %s", time.Since(startTime))
+	return indexertypes.ProcessFromDB(&procInner), nil
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
@@ -81,7 +80,7 @@ func (s *Indexer) ProcessList(entityID []byte,
 	max int,
 	searchTerm string,
 	namespace uint32,
-	srcNetworkIdstr,
+	srcNetworkId int32,
 	status string,
 	withResults bool) ([][]byte, error) {
 	if from < 0 {
@@ -97,31 +96,29 @@ func (s *Indexer) ProcessList(entityID []byte,
 		}
 	}
 	// Filter match function for source network Id
-	if srcNetworkIdstr != "" {
-		if _, ok := models.SourceNetworkId_value[srcNetworkIdstr]; !ok {
-			return nil, fmt.Errorf("sourceNetworkId is unknown %s", srcNetworkIdstr)
-		}
+	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
+		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
 	}
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 
-	sqlStartTime := time.Now()
-	sqlProcs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
+	startTime := time.Now()
+	procs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
-		SourceNetworkID: srcNetworkIdstr,
+		SourceNetworkID: int64(srcNetworkId),
 		IDSubstr:        searchTerm,
 		Offset:          int32(from),
 		Limit:           int32(max),
 		WithResults:     withResults,
 	})
-	log.Debugf("ProcessList sqlite took %s", time.Since(sqlStartTime))
+	log.Debugf("ProcessList sqlite took %s", time.Since(startTime))
 	if err != nil {
 		return nil, err
 	}
-	return sqlProcs, nil
+	return procs, nil
 }
 
 // ProcessCount returns the number of processes of a given entityID indexed.
@@ -245,7 +242,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
-	options := p.GetVoteOptions()
+	options := p.VoteOptions
 	if options == nil {
 		return fmt.Errorf("newEmptyProcess: vote options is nil")
 	}
@@ -258,7 +255,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 
-	eid := p.GetEntityId()
+	eid := p.EntityId
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
 
@@ -267,69 +264,42 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("cannot check if process is live: %w", err)
 	} else {
 		if live {
-			compResultsHeight = p.GetBlockCount() + p.GetStartBlock() + 1
+			compResultsHeight = p.BlockCount + p.StartBlock + 1
 		}
 	}
 
 	// Create and store process in the indexer database
-	proc := &indexertypes.Process{
+	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
-		EntityID:          eid,
-		StartBlock:        p.GetStartBlock(),
-		EndBlock:          p.GetBlockCount() + p.GetStartBlock(),
-		Rheight:           compResultsHeight,
-		HaveResults:       compResultsHeight > 0,
-		CensusRoot:        p.GetCensusRoot(),
-		RollingCensusRoot: p.GetRollingCensusRoot(),
-		CensusURI:         p.GetCensusURI(),
-		CensusOrigin:      int32(p.GetCensusOrigin()),
-		Status:            int32(p.GetStatus()),
-		Namespace:         p.GetNamespace(),
-		PrivateKeys:       p.EncryptionPrivateKeys,
-		PublicKeys:        p.EncryptionPublicKeys,
-		Envelope:          p.GetEnvelopeType(),
-		Mode:              p.GetMode(),
-		VoteOpts:          p.GetVoteOptions(),
-		CreationTime:      currentBlockTime,
-		SourceBlockHeight: p.GetSourceBlockHeight(),
-		SourceNetworkId:   p.SourceNetworkId.String(),
-		Metadata:          p.GetMetadata(),
-		// EntityIndex: entity.ProcessCount, // TODO(sqlite): replace with a COUNT
-		MaxCensusSize:     p.GetMaxCensusSize(),
-		RollingCensusSize: p.GetRollingCensusSize(),
-	}
-	log.Debugf("new indexer process %s", proc.String())
-
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
-	if _, err := queries.CreateProcess(ctx, indexerdb.CreateProcessParams{
-		ID:       pid,
-		EntityID: nonNullBytes(eid),
-		// EntityIndex: int64(entity.ProcessCount), // TODO(sqlite): replace with a COUNT
-		StartBlock:        int64(p.GetStartBlock()),
-		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
+		EntityID:          nonNullBytes(eid),
+		StartBlock:        int64(p.StartBlock),
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		ResultsHeight:     int64(compResultsHeight),
 		HaveResults:       compResultsHeight > 0,
-		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
-		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		CensusRoot:        nonNullBytes(p.CensusRoot),
+		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),
 		CensusUri:         p.GetCensusURI(),
-		CensusOrigin:      int64(p.GetCensusOrigin()),
-		Status:            int64(p.GetStatus()),
-		Namespace:         int64(p.GetNamespace()),
-		EnvelopePb:        encodedPb(p.GetEnvelopeType()),
-		ModePb:            encodedPb(p.GetMode()),
-		VoteOptsPb:        encodedPb(p.GetVoteOptions()),
+		CensusOrigin:      int64(p.CensusOrigin),
+		Status:            int64(p.Status),
+		Namespace:         int64(p.Namespace),
+		EnvelopePb:        encodedPb(p.EnvelopeType),
+		ModePb:            encodedPb(p.Mode),
+		VoteOptsPb:        encodedPb(p.VoteOptions),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
-		SourceNetworkID:   p.SourceNetworkId.String(), // TODO: store the integer?
+		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
+		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+	}
+	log.Debugf("new indexer process: %#v", procParams)
 
-		ResultsVotes: encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
-	}); err != nil {
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}
 
@@ -353,20 +323,20 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	}
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
 		ID:                pid,
-		EndBlock:          int64(p.GetBlockCount() + p.GetStartBlock()),
-		CensusRoot:        nonNullBytes(p.GetCensusRoot()),
-		RollingCensusRoot: nonNullBytes(p.GetRollingCensusRoot()),
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
+		CensusRoot:        nonNullBytes(p.CensusRoot),
+		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		CensusUri:         p.GetCensusURI(),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
 		Metadata:          p.GetMetadata(),
-		Status:            int64(p.GetStatus()),
+		Status:            int64(p.Status),
 	}); err != nil {
 		return err
 	}
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
-		p.GetStatus() == models.ProcessStatus_CANCELED {
+		p.Status == models.ProcessStatus_CANCELED {
 
 		// We use two SQL queries, so use a transaction to apply them together.
 		tx, err := s.sqlDB.Begin()

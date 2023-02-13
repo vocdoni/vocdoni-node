@@ -87,7 +87,7 @@ func (c *HTTPclient) WaitUntilNBlocks(ctx context.Context, n uint32) {
 			time.Sleep(pollInterval)
 			continue
 		}
-		c.WaitUntilHeight(ctx, *info.Height+n)
+		c.WaitUntilHeight(ctx, info.Height+n)
 		return
 	}
 }
@@ -105,7 +105,7 @@ func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 		if err != nil {
 			log.Warn(err)
 		}
-		if *info.Height >= height {
+		if info.Height >= height {
 			return nil
 		}
 		select {

@@ -29,6 +29,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.16.0 generate
+
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
 
@@ -272,7 +274,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
-		options := process.GetVoteOptions()
+		options := process.VoteOptions
 
 		indxR := &results.Results{
 			ProcessID: p,
@@ -280,7 +282,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			Votes:        results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
-			EnvelopeType: process.GetEnvelopeType(),
+			EnvelopeType: process.EnvelopeType,
 			Signatures:   []types.HexBytes{},
 		}
 

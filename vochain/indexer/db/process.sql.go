@@ -15,7 +15,7 @@ import (
 
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, entity_index, start_block, end_block,
+	id, entity_id, start_block, end_block,
 	results_height, have_results, final_results,
 	census_root, rolling_census_root, rolling_census_size,
 	max_census_size, census_uri, metadata,
@@ -28,7 +28,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_envelope_height,
 	results_signatures, results_block_height
 ) VALUES (
-	?, ?, ?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -46,7 +46,6 @@ INSERT INTO processes (
 type CreateProcessParams struct {
 	ID                types.ProcessID
 	EntityID          types.EntityID
-	EntityIndex       int64
 	StartBlock        int64
 	EndBlock          int64
 	ResultsHeight     int64
@@ -69,7 +68,7 @@ type CreateProcessParams struct {
 	QuestionIndex     int64
 	CreationTime      time.Time
 	SourceBlockHeight int64
-	SourceNetworkID   string
+	SourceNetworkID   int64
 	ResultsVotes      string
 }
 
@@ -77,7 +76,6 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 	return q.db.ExecContext(ctx, createProcess,
 		arg.ID,
 		arg.EntityID,
-		arg.EntityIndex,
 		arg.StartBlock,
 		arg.EndBlock,
 		arg.ResultsHeight,
@@ -129,7 +127,7 @@ func (q *Queries) GetEntityProcessCount(ctx context.Context, entityID types.Enti
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, entity_index, start_block, end_block, results_height, have_results, final_results, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+SELECT id, entity_id, start_block, end_block, results_height, have_results, final_results, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -140,7 +138,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
-		&i.EntityIndex,
 		&i.StartBlock,
 		&i.EndBlock,
 		&i.ResultsHeight,
@@ -324,7 +321,7 @@ SELECT id FROM processes
 WHERE (? = 0 OR entity_id = ?)
 	AND (? = 0 OR namespace = ?)
 	AND (? = 0 OR status = ?)
-	AND (? = '' OR source_network_id = ?)
+	AND (? = 0 OR source_network_id = ?)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
@@ -338,7 +335,7 @@ type SearchProcessesParams struct {
 	EntityID        types.EntityID
 	Namespace       int64
 	Status          int64
-	SourceNetworkID string
+	SourceNetworkID int64
 	IDSubstr        string
 	WithResults     interface{}
 	Limit           int32

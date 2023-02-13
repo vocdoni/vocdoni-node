@@ -19,16 +19,24 @@ import (
 
 func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 	processes := []*ElectionSummary{}
-	for _, p := range pids {
-		procInfo, err := a.indexer.ProcessInfo(p)
+	for _, pid := range pids {
+		// TODO(mvdan): We construct ElectionSummaries in many places, deduplicate.
+		// TODO(mvdan): ProcessInfo could give us the results envelope height as well.
+		procInfo, err := a.indexer.ProcessInfo(pid)
 		if err != nil {
 			return nil, fmt.Errorf("cannot fetch election info: %w", err)
 		}
+		count, err := a.indexer.GetEnvelopeHeight(pid)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get envelope height: %w", err)
+		}
 		processes = append(processes, &ElectionSummary{
-			ElectionID: procInfo.ID,
-			Status:     strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
-			StartDate:  procInfo.CreationTime,
-			EndDate:    a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
+			ElectionID:   procInfo.ID,
+			Status:       strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
+			StartDate:    procInfo.CreationTime,
+			EndDate:      a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
+			FinalResults: procInfo.FinalResults,
+			VoteCount:    count,
 		})
 	}
 	return processes, nil

@@ -14,7 +14,6 @@ import (
 type Process struct {
 	ID                    types.ProcessID
 	EntityID              types.EntityID
-	EntityIndex           int64
 	StartBlock            int64
 	EndBlock              int64
 	ResultsHeight         int64
@@ -42,7 +41,7 @@ type Process struct {
 	QuestionIndex         int64
 	CreationTime          time.Time
 	SourceBlockHeight     int64
-	SourceNetworkID       string
+	SourceNetworkID       int64
 }
 
 type TokenTransfer struct {

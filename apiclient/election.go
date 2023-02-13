@@ -110,7 +110,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		if err != nil {
 			return nil, err
 		}
-		blockCount = endBlock - *info.Height
+		blockCount = endBlock - info.Height
 	} else {
 		blockCount = endBlock - startBlock
 	}

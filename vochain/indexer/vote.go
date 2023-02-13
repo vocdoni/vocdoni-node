@@ -195,7 +195,13 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	defer cancel()
 	if len(processID) == 0 {
 		height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
-		return uint64(height.(int64)), err
+		if err != nil {
+			return 0, err
+		}
+		if height == nil {
+			return 0, nil
+		}
+		return uint64(height.(int64)), nil
 	}
 	height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
 	return uint64(height), err
@@ -463,13 +469,13 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results
 	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.StateDBVote) {
 		var vp *vochain.VotePackage
 		var err error
-		if p.Envelope.GetEncryptedVotes() {
-			if len(p.PrivateKeys) < len(vote.GetEncryptionKeyIndexes()) {
+		if p.Envelope.EncryptedVotes {
+			if len(p.PrivateKeys) < len(vote.EncryptionKeyIndexes) {
 				log.Error("encryptionKeyIndexes has too many fields")
 				return
 			}
 			keys := []string{}
-			for _, k := range vote.GetEncryptionKeyIndexes() {
+			for _, k := range vote.EncryptionKeyIndexes {
 				if k >= types.KeyKeeperMaxKeyIndex {
 					log.Warn("key index overflow")
 					return
@@ -480,16 +486,16 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results
 				log.Warn("no keys provided or wrong index")
 				return
 			}
-			vp, err = unmarshalVote(vote.GetVotePackage(), keys)
+			vp, err = unmarshalVote(vote.VotePackage, keys)
 		} else {
-			vp, err = unmarshalVote(vote.GetVotePackage(), []string{})
+			vp, err = unmarshalVote(vote.VotePackage, []string{})
 		}
 		if err != nil {
 			log.Debugf("vote invalid: %v", err)
 			return
 		}
 
-		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.GetWeight()), &lock); err != nil {
+		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.Weight), &lock); err != nil {
 			log.Warnf("addVote failed: %v", err)
 			return
 		}
