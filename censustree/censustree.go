@@ -50,11 +50,11 @@ type Options struct {
 	IndexAsKeysCensus bool
 }
 
-// By default, the maximum number of levels will be 256, which allows to add 
+// By default, the maximum number of levels will be 256, which allows to add
 // up to 2^256 leaves to the tree, with keys with up to 32 bytes. However the
-// number of levels could be setted up during the tree initialization which 
-// allows to support uses cases with specific restrictions such as the 
-// zkweighted census, which needs to optimize some artifacts size that depends 
+// number of levels could be setted up during the tree initialization which
+// allows to support uses cases with specific restrictions such as the
+// zkweighted census, which needs to optimize some artifacts size that depends
 // of the number of levels of the tree.
 const DefaultMaxLevels = 256
 
