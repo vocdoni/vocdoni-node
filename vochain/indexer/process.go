@@ -58,18 +58,16 @@ func encodeVotes(votes [][]*types.BigInt) string {
 
 // ProcessInfo returns the available information regarding an election process id
 func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	sqlStartTime := time.Now()
+	startTime := time.Now()
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	procInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("ProcessInfo sqlite took %s", time.Since(sqlStartTime))
-	sqlProc := indexertypes.ProcessFromDB(&sqlProcInner)
-
-	return sqlProc, nil
+	log.Debugf("ProcessInfo sqlite took %s", time.Since(startTime))
+	return indexertypes.ProcessFromDB(&procInner), nil
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
@@ -103,8 +101,8 @@ func (s *Indexer) ProcessList(entityID []byte,
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 
-	sqlStartTime := time.Now()
-	sqlProcs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
+	startTime := time.Now()
+	procs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
 		Namespace:       int64(namespace),
@@ -115,11 +113,11 @@ func (s *Indexer) ProcessList(entityID []byte,
 		Limit:           int32(max),
 		WithResults:     withResults,
 	})
-	log.Debugf("ProcessList sqlite took %s", time.Since(sqlStartTime))
+	log.Debugf("ProcessList sqlite took %s", time.Since(startTime))
 	if err != nil {
 		return nil, err
 	}
-	return sqlProcs, nil
+	return procs, nil
 }
 
 // ProcessCount returns the number of processes of a given entityID indexed.
@@ -270,35 +268,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Create and store process in the indexer database
-	proc := &indexertypes.Process{
-		ID:                pid,
-		EntityID:          eid,
-		StartBlock:        p.StartBlock,
-		EndBlock:          p.BlockCount + p.StartBlock,
-		HaveResults:       compResultsHeight > 0,
-		CensusRoot:        p.CensusRoot,
-		RollingCensusRoot: p.RollingCensusRoot,
-		CensusURI:         p.GetCensusURI(),
-		CensusOrigin:      int32(p.CensusOrigin),
-		Status:            int32(p.Status),
-		Namespace:         p.Namespace,
-		PrivateKeys:       p.EncryptionPrivateKeys,
-		PublicKeys:        p.EncryptionPublicKeys,
-		Envelope:          p.EnvelopeType,
-		Mode:              p.Mode,
-		VoteOpts:          p.VoteOptions,
-		CreationTime:      currentBlockTime,
-		SourceBlockHeight: p.GetSourceBlockHeight(),
-		SourceNetworkId:   p.SourceNetworkId.String(),
-		Metadata:          p.GetMetadata(),
-		MaxCensusSize:     p.GetMaxCensusSize(),
-		RollingCensusSize: p.GetRollingCensusSize(),
-	}
-	log.Debugf("new indexer process %s", proc.String())
-
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
-	if _, err := queries.CreateProcess(ctx, indexerdb.CreateProcessParams{
+	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
 		EntityID:          nonNullBytes(eid),
 		StartBlock:        int64(p.StartBlock),
@@ -324,7 +294,12 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		Metadata:          p.GetMetadata(),
 
 		ResultsVotes: encodeVotes(indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
-	}); err != nil {
+	}
+	log.Debugf("new indexer process: %#v", procParams)
+
+	queries, ctx, cancel := s.timeoutQueries()
+	defer cancel()
+	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}
 
