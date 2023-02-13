@@ -595,7 +595,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 
 	leafV, siblings, err := ref.Tree().GenProof(leafKey)
 	if err != nil {
-		return err
+		return fmt.Errorf("something was wrong during census proof generation: %w", err)
 	}
 	response := Census{
 		Proof: siblings,
@@ -607,7 +607,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
 		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
 		if err != nil {
-			return err
+			return fmt.Errorf("error geting the census siblings to circom: %w", err)
 		}
 	}
 	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
@@ -650,7 +650,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	// key. It is because the zk friendly key of any census leaf is the
 	// ZkAddress which follows a specific transformation process that must be
 	// implemented into the circom circuit also, and it is already hashed.
-	// Otherwhise, hash the key before verify the proof.
+	// Otherwhise, hash the key before get the proof.
 	leafKey := cdata.Key
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
 		leafKey, err = ref.Tree().Hash(cdata.Key)
@@ -661,7 +661,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
 	if err != nil {
-		return err
+		return fmt.Errorf("something was wrong during census proof verification: %w", err)
 	}
 	if !valid {
 		return ctx.Send(nil, apirest.HTTPstatusCodeErr)

@@ -114,8 +114,8 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
 
-	log.Infow("zk census data received, starting to generate the proof inputs...", map[string]interface{}{
-		"censusRoot": censusData.Root, "electionId": fmt.Sprintf("%x", electionID)})
+	log.Infow("zk census data received, starting to generate the proof inputs...",
+		"censusRoot", censusData.Root, "electionId", fmt.Sprintf("%x", electionID))
 
 	// Encode census root
 	strCensusRoot := arbo.BytesToBigInt(censusData.Root).String()
@@ -164,8 +164,8 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 	inputs, err := json.Marshal(rawInputs)
 	qt.Assert(b, err, qt.IsNil)
 
-	log.Infow("proof inputs generated", map[string]interface{}{
-		"censusRoot": censusData.Root.String(), "nullifier": nullifier.String()})
+	log.Infow("proof inputs generated", "censusRoot", censusData.Root.String(),
+		"nullifier", nullifier.String())
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)

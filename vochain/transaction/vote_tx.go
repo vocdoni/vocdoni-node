@@ -133,11 +133,10 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			return nil, fmt.Errorf("zkSNARK proof verification failed")
 		}
 
-		log.Debugw("vote proof verified", map[string]interface{}{
-			"type":       "zkSNARK",
-			"nullifier":  fmt.Sprintf("%x", voteEnvelope.Nullifier),
-			"electionID": fmt.Sprintf("%x", voteEnvelope.ProcessId),
-		})
+		log.Debugw("vote proof verified",
+			"type", "zkSNARK",
+			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
+			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId))
 
 		// TODO the next 12 lines of code are the same than a little
 		// further down. TODO: maybe movoteEnvelope them before the 'switch', as

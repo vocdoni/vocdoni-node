@@ -58,7 +58,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	}
 
 	// Build the proof
-	log.Debugw("generating a new vote", map[string]interface{}{"electionId": v.ElectionID})
+	log.Debugw("generating a new vote", "electionId", v.ElectionID)
 	censusOriginCSP := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA)]
 	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]
 	switch {
@@ -66,7 +66,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		// First check if the current vote mode configuration contains the flag
 		// anonymouse setted to true, other weighted tree voting modes are
 		// supported by the following case.
-		log.Debugw("zk anonymous voting detected", map[string]interface{}{"electionId": v.ElectionID.String()})
+		log.Debugw("zk anonymous voting detected", "electionId", v.ElectionID.String())
 		if v.ProofZkTree == nil {
 			return nil, fmt.Errorf("no zk proof provided")
 		}
@@ -80,8 +80,8 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, err
 		}
-		log.Debugw("zk vote proof parsed from prover and encoded to protobuf", map[string]interface{}{
-			"electionId": v.ElectionID.String()})
+		log.Debugw("zk vote proof parsed from prover and encoded to protobuf",
+			"electionId", v.ElectionID.String())
 
 		// Set the result to the vote struct with the related nullifier
 		vote.Nullifier = v.ProofZkTree.Nullifier

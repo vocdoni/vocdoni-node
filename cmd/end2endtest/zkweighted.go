@@ -243,12 +243,15 @@ func mkTreeAnonVoteTest(c config) {
 			pr, err := api.CensusGenProofZk(root, electionID)
 			apiClientMtx.Unlock()
 			if err != nil {
-				log.Warnw(err.Error(), map[string]interface{}{"current": i, "total": c.nvotes})
+				log.Warnw(err.Error(),
+					"current", i,
+					"total", c.nvotes)
 				continue
 			}
 
-			log.Debugw("vote proof generated", map[string]interface{}{
-				"current": i, "total": len(accounts)})
+			log.Debugw("vote proof generated",
+				"current", i,
+				"total", len(accounts))
 			proofCh <- true
 
 			_, err = api.Vote(&apiclient.VoteData{
@@ -259,14 +262,14 @@ func mkTreeAnonVoteTest(c config) {
 
 			if err != nil && !strings.Contains(err.Error(), "already exists") {
 				// if the error is not "vote already exists", we need to print it
-				log.Warnw(err.Error(), map[string]interface{}{
-					"nullifier":    pr.Nullifier.String(),
-					"lenNullifier": len(pr.Nullifier),
-				})
+				log.Warnw(err.Error(),
+					"nullifier", pr.Nullifier.String(),
+					"lenNullifier", len(pr.Nullifier))
 				continue
 			}
-			log.Debugw("vote sent", map[string]interface{}{
-				"current": i, "total": len(accounts)})
+			log.Debugw("vote sent",
+				"current", i,
+				"total", len(accounts))
 			voteCh <- true
 			pr = nil
 		}

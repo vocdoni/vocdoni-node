@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/big"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/zk"
@@ -20,7 +19,7 @@ import (
 type CensusProof struct {
 	Proof   types.HexBytes
 	Value   types.HexBytes
-	Weight  uint64
+	Weight  types.BigInt
 	KeyType models.ProofArbo_KeyType
 }
 
@@ -33,7 +32,7 @@ type CensusProof struct {
 type CensusProofZk struct {
 	Proof      types.HexBytes
 	PubSignals types.HexBytes
-	Weight     uint64
+	Weight     types.BigInt
 	KeyType    models.ProofArbo_KeyType
 	Nullifier  types.HexBytes
 }
@@ -127,9 +126,9 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		Value: censusData.Value,
 	}
 	if censusData.Weight != nil {
-		cp.Weight = censusData.Weight.MathBigInt().Uint64()
+		cp.Weight = *censusData.Weight
 	} else {
-		cp.Weight = 1
+		cp.Weight = *new(types.BigInt).SetUint64(1)
 	}
 	return &cp, nil
 }
@@ -173,11 +172,10 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 
-	log.Debugw("zk census data received, starting to generate the proof inputs...", map[string]interface{}{
-		"censusRoot": censusRoot.String(),
-		"electionId": electionId.String(),
-		"zkAddress":  c.zkAddr.String(),
-	})
+	log.Debugw("zk census data received, starting to generate the proof inputs...",
+		"censusRoot", censusRoot.String(),
+		"electionId", electionId.String(),
+		"zkAddress", c.zkAddr.String())
 
 	// get nullifier
 	nullifier, err := c.zkAddr.Nullifier(electionId)
@@ -188,9 +186,9 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	// Encode census root
 	strCensusRoot := arbo.BytesToBigInt(censusRoot).String()
 	// Get vote weight
-	weight := new(big.Int).SetInt64(1)
+	weight := new(types.BigInt).SetUint64(1)
 	if censusData.Weight != nil {
-		weight = censusData.Weight.MathBigInt()
+		weight = censusData.Weight
 	}
 
 	// Calculate and encode vote hash -> sha256(voteWeight)
@@ -201,7 +199,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	rawInputs := map[string]interface{}{
 		"censusRoot":     strCensusRoot,
 		"censusSiblings": censusData.Siblings,
-		"weight":         weight.String(),
+		"weight":         weight,
 		"privateKey":     c.zkAddr.PrivKey.String(),
 		"voteHash":       voteHash,
 		"processId":      encElectionId,
@@ -211,18 +209,17 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
-	log.Debugw("zk circuit proof inputs generated", rawInputs)
+	log.Debug("zk circuit proof inputs generated")
 
 	// Get artifacts of the current circuit
 	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
 	}
-	log.Debugw("zk circuit loaded", map[string]interface{}{
-		"censusRoot": censusRoot.String(),
-		"electionId": electionId.String(),
-		"zkAddress":  c.zkAddr.String(),
-	})
+	log.Debugw("zk circuit loaded",
+		"censusRoot", censusRoot.String(),
+		"electionId", electionId.String(),
+		"zkAddress", c.zkAddr.String())
 
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
@@ -238,7 +235,7 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	return &CensusProofZk{
 		Proof:      encProof,
 		PubSignals: encPubSignals,
-		Weight:     weight.Uint64(),
+		Weight:     *weight,
 		KeyType:    models.ProofArbo_PUBKEY,
 		Nullifier:  nullifier.Bytes(),
 	}, nil
