@@ -190,7 +190,11 @@ func (t *Tree) Root(rTx db.ReadTx) ([]byte, error) {
 
 // Size returns the number of leafs under the current root
 func (t *Tree) Size(rTx db.ReadTx) (uint64, error) {
-	n, err := t.tree.GetNLeafs()
+	if rTx == nil {
+		rTx = t.DB().ReadTx()
+		defer rTx.Discard()
+	}
+	n, err := t.tree.GetNLeafsWithTx(rTx)
 	return uint64(n), err
 }
 

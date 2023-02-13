@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -146,6 +147,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainBlockByHashHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/organizations/filter/page/{page}",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.chainOrganizationsFilterPaginated,
 	); err != nil {
 		return err
 	}
@@ -466,4 +475,35 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return err
 	}
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
+}
+
+// POST /chain/organizations/filter/page/<page>
+// returns a list of organizations paginated by the given page
+func (a *API) chainOrganizationsFilterPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get organizationId from the request body
+	var organizationId string
+	if err := json.Unmarshal(msg.Data, &organizationId); err != nil {
+		return fmt.Errorf("cannot unmarshal organizationId: %w", err)
+	}
+	// get page
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return fmt.Errorf("cannot parse page number")
+		}
+	}
+	page = page * MaxPageSize
+	// get matching organization ids from the indexer
+	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, organizationId)
+	data, err := json.Marshal(struct {
+		Organizations []types.HexBytes `json:"organizations"`
+	}{
+		Organizations: matchingOrganizationIds,
+	})
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }

@@ -82,3 +82,22 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 	tx := &models.Tx{}
 	return tx, protojson.Unmarshal(resp, tx)
 }
+
+// OrganizationsBySearchTermPaginated returns a paginated list of organizations that match the given search term.
+func (c *HTTPclient) OrganizationsBySearchTermPaginated(organizationID types.HexBytes, page int) ([]types.HexBytes, error) {
+	// make a post request to /chain/organizations/filter/page/<page> with the organizationID as the body and page as the url parameter
+	resp, code, err := c.Request(HTTPPOST, organizationID, "chain", "organizations", "filter", "page", fmt.Sprintf("%d", page))
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	orgs := new(struct {
+		Organizations []types.HexBytes `json:"organizations"`
+	})
+	if err := json.Unmarshal(resp, orgs); err != nil {
+		return nil, err
+	}
+	return orgs.Organizations, nil
+}
