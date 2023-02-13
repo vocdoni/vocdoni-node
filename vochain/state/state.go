@@ -487,7 +487,7 @@ func (v *State) setRollingCensusSize(pids [][]byte) error {
 	return nil
 }
 
-// Save persistent save of vochain mem trees
+// Save persistent save of vochain mem trees. It returns the new root hash. It also notifies the event listeners.
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
 	var pidsStartNextBlock [][]byte
@@ -514,11 +514,7 @@ func (v *State) Save() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	mainTreeView, err := v.Store.TreeView(nil)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get statdeb mainTreeView: %w", err)
-	}
-	v.setMainTreeView(mainTreeView)
+
 	// Notify listeners about processes that start in the next block.
 	if len(pidsStartNextBlock) > 0 {
 		for _, l := range v.eventListeners {
@@ -534,6 +530,13 @@ func (v *State) Save() ([]byte, error) {
 			log.Warnf("event callback error on commit: %v", err)
 		}
 	}
+
+	// Update the main state tree
+	mainTreeView, err := v.Store.TreeView(nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
+	}
+	v.setMainTreeView(mainTreeView)
 
 	// TODO: Purge rolling censuses from all processes that start now
 	// for _, pid := range pids {

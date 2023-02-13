@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 )
 
 var zeroBytes = []byte("")
@@ -327,7 +328,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		SourceNetworkID:   p.SourceNetworkId.String(), // TODO: store the integer?
 		Metadata:          p.GetMetadata(),
 
-		ResultsVotes: encodeVotes(indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes: encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}

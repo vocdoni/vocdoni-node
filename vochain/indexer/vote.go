@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
@@ -214,7 +215,7 @@ func (s *Indexer) ComputeResult(processID []byte) error {
 		return fmt.Errorf("computeResult: cannot load processID %x from database: %w", processID, err)
 	}
 	// Compute the results
-	var results *indexertypes.Results
+	var results *results.Results
 	if results, err = s.computeFinalResults(p); err != nil {
 		return err
 	}
@@ -247,7 +248,7 @@ func joinHexBytes(list []types.HexBytes) string {
 }
 
 // GetResults returns the current result for a processId
-func (s *Indexer) GetResults(processID []byte) (*indexertypes.Results, error) {
+func (s *Indexer) GetResults(processID []byte) (*results.Results, error) {
 	startTime := time.Now()
 	defer func() { log.Debugf("GetResults sqlite took %s", time.Since(startTime)) }()
 
@@ -300,8 +301,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*vochain.VotePackage, err
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
-	results *indexertypes.Results) error {
+func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
 	var vote *vochain.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
@@ -393,15 +393,15 @@ func (s *Indexer) isProcessLiveResults(pid []byte) bool {
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (s *Indexer) commitVotes(pid []byte, partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotes(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait
 	s.recoveryBootLock.RLock()
 	defer s.recoveryBootLock.RUnlock()
-	return s.commitVotesUnsafe(pid, partialResults, height)
+	return s.commitVotesUnsafe(pid, partialResults, partialSubResults, height)
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Results, height uint32) error {
+func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// TODO(sqlite): use a tx
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
@@ -412,7 +412,16 @@ func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Res
 		return err
 	}
 	results := indexertypes.ResultsFromDB(&sqlProcInner)
-	results.Add(partialResults)
+	if partialSubResults != nil {
+		if err := results.Sub(partialSubResults); err != nil {
+			return err
+		}
+	}
+	if partialResults != nil {
+		if err := results.Add(partialResults); err != nil {
+			return err
+		}
+	}
 
 	if _, err := queries.UpdateProcessResults(ctx, indexerdb.UpdateProcessResultsParams{
 		ID:             pid,
@@ -427,7 +436,7 @@ func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults *indexertypes.Res
 }
 
 // computeFinalResults walks through the envelopes of a process and computes the results.
-func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Results, error) {
+func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results, error) {
 	if p == nil {
 		return nil, fmt.Errorf("process is nil")
 	}
@@ -437,8 +446,8 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
 		return nil, fmt.Errorf("maxCount and/or maxValue overflows hardcoded maximum")
 	}
-	results := &indexertypes.Results{
-		Votes:        indexertypes.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
+	results := &results.Results{
+		Votes:        results.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
 		ProcessID:    p.ID,
 		Weight:       new(types.BigInt).SetUint64(0),
 		Final:        true,
@@ -498,7 +507,7 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*indexertypes.Re
 
 // BuildProcessResult takes the indexer Results type and builds the protobuf type ProcessResult.
 // EntityId should be provided as addition field to include in ProcessResult.
-func BuildProcessResult(results *indexertypes.Results, entityID []byte) *models.ProcessResult {
+func BuildProcessResult(results *results.Results, entityID []byte) *models.ProcessResult {
 	// build the protobuf type for Results
 	qr := []*models.QuestionResult{}
 	for i := range results.Votes {
