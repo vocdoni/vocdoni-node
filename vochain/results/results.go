@@ -14,7 +14,7 @@ const (
 	// MaxQuestions is the maximum number of questions allowed in a VotePackage
 	MaxQuestions = 64
 	// MaxOptions is the maximum number of options allowed in a VotePackage question
-	MaxOptions = 128
+	MaxOptions = 768
 )
 
 // Results holds the final results and relevant process info for a vochain process

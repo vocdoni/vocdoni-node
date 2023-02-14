@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/processid"
+	"go.vocdoni.io/dvote/vochain/results"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -36,10 +37,11 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf("missing vote maxCount parameter")
 	}
 	// Check for maxCount/maxValue overflows
-	if tx.Process.VoteOptions.MaxCount > MaxQuestions || tx.Process.VoteOptions.MaxValue > MaxOptions {
-		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
+	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions || tx.Process.VoteOptions.MaxValue > results.MaxOptions {
+		return nil, common.Address{},
+			fmt.Errorf("maxCount or maxValue overflows hardcoded maximums (%d, %d). Received (%d, %d)",
+				results.MaxQuestions, results.MaxOptions, tx.Process.VoteOptions.MaxCount, tx.Process.VoteOptions.MaxValue)
 	}
-
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
 		return nil, common.Address{}, fmt.Errorf("status must be READY or PAUSED")
 	}

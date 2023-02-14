@@ -35,10 +35,6 @@ import (
 var embedMigrations embed.FS
 
 const (
-	// MaxQuestions is the maximum number of questions allowed in a VotePackage
-	MaxQuestions = 64
-	// MaxOptions is the maximum number of options allowed in a VotePackage question
-	MaxOptions = 128
 	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
 	// 8.3M seems enough for now
 	MaxEnvelopeListSize = 32 << 18

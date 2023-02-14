@@ -452,7 +452,7 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results
 	if p.VoteOpts.MaxCount == 0 || p.VoteOpts.MaxValue == 0 {
 		return nil, fmt.Errorf("computeNonLiveResults: maxCount and/or maxValue is zero")
 	}
-	if p.VoteOpts.MaxCount > MaxQuestions || p.VoteOpts.MaxValue > MaxOptions {
+	if p.VoteOpts.MaxCount > results.MaxQuestions || p.VoteOpts.MaxValue > results.MaxOptions {
 		return nil, fmt.Errorf("maxCount and/or maxValue overflows hardcoded maximum")
 	}
 	results := &results.Results{

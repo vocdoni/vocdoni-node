@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"encoding/hex"
 	"fmt"
 	"strings"
 	"time"
@@ -251,7 +252,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Check for overflows
-	if options.MaxCount > MaxQuestions || options.MaxValue > MaxOptions {
+	if options.MaxCount > results.MaxQuestions || options.MaxValue > results.MaxOptions {
 		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 
@@ -295,7 +296,26 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		Metadata:          p.GetMetadata(),
 		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
-	log.Debugf("new indexer process: %#v", procParams)
+	log.Debugw("new indexer process",
+		"processID", hex.EncodeToString(pid),
+		"entityID", hex.EncodeToString(eid),
+		"startBlock", procParams.StartBlock,
+		"endBlock", procParams.EndBlock,
+		"resultsHeight", procParams.ResultsHeight,
+		"haveResults", procParams.HaveResults,
+		"censusRoot", hex.EncodeToString(p.CensusRoot),
+		"rollingCensusRoot", hex.EncodeToString(p.RollingCensusRoot),
+		"rollingCensusSize", procParams.RollingCensusSize,
+		"maxCensusSize", procParams.MaxCensusSize,
+		"censusUri", p.GetCensusURI(),
+		"censusOrigin", procParams.CensusOrigin,
+		"status", procParams.Status,
+		"namespace", procParams.Namespace,
+		"creationTime", procParams.CreationTime,
+		"sourceBlockHeight", procParams.SourceBlockHeight,
+		"sourceNetworkID", procParams.SourceNetworkID,
+		"metadata", procParams.Metadata,
+	)
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
