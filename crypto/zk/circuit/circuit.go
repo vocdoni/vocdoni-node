@@ -99,30 +99,28 @@ func (circuit *ZkCircuit) LoadLocal() error {
 
 	log.Debugw("loading circuit locally...", "localDir", circuit.Config.LocalDir)
 
-	// compose files localpath
-	provingKeyLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, circuit.Config.ProvingKeyFilename)
-	verificationKeyLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, circuit.Config.VerificationKeyFilename)
-	wasmLocalPath := filepath.Join(circuit.Config.LocalDir,
-		circuit.Config.CircuitPath, circuit.Config.WasmFilename)
-
-	// read file contents into circuit parameters
-	circuit.ProvingKey, err = os.ReadFile(provingKeyLocalPath)
-	if err != nil {
-		return fmt.Errorf("error reading provingKey locally: %w", err)
+	files := map[string][]byte{
+		circuit.Config.ProvingKeyFilename:      nil,
+		circuit.Config.VerificationKeyFilename: nil,
+		circuit.Config.WasmFilename:            nil,
 	}
 
-	circuit.VerificationKey, err = os.ReadFile(verificationKeyLocalPath)
-	if err != nil {
-		return fmt.Errorf("error reading verificationKey locally: %w", err)
+	for filename := range files {
+		// compose files localpath
+		localPath := filepath.Join(circuit.Config.LocalDir,
+			circuit.Config.CircuitPath, filename)
+
+		// read file contents locally
+		files[filename], err = os.ReadFile(localPath)
+		if err != nil {
+			return fmt.Errorf("error reading '%s' artifact locally: %w", filename, err)
+		}
 	}
 
-	circuit.Wasm, err = os.ReadFile(wasmLocalPath)
-	if err != nil {
-		return fmt.Errorf("error reading wasm circuit locally: %w", err)
-	}
-
+	// store the content into ZkCircuit struct
+	circuit.ProvingKey = files[circuit.Config.ProvingKeyFilename]
+	circuit.VerificationKey = files[circuit.Config.VerificationKeyFilename]
+	circuit.Wasm = files[circuit.Config.WasmFilename]
 	return nil
 }
 
@@ -143,43 +141,29 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 		return err
 	}
 
-	// Compose provingKey remote and local locations
-	provingKeyUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.ProvingKeyFilename)
-	provingKeyLocalPath := filepath.Join(localPath, circuit.Config.ProvingKeyFilename)
-	// Compose verificationKey remote and local locations
-	verificationKeyUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.VerificationKeyFilename)
-	verificationKeyLocalPath := filepath.Join(localPath, circuit.Config.VerificationKeyFilename)
-	// Compose wasm remote and local locations
-	wasmUri := fmt.Sprintf("%s/%s", remotePath, circuit.Config.WasmFilename)
-	wasmLocalPath := filepath.Join(localPath, circuit.Config.WasmFilename)
-
-	// Download and store locally provingKey
-	circuit.ProvingKey, err = downloadFile(ctx, provingKeyUri)
-	if err != nil {
-		return fmt.Errorf("error downloading provingKey: %w", err)
+	files := map[string][]byte{
+		circuit.Config.ProvingKeyFilename:      nil,
+		circuit.Config.VerificationKeyFilename: nil,
+		circuit.Config.WasmFilename:            nil,
 	}
-	if err := storeFile(circuit.ProvingKey, provingKeyLocalPath); err != nil {
-		return fmt.Errorf("error storing provingKey: %w", err)
-	}
-
-	// Download and store locally verificationKey
-	circuit.VerificationKey, err = downloadFile(ctx, verificationKeyUri)
-	if err != nil {
-		return fmt.Errorf("error downloading verificationKey: %w", err)
-	}
-	if err := storeFile(circuit.VerificationKey, verificationKeyLocalPath); err != nil {
-		return fmt.Errorf("error storing verificationKey: %w", err)
+	for filename := range files {
+		// Compose the artifact uri and download it
+		file, err := downloadFile(ctx, fmt.Sprintf("%s/%s", remotePath, filename))
+		if err != nil {
+			return fmt.Errorf("error downloading '%s' artifact: %w", filename, err)
+		}
+		// Compose the local path for the artifact and store it
+		if err := storeFile(file, filepath.Join(localPath, filename)); err != nil {
+			return fmt.Errorf("error storing '%s' artifact: %w", filename, err)
+		}
+		// Also store its content into the map to update the ZkCircuit struct
+		files[filename] = file
 	}
 
-	// Download and store locally wasm circuit
-	circuit.Wasm, err = downloadFile(ctx, wasmUri)
-	if err != nil {
-		return fmt.Errorf("error downloading wasm circuit: %w", err)
-	}
-
-	if err := storeFile(circuit.Wasm, wasmLocalPath); err != nil {
-		return fmt.Errorf("error storing wasm circuit: %w", err)
-	}
+	// Store the downloaded artifacts into the ZkCircuit struct
+	circuit.ProvingKey = files[circuit.Config.ProvingKeyFilename]
+	circuit.VerificationKey = files[circuit.Config.VerificationKeyFilename]
+	circuit.Wasm = files[circuit.Config.WasmFilename]
 
 	return nil
 }
@@ -187,22 +171,36 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 // VerifiedCircuitArtifacts checks that the computed hash of every circuit
 // artifact matches with the expected hash, from the circuit config.
 func (circuit *ZkCircuit) VerifiedCircuitArtifacts() (bool, error) {
-	zKeyVerified, err := checkHash(circuit.ProvingKey, circuit.Config.ProvingKeyHash)
-	if err != nil {
-		return false, err
+	filesToCheck := []struct{ hash, content []byte }{
+		{hash: circuit.Config.ProvingKeyHash, content: circuit.ProvingKey},
+		{hash: circuit.Config.VerificationKeyHash, content: circuit.VerificationKey},
+		{hash: circuit.Config.WasmHash, content: circuit.Wasm},
+	}
+	for _, file := range filesToCheck {
+		if verified, err := checkHash(file.content, file.hash); !verified {
+			return false, nil
+		} else if err != nil {
+			return false, err
+		}
 	}
 
-	vKeyVerified, err := checkHash(circuit.VerificationKey, circuit.Config.VerificationKeyHash)
-	if err != nil {
-		return false, err
-	}
+	// zKeyVerified, err := checkHash(circuit.ProvingKey, circuit.Config.ProvingKeyHash)
+	// if err != nil {
+	// 	return false, err
+	// }
 
-	wasmVerified, err := checkHash(circuit.Wasm, circuit.Config.WasmHash)
-	if err != nil {
-		return false, err
-	}
+	// vKeyVerified, err := checkHash(circuit.VerificationKey, circuit.Config.VerificationKeyHash)
+	// if err != nil {
+	// 	return false, err
+	// }
 
-	return zKeyVerified && vKeyVerified && wasmVerified, nil
+	// wasmVerified, err := checkHash(circuit.Wasm, circuit.Config.WasmHash)
+	// if err != nil {
+	// 	return false, err
+	// }
+
+	// return zKeyVerified && vKeyVerified && wasmVerified, nil
+	return true, nil
 }
 
 // checkHash compute the hash of the content provided and compares it with the
