@@ -171,6 +171,14 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 // VerifiedCircuitArtifacts checks that the computed hash of every circuit
 // artifact matches with the expected hash, from the circuit config.
 func (circuit *ZkCircuit) VerifiedCircuitArtifacts() (bool, error) {
+	if circuit.ProvingKey == nil || circuit.Config.ProvingKeyHash == nil {
+		return false, fmt.Errorf("provingKey or its hash are nil")
+	} else if circuit.VerificationKey == nil || circuit.Config.VerificationKeyHash == nil {
+		return false, fmt.Errorf("verificationKey or its hash are nil")
+	} else if circuit.Wasm == nil || circuit.Config.WasmHash == nil {
+		return false, fmt.Errorf("wasm or its hash are nil")
+	}
+
 	filesToCheck := []struct{ hash, content []byte }{
 		{hash: circuit.Config.ProvingKeyHash, content: circuit.ProvingKey},
 		{hash: circuit.Config.VerificationKeyHash, content: circuit.VerificationKey},
