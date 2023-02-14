@@ -40,10 +40,11 @@ type ZkAddress struct {
 //     the EdDSA standard, and using blake-512 hash.
 //   - ZkAddress.PublicKey: The poseidon hash of the BabyJubJub public key
 //     components (X and Y coordinates as big.Int).
-//   - ZkAddress.addr: The truncated to 20 bytes (defaultZkAddrLen) little
-//     endian version of the ZkAddress.PublicKey.
+//   - ZkAddress.addr: The last 20 bytes of the ZkAddress.PublicKey. This is
+//     calculated by truncating PublicKey (a little endian number) to the
+//     defaultZkAddrLen.
 func AddressFromBytes(seed []byte) (*ZkAddress, error) {
-	if len(seed) < 16 {
+	if len(seed) < 32 {
 		return nil, fmt.Errorf("the seed provided does not have 32 bytes at least")
 	}
 	jubjubKey := babyjub.PrivateKey{}
