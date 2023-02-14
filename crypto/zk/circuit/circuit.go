@@ -184,22 +184,6 @@ func (circuit *ZkCircuit) VerifiedCircuitArtifacts() (bool, error) {
 		}
 	}
 
-	// zKeyVerified, err := checkHash(circuit.ProvingKey, circuit.Config.ProvingKeyHash)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// vKeyVerified, err := checkHash(circuit.VerificationKey, circuit.Config.VerificationKeyHash)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// wasmVerified, err := checkHash(circuit.Wasm, circuit.Config.WasmHash)
-	// if err != nil {
-	// 	return false, err
-	// }
-
-	// return zKeyVerified && vKeyVerified && wasmVerified, nil
 	return true, nil
 }
 
