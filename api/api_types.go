@@ -107,6 +107,7 @@ type Vote struct {
 	BlockHeight          uint32         `json:"blockHeight,omitempty"`
 	TransactionIndex     *int32         `json:"transactionIndex,omitempty"`
 	OverwriteCount       *uint32        `json:"overwriteCount,omitempty"`
+	Date                 *time.Time     `json:"date,omitempty"`
 }
 
 type CensusTypeDescription struct {
