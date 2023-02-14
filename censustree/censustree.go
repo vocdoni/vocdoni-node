@@ -531,7 +531,7 @@ func (t *Tree) fillKeyToIndex(tx db.WriteTx) error {
 	return nil
 }
 
-// GetCircomSiblings function wraps the Arbo tree GetCircomSiblings function
+// GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
 func (t *Tree) GetCircomSiblings(key []byte) ([]string, error) {
 	return t.tree.GetCircomSiblings(key)
 }

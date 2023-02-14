@@ -39,10 +39,8 @@ type CountStore struct {
 type Process struct {
 	ID                types.HexBytes             `json:"processId"`
 	EntityID          types.HexBytes             `json:"entityId"`
-	EntityIndex       uint32                     `json:"entityIndex"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
-	Rheight           uint32                     `json:"-"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
@@ -69,10 +67,8 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
 		EntityID:          nonEmptyBytes(dbproc.EntityID),
-		EntityIndex:       uint32(dbproc.EntityIndex),
 		StartBlock:        uint32(dbproc.StartBlock),
 		EndBlock:          uint32(dbproc.EndBlock),
-		Rheight:           uint32(dbproc.ResultsHeight),
 		HaveResults:       dbproc.HaveResults,
 		FinalResults:      dbproc.FinalResults,
 		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
@@ -95,23 +91,17 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	} else {
 		proc.SourceNetworkId = models.SourceNetworkId(dbproc.SourceNetworkID).String()
 	}
-	// Note that the old DB does not seem to keep a nil Envelope.
-	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
 	proc.Envelope = new(models.EnvelopeType)
 	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
 		log.Error(err)
 	}
-	if len(dbproc.ModePb) > 0 {
-		proc.Mode = new(models.ProcessMode)
-		if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
-			log.Error(err)
-		}
+	proc.Mode = new(models.ProcessMode)
+	if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
+		log.Error(err)
 	}
-	if len(dbproc.VoteOptsPb) > 0 {
-		proc.VoteOpts = new(models.ProcessVoteOptions)
-		if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
-			log.Error(err)
-		}
+	proc.VoteOpts = new(models.ProcessVoteOptions)
+	if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
+		log.Error(err)
 	}
 	return proc
 }
@@ -144,18 +134,14 @@ func ResultsFromDB(dbproc *indexerdb.Process) *Results {
 		Final:          dbproc.FinalResults,
 		BlockHeight:    uint32(dbproc.ResultsBlockHeight),
 	}
-	// Note that the old DB does not seem to keep a nil Envelope.
-	// TODO(mvdan): when we drop badgerhold, consider removing this alloc.
 	results.EnvelopeType = new(models.EnvelopeType)
 	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {
 		log.Error(err)
 		return nil
 	}
-	if len(dbproc.VoteOptsPb) > 0 {
-		results.VoteOpts = new(models.ProcessVoteOptions)
-		if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
-			log.Error(err)
-		}
+	results.VoteOpts = new(models.ProcessVoteOptions)
+	if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
+		log.Error(err)
 	}
 	return results
 }

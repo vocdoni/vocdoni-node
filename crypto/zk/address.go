@@ -34,9 +34,9 @@ type ZkAddress struct {
 	addr *big.Int
 }
 
-// AddressFromBytes functions returns a new ZkAddress based on the seed
-// provided. Using it, a BabyJubJub key pair is calculated and based on it. The
-// ZkAddress components are:
+// AddressFromBytes returns a new ZkAddress based on the seed provided. Using
+// it, a BabyJubJub key pair is calculated and based on it. The ZkAddress
+// components are:
 //   - ZkAddress.PrivKey: The BabyJubJub private key big.Int value, following
 //     the EdDSA standard, and using blake-512 hash.
 //   - ZkAddress.PublicKey: The poseidon hash of the BabyJubJub public key
@@ -71,9 +71,8 @@ func AddressFromString(seed string) (*ZkAddress, error) {
 	return AddressFromBytes([]byte(seed))
 }
 
-// AddressFromSignKeys function gets the private key from the ethereum.SignKeys
-// provided and pass its string representation as []byte to AddressFromBytes
-// function.
+// AddressFromSignKeys gets the private key from the ethereum.SignKeys provided
+// and pass its string representation as []byte to AddressFromBytes function.
 func AddressFromSignKeys(acc *ethereum.SignKeys) (*ZkAddress, error) {
 	privKey := acc.PrivateKey()
 	return AddressFromBytes([]byte(privKey.String()))
@@ -84,8 +83,8 @@ func NewRandAddress() (*ZkAddress, error) {
 	return AddressFromBytes([]byte(util.RandomHex(32)))
 }
 
-// Bytes function returns the current ZkAddress.addr transformed to
-// types.HexBytes using the arbo.BigIntToBytes() function.
+// Bytes returns the current ZkAddress.addr transformed to types.HexBytes using
+// the arbo.BigIntToBytes() function.
 func (zk *ZkAddress) Bytes() types.HexBytes {
 	return types.HexBytes(arbo.BigIntToBytes(defaultZkAddrLen, zk.addr))
 }
@@ -97,7 +96,7 @@ func (zk *ZkAddress) String() string {
 	return addr.String()
 }
 
-// Nullifier function returns ZkSnark ready vote nullifier based on the current
+// Nullifier returns ZkSnark ready vote nullifier based on the current
 // ZkAddress.PrivKey and the electionId provided. The nullifier is calculated
 // following this definition:
 //

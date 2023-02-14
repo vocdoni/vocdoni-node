@@ -14,7 +14,6 @@ import (
 type Process struct {
 	ID                    types.ProcessID
 	EntityID              types.EntityID
-	EntityIndex           int64
 	StartBlock            int64
 	EndBlock              int64
 	ResultsHeight         int64

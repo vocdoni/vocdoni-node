@@ -119,7 +119,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	if err != nil {
 		return err
 	}
-	cli.WaitUntilHeight(context.Background(), *info.Height+2)
+	cli.WaitUntilHeight(context.Background(), info.Height+2)
 
 	// Send the votes
 	for i, k := range voterKeys {

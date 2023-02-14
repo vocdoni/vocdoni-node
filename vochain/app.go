@@ -65,6 +65,7 @@ type BaseApplication struct {
 	chainID             string
 	circuitConfigTag    string
 	dataDir             string
+	genesisInfo         *tmtypes.GenesisDoc
 }
 
 // Ensure that BaseApplication implements abcitypes.Application.
@@ -97,6 +98,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		dataDir:            dbpath,
 		chainID:            "test",
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
+		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil
 }
 
@@ -140,6 +142,11 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if app.Node, err = tmcli.New(app.Service.(tmcli.NodeService)); err != nil {
 		return fmt.Errorf("could not start tendermint node client: %w", err)
 	}
+	nodeGenesis, err := app.Node.Genesis(context.TODO())
+	if err != nil {
+		log.Fatal(err)
+	}
+	app.genesisInfo = nodeGenesis.Genesis
 	return nil
 }
 
@@ -669,4 +676,9 @@ func (app *BaseApplication) SetCircuitConfigTag(tag string) {
 		app.circuitConfigTag = circuit.DefaultCircuitConfigurationTag
 		app.TransactionHandler.LoadZkCircuit(app.circuitConfigTag)
 	}
+}
+
+// Genesis returns the tendermint genesis information
+func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
+	return app.genesisInfo
 }

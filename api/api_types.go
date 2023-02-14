@@ -50,16 +50,15 @@ type ElectionResults struct {
 
 type Election struct {
 	ElectionSummary
-	ElectionCount uint32            `json:"electionCount"`
-	Census        *ElectionCensus   `json:"census,omitempty"`
-	MetadataURL   string            `json:"metadataURL"`
-	CreationTime  time.Time         `json:"creationTime"`
-	PublicKeys    []Key             `json:"publicKeys,omitempty"`
-	PrivateKeys   []Key             `json:"privateKeys,omitempty"`
-	VoteMode      VoteMode          `json:"voteMode,omitempty"`
-	ElectionMode  ElectionMode      `json:"electionMode,omitempty"`
-	TallyMode     TallyMode         `json:"tallyMode,omitempty"`
-	Metadata      *ElectionMetadata `json:"metadata,omitempty"`
+	Census       *ElectionCensus   `json:"census,omitempty"`
+	MetadataURL  string            `json:"metadataURL"`
+	CreationTime time.Time         `json:"creationTime"`
+	PublicKeys   []Key             `json:"publicKeys,omitempty"`
+	PrivateKeys  []Key             `json:"privateKeys,omitempty"`
+	VoteMode     VoteMode          `json:"voteMode,omitempty"`
+	ElectionMode ElectionMode      `json:"electionMode,omitempty"`
+	TallyMode    TallyMode         `json:"tallyMode,omitempty"`
+	Metadata     *ElectionMetadata `json:"metadata,omitempty"`
 }
 
 type ElectionCensus struct {
@@ -159,12 +158,16 @@ type TransactionReference struct {
 }
 
 type ChainInfo struct {
-	ID                      string    `json:"chainId,omitempty"`
-	BlockTime               *[5]int32 `json:"blockTime,omitempty"`
-	ElectionCount           *uint64   `json:"electionCount,omitempty"`
-	Height                  *uint32   `json:"height,omitempty"`
-	Timestamp               *int64    `json:"blockTimestamp,omitempty"`
-	TransactionCount        *uint64   `json:"transactionCount,omitempty"`
+	ID                      string    `json:"chainId"`
+	BlockTime               [5]int32  `json:"blockTime"`
+	ElectionCount           uint64    `json:"electionCount"`
+	GenesisTime             time.Time `json:"genesisTime"`
+	Height                  uint32    `json:"height"`
+	Syncing                 bool      `json:"syncing"`
+	Timestamp               int64     `json:"blockTimestamp"`
+	TransactionCount        uint64    `json:"transactionCount"`
+	ValidatorCount          uint32    `json:"validatorCount"`
+	VoteCount               uint64    `json:"voteCount"`
 	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
 }
 

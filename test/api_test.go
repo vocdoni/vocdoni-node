@@ -255,7 +255,7 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 		chainInfo := api.ChainInfo{}
 		err := json.Unmarshal(resp, &chainInfo)
 		qt.Assert(t, err, qt.IsNil)
-		if *chainInfo.Height >= h {
+		if chainInfo.Height >= h {
 			break
 		}
 		time.Sleep(time.Second * 1)

@@ -56,9 +56,9 @@ func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
 	return zkCircuit, nil
 }
 
-// LoadZkCircuit function load the circuit artifacts based on the configuration
-// provided. First, tries to load the artifacts from local storage, if they are
-// not available, tries to download from their remote location. Then,
+// LoadZkCircuit load the circuit artifacts based on the configuration provided.
+// First, tries to load the artifacts from local storage, if they are not
+// available, tries to download from their remote location. Then,
 func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, error) {
 	// Join the local base path with the local dir set up into the circuit
 	// configuration
@@ -85,7 +85,7 @@ func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, err
 	if correct, err := circuit.VerifiedCircuitArtifacts(); err != nil {
 		return nil, err
 	} else if !correct {
-		return nil, fmt.Errorf("download artifacts does not match with the expected ones")
+		return nil, fmt.Errorf("hashes from downloaded artifacts don't match the expected ones")
 	}
 
 	return circuit, nil
@@ -93,7 +93,7 @@ func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, err
 
 // LoadLocal tries to read the content of current circuit artifacts from its
 // local path (provingKey, verificationKey and wasm). If any of the read
-// operatios fails, returns an error.
+// operations fails, returns an error.
 func (circuit *ZkCircuit) LoadLocal() error {
 	var err error
 
@@ -184,8 +184,8 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	return nil
 }
 
-// VerifiedCircuitArtifacts function checks that the computed hash of every
-// circuit artifact matches with the expected hash, from the circuit config.
+// VerifiedCircuitArtifacts checks that the computed hash of every circuit
+// artifact matches with the expected hash, from the circuit config.
 func (circuit *ZkCircuit) VerifiedCircuitArtifacts() (bool, error) {
 	zKeyVerified, err := checkHash(circuit.ProvingKey, circuit.Config.ProvingKeyHash)
 	if err != nil {
@@ -216,17 +216,15 @@ func checkHash(content, expected []byte) (bool, error) {
 	}
 
 	hash := sha256.New()
-	if n, err := hash.Write(content); err != nil {
+	if _, err := hash.Write(content); err != nil {
 		return false, fmt.Errorf("error computing hash function of %s: %w", content, err)
-	} else if n != len(content) {
-		return false, fmt.Errorf("the number of writted bytes does not match with the content provied")
 	}
 
 	return bytes.Equal(hash.Sum(nil), expected), nil
 }
 
-// downloadFile functions perform a GET request to the URL provided and returns
-// the content of the received response. If something fails returns an error.
+// downloadFile performs a GET request to the URL provided and returns the
+// content of the received response. If something fails returns an error.
 func downloadFile(ctx context.Context, fileUrl string) ([]byte, error) {
 	if _, err := url.Parse(fileUrl); err != nil {
 		return nil, fmt.Errorf("error parsing the file URL provided: %w", err)
@@ -264,13 +262,11 @@ func storeFile(content []byte, dstPath string) error {
 
 	fd, err := os.Create(dstPath)
 	if err != nil {
-		return fmt.Errorf("something was wrong creating the artifact file: %w", err)
+		return fmt.Errorf("error creating the artifact file: %w", err)
 	}
 
-	if nBytes, err := fd.Write(content); err != nil {
-		return fmt.Errorf("something was wrong writting the artifact file: %w", err)
-	} else if len(content) != nBytes {
-		return fmt.Errorf("something was wrong writting the artifact file: the length of the provided content does not match with the bytes writted")
+	if _, err := fd.Write(content); err != nil {
+		return fmt.Errorf("error writting the artifact file: %w", err)
 	}
 
 	return nil

@@ -133,10 +133,10 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 	return &cp, nil
 }
 
-// CensusGenProofZk function generates the census proof of a election based on
-// ZkSnarks. It uses the current apiclient circuit config to instance the
-// circuit and generates the proof for the censusRoot, electionId and voter
-// babyjubjub private key provided.
+// CensusGenProofZk generates the census proof of a election based on ZkSnarks.
+// It uses the current apiclient circuit config to instance the circuit and
+// generates the proof for the censusRoot, electionId and voter babyjubjub
+// private key provided.
 func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*CensusProofZk, error) {
 	// Perform a request to get the type of the current census and check if it
 	// is a zk census.

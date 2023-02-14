@@ -47,9 +47,9 @@ type Proof struct {
 	PubSignals []string  `json:"pubSignals"`
 }
 
-// ParseProof function encodes the provided proof data and public signals into a
-// Proof struct, performing an unmarshal operation over them. Returns an error
-// if something is wrong.
+// ParseProof encodes the provided proof data and public signals into a Proof
+// struct, performing an unmarshal operation over them. Returns an error if
+// something is wrong.
 func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	data := ProofData{}
 	if err := json.Unmarshal(proofData, &data); err != nil {
@@ -63,8 +63,8 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	return &Proof{Data: data, PubSignals: signals}, nil
 }
 
-// Bytes function returns the current Proof struct parameters Data and
-// PubSignals as []byte. It returns an error if something fails.
+// Bytes returns the current Proof struct parameters Data and PubSignals as
+// []byte. It returns an error if something fails.
 func (p *Proof) Bytes() ([]byte, []byte, error) {
 	proofData, err := json.Marshal(p.Data)
 	if err != nil {
@@ -79,8 +79,8 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	return proofData, pubSignals, nil
 }
 
-// Weight function decodes the vote weight value from the current proof public
-// signals and return it as a big.Int.
+// Weight decodes the vote weight value from the current proof public signals
+// and return it as a big.Int.
 func (p *Proof) Weight() (*big.Int, error) {
 	// Check if the current proof contains public signals and it contains the
 	// correct number of positions.
@@ -134,11 +134,11 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	return wtns, nil
 }
 
-// Prove function generates a verifiable proof of the execution of the circuit
-// for the input signals using the proving key provided. All the arguments are
-// slices of bytes with the data read from the generated files by Circom (wasm
-// circuit) and SnarkJS (proving zkey). It returns the verifiable proof of the
-// execution with the public signals associated or an error if something fails.
+// Prove generates a verifiable proof of the execution of the circuit for the
+// input signals using the proving key provided. All the arguments are slices of
+// bytes with the data read from the generated files by Circom (wasm circuit)
+// and SnarkJS (proving zkey). It returns the verifiable proof of the execution
+// with the public signals associated or an error if something fails.
 func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// Calculate the witness calling internal function calcWitness with the
 	// provided wasm and inputs.
@@ -163,9 +163,9 @@ func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	return proof, nil
 }
 
-// Verify function performs a verification of the provided proof and its public
-// signals. It receives the verification key and returns an error if something
-// fails or nil if the verification was ok.
+// Verify performs a verification of the provided proof and its public signals.
+// It receives the verification key and returns an error if something fails or
+// nil if the verification was ok.
 func (p *Proof) Verify(vKey []byte) error {
 	proof := types.ZKProof{
 		Proof: &types.ProofData{

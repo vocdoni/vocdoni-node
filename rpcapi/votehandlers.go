@@ -190,7 +190,6 @@ func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, e
 	response.ProcessSummary = &api.ProcessSummary{
 		BlockCount:      procInfo.EndBlock - procInfo.StartBlock,
 		EntityID:        hex.EncodeToString(procInfo.EntityID),
-		EntityIndex:     procInfo.EntityIndex,
 		EnvelopeHeight:  &votes,
 		Metadata:        procInfo.Metadata,
 		SourceNetworkID: procInfo.SourceNetworkId,

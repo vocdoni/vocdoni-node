@@ -12,8 +12,8 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
-// ProtobufZKProofToProverProof function parses the provided protobuf ready
-// proof struct into a prover ready proof struct.
+// ProtobufZKProofToProverProof parses the provided protobuf ready proof struct
+// into a prover ready proof struct.
 func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error) {
 	if len(p.A) != 3 || len(p.B) != 6 || len(p.C) != 3 {
 		return nil, fmt.Errorf("wrong ZkSnark protobuf format")
@@ -33,13 +33,12 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 	}, nil
 }
 
-// ProverProofToProtobufZKProof function encodes the proof provided into a
-// protobuf ready struct using including the index of the circuit used. If the
-// provided proof does not contains a defined public signals, the rest of the
-// arguments are required to calculate that parameter. If the provided proof
-// does not contains a defined public signals and any of the rest of the
-// parameters is nil, the resulting struct will not contains any defined
-// PublicInputs value.
+// ProverProofToProtobufZKProof encodes the proof provided into a protobuf ready
+// struct using including the index of the circuit used. If the provided proof
+// does not contains a defined public signals, the rest of the arguments are
+// required to calculate that parameter. If the provided proof does not contains
+// a defined public signals and any of the rest of the parameters is nil, the
+// resulting struct will not contains any defined PublicInputs value.
 func ProverProofToProtobufZKProof(p *prover.Proof,
 	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
 	if len(p.Data.A) != 3 || len(p.Data.B) != 3 || len(p.Data.C) != 3 {
@@ -107,10 +106,10 @@ func LittleEndianToNBytes(num *big.Int, n int) *big.Int {
 	return new(big.Int).SetBytes(numBytes[m:])
 }
 
-// BytesToArboStr function calculates the sha256 hash (32 bytes) of the slice
-// of bytes provided. Then, splits the hash into a two parts of 16 bytes, swap
-// the endianess of that parts, encodes they into a two big.Ints and return both
-// as strings into a []string.
+// BytesToArboStr calculates the sha256 hash (32 bytes) of the slice of bytes
+// provided. Then, splits the hash into a two parts of 16 bytes, swap the
+// endianess of that parts, encodes they into a two big.Ints and return both as
+// strings into a []string.
 func BytesToArboStr(input []byte) []string {
 	hash := sha256.Sum256(input)
 	return []string{
