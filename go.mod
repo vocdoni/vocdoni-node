@@ -45,7 +45,7 @@ require (
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.16
 	github.com/multiformats/go-multiaddr v0.6.0
-	github.com/multiformats/go-multicodec v0.5.0
+	github.com/multiformats/go-multicodec v0.6.0
 	github.com/pressly/goose/v3 v3.3.1
 	github.com/prometheus/client_golang v1.13.1
 	github.com/rs/zerolog v1.28.0
@@ -196,7 +196,7 @@ require (
 	github.com/ipld/go-car v0.4.0 // indirect
 	github.com/ipld/go-car/v2 v2.4.1 // indirect
 	github.com/ipld/go-codec-dagpb v1.4.2 // indirect
-	github.com/ipld/go-ipld-prime v0.18.0 // indirect
+	github.com/ipld/go-ipld-prime v0.19.0 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jbenet/go-temp-err-catcher v0.1.0 // indirect
 	github.com/jbenet/goprocess v0.1.4 // indirect
