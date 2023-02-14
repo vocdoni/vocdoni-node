@@ -17,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -46,7 +47,7 @@ const (
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
 type EventListener interface {
-	OnComputeResults(results *indexertypes.Results, process *indexertypes.Process, height uint32)
+	OnComputeResults(results *results.Results, process *indexertypes.Process, height uint32)
 	OnOracleResults(oracleResults *models.ProcessResult, pid []byte, height uint32)
 }
 
@@ -275,10 +276,10 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		}
 		options := process.VoteOptions
 
-		indxR := &indexertypes.Results{
+		indxR := &results.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:        indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Votes:        results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
@@ -298,7 +299,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		}
 
 		// Count the votes, add them to results (in memory, without any db transaction)
-		results := &indexertypes.Results{
+		results := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.EnvelopeType,
@@ -311,7 +312,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			return false
 		})
 		// Store the results on the persistent database
-		if err := idx.commitVotesUnsafe(p, results, idx.App.Height()); err != nil {
+		if err := idx.commitVotesUnsafe(p, results, nil, idx.App.Height()); err != nil {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
@@ -382,7 +383,8 @@ func (idx *Indexer) Commit(height uint32) error {
 	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 
 	// Add votes collected by onVote (live results)
-	nvotes := 0
+	newVotes := 0
+	overwritedVotes := 0
 	startTime = time.Now()
 
 	for pid, votes := range idx.votePool {
@@ -392,32 +394,74 @@ func (idx *Indexer) Commit(height uint32) error {
 			log.Warnf("cannot get process %x", []byte(pid))
 			continue
 		}
-		// This is a temporary "results" for computing votes
-		// of a single processId for the current block.
-		results := &indexertypes.Results{
+
+		// results is used to accumulate the new votes for a process
+		addedResults := &results.Results{
+			Weight:       new(types.BigInt).SetUint64(0),
+			VoteOpts:     proc.VoteOpts,
+			EnvelopeType: proc.Envelope,
+		}
+		// substractedResults is used to substract votes that are overwritten
+		substratedResults := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
 		}
 		for _, v := range votes {
+			if v.Overwrites > 0 {
+				// if overwrite is 1 or more, we need to update the vote (remove the previous
+				// one and add the new) to results.
+				// We fetch the previous vote from the state by setting committed=false
+				previousVote, err := idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
+				if err != nil {
+					log.Errorw(err, "previous vote cannot be fetch")
+					continue
+				}
+				previousOverwrites := uint32(0)
+				if previousVote.OverwriteCount != nil {
+					previousOverwrites = *previousVote.OverwriteCount
+				}
+				log.Debugw("vote overwrite, previous vote",
+					"overwrites", v.Overwrites,
+					"package", string(previousVote.VotePackage))
+				// ensure that overwriteCounter has increased
+				if v.Overwrites <= previousOverwrites {
+					log.Errorw(fmt.Errorf(
+						"state stored overwrite count is equal or smaller than current vote overwrite count (%d <= %d)",
+						v.Overwrites, previousOverwrites),
+						"check vote overwrite failed")
+					continue
+				}
+				// add the live vote to substracted results
+				if err := idx.addLiveVote(v.ProcessID,
+					previousVote.VotePackage,
+					new(big.Int).SetBytes(previousVote.Weight),
+					substratedResults); err != nil {
+					log.Errorw(err, "vote cannot be added to substracted results")
+					continue
+				}
+				overwritedVotes++
+			} else {
+				newVotes++
+			}
+			// add the new vote to results
 			if err := idx.addLiveVote(v.ProcessID,
 				v.VotePackage,
-				// TBD: Not 100% sure what happens if weight=nil
 				v.Weight,
-				results); err != nil {
-				log.Warnf("vote cannot be added: %v", err)
-			} else {
-				nvotes++
+				addedResults); err != nil {
+				log.Errorw(err, "vote cannot be added to results")
+				continue
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes([]byte(pid), results, idx.App.Height()); err != nil {
+		if err := idx.commitVotes([]byte(pid), addedResults, substratedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
-	if nvotes > 0 {
-		log.Infof("added %d live votes on block %d, took %s",
-			nvotes, height, time.Since(startTime))
+	if newVotes+overwritedVotes > 0 {
+		log.Infow("add live votes to results",
+			"block", height, "newVotes", newVotes, "overwritedVotes",
+			overwritedVotes, "time", time.Since(startTime))
 	}
 
 	// Check if there are processes that need results computing.
@@ -518,11 +562,11 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 }
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
-func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
+func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	txIndex int32) {
 	// Execute callbacks
 	for _, l := range idx.eventOnResults {
-		go l.OnOracleResults(results, pid, idx.App.Height())
+		go l.OnOracleResults(presults, pid, idx.App.Height())
 	}
 
 	// We don't execute any action if the blockchain is being syncronized
@@ -539,11 +583,11 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 	// This code must be run async in order to not delay the consensus. The results retrieval
 	// could require some time.
 	go func() {
-		if results == nil || results.Votes == nil {
+		if presults == nil || presults.Votes == nil {
 			log.Errorf("results are nil")
 			return
 		}
-		var myResults *indexertypes.Results
+		var myResults *results.Results
 		var err error
 		retries := 50
 		for {
@@ -564,12 +608,12 @@ func (idx *Indexer) OnProcessResults(pid []byte, results *models.ProcessResult,
 			return
 		}
 
-		myVotes := BuildProcessResult(myResults, results.EntityId).Votes
-		correct := len(myVotes) == len(results.Votes)
+		myVotes := BuildProcessResult(myResults, presults.EntityId).GetVotes()
+		correct := len(myVotes) == len(presults.Votes)
 		if !correct {
 			log.Errorf("results validation failed: wrong number of votes")
 		}
-		for i, q := range results.Votes {
+		for i, q := range presults.GetVotes() {
 			if !correct {
 				break
 			}

@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -29,7 +30,7 @@ type ProcessArchive struct {
 type Process struct {
 	ChainID     string                `json:"chainId,omitempty"`
 	ProcessInfo *indexertypes.Process `json:"process"`
-	Results     *indexertypes.Results `json:"results"`
+	Results     *results.Results      `json:"results"`
 	StartDate   *time.Time            `json:"startDate,omitempty"`
 	EndDate     *time.Time            `json:"endDate,omitempty"`
 }
@@ -273,7 +274,7 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 // OnComputeResults implements the indexer event callback.
 // On this event the results are set always and the process info only if it
 // does not exist yet in the json storage.
-func (pa *ProcessArchive) OnComputeResults(results *indexertypes.Results,
+func (pa *ProcessArchive) OnComputeResults(results *results.Results,
 	proc *indexertypes.Process, height uint32) {
 	// Get the process (if exist)
 	jsProc, err := pa.storage.GetProcess(results.ProcessID)

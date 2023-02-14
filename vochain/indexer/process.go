@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 )
 
 var zeroBytes = []byte("")
@@ -292,8 +293,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-
-		ResultsVotes: encodeVotes(indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 	log.Debugf("new indexer process: %#v", procParams)
 

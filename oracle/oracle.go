@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -108,7 +109,7 @@ func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
 // OnComputeResults is called once a process result is computed by the indexer.
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
-func (o *Oracle) OnComputeResults(results *indexertypes.Results, proc *indexertypes.Process, h uint32) {
+func (o *Oracle) OnComputeResults(results *results.Results, proc *indexertypes.Process, h uint32) {
 	log.Infof("launching on computeResults callback for process %x", results.ProcessID)
 	// check vochain process status
 	vocProcessData, err := o.VochainApp.State.Process(results.ProcessID, true)
