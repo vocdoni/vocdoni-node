@@ -36,7 +36,7 @@ type VoteData struct {
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
 // which contains the electionID, the choices and the proof. The
-// return value is the fcvoteID (nullifier).
+// return value is the voteID (nullifier).
 func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	votePackage := &vochain.VotePackage{
 		Votes: v.Choices,
