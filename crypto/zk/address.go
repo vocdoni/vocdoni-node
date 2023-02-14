@@ -10,7 +10,6 @@ import (
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/tree/arbo"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -85,15 +84,15 @@ func NewRandAddress() (*ZkAddress, error) {
 
 // Bytes returns the current ZkAddress.addr transformed to types.HexBytes using
 // the arbo.BigIntToBytes() function.
-func (zk *ZkAddress) Bytes() types.HexBytes {
-	return types.HexBytes(arbo.BigIntToBytes(defaultZkAddrLen, zk.addr))
+func (zk *ZkAddress) Bytes() []byte {
+	return arbo.BigIntToBytes(defaultZkAddrLen, zk.addr)
 }
 
 // String function returns the current ZkAddress.Bytes() result transformed to
 // string using the types.HexBytes.String() function.
 func (zk *ZkAddress) String() string {
 	addr := zk.Bytes()
-	return addr.String()
+	return hex.EncodeToString(addr)
 }
 
 // Nullifier returns ZkSnark ready vote nullifier based on the current
