@@ -251,6 +251,7 @@ type EnvelopePackage struct {
 	VotePackage          []byte           `json:"votePackage"`
 	Weight               string           `json:"weight"`
 	OverwriteCount       uint32           `json:"overwriteCount"`
+	Date                 time.Time        `json:"date"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api

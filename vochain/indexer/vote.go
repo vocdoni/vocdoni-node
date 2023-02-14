@@ -53,8 +53,6 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 // GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("GetEnvelope took %s", time.Since(startTime)) }()
 	t := time.Now()
 	voteRef, err := s.GetEnvelopeReference(nullifier)
 	if err != nil {
@@ -70,12 +68,13 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 		return nil, err
 	}
 
-	log.Debugf("getEnvelope took %s", time.Since(t))
+	log.Debugw("getEnvelope", "took", time.Since(t), "nullifier", hex.EncodeToString(nullifier))
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          vote.VotePackage,
 		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 		Weight:               voteRef.Weight.String(),
 		OverwriteCount:       voteRef.OverwriteCount,
+		Date:                 voteRef.CreationTime,
 		Meta: indexertypes.EnvelopeMetadata{
 			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
@@ -337,7 +336,11 @@ func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int,
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
-	creationTime := time.Now()
+	creationTime := s.App.TimestampFromBlock(int64(vote.Height))
+	if creationTime == nil {
+		t := time.Now()
+		creationTime = &t
+	}
 	weightStr := []byte("1")
 	if vote.Weight != nil {
 		var err error
@@ -362,7 +365,7 @@ func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
 		// VoterID has a NOT NULL constraint, so we need to provide
 		// a zero value for it since nil is not allowed
 		VoterID:      nonNullBytes(vote.VoterID),
-		CreationTime: creationTime,
+		CreationTime: *creationTime,
 	}); err != nil {
 		return err
 	}
