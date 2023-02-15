@@ -52,19 +52,6 @@ func (config ZkCircuitConfig) KeySize() int {
 // the remote and local location of the circuits artifacts and their metadata
 // such as artifacts hash or the number of parameters.
 var CircuitsConfigurations = map[string]ZkCircuitConfig{
-	"bizono": {
-		URI: "https://raw.githubusercontent.com/vocdoni/" +
-			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-		CircuitPath:             "zkcensusproof/dev/65536",
-		Levels:                  16, // ZkCircuit number of levels
-		LocalDir:                "artifacts",
-		ProvingKeyHash:          hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
-		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0x50029154e81a2078eff83751454bb3ece2cf9391103cc17306d47f7d4461b0b6"),
-		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0x1d975d68220d1f10bd54e2f53ea9526ce8f916efb15a2079edc3db9403a78278"),
-		WasmFilename:            "circuit.wasm",
-	},
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
@@ -76,19 +63,6 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 		VerificationKeyHash:     hexToBytes("0x1d6818b479f80211feb19a68fb9dff78e94d0aa0e32e1df8e6ede61beb75c0ce"),
 		VerificationKeyFilename: "verification_key.json",
 		WasmHash:                hexToBytes("0x0b25bd8ac0861f3d3843fc9a9c635afc21b100404037bc47d31e173c3cc67791"),
-		WasmFilename:            "circuit.wasm",
-	},
-	"stage": {
-		URI: "https://raw.githubusercontent.com/vocdoni/" +
-			"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-		CircuitPath:             "zkcensusproof/dev/1024",
-		Levels:                  10, // ZkCircuit number of levels
-		LocalDir:                "artifacts",
-		ProvingKeyHash:          hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
-		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),
-		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
 		WasmFilename:            "circuit.wasm",
 	},
 }
