@@ -45,11 +45,7 @@ func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
 	circuitConf := GetCircuitConfiguration(configTag)
 	ctx, cancel := context.WithTimeout(context.Background(), downloadCircuitsTimeout)
 	defer cancel()
-	zkCircuit, err := LoadZkCircuit(ctx, circuitConf)
-	if err != nil {
-		return nil, err
-	}
-	return zkCircuit, nil
+	return LoadZkCircuit(ctx, circuitConf)
 }
 
 // LoadZkCircuit load the circuit artifacts based on the configuration provided.
@@ -212,10 +208,10 @@ func downloadFile(ctx context.Context, fileUrl string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer res.Body.Close()
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error on download file %s: http status: %d", fileUrl, res.StatusCode)
 	}
-	defer res.Body.Close()
 	content, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error reading the file content from the http response: %w", err)
