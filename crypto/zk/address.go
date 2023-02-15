@@ -33,9 +33,41 @@ type ZkAddress struct {
 	addr *big.Int
 }
 
-// AddressFromBytes returns a new ZkAddress based on the seed provided. Using
-// it, a BabyJubJub key pair is calculated and based on it. The ZkAddress
-// components are:
+// Bytes returns the current ZkAddress.addr transformed to types.HexBytes using
+// the arbo.BigIntToBytes() function.
+func (zk *ZkAddress) Bytes() []byte {
+	return arbo.BigIntToBytes(defaultZkAddrLen, zk.addr)
+}
+
+// String function returns the current ZkAddress.Bytes() result transformed to
+// string using the types.HexBytes.String() function.
+func (zk *ZkAddress) String() string {
+	return hex.EncodeToString(zk.Bytes())
+}
+
+// Nullifier returns ZkSnark ready vote nullifier based on the current
+// ZkAddress.PrivKey and the electionId provided. The nullifier is calculated
+// following this definition:
+//
+//	nullifier = poseidon(jubjubPrivKey, sha256(electionId))
+func (zk *ZkAddress) Nullifier(electionId []byte) (*big.Int, error) {
+	// Encode the electionId -> sha256(electionId)
+	hashedElectionId := sha256.Sum256(electionId)
+	intElectionId := []*big.Int{
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[:16])),
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[16:])),
+	}
+	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(ElectionId))
+	return poseidon.Hash([]*big.Int{
+		zk.PrivKey,
+		intElectionId[0],
+		intElectionId[1],
+	})
+}
+
+// AddressFromBytes returns a new ZkAddress based on the seed provided. The seed
+// has to be at least 32 bytes. Using it, a BabyJubJub key pair is calculated
+// and based on it. The ZkAddress components are:
 //   - ZkAddress.PrivKey: The BabyJubJub private key big.Int value, following
 //     the EdDSA standard, and using blake-512 hash.
 //   - ZkAddress.PublicKey: The poseidon hash of the BabyJubJub public key
@@ -48,7 +80,7 @@ func AddressFromBytes(seed []byte) (*ZkAddress, error) {
 		return nil, fmt.Errorf("the seed provided does not have 32 bytes at least")
 	}
 	jubjubKey := babyjub.PrivateKey{}
-	if _, err := hex.Decode(jubjubKey[:], seed); err != nil {
+	if _, err := hex.Decode(jubjubKey[:], seed[:]); err != nil {
 		return nil, fmt.Errorf("error generating babyjub key: %w", err)
 	}
 	pubKey, err := poseidon.Hash([]*big.Int{
@@ -74,48 +106,12 @@ func AddressFromString(seed string) (*ZkAddress, error) {
 // AddressFromSignKeys gets the private key from the ethereum.SignKeys provided
 // and pass its string representation as []byte to AddressFromBytes function.
 func AddressFromSignKeys(acc *ethereum.SignKeys) (*ZkAddress, error) {
-	privKey := acc.PrivateKey()
-	return AddressFromBytes([]byte(privKey.String()))
+	// Get the bytes from the ethereum.SignKeys privateKey, encode it to hex
+	// string and pass its bytes to AddressFromBytes
+	return AddressFromBytes([]byte(hex.EncodeToString(acc.PrivateKey())))
 }
 
 // NewRandAddress returns a ZkAddress based on a random BabyJubJub private key.
 func NewRandAddress() (*ZkAddress, error) {
 	return AddressFromBytes([]byte(util.RandomHex(32)))
-}
-
-// Bytes returns the current ZkAddress.addr transformed to types.HexBytes using
-// the arbo.BigIntToBytes() function.
-func (zk *ZkAddress) Bytes() []byte {
-	return arbo.BigIntToBytes(defaultZkAddrLen, zk.addr)
-}
-
-// String function returns the current ZkAddress.Bytes() result transformed to
-// string using the types.HexBytes.String() function.
-func (zk *ZkAddress) String() string {
-	addr := zk.Bytes()
-	return hex.EncodeToString(addr)
-}
-
-// Nullifier returns ZkSnark ready vote nullifier based on the current
-// ZkAddress.PrivKey and the electionId provided. The nullifier is calculated
-// following this definition:
-//
-//	nullifier = poseidon(jubjubPrivKey, sha256(electionId))
-func (zk *ZkAddress) Nullifier(electionId []byte) (*big.Int, error) {
-	// Encode the electionId -> sha256(electionId)
-	hashedElectionId := sha256.Sum256(electionId)
-	intElectionId := []*big.Int{
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[:16])),
-		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[16:])),
-	}
-	// Calculate nullifier hash: poseidon(babyjubjub(privKey) + sha256(ElectionId))
-	nullifier, err := poseidon.Hash([]*big.Int{
-		zk.PrivKey,
-		intElectionId[0],
-		intElectionId[1],
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error generating nullifier: %w", err)
-	}
-	return nullifier, nil
 }
