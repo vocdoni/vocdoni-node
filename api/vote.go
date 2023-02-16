@@ -3,12 +3,14 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -89,6 +91,9 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 
 	voteData, err := a.indexer.GetEnvelope(voteID)
 	if err != nil {
+		if errors.Is(err, indexer.ErrVoteNotFound) {
+			return httprouter.ErrNotFound
+		}
 		return fmt.Errorf("cannot get vote: %w", err)
 	}
 
@@ -135,7 +140,7 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return fmt.Errorf("malformed voteId")
 	}
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
-		return fmt.Errorf("not registered")
+		return httprouter.ErrNotFound
 	}
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }

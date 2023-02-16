@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
@@ -11,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer"
 )
 
 const (
@@ -18,8 +20,7 @@ const (
 )
 
 var (
-	ErrTransactionNotFound = fmt.Errorf("transaction hash not found")
-	ErrBlockNotFound       = fmt.Errorf("block not found")
+	ErrBlockNotFound = fmt.Errorf("block not found")
 )
 
 func (a *API) enableChainHandlers() error {
@@ -310,7 +311,10 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	}
 	ref, err := a.indexer.GetTxHashReference(hash)
 	if err != nil {
-		return ErrTransactionNotFound
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+		}
+		return fmt.Errorf("cannot get transaction reference: %w", err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {
@@ -332,6 +336,9 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	}
 	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+		}
 		return fmt.Errorf("cannot get tx: %w", err)
 	}
 	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusCodeOK)
@@ -345,6 +352,9 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 	ref, err := a.indexer.GetTxReference(index)
 	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+		}
 		return fmt.Errorf("cannot get tx: %w", err)
 	}
 	data, err := json.Marshal(ref)
@@ -386,7 +396,7 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	block := a.vocapp.GetBlockByHeight(height)
 	if block == nil {
-		return ErrBlockNotFound
+		return httprouter.ErrNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -405,7 +415,7 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	}
 	block := a.vocapp.GetBlockByHash(hash)
 	if block == nil {
-		return ErrBlockNotFound
+		return httprouter.ErrNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
