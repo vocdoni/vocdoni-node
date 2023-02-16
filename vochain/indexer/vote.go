@@ -1,8 +1,10 @@
 package indexer
 
 import (
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strings"
@@ -23,10 +25,13 @@ import (
 )
 
 // ErrNoResultsYet is an error returned to indicate the process exist but
-// it does not have yet reuslts
+// it does not have yet reuslts.
 var ErrNoResultsYet = fmt.Errorf("no results yet")
 
-// Getindexertypes.VoteReference gets the reference for an AddVote transaction.
+// ErrVoteNotFound is returned if the vote is not found in the indexer database.
+var ErrVoteNotFound = fmt.Errorf("vote not found")
+
+// GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	sqlStartTime := time.Now()
@@ -35,6 +40,9 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 	defer cancel()
 	sqlTxRefInner, err := queries.GetVoteReference(ctx, nullifier)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrVoteNotFound
+		}
 		return nil, err
 	}
 	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)),
@@ -61,7 +69,7 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 	}
 	vote, err := s.App.State.Vote(voteRef.ProcessID, nullifier, true)
 	if err != nil {
-		return nil, err
+		return nil, ErrVoteNotFound
 	}
 	// TODO: get the txHash from another place, not the blockstore
 	_, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
@@ -143,6 +151,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 }
 
 // GetEnvelopes retrieves all envelope metadata for a ProcessId.
+// Returns ErrVoteNotFound if the envelope reference is not found.
 func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
@@ -161,6 +170,9 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 		Offset:          int32(from),
 	})
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrVoteNotFound
+		}
 		return nil, err
 	}
 	for _, txRef := range txRefs {

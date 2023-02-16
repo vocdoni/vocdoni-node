@@ -1,7 +1,9 @@
 package indexer
 
 import (
+	"database/sql"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -17,7 +19,10 @@ import (
 	"go.vocdoni.io/dvote/vochain/results"
 )
 
-var zeroBytes = []byte("")
+var (
+	ErrProcessNotFound = fmt.Errorf("process not found")
+	zeroBytes          = []byte("")
+)
 
 // nonNullBytes helps for sql CREATE queries, as most columns are NOT NULL.
 func nonNullBytes(p []byte) []byte {
@@ -66,9 +71,12 @@ func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	defer cancel()
 	procInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrProcessNotFound
+		}
 		return nil, err
 	}
-	log.Debugf("ProcessInfo sqlite took %s", time.Since(startTime))
+	log.Debugf("processInfo sqlite took %s", time.Since(startTime))
 	return indexertypes.ProcessFromDB(&procInner), nil
 }
 

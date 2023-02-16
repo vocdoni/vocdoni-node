@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt" // required for evm encoding
 	"strconv"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
@@ -61,18 +63,18 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/elections/{electionID}/votes",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionVotesHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionVotesCountHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/elections/{electionID}/votes",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionVotesHandler,
 	); err != nil {
 		return err
 	}
@@ -168,6 +170,9 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	}
 	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
+		if errors.Is(err, indexer.ErrProcessNotFound) {
+			return httprouter.ErrNotFound
+		}
 		return fmt.Errorf("cannot fetch electionID %x: %w", electionID, err)
 	}
 	count, err := a.indexer.GetEnvelopeHeight(electionID)
@@ -257,6 +262,9 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
+		if errors.Is(err, indexer.ErrProcessNotFound) {
+			return httprouter.ErrNotFound
+		}
 		return fmt.Errorf("cannot get election keys: %w", err)
 	}
 	election := Election{}
@@ -286,6 +294,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
+// GET elections/<electionID>/votes
 // GET elections/<electionID>/votes/page/<page>
 // returns the list of voteIDs for an election (paginated)
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -304,6 +313,9 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 	votesRaw, err := a.indexer.GetEnvelopes(electionID, MaxPageSize, page, "")
 	if err != nil {
+		if errors.Is(err, indexer.ErrVoteNotFound) {
+			return httprouter.ErrNotFound
+		}
 		return err
 	}
 	votes := []Vote{}
@@ -332,6 +344,9 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	}
 	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
+		if errors.Is(err, indexer.ErrProcessNotFound) {
+			return httprouter.ErrNotFound
+		}
 		return fmt.Errorf("cannot get election results: %w", err)
 	}
 	if process == nil {

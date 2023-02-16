@@ -2,6 +2,7 @@ package apirest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -26,8 +27,10 @@ const (
 
 	namespace              = "bearerStd"
 	bearerPrefix           = "Bearer "
-	HTTPstatusCodeOK       = 200
-	HTTPstatusCodeErr      = 400
+	HTTPstatusCodeOK       = http.StatusOK
+	HTTPstatusNoContent    = http.StatusNoContent
+	HTTPstatusCodeErr      = http.StatusBadRequest
+	HTTPstatusInternalErr  = http.StatusInternalServerError
 	HTTPstatusCodeNotFound = 404
 )
 
@@ -109,7 +112,7 @@ func (a *API) AuthorizeRequest(data interface{},
 
 // ProcessData is a function for the RouterNamespace interface.
 // The body of the http requests and the bearer auth token are readed.
-func (b *API) ProcessData(req *http.Request) (interface{}, error) {
+func (a *API) ProcessData(req *http.Request) (interface{}, error) {
 	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
@@ -121,7 +124,7 @@ func (b *API) ProcessData(req *http.Request) (interface{}, error) {
 		Data:      reqBody,
 		AuthToken: strings.TrimPrefix(req.Header.Get("Authorization"), bearerPrefix),
 	}
-	if b.verboseAuthLog && msg.AuthToken != "" {
+	if a.verboseAuthLog && msg.AuthToken != "" {
 		fmt.Printf("[BearerAPI/%d/%s] %s {%s}\n", time.Now().Unix(), msg.AuthToken, req.URL.RequestURI(), reqBody)
 	}
 	return msg, nil
@@ -139,6 +142,20 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string,
 	routerHandler := func(msg httprouter.Message) {
 		bsaMsg := msg.Data.(*APIdata)
 		if err := handler(bsaMsg, msg.Context); err != nil {
+			// catch some specific errors to return the HTTP status code
+			if errors.Is(err, httprouter.ErrNotFound) {
+				if err := msg.Context.Send(nil, HTTPstatusCodeNotFound); err != nil {
+					log.Warn(err)
+				}
+				return
+			}
+			if errors.Is(err, httprouter.ErrInternal) {
+				if err := msg.Context.Send(nil, HTTPstatusInternalErr); err != nil {
+					log.Warn(err)
+				}
+				return
+			}
+			// return 400 with an error message
 			data, err2 := json.Marshal(&ErrorMsg{Error: err.Error()})
 			if err2 != nil {
 				log.Warn(err2)
@@ -163,7 +180,6 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string,
 	default:
 		return fmt.Errorf("method access type not implemented: %s", accessType)
 	}
-	log.Infof("registered %s %s method for path %s", HTTPmethod, accessType, path)
 	return nil
 }
 
