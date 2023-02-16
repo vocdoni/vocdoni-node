@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -138,9 +137,9 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 // generates the proof for the censusRoot, electionId and voter babyjubjub
 // private key provided.
 func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*CensusProofZk, error) {
-	// Perform a request to get the type of the current census and check if it
-	// is a zk census.
-	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "type")
+	// get merkle proof associated to the voter key provided, that will contains
+	// the leaf siblings and value (weight)
+	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", c.zkAddr.String())
 	if err != nil {
 		return nil, err
 	}
@@ -152,66 +151,28 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 	if err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
-
+	// ensure that the current census is a zkweighted one
 	if censusData.Type != api.CensusTypeZKWeighted {
 		return nil, fmt.Errorf("current census is not a zk census")
 	}
-
-	// Get merkle proof associated to the voter key provided, that will contains
-	// the leaf siblings and value (weight)
-	resp, code, err = c.Request("GET", nil, "censuses", censusRoot.String(), "proof", c.zkAddr.String())
-	if err != nil {
-		return nil, err
-	}
-	if code != 200 {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	censusData = &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal response: %w", err)
-	}
-
 	log.Debugw("zk census data received, starting to generate the proof inputs...",
 		"censusRoot", censusRoot.String(),
 		"electionId", electionId.String(),
 		"zkAddress", c.zkAddr.String())
 
-	// get nullifier
-	nullifier, err := c.zkAddr.Nullifier(electionId)
+	// generate inputs based on the current census data
+	rawInputs, err := circuit.GenerateCircuitInput(c.zkAddr, censusRoot, electionId,
+		censusData.Weight.MathBigInt(), censusData.Siblings)
 	if err != nil {
 		return nil, err
 	}
-
-	// Encode census root
-	strCensusRoot := arbo.BytesToBigInt(censusRoot).String()
-	// Get vote weight
-	weight := new(types.BigInt).SetUint64(1)
-	if censusData.Weight != nil {
-		weight = censusData.Weight
-	}
-
-	// Calculate and encode vote hash -> sha256(voteWeight)
-	encElectionId := zk.BytesToArboStr(electionId)
-	voteHash := zk.BytesToArboStr(weight.Bytes())
-
-	// Create the inputs and encode them into a JSON
-	rawInputs := map[string]interface{}{
-		"censusRoot":     strCensusRoot,
-		"censusSiblings": censusData.Siblings,
-		"weight":         weight,
-		"privateKey":     c.zkAddr.PrivKey.String(),
-		"voteHash":       voteHash,
-		"processId":      encElectionId,
-		"nullifier":      nullifier.String(),
-	}
+	// marshall inputs to bytes
 	inputs, err := json.Marshal(rawInputs)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding inputs: %w", err)
 	}
 	log.Debug("zk circuit proof inputs generated")
-
-	// Get artifacts of the current circuit
+	// get artifacts of the current circuit
 	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
 	if err != nil {
 		return nil, fmt.Errorf("error loading circuit: %w", err)
@@ -221,21 +182,26 @@ func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*C
 		"electionId", electionId.String(),
 		"zkAddress", c.zkAddr.String())
 
-	// Calculate the proof for the current apiclient circuit config and the
+	// calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
 	if err != nil {
 		return nil, err
 	}
-	// Encode the results as bytes and return the proof
+	// encode the results as bytes and return the proof
 	encProof, encPubSignals, err := proof.Bytes()
 	if err != nil {
 		return nil, err
 	}
+	// parse nullifier from generated inputs
+	nullifier, ok := new(big.Int).SetString(rawInputs.Nullifier, 10)
+	if !ok {
+		return nil, fmt.Errorf("error parsing nullifier from string to big.Int")
+	}
 	return &CensusProofZk{
 		Proof:      encProof,
 		PubSignals: encPubSignals,
-		Weight:     *weight,
+		Weight:     *censusData.Weight,
 		KeyType:    models.ProofArbo_PUBKEY,
 		Nullifier:  nullifier.Bytes(),
 	}, nil

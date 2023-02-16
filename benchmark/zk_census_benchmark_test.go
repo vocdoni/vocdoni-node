@@ -24,7 +24,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -117,60 +116,31 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 	log.Infow("zk census data received, starting to generate the proof inputs...",
 		"censusRoot", censusData.Root, "electionId", fmt.Sprintf("%x", electionID))
 
-	// Encode census root
-	strCensusRoot := arbo.BytesToBigInt(censusData.Root).String()
 	// Get vote weight
 	weight := new(big.Int).SetInt64(1)
 	if censusData.Weight != nil {
 		weight = censusData.Weight.MathBigInt()
 	}
-	// Get nullifier and encoded processId
-	nullifier, err := zkAddr.Nullifier(electionID)
+	// Generate circuit inputs
+	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.Root, electionID, weight, censusData.Siblings)
 	qt.Assert(b, err, qt.IsNil)
-
-	// Calculate and encode vote hash and the encoded version of the electionID
-	strVoteHash := zk.BytesToArboStr(censusData.Value)
-	strProcessId := zk.BytesToArboStr(electionID)
-
-	// Unpack and encode siblings
-	unpackedSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, censusData.Proof)
-	qt.Assert(b, err, qt.IsNil)
-
-	// Create a list of siblings with the same number of items that levels
-	// allowed by the circuit (from its config) plus one. Fill with zeros if its
-	// needed.
-	strSiblings := make([]string, zkCircuitTest.Levels+1)
-	for i := 0; i < len(strSiblings); i++ {
-		newSibling := "0"
-		if i < len(unpackedSiblings) {
-			newSibling = arbo.BytesToBigInt(unpackedSiblings[i]).String()
-		}
-		strSiblings[i] = newSibling
-	}
-	// Get artifacts of the current circuit
-	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), zkCircuitTest)
-	qt.Assert(b, err, qt.IsNil)
-
-	// Create the inputs and encode them into a JSON
-	rawInputs := map[string]interface{}{
-		"censusRoot":     strCensusRoot,
-		"censusSiblings": strSiblings,
-		"weight":         weight.String(),
-		"privateKey":     zkAddr.PrivKey.String(),
-		"voteHash":       strVoteHash,
-		"processId":      strProcessId,
-		"nullifier":      nullifier.String(),
-	}
+	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)
 	qt.Assert(b, err, qt.IsNil)
+	// parse nullifier from generated inputs
+	nullifier, ok := new(big.Int).SetString(rawInputs.Nullifier, 10)
+	qt.Assert(b, ok, qt.IsTrue)
 
 	log.Infow("proof inputs generated", "censusRoot", censusData.Root.String(),
 		"nullifier", nullifier.String())
+
+	// Get artifacts of the current circuit
+	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), zkCircuitTest)
+	qt.Assert(b, err, qt.IsNil)
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.
 	proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
 	qt.Assert(b, err, qt.IsNil)
-
 	// Encode the results as bytes and return the proof
 	encProof, encPubSignals, err := proof.Bytes()
 	qt.Assert(b, err, qt.IsNil)
