@@ -579,6 +579,18 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 
+	// Get the census type to return it into the response to prevent to perform
+	// two api calls.
+	censusType := CensusTypeUnknown
+	switch ref.CensusType {
+	case int32(models.Census_ARBO_POSEIDON):
+		censusType = CensusTypeZKWeighted
+	case int32(models.Census_ARBO_BLAKE2B):
+		censusType = CensusTypeWeighted
+	case int32(models.Census_CA):
+		censusType = CensusTypeCSP
+	}
+
 	// If the census type is zkweighted (that means that it uses Poseidon hash
 	// with Arbo merkle tree), skip to perform a hash function over the census
 	// key. It is because the zk friendly key of any census leaf is the
@@ -600,6 +612,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	response := Census{
 		Proof: siblings,
 		Value: leafV,
+		Type:  censusType,
 	}
 
 	// Get the leaf siblings from arbo based on the key received and include
