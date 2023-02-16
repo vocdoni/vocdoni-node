@@ -15,19 +15,11 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
+var downloadCircuitsTimeout = time.Minute * 5
+
 // By default set the circuit base dir empty which means that the artifacts will
 // be downloaded or loaded from the LocalDir path associated to the circuit config
-var circuitsBaseDir = ""
-var BaseDir = &circuitsBaseDir
-
-// SetBaseDir allows to modify the default base dir to download and load the
-// circuits artifacts. They will be dowloaded or loaded from the LocalDir path
-// associated to the circuit config but inside of BaseDir folder path.
-func SetBaseDir(dir string) {
-	BaseDir = &dir
-}
-
-var downloadCircuitsTimeout = time.Minute * 5
+var BaseDir = ""
 
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)
@@ -54,7 +46,7 @@ func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
 func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, error) {
 	// Join the local base path with the local dir set up into the circuit
 	// configuration
-	config.LocalDir = filepath.Join(*BaseDir, config.LocalDir)
+	config.LocalDir = filepath.Join(BaseDir, config.LocalDir)
 	circuit := &ZkCircuit{Config: config}
 	// load the artifacts of the provided circuit from the local storage
 	if err := circuit.LoadLocal(); err == nil {
