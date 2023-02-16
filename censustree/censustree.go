@@ -87,6 +87,11 @@ func New(opts Options) (*Tree, error) {
 	case models.Census_ARBO_BLAKE2B:
 		hashFunc = arbo.HashFunctionBlake2b
 	case models.Census_ARBO_POSEIDON:
+		// If an Arbo census tree is based on Poseidon hash to use it with a
+		// circom circuit, it is necessary to increase the number of levels by one
+		// (unless it has the maximum number of levels). This is done to
+		// emulate the same behaviour than Circom SMT library, which increases
+		// the desired number of levels by one.
 		if opts.MaxLevels < maxLevels {
 			maxLevels = opts.MaxLevels + 1
 		}
