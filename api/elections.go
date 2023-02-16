@@ -142,12 +142,13 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			return fmt.Errorf("cannot get envelope height: %w", err)
 		}
 		list = append(list, ElectionSummary{
-			ElectionID:   eid,
-			Status:       models.ProcessStatus_name[e.Status],
-			StartDate:    a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:      a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults: e.FinalResults,
-			VoteCount:    count,
+			ElectionID:     eid,
+			OrganizationID: e.EntityID,
+			Status:         models.ProcessStatus_name[e.Status],
+			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
+			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
+			FinalResults:   e.FinalResults,
+			VoteCount:      count,
 		})
 	}
 

@@ -23,13 +23,14 @@ type OrganizationList struct {
 }
 
 type ElectionSummary struct {
-	ElectionID   types.HexBytes    `json:"electionId"`
-	Status       string            `json:"status"`
-	StartDate    time.Time         `json:"startDate"`
-	EndDate      time.Time         `json:"endDate"`
-	VoteCount    uint64            `json:"voteCount"`
-	FinalResults bool              `json:"finalResults"`
-	Results      [][]*types.BigInt `json:"result,omitempty"`
+	ElectionID     types.HexBytes    `json:"electionId"`
+	OrganizationID types.HexBytes    `json:"organizationId"`
+	Status         string            `json:"status"`
+	StartDate      time.Time         `json:"startDate"`
+	EndDate        time.Time         `json:"endDate"`
+	VoteCount      uint64            `json:"voteCount"`
+	FinalResults   bool              `json:"finalResults"`
+	Results        [][]*types.BigInt `json:"result,omitempty"`
 }
 
 // ElectionResults is the struct used to wrap the results of an election
