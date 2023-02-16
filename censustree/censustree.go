@@ -101,7 +101,6 @@ func New(opts Options) (*Tree, error) {
 	}
 
 	kv := prefixeddb.NewPrefixedDatabase(opts.ParentDB, []byte(opts.Name))
-	// TODO: (lucasmenendez) get the number of levels from options provided
 	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: maxLevels, HashFunc: hashFunc})
 	if err != nil {
 		return nil, err
