@@ -80,6 +80,9 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 		},
 	}
 	mockData := make([]byte, 32)
+	_, err = ProverProofToProtobufZKProof(input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
+	c.Assert(err, qt.IsNotNil)
+	input.PubSignals = nil
 	result, err := ProverProofToProtobufZKProof(input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
 	c.Assert(err, qt.IsNil)
 	c.Assert(result.A, qt.ContentEquals, expected.A)
