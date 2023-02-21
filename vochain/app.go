@@ -269,8 +269,14 @@ func (app *BaseApplication) TimestampStartBlock() int64 {
 	return app.startBlockTimestamp.Load()
 }
 
-// TimestampFromBlock returns the timestamp for a specific block height
+// TimestampFromBlock returns the timestamp for a specific block height.
+// If the block is not found, it returns nil.
+// If the block is the current block, it returns the current block start timestamp.
 func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
+	if int64(app.Height()) == height {
+		t := time.Unix(app.TimestampStartBlock(), 0)
+		return &t
+	}
 	blk := app.fnGetBlockByHeight(height)
 	if blk == nil {
 		return nil

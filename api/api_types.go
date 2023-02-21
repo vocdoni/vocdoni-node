@@ -23,13 +23,14 @@ type OrganizationList struct {
 }
 
 type ElectionSummary struct {
-	ElectionID   types.HexBytes    `json:"electionId"`
-	Status       string            `json:"status"`
-	StartDate    time.Time         `json:"startDate"`
-	EndDate      time.Time         `json:"endDate"`
-	VoteCount    uint64            `json:"voteCount"`
-	FinalResults bool              `json:"finalResults"`
-	Results      [][]*types.BigInt `json:"result,omitempty"`
+	ElectionID     types.HexBytes    `json:"electionId"`
+	OrganizationID types.HexBytes    `json:"organizationId"`
+	Status         string            `json:"status"`
+	StartDate      time.Time         `json:"startDate"`
+	EndDate        time.Time         `json:"endDate"`
+	VoteCount      uint64            `json:"voteCount"`
+	FinalResults   bool              `json:"finalResults"`
+	Results        [][]*types.BigInt `json:"result,omitempty"`
 }
 
 // ElectionResults is the struct used to wrap the results of an election
@@ -107,6 +108,7 @@ type Vote struct {
 	BlockHeight          uint32         `json:"blockHeight,omitempty"`
 	TransactionIndex     *int32         `json:"transactionIndex,omitempty"`
 	OverwriteCount       *uint32        `json:"overwriteCount,omitempty"`
+	Date                 *time.Time     `json:"date,omitempty"`
 }
 
 type CensusTypeDescription struct {
@@ -260,10 +262,10 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		origin = models.CensusOrigin_OFF_CHAIN_TREE
 		root = ctype.RootHash
 	default:
-		return 0, nil, fmt.Errorf("census type %q is unknown", ctype)
+		return 0, nil, fmt.Errorf("%w: %q", ErrCensusTypeUnknown, ctype)
 	}
 	if root == nil {
-		return 0, nil, fmt.Errorf("census root is not correctyl specified")
+		return 0, nil, ErrCensusRootIsNil
 	}
 	return origin, root, nil
 }

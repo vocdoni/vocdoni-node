@@ -1,6 +1,9 @@
 package indexer
 
 import (
+	"database/sql"
+	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -13,9 +16,13 @@ import (
 	"go.vocdoni.io/dvote/util"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 )
 
-var zeroBytes = []byte("")
+var (
+	ErrProcessNotFound = fmt.Errorf("process not found")
+	zeroBytes          = []byte("")
+)
 
 // nonNullBytes helps for sql CREATE queries, as most columns are NOT NULL.
 func nonNullBytes(p []byte) []byte {
@@ -64,9 +71,12 @@ func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	defer cancel()
 	procInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrProcessNotFound
+		}
 		return nil, err
 	}
-	log.Debugf("ProcessInfo sqlite took %s", time.Since(startTime))
+	log.Debugf("processInfo sqlite took %s", time.Since(startTime))
 	return indexertypes.ProcessFromDB(&procInner), nil
 }
 
@@ -250,7 +260,7 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	}
 
 	// Check for overflows
-	if options.MaxCount > MaxQuestions || options.MaxValue > MaxOptions {
+	if options.MaxCount > results.MaxQuestions || options.MaxValue > results.MaxOptions {
 		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
 	}
 
@@ -292,10 +302,28 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-
-		ResultsVotes: encodeVotes(indexertypes.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
-	log.Debugf("new indexer process: %#v", procParams)
+	log.Debugw("new indexer process",
+		"processID", hex.EncodeToString(pid),
+		"entityID", hex.EncodeToString(eid),
+		"startBlock", procParams.StartBlock,
+		"endBlock", procParams.EndBlock,
+		"resultsHeight", procParams.ResultsHeight,
+		"haveResults", procParams.HaveResults,
+		"censusRoot", hex.EncodeToString(p.CensusRoot),
+		"rollingCensusRoot", hex.EncodeToString(p.RollingCensusRoot),
+		"rollingCensusSize", procParams.RollingCensusSize,
+		"maxCensusSize", procParams.MaxCensusSize,
+		"censusUri", p.GetCensusURI(),
+		"censusOrigin", procParams.CensusOrigin,
+		"status", procParams.Status,
+		"namespace", procParams.Namespace,
+		"creationTime", procParams.CreationTime,
+		"sourceBlockHeight", procParams.SourceBlockHeight,
+		"sourceNetworkID", procParams.SourceNetworkID,
+		"metadata", procParams.Metadata,
+	)
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()

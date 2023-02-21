@@ -114,12 +114,12 @@ func (a *API) enableAccountHandlers() error {
 // get the account information
 func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
-		return fmt.Errorf("address malformed")
+		return ErrAddressMalformed
 	}
 	addr := common.HexToAddress(ctx.URLParam("address"))
 	acc, err := a.vocapp.State.GetAccount(addr, true)
 	if err != nil || acc == nil {
-		return fmt.Errorf("account %s does not exist", addr.Hex())
+		return fmt.Errorf("%w (%s)", ErrAccountNotFound, addr.Hex())
 	}
 
 	// Try to retrieve the account info metadata
@@ -182,7 +182,7 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	// Note that we enforce the metadata URI to be provided in the tx payload only if
 	// req.Metadata is provided, but not in the other direction.
 	if req.Metadata != nil && metadataURI == "" {
-		return fmt.Errorf("metadata provided but no metadata URI found in transaction")
+		return ErrMetadataProvidedButNoURI
 	}
 
 	var metadataCID string
@@ -190,27 +190,27 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		// if election metadata defined, check the format
 		metadata := AccountMetadata{}
 		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
-			return fmt.Errorf("wrong metadata format: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantParseMetadataAsJSON, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 
 		// set metadataCID from metadata bytes
 		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
 		// check metadata URI matches metadata content
 		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
-			return fmt.Errorf("metadata URI does not match metadata content")
+			return ErrMetadataURINotMatchContent
 		}
 	}
 
 	// send the transaction to the blockchain
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %v", ErrVochainSendTxFailed, err)
 	}
 	if res == nil {
-		return fmt.Errorf("no reply from vochain")
+		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%s", string(res.Data))
+		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
 	}
 
 	// prepare the reply
@@ -248,7 +248,7 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 	if acc == nil {
-		return fmt.Errorf("treasurer account does not exist")
+		return ErrTreasurerNotFound
 	}
 	data, err := json.Marshal(struct {
 		Address types.HexBytes `json:"address"`
@@ -265,14 +265,14 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
-		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
+		return fmt.Errorf("%w (%q)", ErrCantParseOrgID, ctx.URLParam("organizationID"))
 	}
 
 	page := 0
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("cannot parse page number")
+			return ErrCantParsePageNumber
 		}
 	}
 	page = page * MaxPageSize
@@ -282,35 +282,35 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	case "ready":
 		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 	case "paused":
 		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 	case "canceled":
 		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 	case "ended", "results":
 		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 		pids2, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 		pids = append(pids, pids2...)
 	case "":
 		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
 		if err != nil {
-			return fmt.Errorf("cannot fetch election list: %w", err)
+			return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err) // TODO: go 1.20 supports double wrap %w %w
 		}
 	default:
-		return fmt.Errorf("missing status parameter or unknown")
+		return ErrParamStatusMissing
 	}
 
 	elections, err := a.electionSummaryList(pids...)
@@ -321,7 +321,7 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		Elections: elections,
 	})
 	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
+		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
@@ -331,11 +331,11 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
-		return fmt.Errorf("organizationID (%q) cannot be decoded", ctx.URLParam("organizationID"))
+		return fmt.Errorf("%w (%q)", ErrCantParseOrgID, ctx.URLParam("organizationID"))
 	}
 	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
 	if acc == nil {
-		return fmt.Errorf("organization not found")
+		return ErrOrgNotFound
 	}
 	if err != nil {
 		return err
@@ -346,7 +346,7 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		}{Count: acc.GetProcessIndex()},
 	)
 	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
+		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
@@ -356,11 +356,11 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
 	if err != nil || accountID == nil {
-		return fmt.Errorf("accountID (%q) cannot be decoded", ctx.URLParam("accountID"))
+		return fmt.Errorf("%w (%q)", ErrCantParseAccountID, ctx.URLParam("accountID"))
 	}
 	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
 	if acc == nil {
-		return fmt.Errorf("account not found")
+		return ErrAccountNotFound
 	}
 	if err != nil {
 		return err
@@ -369,13 +369,13 @@ func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("cannot parse page number")
+			return ErrCantParsePageNumber
 		}
 	}
 	page = page * MaxPageSize
 	transfers, err := a.indexer.GetTokenTransfersByFromAccount(accountID, int32(page), MaxPageSize)
 	if err != nil {
-		return fmt.Errorf("cannot fetch token transfers: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantFetchTokenTransfers, err) // TODO: go 1.20 supports double wrap %w %w
 	}
 	data, err := json.Marshal(
 		struct {
@@ -383,7 +383,7 @@ func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		}{Transfers: transfers},
 	)
 	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
+		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }

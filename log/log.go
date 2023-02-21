@@ -213,7 +213,7 @@ func Fatalf(template string, args ...interface{}) {
 
 // Debugw sends a debug level log message with key-value pairs.
 func Debugw(msg string, keyvalues ...interface{}) {
-	Logger().Debug().Fields(keyvalues)
+	Logger().Debug().Fields(keyvalues).Msg(msg)
 	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 

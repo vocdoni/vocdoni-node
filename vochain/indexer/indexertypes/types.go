@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -124,8 +125,8 @@ func decodeVotes(input string) [][]*types.BigInt {
 	return votes
 }
 
-func ResultsFromDB(dbproc *indexerdb.Process) *Results {
-	results := &Results{
+func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
+	results := &results.Results{
 		ProcessID:      dbproc.ID,
 		Votes:          decodeVotes(dbproc.ResultsVotes),
 		Weight:         decodeBigint(dbproc.ResultsWeight),
@@ -251,6 +252,7 @@ type EnvelopePackage struct {
 	VotePackage          []byte           `json:"votePackage"`
 	Weight               string           `json:"weight"`
 	OverwriteCount       uint32           `json:"overwriteCount"`
+	Date                 time.Time        `json:"date"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api

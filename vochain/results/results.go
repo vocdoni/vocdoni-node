@@ -1,4 +1,4 @@
-package indexertypes
+package results
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ const (
 	// MaxQuestions is the maximum number of questions allowed in a VotePackage
 	MaxQuestions = 64
 	// MaxOptions is the maximum number of options allowed in a VotePackage question
-	MaxOptions = 128
+	MaxOptions = 768
 )
 
 // Results holds the final results and relevant process info for a vochain process
@@ -72,6 +72,33 @@ func (r *Results) Add(new *Results) error {
 		//	[ [3,3,4], [1,1,7] ]
 		for j := range new.Votes[i] {
 			r.Votes[i][j].Add(r.Votes[i][j], new.Votes[i][j])
+		}
+	}
+	return nil
+}
+
+// Sub subtracts the total weight and votes from the given Results to the containing Results.
+func (r *Results) Sub(new *Results) error {
+	r.Weight.Sub(r.Weight, new.Weight)
+	r.EnvelopeHeight -= new.EnvelopeHeight
+	// Update votes only if present
+	if len(new.Votes) == 0 {
+		return nil
+	}
+	if len(new.Votes) != len(r.Votes) {
+		return fmt.Errorf("results.Sub: incorrect number of fields")
+	}
+	for i := range new.Votes {
+		if len(r.Votes[i]) < len(new.Votes[i]) {
+			return fmt.Errorf("results.Sub: values overflow (%d)", i)
+		}
+		// Example:
+		//	[ [3,2,3], [2,1,5] ]
+		//	[ [2,1,1], [1,0,2] ]
+		//	- -----------------
+		//	[ [1,1,2], [1,1,3] ]
+		for j := range new.Votes[i] {
+			r.Votes[i][j].Sub(r.Votes[i][j], new.Votes[i][j])
 		}
 	}
 	return nil

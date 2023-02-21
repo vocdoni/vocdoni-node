@@ -19,7 +19,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -667,8 +667,8 @@ func TestLiveResults(t *testing.T) {
 		Votes: []int{1, 1, 1},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	r := &indexertypes.Results{
-		Votes:        indexertypes.NewEmptyVotes(3, 100),
+	r := &results.Results{
+		Votes:        results.NewEmptyVotes(3, 100),
 		Weight:       new(types.BigInt).SetUint64(0),
 		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		EnvelopeType: &models.EnvelopeType{},
@@ -682,7 +682,7 @@ func TestLiveResults(t *testing.T) {
 			r),
 			qt.IsNil)
 	}
-	qt.Assert(t, idx.commitVotes(pid, r, 1), qt.IsNil)
+	qt.Assert(t, idx.commitVotes(pid, r, nil, 1), qt.IsNil)
 
 	if live, err := idx.isOpenProcess(pid); !live || err != nil {
 		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
@@ -802,9 +802,9 @@ var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 	if err != nil {
 		return err
 	}
-	r := &indexertypes.Results{
+	r := &results.Results{
 		ProcessID: pid,
-		Votes: indexertypes.NewEmptyVotes(
+		Votes: results.NewEmptyVotes(
 			int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
 		Weight:       new(types.BigInt).SetUint64(0),
 		Signatures:   []types.HexBytes{},
@@ -815,7 +815,7 @@ var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 	if err := idx.addLiveVote(pid, vp, weight, r); err != nil {
 		return err
 	}
-	return idx.commitVotes(pid, r, 1)
+	return idx.commitVotes(pid, r, nil, 1)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {
@@ -1083,11 +1083,11 @@ func TestOverwriteVotes(t *testing.T) {
 		Mode:         &models.ProcessMode{AutoStart: true},
 		BlockCount:   10,
 		VoteOptions: &models.ProcessVoteOptions{
-			MaxCount:          5,
+			MaxCount:          3,
 			MaxValue:          2,
 			MaxTotalCost:      8,
 			CostExponent:      1,
-			MaxVoteOverwrites: 1,
+			MaxVoteOverwrites: 2,
 		},
 	})
 	qt.Assert(t, err, qt.IsNil)
@@ -1100,7 +1100,7 @@ func TestOverwriteVotes(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 	vote := &models.VoteEnvelope{
-		Nonce: util.RandomBytes(32),
+		Nonce: util.RandomBytes(8),
 		Proof: &models.Proof{Payload: &models.Proof_Arbo{
 			Arbo: &models.ProofArbo{
 				Type:     models.ProofArbo_BLAKE2B,
@@ -1126,6 +1126,19 @@ func TestOverwriteVotes(t *testing.T) {
 	qt.Assert(t, nullifier, qt.DeepEquals, state.GenerateNullifier(keys[0].Address(), pid))
 
 	app.AdvanceTestBlock()
+
+	stateVote, err := app.State.Vote(pid, nullifier, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, stateVote.OverwriteCount, qt.IsNil)
+
+	// Check the results actually changed
+	results, err := idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"0", "1", "0"},
+		{"0", "1", "0"},
+		{"0", "1", "0"},
+	})
 
 	// Send the second
 	vp, err = json.Marshal(vochain.VotePackage{
@@ -1154,7 +1167,7 @@ func TestOverwriteVotes(t *testing.T) {
 	// check envelope height for this PID
 	height, err := idx.GetEnvelopeHeight(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), uint64(2))
+	qt.Assert(t, height, qt.CmpEquals(), uint64(1))
 
 	// check overwrite count is correct
 	ref, err := idx.GetEnvelopeReference(nullifier)
@@ -1165,6 +1178,93 @@ func TestOverwriteVotes(t *testing.T) {
 	envelope, err := idx.GetEnvelope(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, envelope.VotePackage, qt.DeepEquals, vp)
+
+	// check the results are correct (only the second vote should be counted)
+	results, err = idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"0", "0", "1"},
+		{"0", "0", "1"},
+		{"0", "0", "1"},
+	})
+
+	// Send a third vote from a different key
+	vp, err = json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{2, 2, 2},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote2 := &models.VoteEnvelope{
+		Nonce: util.RandomBytes(8),
+		Proof: &models.Proof{Payload: &models.Proof_Arbo{
+			Arbo: &models.ProofArbo{
+				Type:     models.ProofArbo_BLAKE2B,
+				Siblings: proofs[1],
+				KeyType:  models.ProofArbo_PUBKEY,
+			}}},
+		ProcessId:   pid,
+		VotePackage: vp,
+	}
+	voteTx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote2}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err = keys[1].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+
+	signedTx, err = proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err = app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, response.Code, qt.Equals, uint32(0))
+
+	app.AdvanceTestBlock()
+
+	// check the results again
+	results, err = idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"0", "0", "2"},
+		{"0", "0", "2"},
+		{"0", "0", "2"},
+	})
+
+	// Send the initial vote again (for third time)
+	vp, err = json.Marshal(vochain.VotePackage{
+		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
+		Votes: []int{0, 0, 0},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vote.VotePackage = vp
+	vote.Nonce = util.RandomBytes(32)
+
+	voteTx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err = keys[0].SignVocdoniTx(voteTx, app.ChainID())
+	qt.Check(t, err, qt.IsNil)
+	signedTx, err = proto.Marshal(&models.SignedTx{
+		Tx:        voteTx,
+		Signature: signature,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	response, err = app.SendTx(signedTx)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, response.Code, qt.Equals, uint32(0))
+
+	app.AdvanceTestBlock()
+
+	// check the results again
+	results, err = idx.GetResults(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"1", "0", "1"},
+		{"1", "0", "1"},
+		{"1", "0", "1"},
+	})
+
+	// check the weight is correct (should be 2 because of the overwrite)
+	qt.Assert(t, results.Weight.MathBigInt().Int64(), qt.Equals, int64(2))
 }
 
 func TestTxIndexer(t *testing.T) {

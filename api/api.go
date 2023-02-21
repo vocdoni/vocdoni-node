@@ -41,10 +41,10 @@ type API struct {
 // NewAPI creates a new instance of the API.  Attach must be called next.
 func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, error) {
 	if router == nil {
-		return nil, fmt.Errorf("httprouter is nil")
+		return nil, ErrHTTPRouterIsNil
 	}
 	if len(baseRoute) == 0 || baseRoute[0] != '/' {
-		return nil, fmt.Errorf("invalid base route (%s), it must start with /", baseRoute)
+		return nil, fmt.Errorf("%w (invalid given: %s)", ErrBaseRouteInvalid, baseRoute)
 	}
 	// Remove trailing slash
 	if len(baseRoute) > 1 {
@@ -88,37 +88,37 @@ func (a *API) EnableHandlers(handlers ...string) error {
 		switch h {
 		case VoteHandler:
 			if a.vocapp == nil || a.indexer == nil {
-				return fmt.Errorf("missing modules attached for enabling vote handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 			a.enableVoteHandlers()
 		case ElectionHandler:
 			if a.indexer == nil || a.vocinfo == nil {
-				return fmt.Errorf("missing modules attached for enabling election handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 			a.enableElectionHandlers()
 		case ChainHandler:
 			if a.indexer == nil {
-				return fmt.Errorf("missing modules attached for enabling chain handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 			a.enableChainHandlers()
 		case WalletHandler:
 			if a.vocapp == nil {
-				return fmt.Errorf("missing modules attached for enabling wallet handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 			a.enableWalletHandlers()
 		case AccountHandler:
 			if a.vocapp == nil {
-				return fmt.Errorf("missing modules attached for enabling account handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 			a.enableAccountHandlers()
 		case CensusHandler:
 			a.enableCensusHandlers()
 			if a.censusdb == nil {
-				return fmt.Errorf("missing modules attached for enabling census handler")
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 
 		default:
-			return fmt.Errorf("handler unknown %s", h)
+			return fmt.Errorf("%w: %s", ErrHandlerUnknown, h)
 		}
 	}
 	return nil

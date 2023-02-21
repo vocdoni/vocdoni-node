@@ -3,12 +3,14 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -53,9 +55,9 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 	// check if the transaction is of the correct type
 	if ok, err := isTransactionType(req.TxPayload, &models.Tx_Vote{}); err != nil {
-		return fmt.Errorf("could not check transaction type: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantCheckTxType, err)
 	} else if !ok {
-		return fmt.Errorf("transaction is not of type NewProcess")
+		return fmt.Errorf("%w (expected %s)", ErrTxTypeMismatch, "Vote")
 	}
 
 	// send the transaction to the mempool
@@ -64,10 +66,10 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 	if res == nil {
-		return fmt.Errorf("no reply from vochain")
+		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%s", string(res.Data))
+		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
 	}
 	var data []byte
 	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
@@ -81,15 +83,18 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
-		return fmt.Errorf("cannot decode voteID: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantParseVoteID, err)
 	}
 	if len(voteID) != types.VoteNullifierSize {
-		return fmt.Errorf("malformed voteId")
+		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
 	}
 
 	voteData, err := a.indexer.GetEnvelope(voteID)
 	if err != nil {
-		return fmt.Errorf("cannot get vote: %w", err)
+		if errors.Is(err, indexer.ErrVoteNotFound) {
+			return httprouter.ErrNotFound
+		}
+		return fmt.Errorf("%w: %v", ErrCantFetchEnvelope, err)
 	}
 
 	vote := &Vote{
@@ -102,6 +107,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		VoterID:              voteData.Meta.VoterID,
 		TransactionIndex:     &voteData.Meta.TxIndex,
 		OverwriteCount:       &voteData.OverwriteCount,
+		Date:                 &voteData.Date,
 	}
 
 	// check if votePackage is not encrypted and if so, return it
@@ -121,20 +127,20 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
-		return fmt.Errorf("cannot decode voteID: %w", err)
+		return fmt.Errorf("%w: %v", ErrCantParseVoteID, err)
 	}
 	if len(voteID) != types.VoteNullifierSize {
-		return fmt.Errorf("malformed voteId")
+		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
 	}
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
-		return fmt.Errorf("cannot decode electionID: %w", err)
+		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
 	}
 	if len(voteID) != types.ProcessIDsize {
-		return fmt.Errorf("malformed voteId")
+		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
 	}
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
-		return fmt.Errorf("not registered")
+		return httprouter.ErrNotFound
 	}
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
 }

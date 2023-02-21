@@ -2,6 +2,7 @@ package httprouter
 
 import (
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -26,6 +27,13 @@ import (
 
 const (
 	desiredSoMaxConn = 4096
+)
+
+var (
+	// ErrNotFound can be used by the handlers to send a 404 to the client.
+	ErrNotFound = fmt.Errorf("not found")
+	// ErrInternal can be used by the handlers to send a 500 to the client.
+	ErrInternal = fmt.Errorf("internal server error")
 )
 
 // HTTProuter is a thread-safe multiplexer http(s) router using go-chi and autocert with a set of
@@ -203,7 +211,7 @@ func (r *HTTProuter) AddAdminHandler(namespaceID,
 // The Quota requests are rate-limited per bearer token
 func (r *HTTProuter) AddQuotaHandler(namespaceID,
 	pattern, HTTPmethod string, handler RouterHandlerFn) {
-	log.Infof("added quota handler for namespace %s with pattern %s", namespaceID, pattern)
+	log.Infow("added handler", "type", "quota", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypeQuota, handler))
 }
 
@@ -212,7 +220,7 @@ func (r *HTTProuter) AddQuotaHandler(namespaceID,
 // which must be handled by the namespace implementation.
 func (r *HTTProuter) AddPrivateHandler(namespaceID,
 	pattern, HTTPmethod string, handler RouterHandlerFn) {
-	log.Infof("added private handler for namespace %s with pattern %s", namespaceID, pattern)
+	log.Infow("added handler", "type", "private", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePrivate, handler))
 }
 
@@ -220,14 +228,14 @@ func (r *HTTProuter) AddPrivateHandler(namespaceID,
 // The public requests are not protected so all requests are allowed.
 func (r *HTTProuter) AddPublicHandler(namespaceID,
 	pattern, HTTPmethod string, handler RouterHandlerFn) {
-	log.Infof("added public handler for namespace %s with pattern %s", namespaceID, pattern)
+	log.Infow("added handler", "type", "public", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePublic, handler))
 }
 
 // AddRawHTTPHandler adds a standard net/http handled function to the router.
 // The public requests are not protected so all requests are allowed.
 func (r *HTTProuter) AddRawHTTPHandler(pattern, HTTPmethod string, handler http.HandlerFunc) {
-	log.Infof("added http raw handler for pattern %s", pattern)
+	log.Infow("added handler", "type", "raw", "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, handler)
 }
 
@@ -243,6 +251,14 @@ func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType
 		}
 		data, err := nsProcessor.ProcessData(req)
 		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			if errors.Is(err, ErrInternal) {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
