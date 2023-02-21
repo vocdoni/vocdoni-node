@@ -12,10 +12,18 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
+const (
+	proofALen    = 3
+	proofBLen    = 6
+	proofBEncLen = 3
+	proofCLen    = 3
+	publicSigLen = 7
+)
+
 // ProtobufZKProofToProverProof parses the provided protobuf ready proof struct
 // into a prover ready proof struct.
 func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error) {
-	if len(p.A) != 3 || len(p.B) != 6 || len(p.C) != 3 {
+	if len(p.A) != proofALen || len(p.B) != proofBLen || len(p.C) != proofCLen {
 		return nil, fmt.Errorf("wrong ZkSnark protobuf format")
 	}
 
@@ -41,10 +49,9 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 // resulting struct will not contains any defined PublicInputs value.
 func ProverProofToProtobufZKProof(p *prover.Proof,
 	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
-	if len(p.Data.A) != 3 || len(p.Data.B) != 3 || len(p.Data.C) != 3 {
+	if len(p.Data.A) != proofALen || len(p.Data.B) != proofBEncLen || len(p.Data.C) != proofCLen {
 		return nil, fmt.Errorf("wrong ZkSnark prover proof format")
 	}
-
 	proof := &models.ProofZkSNARK{
 		A: p.Data.A,
 		B: []string{
@@ -55,18 +62,19 @@ func ProverProofToProtobufZKProof(p *prover.Proof,
 		C: p.Data.C,
 	}
 
-	if p.PubSignals != nil && len(p.PubSignals) > 0 {
-		if len(p.PubSignals) != 7 {
-			return nil, fmt.Errorf("wrong ZkSnark prover public signals format")
-		}
-
-		proof.PublicInputs = p.PubSignals
-	} else if electionId != nil && censusRoot != nil && nullifier != nil && weight != nil {
-		proof.PublicInputs = zkProofPublicInputs(electionId, censusRoot, nullifier, weight)
-	} else {
-		return nil, fmt.Errorf("no enought arguments to generate the calc signals")
+	// if public signals are provided, check their format
+	proof.PublicInputs = p.PubSignals
+	if p.PubSignals != nil && len(p.PubSignals) != publicSigLen {
+		return nil, fmt.Errorf("wrong ZkSnark prover public signals format")
 	}
-
+	// if not, check if the rest of the arguments are provided and try to
+	// generate the correct public signals
+	if p.PubSignals == nil {
+		if electionId == nil || censusRoot == nil || nullifier == nil || weight == nil {
+			return nil, fmt.Errorf("no enought arguments to generate the calc signals")
+		}
+		proof.PublicInputs = zkProofPublicInputs(electionId, censusRoot, nullifier, weight)
+	}
 	return proof, nil
 }
 
