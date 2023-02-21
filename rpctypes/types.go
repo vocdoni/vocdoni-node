@@ -8,7 +8,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -170,8 +170,7 @@ type APIresponse struct {
 	CensusDump           []byte                           `json:"censusDump,omitempty"`
 	CensusValue          []byte                           `json:"censusValue,omitempty"`
 	ChainID              string                           `json:"chainId,omitempty"`
-	CircuitIndex         *int                             `json:"circuitIndex,omitempty"`
-	CircuitConfig        *artifacts.CircuitConfig         `json:"circuitConfig,omitempty"`
+	CircuitConfig        *circuit.ZkCircuitConfig         `json:"circuitConfig,omitempty"`
 	Content              []byte                           `json:"content,omitempty"`
 	Amount               *uint64                          `json:"amount,omitempty"`
 	CreationTime         int64                            `json:"creationTime,omitempty"`

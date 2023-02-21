@@ -11,16 +11,15 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"github.com/iden3/go-iden3-crypto/babyjub"
-	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -40,7 +39,8 @@ func TestCensus(t *testing.T) {
 	censusDB := censusdb.NewCensusDB(db)
 
 	storage := data.MockIPFS(t)
-	api.Attach(nil, nil, nil, storage, censusDB)
+	app := vochain.TestBaseApplication(t)
+	api.Attach(app, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -167,7 +167,8 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	api.Attach(nil, nil, nil, nil, censusDB)
+	app := vochain.TestBaseApplication(t)
+	api.Attach(app, nil, nil, nil, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -254,7 +255,8 @@ func TestCensusZk(t *testing.T) {
 	censusDB := censusdb.NewCensusDB(db)
 
 	storage := data.MockIPFS(t)
-	api.Attach(nil, nil, nil, storage, censusDB)
+	app := vochain.TestBaseApplication(t)
+	api.Attach(app, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
@@ -270,13 +272,9 @@ func TestCensusZk(t *testing.T) {
 	// add a bunch of keys and values (weights)
 	keys := [][]byte{}
 	for i := 1; i < 11; i++ {
-		k := babyjub.NewRandPrivKey()
-		publicKeyHash, err := poseidon.Hash([]*big.Int{
-			k.Public().X,
-			k.Public().Y,
-		})
+		zkAddr, err := zk.NewRandAddress()
 		qt.Assert(t, err, qt.IsNil)
-		keys = append(keys, arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), publicKeyHash))
+		keys = append(keys, zkAddr.Bytes())
 	}
 
 	weight := 0

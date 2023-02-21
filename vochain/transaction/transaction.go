@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -38,6 +39,8 @@ type TransactionHandler struct {
 	dataDir string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
+
+	ZkCircuit *circuit.ZkCircuit
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
@@ -48,15 +51,12 @@ func NewTransactionHandler(state *vstate.State, dataDir string) (*TransactionHan
 	}, nil
 }
 
-// LoadZkVerificationKeys loads or downloads the zk Circuits VerificationKey files.
-// It is required for veirying zkSnark proofs.
-func (t *TransactionHandler) LoadZkVerificationKeys() error {
-	// get the zk Circuits VerificationKey files
-	vks, err := LoadZkVerificationKeys(t.dataDir, t.state.ChainID())
+func (t *TransactionHandler) LoadZkCircuit(configTag string) error {
+	circuit, err := circuit.LoadZkCircuitByTag(configTag)
 	if err != nil {
 		return fmt.Errorf("could not load zk verification keys: %w", err)
 	}
-	t.ZkVKs = vks
+	t.ZkCircuit = circuit
 	return nil
 }
 

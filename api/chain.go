@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"time"
 
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/util"
@@ -49,6 +50,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainInfoHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/info/circuit",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainCircuitInfoHandler,
 	); err != nil {
 		return err
 	}
@@ -195,17 +204,33 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 	data, err := json.Marshal(&ChainInfo{
-		ID:               a.vocapp.ChainID(),
-		BlockTime:        *a.vocinfo.BlockTimes(),
-		ElectionCount:    a.indexer.ProcessCount(nil),
-		Height:           a.vocapp.Height(),
-		Syncing:          a.vocapp.IsSynchronizing(),
-		TransactionCount: transactionCount,
-		ValidatorCount:   uint32(len(validators)),
-		Timestamp:        a.vocapp.Timestamp(),
-		VoteCount:        voteCount,
-		GenesisTime:      a.vocapp.Genesis().GenesisTime,
+		ID:                      a.vocapp.ChainID(),
+		BlockTime:               *a.vocinfo.BlockTimes(),
+		ElectionCount:           a.indexer.ProcessCount(nil),
+		Height:                  a.vocapp.Height(),
+		Syncing:                 a.vocapp.IsSynchronizing(),
+		TransactionCount:        transactionCount,
+		ValidatorCount:          uint32(len(validators)),
+		Timestamp:               a.vocapp.Timestamp(),
+		VoteCount:               voteCount,
+		GenesisTime:             a.vocapp.Genesis().GenesisTime,
+		CircuitConfigurationTag: a.vocapp.CircuitConfigurationTag(),
 	})
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+}
+
+// /chain/info/circuit
+// returns the circuit configuration according to the current circuit
+func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// Get current circuit tag
+	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
+	// Set LocalDir parameter to empty to be omitted
+	circuitConfig.LocalDir = ""
+	// Encode the circuit configuration to JSON
+	data, err := json.Marshal(circuitConfig)
 	if err != nil {
 		return err
 	}

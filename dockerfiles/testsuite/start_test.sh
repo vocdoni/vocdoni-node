@@ -44,7 +44,7 @@ tests_to_run=(
 	"tokentransactions"
 	"merkle_vote_encrypted"
 	"cspvoting"
-	"anonvoting"
+	"e2etest_anonvoting"
 	"e2etest_tokentxs"
 )
 
@@ -96,17 +96,6 @@ merkle_vote_encrypted() {
 	merkle_vote encrypted-poll
 }
 
-anonvoting() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=anonvoting \
-		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY \
-		  --electionSize=$ELECTION_SIZE_ANON \
-		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $2}')
-}
-
 cspvoting() {
 	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
@@ -126,6 +115,14 @@ tokentransactions() {
 		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
+}
+
+e2etest_anonvoting() {
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
+		./end2endtest --host $APIHOST \
+		  --logLevel=$LOGLEVEL \
+		  --operation=anonvoting \
+		  --faucet=$FAUCET
 }
 
 e2etest_tokentxs() {

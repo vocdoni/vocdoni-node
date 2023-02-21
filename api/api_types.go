@@ -160,16 +160,17 @@ type TransactionReference struct {
 }
 
 type ChainInfo struct {
-	ID               string    `json:"chainId"`
-	BlockTime        [5]int32  `json:"blockTime"`
-	ElectionCount    uint64    `json:"electionCount"`
-	GenesisTime      time.Time `json:"genesisTime"`
-	Height           uint32    `json:"height"`
-	Syncing          bool      `json:"syncing"`
-	Timestamp        int64     `json:"blockTimestamp"`
-	TransactionCount uint64    `json:"transactionCount"`
-	ValidatorCount   uint32    `json:"validatorCount"`
-	VoteCount        uint64    `json:"voteCount"`
+	ID                      string    `json:"chainId"`
+	BlockTime               [5]int32  `json:"blockTime"`
+	ElectionCount           uint64    `json:"electionCount"`
+	GenesisTime             time.Time `json:"genesisTime"`
+	Height                  uint32    `json:"height"`
+	Syncing                 bool      `json:"syncing"`
+	Timestamp               int64     `json:"blockTimestamp"`
+	TransactionCount        uint64    `json:"transactionCount"`
+	ValidatorCount          uint32    `json:"validatorCount"`
+	VoteCount               uint64    `json:"voteCount"`
+	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
 }
 
 type Account struct {
@@ -191,6 +192,7 @@ type AccountSet struct {
 
 type Census struct {
 	CensusID types.HexBytes `json:"censusID,omitempty"`
+	Type     string         `json:"type,omitempty"`
 	Root     types.HexBytes `json:"root,omitempty"`
 	Weight   *types.BigInt  `json:"weight,omitempty"`
 	Key      types.HexBytes `json:"key,omitempty"`
@@ -199,6 +201,7 @@ type Census struct {
 	Size     uint64         `json:"size,omitempty"`
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
+	Siblings []string       `json:"siblings,omitempty"`
 }
 
 type File struct {
@@ -252,7 +255,7 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	case CensusTypeCSP:
 		origin = models.CensusOrigin_OFF_CHAIN_CA
 		root = ctype.PublicKey
-	case CensusTypeWeighted:
+	case CensusTypeWeighted, CensusTypeZKWeighted:
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 		root = ctype.RootHash
 	case CensusTypeZK:

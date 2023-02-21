@@ -26,6 +26,7 @@ const (
 	CensusTypeZKWeighted = "zkweighted"
 	CensusTypeZK         = "zkindexed" // Will be deprecated soon
 	CensusTypeCSP        = "csp"
+	CensusTypeUnknown    = "unknown"
 
 	MaxCensusAddBatchSize = 8192
 
@@ -47,6 +48,14 @@ func (a *API) enableCensusHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.censusAddHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/censuses/{censusID}/type",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.censusTypeHandler,
 	); err != nil {
 		return err
 	}
@@ -146,8 +155,9 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return ErrCensusTypeUnknown
 	}
 
+	maxLevels := a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
 	censusID := util.RandomBytes(32)
-	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token)
+	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token, maxLevels)
 	if err != nil {
 		return err
 	}
@@ -204,12 +214,17 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		if ref.Indexed && p.Weight.MathBigInt().Uint64() != 1 {
 			return ErrIndexedCensusCantUseWeight
 		}
-		// compute the hash, we use it as key for the merkle tree
-		keyHash, err := ref.Tree().Hash(p.Key)
-		if err != nil {
-			return fmt.Errorf("%w: %v", ErrCantComputeKeyHash, err)
+
+		leafKey := p.Key
+		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+			// compute the hash, we use it as key for the merkle tree
+			leafKey, err = ref.Tree().Hash(p.Key)
+			if err != nil {
+				return fmt.Errorf("%w: %v", ErrCantComputeKeyHash, err)
+			}
 		}
-		keys = append(keys, keyHash)
+
+		keys = append(keys, leafKey)
 		if !ref.Indexed {
 			values = append(values, ref.Tree().BigIntToBytes(p.Weight.MathBigInt()))
 		}
@@ -237,6 +252,39 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	log.Infof("added %d keys to census %x", len(keys), censusID)
 
 	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
+}
+
+// /censuses/{censusID}/type
+func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	censusID, err := censusIDparse(ctx.URLParam("censusID"))
+	if err != nil {
+		return err
+	}
+
+	// Get the current census type from the disk
+	ref, err := a.censusdb.Load(censusID, nil)
+	if err != nil {
+		return err
+	}
+
+	// Set unknown as default type and check other available types
+	censusType := CensusTypeUnknown
+	switch ref.CensusType {
+	case int32(models.Census_ARBO_POSEIDON):
+		censusType = CensusTypeZKWeighted
+	case int32(models.Census_ARBO_BLAKE2B):
+		censusType = CensusTypeWeighted
+	case int32(models.Census_CA):
+		censusType = CensusTypeCSP
+	}
+
+	// Envolves the type into the Census struct and return it as JSON
+	data, err := json.Marshal(Census{Type: censusType})
+	if err != nil {
+		return err
+	}
+
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
 // /censuses/{censusID}/root
@@ -479,6 +527,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 			dump,
 			models.Census_Type(ref.CensusType),
 			ref.Indexed,
+			ref.MaxLevels,
 		)
 		if err != nil {
 			return err
@@ -495,7 +544,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 	newRef, err := a.censusdb.New(
 		root, models.Census_Type(ref.CensusType),
-		ref.Indexed, uri, nil)
+		ref.Indexed, uri, nil, ref.MaxLevels)
 	if err != nil {
 		return err
 	}
@@ -529,18 +578,50 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.Tree().Hash(key)
-	if err != nil {
-		return err
-	}
-	leafV, siblings, err := ref.Tree().GenProof(keyHash)
-	if err != nil {
-		return err
+
+	// Get the census type to return it into the response to prevent to perform
+	// two api calls.
+	censusType := CensusTypeUnknown
+	switch ref.CensusType {
+	case int32(models.Census_ARBO_POSEIDON):
+		censusType = CensusTypeZKWeighted
+	case int32(models.Census_ARBO_BLAKE2B):
+		censusType = CensusTypeWeighted
+	case int32(models.Census_CA):
+		censusType = CensusTypeCSP
 	}
 
+	// If the census type is zkweighted (that means that it uses Poseidon hash
+	// with Arbo merkle tree), skip to perform a hash function over the census
+	// key. It is because the zk friendly key of any census leaf is the
+	// ZkAddress which follows a specific transformation process that must be
+	// implemented into the circom circuit also, and it is already hashed.
+	// Otherwhise, hash the key before get the proof.
+	leafKey := key
+	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+		leafKey, err = ref.Tree().Hash(key)
+		if err != nil {
+			return err
+		}
+	}
+
+	leafV, siblings, err := ref.Tree().GenProof(leafKey)
+	if err != nil {
+		return fmt.Errorf("something was wrong during census proof generation: %w", err)
+	}
 	response := Census{
 		Proof: siblings,
 		Value: leafV,
+		Type:  censusType,
+	}
+
+	// Get the leaf siblings from arbo based on the key received and include
+	// them into the response, only if it is zkweighted.
+	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
+		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
+		if err != nil {
+			return fmt.Errorf("error geting the census siblings to circom: %w", err)
+		}
 	}
 	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
 		// return the string representation of the census value (weight)
@@ -576,13 +657,24 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	keyHash, err := ref.Tree().Hash(cdata.Key)
-	if err != nil {
-		return err
+
+	// If the census type is zkweighted (that means that it uses Poseidon hash
+	// with Arbo merkle tree), skip to perform a hash function over the census
+	// key. It is because the zk friendly key of any census leaf is the
+	// ZkAddress which follows a specific transformation process that must be
+	// implemented into the circom circuit also, and it is already hashed.
+	// Otherwhise, hash the key before get the proof.
+	leafKey := cdata.Key
+	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
+		leafKey, err = ref.Tree().Hash(cdata.Key)
+		if err != nil {
+			return err
+		}
 	}
-	valid, err := ref.Tree().VerifyProof(keyHash, cdata.Value, cdata.Proof, cdata.Root)
+
+	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
 	if err != nil {
-		return err
+		return fmt.Errorf("something was wrong during census proof verification: %w", err)
 	}
 	if !valid {
 		return ctx.Send(nil, apirest.HTTPstatusCodeErr)

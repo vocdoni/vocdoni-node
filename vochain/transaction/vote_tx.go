@@ -1,16 +1,12 @@
 package transaction
 
 import (
-	"crypto/sha256"
 	"errors"
 	"fmt"
-	"math/big"
 
-	"github.com/vocdoni/go-snark/verifier"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/tree/arbo"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -62,9 +58,10 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 
 	var vote *vstate.Vote
 	if process.EnvelopeType.Anonymous {
-		if t.ZkVKs == nil || len(t.ZkVKs) == 0 {
-			return nil, fmt.Errorf("anonymous voting not supported, missing zk verification keys")
+		if t.ZkCircuit == nil {
+			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
+
 		// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 		// An element can only be added to the vote cache during checkTx.
 		// Every N seconds the old votes which are not yet in the blockchain will be removed from cache.
@@ -93,19 +90,33 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			return vote, nil
 		}
 
+		// check if vote already exists
+		if exist, err := t.state.VoteExists(voteEnvelope.ProcessId,
+			voteEnvelope.Nullifier, false); err != nil || exist {
+			if err != nil {
+				return nil, err
+			}
+			return nil, fmt.Errorf("vote %x already exists", voteEnvelope.Nullifier)
+		}
+
 		// Supports Groth16 proof generated from circom snark compatible
 		// provoteEnveloper
 		proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
 		if proofZkSNARK == nil {
 			return nil, fmt.Errorf("zkSNARK proof is empty")
 		}
-		proof, _, err := zk.ProtobufZKProofToCircomProof(proofZkSNARK)
+
+		// Parse the ZkProof protobuf to prover.Proof
+		proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
 		if err != nil {
 			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
 
-		// voteEnvelope.Nullifier is encoded in little-endian
-		nullifierBI := arbo.BytesToBigInt(voteEnvelope.Nullifier)
+		// Get vote weight from proof publicSignals
+		voteWeight, err := proof.Weight()
+		if err != nil {
+			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
+		}
 
 		// check if vote already exists
 		if err := t.checkVoteAlreadyExists(voteEnvelope.Nullifier, process); err != nil {
@@ -117,36 +128,15 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
 
-		if int(proofZkSNARK.CircuitParametersIndex) >= len(t.ZkVKs) ||
-			int(proofZkSNARK.CircuitParametersIndex) < 0 {
-			return nil, fmt.Errorf("invalid CircuitParametersIndex: %d of %d",
-				proofZkSNARK.CircuitParametersIndex, len(t.ZkVKs))
-		}
-		verificationKey := t.ZkVKs[proofZkSNARK.CircuitParametersIndex]
-
-		// prepare the publicInputs that are defined by the process.
-		// publicInputs contains: processId0, processId1, censusRoot,
-		// nullifier, voteHash0, voteHash1.
-		processId0BI := arbo.BytesToBigInt(process.ProcessId[:16])
-		processId1BI := arbo.BytesToBigInt(process.ProcessId[16:])
-		censusRootBI := arbo.BytesToBigInt(process.RollingCensusRoot)
-		// voteHash from the user voteValue to the publicInputs
-		voteValueHash := sha256.Sum256(voteEnvelope.VotePackage)
-		voteHash0 := arbo.BytesToBigInt(voteValueHash[:16])
-		voteHash1 := arbo.BytesToBigInt(voteValueHash[16:])
-		publicInputs := []*big.Int{
-			processId0BI,
-			processId1BI,
-			censusRootBI,
-			nullifierBI,
-			voteHash0,
-			voteHash1,
-		}
-
-		// check zkSnark proof
-		if !verifier.Verify(verificationKey, proof, publicInputs) {
+		// Get valid verification key and verify the proof parsed
+		if err := proof.Verify(t.ZkCircuit.VerificationKey); err != nil {
 			return nil, fmt.Errorf("zkSNARK proof verification failed")
 		}
+
+		log.Debugw("vote proof verified",
+			"type", "zkSNARK",
+			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
+			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId))
 
 		// TODO the next 12 lines of code are the same than a little
 		// further down. TODO: maybe movoteEnvelope them before the 'switch', as
@@ -157,9 +147,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			ProcessID:   voteEnvelope.ProcessId,
 			VotePackage: voteEnvelope.VotePackage,
 			Nullifier:   voteEnvelope.Nullifier,
-			// Anonymous Voting doesn't support weighted voting, so
-			// we assing always 1 to each vote.
-			Weight: big.NewInt(1),
+			Weight:      voteWeight,
 		}
 		// If process encrypted, check the vote is encrypted (includes at least one key index)
 		if process.EnvelopeType.EncryptedVotes {

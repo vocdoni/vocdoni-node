@@ -50,8 +50,13 @@ type Options struct {
 	IndexAsKeysCensus bool
 }
 
-// TMP to be defined the production circuit nLevels
-const nLevels = 256
+// By default, the maximum number of levels will be 256, which allows to add
+// up to 2^256 leaves to the tree, with keys with up to 32 bytes. However the
+// number of levels could be setted up during the tree initialization which
+// allows to support uses cases with specific restrictions such as the
+// zkweighted census, which needs to optimize some artifacts size that depends
+// of the number of levels of the tree.
+const DefaultMaxLevels = 256
 
 // DeleteCensusTreeFromDatabase removes all the database entries for the census identified by name.
 // Caller must take care of potential data races, the census must be closed before calling this method.
@@ -76,18 +81,27 @@ func DeleteCensusTreeFromDatabase(kv db.Database, name string) (int, error) {
 // New returns a new Tree, if there already is a Tree in the
 // database, it will load it.
 func New(opts Options) (*Tree, error) {
+	var maxLevels = DefaultMaxLevels
 	var hashFunc arbo.HashFunction
 	switch opts.CensusType {
 	case models.Census_ARBO_BLAKE2B:
 		hashFunc = arbo.HashFunctionBlake2b
 	case models.Census_ARBO_POSEIDON:
+		// If an Arbo census tree is based on Poseidon hash to use it with a
+		// circom circuit, it is necessary to increase the number of levels by one
+		// (unless it has the maximum number of levels). This is done to
+		// emulate the same behaviour than Circom SMT library, which increases
+		// the desired number of levels by one.
+		if opts.MaxLevels < maxLevels {
+			maxLevels = opts.MaxLevels + 1
+		}
 		hashFunc = arbo.HashFunctionPoseidon
 	default:
 		return nil, fmt.Errorf("unrecognized census type (%d)", opts.CensusType)
 	}
 
 	kv := prefixeddb.NewPrefixedDatabase(opts.ParentDB, []byte(opts.Name))
-	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: nLevels, HashFunc: hashFunc})
+	t, err := tree.New(nil, tree.Options{DB: kv, MaxLevels: maxLevels, HashFunc: hashFunc})
 	if err != nil {
 		return nil, err
 	}
@@ -519,4 +533,9 @@ func (t *Tree) fillKeyToIndex(tx db.WriteTx) error {
 		return err
 	}
 	return nil
+}
+
+// GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
+func (t *Tree) GetCircomSiblings(key []byte) ([]string, error) {
+	return t.tree.GetCircomSiblings(key)
 }

@@ -8,10 +8,8 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -134,36 +132,19 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 
-	// check valid/implemented process types
-	// pre-regiser and anonymous must be either both enabled or disabled, as
-	// we only support a single scenario of pre-register + anonymous.
-	if tx.Process.Mode.PreRegister != tx.Process.EnvelopeType.Anonymous {
-		return nil, common.Address{}, fmt.Errorf("pre-register mode only supported " +
-			"with anonymous envelope type and viceversa")
-	}
 	if tx.Process.Mode.PreRegister &&
 		(tx.Process.MaxCensusSize == nil || tx.Process.GetMaxCensusSize() <= 0) {
 		return nil, common.Address{}, fmt.Errorf("pre-register mode requires setting " +
 			"maxCensusSize to be > 0")
 	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		var circuits []artifacts.CircuitConfig
-		if genesis, ok := vocdoniGenesis.Genesis[t.state.ChainID()]; ok {
-			circuits = genesis.CircuitsConfig
-		} else {
-			log.Warn("using dev network genesis CircuitsConfig")
-			circuits = vocdoniGenesis.Genesis["dev"].CircuitsConfig
-		}
-		if len(circuits) == 0 {
-			return nil, common.Address{}, fmt.Errorf("no circuit configs in the %v genesis", t.state.ChainID())
-		}
 		if tx.Process.MaxCensusSize == nil {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
 		}
-		if tx.Process.GetMaxCensusSize() > uint64(circuits[len(circuits)-1].Parameters[0]) {
+		if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Levels) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
-				"cannot be bigger than the parameter for the biggest circuit (%v)",
-				circuits[len(circuits)-1].Parameters[0])
+				"cannot be bigger than the number of levels of the circuit (%d)",
+				t.ZkCircuit.Config.Levels)
 		}
 	}
 

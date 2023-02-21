@@ -1,18 +1,10 @@
 package genesis
 
-import (
-	"encoding/hex"
-	"strings"
-
-	"go.vocdoni.io/dvote/crypto/zk/artifacts"
-	"go.vocdoni.io/dvote/log"
-)
-
 // VochainGenesis is a struct containing the genesis details
 type VochainGenesis struct {
 	AutoUpdateGenesis bool
 	SeedNodes         []string
-	CircuitsConfig    []artifacts.CircuitConfig
+	CircuitsConfigTag string
 	Genesis           string
 }
 
@@ -32,28 +24,7 @@ var Genesis = map[string]VochainGenesis{
 	"bizono": {
 		AutoUpdateGenesis: false,
 		SeedNodes:         []string{"1612de9353b4bd5891981c69f554e56e07733870@seed.azeno.vocdoni.net:26656"},
-		CircuitsConfig: []artifacts.CircuitConfig{
-			{ // index: 0, size: 1024
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/1024",
-				Parameters:  []int64{1024},
-				LocalDir:    "zkCircuits",
-				ZKeyHash:    hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
-				WitnessHash: hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
-				VKHash:      hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),
-			},
-			{ // index: 1, size: 65k
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/65536",
-				Parameters:  []int64{65536},
-				LocalDir:    "zkCircuits",
-				ZKeyHash:    hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
-				WitnessHash: hexToBytes("0x1d975d68220d1f10bd54e2f53ea9526ce8f916efb15a2079edc3db9403a78278"),
-				VKHash:      hexToBytes("0x50029154e81a2078eff83751454bb3ece2cf9391103cc17306d47f7d4461b0b6"),
-			},
-		},
+		CircuitsConfigTag: "bizono",
 		Genesis: `
       {
          "genesis_time": "2022-11-10T17:00:33.672114557Z",
@@ -189,28 +160,7 @@ var Genesis = map[string]VochainGenesis{
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
-		CircuitsConfig: []artifacts.CircuitConfig{
-			{ // index: 0, size: 1024
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/1024",
-				Parameters:  []int64{1024},
-				LocalDir:    "zkCircuits",
-				ZKeyHash:    hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
-				WitnessHash: hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
-				VKHash:      hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),
-			},
-			{ // index: 1, size: 65k
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/65536",
-				Parameters:  []int64{65536},
-				LocalDir:    "zkCircuits",
-				ZKeyHash:    hexToBytes("0xb7fb6f74ecf56e41de103e679c76c45a1bde99e2203b2ab6928396020f4d4ab6"),
-				WitnessHash: hexToBytes("0x1d975d68220d1f10bd54e2f53ea9526ce8f916efb15a2079edc3db9403a78278"),
-				VKHash:      hexToBytes("0x50029154e81a2078eff83751454bb3ece2cf9391103cc17306d47f7d4461b0b6"),
-			},
-		},
+		CircuitsConfigTag: "dev",
 		Genesis: `
 {
    "genesis_time":"2023-02-06T09:33:52.180295926Z",
@@ -341,7 +291,7 @@ var Genesis = map[string]VochainGenesis{
          "Tx_AddDelegateForAccount": 10,
          "Tx_DelDelegateForAccount": 10,
          "Tx_CollectFaucet": 10
-       }
+      }
    }
 }
 `,
@@ -351,38 +301,7 @@ var Genesis = map[string]VochainGenesis{
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
-		CircuitsConfig: []artifacts.CircuitConfig{
-			{ // index: 0, size: 8
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/8",
-				Parameters:  []int64{8},
-				LocalDir:    "./circuits",
-				ZKeyHash:    hexToBytes("0x7d09a880e14e08143bb66a6f28e13b2707afabc79693ce1613f68083fd70ac31"),
-				WitnessHash: hexToBytes("0xd021d42d79d4e10b94a5785e1c1854ddb80d087cb58ad6bb29aa8b8d541d420d"),
-				VKHash:      hexToBytes("0xf4876aa550e33de1d1f552dc38fa89f6e87e553fd05179e693f82f661cd0c6a0"),
-			},
-			{ // index: 1, size: 16
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/16",
-				Parameters:  []int64{16},
-				LocalDir:    "./circuits",
-				ZKeyHash:    hexToBytes("0x2d84f9ce275f35e10b6debde1c53d74264ebb401077aaaa2ac4970e3a06eba03"),
-				WitnessHash: hexToBytes("0xe55effa3d7ee28037a073f1096012ae75d97d949320bb0dfbc26ca553b818c70"),
-				VKHash:      hexToBytes("0x0d8af5c3cc443cfbaed59b6144b1edb959daacbae085a97f74cbafbe109de2fa"),
-			},
-			{ // index: 2, size: 1024
-				URI: "https://raw.githubusercontent.com/vocdoni/" +
-					"zk-circuits-artifacts/6afb7c22d856c8b727262b0a0ae8ab7ca534dd4e",
-				CircuitPath: "zkcensusproof/dev/1024",
-				Parameters:  []int64{1024},
-				LocalDir:    "./circuits",
-				ZKeyHash:    hexToBytes("0x1cd0c9225210700d4d6307493bbe5f98554e29339daba6d9bd08a4e0e78df443"),
-				WitnessHash: hexToBytes("0x61b40e11ece8de3fbfaf27dbd984e0e0b1fa05ee72d4faa0c2be06c1d7a9b845"),
-				VKHash:      hexToBytes("0xaed892ff98ab37b877cfcb678cb5f48f1be9d09dbbaf74b5877f46b54d10f9ad"),
-			},
-		},
+		CircuitsConfigTag: "dev",
 		Genesis: `
 {
    "genesis_time":"2022-12-14T14:00:01.055210151Z",
@@ -517,15 +436,4 @@ var Genesis = map[string]VochainGenesis{
 }
 `,
 	},
-}
-
-// hexToBytes parses a hex string and returns the byte array from it. Warning,
-// in case of error it will panic.
-func hexToBytes(s string) []byte {
-	s = strings.TrimPrefix(s, "0x")
-	b, err := hex.DecodeString(s)
-	if err != nil {
-		log.Fatalf("Error decoding hex string %s: %s", s, err)
-	}
-	return b
 }

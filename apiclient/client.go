@@ -14,6 +14,8 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 )
@@ -36,6 +38,8 @@ type HTTPclient struct {
 	addr    *url.URL
 	account *ethereum.SignKeys
 	chainID string
+	circuit circuit.ZkCircuitConfig
+	zkAddr  *zk.ZkAddress
 }
 
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
@@ -63,6 +67,14 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		return nil, fmt.Errorf("cannot get chain ID from API server")
 	}
 	c.chainID = info.ID
+
+	// Get the default circuit config
+	circuitConf, exists := circuit.CircuitsConfigurations[info.CircuitConfigurationTag]
+	if !exists {
+		return nil, fmt.Errorf("empty or wrong circui configuration tag provided")
+	}
+	c.circuit = circuitConf
+
 	return c, nil
 }
 
@@ -74,7 +86,13 @@ func (c *HTTPclient) ChainID() string {
 // SetAccount sets the Vocdoni account used for signing transactions.
 func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	c.account = new(ethereum.SignKeys)
-	return c.account.AddHexKey(accountPrivateKey)
+	err := c.account.AddHexKey(accountPrivateKey)
+	if err != nil {
+		return err
+	}
+
+	c.zkAddr, err = zk.AddressFromString(accountPrivateKey)
+	return err
 }
 
 // Clone returns a copy of the HTTPclient with the accountPrivateKey set as the account key.

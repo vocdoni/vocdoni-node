@@ -19,6 +19,7 @@ import (
 	tmcli "github.com/tendermint/tendermint/rpc/client/local"
 	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -62,6 +63,7 @@ type BaseApplication struct {
 	// abcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp atomic.Int64
 	chainID             string
+	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
 }
@@ -86,8 +88,8 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		return nil, fmt.Errorf("cannot create transaction handler: (%v)", err)
 	}
 	// Load or download the zk verification keys
-	if err := transactionHandler.LoadZkVerificationKeys(); err != nil {
-		return nil, fmt.Errorf("cannot load zk verification keys: (%v)", err)
+	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
+		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
 	return &BaseApplication{
 		State:              state,
@@ -95,6 +97,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		blockCache:         lru.NewAtomic(32),
 		dataDir:            dbpath,
 		chainID:            "test",
+		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil
 }
@@ -284,6 +287,11 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 // ChainID returns the Node ChainID
 func (app *BaseApplication) ChainID() string {
 	return app.chainID
+}
+
+// CircuitConfigurationTag returns the Node CircuitConfigurationTag
+func (app *BaseApplication) CircuitConfigurationTag() string {
+	return app.circuitConfigTag
 }
 
 // MempoolSize returns the size of the transaction mempool
@@ -666,6 +674,19 @@ func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock)
 func (app *BaseApplication) SetChainID(chainId string) {
 	app.chainID = chainId
 	app.State.SetChainID(chainId)
+}
+
+// SetCircuitConfigTag sets the current BaseApplication circuit config tag
+// attribute to the provided one and loads the circuit configuration based on
+// it. The available circuit config tags are defined in
+// /crypto/zk/circuit/config.go
+func (app *BaseApplication) SetCircuitConfigTag(tag string) error {
+	// Update the loaded circuit of the current app transactionHandler
+	if err := app.TransactionHandler.LoadZkCircuit(tag); err != nil {
+		return fmt.Errorf("cannot load zk circuit: %w", err)
+	}
+	app.circuitConfigTag = tag
+	return nil
 }
 
 // Genesis returns the tendermint genesis information

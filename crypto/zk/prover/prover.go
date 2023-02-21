@@ -8,6 +8,7 @@ package prover
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
@@ -15,16 +16,20 @@ import (
 	"github.com/iden3/go-rapidsnark/witness"
 )
 
+// TODO: Refactor the error handling to include the trace of the original error
+// into the error returned.
 var (
-	ErrParsingWitness  = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty unmarshalled bytes of a json")
-	ErrInitWitnessCalc = fmt.Errorf("error parsing circuit wasm during calculator instance")
-	ErrWitnessCalc     = fmt.Errorf("error during witness calculation")
-	ErrProofGen        = fmt.Errorf("error during zksnark proof generation")
-	ErrParseProofData  = fmt.Errorf("error parsing the proof provided, it must be a valid json, check https://github.com/iden3/go-rapidsnark/blob/73d5784d2aa791dd6646142b0017dbef97240f57/types/proof.go")
-	ErrParsePubSignals = fmt.Errorf("error during zksnark public signals proof generation, it must be a json with array of strings")
-	ErrEncodingProof   = fmt.Errorf("error encoding prove result into a proof struct")
-	ErrDecodingProof   = fmt.Errorf("error decoding prove as []byte")
-	ErrVerifyProof     = fmt.Errorf("error during zksnark verification")
+	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
+	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
+	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
+	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
+	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
+	ErrProofGen           = fmt.Errorf("error during zksnark proof generation")
+	ErrParseProofData     = fmt.Errorf("error parsing the proof provided, it must be a valid json, check https://github.com/iden3/go-rapidsnark/blob/73d5784d2aa791dd6646142b0017dbef97240f57/types/proof.go")
+	ErrParsePubSignals    = fmt.Errorf("error during zksnark public signals proof generation, it must be a json with array of strings")
+	ErrEncodingProof      = fmt.Errorf("error encoding prove result into a proof struct")
+	ErrDecodingProof      = fmt.Errorf("error decoding prove as []byte")
+	ErrVerifyProof        = fmt.Errorf("error during zksnark verification")
 )
 
 // ProofData struct contains the calculated parameters of a Proof. It allows to
@@ -42,9 +47,9 @@ type Proof struct {
 	PubSignals []string  `json:"pubSignals"`
 }
 
-// ParseProof function encodes the provided proof data and public signals into a
-// Proof struct, performing an unmarshal operation over them. Returns an error
-// if something is wrong.
+// ParseProof encodes the provided proof data and public signals into a Proof
+// struct, performing an unmarshal operation over them. Returns an error if
+// something is wrong.
 func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	data := ProofData{}
 	if err := json.Unmarshal(proofData, &data); err != nil {
@@ -58,8 +63,8 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	return &Proof{Data: data, PubSignals: signals}, nil
 }
 
-// Bytes function returns the current Proof struct parameters Data and
-// PubSignals as []byte. It returns an error if something fails.
+// Bytes returns the current Proof struct parameters Data and PubSignals as
+// []byte. It returns an error if something fails.
 func (p *Proof) Bytes() ([]byte, []byte, error) {
 	proofData, err := json.Marshal(p.Data)
 	if err != nil {
@@ -72,6 +77,24 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	}
 
 	return proofData, pubSignals, nil
+}
+
+// Weight decodes the vote weight value from the current proof public signals
+// and return it as a big.Int.
+func (p *Proof) Weight() (*big.Int, error) {
+	// Check if the current proof contains public signals and it contains the
+	// correct number of positions.
+	if p.PubSignals == nil || len(p.PubSignals) < 5 {
+		return nil, ErrPublicSignalFormat
+	}
+	// Get the weight from the fourth public signal of the proof
+	strWeight := p.PubSignals[4]
+	// Parse it into a big.Int
+	weight, ok := new(big.Int).SetString(strWeight, 10)
+	if !ok {
+		return nil, ErrParsingWeight
+	}
+	return weight, nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based
@@ -111,11 +134,11 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	return wtns, nil
 }
 
-// Prove function generates a verifiable proof of the execution of the circuit
-// for the input signals using the proving key provided. All the arguments are
-// slices of bytes with the data read from the generated files by Circom (wasm
-// circuit) and SnarkJS (proving zkey). It returns the verifiable proof of the
-// execution with the public signals associated or an error if something fails.
+// Prove generates a verifiable proof of the execution of the circuit for the
+// input signals using the proving key provided. All the arguments are slices of
+// bytes with the data read from the generated files by Circom (wasm circuit)
+// and SnarkJS (proving zkey). It returns the verifiable proof of the execution
+// with the public signals associated or an error if something fails.
 func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// Calculate the witness calling internal function calcWitness with the
 	// provided wasm and inputs.
@@ -140,9 +163,9 @@ func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	return proof, nil
 }
 
-// Verify function performs a verification of the provided proof and its public
-// signals. It receives the verification key and returns an error if something
-// fails or nil if the verification was ok.
+// Verify performs a verification of the provided proof and its public signals.
+// It receives the verification key and returns an error if something fails or
+// nil if the verification was ok.
 func (p *Proof) Verify(vKey []byte) error {
 	proof := types.ZKProof{
 		Proof: &types.ProofData{

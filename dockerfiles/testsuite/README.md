@@ -10,7 +10,7 @@ go run ../../cmd/vochaintest/vochaintest.go --oracleKey $(. env.oracle0key; echo
 
 there's also a bash script, which prefers to be run with `NOTTY=1`
 ```
-NOTTY=1 ./start-test.sh
+NOTTY=1 ./start_test.sh
 ```
 
 ## Default testnet components
@@ -72,7 +72,7 @@ if you want to generate a custom-sized testnet (with X miners, Y gateways, Z ora
 cd ansible
 cat README.md
 ansible-playbook generate_testnet.yml
-../start-test.sh
+../start_test.sh
 ```
 
 ## Troubleshooting

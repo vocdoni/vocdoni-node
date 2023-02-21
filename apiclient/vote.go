@@ -5,7 +5,10 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -28,10 +31,11 @@ type VoteData struct {
 
 	ProofMkTree *CensusProof
 	ProofCSP    types.HexBytes
+	ProofZkTree *CensusProofZk
 }
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
-// which contains the electionID, the choices and the proof.  The
+// which contains the electionID, the choices and the proof. The
 // return value is the voteID (nullifier).
 func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	votePackage := &vochain.VotePackage{
@@ -47,9 +51,46 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		VotePackage: votePackageBytes,
 	}
 
+	// Get de election metadata
+	election, err := c.Election(v.ElectionID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Build the proof
+	log.Debugw("generating a new vote", "electionId", v.ElectionID)
+	censusOriginCSP := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA)]
+	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]
 	switch {
-	case v.ProofMkTree != nil:
+	case election.VoteMode.Anonymous:
+		// First check if the current vote mode configuration contains the flag
+		// anonymouse setted to true, other weighted tree voting modes are
+		// supported by the following case.
+		log.Debugw("zk anonymous voting detected", "electionId", v.ElectionID.String())
+		if v.ProofZkTree == nil {
+			return nil, fmt.Errorf("no zk proof provided")
+		}
+		// Parse the provided proof and public signals using the prover parser
+		// and encodes to a protobuf
+		proof, err := prover.ParseProof(v.ProofZkTree.Proof, v.ProofZkTree.PubSignals)
+		if err != nil {
+			return nil, err
+		}
+		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil)
+		if err != nil {
+			return nil, err
+		}
+		log.Debugw("zk vote proof parsed from prover and encoded to protobuf",
+			"electionId", v.ElectionID.String())
+
+		// Set the result to the vote struct with the related nullifier
+		vote.Nullifier = v.ProofZkTree.Nullifier
+		vote.Proof = &models.Proof{
+			Payload: &models.Proof_ZkSnark{
+				ZkSnark: protoProof,
+			},
+		}
+	case election.Census.CensusOrigin == censusOriginWeighted:
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
@@ -60,7 +101,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				},
 			},
 		}
-	case v.ProofCSP != nil:
+	case election.Census.CensusOrigin == censusOriginCSP:
 		p := models.ProofCA{}
 		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
 			return nil, fmt.Errorf("could not decode CSP proof: %w", err)
