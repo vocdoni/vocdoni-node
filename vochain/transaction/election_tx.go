@@ -125,13 +125,6 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 
-	// check valid/implemented process types
-	// pre-regiser and anonymous must be either both enabled or disabled, as
-	// we only support a single scenario of pre-register + anonymous.
-	// if tx.Process.Mode.PreRegister != tx.Process.EnvelopeType.Anonymous {
-	// 	return nil, common.Address{}, fmt.Errorf("pre-register mode only supported " +
-	// 		"with anonymous envelope type and viceversa")
-	// }
 	if tx.Process.Mode.PreRegister &&
 		(tx.Process.MaxCensusSize == nil || tx.Process.GetMaxCensusSize() <= 0) {
 		return nil, common.Address{}, fmt.Errorf("pre-register mode requires setting " +
