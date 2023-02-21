@@ -301,7 +301,7 @@ var Genesis = map[string]VochainGenesis{
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
-		CircuitsConfigTag: "stage",
+		CircuitsConfigTag: "dev",
 		Genesis: `
 {
    "genesis_time":"2022-12-14T14:00:01.055210151Z",
