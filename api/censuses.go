@@ -150,7 +150,7 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	censusType, indexed := censusType(ctx.URLParam("type"))
+	censusType, indexed := decodeCensusType(ctx.URLParam("type"))
 	if censusType == models.Census_UNKNOWN {
 		return ErrCensusTypeUnknown
 	}
@@ -267,16 +267,8 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 
-	// Set unknown as default type and check other available types
-	censusType := CensusTypeUnknown
-	switch ref.CensusType {
-	case int32(models.Census_ARBO_POSEIDON):
-		censusType = CensusTypeZKWeighted
-	case int32(models.Census_ARBO_BLAKE2B):
-		censusType = CensusTypeWeighted
-	case int32(models.Census_CA):
-		censusType = CensusTypeCSP
-	}
+	// Encode the current censusType to string
+	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
 
 	// Envolves the type into the Census struct and return it as JSON
 	data, err := json.Marshal(Census{Type: censusType})
@@ -581,15 +573,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 
 	// Get the census type to return it into the response to prevent to perform
 	// two api calls.
-	censusType := CensusTypeUnknown
-	switch ref.CensusType {
-	case int32(models.Census_ARBO_POSEIDON):
-		censusType = CensusTypeZKWeighted
-	case int32(models.Census_ARBO_BLAKE2B):
-		censusType = CensusTypeWeighted
-	case int32(models.Census_CA):
-		censusType = CensusTypeCSP
-	}
+	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
 
 	// If the census type is zkweighted (that means that it uses Poseidon hash
 	// with Arbo merkle tree), skip to perform a hash function over the census
