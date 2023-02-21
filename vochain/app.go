@@ -89,7 +89,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	}
 	// Load or download the zk verification keys
 	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
-		return nil, fmt.Errorf("cannot load zk circuit: (%v)", err)
+		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
 	return &BaseApplication{
 		State:              state,
@@ -670,12 +670,17 @@ func (app *BaseApplication) SetChainID(chainId string) {
 	app.State.SetChainID(chainId)
 }
 
-func (app *BaseApplication) SetCircuitConfigTag(tag string) {
+// SetCircuitConfigTag sets the current BaseApplication circuit config tag
+// attribute to the provided one and loads the circuit configuration based on
+// it. The available circuit config tags are defined in
+// /crypto/zk/circuit/config.go
+func (app *BaseApplication) SetCircuitConfigTag(tag string) error {
 	// Update the loaded circuit of the current app transactionHandler
 	if err := app.TransactionHandler.LoadZkCircuit(tag); err != nil {
-		app.circuitConfigTag = circuit.DefaultCircuitConfigurationTag
-		app.TransactionHandler.LoadZkCircuit(app.circuitConfigTag)
+		return fmt.Errorf("cannot load zk circuit: %w", err)
 	}
+	app.circuitConfigTag = tag
+	return nil
 }
 
 // Genesis returns the tendermint genesis information
