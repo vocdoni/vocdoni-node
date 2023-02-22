@@ -30,7 +30,8 @@ const (
 
 	MaxCensusAddBatchSize = 8192
 
-	censusIDsize  = 32
+	censusIDsize = 32
+	// TODO: (lucasmenendez) remove this constant
 	censusKeysize = 32
 )
 
@@ -330,8 +331,9 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if data, err = json.Marshal(censusdb.CensusDump{
 		RootHash: root,
 		Data:     compressor.NewCompressor().CompressBytes(dump),
-		Type:     models.Census_Type(ref.CensusType),
-		Indexed:  ref.Indexed,
+		// TODO: (lucasmenendez) use decodeCensusType() helper
+		Type:    models.Census_Type(ref.CensusType),
+		Indexed: ref.Indexed,
 	}); err != nil {
 		return err
 	}
