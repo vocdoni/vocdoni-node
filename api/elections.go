@@ -153,8 +153,13 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			VoteCount:      count,
 		})
 	}
-	// wrap list in a map to consistently return list in a object
-	data, err := json.Marshal(map[string]interface{}{"elections:": list})
+	// wrap list in a map to consistently return list in a object, return empty
+	// object if the list does not contains any result
+	res := map[string]interface{}{}
+	if len(list) > 0 {
+		res["elections"] = list
+	}
+	data, err := json.Marshal(res)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}

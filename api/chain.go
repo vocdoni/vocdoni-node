@@ -317,8 +317,14 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
-	// wrap list in a map to consistently return list in a object
-	data, err := json.Marshal(map[string]interface{}{"transactions": refs})
+	// wrap list in a map to consistently return list in a object, return empty
+	// object if the list does not contains any result
+	res := map[string]interface{}{}
+	if len(refs) > 0 {
+		res["transactions"] = refs
+	}
+
+	data, err := json.Marshal(res)
 	if err != nil {
 		return err
 	}
