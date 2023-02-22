@@ -153,8 +153,8 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			VoteCount:      count,
 		})
 	}
-
-	data, err := json.Marshal(list)
+	// wrap list in a map to consistently return list in a object
+	data, err := json.Marshal(map[string]interface{}{"elections:": list})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}

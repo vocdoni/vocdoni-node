@@ -317,7 +317,8 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(refs)
+	// wrap list in a map to consistently return list in a object
+	data, err := json.Marshal(map[string]interface{}{"transactions": refs})
 	if err != nil {
 		return err
 	}
