@@ -153,13 +153,11 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			VoteCount:      count,
 		})
 	}
-	// wrap list in a map to consistently return list in a object, return empty
+	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
-	res := map[string]interface{}{}
-	if len(list) > 0 {
-		res["elections"] = list
-	}
-	data, err := json.Marshal(res)
+	data, err := json.Marshal(struct {
+		Elections []ElectionSummary `json:"elections,omitempty"`
+	}{list})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
@@ -333,7 +331,9 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 			TransactionIndex: &v.TxIndex,
 		})
 	}
-	data, err := json.Marshal(votes)
+	data, err := json.Marshal(struct {
+		Votes []Vote `json:"votes,omitempty"`
+	}{votes})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}

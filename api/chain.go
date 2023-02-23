@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 const (
@@ -317,14 +318,11 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
-	// wrap list in a map to consistently return list in a object, return empty
+	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
-	res := map[string]interface{}{}
-	if len(refs) > 0 {
-		res["transactions"] = refs
-	}
-
-	data, err := json.Marshal(res)
+	data, err := json.Marshal(struct {
+		Txs []*indexertypes.TxReference `json:"transactions,omitempty"`
+	}{refs})
 	if err != nil {
 		return err
 	}
