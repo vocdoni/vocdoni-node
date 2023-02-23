@@ -144,7 +144,9 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 	for {
 		election, err := c.Election(electionID)
 		if err != nil {
-			if !strings.Contains(err.Error(), "no rows in result set") {
+			// Return an error if the received error is not a '404 - Not found'
+			// error which means that the election has not yet been created.
+			if !strings.Contains(err.Error(), "API error: 404") {
 				return nil, err
 			}
 		}
