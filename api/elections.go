@@ -156,7 +156,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
 	data, err := json.Marshal(struct {
-		Elections []ElectionSummary `json:"elections,omitempty"`
+		Elections []ElectionSummary `json:"elections"`
 	}{list})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
@@ -297,8 +297,8 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// GET elections/<electionID>/votes
-// GET elections/<electionID>/votes/page/<page>
+// GET /elections/<electionID>/votes
+// GET /elections/<electionID>/votes/page/<page>
 // returns the list of voteIDs for an election (paginated)
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -332,7 +332,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		})
 	}
 	data, err := json.Marshal(struct {
-		Votes []Vote `json:"votes,omitempty"`
+		Votes []Vote `json:"votes"`
 	}{votes})
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
@@ -469,7 +469,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// POST elections
+// POST /elections
 // creates a new election
 func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &ElectionCreate{}

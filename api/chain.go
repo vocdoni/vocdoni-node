@@ -158,18 +158,20 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		}
 	}
 	page = page * MaxPageSize
-	organization := &Organization{}
+	organizations := []*OrganizationList{}
 
 	list := a.indexer.EntityList(MaxPageSize, page, "")
 	for _, orgID := range list {
-		organization.Organizations = append(organization.Organizations, &OrganizationList{
+		organizations = append(organizations, &OrganizationList{
 			OrganizationID: orgID,
 			ElectionCount:  a.indexer.ProcessCount(orgID),
 		})
 	}
 
-	var data []byte
-	if data, err = json.Marshal(organization); err != nil {
+	data, err := json.Marshal(struct {
+		Organizations []*OrganizationList `json:"organizations"`
+	}{organizations})
+	if err != nil {
 		return err
 	}
 
@@ -321,7 +323,7 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
 	data, err := json.Marshal(struct {
-		Txs []*indexertypes.TxReference `json:"transactions,omitempty"`
+		Txs []*indexertypes.TxReference `json:"transactions"`
 	}{refs})
 	if err != nil {
 		return err
