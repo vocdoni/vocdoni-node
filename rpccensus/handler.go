@@ -43,7 +43,6 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		if _, err := m.cdb.New(
 			censusID,
 			r.CensusType,
-			r.CensusType == models.Census_ARBO_POSEIDON,
 			"",
 			nil,
 			160,
@@ -190,21 +189,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		// Weight is 1 by default
 		resp.Weight = new(types.BigInt).SetUint64(1)
 
-		if ref.Indexed {
-			// When the census is indexed thus the key is not the user's
-			// public key from the request, we prefix it to the proof so that
-			// the user receives the real proof key as well.
-			//
-			// This is legacy compatibility for the old API. The new censustree API
-			// handles this internally.
-			index, err := ref.Tree().KeyToIndex(key)
-			if err != nil {
-				return nil, err
-			}
-			resp.Siblings = append(index, resp.Siblings...)
-		}
-
-		if len(resp.CensusValue) > 0 && !ref.Indexed {
+		if len(resp.CensusValue) > 0 {
 			// return also the string representation of the census value (weight)
 			// to make the client know his voting power for the census
 			weight := ref.Tree().BytesToBigInt(resp.CensusValue)
@@ -263,8 +248,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			return nil, err
 		}
 		newRef, err := m.cdb.New(
-			root, models.Census_Type(ref.CensusType),
-			ref.Indexed, "", nil, ref.MaxLevels)
+			root, models.Census_Type(ref.CensusType), "", nil, ref.MaxLevels)
 		if err != nil {
 			return nil, err
 		}
@@ -276,13 +260,8 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		// export the tree to the remote storage (IPFS)
 		uri := ""
 		if m.RemoteStorage != nil {
-			exportData, err := censusdb.BuildExportDump(
-				root,
-				dump,
-				models.Census_Type(ref.CensusType),
-				ref.Indexed,
-				ref.MaxLevels,
-			)
+			exportData, err := censusdb.BuildExportDump(root, dump,
+				models.Census_Type(ref.CensusType), ref.MaxLevels)
 			if err != nil {
 				return nil, err
 			}
