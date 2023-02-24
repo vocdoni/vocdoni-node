@@ -20,6 +20,13 @@ import (
 // MaxPageSize defines the maximum number of results returned by the paginated endpoints
 const MaxPageSize = 10
 
+var (
+	ErrMissingModulesForHandler = fmt.Errorf("missing modules attached for enabling handler")
+	ErrHandlerUnknown           = fmt.Errorf("handler unknown")
+	ErrHTTPRouterIsNil          = fmt.Errorf("httprouter is nil")
+	ErrBaseRouteInvalid         = fmt.Errorf("base route must start with /")
+)
+
 // API is the URL based REST API supporting bearer authentication.
 type API struct {
 	PrivateCalls uint64

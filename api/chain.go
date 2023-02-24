@@ -340,7 +340,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	ref, err := a.indexer.GetTxHashReference(hash)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("cannot get transaction reference: %w", err)
 	}
@@ -365,7 +365,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
@@ -381,7 +381,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	ref, err := a.indexer.GetTxReference(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
@@ -424,7 +424,7 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	block := a.vocapp.GetBlockByHeight(height)
 	if block == nil {
-		return httprouter.ErrNotFound
+		return ErrBlockNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -443,7 +443,7 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	}
 	block := a.vocapp.GetBlockByHash(hash)
 	if block == nil {
-		return httprouter.ErrNotFound
+		return ErrBlockNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {

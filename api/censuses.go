@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
@@ -197,6 +198,9 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 
@@ -264,6 +268,9 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	// Get the current census type from the disk
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 
@@ -287,6 +294,9 @@ func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	root, err := ref.Tree().Root()
@@ -316,6 +326,9 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	root, err := ref.Tree().Root()
@@ -360,6 +373,9 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	if ref.CensusType != int32(cdata.Type) {
@@ -393,6 +409,9 @@ func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	weight, err := ref.Tree().GetCensusWeight()
@@ -417,6 +436,9 @@ func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	size, err := ref.Tree().Size()
@@ -445,6 +467,9 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 	_, err = a.censusdb.Load(censusID, &token)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 	if err := a.censusdb.Del(censusID); err != nil {
@@ -467,6 +492,9 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 	ref, err := a.censusdb.Load(censusID, &token)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 
@@ -493,6 +521,9 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if a.censusdb.Exists(root) {
 		ref, err := a.censusdb.Load(root, nil)
 		if err != nil {
+			if errors.Is(err, censusdb.ErrCensusNotFound) {
+				return ErrCensusNotFound
+			}
 			return err
 		}
 		var data []byte
@@ -568,6 +599,9 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 
@@ -639,6 +673,9 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
+		if errors.Is(err, censusdb.ErrCensusNotFound) {
+			return ErrCensusNotFound
+		}
 		return err
 	}
 

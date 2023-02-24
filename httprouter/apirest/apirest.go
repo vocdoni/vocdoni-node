@@ -2,7 +2,6 @@ package apirest
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -58,9 +57,28 @@ type APIdata struct {
 // APIhandler is the handler function used by the bearer std API httprouter implementation
 type APIhandler = func(*APIdata, *httprouter.HTTPContext) error
 
-// ErrorMsg is the error returned by bearer std API
-type ErrorMsg struct {
-	Error string `json:"error"`
+// APIerror is used by handler functions to wrap errors, assigning a unique error code
+// and also specifying which HTTP Status should be used.
+type APIerror struct {
+	Message    string `json:"error"`
+	Code       int    `json:"code"`
+	HTTPstatus int    `json:"-"`
+}
+
+// Error returns the Message contained inside the APIerror
+func (e APIerror) Error() string {
+	return e.Message
+}
+
+// Send serializes a JSON msg using APIerror.Message and APIerror.Code
+// and passes that to ctx.Send()
+func (e APIerror) Send(ctx *httprouter.HTTPContext) error {
+	msg, err := json.Marshal(e)
+	if err != nil {
+		log.Warn(err)
+		return ctx.Send([]byte("marshal failed"), HTTPstatusInternalErr)
+	}
+	return ctx.Send(msg, e.HTTPstatus)
 }
 
 // NewAPI returns a API initialized type
@@ -146,28 +164,20 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string,
 	routerHandler := func(msg httprouter.Message) {
 		bsaMsg := msg.Data.(*APIdata)
 		if err := handler(bsaMsg, msg.Context); err != nil {
-			// catch some specific errors to return the HTTP status code
-			if errors.Is(err, httprouter.ErrNotFound) {
-				if err := msg.Context.Send(nil, HTTPstatusNotFound); err != nil {
-					log.Warn(err)
+			// err should be an APIError, use those properties
+			if apierror, ok := err.(APIerror); ok {
+				err := apierror.Send(msg.Context)
+				if err != nil {
+					log.Warnf("couldn't send apierror: %v", err)
 				}
 				return
 			}
-			if errors.Is(err, httprouter.ErrInternal) {
-				if err := msg.Context.Send(nil, HTTPstatusInternalErr); err != nil {
-					log.Warn(err)
-				}
-				return
-			}
-			// return 400 with an error message
-			data, err2 := json.Marshal(&ErrorMsg{Error: err.Error()})
-			if err2 != nil {
-				log.Warn(err2)
-				return
-			}
-			if err := msg.Context.Send(data, HTTPstatusBadRequest); err != nil {
+			// else, it's a plain error (this shouldn't happen)
+			// send it in plaintext with HTTP Status 500 Internal Server Error
+			if err := msg.Context.Send([]byte(err.Error()), HTTPstatusInternalErr); err != nil {
 				log.Warn(err)
 			}
+
 		}
 	}
 

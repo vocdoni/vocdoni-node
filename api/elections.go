@@ -171,7 +171,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
 		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return httprouter.ErrNotFound
+			return ErrElectionNotFound
 		}
 		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
 	}
@@ -263,7 +263,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
 		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return httprouter.ErrNotFound
+			return ErrElectionNotFound
 		}
 		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
 	}
@@ -314,7 +314,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	votesRaw, err := a.indexer.GetEnvelopes(electionID, MaxPageSize, page, "")
 	if err != nil {
 		if errors.Is(err, indexer.ErrVoteNotFound) {
-			return httprouter.ErrNotFound
+			return ErrVoteNotFound
 		}
 		return err
 	}
@@ -347,7 +347,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	process, err := a.vocapp.State.Process(electionID, true)
 	if err != nil {
 		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return httprouter.ErrNotFound
+			return ErrElectionNotFound
 		}
 		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
 	}

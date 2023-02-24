@@ -151,7 +151,7 @@ func TestCensus(t *testing.T) {
 
 	// check the first census is not available
 	_, code = c.Request("GET", nil, id1, "proof", fmt.Sprintf("%x", key))
-	qt.Assert(t, code, qt.Equals, 400)
+	qt.Assert(t, code, qt.Equals, 404)
 }
 
 func TestCensusProof(t *testing.T) {
