@@ -79,6 +79,9 @@ func (d *OffChainDataHandler) Commit(height uint32) error {
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
 			log.Infof("importing metadata from %s", item.uri)
 			go d.enqueueMetadata(item.uri)
+		case itemTypeRollingCensus:
+			log.Infof("importing rolling census for process %x", item.pid)
+			d.importRollingCensus(item.pid)
 		default:
 			log.Errorf("unknown item %d", item.itemType)
 		}
