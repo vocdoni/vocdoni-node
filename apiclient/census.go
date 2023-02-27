@@ -37,7 +37,7 @@ type CensusProofZk struct {
 }
 
 // NewCensus creates a new census and returns its ID. The censusType can be
-// weighted (api.CensusTypeWeighted), zkweighted (api.CensusTypeZKWeighted) or 
+// weighted (api.CensusTypeWeighted), zkweighted (api.CensusTypeZKWeighted) or
 // csp (api.CensusTypeCSP).
 func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 	// create a new census
