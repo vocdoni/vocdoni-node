@@ -53,7 +53,14 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	h.Writer.Header().Set("Content-Type", "application/json")
 	h.Writer.WriteHeader(httpStatusCode)
 
-	log.Debugf("response: %s", msg)
+	log.Debugf("response: (%d) %s", httpStatusCode, msg)
+
+	if httpStatusCode == http.StatusNoContent {
+		// don't try to h.Writer.Write(msg) since that would fail with
+		// "request method or response status code does not allow body"
+		return nil
+	}
+
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
 	}
