@@ -331,7 +331,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 			// If error is not ErrTxCostNotFound, return it
 			return err
 		}
-		log.Debugf("setting tx cost for txtype %s", models.TxType_name[int32(k)])
+		log.Infow("setting tx cost", "txtype", models.TxType_name[int32(k)], "cost", txCost)
 		if err := vc.app.State.SetTxCost(k, txCost); err != nil {
 			return err
 		}
