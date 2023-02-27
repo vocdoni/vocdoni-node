@@ -129,9 +129,6 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err)
 	}
-	// if len(elections) == 0 {
-	// 	return ctx.Send(nil, apirest.HTTPstatusCodeNotFound)
-	// }
 
 	list := []ElectionSummary{}
 	for _, eid := range elections {
