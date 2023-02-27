@@ -175,7 +175,7 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/organizations/count
@@ -187,7 +187,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 
 }
 
@@ -222,7 +222,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/info/circuit
@@ -237,7 +237,7 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/dateToblock/<timestamp>
@@ -258,7 +258,7 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /chain/transactions
@@ -286,7 +286,7 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transaction/cost
@@ -306,7 +306,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if data, err = json.Marshal(txCosts); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/page/<page>
@@ -328,7 +328,7 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/reference/<hash>
@@ -349,7 +349,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/<height>/<index>
@@ -369,7 +369,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
-	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusCodeOK)
+	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/reference/index/<index>
@@ -389,7 +389,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /chain/validators
@@ -412,7 +412,7 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /chain/blocks/<height>
@@ -431,7 +431,7 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 
-	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
 // GET /chain/blocks/hash/<hash>
@@ -449,5 +449,5 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }

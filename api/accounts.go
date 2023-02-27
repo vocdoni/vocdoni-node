@@ -148,7 +148,7 @@ func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /account
@@ -237,7 +237,7 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /accounts/treasurer
@@ -257,7 +257,7 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /accounts/<organizationID>/elections/status/<status>
@@ -323,7 +323,7 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /accounts/<organizationID>/elections/count
@@ -348,7 +348,7 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /accounts/<accountID>/transfers/page/<page>
@@ -385,5 +385,5 @@ func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingJSONFailed, err) // TODO: go 1.20 supports double wrap %w %w
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }

@@ -75,7 +75,7 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /votes/<voteID>
@@ -119,7 +119,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	if data, err = json.Marshal(vote); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /votes/verify/<electionID>/<voteID>
@@ -142,5 +142,5 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
 		return httprouter.ErrNotFound
 	}
-	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusOK)
 }

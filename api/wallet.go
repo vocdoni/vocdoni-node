@@ -190,7 +190,7 @@ func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /wallet/bootstrap
@@ -229,7 +229,7 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /wallet/transfer/{dstAddress}/{amount}
@@ -279,7 +279,7 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /wallet/election
@@ -452,5 +452,5 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		log.Error(err)
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }

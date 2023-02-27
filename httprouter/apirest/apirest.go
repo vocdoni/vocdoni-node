@@ -25,13 +25,17 @@ const (
 	// MethodAccessTypeAdmin for admin requests
 	MethodAccessTypeAdmin = "admin"
 
-	namespace              = "bearerStd"
-	bearerPrefix           = "Bearer "
-	HTTPstatusCodeOK       = http.StatusOK
-	HTTPstatusNoContent    = http.StatusNoContent
-	HTTPstatusCodeErr      = http.StatusBadRequest
-	HTTPstatusInternalErr  = http.StatusInternalServerError
-	HTTPstatusCodeNotFound = 404
+	namespace    = "bearerStd"
+	bearerPrefix = "Bearer "
+)
+
+// HTTPstatus* equal http.Status*, simple sugar to avoid importing http everywhere
+const (
+	HTTPstatusOK          = http.StatusOK
+	HTTPstatusNoContent   = http.StatusNoContent
+	HTTPstatusBadRequest  = http.StatusBadRequest
+	HTTPstatusInternalErr = http.StatusInternalServerError
+	HTTPstatusNotFound    = http.StatusNotFound
 )
 
 // API is a namespace handler for the httpRouter with Bearer authorization
@@ -144,7 +148,7 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string,
 		if err := handler(bsaMsg, msg.Context); err != nil {
 			// catch some specific errors to return the HTTP status code
 			if errors.Is(err, httprouter.ErrNotFound) {
-				if err := msg.Context.Send(nil, HTTPstatusCodeNotFound); err != nil {
+				if err := msg.Context.Send(nil, HTTPstatusNotFound); err != nil {
 					log.Warn(err)
 				}
 				return
@@ -161,7 +165,7 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string,
 				log.Warn(err2)
 				return
 			}
-			if err := msg.Context.Send(data, HTTPstatusCodeErr); err != nil {
+			if err := msg.Context.Send(data, HTTPstatusBadRequest); err != nil {
 				log.Warn(err)
 			}
 		}

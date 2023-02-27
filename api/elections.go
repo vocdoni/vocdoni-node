@@ -158,7 +158,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /elections/<electionID>
@@ -230,7 +230,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /elections/<electionID>/votes/count
@@ -249,7 +249,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /elections/<electionID>/keys
@@ -291,7 +291,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /elections/<electionID>/votes
@@ -334,7 +334,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /elections/<electionID>/scrutiny
@@ -463,7 +463,7 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /elections
@@ -560,7 +560,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /files/cid
@@ -584,5 +584,5 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
