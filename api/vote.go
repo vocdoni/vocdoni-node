@@ -45,7 +45,7 @@ func (a *API) enableVoteHandlers() error {
 	return nil
 }
 
-// /votes
+// POST /votes
 // submit a vote
 func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
@@ -78,7 +78,7 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /votes/<voteID>
+// GET /votes/<voteID>
 // get a vote by its voteID (nullifier)
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
@@ -122,7 +122,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
 
-// /votes/verify/<electionID>/<voteID>
+// GET /votes/verify/<electionID>/<voteID>
 // verify a vote (get basic information)
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
