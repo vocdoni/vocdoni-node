@@ -24,7 +24,6 @@ const (
 
 	CensusTypeWeighted   = "weighted"
 	CensusTypeZKWeighted = "zkweighted"
-	CensusTypeZK         = "zkindexed" // Will be deprecated soon
 	CensusTypeCSP        = "csp"
 	CensusTypeUnknown    = "unknown"
 

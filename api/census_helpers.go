@@ -14,8 +14,6 @@ import (
 // not.
 func decodeCensusType(t string) models.Census_Type {
 	switch t {
-	case CensusTypeZK:
-		return models.Census_ARBO_POSEIDON
 	case CensusTypeZKWeighted:
 		return models.Census_ARBO_POSEIDON
 	case CensusTypeWeighted:
