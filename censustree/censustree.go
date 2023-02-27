@@ -15,10 +15,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-var (
-	censusWeightKey = []byte("censusWeight")
-	censusIndexKey  = []byte("censusIndex")
-)
+var censusWeightKey = []byte("censusWeight")
 
 // Tree implements the Merkle Tree used for census
 // Concurrent updates to the tree.Tree can lead to losing some of the updates,
@@ -219,25 +216,6 @@ func (t *Tree) updateCensusWeight(wTx db.WriteTx, w []byte) error {
 	return nil
 }
 
-// updateCensusIndex increments the census tree index by delta and return the previous value.
-func (t *Tree) updateCensusIndex(wTx db.WriteTx, delta uint32) (uint64, error) {
-	t.updatesLock.Lock()
-	defer t.updatesLock.Unlock()
-	indexBytes, err := wTx.Get(censusIndexKey)
-	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
-		return 0, fmt.Errorf("could not get census index: %w", err)
-	}
-	currentIndex := big.NewInt(0)
-	if indexBytes != nil {
-		currentIndex = t.BytesToBigInt(indexBytes)
-	}
-	index := new(big.Int).Add(currentIndex, big.NewInt(int64(delta)))
-	if err := wTx.Set(censusIndexKey, t.BigIntToBytes(index)); err != nil {
-		return 0, fmt.Errorf("could not set census index: %w", err)
-	}
-	return currentIndex.Uint64(), nil
-}
-
 // AddBatch wraps t.tree.AddBatch while acquiring the lock.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	t.Lock()
@@ -248,11 +226,6 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 	invalids, err := t.tree.AddBatch(wTx, keys, values)
 	if err != nil {
 		return invalids, fmt.Errorf("addBatch failed: %w", err)
-	}
-
-	// update the census index
-	if _, err := t.updateCensusIndex(wTx, uint32(len(keys)-len(invalids))); err != nil {
-		return nil, err
 	}
 
 	// The census weight update should be done only for the
@@ -351,21 +324,6 @@ func (t *Tree) GetCensusWeight() (*big.Int, error) {
 	}
 
 	return t.BytesToBigInt(weight), nil
-}
-
-// GetCensusIndex returns the current index of the census (number of elements).
-func (t *Tree) GetCensusIndex() (uint32, error) {
-	t.updatesLock.RLock()
-	defer t.updatesLock.RUnlock()
-	index, err := t.tree.DB().ReadTx().Get(censusIndexKey)
-	if errors.Is(err, db.ErrKeyNotFound) {
-		return 0, nil
-	}
-	if err != nil {
-		return 0, fmt.Errorf("could not get census index: %w", err)
-	}
-
-	return uint32(t.BytesToBigInt(index).Uint64()), nil
 }
 
 // GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
