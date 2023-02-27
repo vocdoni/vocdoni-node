@@ -1,58 +1,16 @@
 version: "3.4"
 
 services:
-  vocdoni-ui:
-    image: ghcr.io/vocdoni/vocdoni-ui:${VOCDONI_UI_TAG:-main}
-    env_file:
-      - .env
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.vocdoni-ui.rule=Host(`localhost`)"
-      - "traefik.http.routers.explorer.entrypoints=web"
-      - "traefik.http.routers.vocdoni-ui.service=vocdoni-ui"
-      - "traefik.http.services.vocdoni-ui.loadbalancer.server.port=80"
-    restart: always
-  nginx-gw:
-    image: nginx
-    volumes:
-      - ./gateways.json:/usr/share/nginx/html/gateways.json:ro
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.nginx-gw.rule=Host(`localhost`) && Path(`/gateways.json`)"
-      - "traefik.http.routers.nginx-gw.entrypoints=web"
-      - "traefik.http.routers.nginx-gw.service=nginx-gw"
-      - "traefik.http.services.nginx-gw.loadbalancer.server.port=80"
-  explorer:
-    image: "ghcr.io/vocdoni/vocexplorer:master"
-    env_file: .env
-    environment:
-      - "VOCEXPLORER_GLOBAL_GATEWAYURL=http://localhost:8080/dvote"
-    volumes:
-      - "vocexplorer:/data/vocexplorer"
-    restart: always
-    labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.explorer.entrypoints=web"
-      - "traefik.http.routers.explorer.service=explorer"
-      - "traefik.http.routers.explorer.rule=Host(`localhost`)"
-      - "traefik.http.services.explorer.loadbalancer.server.port=8081"
-    logging:
-      driver: json-file
-      options:
-        max-size: "20m"
-        max-file: "10"
-
   gateway:
     build:
       context: ../../
-    image: "ghcr.io/vocdoni/voconed:master"
+    image: "ghcr.io/vocdoni/voconed:${IMAGE_TAG:-master}"
     entrypoint: "/app/voconed"
     env_file: .env
     volumes:
       - "run:/app/run"
     ports:
-      - "9095:9095"
+      - "${VOCONED_PORT}:${VOCONED_PORT}"
     sysctls:
       net.core.somaxconn: 8128
     restart: ${RESTART:-no}
@@ -60,8 +18,8 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.gateway.entrypoints=web"
       - "traefik.http.routers.gateway.service=gateway"
-      - "traefik.http.routers.gateway.rule=(Host(`localhost`) && PathPrefix(`/dvote`))"
-      - "traefik.http.services.gateway.loadbalancer.server.port=9095"
+      - "traefik.http.routers.gateway.rule=(PathPrefix(`${VOCONED_URLPATH}`))"
+      - "traefik.http.services.gateway.loadbalancer.server.port=${VOCONED_PORT}"
     logging:
       driver: json-file
       options:
@@ -71,7 +29,7 @@ services:
   traefik:
     image: traefik:2.3
     ports:
-      - 8080:80
+      - 80:80
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     command:
