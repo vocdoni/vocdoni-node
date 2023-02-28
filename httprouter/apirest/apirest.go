@@ -60,14 +60,30 @@ type APIhandler = func(*APIdata, *httprouter.HTTPContext) error
 // APIerror is used by handler functions to wrap errors, assigning a unique error code
 // and also specifying which HTTP Status should be used.
 type APIerror struct {
-	Message    string `json:"error"`
-	Code       int    `json:"code"`
-	HTTPstatus int    `json:"-"`
+	Err        error
+	Code       int
+	HTTPstatus int
+}
+
+// MarshalJSON returns a JSON containing Err.Error() and Code. Field HTTPstatus is ignored.
+//
+// Example output: {"error":"account not found","code":4003}
+func (e APIerror) MarshalJSON() ([]byte, error) {
+	// This anon struct is needed to actually include the error string,
+	// since it wouldn't be marshaled otherwise. (json.Marshal doesn't call Err.Error())
+	return json.Marshal(
+		struct {
+			Err  string `json:"error"`
+			Code int    `json:"code"`
+		}{
+			Err:  e.Err.Error(),
+			Code: e.Code,
+		})
 }
 
 // Error returns the Message contained inside the APIerror
 func (e APIerror) Error() string {
-	return e.Message
+	return e.Err.Error()
 }
 
 // Send serializes a JSON msg using APIerror.Message and APIerror.Code
@@ -79,6 +95,29 @@ func (e APIerror) Send(ctx *httprouter.HTTPContext) error {
 		return ctx.Send([]byte("marshal failed"), HTTPstatusInternalErr)
 	}
 	return ctx.Send(msg, e.HTTPstatus)
+}
+
+// Withf returns a copy of APIerror with the Sprintf formatted string appended at the end of e.Err
+// Original e.Err is wrapped inside, so you can still match with errors.Is()
+func (e APIerror) Withf(format string, args ...interface{}) APIerror {
+	e.Err = fmt.Errorf("%w: %v", e.Err, fmt.Sprintf(format, args...))
+	return e
+}
+
+// With returns a copy of APIerror with the string appended at the end of e.Err
+// Original e.Err is wrapped inside, so you can still match with errors.Is()
+func (e APIerror) With(s string) APIerror {
+	e.Err = fmt.Errorf("%w: %v", e.Err, s)
+	return e
+}
+
+// WithErr returns a copy of APIerror with err.Error() appended at the end of e.Err
+// Original e.Err is wrapped inside, so you can still match with errors.Is()
+//
+// TODO: wrap both errors instead, as soon as we get Go 1.20
+func (e APIerror) WithErr(err error) APIerror {
+	e.Err = fmt.Errorf("%w: %v", e.Err, err.Error())
+	return e
 }
 
 // NewAPI returns a API initialized type

@@ -126,7 +126,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 		return nil, ErrVochainEmptyReply
 	}
 	if resp.Code != 0 {
-		return nil, fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, resp.Code, string(resp.Data))
+		return nil, ErrVochainReturnedErrorCode.Withf("(%d) %s", resp.Code, string(resp.Data))
 	}
 
 	return &Transaction{
@@ -202,7 +202,7 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 
 	if acc, _ := a.vocapp.State.GetAccount(wallet.Address(), true); acc != nil {
-		return fmt.Errorf("%w (%s)", ErrAccountAlreadyExists, wallet.AddressString())
+		return ErrAccountAlreadyExists.With(wallet.AddressString())
 	}
 
 	stx := models.SignedTx{}
@@ -296,7 +296,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 	description := &ElectionDescription{}
 	if err := json.Unmarshal(msg.Data, description); err != nil {
-		return fmt.Errorf("%w: %v", ErrCantParseDataAsJSON, err)
+		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 
 	// Set startBlock and endBlock
@@ -305,7 +305,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// election immediately. Otherwise, ensure the startBlock is in the future
 	if !description.StartDate.IsZero() {
 		if startBlock, err = a.vocinfo.EstimateBlockHeight(description.StartDate); err != nil {
-			return fmt.Errorf("%w: %v", ErrCantEstimateBlockHeight, err)
+			return ErrCantEstimateBlockHeight.WithErr(err)
 		}
 	} else {
 		description.StartDate = time.Now().Add(time.Minute * 10)
@@ -316,7 +316,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 	endBlock, err := a.vocinfo.EstimateBlockHeight(description.EndDate)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantEstimateBlockHeight, err)
+		return ErrCantEstimateBlockHeight.WithErr(err)
 	}
 	if description.EndDate.Before(description.StartDate) {
 		return ErrElectionEndDateBeforeStart
@@ -399,13 +399,13 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// Publish the metadata to IPFS
 	metadataBytes, err := json.Marshal(&metadata)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantMarshalMetadata, err)
+		return ErrCantMarshalMetadata.WithErr(err)
 	}
 	storageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	metadataURI, err := a.storage.Publish(storageCtx, metadataBytes)
 	cancel()
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantPublishMetadata, err)
+		return ErrCantPublishMetadata.WithErr(err)
 	}
 	metadataURI = "ipfs://" + metadataURI
 

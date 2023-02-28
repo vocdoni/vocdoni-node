@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -274,17 +273,17 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return fmt.Errorf("%w: %v", ErrCantParseDataAsJSON, err)
+		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	res, err := a.vocapp.SendTx(req.Payload)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrVochainSendTxFailed, err)
+		return ErrVochainSendTxFailed.WithErr(err)
 	}
 	if res == nil {
 		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
+		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
 	}
 	var data []byte
 	if data, err = json.Marshal(Transaction{
@@ -358,7 +357,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("cannot get transaction reference: %w", err)
+		return ErrTransactionNotFound.WithErr(err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {
@@ -383,7 +382,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		if errors.Is(err, vochain.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
+		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
 }
@@ -399,7 +398,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
+		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {

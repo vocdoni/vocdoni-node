@@ -190,8 +190,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return ErrParamParticipantsMissing
 	}
 	if len(cdata.Participants) > MaxCensusAddBatchSize {
-		return fmt.Errorf("%w (%d, got %d)", ErrParamParticipantsTooBig,
-			MaxCensusAddBatchSize, len(cdata.Participants))
+		return ErrParamParticipantsTooBig.Withf("expected %d, got %d", MaxCensusAddBatchSize, len(cdata.Participants))
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)
@@ -206,7 +205,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	values := [][]byte{}
 	for i, p := range cdata.Participants {
 		if p.Key == nil {
-			return fmt.Errorf("%w (number %d)", ErrParticipantKeyMissing, i)
+			return ErrParticipantKeyMissing.Withf("number %d", i)
 		}
 		// check the weight parameter
 		if p.Weight == nil {
@@ -218,7 +217,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 			// compute the hash, we use it as key for the merkle tree
 			leafKey, err = ref.Tree().Hash(p.Key)
 			if err != nil {
-				return fmt.Errorf("%w: %v", ErrCantComputeKeyHash, err)
+				return ErrCantComputeKeyHash.WithErr(err)
 			}
 		}
 		keys = append(keys, leafKey)
@@ -228,7 +227,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	// add the keys and values to the tree in a single transaction
 	failed, err := ref.Tree().AddBatch(keys, values)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantAddKeyAndValueToTree, err)
+		return ErrCantAddKeyAndValueToTree.WithErr(err)
 	}
 	log.Infof("added %d keys to census %x", len(keys), censusID)
 	if len(failed) > 0 {
