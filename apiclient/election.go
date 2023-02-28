@@ -72,7 +72,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	if err != nil {
 		return nil, err
 	}
-	if code != apirest.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
@@ -246,7 +246,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	if err != nil {
 		return nil, err
 	}
-	if code != apirest.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
@@ -317,7 +317,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	if err != nil {
 		return nil, err
 	}
-	if code != apirest.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	txResp := new(api.Transaction)
@@ -334,7 +334,7 @@ func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error
 	if err != nil {
 		return 0, err
 	}
-	if code != apirest.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusOK {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	votes := new(struct {

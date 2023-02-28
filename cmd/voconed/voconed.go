@@ -64,42 +64,56 @@ func main() {
 		log.Fatal(err)
 	}
 	config.dir = viper.GetString("dir")
+
 	if err := viper.BindPFlag("keymanager", flag.Lookup("keymanager")); err != nil {
 		log.Fatal(err)
 	}
 	config.keymanager = viper.GetString("keymanager")
+
 	if err := viper.BindPFlag("chainID", flag.Lookup("chainID")); err != nil {
 		log.Fatal(err)
 	}
 	config.chainID = viper.GetString("chainID")
+
 	if err := viper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
 		log.Fatal(err)
 	}
 	config.logLevel = viper.GetString("logLevel")
+
 	if err := viper.BindPFlag("port", flag.Lookup("port")); err != nil {
 		log.Fatal(err)
 	}
 	config.port = viper.GetInt("port")
+
 	if err := viper.BindPFlag("urlPath", flag.Lookup("urlPath")); err != nil {
 		log.Fatal(err)
 	}
 	config.path = viper.GetString("urlPath")
+
 	if err := viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucet")); err != nil {
 		log.Fatal(err)
 	}
 	config.enableFaucetWithAmount = viper.GetUint64("enableFaucetWithAmount")
+
 	if err := viper.BindPFlag("blockPeriod", flag.Lookup("blockPeriod")); err != nil {
 		log.Fatal(err)
 	}
 	config.blockSeconds = viper.GetInt("blockPeriod")
+
 	if err := viper.BindPFlag("blockSize", flag.Lookup("blockSize")); err != nil {
 		log.Fatal(err)
 	}
 	config.blockSize = viper.GetInt("blockSize")
+
 	if err := viper.BindPFlag("txCosts", flag.Lookup("txCosts")); err != nil {
 		log.Fatal(err)
 	}
 	config.txCosts = viper.GetUint64("txCosts")
+
+	if err := viper.BindPFlag("setTxCosts", flag.Lookup("setTxCosts")); err != nil {
+		log.Fatal(err)
+	}
+	*setTxCosts = viper.GetBool("setTxCosts")
 
 	viper.AddConfigPath(config.dir)
 

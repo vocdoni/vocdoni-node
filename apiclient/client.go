@@ -59,7 +59,7 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	if err != nil {
 		return nil, err
 	}
-	if status != apirest.HTTPstatusCodeOK {
+	if status != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
 	}
 	info := &api.ChainInfo{}
@@ -123,7 +123,7 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	if err != nil {
 		return err
 	}
-	if status != apirest.HTTPstatusCodeOK {
+	if status != apirest.HTTPstatusOK {
 		return fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
 	}
 	info := &api.ChainInfo{}

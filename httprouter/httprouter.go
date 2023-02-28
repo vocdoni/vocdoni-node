@@ -2,7 +2,6 @@ package httprouter
 
 import (
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,13 +26,6 @@ import (
 
 const (
 	desiredSoMaxConn = 4096
-)
-
-var (
-	// ErrNotFound can be used by the handlers to send a 404 to the client.
-	ErrNotFound = fmt.Errorf("not found")
-	// ErrInternal can be used by the handlers to send a 500 to the client.
-	ErrInternal = fmt.Errorf("internal server error")
 )
 
 // HTTProuter is a thread-safe multiplexer http(s) router using go-chi and autocert with a set of
@@ -251,14 +243,6 @@ func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType
 		}
 		data, err := nsProcessor.ProcessData(req)
 		if err != nil {
-			if errors.Is(err, ErrNotFound) {
-				http.Error(w, err.Error(), http.StatusNotFound)
-				return
-			}
-			if errors.Is(err, ErrInternal) {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}

@@ -136,7 +136,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 	}, nil
 }
 
-// /wallet/add/{privateKey}
+// POST /wallet/add/{privateKey}
 // add a new account to the local store
 func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
@@ -190,10 +190,10 @@ func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /wallet/bootstrap
+// GET /wallet/bootstrap
 // set a new account
 func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
@@ -229,10 +229,10 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /wallet/transfer/{dstAddress}/{amount}
+// GET /wallet/transfer/{dstAddress}/{amount}
 // transfer balance to another account
 func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
@@ -279,10 +279,10 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /wallet/election POST
+// POST /wallet/election
 // creates an election
 func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
@@ -452,5 +452,5 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		log.Error(err)
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }

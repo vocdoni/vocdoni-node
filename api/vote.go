@@ -45,7 +45,7 @@ func (a *API) enableVoteHandlers() error {
 	return nil
 }
 
-// /votes
+// POST /votes
 // submit a vote
 func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
@@ -75,10 +75,10 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /votes/<voteID>
+// GET /votes/<voteID>
 // get a vote by its voteID (nullifier)
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
@@ -92,7 +92,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	voteData, err := a.indexer.GetEnvelope(voteID)
 	if err != nil {
 		if errors.Is(err, indexer.ErrVoteNotFound) {
-			return httprouter.ErrNotFound
+			return ErrVoteNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrCantFetchEnvelope, err)
 	}
@@ -119,10 +119,10 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	if data, err = json.Marshal(vote); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /votes/verify/<electionID>/<voteID>
+// GET /votes/verify/<electionID>/<voteID>
 // verify a vote (get basic information)
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
@@ -140,7 +140,7 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
 	}
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
-		return httprouter.ErrNotFound
+		return ErrVoteNotFound
 	}
-	return ctx.Send(nil, apirest.HTTPstatusCodeOK)
+	return ctx.Send(nil, apirest.HTTPstatusOK)
 }

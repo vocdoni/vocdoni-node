@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
 const (
@@ -157,22 +158,24 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		}
 	}
 	page = page * MaxPageSize
-	organization := &Organization{}
+	organizations := []*OrganizationList{}
 
 	list := a.indexer.EntityList(MaxPageSize, page, "")
 	for _, orgID := range list {
-		organization.Organizations = append(organization.Organizations, &OrganizationList{
+		organizations = append(organizations, &OrganizationList{
 			OrganizationID: orgID,
 			ElectionCount:  a.indexer.ProcessCount(orgID),
 		})
 	}
 
-	var data []byte
-	if data, err = json.Marshal(organization); err != nil {
+	data, err := json.Marshal(struct {
+		Organizations []*OrganizationList `json:"organizations"`
+	}{organizations})
+	if err != nil {
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/organizations/count
@@ -184,7 +187,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 
 }
 
@@ -219,7 +222,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/info/circuit
@@ -234,7 +237,7 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/dateToblock/<timestamp>
@@ -255,7 +258,7 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // POST /chain/transactions
@@ -283,7 +286,7 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transaction/cost
@@ -303,7 +306,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if data, err = json.Marshal(txCosts); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/page/<page>
@@ -317,11 +320,15 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(refs)
+	// wrap list in a struct to consistently return list in a object, return empty
+	// object if the list does not contains any result
+	data, err := json.Marshal(struct {
+		Txs []*indexertypes.TxReference `json:"transactions"`
+	}{refs})
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/reference/<hash>
@@ -333,7 +340,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	ref, err := a.indexer.GetTxHashReference(hash)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("cannot get transaction reference: %w", err)
 	}
@@ -342,7 +349,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/<height>/<index>
@@ -358,11 +365,11 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
-	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusCodeOK)
+	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
 }
 
 // /chain/transactions/reference/index/<index>
@@ -374,7 +381,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	ref, err := a.indexer.GetTxReference(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ctx.Send(nil, apirest.HTTPstatusNoContent)
+			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
 	}
@@ -382,7 +389,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /chain/validators
@@ -405,7 +412,7 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // GET /chain/blocks/<height>
@@ -417,14 +424,14 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	block := a.vocapp.GetBlockByHeight(height)
 	if block == nil {
-		return httprouter.ErrNotFound
+		return ErrBlockNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
 
-	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
 // GET /chain/blocks/hash/<hash>
@@ -436,11 +443,11 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	}
 	block := a.vocapp.GetBlockByHash(hash)
 	if block == nil {
-		return httprouter.ErrNotFound
+		return ErrBlockNotFound
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
-	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusCodeOK)
+	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
