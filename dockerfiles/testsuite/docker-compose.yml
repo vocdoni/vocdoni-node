@@ -51,36 +51,6 @@ services:
     links:
       - seed
 
-  miner4:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner4"
-    volumes:
-      - data-miner4:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
-    links:
-      - seed
-
-  miner5:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner5"
-    volumes:
-      - data-miner5:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
-    links:
-      - seed
-
-  miner6:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner6"
-    volumes:
-      - data-miner6:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
-    links:
-      - seed
-
   oracle:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file:
@@ -104,7 +74,6 @@ services:
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
     links:
       - seed
-  
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
@@ -121,8 +90,5 @@ volumes:
   data-miner1: {}
   data-miner2: {}
   data-miner3: {}
-  data-miner4: {}
-  data-miner5: {}
-  data-miner6: {}
   data-oracle: {}
   data-gateway0: {}

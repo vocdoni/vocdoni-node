@@ -66,8 +66,12 @@ func (r *RPCAPI) getEnvelopeList(request *api.APIrequest) (*api.APIresponse, err
 func (r *RPCAPI) getValidatorList(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	var err error
-	if response.ValidatorList, err = r.vocapp.State.Validators(true); err != nil {
-		return nil, fmt.Errorf("cannot get validator list: %w", err)
+	validators, err := r.vocapp.State.Validators(true)
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range validators {
+		response.ValidatorList = append(response.ValidatorList, v)
 	}
 	return &response, err
 }

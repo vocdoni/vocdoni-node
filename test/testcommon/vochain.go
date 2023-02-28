@@ -132,7 +132,7 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	var err error
 	vals[0], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
-		tmtypes.ABCIPubKeyTypeEd25519,
+		tmtypes.ABCIPubKeyTypeSecp256k1,
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -140,7 +140,7 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	rint = rand.Int()
 	vals[1], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
-		tmtypes.ABCIPubKeyTypeEd25519,
+		tmtypes.ABCIPubKeyTypeSecp256k1,
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -200,7 +200,7 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	validator, err := privval.GenFilePV(
 		path.Join(cfg.DataDir, "config", "priv_validator_key.json"),
 		path.Join(cfg.DataDir, "data", "priv_validator_state.json"),
-		tmtypes.ABCIPubKeyTypeEd25519,
+		tmtypes.ABCIPubKeyTypeSecp256k1,
 	)
 
 	if err != nil {
