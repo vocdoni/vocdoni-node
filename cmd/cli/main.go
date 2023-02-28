@@ -16,6 +16,7 @@ import (
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
+	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -31,6 +32,10 @@ var (
 )
 
 func main() {
+	// Report the version before loading the config or logger init, just in case something goes wrong.
+	// For the sake of including the version in the log, it's also included in a log line later on.
+	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
+
 	home, err := os.UserHomeDir()
 	if err != nil {
 		panic(err)
@@ -40,6 +45,7 @@ func main() {
 	cfgFile := flag.String("config", filepath.Join(home, ".vocdoni-cli.json"), "config file")
 	flag.Parse()
 	log.Init(*logLevel, "stdout")
+	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	cli, err := NewVocdoniCLI(*cfgFile, *host)
 	if err != nil {

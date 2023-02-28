@@ -298,11 +298,8 @@ func newConfig() (*config.Config, config.Error) {
 }
 
 func main() {
-	// Don't use the log package here, because we want to report the version
-	// before loading the config. This is because something could go wrong
-	// while loading the config, and because the logger isn't set up yet.
-	// For the sake of including the version in the log, it's also included
-	// in a log line later on.
+	// Report the version before loading the config or logger init, just in case something goes wrong.
+	// For the sake of including the version in the log, it's also included in a log line later on.
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
 	// creating config and init logger
@@ -384,8 +381,7 @@ func main() {
 		}()
 	}
 
-	log.Infof("starting vocdoni node version %q in %s mode",
-		internal.Version, globalCfg.Mode)
+	log.Infow("starting vocdoni node", "version", internal.Version, "mode", globalCfg.Mode)
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled!")
 	}
