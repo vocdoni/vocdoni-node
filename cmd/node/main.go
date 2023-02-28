@@ -491,6 +491,7 @@ func main() {
 	//
 	// Oracle
 	//
+
 	if globalCfg.Mode == types.ModeOracle {
 		if vochainOracle, err = oracle.NewOracle(srv.App, srv.Signer); err != nil {
 			log.Fatal(err)

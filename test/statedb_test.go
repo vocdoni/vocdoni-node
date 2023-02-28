@@ -75,7 +75,7 @@ func TestAddValidator(t *testing.T) {
 	val, err := privval.GenFilePV(
 		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
 		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
-		"ed25519",
+		"secp256k1",
 	)
 
 	qt.Assert(t, err, qt.IsNil)

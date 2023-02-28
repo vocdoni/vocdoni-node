@@ -22,6 +22,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtime "github.com/tendermint/tendermint/libs/time"
 	"github.com/tendermint/tendermint/privval"
@@ -36,7 +37,7 @@ func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval
 		log.Fatal(err)
 	}
 	if len(tmPrivKey) > 0 {
-		var privKey crypto25519.PrivKey
+		var privKey crypto256k1.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 		if err != nil {
 			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
@@ -62,6 +63,7 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 	if err != nil {
 		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
+	// We need to use ed25519 curve for node key since tendermint does not support secp256k1
 	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
 	nodeKey.ID = tmtypes.NodeIDFromPubKey(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
@@ -81,7 +83,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		}
 		appState.Validators[idx] = GenesisValidator{
 			Address: val.GetAddress().Bytes(),
-			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
+			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeySecp256k1"},
 			Power:   "10",
 			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
 		}
@@ -171,7 +173,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	gd.ConsensusParams.Block.MaxGas = -1
 	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000
 	gd.ConsensusParams.Evidence.MaxAgeDuration = 10000
-	gd.ConsensusParams.Validator.PubKeyTypes = []string{"ed25519"}
+	gd.ConsensusParams.Validator.PubKeyTypes = []string{"secp256k1"}
 
 	// Create validators
 	gd.Validators = []tmtypes.GenesisValidator{}
@@ -201,7 +203,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		appStateValidators = append(appStateValidators, GenesisValidator{
 			Address: pv.Key.Address.Bytes(),
 			PubKey: TendermintPubKey{
-				Type:  "tendermint/PubKeyEd25519",
+				Type:  "tendermint/PubKeySecp256k1",
 				Value: pv.Key.PubKey.Bytes(),
 			},
 			Power: "10",

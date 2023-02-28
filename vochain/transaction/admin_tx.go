@@ -8,7 +8,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -52,39 +51,13 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (common.Addr
 		if !process.EnvelopeType.EncryptedVotes && !process.EnvelopeType.Anonymous {
 			return common.Address{}, fmt.Errorf("process does not require keys")
 		}
-		// get oracles
-		oracles, err := t.state.Oracles(false)
-		if err != nil || len(oracles) == 0 {
-			return common.Address{}, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-		}
 		// check if sender authorized
-		authorized, addr, err := verifySignatureAgainstOracles(oracles, vtx.SignedBody, vtx.Signature)
-		if err != nil {
-			return common.Address{}, err
+		if !t.state.IsValidator(addr.Hex()) {
+			return common.Address{}, fmt.Errorf(
+				"not a validator, unauthorized to perform key management, address: %s", addr.Hex())
 		}
-		if !authorized {
-			return common.Address{}, fmt.Errorf("unauthorized to perform an adminTx, address: %s", addr.Hex())
-		}
-		// check oracle account
-		oracleAcc, err := t.state.GetAccount(addr, false)
-		if err != nil {
-			return common.Address{}, fmt.Errorf("cannot get oracle account: %w", err)
-		}
-		if oracleAcc == nil {
-			return common.Address{}, vstate.ErrAccountNotExist
-		}
-		/* TODO: @jordipainan activate if cost and nonce on add or reveal process keys
-		if oracleAcc.Nonce != tx.Nonce {
-			return common.Address{}, ErrAccountNonceInvalid
-		}
-			cost, err := state.TxCost(tx.Txtype, false)
-			if err != nil {
-				return common.Address{}, fmt.Errorf("cannot get tx %s cost", tx.Txtype.String())
-			}
-			if oracleAcc.Balance < cost {
-				return common.Address{}, ErrNotEnoughBalance
-			}
-		*/
+		// TODO: @pau add cost for this transaction so miners cannot spam
+
 		// get current height
 		height := t.state.CurrentHeight()
 		// Specific checks

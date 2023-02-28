@@ -3,11 +3,13 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
 	"path"
 	"path/filepath"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -321,7 +323,7 @@ func (v *State) RemoveValidator(address []byte) error {
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) Validators(committed bool) ([]*models.Validator, error) {
+func (v *State) Validators(committed bool) (map[string]*models.Validator, error) {
 	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
@@ -332,7 +334,7 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 		return nil, err
 	}
 
-	var validators []*models.Validator
+	validators := make(map[string]*models.Validator)
 	var callbackErr error
 	if err := validatorsTree.Iterate(func(key, value []byte) bool {
 		// removed validators are still in the tree but with value set
@@ -345,7 +347,7 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 			callbackErr = err
 			return false
 		}
-		validators = append(validators, validator)
+		validators[hex.EncodeToString(validator.GetAddress())] = validator
 		return true
 	}); err != nil {
 		return nil, err
@@ -354,6 +356,18 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 		return nil, callbackErr
 	}
 	return validators, nil
+}
+
+// IsValidator returns true if the the address matches with a current validator address.
+// The state used for performing the check is the non-commited.
+// This method will panic if error when fetching the validator list.
+func (v *State) IsValidator(address string) bool {
+	list, err := v.Validators(false)
+	if err != nil {
+		panic(err)
+	}
+	_, ok := list[strings.ToLower(address)]
+	return ok
 }
 
 // AddProcessKeys adds the keys to the process

@@ -41,7 +41,7 @@ var Genesis = map[string]VochainGenesis{
            },
            "validator": {
              "pub_key_types": [
-               "ed25519"
+               "secp256k1"
              ]
            }
          },
@@ -49,7 +49,7 @@ var Genesis = map[string]VochainGenesis{
            {
              "address": "24B62525552021A3E1970D933B4DB3E8B7927B8E",
              "pub_key": {
-               "type": "tendermint/PubKeyEd25519",
+               "type": "tendermint/PubKeySecp256k1",
                "value": "HZVyxtbiSAMTWFweTBVEUHh23bzJjr68iFUW5+P5MQc="
              },
              "power": "10",
@@ -58,7 +58,7 @@ var Genesis = map[string]VochainGenesis{
            {
              "address": "211D1922E2E5DCB6EEC60D69AA96F06BFCCFC85C",
              "pub_key": {
-               "type": "tendermint/PubKeyEd25519",
+               "type": "tendermint/PubKeySecp256k1",
                "value": "0KOkL5fhisXw4IUy8zv+s+FjMbk8gDnkWbCMgbbhL98="
              },
              "power": "10",
@@ -67,7 +67,7 @@ var Genesis = map[string]VochainGenesis{
            {
              "address": "EEE718BF22A3274753822E6A159258D9460A8FA1",
              "pub_key": {
-               "type": "tendermint/PubKeyEd25519",
+               "type": "tendermint/PubKeySecp256k1",
                "value": "0u+bXcCPBO+eTCWiildX5c4HM7cYJ9SbkU5ylzxPMDg="
              },
              "power": "10",
@@ -76,7 +76,7 @@ var Genesis = map[string]VochainGenesis{
            {
              "address": "12D60983CA24ACB37F14693671A2A81FD34FF7F2",
              "pub_key": {
-               "type": "tendermint/PubKeyEd25519",
+               "type": "tendermint/PubKeySecp256k1",
                "value": "wI/kn3XyPEQiiIVOjH9Ll3vUZyZK0zBY3Kho5qlx/nA="
              },
              "power": "10",
@@ -89,7 +89,7 @@ var Genesis = map[string]VochainGenesis{
              {
                "address": "24B62525552021A3E1970D933B4DB3E8B7927B8E",
                "pub_key": {
-                 "type": "tendermint/PubKeyEd25519",
+                 "type": "tendermint/PubKeySecp256k1",
                  "value": "HZVyxtbiSAMTWFweTBVEUHh23bzJjr68iFUW5+P5MQc="
                },
                "power": "10",
@@ -98,7 +98,7 @@ var Genesis = map[string]VochainGenesis{
              {
                "address": "211D1922E2E5DCB6EEC60D69AA96F06BFCCFC85C",
                "pub_key": {
-                 "type": "tendermint/PubKeyEd25519",
+                 "type": "tendermint/PubKeySecp256k1",
                  "value": "0KOkL5fhisXw4IUy8zv+s+FjMbk8gDnkWbCMgbbhL98="
                },
                "power": "10",
@@ -107,7 +107,7 @@ var Genesis = map[string]VochainGenesis{
              {
                "address": "EEE718BF22A3274753822E6A159258D9460A8FA1",
                "pub_key": {
-                 "type": "tendermint/PubKeyEd25519",
+                 "type": "tendermint/PubKeySecp256k1",
                  "value": "0u+bXcCPBO+eTCWiildX5c4HM7cYJ9SbkU5ylzxPMDg="
                },
                "power": "10",
@@ -116,7 +116,7 @@ var Genesis = map[string]VochainGenesis{
              {
                "address": "12D60983CA24ACB37F14693671A2A81FD34FF7F2",
                "pub_key": {
-                 "type": "tendermint/PubKeyEd25519",
+                 "type": "tendermint/PubKeySecp256k1",
                  "value": "wI/kn3XyPEQiiIVOjH9Ll3vUZyZK0zBY3Kho5qlx/nA="
                },
                "power": "10",
@@ -177,7 +177,7 @@ var Genesis = map[string]VochainGenesis{
       },
       "validator":{
          "pub_key_types":[
-            "ed25519"
+            "secp256k1"
          ]
       }
    },
@@ -185,7 +185,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"5C69093136E0CB84E5CFA8E958DADB33C0D0CCCF",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"mXc5xXTKgDSYcy1lBCT1Ag7Lh1nPWHMa/p80XZPzAPY="
          },
          "power":"10",
@@ -194,7 +194,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"2E1B244B84E223747126EF621C022D5CEFC56F69",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"gaf2ZfdxpoielRXDXyBcMxkdzywcE10WsvLMe1K62UY="
          },
          "power":"10",
@@ -203,7 +203,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"4EF00A8C18BD472167E67F28694F31451A195581",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"dZXMBiQl4s0/YplfX9iMnCWonJp2gjrFHHXaIwqqtmc="
          },
          "power":"10",
@@ -212,7 +212,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"ECCC09A0DF8F4E5554A9C58F634E9D6AFD5F1598",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"BebelLYe4GZKwy9IuXCyBTySxQCNRrRoi1DSvAf6QxE="
          },
          "power":"10",
@@ -225,7 +225,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"5C69093136E0CB84E5CFA8E958DADB33C0D0CCCF",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"mXc5xXTKgDSYcy1lBCT1Ag7Lh1nPWHMa/p80XZPzAPY="
             },
             "power":"10",
@@ -234,7 +234,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"2E1B244B84E223747126EF621C022D5CEFC56F69",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"gaf2ZfdxpoielRXDXyBcMxkdzywcE10WsvLMe1K62UY="
             },
             "power":"10",
@@ -243,7 +243,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"4EF00A8C18BD472167E67F28694F31451A195581",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"dZXMBiQl4s0/YplfX9iMnCWonJp2gjrFHHXaIwqqtmc="
             },
             "power":"10",
@@ -252,7 +252,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"ECCC09A0DF8F4E5554A9C58F634E9D6AFD5F1598",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"BebelLYe4GZKwy9IuXCyBTySxQCNRrRoi1DSvAf6QxE="
             },
             "power":"10",
@@ -317,7 +317,7 @@ var Genesis = map[string]VochainGenesis{
       },
       "validator":{
          "pub_key_types":[
-            "ed25519"
+            "secp256k1"
          ]
       }
    },
@@ -325,7 +325,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"B04F5541E932BB754B566969A3CD1F8E4193EFE8",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"JgZaEoVxLyv7jcMDikidK2HEbChqljSrZwN+humPh34="
          },
          "power":"10",
@@ -334,7 +334,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"2DECD25EBDD6E3FAB2F06AC0EE391C16C292DBAD",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"HfZWmadJhz647Gx8zpRsSz8FACcWVpU2z6jYwUwComA="
          },
          "power":"10",
@@ -343,7 +343,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"3C6FF3D424901733818B954AA3AB3BC2E3695332",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"sAsec4Da5SZrRAOmeIWDKKbwieDF5EwT28bjxtbPlpk="
          },
          "power":"10",
@@ -352,7 +352,7 @@ var Genesis = map[string]VochainGenesis{
       {
          "address":"92C9A63172DFB4E9637309DFBFE20B1D11EDC4E7",
          "pub_key":{
-            "type":"tendermint/PubKeyEd25519",
+            "type":"tendermint/PubKeySecp256k1",
             "value":"SeRU76Jq8DRKrjtSpPLR/W69khkbeQBeNLr8CMXiht8="
          },
          "power":"10",
@@ -365,7 +365,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"B04F5541E932BB754B566969A3CD1F8E4193EFE8",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"JgZaEoVxLyv7jcMDikidK2HEbChqljSrZwN+humPh34="
             },
             "power":"10",
@@ -374,7 +374,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"2DECD25EBDD6E3FAB2F06AC0EE391C16C292DBAD",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"HfZWmadJhz647Gx8zpRsSz8FACcWVpU2z6jYwUwComA="
             },
             "power":"10",
@@ -383,7 +383,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"3C6FF3D424901733818B954AA3AB3BC2E3695332",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"sAsec4Da5SZrRAOmeIWDKKbwieDF5EwT28bjxtbPlpk="
             },
             "power":"10",
@@ -392,7 +392,7 @@ var Genesis = map[string]VochainGenesis{
          {
             "address":"92C9A63172DFB4E9637309DFBFE20B1D11EDC4E7",
             "pub_key":{
-               "type":"tendermint/PubKeyEd25519",
+               "type":"tendermint/PubKeySecp256k1",
                "value":"SeRU76Jq8DRKrjtSpPLR/W69khkbeQBeNLr8CMXiht8="
             },
             "power":"10",
