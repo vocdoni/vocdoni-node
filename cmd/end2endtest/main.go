@@ -9,6 +9,7 @@ import (
 	"math/rand"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	flag "github.com/spf13/pflag"
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 
@@ -82,6 +84,10 @@ type config struct {
 }
 
 func main() {
+	// Report the version before loading the config or logger init, just in case something goes wrong.
+	// For the sake of including the version in the log, it's also included in a log line later on.
+	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
+
 	c := config{}
 	flag.StringVar(&c.host, "host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	flag.StringVar(&c.logLevel, "logLevel", "info", "log level (debug, info, warn, error, fatal)")
@@ -114,6 +120,7 @@ func main() {
 	flag.Parse()
 
 	log.Init(c.logLevel, "stdout")
+	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	rand.Seed(time.Now().UnixNano())
 

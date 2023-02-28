@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +17,7 @@ import (
 	flag "github.com/spf13/pflag"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/types"
@@ -53,6 +55,10 @@ func opsAvailable() (opsav []string) {
 }
 
 func main() {
+	// Report the version before loading the config or logger init, just in case something goes wrong.
+	// For the sake of including the version in the log, it's also included in a log line later on.
+	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
+
 	// starting test
 
 	loglevel := flag.String("logLevel", "info", "log level")
@@ -104,6 +110,8 @@ func main() {
 	}
 	flag.Parse()
 	log.Init(*loglevel, "stdout")
+	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
+
 	rand.Seed(time.Now().UnixNano())
 
 	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))
