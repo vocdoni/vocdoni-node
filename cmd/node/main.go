@@ -141,8 +141,6 @@ func newConfig() (*config.Config, config.Error) {
 		"vochain mempool size")
 	globalCfg.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
-	globalCfg.Vochain.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0,
-		"index slot used by this node if it is a key keeper")
 	globalCfg.Vochain.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
 		"if enabled the census downloader will import all existing census")
 	globalCfg.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
@@ -223,7 +221,6 @@ func newConfig() (*config.Config, config.Error) {
 	viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
 	viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
-	viper.BindPFlag("vochain.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochain.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 	viper.Set("vochain.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive"))

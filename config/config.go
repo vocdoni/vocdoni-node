@@ -132,8 +132,6 @@ type VochainCfg struct {
 	NoWaitSync bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
-	// KeyKeeperIndex is the index used by the key keeper (usually and oracle)
-	KeyKeeperIndex int8
 	// ImportPreviousCensus if true the census downloader will try to download
 	// all census (not only the new ones)
 	ImportPreviousCensus bool
