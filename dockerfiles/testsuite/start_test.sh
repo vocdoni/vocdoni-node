@@ -3,9 +3,9 @@
 #  (if no argument is passed, run all tests)
 #  merkle_vote_plaintext: run poll vote test
 #  merkle_vote_encrypted: run encrypted vote test
-#  anonvoting: run anonymous vote test
+#  e2etest_anonvoting: run anonymous vote test
 #  cspvoting: run csp vote test
-#  tokentransactions: run token transactions test (end-user voting is not included)
+#  e2etest_tokentxs: run token transactions test (end-user voting is not included)
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 

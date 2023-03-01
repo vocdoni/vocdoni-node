@@ -512,6 +512,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
+				go vochainKeykeeper.RevealUnpublished()
 			} else {
 				log.Warnw("validator keyIndex disabled")
 			}
@@ -530,7 +531,6 @@ func main() {
 		}
 		// Start oracle results indexer
 		vochainOracle.EnableResults(srv.Indexer)
-		go vochainKeykeeper.RevealUnpublished()
 	}
 
 	//
