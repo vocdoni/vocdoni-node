@@ -9,7 +9,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -358,16 +357,14 @@ func (v *State) Validators(committed bool) (map[string]*models.Validator, error)
 	return validators, nil
 }
 
-// IsValidator returns true if the the address matches with a current validator address.
-// The state used for performing the check is the non-commited.
-// This method will panic if error when fetching the validator list.
-func (v *State) IsValidator(address string) bool {
-	list, err := v.Validators(false)
+// Validator returns an existing validator identified by the given signing address.
+// If the validator is not found, returns nil and no error.
+func (v *State) Validator(address common.Address, committed bool) (*models.Validator, error) {
+	list, err := v.Validators(committed)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	_, ok := list[strings.ToLower(address)]
-	return ok
+	return list[hex.EncodeToString(address.Bytes())], nil
 }
 
 // AddProcessKeys adds the keys to the process

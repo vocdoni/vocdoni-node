@@ -231,7 +231,7 @@ func newTendermint(app *BaseApplication,
 	}
 	pv.Save()
 
-	log.Infof("tendermint validator address: %s", pv.Key.Address)
+	log.Infof("tendermint validator pubkey: %x", pv.Key.PubKey.Bytes())
 	//aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
 	//if err != nil {
 	//	return nil, err
