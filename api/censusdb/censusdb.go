@@ -38,7 +38,6 @@ type CensusRef struct {
 	tree       *censustree.Tree // must be private to avoid gob serialization
 	AuthToken  *uuid.UUID
 	CensusType int32
-	Indexed    bool
 	URI        string
 	// MaxLevels is required to load the census with the original size because
 	// it could be different according to the election (and census) type.
@@ -61,7 +60,6 @@ type CensusDump struct {
 	Type     models.Census_Type `json:"type"`
 	RootHash []byte             `json:"rootHash"`
 	Data     []byte             `json:"data"`
-	Indexed  bool               `json:"indexed"`
 	// MaxLevels is required to load the census with the original size because
 	// it could be different according to the election (and census) type.
 	MaxLevels int `json:"maxLevels"`
@@ -80,16 +78,16 @@ func NewCensusDB(db db.Database) *CensusDB {
 
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
-	indexed bool, uri string, authToken *uuid.UUID, maxLevels int) (*CensusRef, error) {
+	uri string, authToken *uuid.UUID, maxLevels int) (*CensusRef, error) {
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
-	tree, err := censustree.New(censustree.Options{Name: censusName(censusID), ParentDB: c.db,
-		MaxLevels: maxLevels, CensusType: censusType, IndexAsKeysCensus: indexed})
+	tree, err := censustree.New(censustree.Options{Name: censusName(censusID),
+		ParentDB: c.db, MaxLevels: maxLevels, CensusType: censusType})
 	if err != nil {
 		return nil, err
 	}
-	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, indexed, uri, maxLevels)
+	ref, err := c.addCensusRefToDB(censusID, authToken, censusType, uri, maxLevels)
 	if err != nil {
 		return nil, err
 	}
@@ -156,10 +154,9 @@ func (c *CensusDB) Del(censusID []byte) error {
 }
 
 // BuildExportDump builds a census serialization that can be used for import.
-func BuildExportDump(root, data []byte, typ models.Census_Type, isIndexed bool, maxLevels int) ([]byte, error) {
+func BuildExportDump(root, data []byte, typ models.Census_Type, maxLevels int) ([]byte, error) {
 	export := CensusDump{
 		Type:      typ,
-		Indexed:   isIndexed,
 		RootHash:  root,
 		Data:      compressor.NewCompressor().CompressBytes(data),
 		MaxLevels: maxLevels,
@@ -185,7 +182,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 		return fmt.Errorf("could not import census %x, already exists", cdata.RootHash)
 	}
 	uri := "ipfs://" + storagelayer.CalculateIPFSCIDv1json(data)
-	ref, err := c.New(cdata.RootHash, cdata.Type, cdata.Indexed, uri, nil, cdata.MaxLevels)
+	ref, err := c.New(cdata.RootHash, cdata.Type, uri, nil, cdata.MaxLevels)
 	if err != nil {
 		return err
 	}
@@ -208,7 +205,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 
 // addCensusRefToDB adds a censusRef to the database.
 func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
-	t models.Census_Type, indexed bool, uri string, maxLevels int) (*CensusRef, error) {
+	t models.Census_Type, uri string, maxLevels int) (*CensusRef, error) {
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	refData := bytes.Buffer{}
@@ -216,7 +213,6 @@ func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 	ref := &CensusRef{
 		AuthToken:  authToken,
 		CensusType: int32(t),
-		Indexed:    indexed,
 		URI:        uri,
 		MaxLevels:  maxLevels,
 	}

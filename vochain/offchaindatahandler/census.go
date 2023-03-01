@@ -32,6 +32,7 @@ func (d *OffChainDataHandler) enqueueOffchainCensus(root, uri string) {
 }
 
 // importRollingCensus imports a rolling census (zkIndexed) from a remote URI into the censusDB storage.
+// TODO: Adapt this function to a non-indexed census.
 func (d *OffChainDataHandler) importRollingCensus(pid []byte) {
 	rcensus, err := d.vochain.State.DumpRollingCensus(pid)
 	if err != nil {
@@ -43,7 +44,7 @@ func (d *OffChainDataHandler) importRollingCensus(pid []byte) {
 		maxLevels = d.vochain.TransactionHandler.ZkCircuit.Config.Levels
 	}
 	log.Infof("snapshoting rolling census %s", rcensus.CensusID)
-	dump, err := censusdb.BuildExportDump(rcensus.DumpRoot, rcensus.DumpData, rcensus.Type, true, maxLevels)
+	dump, err := censusdb.BuildExportDump(rcensus.DumpRoot, rcensus.DumpData, rcensus.Type, maxLevels)
 	if err != nil {
 		log.Errorf("cannot build census dump for process %x: %v", pid, err)
 		return

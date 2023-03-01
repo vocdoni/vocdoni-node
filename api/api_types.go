@@ -258,9 +258,6 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	case CensusTypeWeighted, CensusTypeZKWeighted:
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 		root = ctype.RootHash
-	case CensusTypeZK:
-		origin = models.CensusOrigin_OFF_CHAIN_TREE
-		root = ctype.RootHash
 	default:
 		return 0, nil, fmt.Errorf("%w: %q", ErrCensusTypeUnknown, ctype)
 	}

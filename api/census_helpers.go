@@ -12,16 +12,14 @@ import (
 // models.Census_Type value, by default models.Census_UNKNOWN. This function
 // also returns a boolean indicating whether the current census is indexed or
 // not.
-func decodeCensusType(t string) (models.Census_Type, bool) {
+func decodeCensusType(t string) models.Census_Type {
 	switch t {
-	case CensusTypeZK:
-		return models.Census_ARBO_POSEIDON, true
 	case CensusTypeZKWeighted:
-		return models.Census_ARBO_POSEIDON, false
+		return models.Census_ARBO_POSEIDON
 	case CensusTypeWeighted:
-		return models.Census_ARBO_BLAKE2B, false
+		return models.Census_ARBO_BLAKE2B
 	}
-	return models.Census_UNKNOWN, false
+	return models.Census_UNKNOWN
 }
 
 // encodeCensusType returns the string version of the given models.Census_Type, by

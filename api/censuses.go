@@ -25,14 +25,12 @@ const (
 
 	CensusTypeWeighted   = "weighted"
 	CensusTypeZKWeighted = "zkweighted"
-	CensusTypeZK         = "zkindexed" // Will be deprecated soon
 	CensusTypeCSP        = "csp"
 	CensusTypeUnknown    = "unknown"
 
 	MaxCensusAddBatchSize = 8192
 
-	censusIDsize  = 32
-	censusKeysize = 32
+	censusIDsize = 32
 )
 
 func (a *API) enableCensusHandlers() error {
@@ -151,14 +149,14 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	censusType, indexed := decodeCensusType(ctx.URLParam("type"))
+	censusType := decodeCensusType(ctx.URLParam("type"))
 	if censusType == models.Census_UNKNOWN {
 		return ErrCensusTypeUnknown
 	}
 
 	maxLevels := a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
 	censusID := util.RandomBytes(32)
-	_, err = a.censusdb.New(censusID, censusType, indexed, "", &token, maxLevels)
+	_, err = a.censusdb.New(censusID, censusType, "", &token, maxLevels)
 	if err != nil {
 		return err
 	}
@@ -203,7 +201,6 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 		return err
 	}
-
 	// build the list of keys and values that will be added to the three
 	keys := [][]byte{}
 	values := [][]byte{}
@@ -215,9 +212,6 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}
-		if ref.Indexed && p.Weight.MathBigInt().Uint64() != 1 {
-			return ErrIndexedCensusCantUseWeight
-		}
 
 		leafKey := p.Key
 		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
@@ -227,33 +221,19 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 				return fmt.Errorf("%w: %v", ErrCantComputeKeyHash, err)
 			}
 		}
-
 		keys = append(keys, leafKey)
-		if !ref.Indexed {
-			values = append(values, ref.Tree().BigIntToBytes(p.Weight.MathBigInt()))
-		}
+		values = append(values, ref.Tree().BigIntToBytes(p.Weight.MathBigInt()))
 	}
 
 	// add the keys and values to the tree in a single transaction
-	if !ref.Indexed {
-		failed, err := ref.Tree().AddBatch(keys, values)
-		if err != nil {
-			return fmt.Errorf("%w: %v", ErrCantAddKeyAndValueToTree, err)
-		}
-		log.Infof("added %d keys to census %x", len(keys), censusID)
-		if len(failed) > 0 {
-			log.Warnf("failed participants %v", failed)
-		}
-	} else {
-		failed, err := ref.Tree().AddBatch(keys, nil)
-		if err != nil {
-			return fmt.Errorf("%w: %v", ErrCantAddKeyToTree, err)
-		}
-		if len(failed) > 0 {
-			log.Warnf("failed participants %v", failed)
-		}
+	failed, err := ref.Tree().AddBatch(keys, values)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrCantAddKeyAndValueToTree, err)
 	}
 	log.Infof("added %d keys to census %x", len(keys), censusID)
+	if len(failed) > 0 {
+		log.Warnf("failed participants %v", failed)
+	}
 
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }
@@ -264,7 +244,6 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-
 	// Get the current census type from the disk
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
@@ -273,10 +252,8 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		}
 		return err
 	}
-
 	// Encode the current censusType to string
 	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
-
 	// Envolves the type into the Census struct and return it as JSON
 	data, err := json.Marshal(Census{Type: censusType})
 	if err != nil {
@@ -303,7 +280,6 @@ func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-
 	var data []byte
 	if data, err = json.Marshal(Census{
 		Root: root,
@@ -344,7 +320,6 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		RootHash: root,
 		Data:     compressor.NewCompressor().CompressBytes(dump),
 		Type:     models.Census_Type(ref.CensusType),
-		Indexed:  ref.Indexed,
 	}); err != nil {
 		return err
 	}
@@ -380,9 +355,6 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 	if ref.CensusType != int32(cdata.Type) {
 		return ErrCensusTypeMismatch
-	}
-	if ref.Indexed != cdata.Indexed {
-		return ErrCensusIndexedFlagMismatch
 	}
 
 	if err := ref.Tree().ImportDump(compressor.NewCompressor().DecompressBytes(cdata.Data)); err != nil {
@@ -545,13 +517,8 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	// export the tree to the remote storage (IPFS)
 	uri := ""
 	if a.storage != nil {
-		exportData, err := censusdb.BuildExportDump(
-			root,
-			dump,
-			models.Census_Type(ref.CensusType),
-			ref.Indexed,
-			ref.MaxLevels,
-		)
+		exportData, err := censusdb.BuildExportDump(root, dump,
+			models.Census_Type(ref.CensusType), ref.MaxLevels)
 		if err != nil {
 			return err
 		}
@@ -565,9 +532,8 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		}
 	}
 
-	newRef, err := a.censusdb.New(
-		root, models.Census_Type(ref.CensusType),
-		ref.Indexed, uri, nil, ref.MaxLevels)
+	newRef, err := a.censusdb.New(root, models.Census_Type(ref.CensusType), uri,
+		nil, ref.MaxLevels)
 	if err != nil {
 		return err
 	}
@@ -641,7 +607,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 			return fmt.Errorf("error geting the census siblings to circom: %w", err)
 		}
 	}
-	if len(leafV) > 0 && !ref.Tree().IsIndexed() {
+	if len(leafV) > 0 {
 		// return the string representation of the census value (weight)
 		// to make the client know his voting power for the census
 		weight := ref.Tree().BytesToBigInt(leafV)
