@@ -18,27 +18,27 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (common.Addr
 		return common.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetAdmin()
-	// check vtx.Signature available
-	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
-		return common.Address{}, fmt.Errorf("missing vtx.Signature and/or admin transaction")
-	}
 
+	// check vtx.Signature available and extract address
+	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
+		return common.Address{}, fmt.Errorf("missing signature or transaction body")
+	}
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+		return common.Address{}, fmt.Errorf("cannot extract public key from signature: %w", err)
 	}
 	addr, err := ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	log.Debugf("checking admin signed tx %s by addr %x", log.FormatProto(tx), addr)
+	log.Debugw("checking admin tx", "addr", addr.Hex(), "tx", log.FormatProto(tx))
 
 	switch tx.Txtype {
-	// TODO: @jordipainan make keykeeper independent of oracles
 	case models.TxType_ADD_PROCESS_KEYS, models.TxType_REVEAL_PROCESS_KEYS:
 		if tx.ProcessId == nil {
-			return common.Address{}, fmt.Errorf("missing processId on AdminTxCheck")
+			return common.Address{}, fmt.Errorf("missing processId on adminTx")
 		}
+
 		// check process exists
 		process, err := t.state.Process(tx.ProcessId, false)
 		if err != nil {
@@ -47,28 +47,47 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (common.Addr
 		if process == nil {
 			return common.Address{}, fmt.Errorf("process with id (%x) does not exist", tx.ProcessId)
 		}
-		// check process actually requires keys
+
+		// check if process actually requires keys
 		if !process.EnvelopeType.EncryptedVotes && !process.EnvelopeType.Anonymous {
 			return common.Address{}, fmt.Errorf("process does not require keys")
 		}
-		// check if sender authorized
-		if !t.state.IsValidator(addr.Hex()) {
+
+		// check if sender authorized (a current validator)
+		validator, err := t.state.Validator(addr, false)
+		if validator == nil || err != nil {
+			if err != nil {
+				return common.Address{}, err
+			}
 			return common.Address{}, fmt.Errorf(
-				"not a validator, unauthorized to perform key management, address: %s", addr.Hex())
+				"not a validator, unauthorized to execute admin tx key management, address: %s", addr.Hex())
 		}
-		// TODO: @pau add cost for this transaction so miners cannot spam
+
+		// if validator keyIndex is zero, it is disabled
+		if validator.KeyIndex == 0 {
+			return common.Address{}, fmt.Errorf("validator key management is disabled")
+		}
+
+		// check keyIndex is not nil
+		if tx.KeyIndex == nil {
+			return common.Address{}, fmt.Errorf("missing keyIndex on adminTx")
+		}
+
+		// check keyIndex in the transaction is correct for the validator
+		if *tx.KeyIndex != validator.KeyIndex {
+			return common.Address{}, fmt.Errorf("transaction key index does not match with validator index")
+		}
 
 		// get current height
 		height := t.state.CurrentHeight()
+
 		// Specific checks
 		switch tx.Txtype {
 		case models.TxType_ADD_PROCESS_KEYS:
-			if tx.KeyIndex == nil {
-				return common.Address{}, fmt.Errorf("missing keyIndex on AdminTxCheck")
-			}
 			// endblock is always greater than start block so that case is also included here
 			if height > process.StartBlock {
-				return common.Address{}, fmt.Errorf("cannot add process keys to a process that has started or finished status (%s)", process.Status.String())
+				return common.Address{}, fmt.Errorf(
+					"cannot add keys to a process that has started or finished (%s)", process.Status.String())
 			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED ||
@@ -77,16 +96,13 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (common.Addr
 				return common.Address{}, fmt.Errorf("cannot add process keys to a %s process", process.Status)
 			}
 			if len(process.EncryptionPublicKeys[tx.GetKeyIndex()]) > 0 {
-				return common.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)
+				return common.Address{}, fmt.Errorf("keys for process %x already added", tx.ProcessId)
 			}
 			// check included keys and keyindex are valid
 			if err := checkAddProcessKeys(tx, process); err != nil {
 				return common.Address{}, err
 			}
 		case models.TxType_REVEAL_PROCESS_KEYS:
-			if tx.KeyIndex == nil {
-				return common.Address{}, fmt.Errorf("missing keyIndex on AdminTxCheck")
-			}
 			// check process is finished
 			if height < process.StartBlock+process.BlockCount &&
 				!(process.Status == models.ProcessStatus_ENDED ||

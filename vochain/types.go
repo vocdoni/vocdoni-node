@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -126,11 +125,11 @@ type GenesisAccount struct {
 
 // GenesisAppState application state in genesis
 type GenesisAppState struct {
-	Validators []GenesisValidator `json:"validators"`
-	Oracles    []types.HexBytes   `json:"oracles"`
-	Accounts   []GenesisAccount   `json:"accounts"`
-	Treasurer  types.HexBytes     `json:"treasurer"`
-	TxCost     TransactionCosts   `json:"tx_cost"`
+	Validators []AppStateValidators `json:"validators"`
+	Oracles    []types.HexBytes     `json:"oracles"`
+	Accounts   []GenesisAccount     `json:"accounts"`
+	Treasurer  types.HexBytes       `json:"treasurer"`
+	TxCost     TransactionCosts     `json:"tx_cost"`
 }
 
 // The rest of these genesis app state types are copied from
@@ -144,7 +143,7 @@ type GenesisDoc struct {
 	ConsensusParams *ConsensusParams   `json:"consensus_params,omitempty"`
 	Validators      []GenesisValidator `json:"validators,omitempty"`
 	AppHash         types.HexBytes     `json:"app_hash"`
-	AppState        json.RawMessage    `json:"app_state,omitempty"`
+	AppState        GenesisAppState    `json:"app_state,omitempty"`
 }
 
 type ConsensusParams struct {
@@ -185,4 +184,12 @@ type GenesisValidator struct {
 type TendermintPubKey struct {
 	Type  string `json:"type"`
 	Value []byte `json:"value"`
+}
+
+type AppStateValidators struct {
+	Address  types.HexBytes `json:"signer_address"`
+	PubKey   types.HexBytes `json:"consensus_pub_key"`
+	Power    uint64         `json:"power"`
+	Name     string         `json:"name"`
+	KeyIndex uint8          `json:"key_index"`
 }

@@ -449,6 +449,7 @@ func main() {
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway
+
 		// create the vochain service
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
@@ -489,27 +490,50 @@ func main() {
 	}
 
 	//
+	// Validator
+	//
+	if globalCfg.Mode == types.ModeMiner {
+		// create the key for the validator used to sign transactions
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(globalCfg.Vochain.MinerKey); err != nil {
+			log.Fatal(err)
+		}
+		validator, err := srv.App.State.Validator(signer.Address(), true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if validator == nil {
+			log.Warnw("node is not a validator", "address", signer.Address().Hex())
+		} else {
+			// start keykeeper service (if key index specified)
+			if validator.KeyIndex > 0 {
+				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
+					path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
+					srv.App,
+					&signer,
+					int8(validator.KeyIndex))
+				if err != nil {
+					log.Fatal(err)
+				}
+			} else {
+				log.Warnw("validator keyIndex disabled")
+			}
+			log.Infow("configured vochain validator",
+				"address", signer.Address().Hex(),
+				"keyIndex", validator.KeyIndex)
+		}
+	}
+
+	//
 	// Oracle
 	//
-
 	if globalCfg.Mode == types.ModeOracle {
 		if vochainOracle, err = oracle.NewOracle(srv.App, srv.Signer); err != nil {
 			log.Fatal(err)
 		}
 		// Start oracle results indexer
 		vochainOracle.EnableResults(srv.Indexer)
-		// Start keykeeper service (if key index specified)
-		if globalCfg.Vochain.KeyKeeperIndex > 0 {
-			vochainKeykeeper, err = keykeeper.NewKeyKeeper(
-				path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
-				srv.App,
-				srv.Signer,
-				globalCfg.Vochain.KeyKeeperIndex)
-			if err != nil {
-				log.Fatal(err)
-			}
-			go vochainKeykeeper.RevealUnpublished()
-		}
+		go vochainKeykeeper.RevealUnpublished()
 	}
 
 	//
