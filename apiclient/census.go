@@ -108,9 +108,10 @@ func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, str
 }
 
 // CensusGenProof generates a proof for a voter in a census. The voterKey is the public key or address of the voter.
-func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusProof, error) {
+func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes, votingWeight types.BigInt) (*CensusProof, error) {
 	// TODO: Send votingWeight to the API
-	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "proof", voterKey.String())
+	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "proof", voterKey.String(),
+		"?weight=", votingWeight.MathBigInt().String())
 	if err != nil {
 		return nil, err
 	}
@@ -138,10 +139,11 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 // It uses the current apiclient circuit config to instance the circuit and
 // generates the proof for the censusRoot, electionId and voter babyjubjub
 // private key provided.
-func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes) (*CensusProofZk, error) {
+func (c *HTTPclient) CensusGenProofZk(censusRoot, electionId types.HexBytes, votingWeight types.BigInt) (*CensusProofZk, error) {
 	// get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", c.zkAddr.String())
+	resp, code, err := c.Request("GET", nil, "censuses", censusRoot.String(), "proof", c.zkAddr.String(),
+		"?weight=", votingWeight.MathBigInt().String())
 	if err != nil {
 		return nil, err
 	}

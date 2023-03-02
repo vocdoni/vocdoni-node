@@ -287,7 +287,7 @@ func mkTreeVoteTest(c config) {
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
 		for _, acc := range accounts {
-			pr, err := api.CensusGenProof(root, acc.Address().Bytes())
+			pr, err := api.CensusGenProof(root, acc.Address().Bytes(), *new(types.BigInt).SetUint64(10))
 			if err != nil {
 				log.Fatal(err)
 			}

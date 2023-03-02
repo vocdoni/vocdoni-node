@@ -240,7 +240,7 @@ func mkTreeAnonVoteTest(c config) {
 				log.Fatal(err)
 				return
 			}
-			pr, err := api.CensusGenProofZk(root, electionID)
+			pr, err := api.CensusGenProofZk(root, electionID, *new(types.BigInt).SetUint64(10))
 			apiClientMtx.Unlock()
 			if err != nil {
 				log.Warnw(err.Error(),
