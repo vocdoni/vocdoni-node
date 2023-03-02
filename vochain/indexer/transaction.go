@@ -62,7 +62,10 @@ func (s *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxRe
 		Limit:  limit,
 		Offset: offset,
 	})
-	if err != nil {
+	if err != nil || len(sqlTxRefs) == 0 {
+		if errors.Is(err, sql.ErrNoRows) || len(sqlTxRefs) == 0 {
+			return nil, ErrTransactionNotFound
+		}
 		return nil, fmt.Errorf("could not get last %d tx refs: %v", limit, err)
 	}
 	txRefs := make([]*indexertypes.TxReference, len(sqlTxRefs))

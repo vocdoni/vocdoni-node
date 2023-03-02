@@ -33,6 +33,11 @@ import (
 	models "go.vocdoni.io/proto/build/go/models"
 )
 
+var (
+	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
+	ErrTransactionNotFound = fmt.Errorf("transaction not found")
+)
+
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State              *vstate.State
@@ -334,10 +339,10 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*models.SignedTx, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
-		return nil, fmt.Errorf("unable to get block by height: %d", height)
+		return nil, ErrTransactionNotFound
 	}
 	if int32(len(block.Txs)) <= txIndex {
-		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+		return nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
 	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
@@ -351,10 +356,10 @@ func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.Sig
 func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
-		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
+		return nil, nil, ErrTransactionNotFound
 	}
 	if int32(len(block.Txs)) <= txIndex {
-		return nil, nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+		return nil, nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
 	return tx, block.Txs[txIndex].Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
