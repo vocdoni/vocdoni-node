@@ -111,6 +111,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxListPaginated,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -310,14 +318,22 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 }
 
 // /chain/transactions/page/<page>
+// /chain/transactions
 func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page, err := strconv.Atoi(ctx.URLParam("page"))
-	if err != nil {
-		return err
+	page := 0
+	if ctx.URLParam("page") != "" {
+		var err error
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return err
+		}
 	}
 	offset := int32(page * MaxPageSize)
 	refs, err := a.indexer.GetLastTxReferences(MaxPageSize, offset)
 	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ErrTransactionNotFound
+		}
 		return err
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
@@ -364,7 +380,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	}
 	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
-		if errors.Is(err, indexer.ErrTransactionNotFound) {
+		if errors.Is(err, vochain.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
 		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)

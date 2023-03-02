@@ -240,6 +240,11 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 	if err != nil || electionID == nil {
 		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
 	}
+	// check process exists and return 404 if not
+	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+		return err
+	}
+
 	count := a.vocapp.State.CountVotes(electionID, true)
 	data, err := json.Marshal(
 		struct {
@@ -259,13 +264,9 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil || electionID == nil {
 		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
 	}
-
-	process, err := a.vocapp.State.Process(electionID, true)
+	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
-		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return ErrElectionNotFound
-		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+		return err
 	}
 	election := Election{}
 	for idx, pubk := range process.EncryptionPublicKeys {
@@ -302,6 +303,9 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil || electionID == nil {
 		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
 	}
+	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+		return err
+	}
 	page := 0
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
@@ -316,7 +320,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		if errors.Is(err, indexer.ErrVoteNotFound) {
 			return ErrVoteNotFound
 		}
-		return err
+		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
 	}
 	votes := []Vote{}
 	for _, v := range votesRaw {
@@ -344,15 +348,9 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil || electionID == nil {
 		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
 	}
-	process, err := a.vocapp.State.Process(electionID, true)
+	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
-		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return ErrElectionNotFound
-		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
-	}
-	if process == nil {
-		return fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
+		return err
 	}
 	// do not make distinction between live results elections and encrypted results elections
 	// since we fetch the results from the blockchain state, elections must be terminated and
@@ -585,4 +583,20 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// getElection retrieves an election from the vochain state.
+// Checks if election exists and return 404 if not
+func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
+	process, err := vs.Process(electionID, true)
+	if err != nil {
+		if errors.Is(err, state.ErrProcessNotFound) {
+			return nil, ErrElectionNotFound
+		}
+		return nil, fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+	}
+	if process == nil {
+		return nil, fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
+	}
+	return process, nil
 }
