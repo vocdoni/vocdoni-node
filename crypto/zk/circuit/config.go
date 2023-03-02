@@ -52,6 +52,7 @@ func (config ZkCircuitConfig) KeySize() int {
 // the remote and local location of the circuits artifacts and their metadata
 // such as artifacts hash or the number of parameters.
 var CircuitsConfigurations = map[string]ZkCircuitConfig{
+	// TODO: set up the circuit URI's to the branch that supports customWeight
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/master",

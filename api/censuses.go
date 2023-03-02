@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -124,6 +125,8 @@ func (a *API) enableCensusHandlers() error {
 	}
 	if err := a.endpoint.RegisterMethod(
 		"/censuses/{censusID}/proof/{key}",
+		// TODO: Change the method to receive data into the body or get
+		// votingWeight from query arguments.
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.censusProofHandler,
@@ -564,12 +567,30 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
+
+	// Get votingWeight from 'weight' query parameter and parse as big.Int
+	votingWeight, ok := new(big.Int).SetString(ctx.Request.URL.Query().Get("weight"), 10)
+	if !ok {
+		return fmt.Errorf("error parsign weight provided")
+	}
+
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
 		}
 		return err
+	}
+
+	// Get factoryWeight from the leaf value and parse as big.Int to compare it
+	// with the votingWeight
+	bfactoryWeight, err := ref.Tree().Get(key)
+	if err != nil {
+		return err
+	}
+	factoryWeight := ref.Tree().BytesToBigInt(bfactoryWeight)
+	if votingWeight.Cmp(factoryWeight) > 0 {
+		return fmt.Errorf("assigned weight exceeded")
 	}
 
 	// Get the census type to return it into the response to prevent to perform

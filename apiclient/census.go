@@ -109,6 +109,7 @@ func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, str
 
 // CensusGenProof generates a proof for a voter in a census. The voterKey is the public key or address of the voter.
 func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusProof, error) {
+	// TODO: Send votingWeight to the API
 	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "proof", voterKey.String())
 	if err != nil {
 		return nil, err
