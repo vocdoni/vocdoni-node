@@ -124,9 +124,7 @@ func (a *API) enableCensusHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/censuses/{censusID}/proof/{key}",
-		// TODO: Change the method to receive data into the body or get
-		// votingWeight from query arguments.
+		"/censuses/{censusID}/proof/{key}/weight/{weight}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.censusProofHandler,
@@ -557,7 +555,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/proof/{key}
+// /censuses/{censusID}/proof/{key}/weight/{weight}
 func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -569,7 +567,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}
 
 	// Get votingWeight from 'weight' query parameter and parse as big.Int
-	votingWeight, ok := new(big.Int).SetString(ctx.Request.URL.Query().Get("weight"), 10)
+	votingWeight, ok := new(big.Int).SetString(ctx.URLParam("weight"), 10)
 	if !ok {
 		return fmt.Errorf("error parsign weight provided")
 	}
@@ -580,17 +578,6 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 			return ErrCensusNotFound
 		}
 		return err
-	}
-
-	// Get factoryWeight from the leaf value and parse as big.Int to compare it
-	// with the votingWeight
-	bfactoryWeight, err := ref.Tree().Get(key)
-	if err != nil {
-		return err
-	}
-	factoryWeight := ref.Tree().BytesToBigInt(bfactoryWeight)
-	if votingWeight.Cmp(factoryWeight) > 0 {
-		return fmt.Errorf("assigned weight exceeded")
 	}
 
 	// Get the census type to return it into the response to prevent to perform
@@ -615,6 +602,13 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return fmt.Errorf("something was wrong during census proof generation: %w", err)
 	}
+	// Get factoryWeight from the leaf value and parse as big.Int to compare it
+	// with the votingWeight
+	factoryWeight := ref.Tree().BytesToBigInt(leafV)
+	if votingWeight.Cmp(factoryWeight) > 0 {
+		return fmt.Errorf("assigned weight exceeded")
+	}
+
 	response := Census{
 		Proof: siblings,
 		Value: leafV,

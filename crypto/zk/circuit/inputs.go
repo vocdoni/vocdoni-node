@@ -14,7 +14,8 @@ import (
 type CircuitInputs struct {
 	CensusRoot     string   `json:"censusRoot"`
 	CensusSiblings []string `json:"censusSiblings"`
-	Weight         string   `json:"weight"`
+	VotingWeight   string   `json:"votingWeight"`
+	FactoryWeight  string   `json:"factoryWeight"`
 	PrivateKey     string   `json:"privateKey"`
 	VoteHash       []string `json:"voteHash"`
 	ProcessId      []string `json:"processId"`
@@ -27,8 +28,9 @@ type CircuitInputs struct {
 // the census root, the election id and the weight provided, and includes the
 // census siblings provided into the result.
 func GenerateCircuitInput(zkAddr *zk.ZkAddress, censusRoot, electionId []byte,
-	weight *big.Int, censusSiblings []string) (*CircuitInputs, error) {
-	if zkAddr == nil || censusRoot == nil || electionId == nil || weight == nil || len(censusSiblings) == 0 {
+	factoryWeight, votingWeight *big.Int, censusSiblings []string) (*CircuitInputs, error) {
+	if zkAddr == nil || censusRoot == nil || electionId == nil ||
+		factoryWeight == nil || votingWeight == nil || len(censusSiblings) == 0 {
 		return nil, fmt.Errorf("bad arguments provided")
 	}
 
@@ -42,10 +44,11 @@ func GenerateCircuitInput(zkAddr *zk.ZkAddress, censusRoot, electionId []byte,
 		// Encode census root
 		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
 		CensusSiblings: censusSiblings,
-		Weight:         weight.String(),
+		VotingWeight:   votingWeight.String(),
+		FactoryWeight:  factoryWeight.String(),
 		PrivateKey:     zkAddr.PrivKey.String(),
 		// Encode weight into voteHash
-		VoteHash: zk.BytesToArboStr(weight.Bytes()),
+		VoteHash: zk.BytesToArboStr(factoryWeight.Bytes()),
 		// Encode electionId
 		ProcessId: zk.BytesToArboStr(electionId),
 		Nullifier: nullifier.String(),
