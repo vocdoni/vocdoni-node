@@ -29,26 +29,27 @@ func TestGenerateCircuitInput(t *testing.T) {
 	zkAddr, err := zk.AddressFromString(testAccountPrivateKey)
 	c.Assert(err, qt.IsNil)
 	// Instance the correct vote weight
-	weight := new(big.Int).SetUint64(10)
+	factoryWeight := new(big.Int).SetUint64(10)
 	// Instance expected inputs
 	expected := &CircuitInputs{
 		CensusRoot:     "7714269703880573582519379213888374390024853519732158909852028066903886590497",
 		CensusSiblings: testCensusSiblings,
-		Weight:         "10",
+		VotingWeight:   "10",
+		FactoryWeight:  "10",
 		PrivateKey:     "6735248701457559886126785742277482466576784161746903995071090348762482970571",
 		VoteHash:       []string{"242108076058607163538102198631955675649", "142667662805314151155817304537028292174"},
 		ProcessId:      []string{"18517551409637235305922365793037451371", "135271561984151624501280044000043030166"},
 		Nullifier:      "13830839320176376721270728875863016529251254252806875185281289627544884475042",
 	}
 	// Generate correct inputs
-	rawInputs, err := GenerateCircuitInput(zkAddr, censusRoot, electionId, weight, testCensusSiblings)
+	rawInputs, err := GenerateCircuitInput(zkAddr, censusRoot, electionId, factoryWeight, factoryWeight, testCensusSiblings)
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
-	rawInputs, err = GenerateCircuitInput(zkAddr, censusRoot, electionId, new(big.Int).SetInt64(1), testCensusSiblings)
+	rawInputs, err = GenerateCircuitInput(zkAddr, censusRoot, electionId, factoryWeight, factoryWeight, testCensusSiblings)
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
-	_, err = GenerateCircuitInput(zkAddr, nil, electionId, new(big.Int).SetInt64(1), testCensusSiblings)
+	_, err = GenerateCircuitInput(zkAddr, nil, electionId, new(big.Int).SetInt64(1), factoryWeight, testCensusSiblings)
 	c.Assert(err, qt.IsNotNil)
 }
