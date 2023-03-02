@@ -54,7 +54,7 @@ func (config ZkCircuitConfig) KeySize() int {
 var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
-			"zk-franchise-proof-circuit/feature/merging_repos_and_new_tests",
+			"zk-franchise-proof-circuit/master",
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
 		LocalDir:                "zkCircuits",
