@@ -209,6 +209,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 			return fmt.Errorf("%w (number %d)", ErrParticipantKeyMissing, i)
 		}
 		// check the weight parameter
+		// TODO: (lucasmenendez) remove that check, now all census are weighted
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}

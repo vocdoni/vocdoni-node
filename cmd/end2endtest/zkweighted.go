@@ -92,7 +92,7 @@ func mkTreeAnonVoteTest(c config) {
 	}
 	log.Infof("new census created with id %s", censusID.String())
 
-	// Generate 10 participant accounts
+	// Generate n participant accounts
 	voterAccounts := util.CreateEthRandomKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
