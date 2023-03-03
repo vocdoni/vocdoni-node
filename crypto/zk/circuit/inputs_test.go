@@ -46,7 +46,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
-	rawInputs, err = GenerateCircuitInput(zkAddr, censusRoot, electionId, factoryWeight, factoryWeight, testCensusSiblings)
+	rawInputs, err = GenerateCircuitInput(zkAddr, censusRoot, electionId, new(big.Int).SetInt64(1), factoryWeight, testCensusSiblings)
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
