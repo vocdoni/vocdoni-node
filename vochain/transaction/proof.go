@@ -102,11 +102,24 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
 		}
 		valid, err := tree.VerifyProof(hashFunc, hashedKey, p.Value, p.Siblings, censusRoot)
+		if !valid || err != nil {
+			return false, nil, err
+		}
 		// Legacy: support p.Value == nil, assume then value=1
 		if p.Value == nil {
-			return valid, bigOne, err
+			return true, bigOne, err
 		}
-		return valid, arbo.BytesToBigInt(p.Value), err
+
+		factoryWeight := arbo.BytesToBigInt(p.Value)
+		if p.Weight == nil {
+			return true, factoryWeight, nil
+		}
+
+		votingWeight := new(big.Int).SetBytes(p.Weight)
+		if votingWeight.Cmp(factoryWeight) == 1 {
+			return false, nil, fmt.Errorf("assigned weight exceeded")
+		}
+		return true, votingWeight, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)
