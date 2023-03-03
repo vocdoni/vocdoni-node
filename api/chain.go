@@ -217,6 +217,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		ID:                      a.vocapp.ChainID(),
 		BlockTime:               *a.vocinfo.BlockTimes(),
 		ElectionCount:           a.indexer.ProcessCount(nil),
+		OrganizationCount:       a.indexer.EntityCount(),
 		Height:                  a.vocapp.Height(),
 		Syncing:                 a.vocapp.IsSynchronizing(),
 		TransactionCount:        transactionCount,
