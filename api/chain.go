@@ -483,7 +483,7 @@ func (a *API) chainOrganizationsFilterPaginated(msg *apirest.APIdata, ctx *httpr
 	// get organizationId from the request body
 	var organizationId string
 	if err := json.Unmarshal(msg.Data, &organizationId); err != nil {
-		return fmt.Errorf("cannot unmarshal organizationId: %w", err)
+		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	// get page
 	var err error
@@ -491,19 +491,22 @@ func (a *API) chainOrganizationsFilterPaginated(msg *apirest.APIdata, ctx *httpr
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("cannot parse page number")
+			return ErrCantParsePageNumber.WithErr(err)
 		}
 	}
 	page = page * MaxPageSize
 	// get matching organization ids from the indexer
 	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, organizationId)
+	if len(matchingOrganizationIds) == 0 {
+		return ErrOrgNotFound
+	}
 	data, err := json.Marshal(struct {
 		Organizations []types.HexBytes `json:"organizations"`
 	}{
 		Organizations: matchingOrganizationIds,
 	})
 	if err != nil {
-		return err
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }

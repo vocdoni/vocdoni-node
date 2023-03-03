@@ -386,7 +386,7 @@ func (c *HTTPclient) ElectionFilterPaginated(organizationId types.HexBytes,
 	if err != nil {
 		return nil, err
 	}
-	if code != apirest.HTTPstatusCodeOK {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	var elections []api.ElectionSummary

@@ -623,10 +623,10 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		Status         string         `json:"status"`
 	}{}
 	if err := json.Unmarshal(msg.Data, &body); err != nil {
-		return fmt.Errorf("cannot unmarshal request body: %w", err)
+		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	if len(body.OrganizationID) == 0 {
-		return fmt.Errorf("organizationId is required")
+		return ErrOrgNotFound
 	}
 	// get page
 	var err error
@@ -634,14 +634,14 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	if ctx.URLParam("page") != "" {
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("cannot parse page number")
+			return ErrCantParsePageNumber.WithErr(err)
 		}
 	}
 	page = page * MaxPageSize
 	// get election list
 	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, body.WithResults)
 	if err != nil {
-		return fmt.Errorf("cannot get process list: %w", err)
+		return ErrCantFetchElectionList.WithErr(err)
 	}
 
 	var list []ElectionSummary
@@ -649,11 +649,11 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	for _, eid := range elections {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
-			return fmt.Errorf("cannot fetch electionID %x: %w", eid, err)
+			return ErrCantFetchElection.WithErr(err)
 		}
 		count, err := a.indexer.GetEnvelopeHeight(eid)
 		if err != nil {
-			return fmt.Errorf("cannot get envelope height: %w", err)
+			return ErrCantFetchEnvelopeHeight.WithErr(err)
 		}
 		list = append(list, ElectionSummary{
 			ElectionID:   eid,
@@ -666,7 +666,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	}
 	data, err := json.Marshal(list)
 	if err != nil {
-		return fmt.Errorf("error marshaling JSON: %w", err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusCodeOK)
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
