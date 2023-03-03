@@ -3,6 +3,7 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.vocdoni.io/dvote/api"
@@ -362,4 +363,35 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	return electionResults, nil
+}
+
+// POST /elections/filter/page/<page>
+// Retuns a list of elections filtered by the given parameters.
+func (c *HTTPclient) ElectionFilterPaginated(organizationId types.HexBytes,
+	electionId types.HexBytes,
+	status models.ProcessStatus,
+	withResults bool, page int) (*[]api.ElectionSummary, error) {
+	body := struct {
+		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
+		ElectionID     types.HexBytes `json:"electionId,omitempty"`
+		WithResults    bool           `json:"withResults,omitempty"`
+		Status         string         `json:"status,omitempty"`
+	}{
+		OrganizationID: organizationId,
+		ElectionID:     electionId,
+		WithResults:    withResults,
+		Status:         status.String(),
+	}
+	resp, code, err := c.Request("POST", body, "elections", "filter", "page", strconv.Itoa(page))
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusCodeOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	var elections []api.ElectionSummary
+	if err := json.Unmarshal(resp, &elections); err != nil {
+		return nil, err
+	}
+	return &elections, nil
 }

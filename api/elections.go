@@ -612,17 +612,21 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 }
 
 // POST /elections/filter/page/<page>
-// returns a paginated list of elections filtered by partial organizationID or partial processID
+// returns a paginated list of elections filtered by partial organizationID, partial processID,
+// process status and with results available or not
 func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
 	body := struct {
-		OrganizationID types.HexBytes       `json:"organizationId,omitempty"`
-		ElectionId     types.HexBytes       `json:"electionId,omitempty"`
-		WithResults    bool                 `json:"withResults,omitempty"`
-		Status         models.ProcessStatus `json:"status,omitempty"`
+		OrganizationID types.HexBytes `json:"organizationId"`
+		ElectionID     types.HexBytes `json:"electionId"`
+		WithResults    bool           `json:"withResults"`
+		Status         string         `json:"status"`
 	}{}
-	if err := json.Unmarshal(msg.Data, body); err != nil {
+	if err := json.Unmarshal(msg.Data, &body); err != nil {
 		return fmt.Errorf("cannot unmarshal request body: %w", err)
+	}
+	if len(body.OrganizationID) == 0 {
+		return fmt.Errorf("organizationId is required")
 	}
 	// get page
 	var err error
@@ -634,5 +638,35 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		}
 	}
 	page = page * MaxPageSize
-	if body.ElectionId
+	// get election list
+	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, body.WithResults)
+	if err != nil {
+		return fmt.Errorf("cannot get process list: %w", err)
+	}
+
+	var list []ElectionSummary
+	// get election summary
+	for _, eid := range elections {
+		e, err := a.indexer.ProcessInfo(eid)
+		if err != nil {
+			return fmt.Errorf("cannot fetch electionID %x: %w", eid, err)
+		}
+		count, err := a.indexer.GetEnvelopeHeight(eid)
+		if err != nil {
+			return fmt.Errorf("cannot get envelope height: %w", err)
+		}
+		list = append(list, ElectionSummary{
+			ElectionID:   eid,
+			Status:       models.ProcessStatus_name[e.Status],
+			StartDate:    a.vocinfo.HeightTime(int64(e.StartBlock)),
+			EndDate:      a.vocinfo.HeightTime(int64(e.EndBlock)),
+			FinalResults: e.FinalResults,
+			VoteCount:    count,
+		})
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON: %w", err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusCodeOK)
 }
