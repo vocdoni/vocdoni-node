@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/google/uuid"
@@ -124,7 +123,7 @@ func (a *API) enableCensusHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/censuses/{censusID}/proof/{key}/weight/{weight}",
+		"/censuses/{censusID}/proof/{key}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.censusProofHandler,
@@ -555,7 +554,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/proof/{key}/weight/{weight}
+// /censuses/{censusID}/proof/{key}
 func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -566,12 +565,6 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 
-	// Get votingWeight from 'weight' query parameter and parse as big.Int
-	votingWeight, ok := new(big.Int).SetString(ctx.URLParam("weight"), 10)
-	if !ok {
-		return fmt.Errorf("error parsign weight provided")
-	}
-
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
@@ -579,11 +572,9 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		}
 		return err
 	}
-
 	// Get the census type to return it into the response to prevent to perform
 	// two api calls.
 	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
-
 	// If the census type is zkweighted (that means that it uses Poseidon hash
 	// with Arbo merkle tree), skip to perform a hash function over the census
 	// key. It is because the zk friendly key of any census leaf is the
@@ -597,18 +588,10 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 			return err
 		}
 	}
-
 	leafV, siblings, err := ref.Tree().GenProof(leafKey)
 	if err != nil {
 		return fmt.Errorf("something was wrong during census proof generation: %w", err)
 	}
-	// Get factoryWeight from the leaf value and parse as big.Int to compare it
-	// with the votingWeight
-	factoryWeight := ref.Tree().BytesToBigInt(leafV)
-	if votingWeight.Cmp(factoryWeight) > 0 {
-		return fmt.Errorf("assigned weight exceeded")
-	}
-
 	response := Census{
 		Proof: siblings,
 		Value: leafV,
