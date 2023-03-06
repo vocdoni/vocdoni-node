@@ -126,8 +126,8 @@ var Genesis = map[string]VochainGenesis{
 		CircuitsConfigTag: "dev",
 		Genesis: `
 {
-   "genesis_time": "2023-03-01T22:40:44.294386842Z",
-   "chain_id": "vocdoni-stage-1",
+   "genesis_time": "2023-03-06T08:40:44.294386842Z",
+   "chain_id": "vocdoni-stage-2",
    "initial_height": "0",
    "consensus_params": {
      "block": {
@@ -163,22 +163,64 @@ var Genesis = map[string]VochainGenesis{
          "consensus_pub_key": "03e6c55195825f9736ce8a4553913bbadb26c7f094540e06aed9ccda0e6e26050d",
          "power": 10,
          "name": "",
-         "key_index": 2
+         "key_index": 0
        },
        {
          "signer_address": "9d4c46f7485036faea5f15c3034e9e864b9415b5",
          "consensus_pub_key": "03cb39e1132eee0b25ec75d7dad1f2885460f9b2f200d108a923b78e648b783839",
          "power": 10,
          "name": "",
-         "key_index": 3
+         "key_index": 0
        },
        {
          "signer_address": "52d74938f81569aba46f384c8108c370b5403585",
          "consensus_pub_key": "03f6c246831a524e8214e9ceb61d3da2c3c4dbee09bcbe5d9d9878aaa085764d65",
          "power": 10,
          "name": "",
-         "key_index": 4
-       }
+         "key_index": 0
+       },
+       {
+        "signer_address": "ad6ff21ccfb31002adc52714043e37da1b555b15",
+        "consensus_pub_key": "02fd283ff5760958b4e59eac6b0647ed002669ef2862eb9361251376160aa72fe5",
+        "power": 10,
+        "name": "",
+        "key_index": 3
+      },
+      {
+        "signer_address": "8367a1488c3afda043a2a602c13f01d801d0270e",
+        "consensus_pub_key": "03369a8c595c70526baf8528b908591ec286e910b10796c3d6dfca0ef76a645167",
+        "power": 10,
+        "name": "",
+        "key_index": 0
+      },
+      {
+        "signer_address": "4146598ff76009f45903958c4c7a3195683b2f61",
+        "consensus_pub_key": "02b5005aeefdb8bb196d308df3fba157a7c1e84966f899a9def6aa97b086bc87e7",
+        "power": 10,
+        "name": "",
+        "key_index": 4
+      },
+      {
+        "signer_address": "205bd3ae071118849535c9746f577ddd5eb226e6",
+        "consensus_pub_key": "02cc2386b56cd46c196d33ec23cc9ad5228942fabd62e1cdbc12b4688fa3ac49e0",
+        "power": 10,
+        "name": "",
+        "key_index": 0
+      },
+      {
+        "signer_address": "96db730d4478eaea44ee2bcb90fc1430a22521cb",
+        "consensus_pub_key": "02a059f4f5454555a588ef99b1c6ba525b551a16621d6c476998e4972ef5e42913",
+        "power": 10,
+        "name": "",
+        "key_index": 2
+      },
+      {
+        "signer_address": "c7864964dab0107eb01a1cade4c3319dae69754e",
+        "consensus_pub_key": "022fb2c1b4df15418a268b3d8027809e44d321c640b21ace6f0d5c6fa9fde18989",
+        "power": 10,
+        "name": "",
+        "key_index":0
+      }
      ],       
       "oracles":[
          "0x81ff945dda4b94690a13f49fdc8f0819970b2db0",
