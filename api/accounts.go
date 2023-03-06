@@ -50,14 +50,6 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
