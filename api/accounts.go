@@ -89,14 +89,6 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
-		"/accounts/{accountID}/transfers",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.tokenTransfersHandler,
-	); err != nil {
-		return err
-	}
 
 	return nil
 }
