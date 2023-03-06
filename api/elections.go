@@ -64,14 +64,6 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/elections/{electionID}/votes",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionVotesHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
