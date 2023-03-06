@@ -164,8 +164,6 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantParsePageNumber
 		}
-	} else {
-		return ErrCantParsePageNumber.With("empty page number")
 	}
 	page = page * MaxPageSize
 	organizations := []*OrganizationList{}

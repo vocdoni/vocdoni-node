@@ -125,8 +125,6 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantParsePageNumber.With(ctx.URLParam("page"))
 		}
-	} else {
-		return ErrCantParsePageNumber.With("empty page number")
 	}
 	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
 	if err != nil {
