@@ -10,12 +10,18 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// CensusProof represents proof for a voter in a census.
+// CensusProof represents proof for a voter in a census
 type CensusProof struct {
-	Proof    types.HexBytes
-	Value    types.HexBytes
-	Weight   *big.Int
-	KeyType  models.ProofArbo_KeyType
+	// Proof contains encoded and packed siblings as a census proof
+	Proof types.HexBytes
+	// LeafValue contains the associated value on the census tree
+	LeafValue types.HexBytes
+	// LeafWeight contains the decoded LeafValue as big.Int that represents
+	// the associated weight for the voter.
+	LeafWeight *big.Int
+	// KeyType defines the type of the census tree key
+	KeyType models.ProofArbo_KeyType
+	// Siblings contains the decoded siblings keys
 	Siblings []string
 }
 
@@ -105,14 +111,14 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	cp := CensusProof{
-		Proof:    censusData.Proof,
-		Value:    censusData.Value,
-		Siblings: censusData.Siblings,
+		Proof:     censusData.Proof,
+		LeafValue: censusData.Value,
+		Siblings:  censusData.Siblings,
 	}
 	if censusData.Weight != nil {
-		cp.Weight = censusData.Weight.MathBigInt()
+		cp.LeafWeight = censusData.Weight.MathBigInt()
 	} else {
-		cp.Weight = new(big.Int).SetUint64(1)
+		cp.LeafWeight = new(big.Int).SetUint64(1)
 	}
 	return &cp, nil
 }

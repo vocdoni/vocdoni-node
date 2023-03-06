@@ -23,6 +23,9 @@ import (
 //
 // Choices is a list of choices, where each position represents a question.
 // ElectionID is the ID of the election.
+// VotingWeight is the desired weight for voting. It can be less than or equal
+// to the  weight registered in the census. If is defined as nil, it will be
+// equal to the registered one.
 // ProofMkTree is the proof of the vote for a off chain tree, weighted election.
 // ProofCSP is the proof of the vote fore a CSP election.
 //
@@ -68,13 +71,13 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	case election.VoteMode.Anonymous:
 		// support no vote weight provided
 		if v.VotingWeight == nil {
-			v.VotingWeight = v.ProofMkTree.Weight
+			v.VotingWeight = v.ProofMkTree.LeafWeight
 		}
 
 		// generate circuit inputs with the election, census and voter
 		// information and encode it into a json
 		rawInputs, err := circuit.GenerateCircuitInput(c.zkAddr, election.Census.CensusRoot, election.ElectionID,
-			v.ProofMkTree.Weight, v.VotingWeight, v.ProofMkTree.Siblings)
+			v.ProofMkTree.LeafWeight, v.VotingWeight, v.ProofMkTree.Siblings)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +130,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				Arbo: &models.ProofArbo{
 					Type:     models.ProofArbo_BLAKE2B,
 					Siblings: v.ProofMkTree.Proof,
-					Value:    v.ProofMkTree.Value,
+					Value:    v.ProofMkTree.LeafValue,
 					KeyType:  v.ProofMkTree.KeyType,
 					Weight:   votingWeight,
 				},
