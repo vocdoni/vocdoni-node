@@ -130,12 +130,13 @@ jobs:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.CR_PAT }}
-      - name: Get short branch name
-        id: var
+      - name: Get branch name, git commit hash and current time in secs
+        id: vars
         shell: bash
-        # Grab the short branch name, convert slashes to dashes
         run: |
-          echo "branch_name=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )" >> $GITHUB_OUTPUT
+          echo "GIT_HASH_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "DATE_IN_SECS=$(date +%s)" >> $GITHUB_OUTPUT
       - name: Push image to Docker Hub and ghcr.io
         uses: docker/build-push-action@v3
         with:
@@ -143,8 +144,8 @@ jobs:
           # platforms: linux/amd64,linux/arm64
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.var.outputs.branch_name }},
-            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}
+            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push image to Docker Hub and ghcr.io (race enabled)
@@ -156,8 +157,8 @@ jobs:
           build-args: |
             BUILDARGS=-race
           tags: |
-            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race,
-            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.var.outputs.branch_name }}-race
+            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
