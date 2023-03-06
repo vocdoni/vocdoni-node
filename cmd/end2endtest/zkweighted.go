@@ -241,12 +241,7 @@ func mkTreeAnonVoteTest(c config) {
 				return
 			}
 
-			zkAddr, err := zk.AddressFromSignKeys(acc)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			pr, err := api.CensusGenProof(root, zkAddr.Bytes())
+			pr, err := api.CensusGenProof(root, api.MyZkAddress().Bytes())
 			if err != nil {
 				apiClientMtx.Unlock()
 				log.Warnw(err.Error(),
