@@ -73,14 +73,14 @@ func (d *OffChainDataHandler) Commit(height uint32) error {
 	for _, item := range d.queue {
 		switch item.itemType {
 		case itemTypeExternalCensus:
-			log.Infof("importing external census %s", item.uri)
+			log.Infow("importing data", "type", "external census", "uri", item.uri)
 			// AddToQueue() writes to a channel that might be full, so we don't want to block the main thread.
 			go d.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
-			log.Infof("importing metadata from %s", item.uri)
+			log.Infow("importing data", "type", "election metadata", "uri", item.uri)
 			go d.enqueueMetadata(item.uri)
 		case itemTypeRollingCensus:
-			log.Infof("importing rolling census for process %x", item.pid)
+			log.Infow("importing data", "type", "rolling census", "uri", item.uri)
 			d.importRollingCensus(item.pid)
 		default:
 			log.Errorf("unknown item %d", item.itemType)
@@ -95,15 +95,14 @@ func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 	censusRoot = util.TrimHex(censusRoot)
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if !d.importOnlyNew || !d.isFastSync {
+	if !d.importOnlyNew {
 		p, err := d.vochain.State.Process(pid, false)
 		if err != nil || p == nil {
-			log.Errorf("could get process from state: %v", err)
+			log.Errorw(err, "could get process from state")
 			return
 		}
 		// enqueue for import election metadata information
 		if m := p.GetMetadata(); m != "" {
-			log.Debugf("adding election metadata %s to queue", m)
 			d.queue = append(d.queue, importItem{
 				uri:      m,
 				itemType: itemTypeElectionMetadata,
@@ -111,7 +110,6 @@ func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 		}
 		// enqueue for download external census if needs to be imported
 		if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
-			log.Infof("adding external census %s to queue", censusURI)
 			d.queue = append(d.queue, importItem{
 				censusRoot: censusRoot,
 				uri:        censusURI,
@@ -124,7 +122,7 @@ func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI s
 // OnProcessesStart is triggered when a process starts. It checks if the process contains a rolling census.
 func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 	for _, pid := range pids {
-		process, err := d.vochain.State.Process(pid, true)
+		process, err := d.vochain.State.Process(pid, false)
 		if err != nil {
 			log.Errorf("could find process with pid %x: %v", pid, err)
 			continue
@@ -146,7 +144,7 @@ func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 func (d *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if !d.importOnlyNew || !d.isFastSync {
+	if !d.importOnlyNew {
 		// enqueue for import account metadata information
 		if m := account.GetInfoURI(); m != "" {
 			log.Debugf("adding account info metadata %s to queue", m)

@@ -3,6 +3,7 @@ package censusdb
 import (
 	"bytes"
 	"encoding/gob"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -177,9 +178,9 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 	if cdata.Data == nil || cdata.RootHash == nil {
 		return fmt.Errorf("missing dump or root parameters")
 	}
-	log.Debugf("importing census %x of type %s", cdata.RootHash, cdata.Type.String())
+	log.Debugw("importing census", "root", hex.EncodeToString(cdata.RootHash), "type", cdata.Type.String())
 	if c.Exists(cdata.RootHash) {
-		return fmt.Errorf("could not import census %x, already exists", cdata.RootHash)
+		return ErrCensusAlreadyExists
 	}
 	uri := "ipfs://" + storagelayer.CalculateIPFSCIDv1json(data)
 	ref, err := c.New(cdata.RootHash, cdata.Type, uri, nil, cdata.MaxLevels)

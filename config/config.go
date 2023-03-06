@@ -132,9 +132,8 @@ type VochainCfg struct {
 	NoWaitSync bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
-	// ImportPreviousCensus if true the census downloader will try to download
-	// all census (not only the new ones)
-	ImportPreviousCensus bool
+	// SkipPreviousOffchainData if enabled, the node will skip downloading the previous off-chain data to the current block
+	SkipPreviousOffchainData bool
 	// Enable Prometheus metrics from tendermint
 	TendermintMetrics bool
 	// Target block time in seconds (only for miners)
