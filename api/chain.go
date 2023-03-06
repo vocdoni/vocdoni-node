@@ -23,14 +23,6 @@ const (
 
 func (a *API) enableChainHandlers() error {
 	if err := a.endpoint.RegisterMethod(
-		"/chain/organizations",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.organizationListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/chain/organizations/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -172,6 +164,8 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantParsePageNumber
 		}
+	} else {
+		return ErrCantParsePageNumber.With("empty page number")
 	}
 	page = page * MaxPageSize
 	organizations := []*OrganizationList{}
