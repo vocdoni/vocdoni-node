@@ -192,12 +192,13 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 
 	election := Election{
 		ElectionSummary: ElectionSummary{
-			ElectionID:   electionID,
-			Status:       models.ProcessStatus_name[proc.Status],
-			StartDate:    a.vocinfo.HeightTime(int64(proc.StartBlock)),
-			EndDate:      a.vocinfo.HeightTime(int64(proc.EndBlock)),
-			FinalResults: proc.FinalResults,
-			VoteCount:    count,
+			ElectionID:     electionID,
+			OrganizationID: proc.EntityID,
+			Status:         models.ProcessStatus_name[proc.Status],
+			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
+			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
+			FinalResults:   proc.FinalResults,
+			VoteCount:      count,
 		},
 		MetadataURL:  proc.Metadata,
 		CreationTime: proc.CreationTime,
