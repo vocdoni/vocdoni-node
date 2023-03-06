@@ -141,7 +141,7 @@ func newConfig() (*config.Config, config.Error) {
 		"vochain mempool size")
 	globalCfg.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
-	globalCfg.Vochain.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
+	globalCfg.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
 	globalCfg.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
@@ -221,7 +221,7 @@ func newConfig() (*config.Config, config.Error) {
 	viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
 	viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
-	viper.BindPFlag("vochain.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
+	viper.BindPFlag("vochain.SkipPreviousOffchainData", flag.Lookup("skipPreviousOffchainData"))
 	viper.Set("vochain.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive"))
 	viper.BindPFlag("vochain.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
@@ -451,39 +451,32 @@ func main() {
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
-		defer func() {
-			srv.App.Service.Stop()
-			srv.App.Service.Wait()
-		}()
-
-		if globalCfg.Vochain.OffChainDataDownloader {
-			if err := srv.OffChainDataHandler(); err != nil {
-				log.Fatal(err)
-			}
-		}
-
+		// create the indexer service
 		if globalCfg.Vochain.Indexer.Enabled {
 			if err := srv.VochainIndexer(); err != nil {
 				log.Fatal(err)
 			}
 		}
-
+		// create the process archiver service
 		if globalCfg.Vochain.ProcessArchive {
 			if err := srv.ProcessArchiver(); err != nil {
 				log.Fatal(err)
 			}
 		}
-
-		// Wait for Vochain to be ready
-		var h, hPrev uint32
-		for srv.App.Node == nil {
-			hPrev = h
-			time.Sleep(time.Second * 10)
-			h = srv.App.Height()
-			log.Infof("[vochain info] replaying height %d at %d blocks/s",
-				h, (h-hPrev)/5)
+		// create the offchain data downloader service
+		if globalCfg.Vochain.OffChainDataDownloader {
+			if err := srv.OffChainDataHandler(); err != nil {
+				log.Fatal(err)
+			}
 		}
-		log.Infof("vochain chainID %s", srv.App.ChainID())
+		// start the service and block until finish fast sync
+		if err := srv.Start(); err != nil {
+			log.Fatal(err)
+		}
+		defer func() {
+			srv.App.Service.Stop()
+			srv.App.Service.Wait()
+		}()
 	}
 
 	//

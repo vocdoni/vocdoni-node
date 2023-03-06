@@ -103,11 +103,18 @@ func (vs *VocdoniService) Vochain() error {
 	// Create the vochain node
 	vs.App = vochain.NewVochain(vs.Config, genesisBytes)
 
+	return nil
+}
+
+// Start the vochain node and the vochaininfo service. Blocks until the node is ready if config.NoWaitSync is false.
+func (vs *VocdoniService) Start() error {
+	if err := vs.App.Service.Start(); err != nil {
+		return err
+	}
 	// If seed mode, we are finished
 	if vs.Config.IsSeedNode {
-		return vs.App.Service.Start()
+		return nil
 	}
-
 	// Vochain info
 	if vs.Stats == nil {
 		vs.Stats = vochaininfo.NewVochainInfo(vs.App)
@@ -117,24 +124,20 @@ func (vs *VocdoniService) Vochain() error {
 		go vs.Stats.CollectMetrics(vs.MetricsAgent)
 	}
 
-	// Start the vochain node
-	if err := vs.App.Service.Start(); err != nil {
-		return err
-	}
-
 	if !vs.Config.NoWaitSync {
 		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
 		i := 0
+		timeCounter := time.Now()
 		for !vs.Stats.Sync() {
 			time.Sleep(time.Second * 1)
-			if i%20 == 0 {
+			if i%10 == 0 {
 				log.Monitor("vochain fastsync", map[string]interface{}{
 					"height":   vs.Stats.Height(),
-					"blocks/s": (vs.Stats.Height() - lastHeight) / 20,
+					"blocks/s": float64((vs.Stats.Height() - lastHeight)) / time.Since(timeCounter).Seconds(),
 					"peers":    vs.Stats.NPeers(),
 				})
-
+				timeCounter = time.Now()
 				lastHeight = vs.Stats.Height()
 			}
 			i++
@@ -146,11 +149,10 @@ func (vs *VocdoniService) Vochain() error {
 	if vs.Config.LogLevel == "debug" {
 		go vochainPrintPeers(20*time.Second, vs.Stats)
 	}
-
 	return nil
 }
 
-// VochainPrintInfo initializes the Vochain statistics recollection
+// VochainPrintInfo initializes the Vochain statistics recollection.
 func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 	var a *[5]int32
 	var h int64
