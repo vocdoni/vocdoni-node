@@ -32,14 +32,6 @@ const (
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.endpoint.RegisterMethod(
-		"/elections",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionFullListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -124,7 +116,6 @@ func (a *API) enableElectionHandlers() error {
 	return nil
 }
 
-// GET /elections
 // GET /elections/page/<page>
 func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
@@ -134,6 +125,8 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantParsePageNumber.With(ctx.URLParam("page"))
 		}
+	} else {
+		return ErrCantParsePageNumber.With("empty page number")
 	}
 	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
 	if err != nil {
