@@ -68,7 +68,7 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrCantParseOrgID,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "transfers"}},
+			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "transfers", "page", "0"}},
 			want: api.ErrCantParseAccountID,
 		},
 		{
