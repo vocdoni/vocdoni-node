@@ -279,7 +279,11 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	election := Election{}
+	if !process.GetEnvelopeType().EncryptedVotes {
+		return ErrNoElectionKeys
+	}
+
+	election := ElectionKeys{}
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
 			pk, err := hex.DecodeString(pubk)
