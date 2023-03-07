@@ -200,7 +200,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 		return err
 	}
-	// build the list of keys and values that will be added to the three
+	// build the list of keys and values that will be added to the tree
 	keys := [][]byte{}
 	values := [][]byte{}
 	for i, p := range cdata.Participants {
