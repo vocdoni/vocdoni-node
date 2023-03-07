@@ -93,8 +93,12 @@ func (a *API) enableAccountHandlers() error {
 	return nil
 }
 
-// /account/{address}
-// get the account information
+// accountHandler
+//
+//	@Summary		Get account
+//	@Description	Get account information
+//	@Success		200	{object}	Account
+//	@Router			/accounts/{address} [get]
 func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return ErrAddressMalformed
@@ -134,8 +138,12 @@ func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// POST /account
-// set account information
+// accountSetHandler
+//
+//	@Summary		Set account
+//	@Description	Set account information
+//	@Success		200	{object}	AccountSet
+//	@Router			/accounts [post]
 func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &AccountSet{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -223,8 +231,12 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /accounts/treasurer
-// get the treasurer address
+// treasurerHandler
+//
+//	@Summary		Get treasurer address
+//	@Description	Get treasurer address
+//	@Success		200	{object}	object
+//	@Router			/accounts/treasurer [get]
 func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	acc, err := a.vocapp.State.Treasurer(true)
 	if err != nil {
@@ -243,8 +255,14 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /accounts/<organizationID>/elections/status/<status>
-// list the elections of an organization.
+// electionListHandler
+//
+//	@Summary		Elections list
+//	@Description	List the elections of an organization
+//	@Success		200	{object}	Organization
+//	@Router			/accounts/{organizationID}/elections/status/{status}/page/{page} [get]
+//	@Router			/accounts/{organizationID}/elections/status/{status} [get]
+//	@Router			/accounts/{organizationID}/elections/page/{page} [get]
 func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
@@ -309,8 +327,12 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /accounts/<organizationID>/elections/count
-// Returns the number of elections for an organization
+// electionCountHandler
+//
+//	@Summary		Elections count
+//	@Description	Returns the number of elections for an organization
+//	@Success		200	{object}	object
+//	@Router			/accounts/{organizationID}/elections/count [get]
 func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
@@ -334,8 +356,12 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /accounts/<accountID>/transfers/page/<page>
-// Returns the token transfers for an organization
+// tokenTransfersHandler
+//
+//	@Summary		Token transfers list
+//	@Description	Returns the token transfers for an organization
+//	@Success		200	{object}	object
+//	@Router			/accounts/{accountID}/transfers/page/{page} [get]
 func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
 	if err != nil || accountID == nil {

@@ -136,8 +136,12 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 	}, nil
 }
 
-// POST /wallet/add/{privateKey}
-// add a new account to the local store
+// walletAddHandler
+//
+//	@Summary		Add account
+//	@Description	Add a new account to the local store
+//	@Success		200	{object}	Account
+//	@Router			/wallet/add/{privateKey} [post]
 func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
 	wallet := ethereum.SignKeys{}
@@ -193,8 +197,12 @@ func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /wallet/bootstrap
-// set a new account
+// walletCreateHandler
+//
+//	@Summary		Set account
+//	@Description	Set a new account
+//	@Success		200	{object}	Transaction
+//	@Router			/wallet/bootstrap [get]
 func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
@@ -232,8 +240,12 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /wallet/transfer/{dstAddress}/{amount}
-// transfer balance to another account
+// walletTransferHandler
+//
+//	@Summary		Transfer tokens
+//	@Description	Transfer balance to another account
+//	@Success		200	{object}	Transaction
+//	@Router			/wallet/transfer/{dstAddress}/{amount} [get]
 func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {
@@ -282,8 +294,12 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// POST /wallet/election
-// creates an election
+// walletElectionHandler
+//
+//	@Summary		Create election
+//	@Description	Creates an election
+//	@Success		200	{object}	Transaction
+//	@Router			/wallet/election [post]
 func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
 	if err != nil {

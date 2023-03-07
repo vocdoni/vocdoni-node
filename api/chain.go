@@ -146,7 +146,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/organizations/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,
-		a.chainOrganizationsFilterPaginated,
+		a.chainOrganizationsFilterPaginatedHandler,
 	); err != nil {
 		return err
 	}
@@ -154,8 +154,12 @@ func (a *API) enableChainHandlers() error {
 	return nil
 }
 
-// /chain/organizations/pages/<page>
-// list the existing organizations
+// organizationListHandler
+//
+//	@Summary		List organizations
+//	@Description	List the existing organizations
+//	@Success		200	{object}	object
+//	@Router			/chain/organizations/page/{page} [get]
 func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	var err error
 	page := 0
@@ -186,8 +190,12 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/organizations/count
-// return the number of organizations
+// organizationCountHandler
+//
+//	@Summary		Organizations count
+//	@Description	Return the number of organizations
+//	@Success		200	{object}	Organization
+//	@Router			/chain/organizations/count [get]
 func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.EntityCount()
 	organization := &Organization{Count: &count}
@@ -199,8 +207,12 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 
 }
 
-// /chain/info
-// returns the chain ID, blocktimes, timestamp and height of the blockchain
+// chainInfoHandler
+//
+//	@Summary		Chain info
+//	@Description	Returns the chain ID, blocktimes, timestamp and height of the blockchain
+//	@Success		200	{object}	ChainInfo
+//	@Router			/chain/info [get]
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	transactionCount, err := a.indexer.TransactionCount()
 	if err != nil {
@@ -234,8 +246,12 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/info/circuit
-// returns the circuit configuration according to the current circuit
+// chainCircuitInfoHandler
+//
+//	@Summary		Circuit info
+//	@Description	Returns the circuit configuration according to the current circuit
+//	@Success		200	{object}	circuit.ZkCircuitConfig
+//	@Router			/chain/info/circuit [get]
 func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// Get current circuit tag
 	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
@@ -249,8 +265,12 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/dateToblock/<timestamp>
-// returns the estimated block height for the timestamp provided
+// chainEstimateHeightHandler
+//
+//	@Summary		Estimate block for timestamp
+//	@Description	Returns the estimated block height for the timestamp provided
+//	@Success		200	{object}	object
+//	@Router			/chain/dateToBlock/{timestamp} [get]
 func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	timestamp, err := strconv.ParseInt(ctx.URLParam("timestamp"), 10, 64)
 	if err != nil {
@@ -270,8 +290,12 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// POST /chain/transactions
-// submits a blockchain transaction
+// chainSendTxHandler
+//
+//	@Summary		Submit transaction
+//	@Description	Submits a blockchain transaction
+//	@Success		200	{object}	Transaction
+//	@Router			/chain/transactions [post]
 func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -298,8 +322,12 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/transaction/cost
-// returns de list of transactions and its cost
+// chainTxCostHandler
+//
+//	@Summary		Transaction costs
+//	@Description	Returns the list of transactions and its cost
+//	@Success		200	{object}	Transaction
+//	@Router			/chain/transactions/cost [get]
 func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCosts := &Transaction{
 		Costs: make(map[string]uint64),
@@ -318,8 +346,13 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/transactions/page/<page>
-// /chain/transactions
+// chainTxListPaginated
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	object
+//	@Router			/chain/transactions [get]
+//	@Router			/chain/transactions/page/{page} [get]
 func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
 	if ctx.URLParam("page") != "" {
@@ -348,7 +381,12 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/transactions/reference/<hash>
+// chainTxbyHashHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	indexertypes.TxReference
+//	@Router			/chain/transactions/reference/{hash} [get]
 func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
@@ -369,7 +407,12 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /chain/transactions/<height>/<index>
+// chainTxHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	object
+//	@Router			/chain/transactions/{height}/{index} [get]
 func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
@@ -389,7 +432,12 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
 }
 
-// /chain/transactions/reference/index/<index>
+// chainTxByIndexHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	indexertypes.TxReference
+//	@Router			/chain/transactions/reference/index/{index} [get]
 func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
 	if err != nil {
@@ -409,8 +457,12 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /chain/validators
-// returns the list of validators
+// chainValidatorsHandler
+//
+//	@Summary		Validators list
+//	@Description	Returns the list of validators
+//	@Success		200	{object}	ValidatorList
+//	@Router			/chain/validators [get]
 func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	stateValidators, err := a.vocapp.State.Validators(true)
 	if err != nil {
@@ -432,8 +484,12 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /chain/blocks/<height>
-// returns the block at the given height
+// chainBlockHandler
+//
+//	@Summary		Get block (by height)
+//	@Description	Returns the block at the given height
+//	@Success		200	{object}	types.Block
+//	@Router			/chain/blocks/{height} [get]
 func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
@@ -451,8 +507,12 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
-// GET /chain/blocks/hash/<hash>
-// returns the block from the given hash
+// chainBlockByHashHandler
+//
+//	@Summary		Get block (by hash)
+//	@Description	Returns the block from the given hash
+//	@Success		200	{object}	types.Block
+//	@Router			/chain/blocks/hash/{hash} [get]
 func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
@@ -469,9 +529,13 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
-// POST /chain/organizations/filter/page/<page>
-// returns a list of organizations paginated by the given page
-func (a *API) chainOrganizationsFilterPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+// chainOrganizationsFilterPaginatedHandler
+//
+//	@Summary		Organizations list (paginated)
+//	@Description	Returns a list of organizations paginated by the given page
+//	@Success		200	{object}	object
+//	@Router			/chain/organizations/filter/page/{page} [post]
+func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
 	var organizationId string
 	if err := json.Unmarshal(msg.Data, &organizationId); err != nil {
