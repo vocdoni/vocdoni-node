@@ -66,14 +66,6 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections/status/{status}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -261,7 +253,6 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Description	List the elections of an organization
 //	@Success		200	{object}	Organization
 //	@Router			/accounts/{organizationID}/elections/status/{status}/page/{page} [get]
-//	@Router			/accounts/{organizationID}/elections/status/{status} [get]
 //	@Router			/accounts/{organizationID}/elections/page/{page} [get]
 func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))

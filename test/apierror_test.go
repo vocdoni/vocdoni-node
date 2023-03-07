@@ -64,7 +64,7 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrFileSizeTooBig,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "elections", "status", "ready"}},
+			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "elections", "status", "ready", "page", "0"}},
 			want: api.ErrCantParseOrgID,
 		},
 		{

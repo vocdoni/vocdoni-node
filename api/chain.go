@@ -103,14 +103,6 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/chain/transactions",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxListPaginated,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -351,7 +343,6 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Summary		TODO
 //	@Description	TODO
 //	@Success		200	{object}	object
-//	@Router			/chain/transactions [get]
 //	@Router			/chain/transactions/page/{page} [get]
 func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
