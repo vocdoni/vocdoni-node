@@ -165,9 +165,9 @@ func sendVote(b *testing.B, cl *client.Client, chainID string, s *ethereum.SignK
 		Proof: &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
-					Type:     models.ProofArbo_BLAKE2B,
-					Value:    proof.Value,
-					Siblings: proof.Siblings,
+					Type:       models.ProofArbo_BLAKE2B,
+					LeafWeight: proof.Value,
+					Siblings:   proof.Siblings,
 				},
 			},
 		},

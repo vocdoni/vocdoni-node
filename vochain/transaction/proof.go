@@ -101,21 +101,21 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
 		}
-		valid, err := tree.VerifyProof(hashFunc, hashedKey, p.Value, p.Siblings, censusRoot)
+		valid, err := tree.VerifyProof(hashFunc, hashedKey, p.LeafWeight, p.Siblings, censusRoot)
 		if !valid || err != nil {
 			return false, nil, err
 		}
-		// Legacy: support p.Value == nil, assume then value=1
-		if p.Value == nil {
+		// Legacy: support p.LeafWeight == nil, assume then value=1
+		if p.LeafWeight == nil {
 			return true, bigOne, err
 		}
 
-		factoryWeight := arbo.BytesToBigInt(p.Value)
-		if p.Weight == nil {
+		factoryWeight := arbo.BytesToBigInt(p.LeafWeight)
+		if p.VotingWeight == nil {
 			return true, factoryWeight, nil
 		}
 
-		votingWeight := new(big.Int).SetBytes(p.Weight)
+		votingWeight := new(big.Int).SetBytes(p.VotingWeight)
 		if votingWeight.Cmp(factoryWeight) == 1 {
 			return false, nil, fmt.Errorf("assigned weight exceeded")
 		}

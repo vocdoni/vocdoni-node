@@ -128,11 +128,11 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
-					Type:     models.ProofArbo_BLAKE2B,
-					Siblings: v.ProofMkTree.Proof,
-					Value:    v.ProofMkTree.LeafValue,
-					KeyType:  v.ProofMkTree.KeyType,
-					Weight:   votingWeight,
+					Type:         models.ProofArbo_BLAKE2B,
+					Siblings:     v.ProofMkTree.Proof,
+					LeafWeight:   v.ProofMkTree.LeafValue,
+					KeyType:      v.ProofMkTree.KeyType,
+					VotingWeight: votingWeight,
 				},
 			},
 		}
