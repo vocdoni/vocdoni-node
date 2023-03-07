@@ -31,12 +31,13 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 			return nil, fmt.Errorf("%w: %v", ErrCantFetchEnvelopeHeight, err)
 		}
 		processes = append(processes, &ElectionSummary{
-			ElectionID:   procInfo.ID,
-			Status:       strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
-			StartDate:    procInfo.CreationTime,
-			EndDate:      a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
-			FinalResults: procInfo.FinalResults,
-			VoteCount:    count,
+			ElectionID:     procInfo.ID,
+			OrganizationID: procInfo.EntityID,
+			Status:         strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
+			StartDate:      procInfo.CreationTime,
+			EndDate:        a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
+			FinalResults:   procInfo.FinalResults,
+			VoteCount:      count,
 		})
 	}
 	return processes, nil

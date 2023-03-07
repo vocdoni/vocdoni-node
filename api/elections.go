@@ -177,7 +177,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 		ElectionSummary: ElectionSummary{
 			ElectionID:     electionID,
 			OrganizationID: proc.EntityID,
-			Status:         models.ProcessStatus_name[proc.Status],
+			Status:         strings.ToLower(models.ProcessStatus_name[proc.Status]),
 			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
 			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults:   proc.FinalResults,
