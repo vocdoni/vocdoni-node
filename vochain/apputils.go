@@ -22,6 +22,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 
 	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmtime "github.com/tendermint/tendermint/libs/time"
 	"github.com/tendermint/tendermint/privval"
@@ -36,14 +37,14 @@ func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval
 		log.Fatal(err)
 	}
 	if len(tmPrivKey) > 0 {
-		var privKey crypto25519.PrivKey
+		var privKey crypto256k1.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 		if err != nil {
 			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 		}
-		privKey = make([]byte, 64)
-		if n := copy(privKey[:], keyBytes[:]); n != 64 {
-			return nil, fmt.Errorf("incorrect private key length (got %d, need 64)", n)
+		privKey = make([]byte, crypto256k1.PrivKeySize)
+		if n := copy(privKey[:], keyBytes[:]); n != crypto256k1.PrivKeySize {
+			return nil, fmt.Errorf("incorrect private key length (got %d, need %d)", n, crypto25519.PrivateKeySize)
 		}
 		pv.Key.Address = privKey.PubKey().Address()
 		pv.Key.PrivKey = privKey
@@ -62,6 +63,7 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 	if err != nil {
 		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
 	}
+	// We need to use ed25519 curve for node key since tendermint does not support secp256k1
 	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
 	nodeKey.ID = tmtypes.NodeIDFromPubKey(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
@@ -72,17 +74,21 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
 	validators []privval.FilePV, oracles, accounts []string, initAccountsBalance int, treasurer string, txCosts *TransactionCosts) ([]byte, error) {
 	// default consensus params
-	appState := new(GenesisAppState)
-	appState.Validators = make([]GenesisValidator, len(validators))
+	appState := GenesisAppState{}
+	appState.Validators = make([]AppStateValidators, len(validators))
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey(context.Background())
 		if err != nil {
 			return nil, err
 		}
-		appState.Validators[idx] = GenesisValidator{
-			Address: val.GetAddress().Bytes(),
-			PubKey:  TendermintPubKey{Value: pubk.Bytes(), Type: "tendermint/PubKeyEd25519"},
-			Power:   "10",
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(hex.EncodeToString(val.Key.PrivKey.Bytes())); err != nil {
+			return nil, err
+		}
+		appState.Validators[idx] = AppStateValidators{
+			Address: signer.Address().Bytes(),
+			PubKey:  pubk.Bytes(),
+			Power:   10,
 			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
 		}
 	}
@@ -112,16 +118,11 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		return nil, err
 	}
 	appState.Treasurer = tb
-	appStateBytes, err := json.Marshal(appState)
-	if err != nil {
-		return nil, err
-	}
 	genDoc := GenesisDoc{
 		ChainID:         chainID,
 		GenesisTime:     tmtime.Now(),
 		ConsensusParams: consensusParams,
-		Validators:      appState.Validators,
-		AppState:        appStateBytes,
+		AppState:        appState,
 	}
 
 	// Note that the genesis doc bytes are later consumed by tendermint,
@@ -171,17 +172,16 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	gd.ConsensusParams.Block.MaxGas = -1
 	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000
 	gd.ConsensusParams.Evidence.MaxAgeDuration = 10000
-	gd.ConsensusParams.Validator.PubKeyTypes = []string{"ed25519"}
+	gd.ConsensusParams.Validator.PubKeyTypes = []string{"secp256k1"}
 
 	// Create validators
-	gd.Validators = []tmtypes.GenesisValidator{}
-	appStateValidators := []GenesisValidator{}
+	appStateValidators := []AppStateValidators{}
 	for i := 0; i < validators; i++ {
 		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
 		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
 			return nil, err
 		}
-		privKey := util.RandomHex(64)
+		privKey := hex.EncodeToString(crypto256k1.GenPrivKey().Bytes())
 		pv, err := NewPrivateValidator(privKey,
 			filepath.Join(nodeDir, "priv_validator_key.json"),
 			filepath.Join(nodeDir, "priv_validator_state.json"),
@@ -193,18 +193,15 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKey), 0o600); err != nil {
 			return nil, err
 		}
-		gd.Validators = append(gd.Validators, tmtypes.GenesisValidator{
-			Address: pv.Key.Address,
-			PubKey:  pv.Key.PubKey,
-			Power:   10,
-		})
-		appStateValidators = append(appStateValidators, GenesisValidator{
-			Address: pv.Key.Address.Bytes(),
-			PubKey: TendermintPubKey{
-				Type:  "tendermint/PubKeyEd25519",
-				Value: pv.Key.PubKey.Bytes(),
-			},
-			Power: "10",
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
+			return nil, err
+		}
+		appStateValidators = append(appStateValidators, AppStateValidators{
+			Address:  signer.Address().Bytes(),
+			PubKey:   pv.Key.PubKey.Bytes(),
+			Power:    10,
+			KeyIndex: uint8(i + 1), // zero is reserved for disabling validator key keeper capabilities
 		})
 	}
 

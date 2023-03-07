@@ -61,7 +61,7 @@ func (f *FaucetAPI) faucetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	log.Debugf("faucet request from %s for network %s", to.String(), network)
 	fpackage, err := vochain.GenerateFaucetPackage(f.signingKey, to, amount)
 	if err != nil {
-		return fmt.Errorf("%w: %v", api.ErrCantGenerateFaucetPkg, err)
+		return api.ErrCantGenerateFaucetPkg.WithErr(err)
 	}
 	fpackageBytes, err := json.Marshal(FaucetPackage{
 		FaucetPayload: fpackage.Payload,

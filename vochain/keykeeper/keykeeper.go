@@ -280,7 +280,7 @@ func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {
 	// Generate keys
 	// Add the index in order to win some extra entropy
 	pb := append(pid, byte(k.myIndex))
-	// Private ed25519 key
+	// Private secp256k1 key
 	priv, err := nacl.DecodePrivate(fmt.Sprintf("%x",
 		ethereum.HashRaw(append(k.signer.Private.D.Bytes(), pb...))))
 	if err != nil {

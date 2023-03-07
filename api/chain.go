@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"time"
 
@@ -111,6 +110,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxListPaginated,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -210,6 +217,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		ID:                      a.vocapp.ChainID(),
 		BlockTime:               *a.vocinfo.BlockTimes(),
 		ElectionCount:           a.indexer.ProcessCount(nil),
+		OrganizationCount:       a.indexer.EntityCount(),
 		Height:                  a.vocapp.Height(),
 		Syncing:                 a.vocapp.IsSynchronizing(),
 		TransactionCount:        transactionCount,
@@ -266,17 +274,17 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return fmt.Errorf("%w: %v", ErrCantParseDataAsJSON, err)
+		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	res, err := a.vocapp.SendTx(req.Payload)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrVochainSendTxFailed, err)
+		return ErrVochainSendTxFailed.WithErr(err)
 	}
 	if res == nil {
 		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
+		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
 	}
 	var data []byte
 	if data, err = json.Marshal(Transaction{
@@ -310,14 +318,22 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 }
 
 // /chain/transactions/page/<page>
+// /chain/transactions
 func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page, err := strconv.Atoi(ctx.URLParam("page"))
-	if err != nil {
-		return err
+	page := 0
+	if ctx.URLParam("page") != "" {
+		var err error
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return err
+		}
 	}
 	offset := int32(page * MaxPageSize)
 	refs, err := a.indexer.GetLastTxReferences(MaxPageSize, offset)
 	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ErrTransactionNotFound
+		}
 		return err
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
@@ -342,7 +358,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("cannot get transaction reference: %w", err)
+		return ErrTransactionNotFound.WithErr(err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {
@@ -364,10 +380,10 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	}
 	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
 	if err != nil {
-		if errors.Is(err, indexer.ErrTransactionNotFound) {
+		if errors.Is(err, vochain.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
+		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
 }
@@ -383,7 +399,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
 		}
-		return fmt.Errorf("%w: %v", ErrVochainGetTxFailed, err)
+		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	data, err := json.Marshal(ref)
 	if err != nil {

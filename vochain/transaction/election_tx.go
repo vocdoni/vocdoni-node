@@ -368,7 +368,6 @@ func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
 	if len(process.EncryptionPublicKeys[tx.GetKeyIndex()]) > 0 {
 		return fmt.Errorf("key index %d already exists", tx.KeyIndex)
 	}
-	// TBD check that provided keys are correct (ed25519 for encryption and size for Commitment)
 	return nil
 }
 

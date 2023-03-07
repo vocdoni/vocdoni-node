@@ -141,8 +141,6 @@ func newConfig() (*config.Config, config.Error) {
 		"vochain mempool size")
 	globalCfg.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
-	globalCfg.Vochain.KeyKeeperIndex = *flag.Int8("keyKeeperIndex", 0,
-		"index slot used by this node if it is a key keeper")
 	globalCfg.Vochain.ImportPreviousCensus = *flag.Bool("importPreviousCensus", false,
 		"if enabled the census downloader will import all existing census")
 	globalCfg.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
@@ -223,7 +221,6 @@ func newConfig() (*config.Config, config.Error) {
 	viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
 	viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize"))
 	viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
-	viper.BindPFlag("vochain.KeyKeeperIndex", flag.Lookup("keyKeeperIndex"))
 	viper.BindPFlag("vochain.ImportPreviousCensus", flag.Lookup("importPreviousCensus"))
 	viper.Set("vochain.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
 	viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive"))
@@ -449,6 +446,7 @@ func main() {
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway
+
 		// create the vochain service
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
@@ -489,6 +487,42 @@ func main() {
 	}
 
 	//
+	// Validator
+	//
+	if globalCfg.Mode == types.ModeMiner {
+		// create the key for the validator used to sign transactions
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(globalCfg.Vochain.MinerKey); err != nil {
+			log.Fatal(err)
+		}
+		validator, err := srv.App.State.Validator(signer.Address(), true)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if validator == nil {
+			log.Warnw("node is not a validator", "address", signer.Address().Hex())
+		} else {
+			// start keykeeper service (if key index specified)
+			if validator.KeyIndex > 0 {
+				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
+					path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
+					srv.App,
+					&signer,
+					int8(validator.KeyIndex))
+				if err != nil {
+					log.Fatal(err)
+				}
+				go vochainKeykeeper.RevealUnpublished()
+			} else {
+				log.Warnw("validator keyIndex disabled")
+			}
+			log.Infow("configured vochain validator",
+				"address", signer.Address().Hex(),
+				"keyIndex", validator.KeyIndex)
+		}
+	}
+
+	//
 	// Oracle
 	//
 	if globalCfg.Mode == types.ModeOracle {
@@ -497,18 +531,6 @@ func main() {
 		}
 		// Start oracle results indexer
 		vochainOracle.EnableResults(srv.Indexer)
-		// Start keykeeper service (if key index specified)
-		if globalCfg.Vochain.KeyKeeperIndex > 0 {
-			vochainKeykeeper, err = keykeeper.NewKeyKeeper(
-				path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
-				srv.App,
-				srv.Signer,
-				globalCfg.Vochain.KeyKeeperIndex)
-			if err != nil {
-				log.Fatal(err)
-			}
-			go vochainKeykeeper.RevealUnpublished()
-		}
 	}
 
 	//

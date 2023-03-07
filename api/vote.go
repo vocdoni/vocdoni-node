@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -55,9 +54,9 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 	// check if the transaction is of the correct type
 	if ok, err := isTransactionType(req.TxPayload, &models.Tx_Vote{}); err != nil {
-		return fmt.Errorf("%w: %v", ErrCantCheckTxType, err)
+		return ErrCantCheckTxType.WithErr(err)
 	} else if !ok {
-		return fmt.Errorf("%w (expected %s)", ErrTxTypeMismatch, "Vote")
+		return ErrTxTypeMismatch.Withf("expected Tx_Vote")
 	}
 
 	// send the transaction to the mempool
@@ -69,7 +68,7 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
+		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
 	}
 	var data []byte
 	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
@@ -83,10 +82,10 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantParseVoteID, err)
+		return ErrCantParseVoteID.WithErr(err)
 	}
 	if len(voteID) != types.VoteNullifierSize {
-		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
+		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
 
 	voteData, err := a.indexer.GetEnvelope(voteID)
@@ -94,7 +93,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		if errors.Is(err, indexer.ErrVoteNotFound) {
 			return ErrVoteNotFound
 		}
-		return fmt.Errorf("%w: %v", ErrCantFetchEnvelope, err)
+		return ErrCantFetchEnvelope.WithErr(err)
 	}
 
 	vote := &Vote{
@@ -127,17 +126,17 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantParseVoteID, err)
+		return ErrCantParseVoteID.WithErr(err)
 	}
 	if len(voteID) != types.VoteNullifierSize {
-		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
+		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
 	if len(voteID) != types.ProcessIDsize {
-		return fmt.Errorf("%w (%x)", ErrVoteIDMalformed, voteID)
+		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
 		return ErrVoteNotFound

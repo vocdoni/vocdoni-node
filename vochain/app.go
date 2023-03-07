@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -14,6 +13,7 @@ import (
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	abcitypes "github.com/tendermint/tendermint/abci/types"
+	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 	"github.com/tendermint/tendermint/libs/service"
 	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
 	tmcli "github.com/tendermint/tendermint/rpc/client/local"
@@ -31,6 +31,11 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	models "go.vocdoni.io/proto/build/go/models"
+)
+
+var (
+	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
+	ErrTransactionNotFound = fmt.Errorf("transaction not found")
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -334,10 +339,10 @@ func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedT
 func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*models.SignedTx, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
-		return nil, fmt.Errorf("unable to get block by height: %d", height)
+		return nil, ErrTransactionNotFound
 	}
 	if int32(len(block.Txs)) <= txIndex {
-		return nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+		return nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
 	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
@@ -351,10 +356,10 @@ func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.Sig
 func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
 	block := app.GetBlockByHeight(int64(height))
 	if block == nil {
-		return nil, nil, fmt.Errorf("unable to get block by height: %d", height)
+		return nil, nil, ErrTransactionNotFound
 	}
 	if int32(len(block.Txs)) <= txIndex {
-		return nil, nil, fmt.Errorf("txIndex overflow on GetTx (height: %d, txIndex:%d)", height, txIndex)
+		return nil, nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
 	return tx, block.Txs[txIndex].Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
@@ -437,23 +442,35 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 				log.Fatal(err)
 			}
 		}
-		log.Infof("created acccount %x with %d tokens", addr, acc.Balance)
+		log.Infow("created acccount", "addr", addr.Hex(), "tokens", acc.Balance)
 	}
 	// get validators
+	// TODO pau: unify this code with the one on apputils.go that essentially does the same
+	tendermintValidators := []abcitypes.ValidatorUpdate{}
 	for i := 0; i < len(genesisAppState.Validators); i++ {
-		log.Infof("adding genesis validator %x", genesisAppState.Validators[i].Address)
-		pwr, err := strconv.ParseUint(genesisAppState.Validators[i].Power, 10, 64)
-		if err != nil {
-			log.Fatalf("cannot decode validator power: %s", err)
-		}
+		log.Infow("add genesis validator",
+			"signingAddress", genesisAppState.Validators[i].Address.String(),
+			"consensusPubKey", genesisAppState.Validators[i].PubKey.String(),
+			"power", genesisAppState.Validators[i].Power,
+			"name", genesisAppState.Validators[i].Name,
+			"keyIndex", genesisAppState.Validators[i].KeyIndex,
+		)
+
 		v := &models.Validator{
-			Address: genesisAppState.Validators[i].Address,
-			PubKey:  genesisAppState.Validators[i].PubKey.Value,
-			Power:   pwr,
+			Address:  genesisAppState.Validators[i].Address,
+			PubKey:   genesisAppState.Validators[i].PubKey,
+			Power:    genesisAppState.Validators[i].Power,
+			KeyIndex: uint32(genesisAppState.Validators[i].KeyIndex),
 		}
 		if err = app.State.AddValidator(v); err != nil {
 			log.Fatal(err)
 		}
+		tendermintValidators = append(tendermintValidators,
+			abcitypes.UpdateValidator(
+				genesisAppState.Validators[i].PubKey,
+				int64(genesisAppState.Validators[i].Power),
+				crypto256k1.KeyType,
+			))
 	}
 
 	// set treasurer address
@@ -475,12 +492,15 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 		log.Fatal("unable to set burn address")
 	}
 
-	// Is this save needed?
-	if _, err := app.State.Save(); err != nil {
+	// commit state and get hash
+	hash, err := app.State.Save()
+	if err != nil {
 		log.Fatalf("cannot save state: %s", err)
 	}
-	// TBD: using empty list here, should return validatorsUpdate to use the validators obtained here
-	return abcitypes.ResponseInitChain{}
+	return abcitypes.ResponseInitChain{
+		Validators: tendermintValidators,
+		AppHash:    hash,
+	}
 }
 
 // fnBeginBlockDefault signals the beginning of a new block. Called prior to any DeliverTxs.

@@ -163,6 +163,7 @@ type ChainInfo struct {
 	ID                      string    `json:"chainId"`
 	BlockTime               [5]int32  `json:"blockTime"`
 	ElectionCount           uint64    `json:"electionCount"`
+	OrganizationCount       uint64    `json:"organizationCount"`
 	GenesisTime             time.Time `json:"genesisTime"`
 	Height                  uint32    `json:"height"`
 	Syncing                 bool      `json:"syncing"`

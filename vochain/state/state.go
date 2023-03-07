@@ -3,6 +3,7 @@ package state
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -321,7 +322,7 @@ func (v *State) RemoveValidator(address []byte) error {
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) Validators(committed bool) ([]*models.Validator, error) {
+func (v *State) Validators(committed bool) (map[string]*models.Validator, error) {
 	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
@@ -332,7 +333,7 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 		return nil, err
 	}
 
-	var validators []*models.Validator
+	validators := make(map[string]*models.Validator)
 	var callbackErr error
 	if err := validatorsTree.Iterate(func(key, value []byte) bool {
 		// removed validators are still in the tree but with value set
@@ -345,7 +346,7 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 			callbackErr = err
 			return false
 		}
-		validators = append(validators, validator)
+		validators[hex.EncodeToString(validator.GetAddress())] = validator
 		return true
 	}); err != nil {
 		return nil, err
@@ -354,6 +355,16 @@ func (v *State) Validators(committed bool) ([]*models.Validator, error) {
 		return nil, callbackErr
 	}
 	return validators, nil
+}
+
+// Validator returns an existing validator identified by the given signing address.
+// If the validator is not found, returns nil and no error.
+func (v *State) Validator(address common.Address, committed bool) (*models.Validator, error) {
+	list, err := v.Validators(committed)
+	if err != nil {
+		return nil, err
+	}
+	return list[hex.EncodeToString(address.Bytes())], nil
 }
 
 // AddProcessKeys adds the keys to the process

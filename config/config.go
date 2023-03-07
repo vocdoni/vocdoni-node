@@ -121,9 +121,9 @@ type VochainCfg struct {
 	Peers []string
 	// Seeds seeds with which the node tries to connect
 	Seeds []string
-	// MinerKey contains the EDDSA private key for signing tendermint blocks
+	// MinerKey contains the secp256k1 private key for signing tendermint blocks
 	MinerKey string
-	// NodeKey contains the EDDSA public key that identifies the node in the P2P network
+	// NodeKey contains the ed25519 public key that identifies the node in the P2P network
 	NodeKey string
 	// PrivValidatorAddr if defined, Tendermint node will open a port and wait for a private validator connection
 	// (example value: tcp://0.0.0.0:26658)
@@ -132,8 +132,6 @@ type VochainCfg struct {
 	NoWaitSync bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
-	// KeyKeeperIndex is the index used by the key keeper (usually and oracle)
-	KeyKeeperIndex int8
 	// ImportPreviousCensus if true the census downloader will try to download
 	// all census (not only the new ones)
 	ImportPreviousCensus bool

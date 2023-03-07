@@ -14,7 +14,7 @@ import (
 
 	abciclient "github.com/tendermint/tendermint/abci/client"
 	tmcfg "github.com/tendermint/tendermint/config"
-	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
+	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
 
 	tmjson "github.com/tendermint/tendermint/libs/json"
 	tmlog "github.com/tendermint/tendermint/libs/log"
@@ -231,7 +231,7 @@ func newTendermint(app *BaseApplication,
 	}
 	pv.Save()
 
-	log.Infof("tendermint validator address: %s", pv.Key.Address)
+	log.Infof("tendermint validator pubkey: %x", pv.Key.PubKey.Bytes())
 	//aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
 	//if err != nil {
 	//	return nil, err
@@ -304,7 +304,7 @@ func newTendermint(app *BaseApplication,
 
 // AminoKeys is a helper function that transforms a standard EDDSA key into
 // Tendermint like amino format useful for creating genesis files.
-func AminoKeys(key crypto25519.PrivKey) (private, public []byte, err error) {
+func AminoKeys(key crypto256k1.PrivKey) (private, public []byte, err error) {
 	aminoKey, err := tmjson.Marshal(key)
 	if err != nil {
 		return nil, nil, err

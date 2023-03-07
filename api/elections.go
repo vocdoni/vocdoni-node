@@ -122,23 +122,23 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		var err error
 		page, err = strconv.Atoi(ctx.URLParam("page"))
 		if err != nil {
-			return fmt.Errorf("%w (%s)", ErrCantParsePageNumber, ctx.URLParam("page"))
+			return ErrCantParsePageNumber.With(ctx.URLParam("page"))
 		}
 	}
 	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantFetchElectionList, err)
+		return ErrCantFetchElectionList.WithErr(err)
 	}
 
 	list := []ElectionSummary{}
 	for _, eid := range elections {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
-			return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, eid, err)
+			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
 		count, err := a.indexer.GetEnvelopeHeight(eid)
 		if err != nil {
-			return fmt.Errorf("%w: %v", ErrCantFetchEnvelopeHeight, err)
+			return ErrCantFetchEnvelopeHeight.WithErr(err)
 		}
 		list = append(list, ElectionSummary{
 			ElectionID:     eid,
@@ -156,7 +156,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		Elections []ElectionSummary `json:"elections"`
 	}{list})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -166,18 +166,18 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
 	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
 		if errors.Is(err, indexer.ErrProcessNotFound) {
 			return ErrElectionNotFound
 		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+		return ErrCantFetchElection.Withf("(%x): %v", electionID, err)
 	}
 	count, err := a.indexer.GetEnvelopeHeight(electionID)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantFetchEnvelopeHeight, err)
+		return ErrCantFetchEnvelopeHeight.WithErr(err)
 	}
 
 	election := Election{
@@ -206,7 +206,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if proc.HaveResults {
 		results, err := a.indexer.GetResults(electionID)
 		if err != nil {
-			return fmt.Errorf("%w (%x): %v", ErrCantFetchElectionResults, electionID, err)
+			return ErrCantFetchElectionResults.Withf("(%x): %v", electionID, err)
 		}
 		election.Results = results.Votes
 	}
@@ -228,7 +228,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	}
 	data, err := json.Marshal(election)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -238,8 +238,13 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
+	// check process exists and return 404 if not
+	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+		return err
+	}
+
 	count := a.vocapp.State.CountVotes(electionID, true)
 	data, err := json.Marshal(
 		struct {
@@ -247,7 +252,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 		}{Count: count},
 	)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -257,15 +262,11 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
-
-	process, err := a.vocapp.State.Process(electionID, true)
+	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
-		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return ErrElectionNotFound
-		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+		return err
 	}
 	election := Election{}
 	for idx, pubk := range process.EncryptionPublicKeys {
@@ -289,7 +290,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	data, err := json.Marshal(election)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -300,7 +301,10 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+	}
+	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+		return err
 	}
 	page := 0
 	if ctx.URLParam("page") != "" {
@@ -316,7 +320,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		if errors.Is(err, indexer.ErrVoteNotFound) {
 			return ErrVoteNotFound
 		}
-		return err
+		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
 	}
 	votes := []Vote{}
 	for _, v := range votesRaw {
@@ -332,7 +336,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		Votes []Vote `json:"votes"`
 	}{votes})
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -342,17 +346,11 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
-		return fmt.Errorf("%w (%s): %v", ErrCantParseElectionID, ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
-	process, err := a.vocapp.State.Process(electionID, true)
+	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
-		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return ErrElectionNotFound
-		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
-	}
-	if process == nil {
-		return fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
+		return err
 	}
 	// do not make distinction between live results elections and encrypted results elections
 	// since we fetch the results from the blockchain state, elections must be terminated and
@@ -456,12 +454,12 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		electionResults.Results,
 	)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrCantABIEncodeResults, err)
+		return ErrCantABIEncodeResults.WithErr(err)
 	}
 
 	data, err := json.Marshal(electionResults)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrMarshalingServerJSONFailed, err)
+		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
@@ -507,7 +505,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		// if election metadata defined, check the format
 		metadata := ElectionMetadata{}
 		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
-			return fmt.Errorf("%w: %v", ErrCantParseMetadataAsJSON, err)
+			return ErrCantParseMetadataAsJSON.WithErr(err)
 		}
 
 		// set metadataCID from metadata bytes
@@ -521,13 +519,13 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// send the transaction
 	res, err := a.vocapp.SendTx(req.TxPayload)
 	if err != nil {
-		return fmt.Errorf("%w: %v", ErrVochainSendTxFailed, err)
+		return ErrVochainSendTxFailed.WithErr(err)
 	}
 	if res == nil {
 		return ErrVochainEmptyReply
 	}
 	if res.Code != 0 {
-		return fmt.Errorf("%w: (%d) %s", ErrVochainReturnedErrorCode, res.Code, string(res.Data))
+		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
 	}
 
 	resp := &ElectionCreate{
@@ -567,7 +565,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 // helper endpoint to get the IPFS CID hash of a file
 func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(msg.Data) > MaxOffchainFileSize {
-		return fmt.Errorf("%w (%d bytes)", ErrFileSizeTooBig, MaxOffchainFileSize)
+		return ErrFileSizeTooBig.Withf("%d vs %d bytes", len(msg.Data), MaxOffchainFileSize)
 	}
 	req := &File{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -585,4 +583,20 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// getElection retrieves an election from the vochain state.
+// Checks if election exists and return 404 if not
+func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
+	process, err := vs.Process(electionID, true)
+	if err != nil {
+		if errors.Is(err, state.ErrProcessNotFound) {
+			return nil, ErrElectionNotFound
+		}
+		return nil, fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+	}
+	if process == nil {
+		return nil, fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
+	}
+	return process, nil
 }
