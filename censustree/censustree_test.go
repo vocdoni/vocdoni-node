@@ -18,11 +18,11 @@ import (
 
 func TestPublish(t *testing.T) {
 	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 	rnd := testutil.NewRandom(0)
-	key, value := rnd.RandomBytes(32), rnd.RandomBytes(32)
+	key, value := rnd.RandomBytes(DefaultMaxKeyLen), rnd.RandomBytes(32)
 	qt.Assert(t, censusTree.Add(key, value), qt.IsNil)
 
 	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
@@ -40,7 +40,7 @@ func TestPublish(t *testing.T) {
 
 func TestImportWeighted(t *testing.T) {
 	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -50,8 +50,9 @@ func TestImportWeighted(t *testing.T) {
 	// add a bunch of keys and values (weights)
 	for i := 1; i < 11; i++ {
 		h, err := arbo.HashFunctionBlake2b.Hash(rnd.RandomBytes(32))
+		h = h[:DefaultMaxKeyLen]
 		qt.Assert(t, err, qt.IsNil)
-		qt.Assert(t, h, qt.Not(qt.HasLen), 0)
+		qt.Assert(t, h, qt.HasLen, DefaultMaxKeyLen)
 		censusTree.Add(h, censusTree.BigIntToBytes(new(big.Int).SetInt64(int64(i))))
 		qt.Assert(t, err, qt.IsNil)
 		totalWeight.Add(totalWeight, big.NewInt(int64(i)))
@@ -67,7 +68,7 @@ func TestImportWeighted(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// import into a new tree
-	censusTree2, err := New(Options{Name: "test2", ParentDB: db, MaxLevels: 256,
+	censusTree2, err := New(Options{Name: "test2", ParentDB: db, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -80,7 +81,7 @@ func TestImportWeighted(t *testing.T) {
 	qt.Assert(t, weight.Cmp(totalWeight), qt.Equals, 0)
 
 	// check root is the same after adding a new leaf
-	k, v := rnd.RandomBytes(32), rnd.RandomBytes(32)
+	k, v := rnd.RandomBytes(DefaultMaxKeyLen), rnd.RandomBytes(32)
 	err = censusTree.Add(k, v)
 	qt.Assert(t, err, qt.IsNil)
 	err = censusTree2.Add(k, v)
@@ -95,7 +96,7 @@ func TestImportWeighted(t *testing.T) {
 
 func TestWeightedProof(t *testing.T) {
 	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_POSEIDON})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -104,14 +105,14 @@ func TestWeightedProof(t *testing.T) {
 	// add a bunch of keys
 	for i := 1; i < 11; i++ {
 		err = censusTree.Add(
-			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
+			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000))))[:DefaultMaxKeyLen],
 			censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(1000000)))),
 		)
 		qt.Assert(t, err, qt.IsNil)
 	}
 
 	// add the last key (we will use if for testing the proof)
-	userKey := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(100000))))
+	userKey := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(100000))))[:DefaultMaxKeyLen]
 	userWeight := censusTree.BigIntToBytes(big.NewInt(int64(rnd.RandomIntn(100000))))
 
 	err = censusTree.Add(userKey, userWeight)
@@ -134,7 +135,7 @@ func TestWeightedProof(t *testing.T) {
 
 func TestGetCensusWeight(t *testing.T) {
 	db := metadb.NewTest(t)
-	tree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: 256,
+	tree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -205,7 +206,7 @@ func TestGetCensusWeight(t *testing.T) {
 	// try to add keys with empty values
 	keys = [][]byte{}
 	for i := 0; i < 100; i++ {
-		keys = append(keys, []byte("keysWithoutWeight"+strconv.Itoa(i)))
+		keys = append(keys, []byte("keysWithoutWeight" + strconv.Itoa(i))[:DefaultMaxKeyLen])
 	}
 
 	invalids, err = tree.AddBatch(keys, nil)
@@ -219,7 +220,7 @@ func TestGetCensusWeight(t *testing.T) {
 	// dump the leaves & import them into a new empty tree, and check that
 	// the censusWeight is correctly recomputed
 	db2 := metadb.NewTest(t)
-	tree2, err := New(Options{Name: "test2", ParentDB: db2, MaxLevels: 256,
+	tree2, err := New(Options{Name: "test2", ParentDB: db2, MaxLevels: DefaultMaxLevels,
 		CensusType: models.Census_ARBO_BLAKE2B})
 	qt.Assert(t, err, qt.IsNil)
 

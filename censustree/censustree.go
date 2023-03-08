@@ -41,13 +41,18 @@ type Options struct {
 	CensusType models.Census_Type
 }
 
-// By default, the maximum number of levels will be 256, which allows to add
-// up to 2^256 leaves to the tree, with keys with up to 32 bytes. However the
+// By default, the maximum number of levels will be 160, which allows to add
+// up to 2^160 leaves to the tree, with keys with up to 20 bytes. However the
 // number of levels could be setted up during the tree initialization which
 // allows to support uses cases with specific restrictions such as the
 // zkweighted census, which needs to optimize some artifacts size that depends
 // of the number of levels of the tree.
-const DefaultMaxLevels = 256
+const DefaultMaxLevels = 160
+
+// The maximum length of a census tree key is defined by the number of levels of
+// the census tree. It is the number of bytes that can fit into 'n' bits, where
+// 'n' is the number of levels of the census tree.
+const DefaultMaxKeyLen = DefaultMaxLevels / 8
 
 // DeleteCensusTreeFromDatabase removes all the database entries for the census identified by name.
 // Caller must take care of potential data races, the census must be closed before calling this method.
@@ -72,20 +77,21 @@ func DeleteCensusTreeFromDatabase(kv db.Database, name string) (int, error) {
 // New returns a new Tree, if there already is a Tree in the
 // database, it will load it.
 func New(opts Options) (*Tree, error) {
-	var maxLevels = DefaultMaxLevels
+	var maxLevels = opts.MaxLevels
+	if maxLevels > DefaultMaxLevels {
+		maxLevels = DefaultMaxLevels
+	}
+
 	var hashFunc arbo.HashFunction
 	switch opts.CensusType {
 	case models.Census_ARBO_BLAKE2B:
 		hashFunc = arbo.HashFunctionBlake2b
 	case models.Census_ARBO_POSEIDON:
 		// If an Arbo census tree is based on Poseidon hash to use it with a
-		// circom circuit, it is necessary to increase the number of levels by one
-		// (unless it has the maximum number of levels). This is done to
-		// emulate the same behaviour than Circom SMT library, which increases
-		// the desired number of levels by one.
-		if opts.MaxLevels < maxLevels {
-			maxLevels = opts.MaxLevels + 1
-		}
+		// circom circuit, it is necessary to increase the number of levels by
+		// one. This is done to emulate the same behaviour than Circom SMT
+		// library, which increases the desired number of levels by one.
+		maxLevels++
 		hashFunc = arbo.HashFunctionPoseidon
 	default:
 		return nil, fmt.Errorf("unrecognized census type (%d)", opts.CensusType)
@@ -177,14 +183,26 @@ func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 			return false, fmt.Errorf("cannot get tree root: %w", err)
 		}
 	}
-	return t.tree.VerifyProof(key, value, proof, root)
+	// If the provided key is longer than the defined maximum length truncate it
+	// TODO: return an error if the other key lengths are deprecated
+	leafKey := key
+	if len(leafKey) > DefaultMaxKeyLen {
+		leafKey = leafKey[:DefaultMaxKeyLen]
+	}
+	return t.tree.VerifyProof(leafKey, value, proof, root)
 }
 
 // GenProof generates a census proof for the provided key.
 // The returned values are `value` and `siblings`.
 // If the census is indexed, value will be equal to key.
 func (t *Tree) GenProof(key []byte) ([]byte, []byte, error) {
-	return t.tree.GenProof(nil, key)
+	// If the provided key is longer than the defined maximum length truncate it
+	// TODO: return an error if the other key lengths are deprecated
+	leafKey := key
+	if len(leafKey) > DefaultMaxKeyLen {
+		leafKey = leafKey[:DefaultMaxKeyLen]
+	}
+	return t.tree.GenProof(nil, leafKey)
 }
 
 // Size returns the census index (number of added leafs to the merkle tree).
