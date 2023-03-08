@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/log"
@@ -101,7 +102,14 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
 		}
-		valid, err := tree.VerifyProof(hashFunc, hashedKey, p.Value, p.Siblings, censusRoot)
+		// If the provided key is longer than the defined maximum length
+		// truncate it.
+		// TODO: return an error if the other key lengths are deprecated
+		leafKey := hashedKey
+		if len(leafKey) > censustree.DefaultMaxKeyLen {
+			leafKey = leafKey[:censustree.DefaultMaxKeyLen]
+		}
+		valid, err := tree.VerifyProof(hashFunc, leafKey, p.Value, p.Siblings, censusRoot)
 		// Legacy: support p.Value == nil, assume then value=1
 		if p.Value == nil {
 			return valid, bigOne, err
