@@ -38,6 +38,7 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/tree/arbo"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -138,7 +139,7 @@ func TestCensusRPC(t *testing.T) {
 		claim, err := arbo.HashFunctionBlake2b.Hash(crypto.FromECDSAPub(&key.Public))
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, claim, qt.Not(qt.HasLen), 0)
-		claims = append(claims, claim)
+		claims = append(claims, claim[:censustree.DefaultMaxKeyLen])
 		req.Weights = append(req.Weights, (&types.BigInt{}).SetUint64(uint64(*censusWeight)))
 	}
 	req.CensusKeys = claims

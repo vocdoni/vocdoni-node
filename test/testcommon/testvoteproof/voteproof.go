@@ -51,7 +51,7 @@ func GetCSPproofBatch(signers []*ethereum.SignKeys,
 func CreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []byte, [][]byte) {
 	db := metadb.NewTest(t)
 	tr, err := censustree.New(censustree.Options{Name: "testcensus", ParentDB: db,
-		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
+		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,6 +61,7 @@ func CreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []b
 	for _, k := range keys {
 		c, err := tr.Hash(k.PublicKey())
 		qt.Check(t, err, qt.IsNil)
+		c = c[:censustree.DefaultMaxKeyLen]
 		err = tr.Add(c, nil)
 		qt.Check(t, err, qt.IsNil)
 		hashedKeys = append(hashedKeys, c)
