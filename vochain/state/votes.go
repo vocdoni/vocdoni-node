@@ -176,7 +176,8 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	// The vote nullifier generated during anonymous voting with zksnarks could
 	// have 31 or 32 bytes of lenght. Now, here only check that the nullifier is
 	// not empty and then, if it is wrong, the verification will be fail.
-	// TODO: (lucas) Set a minimun and maximun length for the nullifier and check it.
+	// TODO: (lucas) Set a minimun and maximum length for the nullifier and
+	// check it.
 	if len(nullifier) == 0 {
 		return nil, fmt.Errorf("empty or nil nullifier")
 	}
