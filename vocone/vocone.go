@@ -105,16 +105,13 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 		return nil, err
 	}
 
-	// Create key keeper and the oracle (same key for both)
-	if err := vc.AddOracle(keymanager); err != nil {
-		return nil, err
+	// Create key keeper
+	if err := vc.SetKeyKeeper(keymanager); err != nil {
+		return nil, fmt.Errorf("could not create keykeeper: %w", err)
 	}
-	vc.kk, err = keykeeper.NewKeyKeeper(
-		filepath.Join(dataDir, "keykeeper"),
-		vc.app,
-		keymanager,
-		1)
-	if err != nil {
+
+	// Create the Oracle for voting results
+	if err := vc.AddOracle(keymanager); err != nil {
 		return nil, err
 	}
 	if vc.oracle, err = oracle.NewOracle(vc.app, keymanager); err != nil {
@@ -281,6 +278,43 @@ func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 		return err
 	}
 	return nil
+}
+
+// SetKeyKeeper adds a keykeper to the application.
+func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
+	// Create key keeper
+	// we need to add a validator, so the keykeeper functions are allowed
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	// remove existing validators before we add the new one (to avoid keyindex collision)
+	validators, err := vc.app.State.Validators(true)
+	if err != nil {
+		return err
+	}
+	for _, v := range validators {
+		if err := vc.app.State.RemoveValidator(v.Address); err != nil {
+			log.Warnf("could not remove validator %x", v.Address)
+		}
+	}
+	// add the new validator
+	if err := vc.app.State.AddValidator(&models.Validator{
+		Address:  key.Address().Bytes(),
+		Power:    100,
+		Name:     "vocone-solo-validator",
+		KeyIndex: 1,
+	}); err != nil {
+		return err
+	}
+	log.Infow("adding validator", "address", key.Address().Hex(), "keyIndex", 1)
+	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	vc.kk, err = keykeeper.NewKeyKeeper(
+		filepath.Join(vc.dataDir, "keykeeper"),
+		vc.app,
+		key,
+		1)
+	return err
 }
 
 // MintTokens mints tokens to the given account address

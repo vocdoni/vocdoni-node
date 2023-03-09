@@ -50,14 +50,6 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -91,14 +83,6 @@ func (a *API) enableAccountHandlers() error {
 	}
 	if err := a.endpoint.RegisterMethod(
 		"/accounts/{accountID}/transfers/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.tokenTransfersHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
-		"/accounts/{accountID}/transfers",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenTransfersHandler,

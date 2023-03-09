@@ -54,12 +54,15 @@ type Election struct {
 	Census       *ElectionCensus   `json:"census,omitempty"`
 	MetadataURL  string            `json:"metadataURL"`
 	CreationTime time.Time         `json:"creationTime"`
-	PublicKeys   []Key             `json:"publicKeys,omitempty"`
-	PrivateKeys  []Key             `json:"privateKeys,omitempty"`
 	VoteMode     VoteMode          `json:"voteMode,omitempty"`
 	ElectionMode ElectionMode      `json:"electionMode,omitempty"`
 	TallyMode    TallyMode         `json:"tallyMode,omitempty"`
 	Metadata     *ElectionMetadata `json:"metadata,omitempty"`
+}
+
+type ElectionKeys struct {
+	PublicKeys  []Key `json:"publicKeys,omitempty"`
+	PrivateKeys []Key `json:"privateKeys,omitempty"`
 }
 
 type ElectionCensus struct {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -58,102 +59,113 @@ func main() {
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
-	viper := viper.New()
-	viper.SetConfigName("voconed")
-	viper.SetConfigType("env")
-	viper.SetEnvPrefix("VOCONED")
-	viper.AutomaticEnv()
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+	pviper := viper.New()
+	pviper.SetConfigName("voconed")
+	pviper.SetConfigType("yml")
+	pviper.SetEnvPrefix("VOCONED")
+	pviper.AutomaticEnv()
+	pviper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// Set FlagVars first
-	if err := viper.BindPFlag("dir", flag.Lookup("dir")); err != nil {
+	if err := pviper.BindPFlag("dir", flag.Lookup("dir")); err != nil {
 		log.Fatal(err)
 	}
-	config.dir = viper.GetString("dir")
+	config.dir = pviper.GetString("dir")
 
-	if err := viper.BindPFlag("keymanager", flag.Lookup("keymanager")); err != nil {
-		log.Fatal(err)
+	pviper.AddConfigPath(config.dir)
+	_ = pviper.ReadInConfig()
+
+	if err := pviper.BindPFlag("keymanager", flag.Lookup("keymanager")); err != nil {
+		panic(err)
 	}
-	config.keymanager = viper.GetString("keymanager")
+	config.keymanager = pviper.GetString("keymanager")
 
-	if err := viper.BindPFlag("chainID", flag.Lookup("chainID")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("chainID", flag.Lookup("chainID")); err != nil {
+		panic(err)
 	}
-	config.chainID = viper.GetString("chainID")
+	config.chainID = pviper.GetString("chainID")
 
-	if err := viper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
+		panic(err)
 	}
-	config.logLevel = viper.GetString("logLevel")
+	config.logLevel = pviper.GetString("logLevel")
 
-	if err := viper.BindPFlag("port", flag.Lookup("port")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("port", flag.Lookup("port")); err != nil {
+		panic(err)
 	}
-	config.port = viper.GetInt("port")
+	config.port = pviper.GetInt("port")
 
-	if err := viper.BindPFlag("urlPath", flag.Lookup("urlPath")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("urlPath", flag.Lookup("urlPath")); err != nil {
+		panic(err)
 	}
-	config.path = viper.GetString("urlPath")
+	config.path = pviper.GetString("urlPath")
 
-	if err := viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucet")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucet")); err != nil {
+		panic(err)
 	}
-	config.enableFaucetWithAmount = viper.GetUint64("enableFaucetWithAmount")
+	config.enableFaucetWithAmount = pviper.GetUint64("enableFaucetWithAmount")
 
-	if err := viper.BindPFlag("blockPeriod", flag.Lookup("blockPeriod")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("blockPeriod", flag.Lookup("blockPeriod")); err != nil {
+		panic(err)
 	}
-	config.blockSeconds = viper.GetInt("blockPeriod")
+	config.blockSeconds = pviper.GetInt("blockPeriod")
 
-	if err := viper.BindPFlag("blockSize", flag.Lookup("blockSize")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("blockSize", flag.Lookup("blockSize")); err != nil {
+		panic(err)
 	}
-	config.blockSize = viper.GetInt("blockSize")
+	config.blockSize = pviper.GetInt("blockSize")
 
-	if err := viper.BindPFlag("txCosts", flag.Lookup("txCosts")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("txCosts", flag.Lookup("txCosts")); err != nil {
+		panic(err)
 	}
-	config.txCosts = viper.GetUint64("txCosts")
+	config.txCosts = pviper.GetUint64("txCosts")
 
-	if err := viper.BindPFlag("setTxCosts", flag.Lookup("setTxCosts")); err != nil {
-		log.Fatal(err)
+	if err := pviper.BindPFlag("setTxCosts", flag.Lookup("setTxCosts")); err != nil {
+		panic(err)
 	}
-	*setTxCosts = viper.GetBool("setTxCosts")
+	*setTxCosts = pviper.GetBool("setTxCosts")
 
-	viper.AddConfigPath(config.dir)
-
-	_, err = os.Stat(filepath.Join(config.dir, "voconed.env"))
-	if os.IsNotExist(err) {
-		if err = os.MkdirAll(config.dir, os.ModePerm); err != nil {
+	_, err = os.Stat(filepath.Join(config.dir, "voconed.yml"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			if err = os.MkdirAll(config.dir, os.ModePerm); err != nil {
+				panic(err)
+			}
+			if err := pviper.SafeWriteConfig(); err != nil {
+				panic(err)
+			}
+		} else {
 			panic(err)
 		}
-		if err := viper.SafeWriteConfig(); err != nil {
-			panic(err)
-		}
-	} else {
-		if err := viper.ReadInConfig(); err != nil {
-			panic(err)
-		}
 	}
-	if err = viper.Unmarshal(&config); err != nil {
+	if err = pviper.Unmarshal(&config); err != nil {
 		panic(err)
 	}
 
+	// generate a new management key if not provided and save it
+	if config.keymanager == "" {
+		fmt.Println("generating new random key for key manager")
+		mngKey := ethereum.SignKeys{}
+		if err := mngKey.Generate(); err != nil {
+			panic(err)
+		}
+		config.keymanager = hex.EncodeToString(mngKey.PrivateKey())
+		pviper.Set("keymanager", config.keymanager)
+	}
+
+	if err := pviper.WriteConfig(); err != nil {
+		panic(err)
+	}
+
+	// start the program
 	log.Init(config.logLevel, "stdout")
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	log.Infof("using data directory at %s", config.dir)
 
 	mngKey := ethereum.SignKeys{}
-	if err := mngKey.Generate(); err != nil {
+	if err := mngKey.AddHexKey(config.keymanager); err != nil {
 		log.Fatal(err)
-	}
-
-	if config.keymanager != "" {
-		if err := mngKey.AddHexKey(config.keymanager); err != nil {
-			log.Fatal(err)
-		}
 	}
 
 	vc, err := vocone.NewVocone(config.dir, &mngKey)

@@ -5,6 +5,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -331,19 +332,22 @@ func (idx *Indexer) Commit(height uint32) error {
 	// Add Entity and register new active process
 	for _, p := range idx.newProcessPool {
 		if err := idx.newEmptyProcess(p.ProcessID); err != nil {
-			log.Errorf("commit: cannot create new empty process: %v", err)
+			log.Errorw(err, "commit: cannot create new empty process")
 			continue
 		}
 		if !idx.App.IsSynchronizing() {
 			idx.addProcessToLiveResults(p.ProcessID)
 		}
+		log.Debugw("new process", "processID", hex.EncodeToString(p.ProcessID))
 	}
 
 	// Update existing processes
 	for _, p := range idx.updateProcessPool {
 		if err := idx.updateProcess(p); err != nil {
-			log.Errorf("commit: cannot update process %x: %v", p, err)
+			log.Errorw(err, "commit: cannot update process")
+			continue
 		}
+		log.Debugw("updated process", "processID", hex.EncodeToString(p))
 	}
 
 	// Index new transactions
@@ -353,11 +357,11 @@ func (idx *Indexer) Commit(height uint32) error {
 	// Schedule results computation
 	for _, p := range idx.resultsPool {
 		if err := idx.setResultsHeight(p.ProcessID, height+1); err != nil {
-			log.Errorf("commit: cannot update process %x: %v", p.ProcessID, err)
+			log.Errorw(err, "commit: cannot update process")
 			continue
 		}
 		idx.delProcessFromLiveResults(p.ProcessID)
-		log.Infof("scheduled results computation on next block for %x", p.ProcessID)
+		log.Infow("scheduled results computation on next block", "processID", hex.EncodeToString(p.ProcessID))
 	}
 
 	startTime := time.Now()

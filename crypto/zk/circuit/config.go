@@ -41,7 +41,7 @@ type ZkCircuitConfig struct {
 	WasmFilename string `json:"wasmFilename"` // circuit.wasm
 }
 
-// KeySize returns the maximun number of bytes of a leaf key according to the
+// KeySize returns the maximum number of bytes of a leaf key according to the
 // number of levels of the current circuit (nBytes = nLevels / 8).
 func (config ZkCircuitConfig) KeySize() int {
 	return config.Levels / 8

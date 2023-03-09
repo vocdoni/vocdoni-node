@@ -29,6 +29,8 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+// TODO: this package should be refactored and updated to the latest IPFS version and config options
+
 const (
 	MaxFileSizeBytes       = 1024 * 1024 * 50 // 50 MB
 	RetrievedFileCacheSize = 128
@@ -59,7 +61,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	// check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
 		if err := ipfs.Init(); err != nil {
-			log.Errorf("error in IPFS init: %s", err)
+			return err
 		}
 	}
 	node, coreAPI, err := ipfs.StartNode()
@@ -73,7 +75,11 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	// Start garbage collector, with our cancellable context.
 	go corerepo.PeriodicGC(ctx, node)
 
-	log.Infof("IPFS peerID: %s", node.Identity.Pretty())
+	log.Infow("IPFS initialization",
+		"peerID", node.Identity.Pretty(),
+		"addresses", node.PeerHost.Addrs(),
+		"pubKey", node.PrivateKey.GetPublic(),
+	)
 	// start http
 	cctx := ipfs.CmdCtx(node, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
@@ -173,14 +179,14 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	cpath := corepath.New(path)
-	log.Infof("adding pin %s", cpath.String())
+	log.Debugf("adding pin %s", cpath.String())
 	return i.CoreAPI.Pin().Add(ctx, cpath, options.Pin.Recursive(true))
 }
 
 func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	cpath := corepath.New(path)
-	log.Infof("removing pin %s", cpath.String())
+	log.Debugf("removing pin %s", cpath.String())
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
 

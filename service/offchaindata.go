@@ -31,7 +31,7 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 		vs.App,
 		vs.DataDownloader,
 		vs.CensusDB,
-		!vs.Config.ImportPreviousCensus,
+		vs.Config.SkipPreviousOffchainData,
 	)
 	return nil
 }

@@ -159,14 +159,21 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		headers = http.Header{
 			"Authorization": []string{"Bearer " + c.token.String()},
 			"User-Agent":    []string{"Vocdoni API client / 1.0"},
+			"Content-Type":  []string{"application/json"},
 		}
 	}
-	log.Debugf("%s %s", method, u)
+
+	log.Debugw("http request", "type", method, "path", u.Path, "body", jsonBody)
 	resp, err := c.c.Do(&http.Request{
 		Method: method,
 		URL:    u,
 		Header: headers,
-		Body:   io.NopCloser(bytes.NewBuffer(body)),
+		Body: func() io.ReadCloser {
+			if jsonBody == nil {
+				return nil
+			}
+			return io.NopCloser(bytes.NewBuffer(body))
+		}(),
 	})
 	if err != nil {
 		return nil, 0, err

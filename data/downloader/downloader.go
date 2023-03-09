@@ -2,6 +2,7 @@ package downloader
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -117,7 +118,7 @@ func (d *Downloader) TotalItemsAdded() int32 {
 // handleImport fetches and imports a remote file. If the download fails, the file
 // is added to a secondary queue for retrying.
 func (d *Downloader) handleImport(item *DownloadItem) {
-	log.Infof("pining remote file %q", item.URI)
+	log.Debugw("pining remote file", "uri", item.URI)
 	d.queueAddDelta(1)
 	defer d.queueAddDelta(-1)
 	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
@@ -125,12 +126,12 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 	cancel()
 	if err != nil {
 		if os.IsTimeout(err) {
-			log.Warnf("timeout importing file %q, adding it to failed queue for retry", item.URI)
+			log.Warnw("timeout importing file adding it to failed queue for retry", "uri", item.URI)
 			d.failedQueueLock.Lock()
 			d.failedQueue[item.URI] = item
 			d.failedQueueLock.Unlock()
 		} else {
-			log.Warnf("cannot pin file %q: (%v)", item.URI, err)
+			log.Warnw("could not pin file", "uri", item.URI, "error", fmt.Sprintf("%v", err))
 		}
 		return
 	}
@@ -138,7 +139,7 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 	defer cancel()
 	data, err := d.RemoteStorage.Retrieve(ctx, item.URI, 0)
 	if err != nil {
-		log.Warnf("could not retrieve file %q: %v", item.URI, err)
+		log.Warnw("could not retrieve file", "uri", item.URI, "error", fmt.Sprintf("%v", err))
 	} else {
 		if item.Callback != nil {
 			go item.Callback(item.URI, data)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	api "go.vocdoni.io/dvote/rpctypes"
@@ -45,7 +46,7 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			r.CensusType,
 			"",
 			nil,
-			160,
+			censustree.DefaultMaxLevels,
 		); err != nil {
 			return nil, err
 		}
@@ -91,6 +92,15 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 		} else {
 			batchKeys = r.CensusKeys
 		}
+		for i, key := range batchKeys {
+			// If the provided key is longer than the defined maximum length
+			// truncate it
+			// TODO: return an error if the other key lengths are deprecated
+			if len(key) > censustree.DefaultMaxKeyLen {
+				batchKeys[i] = key[:censustree.DefaultMaxKeyLen]
+			}
+		}
+
 		var batchValues [][]byte
 		if len(r.Weights) > 0 {
 			for _, v := range r.Weights {
@@ -125,6 +135,9 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			if key, err = ref.Tree().Hash(key); err != nil {
 				return resp, fmt.Errorf("error digesting data: %w", err)
 			}
+		}
+		if len(key) > censustree.DefaultMaxKeyLen {
+			key = key[:censustree.DefaultMaxKeyLen]
 		}
 		value := ref.Tree().BigIntToBytes(big.NewInt(1))
 		if r.Weight != nil {
@@ -162,6 +175,9 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 				return resp, fmt.Errorf("error digesting data: %w", err)
 			}
 		}
+		if len(key) > censustree.DefaultMaxKeyLen {
+			key = key[:censustree.DefaultMaxKeyLen]
+		}
 		// For legacy compatibility, assume weight=1 if value is nil
 		if r.CensusValue == nil {
 			r.CensusValue = ref.Tree().BigIntToBytes(big.NewInt(1))
@@ -181,6 +197,9 @@ func (m *Manager) Handler(ctx context.Context, r *api.APIrequest,
 			if key, err = ref.Tree().Hash(key); err != nil {
 				return nil, fmt.Errorf("error digesting data: %w", err)
 			}
+		}
+		if len(key) > censustree.DefaultMaxKeyLen {
+			key = key[:censustree.DefaultMaxKeyLen]
 		}
 		resp.CensusValue, resp.Siblings, err = ref.Tree().GenProof(key)
 		if err != nil {

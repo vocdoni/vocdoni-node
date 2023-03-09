@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -30,14 +31,6 @@ const (
 )
 
 func (a *API) enableElectionHandlers() error {
-	if err := a.endpoint.RegisterMethod(
-		"/elections",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionFullListHandler,
-	); err != nil {
-		return err
-	}
 	if err := a.endpoint.RegisterMethod(
 		"/elections/page/{page}",
 		"GET",
@@ -67,14 +60,6 @@ func (a *API) enableElectionHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionVotesCountHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
-		"/elections/{electionID}/votes",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionVotesHandler,
 	); err != nil {
 		return err
 	}
@@ -111,10 +96,18 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 
+	if err := a.endpoint.RegisterMethod(
+		"/elections/filter/page/{page}",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.electionFilterPaginatedHandler,
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
-// GET /elections
 // GET /elections/page/<page>
 func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
@@ -182,12 +175,13 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 
 	election := Election{
 		ElectionSummary: ElectionSummary{
-			ElectionID:   electionID,
-			Status:       models.ProcessStatus_name[proc.Status],
-			StartDate:    a.vocinfo.HeightTime(int64(proc.StartBlock)),
-			EndDate:      a.vocinfo.HeightTime(int64(proc.EndBlock)),
-			FinalResults: proc.FinalResults,
-			VoteCount:    count,
+			ElectionID:     electionID,
+			OrganizationID: proc.EntityID,
+			Status:         strings.ToLower(models.ProcessStatus_name[proc.Status]),
+			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
+			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
+			FinalResults:   proc.FinalResults,
+			VoteCount:      count,
 		},
 		MetadataURL:  proc.Metadata,
 		CreationTime: proc.CreationTime,
@@ -268,7 +262,11 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil {
 		return err
 	}
-	election := Election{}
+	if !process.GetEnvelopeType().EncryptedVotes {
+		return ErrNoElectionKeys
+	}
+
+	election := ElectionKeys{}
 	for idx, pubk := range process.EncryptionPublicKeys {
 		if len(pubk) > 0 {
 			pk, err := hex.DecodeString(pubk)
@@ -599,4 +597,64 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 		return nil, fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
 	}
 	return process, nil
+}
+
+// POST /elections/filter/page/<page>
+// returns a paginated list of elections filtered by partial organizationID, partial processID,
+// process status and with results available or not
+func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get organizationId from the request body
+	body := struct {
+		OrganizationID types.HexBytes `json:"organizationId"`
+		ElectionID     types.HexBytes `json:"electionId"`
+		WithResults    bool           `json:"withResults"`
+		Status         string         `json:"status"`
+	}{}
+	if err := json.Unmarshal(msg.Data, &body); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+	if len(body.OrganizationID) == 0 {
+		return ErrOrgNotFound
+	}
+	// get page
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber.WithErr(err)
+		}
+	}
+	page = page * MaxPageSize
+	// get election list
+	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, body.WithResults)
+	if err != nil {
+		return ErrCantFetchElectionList.WithErr(err)
+	}
+
+	var list []ElectionSummary
+	// get election summary
+	for _, eid := range elections {
+		e, err := a.indexer.ProcessInfo(eid)
+		if err != nil {
+			return ErrCantFetchElection.WithErr(err)
+		}
+		count, err := a.indexer.GetEnvelopeHeight(eid)
+		if err != nil {
+			return ErrCantFetchEnvelopeHeight.WithErr(err)
+		}
+		list = append(list, ElectionSummary{
+			ElectionID:   eid,
+			Status:       models.ProcessStatus_name[e.Status],
+			StartDate:    a.vocinfo.HeightTime(int64(e.StartBlock)),
+			EndDate:      a.vocinfo.HeightTime(int64(e.EndBlock)),
+			FinalResults: e.FinalResults,
+			VoteCount:    count,
+		})
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }

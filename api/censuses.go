@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -200,7 +201,12 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 		return err
 	}
-	// build the list of keys and values that will be added to the three
+	// Instance variable to send any deprecation message
+	// TODO: design a feture to standarize this kind of behaviour for future
+	// uses cases
+	var deprecationMsg []byte
+
+	// build the list of keys and values that will be added to the tree
 	keys := [][]byte{}
 	values := [][]byte{}
 	for i, p := range cdata.Participants {
@@ -214,13 +220,26 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		}
 
 		leafKey := p.Key
+		if len(leafKey) > censustree.DefaultMaxKeyLen {
+			deprecationMsg = []byte(fmt.Sprintf("census keys must not be longer "+
+				"than %d, the key provided has been truncated to this length",
+				censustree.DefaultMaxKeyLen))
+		}
+
 		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
 			// compute the hash, we use it as key for the merkle tree
 			leafKey, err = ref.Tree().Hash(p.Key)
 			if err != nil {
 				return ErrCantComputeKeyHash.WithErr(err)
 			}
+			// If the provided key is longer than the defined maximum length
+			// truncate it.
+			// TODO: return an error if the other key lengths are deprecated
+			if len(leafKey) > censustree.DefaultMaxKeyLen {
+				leafKey = leafKey[:censustree.DefaultMaxKeyLen]
+			}
 		}
+
 		keys = append(keys, leafKey)
 		values = append(values, ref.Tree().BigIntToBytes(p.Weight.MathBigInt()))
 	}
@@ -235,7 +254,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		log.Warnf("failed participants %v", failed)
 	}
 
-	return ctx.Send(nil, apirest.HTTPstatusOK)
+	return ctx.Send(deprecationMsg, apirest.HTTPstatusOK)
 }
 
 // /censuses/{censusID}/type
