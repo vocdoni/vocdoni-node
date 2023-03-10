@@ -25,12 +25,28 @@ jobs:
           go-version: '1.19.5'
           cache: true
       - name: Tidy go cache
-        run: go mod tidy
+        run: |
+          go mod tidy
+          if [[ $(git status --porcelain) ]]; then
+            git diff
+            echo
+            echo "go mod tidy made these changes, please run 'go mod tidy' and include those changes in a commit"
+            exit 1
+          fi
       - name: Run gofmt
         # Run gofmt first, as it's quick and issues are common.
         run: diff -u <(echo -n) <(gofmt -s -d .)
       - name: Run go vet
         run: go vet ./...
+      - name: Run go generate
+        run: |
+          go generate ./...
+          if [[ $(git status --porcelain) ]]; then
+            git diff
+            echo
+            echo "go generate made these changes, please run 'go generate ./...' and include those changes in a commit"
+            exit 1
+          fi
       - name: Download staticcheck
         # staticcheck provides a github action, use it (https://staticcheck.io/docs/running-staticcheck/ci/github-actions/)
         # or use golangci-lint (github action) with staticcheck as enabled linter

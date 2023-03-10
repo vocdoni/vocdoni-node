@@ -1,5 +1,8 @@
 package api
 
+//go:generate go run go.vocdoni.io/dvote/api/autoswag
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.8.10 fmt
+
 import (
 	"fmt"
 	"path/filepath"

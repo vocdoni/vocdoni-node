@@ -33,7 +33,7 @@ func (a *API) enableVoteHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/votes/verify/{electionID}/{voteID}/",
+		"/votes/verify/{electionID}/{voteID}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.verifyVoteHandler,
@@ -44,8 +44,12 @@ func (a *API) enableVoteHandlers() error {
 	return nil
 }
 
-// POST /votes
-// submit a vote
+// submitVoteHandler
+//
+//	@Summary		Submit a vote
+//	@Description	Submit a vote
+//	@Success		200	{object}	Vote
+//	@Router			/votes [post]
 func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -77,8 +81,12 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /votes/<voteID>
-// get a vote by its voteID (nullifier)
+// getVoteHandler
+//
+//	@Summary		Get vote (by voteID)
+//	@Description	Get a vote by its voteID (nullifier)
+//	@Success		200	{object}	Vote
+//	@Router			/votes/{voteID} [get]
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
@@ -121,8 +129,12 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// GET /votes/verify/<electionID>/<voteID>
-// verify a vote (get basic information)
+// verifyVoteHandler
+//
+//	@Summary		Verify vote
+//	@Description	Verify a vote (get basic information)
+//	@Success		200	"(empty body)"
+//	@Router			/votes/verify/{electionID}/{voteID} [get]
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {

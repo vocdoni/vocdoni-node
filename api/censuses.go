@@ -143,8 +143,12 @@ func (a *API) enableCensusHandlers() error {
 	return nil
 }
 
-// POST /censuses/{type}
-// create a new census
+// censusCreateHandler
+//
+//	@Summary		Create a new census
+//	@Description	Create a new census
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{type} [post]
 func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -171,8 +175,12 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// POST /censuses/participants/{censusID}
-// Adds one or multiple key/weights to the census
+// censusAddHandler
+//
+//	@Summary		Add participants to census
+//	@Description	Adds one or multiple key/weights to the census
+//	@Success		200	"(empty body)"
+//	@Router			/censuses/{censusID}/participants [post]
 func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -257,7 +265,12 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	return ctx.Send(deprecationMsg, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/type
+// censusTypeHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/type [get]
 func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -282,7 +295,12 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/root
+// censusRootHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/root [get]
 func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -309,7 +327,12 @@ func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/export
+// censusDumpHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	censusdb.CensusDump
+//	@Router			/censuses/{censusID}/export [get]
 func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -346,7 +369,12 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/import
+// censusImportHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	"(empty body)"
+//	@Router			/censuses/{censusID}/import [post]
 func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -392,7 +420,12 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/weight
+// censusWeightHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/weight [get]
 func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -419,7 +452,12 @@ func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/size
+// censusSizeHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/size [get]
 func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -446,7 +484,12 @@ func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/delete
+// censusDeleteHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	"(empty body)"
+//	@Router			/censuses/{censusID} [delete]
 func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -469,8 +512,13 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }
 
-// POST /censuses/{censusID}/publish/{root}
-// POST /censuses/{censusID}/publish
+// censusPublishHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/publish [post]
+//	@Router			/censuses/{censusID}/publish/{root} [post]
 func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -572,7 +620,12 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// /censuses/{censusID}/proof/{key}
+// censusProofHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/proof/{key} [get]
 func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -639,7 +692,12 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// POST /censuses/{censusID}/verify
+// censusVerifyHandler
+//
+//	@Summary		TODO
+//	@Description	TODO
+//	@Success		200	{object}	Census
+//	@Router			/censuses/{censusID}/verify [post]
 func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
