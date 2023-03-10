@@ -640,16 +640,17 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
 	body := struct {
-		OrganizationID types.HexBytes `json:"organizationId"`
-		ElectionID     types.HexBytes `json:"electionId"`
-		WithResults    bool           `json:"withResults"`
-		Status         string         `json:"status"`
+		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
+		ElectionID     types.HexBytes `json:"electionId,omitempty"`
+		WithResults    *bool          `json:"withResults,omitempty"`
+		Status         string         `json:"status,omitempty"`
 	}{}
 	if err := json.Unmarshal(msg.Data, &body); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
-	if len(body.OrganizationID) == 0 {
-		return ErrOrgNotFound
+	// check that at least one filter is set
+	if len(body.OrganizationID) == 0 && len(body.ElectionID) == 0 && body.WithResults == nil && body.Status == "" {
+		return ErrMissingParameter
 	}
 	// get page
 	var err error
@@ -661,8 +662,12 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		}
 	}
 	page = page * MaxPageSize
+
 	// get election list
-	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, body.WithResults)
+	if body.WithResults == nil {
+		body.WithResults = new(bool)
+	}
+	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, *body.WithResults)
 	if err != nil {
 		return ErrCantFetchElectionList.WithErr(err)
 	}
@@ -679,12 +684,13 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			return ErrCantFetchEnvelopeHeight.WithErr(err)
 		}
 		list = append(list, ElectionSummary{
-			ElectionID:   eid,
-			Status:       models.ProcessStatus_name[e.Status],
-			StartDate:    a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:      a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults: e.FinalResults,
-			VoteCount:    count,
+			OrganizationID: body.OrganizationID,
+			ElectionID:     eid,
+			Status:         models.ProcessStatus_name[e.Status],
+			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
+			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
+			FinalResults:   e.FinalResults,
+			VoteCount:      count,
 		})
 	}
 	data, err := json.Marshal(list)
