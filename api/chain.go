@@ -537,8 +537,10 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Router			/chain/organizations/filter/page/{page} [post]
 func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
-	var organizationId string
-	if err := json.Unmarshal(msg.Data, &organizationId); err != nil {
+	requestData := struct {
+		OrganizationId types.HexBytes `json:"organizationId"`
+	}{}
+	if err := json.Unmarshal(msg.Data, &requestData); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	// get page
@@ -552,7 +554,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 	}
 	page = page * MaxPageSize
 	// get matching organization ids from the indexer
-	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, organizationId)
+	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId.String()))
 	if len(matchingOrganizationIds) == 0 {
 		return ErrOrgNotFound
 	}
