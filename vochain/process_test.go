@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -23,17 +24,18 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     accounts[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 
 	// create process with entityID (should work)
@@ -135,17 +137,18 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
@@ -180,16 +183,17 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	censusURI = ipfsUrl
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true},
-		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		Status:        models.ProcessStatus_PAUSED,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
@@ -218,16 +222,17 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	censusURI = ipfsUrl
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
-		ProcessId:    pid,
-		StartBlock:   10,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: false, AutoStart: false},
-		Status:       models.ProcessStatus_PAUSED,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    10,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: false, AutoStart: false},
+		Status:        models.ProcessStatus_PAUSED,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
@@ -283,16 +288,17 @@ func TestProcessSetResultsCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	censusURI := ipfsUrl
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 	t.Log(app.State.Process(process.ProcessId, false))
@@ -381,42 +387,45 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	pid2 := util.RandomBytes(types.ProcessIDsize)
 	pid3 := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 
 	process2 := &models.Process{
-		ProcessId:    pid2,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI2,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid2,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI2,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 
 	process3 := &models.Process{
-		ProcessId:    pid3,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{Interruptible: true, DynamicCensus: true},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     keys[1].Address().Bytes(),
-		CensusRoot:   util.RandomBytes(32),
-		CensusURI:    &censusURI2,
-		CensusOrigin: models.CensusOrigin_ERC20,
-		BlockCount:   1024,
+		ProcessId:     pid3,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      keys[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI2,
+		CensusOrigin:  models.CensusOrigin_ERC20,
+		BlockCount:    1024,
+		MaxCensusSize: 100,
 	}
 	t.Logf("adding READY process %x", process.ProcessId)
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
@@ -525,7 +534,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	), qt.IsNil)
 
 	// set tx costs
-	for _, cost := range TxCostNameToTxTypeMap {
+	for _, cost := range genesis.TxCostNameToTxTypeMap {
 		qt.Assert(t, app.State.SetTxCost(cost, txCostNumber), qt.IsNil)
 
 	}

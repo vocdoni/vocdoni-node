@@ -1,12 +1,14 @@
 package service
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
 	"strings"
 	"time"
 
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -18,7 +20,6 @@ import (
 // initializes the missing services of the VocdoniService struct.  All started services will be
 // respected unless the App, which is the main service and thus overwriten by this function.
 func (vs *VocdoniService) Vochain() error {
-	log.Infof("creating vochain service for network %s", vs.Config.Chain)
 	// node + app layer
 	if len(vs.Config.PublicAddr) == 0 {
 		// tendermint doesn't have support for finding out it's own external address (as of v0.35.0)
@@ -42,7 +43,10 @@ func (vs *VocdoniService) Vochain() error {
 		}
 		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
-	log.Infof("vochain listening on: %s:%s", vs.Config.PublicAddr, vs.Config.P2PListen)
+	log.Infow("vochain p2p enabled",
+		"network", vs.Config.Chain,
+		"address", vs.Config.PublicAddr,
+		"listenHost", vs.Config.P2PListen)
 
 	// Genesis file
 	var genesisBytes []byte
@@ -62,8 +66,8 @@ func (vs *VocdoniService) Vochain() error {
 		if err == nil { // If genesis file found
 			log.Info("found genesis file")
 			// compare genesis
-			if string(genesisBytes) != vocdoniGenesis.Genesis[vs.Config.Chain].Genesis {
-				// if using a development chain, restore vochain
+			if !bytes.Equal(ethereum.HashRaw(genesisBytes), vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Hash()) {
+				// if auto-update genesis enabled, delete local genesis and use hardcoded genesis
 				if vocdoniGenesis.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
@@ -73,25 +77,23 @@ func (vs *VocdoniService) Vochain() error {
 						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 						return err
 					}
-					genesisBytes = []byte(vocdoniGenesis.Genesis[vs.Config.Chain].Genesis)
+					genesisBytes = vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Marshal()
 				} else {
 					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
 			} else {
-				log.Info("local genesis matches with the hardcoded genesis")
+				log.Info("local and factory genesis matches")
 			}
 		} else { // If genesis file not found
 			if !os.IsNotExist(err) {
 				return err
 			}
-			// If dev mode enabled, auto-update genesis file
-			log.Debug("genesis does not exist, using hardcoded genesis")
-			err = nil
+			log.Info("genesis file does not exist, using factory")
 			if _, ok := vocdoniGenesis.Genesis[vs.Config.Chain]; !ok {
 				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
 				return err
 			}
-			genesisBytes = []byte(vocdoniGenesis.Genesis[vs.Config.Chain].Genesis)
+			genesisBytes = vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Marshal()
 		}
 	}
 

@@ -125,7 +125,6 @@ func (v *TreeView) Root() ([]byte, error) {
 
 // Size returns the number of leafs (key-values) that this tree contains.
 func (v *TreeView) Size() (uint64, error) {
-	// NOTE: Tree.Size is currently unimplemented
 	return v.tree.Size(nil)
 }
 

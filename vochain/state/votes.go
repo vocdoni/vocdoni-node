@@ -304,14 +304,15 @@ func (v *State) iterateVotes(processID []byte,
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) CountVotes(processID []byte, committed bool) uint32 {
-	var count uint32
-	// TODO: Once statedb.TreeView.Size() works, replace this by that.
-	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
-		count++
-		return false
-	}, committed)
-	return count
+func (v *State) CountVotes(processID []byte, committed bool) (uint64, error) {
+	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+		StateTreeCfg(TreeProcess),
+		StateChildTreeCfg(ChildTreeVotes).WithKey(processID),
+	)
+	if err != nil {
+		return 0, err
+	}
+	return votesTree.Size()
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId

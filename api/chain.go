@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
@@ -325,7 +326,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		Costs: make(map[string]uint64),
 	}
 	var err error
-	for k, v := range vochain.TxCostNameToTxTypeMap {
+	for k, v := range genesis.TxCostNameToTxTypeMap {
 		txCosts.Costs[k], err = a.vocapp.State.TxCost(v, true)
 		if err != nil {
 			return err

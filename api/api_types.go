@@ -116,6 +116,7 @@ type Vote struct {
 
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
+	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty"`
 	RootHash  types.HexBytes `json:"rootHash,omitempty"`

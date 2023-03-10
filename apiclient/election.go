@@ -199,17 +199,18 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 
 	// build the process transaction
 	process := &models.Process{
-		EntityId:     c.account.Address().Bytes(),
-		StartBlock:   startBlock,
-		BlockCount:   blockCount,
-		CensusRoot:   root,
-		CensusURI:    &description.Census.URL,
-		Status:       models.ProcessStatus_READY,
-		EnvelopeType: envelopeType,
-		Mode:         processMode,
-		VoteOptions:  voteOptions,
-		CensusOrigin: censusOrigin,
-		Metadata:     &metadataURI,
+		EntityId:      c.account.Address().Bytes(),
+		StartBlock:    startBlock,
+		BlockCount:    blockCount,
+		CensusRoot:    root,
+		CensusURI:     &description.Census.URL,
+		Status:        models.ProcessStatus_READY,
+		EnvelopeType:  envelopeType,
+		Mode:          processMode,
+		VoteOptions:   voteOptions,
+		CensusOrigin:  censusOrigin,
+		Metadata:      &metadataURI,
+		MaxCensusSize: description.Census.Size,
 	}
 	log.Debugf("election transaction: %+v", log.FormatProto(process))
 

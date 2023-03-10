@@ -49,6 +49,15 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 			voteEnvelope.ProcessId, process.Status.String())
 	}
 
+	// check if maxCensusSize is reached
+	votesCount, err := t.state.CountVotes(voteEnvelope.ProcessId, false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot count votes: %w", err)
+	}
+	if votesCount > process.GetMaxCensusSize() {
+		return nil, fmt.Errorf("maxCensusSize reached %d/%d", votesCount, process.GetMaxCensusSize())
+	}
+
 	// Check in case of keys required, they have been sent by some keykeeper
 	if process.EnvelopeType.EncryptedVotes &&
 		process.KeyIndex != nil &&

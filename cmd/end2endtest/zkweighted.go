@@ -167,6 +167,7 @@ func mkTreeAnonVoteTest(c config) {
 			RootHash: root,
 			URL:      censusURI,
 			Type:     vapi.CensusTypeZKWeighted,
+			Size:     size,
 		},
 
 		Questions: []vapi.Question{

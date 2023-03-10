@@ -95,12 +95,13 @@ func TestVoteOverwrite(t *testing.T) {
 			MaxValue:          3,
 			MaxVoteOverwrites: 2,
 		},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   root,
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    root,
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 10,
 	}
 	err := app.State.AddProcess(process)
 	qt.Check(t, err, qt.IsNil)

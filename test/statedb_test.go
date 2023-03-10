@@ -168,8 +168,9 @@ func TestCountVotes(t *testing.T) {
 	_, err = s.Vote(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		testutil.Hex2byte(t, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"), false)
 	qt.Assert(t, err, qt.IsNil)
-	c := s.CountVotes(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), false)
-	qt.Assert(t, c, qt.Equals, uint32(1))
+	c, err := s.CountVotes(testutil.Hex2byte(t, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, c, qt.Equals, uint64(1))
 }
 
 func TestGetEnvelopeList(t *testing.T) {

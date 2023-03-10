@@ -6,7 +6,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -41,7 +41,7 @@ func (c *HTTPclient) TransactionCost(txType models.TxType) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	txcost, found := txscost[vochain.TxTypeToCostName(txType)]
+	txcost, found := txscost[genesis.TxTypeToCostName(txType)]
 	if !found {
 		return 0, fmt.Errorf("transaction type not found")
 	}

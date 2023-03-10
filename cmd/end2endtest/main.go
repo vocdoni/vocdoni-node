@@ -335,6 +335,7 @@ func mkTreeVoteTest(c config) {
 			RootHash: root,
 			URL:      censusURI,
 			Type:     "weighted",
+			Size:     uint64(len(voterAccounts)),
 		},
 
 		Questions: []vapi.Question{

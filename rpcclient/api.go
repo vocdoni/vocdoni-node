@@ -25,6 +25,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -1077,7 +1078,7 @@ func (c *Client) CreateProcess(
 		Mode:          mode,
 		Status:        models.ProcessStatus_READY,
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 8},
-		MaxCensusSize: &maxCensusSize,
+		MaxCensusSize: maxCensusSize,
 	}
 	// get oracle account
 	acc, err := c.GetAccount(account.Address())
@@ -1343,7 +1344,7 @@ func (c *Client) GetTreasurer() (*models.Treasurer, error) {
 
 // GetTreasurer returns information about the treasurer
 func (c *Client) GetTransactionCost(txType models.TxType) (uint64, error) {
-	req := api.APIrequest{Method: "getTxCost", Type: vochain.TxTypeToCostName(txType)}
+	req := api.APIrequest{Method: "getTxCost", Type: genesis.TxTypeToCostName(txType)}
 	resp, err := c.Request(req, nil)
 	if err != nil {
 		return 0, err
