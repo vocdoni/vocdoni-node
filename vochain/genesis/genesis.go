@@ -27,8 +27,8 @@ var Genesis = map[string]VochainGenesis{
 		CircuitsConfigTag: "dev",
 		Genesis: `
 {
-   "genesis_time": "2023-03-01T22:35:46.527310402Z",
-   "chain_id": "vocdoni-dev-1",
+   "genesis_time": "2023-03-09T15:47:54.319779Z",
+   "chain_id": "vocdoni-dev-2",
    "initial_height": "0",
    "consensus_params": {
      "block": {

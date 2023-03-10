@@ -92,7 +92,7 @@ func mkTreeAnonVoteTest(c config) {
 	}
 	log.Infof("new census created with id %s", censusID.String())
 
-	// Generate 10 participant accounts
+	// Generate n participant accounts
 	voterAccounts := util.CreateEthRandomKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
@@ -240,31 +240,31 @@ func mkTreeAnonVoteTest(c config) {
 				log.Fatal(err)
 				return
 			}
-			pr, err := api.CensusGenProofZk(root, electionID)
-			apiClientMtx.Unlock()
+
+			pr, err := api.CensusGenProof(root, api.MyZkAddress().Bytes())
 			if err != nil {
+				apiClientMtx.Unlock()
 				log.Warnw(err.Error(),
 					"current", i,
 					"total", c.nvotes)
 				continue
 			}
 
-			log.Debugw("vote proof generated",
+			log.Debugw("census proof generated",
 				"current", i,
 				"total", len(accounts))
 			proofCh <- true
 
 			_, err = api.Vote(&apiclient.VoteData{
-				ElectionID:  electionID,
-				ProofZkTree: pr,
-				Choices:     []int{i % 2},
+				ElectionID:   electionID,
+				ProofMkTree:  pr,
+				Choices:      []int{i % 2},
+				VotingWeight: new(big.Int).SetUint64(8),
 			})
-
+			apiClientMtx.Unlock()
 			if err != nil && !strings.Contains(err.Error(), "already exists") {
 				// if the error is not "vote already exists", we need to print it
-				log.Warnw(err.Error(),
-					"nullifier", pr.Nullifier.String(),
-					"lenNullifier", len(pr.Nullifier))
+				log.Warn(err.Error())
 				continue
 			}
 			log.Debugw("vote sent",

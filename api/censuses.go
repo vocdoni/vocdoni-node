@@ -222,6 +222,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 			return ErrParticipantKeyMissing.Withf("number %d", i)
 		}
 		// check the weight parameter
+		// TODO: (lucasmenendez) remove that check, now all census are weighted
 		if p.Weight == nil {
 			p.Weight = new(types.BigInt).SetUint64(1)
 		}
@@ -634,6 +635,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
+
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
@@ -641,11 +643,9 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		}
 		return err
 	}
-
 	// Get the census type to return it into the response to prevent to perform
 	// two api calls.
 	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
-
 	// If the census type is zkweighted (that means that it uses Poseidon hash
 	// with Arbo merkle tree), skip to perform a hash function over the census
 	// key. It is because the zk friendly key of any census leaf is the
@@ -659,7 +659,6 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 			return err
 		}
 	}
-
 	leafV, siblings, err := ref.Tree().GenProof(leafKey)
 	if err != nil {
 		return fmt.Errorf("something was wrong during census proof generation: %w", err)

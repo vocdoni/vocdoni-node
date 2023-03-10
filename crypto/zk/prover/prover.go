@@ -21,6 +21,7 @@ import (
 var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
 	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
+	ErrParsingNullifier   = fmt.Errorf("error parsing proof nullifier string to big.Int")
 	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
 	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
 	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
@@ -92,9 +93,25 @@ func (p *Proof) Weight() (*big.Int, error) {
 	// Parse it into a big.Int
 	weight, ok := new(big.Int).SetString(strWeight, 10)
 	if !ok {
-		return nil, ErrParsingWeight
+		return nil, ErrParsingNullifier
 	}
 	return weight, nil
+}
+
+// Nullifier decodes the vote nullifier value from the current proof public
+// signals and return it as a big.Int
+func (p *Proof) Nullifier() (*big.Int, error) {
+	if p.PubSignals == nil || len(p.PubSignals) < 5 {
+		return nil, ErrPublicSignalFormat
+	}
+	// Get the nullifier from the fourth public signal of the proof
+	strNullifier := p.PubSignals[3]
+	// Parse it into a big.Int
+	nullifier, ok := new(big.Int).SetString(strNullifier, 10)
+	if !ok {
+		return nil, ErrParsingWeight
+	}
+	return nullifier, nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based

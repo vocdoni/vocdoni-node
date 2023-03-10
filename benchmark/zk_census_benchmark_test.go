@@ -122,7 +122,7 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 		weight = censusData.Weight.MathBigInt()
 	}
 	// Generate circuit inputs
-	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.Root, electionID, weight, censusData.Siblings)
+	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.Root, electionID, weight, weight, censusData.Siblings)
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)
