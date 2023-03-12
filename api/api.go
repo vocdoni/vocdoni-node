@@ -14,7 +14,6 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -41,11 +40,9 @@ type API struct {
 	indexer  *indexer.Indexer
 	vocapp   *vochain.BaseApplication
 	storage  data.Storage
-	//lint:ignore U1000 unused
-	metricsagent *metrics.Agent
-	vocinfo      *vochaininfo.VochainInfo
-	censusdb     *censusdb.CensusDB
-	db           db.Database // used for internal db operations
+	vocinfo  *vochaininfo.VochainInfo
+	censusdb *censusdb.CensusDB
+	db       db.Database // used for internal db operations
 }
 
 // NewAPI creates a new instance of the API.  Attach must be called next.

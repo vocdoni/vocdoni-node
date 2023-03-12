@@ -11,8 +11,6 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 )
 
-//lint:file-ignore U1000 TODO(mvdan): remove once staticcheck removes its testing.T.Skip false positives
-
 func checkRoots(c *qt.C, tree1, tree2 *Tree) {
 	root1, err := tree1.Root()
 	c.Assert(err, qt.IsNil)
