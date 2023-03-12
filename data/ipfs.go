@@ -10,7 +10,7 @@ import (
 	ipfscid "github.com/ipfs/go-cid"
 	keystore "github.com/ipfs/go-ipfs-keystore"
 	files "github.com/ipfs/go-libipfs/files"
-	ipfslog "github.com/ipfs/go-log"
+	ipfslog "github.com/ipfs/go-log/v2"
 	coreiface "github.com/ipfs/interface-go-ipfs-core"
 	"github.com/ipfs/interface-go-ipfs-core/options"
 	corepath "github.com/ipfs/interface-go-ipfs-core/path"
