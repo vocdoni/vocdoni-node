@@ -11,7 +11,7 @@ import (
 
 	"git.sr.ht/~sircmpwn/go-bare"
 	eth "github.com/ethereum/go-ethereum/crypto"
-	ipfslog "github.com/ipfs/go-log"
+	ipfslog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"

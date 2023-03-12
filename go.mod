@@ -32,13 +32,13 @@ require (
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-ipfs-keystore v0.1.0
 	github.com/ipfs/go-libipfs v0.6.1-0.20230228004237-36918f45f260
-	github.com/ipfs/go-log v1.0.5
+	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/interface-go-ipfs-core v0.11.0
 	github.com/ipfs/kubo v0.19.0-rc1
 	github.com/klauspost/compress v1.15.12
 	github.com/libp2p/go-libp2p v0.26.2
 	github.com/libp2p/go-libp2p-kad-dht v0.21.1
-	github.com/libp2p/go-libp2p-pubsub v0.9.0 // direct
+	github.com/libp2p/go-libp2p-pubsub v0.9.0
 	github.com/libp2p/go-reuseport v0.2.0
 	github.com/manifoldco/promptui v0.9.0
 	github.com/mattn/go-sqlite3 v1.14.16
@@ -54,7 +54,6 @@ require (
 	github.com/tendermint/tm-db v0.6.7
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
-	go.uber.org/zap v1.24.0 // indirect
 	go.vocdoni.io/proto v1.14.1-0.20230309101142-6f452d75afd8
 	golang.org/x/crypto v0.5.0
 	golang.org/x/exp v0.0.0-20230129154200-a960b3787bd2
@@ -181,7 +180,7 @@ require (
 	github.com/ipfs/go-ipld-git v0.1.1 // indirect
 	github.com/ipfs/go-ipld-legacy v0.1.1 // indirect
 	github.com/ipfs/go-ipns v0.3.0 // indirect
-	github.com/ipfs/go-log/v2 v2.5.1 // indirect
+	github.com/ipfs/go-log v1.0.5 // indirect
 	github.com/ipfs/go-merkledag v0.9.0 // indirect
 	github.com/ipfs/go-metrics-interface v0.0.1 // indirect
 	github.com/ipfs/go-mfs v0.2.1 // indirect
@@ -317,6 +316,7 @@ require (
 	go.uber.org/dig v1.15.0 // indirect
 	go.uber.org/fx v1.18.2 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
+	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20201209231011-d4a079459e60 // indirect
 	golang.org/x/mod v0.7.0 // indirect
 	golang.org/x/oauth2 v0.1.0 // indirect
