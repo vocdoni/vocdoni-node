@@ -5,11 +5,16 @@ services:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     build: # reused by the other services
       context: ../../
+      args:
+        - BUILDARGS
     env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
     volumes:
       - data-seed:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-seed:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
 
   miner0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -18,6 +23,9 @@ services:
       - data-miner0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-miner0:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -28,6 +36,9 @@ services:
       - data-miner1:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-miner1:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -38,6 +49,9 @@ services:
       - data-miner2:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-miner2:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -48,6 +62,9 @@ services:
       - data-miner3:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-miner3:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -60,6 +77,9 @@ services:
       - data-oracle:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-oracle:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -72,6 +92,9 @@ services:
       - data-gateway0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
       - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
+      - gocoverage-gateway0:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
     links:
       - seed
 
@@ -80,8 +103,21 @@ services:
     build:
       context: ../../
       target: test
+      args:
+        - BUILDARGS
     links:
       - gateway0
+    volumes:
+      - gocoverage-seed:/app/run/gocoverage/seed
+      - gocoverage-miner0:/app/run/gocoverage/miner0
+      - gocoverage-miner1:/app/run/gocoverage/miner1
+      - gocoverage-miner2:/app/run/gocoverage/miner2
+      - gocoverage-miner3:/app/run/gocoverage/miner3
+      - gocoverage-oracle:/app/run/gocoverage/oracle
+      - gocoverage-gateway0:/app/run/gocoverage/gateway0
+      - gocoverage-test:/app/run/gocoverage/test
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage/test
     command: "true"
 
 volumes:
@@ -92,3 +128,11 @@ volumes:
   data-miner3: {}
   data-oracle: {}
   data-gateway0: {}
+  gocoverage-seed: {}
+  gocoverage-miner0: {}
+  gocoverage-miner1: {}
+  gocoverage-miner2: {}
+  gocoverage-miner3: {}
+  gocoverage-oracle: {}
+  gocoverage-gateway0: {}
+  gocoverage-test: {}

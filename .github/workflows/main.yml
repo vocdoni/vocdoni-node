@@ -78,16 +78,20 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-      - name: Run Go test
+      - name: Run Go test (and collect code coverage)
         if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
-        run: go test ./...
+        run: go test -coverprofile=unit.covprofile ./...
       - name: Run Go test race
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
-        run: |
-          # check that log lines contains no invalid chars (evidence of format mismatch)
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          # -race can easily make the crypto stuff 10x slower
-          go test -vet=off -timeout=15m -race ./...
+        env:
+          LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
+        run: go test -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
+      - name: Send unit test coverage to coveralls.io
+        uses: coverallsapp/github-action@v2
+        with:
+          file: unit.covprofile
+          flag-name: unit
+          parallel: true
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
@@ -118,9 +122,24 @@ jobs:
           export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
           export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
           export LOG_PANIC_ON_INVALIDCHARS=true
+          export BUILDARGS="-cover" # collect code coverage when running binaries
           cd dockerfiles/testsuite
           docker-compose build
           ./start_test.sh
+      - name: Convert code coverage profile format
+        run: docker run --rm -v $(pwd):/wd/ golang:1.20
+              go tool covdata textfmt -i=/wd/dockerfiles/testsuite/integration.covdir/ -o /wd/integration.covprofile
+      - name: Send integration test coverage to coveralls.io
+        # coverallsapp/github-action@v2 fails on our self-hosted since runner has no permissions to write in /usr/local/bin
+        # workaround using /tmp
+        env:
+          COVERALLS_REPO_TOKEN: ${{ secrets.github_token }}
+        run: |
+          curl -sL https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux.tar.gz | tar xz -C /tmp
+          /tmp/coveralls \
+            --file integration.covprofile \
+            --job-flag=integration \
+            --parallel
 
   job_docker_release:
     runs-on: ubuntu-latest
@@ -189,3 +208,14 @@ jobs:
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
+
+  job_coveralls:
+    needs: [job_go_test, job_compose_test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send coverage to Coveralls.io (finish)
+      uses: coverallsapp/github-action@v2
+      with:
+        parallel-finished: true
+        carryforward: "unit,integration"
