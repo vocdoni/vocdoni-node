@@ -186,6 +186,15 @@ for test in ${tests_to_run[@]} ; do
 	fi
 done
 
+if echo "$BUILDARGS" | grep -q -- "-cover"; then
+	hostdir="./gocoverage/"
+	echo "### Collect all coverage files in $hostdir ###"
+	mkdir -p $hostdir
+	$COMPOSE_CMD down
+    $COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/host/ \
+	--entrypoint="cp -rf /app/run/gocoverage/. /host/$hostdir" test
+fi
+
 [ $CLEAN -eq 1 ] && {
 	echo "### Cleaning docker environment ###"
 	$COMPOSE_CMD down -v --remove-orphans
