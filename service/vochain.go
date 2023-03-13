@@ -82,7 +82,7 @@ func (vs *VocdoniService) Vochain() error {
 					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
 			} else {
-				log.Info("local and factory genesis matches")
+				log.Info("local and factory genesis match")
 			}
 		} else { // If genesis file not found
 			if !os.IsNotExist(err) {
