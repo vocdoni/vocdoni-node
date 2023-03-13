@@ -70,7 +70,8 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
 	}
 	if maxProcessSize > 0 && tx.Process.GetMaxCensusSize() > maxProcessSize {
-		return nil, common.Address{}, fmt.Errorf("maxCensusSize is greater than the maximum allowed")
+		return nil, common.Address{},
+			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
 	}
 
 	// check tx cost
