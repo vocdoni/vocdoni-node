@@ -671,6 +671,9 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	if err != nil {
 		return ErrCantFetchElectionList.WithErr(err)
 	}
+	if len(elections) == 0 {
+		return ErrElectionNotFound
+	}
 
 	var list []ElectionSummary
 	// get election summary
@@ -684,7 +687,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			return ErrCantFetchEnvelopeHeight.WithErr(err)
 		}
 		list = append(list, ElectionSummary{
-			OrganizationID: body.OrganizationID,
+			OrganizationID: e.EntityID,
 			ElectionID:     eid,
 			Status:         models.ProcessStatus_name[e.Status],
 			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
