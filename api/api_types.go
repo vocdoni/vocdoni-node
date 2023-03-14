@@ -93,6 +93,13 @@ type ElectionDescription struct {
 	Census       CensusTypeDescription `json:"census"`
 }
 
+type ElectionFilter struct {
+	OrganizationID types.HexBytes `json:"organizationId,omitempty"`
+	ElectionID     types.HexBytes `json:"electionId,omitempty"`
+	WithResults    bool           `json:"withResults"`
+	Status         string         `json:"status,omitempty"`
+}
+
 type Key struct {
 	Index int            `json:"index"`
 	Key   types.HexBytes `json:"key"`

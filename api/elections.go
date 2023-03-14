@@ -16,7 +16,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -634,22 +633,18 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 // electionFilterPaginatedHandler
 //
 //	@Summary		Election list (filtered, paginated)
-//	@Description	Returns a paginated list of elections filtered by partial organizationID, partial processID, process status and with results available or not
+//	@Description	Returns a paginated list of elections filtered by partial organizationID, partial processID,
+//					process status and with results available or not.
 //	@Success		200	{object}	object
 //	@Router			/elections/filter/page/{page} [post]
 func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
-	body := struct {
-		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
-		ElectionID     types.HexBytes `json:"electionId,omitempty"`
-		WithResults    *bool          `json:"withResults,omitempty"`
-		Status         string         `json:"status,omitempty"`
-	}{}
+	body := &ElectionFilter{}
 	if err := json.Unmarshal(msg.Data, &body); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	// check that at least one filter is set
-	if len(body.OrganizationID) == 0 && len(body.ElectionID) == 0 && body.WithResults == nil && body.Status == "" {
+	if body.OrganizationID == nil && body.ElectionID == nil && body.Status == "" {
 		return ErrMissingParameter
 	}
 	// get page
@@ -663,11 +658,16 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	}
 	page = page * MaxPageSize
 
-	// get election list
-	if body.WithResults == nil {
-		body.WithResults = new(bool)
-	}
-	elections, err := a.indexer.ProcessList(body.OrganizationID, page, MaxPageSize, body.ElectionID.String(), 0, 0, body.Status, *body.WithResults)
+	elections, err := a.indexer.ProcessList(
+		body.OrganizationID,
+		page,
+		MaxPageSize,
+		body.ElectionID.String(),
+		0,
+		0,
+		body.Status,
+		body.WithResults,
+	)
 	if err != nil {
 		return ErrCantFetchElectionList.WithErr(err)
 	}
