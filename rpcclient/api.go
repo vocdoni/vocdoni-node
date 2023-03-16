@@ -892,7 +892,6 @@ func (c *Client) TestSendAnonVotes(
 	}
 
 	log.Infof("Downloading Circuit Artifacts")
-	circuitConfig.LocalDir = "/tmp"
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
