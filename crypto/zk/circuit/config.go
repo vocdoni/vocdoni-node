@@ -3,12 +3,13 @@ package circuit
 import (
 	"encoding/hex"
 	"log"
-	"strings"
+
+	"go.vocdoni.io/dvote/util"
 )
 
 // DefaultCircuitConfigurationTag constant contains the tag value that points
 // to the default ZkSnark circuit configuration. It ensures that at least one
-// circuit configuration is available so the configuration refered by this tag
+// circuit configuration is available so the configuration referred by this tag
 // must be defined.
 const DefaultCircuitConfigurationTag = "dev"
 
@@ -76,8 +77,7 @@ func GetCircuitConfiguration(configTag string) ZkCircuitConfig {
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
 // in case of error it will panic.
 func hexToBytes(s string) []byte {
-	s = strings.TrimPrefix(s, "0x")
-	b, err := hex.DecodeString(s)
+	b, err := hex.DecodeString(util.TrimHex(s))
 	if err != nil {
 		log.Fatalf("Error decoding hex string %s: %s", s, err)
 	}
