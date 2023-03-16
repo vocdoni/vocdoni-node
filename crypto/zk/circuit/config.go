@@ -67,14 +67,13 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	},
 }
 
-// GetCircuitConfiguration returns the circuit configuration associated to the
+// GetCircuitConfiguration returns the circuit configuration associated with the
 // provided tag or gets the default one.
 func GetCircuitConfiguration(configTag string) ZkCircuitConfig {
-	circuitConf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
 	if conf, ok := CircuitsConfigurations[configTag]; ok {
-		circuitConf = conf
+		return conf
 	}
-	return circuitConf
+	return CircuitsConfigurations[DefaultCircuitConfigurationTag]
 }
 
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
