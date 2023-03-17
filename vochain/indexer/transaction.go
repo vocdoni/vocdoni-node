@@ -80,7 +80,7 @@ func (s *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex i
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
-		Hash:         types.HexBytes(tx.TxID[:]),
+		Hash:         tx.TxID[:],
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 		TxType:       tx.TxModelType,
