@@ -327,7 +327,9 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
+
+	tx := queries.WithTx(s.blockTx)
+	if _, err := tx.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}
 
