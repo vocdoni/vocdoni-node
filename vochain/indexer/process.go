@@ -170,7 +170,7 @@ func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes 
 	}
 	hexIDs := make([]types.HexBytes, len(entityIDs))
 	for i, id := range entityIDs {
-		hexIDs[i] = types.HexBytes(id)
+		hexIDs[i] = id
 	}
 	return hexIDs
 }
