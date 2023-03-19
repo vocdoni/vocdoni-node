@@ -20,11 +20,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up Go environment
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-          cache: true
-      - name: Tidy go cache
+      - name: Tidy go module
         run: |
           go mod tidy
           if [[ $(git status --porcelain) ]]; then
@@ -76,12 +75,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up Go environment
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-          cache: true
-      - name: Tidy go cache
-        run: go mod tidy
       - name: Run Go test
         if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
         run: go test ./...
@@ -185,12 +181,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Set up Go environment
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-          cache: true
-      - name: Tidy go cache
-        run: go mod tidy
       - name: Run go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
