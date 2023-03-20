@@ -344,7 +344,6 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
 func (s *Indexer) updateProcess(pid []byte) error {
-
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
