@@ -1343,10 +1343,7 @@ func TestIndexerConcurrentDB(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	// this could be removed due the update done in OnProcess(..) that calls newEmptyProcess
-	//if err := idx.newEmptyProcess(pid); err != nil {
-	//	t.Fatal(err)
-	//}
+
 	if err := idx.setResultsHeight(pid, 123); err != nil {
 		t.Error(err)
 	}
