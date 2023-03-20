@@ -482,7 +482,10 @@ func (idx *Indexer) Rollback() {
 	defer idx.lockPool.Unlock()
 	idx.votePool = make(map[string][]*state.Vote)
 	idx.voteIndexPool = []*VoteWithIndex{}
-	idx.blockTx.Rollback()
+	//err := idx.blockTx.Rollback()
+	//if err != nil {
+	//	log.Errorw(err, "rollback: cannot rollback the tx")
+	//}
 	idx.newProcessPool = []*indexertypes.IndexerOnProcessData{}
 	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	idx.updateProcessPool = [][]byte{}
