@@ -93,7 +93,7 @@ func mkTreeAnonVoteTest(c config) {
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate n participant accounts
-	voterAccounts := util.CreateEthRandomKeysBatch(c.nvotes)
+	voterAccounts := ethereum.NewSignKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}

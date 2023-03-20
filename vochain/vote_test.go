@@ -25,7 +25,7 @@ func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys,
 		t.Fatal(err)
 	}
 
-	keys := util.CreateEthRandomKeysBatch(size)
+	keys := ethereum.NewSignKeysBatch(size)
 	hashedKeys := [][]byte{}
 	for _, k := range keys {
 		c, err := tr.Hash(k.PublicKey())
