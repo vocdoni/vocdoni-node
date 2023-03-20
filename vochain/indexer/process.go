@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -325,69 +326,75 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		"metadata", procParams.Metadata,
 	)
 
-	queries, ctx, cancel := s.timeoutQueries()
+	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	tx := queries.WithTx(s.blockTx)
-	if _, err := tx.CreateProcess(ctx, procParams); err != nil {
-		return fmt.Errorf("sql create process: %w", err)
+	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
+		if _, err := q.CreateProcess(ctx, procParams); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
-
 	return nil
 }
 
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
 func (s *Indexer) updateProcess(pid []byte) error {
+
 	p, err := s.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
+
 	// TODO: remove from results table
 	// TODO: hold a sql db transaction for multiple queries
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
-	previousStatus, err := queries.GetProcessStatus(ctx, pid)
-	if err != nil {
-		return err
-	}
-	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
-		ID:                pid,
-		EndBlock:          int64(p.BlockCount + p.StartBlock),
-		CensusRoot:        nonNullBytes(p.CensusRoot),
-		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
-		RollingCensusSize: int64(p.GetRollingCensusSize()),
-		CensusUri:         p.GetCensusURI(),
-		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
-		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
-		Metadata:          p.GetMetadata(),
-		Status:            int64(p.Status),
-	}); err != nil {
-		return err
-	}
-	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
-		p.Status == models.ProcessStatus_CANCELED {
 
-		// We use two SQL queries, so use a transaction to apply them together.
-		tx, err := s.sqlDB.Begin()
+	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	defer cancel()
+
+	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
+		previousStatus, err := q.GetProcessStatus(ctx, pid)
 		if err != nil {
 			return err
 		}
-		queries = queries.WithTx(tx)
-
-		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
-			ID:            pid,
-			ResultsHeight: 0,
+		if _, err := q.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
+			ID:                pid,
+			EndBlock:          int64(p.BlockCount + p.StartBlock),
+			CensusRoot:        nonNullBytes(p.CensusRoot),
+			RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
+			RollingCensusSize: int64(p.GetRollingCensusSize()),
+			CensusUri:         p.GetCensusURI(),
+			PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
+			PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+			Metadata:          p.GetMetadata(),
+			Status:            int64(p.Status),
 		}); err != nil {
 			return err
 		}
-		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
-			return err
+
+		if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
+			p.Status == models.ProcessStatus_CANCELED {
+
+			if _, err := q.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
+				ID:            pid,
+				ResultsHeight: 0,
+			}); err != nil {
+				return err
+			}
+			if _, err := q.SetProcessResultsCancelled(ctx, pid); err != nil {
+				return err
+			}
 		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
+		return nil
+	}); err != nil {
+		return err
 	}
+
 	return nil
 }
 
@@ -396,13 +403,22 @@ func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-	queries, ctx, cancel := s.timeoutQueries()
+
+	ctx := context.TODO()
+	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
-	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
-		ID:            pid,
-		ResultsHeight: int64(height),
+
+	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
+		if _, err := q.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
+			ID:            pid,
+			ResultsHeight: int64(height),
+		}); err != nil {
+			return err
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
+
 	return nil
 }

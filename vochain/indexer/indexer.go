@@ -60,9 +60,9 @@ type Indexer struct {
 	App *vochain.BaseApplication
 	// voteIndexPool is the list of votes that will be indexed in the database
 	voteIndexPool []*VoteWithIndex
-	blockTx       *sql.Tx
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*state.Vote
+	blockTx  *sql.Tx
 	// newProcessPool is the list of new process IDs on the current block
 	newProcessPool []*indexertypes.IndexerOnProcessData
 	// updateProcessPool is the list of process IDs that require sync with the state database
@@ -161,14 +161,6 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 	// Subscribe to events
 	s.App.State.AddEventListener(s)
-
-	//Starts a transaction
-	blockTx, err := s.sqlDB.Begin()
-	if err != nil {
-		return nil, err
-	}
-	s.blockTx = blockTx
-
 	return s, nil
 }
 
@@ -338,26 +330,6 @@ func (idx *Indexer) AfterSyncBootstrap() {
 func (idx *Indexer) Commit(height uint32) error {
 	idx.lockPool.RLock()
 	defer idx.lockPool.RUnlock()
-	// Add Entity and register new active process
-	//for _, p := range idx.newProcessPool {
-	//	if err := idx.newEmptyProcess(p.ProcessID); err != nil {
-	//		log.Errorw(err, "commit: cannot create new empty process")
-	//		continue
-	//	}
-	//	if !idx.App.IsSynchronizing() {
-	//		idx.addProcessToLiveResults(p.ProcessID)
-	//	}
-	//	log.Debugw("new process", "processID", hex.EncodeToString(p.ProcessID))
-	//}
-
-	// Update existing processes
-	for _, p := range idx.updateProcessPool {
-		if err := idx.updateProcess(p); err != nil {
-			log.Errorw(err, "commit: cannot update process")
-			continue
-		}
-		log.Debugw("updated process", "processID", hex.EncodeToString(p))
-	}
 
 	// Index new transactions
 	idx.liveGoroutines.Add(1)
@@ -485,6 +457,25 @@ func (idx *Indexer) Commit(height uint32) error {
 	return nil
 }
 
+func (idx *Indexer) ExecTx(ctx context.Context, fn func(*indexerdb.Queries) error) error {
+	tx, err := idx.sqlDB.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	idx.blockTx = tx
+	queries := indexerdb.New(idx.blockTx)
+	q := queries.WithTx(idx.blockTx)
+
+	if err := fn(q); err != nil {
+		if rErr := idx.blockTx.Rollback(); err != nil {
+			log.Errorf("Tx error: %v, Rollback error: %v", err, rErr)
+			return err
+		}
+		return err
+	}
+	return idx.blockTx.Commit()
+}
+
 // Rollback removes the non committed pending operations
 func (idx *Indexer) Rollback() {
 	idx.lockPool.Lock()
@@ -503,10 +494,8 @@ func (idx *Indexer) Rollback() {
 func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	//data := &indexertypes.IndexerOnProcessData{EntityID: eid, ProcessID: pid}
-	//idx.newProcessPool = append(idx.newProcessPool, data)
 	if err := idx.newEmptyProcess(pid); err != nil {
-		log.Errorw(err, "commit: cannot create new empty process salomeeeee")
+		log.Errorw(err, "commit: cannot create new empty process")
 	}
 	if !idx.App.IsSynchronizing() {
 		idx.addProcessToLiveResults(pid)
@@ -531,14 +520,20 @@ func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	if err := idx.updateProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot update process")
+	}
+	log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 }
 
 // OnProcessKeys does nothing
 func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	if err := idx.updateProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot update process")
+	}
+	log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 }
 
 // OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
@@ -553,7 +548,10 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 			idx.resultsPool = append(idx.resultsPool, &indexertypes.IndexerOnProcessData{ProcessID: pid})
 		}
 	}
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	if err := idx.updateProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot update process")
+	}
+	log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
@@ -575,7 +573,10 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		data := indexertypes.IndexerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
 		idx.resultsPool = append(idx.resultsPool, &data)
 	}
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	if err := idx.updateProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot update process")
+	}
+	log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 }
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
@@ -586,7 +587,7 @@ func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 		go l.OnOracleResults(presults, pid, idx.App.Height())
 	}
 
-	// We don't execute any action if the blockchain is being syncronized
+	// We don't execute any action if the blockchain is being synchronized
 	if idx.App.IsSynchronizing() {
 		return
 	}
@@ -655,7 +656,10 @@ func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	}()
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	if err := idx.updateProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot update process")
+	}
+	log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 }
 
 // OnProcessesStart adds the processes to the updateProcessPool.
@@ -663,7 +667,13 @@ func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pids...)
+
+	for _, pid := range pids {
+		if err := idx.updateProcess(pid); err != nil {
+			log.Errorw(err, "commit: cannot update process")
+		}
+		log.Debugw("updated process", "processID", hex.EncodeToString(pid))
+	}
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
