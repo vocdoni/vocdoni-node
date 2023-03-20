@@ -114,21 +114,23 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
       - name: Run compose script
+        env:
+          TESTSUITE_BUILD_TAG: ${{ env.GITHUB_SHA | slice(0, 10) }}
+          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }}
+          COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
+          COMPOSE_DOCKER_CLI_BUILD: 1
+          DOCKER_BUILDKIT: 1
+          DOCKER_CLI_EXPERIMENTAL: enabled
+          COMPOSE_DVOTE_PORT_MAPPING: "9090" # Will use a random available port mapping
+          LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
+          BUILDARGS: "-cover" # collect code coverage when running binaries
         run: |
-          export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
-          export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
-          export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
-          export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          export BUILDARGS="-cover" # collect code coverage when running binaries
-          cd dockerfiles/testsuite
-          docker-compose build
-          ./start_test.sh
+          cd dockerfiles/testsuite && ./start_test.sh
       - name: Convert code coverage profile format
         run: docker run --rm -v $(pwd):/wd/ golang:1.20
-              go tool covdata textfmt -i=/wd/dockerfiles/testsuite/integration.covdir/ -o /wd/integration.covprofile
+              go tool covdata textfmt
+              -i=$(find /wd/dockerfiles/testsuite/gocoverage/ -type d -printf '%p,'| sed 's/,$//')
+              -o=/wd/integration.covprofile
       - name: Send integration test coverage to coveralls.io
         # coverallsapp/github-action@v2 fails on our self-hosted since runner has no permissions to write in /usr/local/bin
         # workaround using /tmp
