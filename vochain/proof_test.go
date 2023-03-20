@@ -145,7 +145,7 @@ func TestCSPproof(t *testing.T) {
 
 	// Test 20 valid votes
 	vp := []byte("[1,2,3,4]")
-	keys := util.CreateEthRandomKeysBatch(20)
+	keys := ethereum.NewSignKeysBatch(20)
 	for _, k := range keys {
 		bundle := &models.CAbundle{
 			ProcessId: pid,
