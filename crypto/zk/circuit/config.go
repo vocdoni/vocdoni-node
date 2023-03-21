@@ -3,12 +3,13 @@ package circuit
 import (
 	"encoding/hex"
 	"log"
-	"strings"
+
+	"go.vocdoni.io/dvote/util"
 )
 
 // DefaultCircuitConfigurationTag constant contains the tag value that points
 // to the default ZkSnark circuit configuration. It ensures that at least one
-// circuit configuration is available so the configuration refered by this tag
+// circuit configuration is available so the configuration referred by this tag
 // must be defined.
 const DefaultCircuitConfigurationTag = "dev"
 
@@ -16,15 +17,13 @@ const DefaultCircuitConfigurationTag = "dev"
 type ZkCircuitConfig struct {
 	// URI defines the URI from where to download the files
 	URI string `json:"uri"`
-	// CircuitPath defines the path from where the files are downloaded
+	// CircuitPath defines the path from where the files are downloaded.
+	// Locally, they will be cached inside circuit.BaseDir path,
+	// under that directory it will follow the CircuitPath dir structure
 	CircuitPath string `json:"circuitPath"`
 	// Levels refers the number of levels that the merkle tree associated to the
 	// current circuit configuration artifacts has
 	Levels int `json:"levels"`
-	// LocalDir defines in which directory will be the files
-	// downloaded, under that directory it will follow the CircuitPath
-	// directories structure
-	LocalDir string `json:"localDir,omitempty"`
 	// ProvingKeyHash contains the expected hash for the file filenameZKey
 	ProvingKeyHash []byte `json:"zKeyHash"`
 	// FilenameProvingKey defines the name of the file of the circom ProvingKey
@@ -57,7 +56,6 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 			"zk-franchise-proof-circuit/master",
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
-		LocalDir:                "zkCircuits",
 		ProvingKeyHash:          hexToBytes("0x48596c390d24a173c796b0dae68f3c08db034171917ca1b2f253ce9476a35945"),
 		ProvingKeyFilename:      "proving_key.zkey",
 		VerificationKeyHash:     hexToBytes("0x411c78a012d6d163e02704d9ce33b6d84e84ee67f62179f53158ffabd88da44a"),
@@ -67,21 +65,19 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	},
 }
 
-// GetCircuitConfiguration returns the circuit configuration associated to the
+// GetCircuitConfiguration returns the circuit configuration associated with the
 // provided tag or gets the default one.
 func GetCircuitConfiguration(configTag string) ZkCircuitConfig {
-	circuitConf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
 	if conf, ok := CircuitsConfigurations[configTag]; ok {
-		circuitConf = conf
+		return conf
 	}
-	return circuitConf
+	return CircuitsConfigurations[DefaultCircuitConfigurationTag]
 }
 
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
 // in case of error it will panic.
 func hexToBytes(s string) []byte {
-	s = strings.TrimPrefix(s, "0x")
-	b, err := hex.DecodeString(s)
+	b, err := hex.DecodeString(util.TrimHex(s))
 	if err != nil {
 		log.Fatalf("Error decoding hex string %s: %s", s, err)
 	}

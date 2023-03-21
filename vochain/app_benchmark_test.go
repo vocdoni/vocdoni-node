@@ -9,6 +9,7 @@ import (
 
 	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -44,7 +45,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		b.Fatal(err)
 	}
 
-	keys := util.CreateEthRandomKeysBatch(nvoters)
+	keys := ethereum.NewSignKeysBatch(nvoters)
 	if keys == nil {
 		b.Fatal("cannot create keys batch")
 	}

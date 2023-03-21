@@ -109,7 +109,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	if err != nil {
 		return err
 	}
-	voterKeys := util.CreateEthRandomKeysBatch(int(censusSize))
+	voterKeys := ethereum.NewSignKeysBatch(int(censusSize))
 	proofs, err := testvoteproof.GetCSPproofBatch(voterKeys, &cspKey, processID)
 	if err != nil {
 		return err

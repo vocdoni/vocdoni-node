@@ -17,9 +17,23 @@ import (
 
 var downloadCircuitsTimeout = time.Minute * 5
 
-// By default set the circuit base dir empty which means that the artifacts will
-// be downloaded or loaded from the LocalDir path associated to the circuit config
+// BaseDir is where the artifact cache is expected to be found.
+// If the artifacts are not found there, they will be downloaded and stored.
+// If unset ("") it will default to ~/.cache/vocdoni/zkCircuits/
+//
+// In any case, the LocalDir path associated with the circuit config will be appended at the end
 var BaseDir = ""
+
+func init() {
+	// if base dir is unset, default to ~/.cache/vocdoni/
+	if BaseDir == "" {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			panic(err)
+		}
+		BaseDir = home + "/.cache/vocdoni/zkCircuits"
+	}
+}
 
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)
@@ -42,11 +56,8 @@ func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
 
 // LoadZkCircuit load the circuit artifacts based on the configuration provided.
 // First, tries to load the artifacts from local storage, if they are not
-// available, tries to download from their remote location. Then,
+// available, tries to download from their remote location.
 func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, error) {
-	// Join the local base path with the local dir set up into the circuit
-	// configuration
-	config.LocalDir = filepath.Join(BaseDir, config.LocalDir)
 	circuit := &ZkCircuit{Config: config}
 	// load the artifacts of the provided circuit from the local storage
 	if err := circuit.LoadLocal(); err == nil {
@@ -78,7 +89,7 @@ func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, err
 // operations fails, returns an error.
 func (circuit *ZkCircuit) LoadLocal() error {
 	var err error
-	log.Debugw("loading circuit locally...", "localDir", circuit.Config.LocalDir)
+	log.Debugw("loading circuit locally...", "BaseDir", BaseDir)
 	files := map[string][]byte{
 		circuit.Config.ProvingKeyFilename:      nil,
 		circuit.Config.VerificationKeyFilename: nil,
@@ -86,7 +97,7 @@ func (circuit *ZkCircuit) LoadLocal() error {
 	}
 	for filename := range files {
 		// compose files localpath
-		localPath := filepath.Join(circuit.Config.LocalDir,
+		localPath := filepath.Join(BaseDir,
 			circuit.Config.CircuitPath, filename)
 		// read file contents locally
 		files[filename], err = os.ReadFile(localPath)
@@ -105,13 +116,13 @@ func (circuit *ZkCircuit) LoadLocal() error {
 // remote location. If any of the downloads fails, returns an error.
 func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	log.Debugw("circuit not downloaded yet, downloading...",
-		"localDir", circuit.Config.LocalDir)
+		"BaseDir", BaseDir)
 	baseUri, err := url.Parse(circuit.Config.URI)
 	if err != nil {
 		return err
 	}
 	remotePath := fmt.Sprintf("%s/%s", baseUri.String(), circuit.Config.CircuitPath)
-	localPath := filepath.Join(circuit.Config.LocalDir, circuit.Config.CircuitPath)
+	localPath := filepath.Join(BaseDir, circuit.Config.CircuitPath)
 	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
 		return err
 	}

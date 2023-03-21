@@ -248,8 +248,6 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// Get current circuit tag
 	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
-	// Set LocalDir parameter to empty to be omitted
-	circuitConfig.LocalDir = ""
 	// Encode the circuit configuration to JSON
 	data, err := json.Marshal(circuitConfig)
 	if err != nil {
