@@ -54,7 +54,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 	if err != nil {
 		return nil, fmt.Errorf("cannot count votes: %w", err)
 	}
-	if votesCount > process.GetMaxCensusSize() {
+	if votesCount >= process.GetMaxCensusSize() {
 		return nil, fmt.Errorf("maxCensusSize reached %d/%d", votesCount, process.GetMaxCensusSize())
 	}
 

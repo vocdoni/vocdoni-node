@@ -12,9 +12,26 @@ import (
 )
 
 var (
-	//ErrTransactionDoesNotExist is returned when the transaction does not exist
+	// ErrTransactionDoesNotExist is returned when the transaction does not exist
 	ErrTransactionDoesNotExist = fmt.Errorf("transaction does not exist")
 )
+
+// ChainInfo returns some information about the chain, such as block height.
+func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "info")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	chainInfo := &api.ChainInfo{}
+	err = json.Unmarshal(resp, chainInfo)
+	if err != nil {
+		return nil, err
+	}
+	return chainInfo, nil
+}
 
 // TransactionsCost returns a map with the current cost for all transactions
 func (c *HTTPclient) TransactionsCost() (map[string]uint64, error) {
@@ -64,7 +81,8 @@ func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.Transacti
 	return txRef, nil
 }
 
-// TransactionByHash returns the full transaction given its hash.  For querying if a transaction is included in a block,
+// TransactionByHash returns the full transaction given its hash.
+// For querying if a transaction is included in a block, it is recommended to
 // use TransactionReference which is much faster.
 func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error) {
 	ref, err := c.TransactionReference(txHash)
@@ -77,16 +95,25 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 		return nil, err
 	}
 	if code != 200 {
-		return nil, fmt.Errorf("%d: could not get raw transaction: %s", code, resp)
+		return nil, ErrTransactionDoesNotExist
 	}
 	tx := &models.Tx{}
 	return tx, protojson.Unmarshal(resp, tx)
 }
 
-// OrganizationsBySearchTermPaginated returns a paginated list of organizations that match the given search term.
-func (c *HTTPclient) OrganizationsBySearchTermPaginated(organizationID types.HexBytes, page int) ([]types.HexBytes, error) {
-	// make a post request to /chain/organizations/filter/page/<page> with the organizationID as the body and page as the url parameter
-	resp, code, err := c.Request(HTTPPOST, organizationID, "chain", "organizations", "filter", "page", fmt.Sprintf("%d", page))
+// OrganizationsBySearchTermPaginated returns a paginated list of organizations
+// that match the given search term.
+func (c *HTTPclient) OrganizationsBySearchTermPaginated(
+	organizationID types.HexBytes, page int) ([]types.HexBytes, error) {
+	// make a post request to /chain/organizations/filter/page/<page> with the organizationID
+	// as the body and page as the url parameter
+	resp, code, err := c.Request(HTTPPOST,
+		organizationID,
+		"chain",
+		"organizations",
+		"filter",
+		"page",
+		fmt.Sprintf("%d", page))
 	if err != nil {
 		return nil, err
 	}

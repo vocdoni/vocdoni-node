@@ -266,6 +266,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		},
 		TxCost: genesis.TransactionCosts{},
 	}
+	appState.MaxElectionSize = 100000
 	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return nil, err

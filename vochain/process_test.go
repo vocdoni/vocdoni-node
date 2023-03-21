@@ -570,3 +570,30 @@ func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.
 	app.Commit()
 	return nil
 }
+
+func TestGlobalMaxProcessSize(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
+	app.State.SetMaxProcessSize(10)
+	app.AdvanceTestBlock()
+
+	// define process
+	censusURI := ipfsUrl
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:     pid,
+		StartBlock:    1,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[1].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 20,
+	}
+
+	// create process with entityID (should work)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process), qt.IsNotNil)
+}

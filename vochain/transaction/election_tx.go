@@ -148,7 +148,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	}
 
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Levels) {
+		if tx.Process.GetMaxCensusSize() >= uint64(t.ZkCircuit.Config.Levels) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the number of levels of the circuit (%d)",
 				t.ZkCircuit.Config.Levels)

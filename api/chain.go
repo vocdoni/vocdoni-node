@@ -203,7 +203,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // chainInfoHandler
 //
 //	@Summary		Chain info
-//	@Description	Returns the chain ID, blocktimes, timestamp and height of the blockchain
+//	@Description	Returns the chain parameters and info
 //	@Success		200	{object}	ChainInfo
 //	@Router			/chain/info [get]
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -219,6 +219,11 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
+	maxCensusSize, err := a.vocapp.State.MaxProcessSize()
+	if err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(&ChainInfo{
 		ID:                      a.vocapp.ChainID(),
 		BlockTime:               *a.vocinfo.BlockTimes(),
@@ -232,6 +237,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		VoteCount:               voteCount,
 		GenesisTime:             a.vocapp.Genesis().GenesisTime,
 		CircuitConfigurationTag: a.vocapp.CircuitConfigurationTag(),
+		MaxCensusSize:           maxCensusSize,
 	})
 	if err != nil {
 		return err
