@@ -95,12 +95,13 @@ func TestVoteOverwrite(t *testing.T) {
 			MaxValue:          3,
 			MaxVoteOverwrites: 2,
 		},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   root,
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    root,
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 10,
 	}
 	err := app.State.AddProcess(process)
 	qt.Check(t, err, qt.IsNil)
@@ -166,6 +167,68 @@ func TestVoteOverwrite(t *testing.T) {
 	vote, err := app.State.Vote(pid, detxresp.Data, false)
 	qt.Check(t, err, qt.IsNil)
 	qt.Check(t, vote.GetOverwriteCount(), qt.Equals, uint32(2))
+}
 
-	// TODO: add an indexer and check that the vote conent has actually been overwritten
+func TestMaxCensusSize(t *testing.T) {
+	app := TestBaseApplication(t)
+
+	// set the global max census size to 20
+	err := app.State.SetMaxProcessSize(20)
+	qt.Check(t, err, qt.IsNil)
+
+	// create a census with 10 keys
+	keys, root, proofs := testCreateKeysAndBuildCensus(t, 11)
+	censusURI := ipfsUrl
+
+	// create a process with max census size 10
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:    pid,
+		StartBlock:   0,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+		Mode: &models.ProcessMode{
+			AutoStart: true,
+		},
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:          3,
+			MaxValue:          3,
+			MaxVoteOverwrites: 2,
+		},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    root,
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 10,
+	}
+	err = app.State.AddProcess(process)
+	qt.Check(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// define a function to send a vote
+	vote := func(i int) uint32 {
+		var cktx abcitypes.RequestCheckTx
+		var detx abcitypes.RequestDeliverTx
+		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
+		cktx.Tx, err = proto.Marshal(stx)
+		qt.Check(t, err, qt.IsNil)
+		cktxresp := app.CheckTx(cktx)
+		if cktxresp.Code != 0 {
+			return cktxresp.Code
+		}
+		detx.Tx, err = proto.Marshal(stx)
+		qt.Check(t, err, qt.IsNil)
+		detxresp := app.DeliverTx(detx)
+		return detxresp.Code
+	}
+
+	// send 10 votes, should be fine
+	for i := 0; i < 10; i++ {
+		qt.Check(t, vote(i), qt.Equals, uint32(0))
+		app.AdvanceTestBlock()
+	}
+
+	// the 11th vote should fail
+	qt.Check(t, vote(10), qt.Equals, uint32(1))
 }

@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
@@ -71,11 +72,12 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 }
 
 // NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *ConsensusParams,
-	validators []privval.FilePV, oracles, accounts []string, initAccountsBalance int, treasurer string, txCosts *TransactionCosts) ([]byte, error) {
+func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *genesis.ConsensusParams,
+	validators []privval.FilePV, oracles, accounts []string, initAccountsBalance int,
+	treasurer string, txCosts *genesis.TransactionCosts) ([]byte, error) {
 	// default consensus params
-	appState := GenesisAppState{}
-	appState.Validators = make([]AppStateValidators, len(validators))
+	appState := genesis.GenesisAppState{}
+	appState.Validators = make([]genesis.AppStateValidators, len(validators))
 	for idx, val := range validators {
 		pubk, err := val.GetPubKey(context.Background())
 		if err != nil {
@@ -85,7 +87,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		if err := signer.AddHexKey(hex.EncodeToString(val.Key.PrivKey.Bytes())); err != nil {
 			return nil, err
 		}
-		appState.Validators[idx] = AppStateValidators{
+		appState.Validators[idx] = genesis.AppStateValidators{
 			Address: signer.Address().Bytes(),
 			PubKey:  pubk.Bytes(),
 			Power:   10,
@@ -104,7 +106,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		if err != nil {
 			return nil, err
 		}
-		appState.Accounts = append(appState.Accounts, GenesisAccount{
+		appState.Accounts = append(appState.Accounts, genesis.GenesisAccount{
 			Address: accAddressBytes,
 			Balance: uint64(initAccountsBalance),
 		})
@@ -118,7 +120,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *Consens
 		return nil, err
 	}
 	appState.Treasurer = tb
-	genDoc := GenesisDoc{
+	genDoc := genesis.GenesisDoc{
 		ChainID:         chainID,
 		GenesisTime:     tmtime.Now(),
 		ConsensusParams: consensusParams,
@@ -175,7 +177,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	gd.ConsensusParams.Validator.PubKeyTypes = []string{"secp256k1"}
 
 	// Create validators
-	appStateValidators := []AppStateValidators{}
+	appStateValidators := []genesis.AppStateValidators{}
 	for i := 0; i < validators; i++ {
 		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
 		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
@@ -197,7 +199,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
 			return nil, err
 		}
-		appStateValidators = append(appStateValidators, AppStateValidators{
+		appStateValidators = append(appStateValidators, genesis.AppStateValidators{
 			Address:  signer.Address().Bytes(),
 			PubKey:   pv.Key.PubKey.Bytes(),
 			Power:    10,
@@ -252,18 +254,19 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	}
 
 	// Build genesis app state and create genesis file
-	appState := GenesisAppState{
+	appState := genesis.GenesisAppState{
 		Validators: appStateValidators,
 		Oracles:    []types.HexBytes{oracle.Address().Bytes()},
 		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
-		Accounts: []GenesisAccount{
+		Accounts: []genesis.GenesisAccount{
 			{
 				Address: faucet.Address().Bytes(),
 				Balance: 100000,
 			},
 		},
-		TxCost: TransactionCosts{},
+		TxCost: genesis.TransactionCosts{},
 	}
+	appState.MaxElectionSize = 100000
 	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return nil, err

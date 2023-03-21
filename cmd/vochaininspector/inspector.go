@@ -191,7 +191,7 @@ func newVochain(chain, dataDir string) *vochain.BaseApplication {
 	}
 	log.Infof("external ip address %s", cfg.PublicAddr)
 	// Create the vochain node
-	genesisBytes := []byte(genesis.Genesis[chain].Genesis)
+	genesisBytes := genesis.Genesis[chain].Genesis.Marshal()
 	return vochain.NewVochain(cfg, genesisBytes)
 }
 

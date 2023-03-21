@@ -116,6 +116,7 @@ type Vote struct {
 
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
+	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty"`
 	RootHash  types.HexBytes `json:"rootHash,omitempty"`
@@ -175,6 +176,7 @@ type ChainInfo struct {
 	ValidatorCount          uint32    `json:"validatorCount"`
 	VoteCount               uint64    `json:"voteCount"`
 	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
+	MaxCensusSize           uint64    `json:"maxCensusSize,omitempty"`
 }
 
 type Account struct {

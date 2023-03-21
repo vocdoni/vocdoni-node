@@ -252,10 +252,13 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 		return err
 	}
 
-	count := a.vocapp.State.CountVotes(electionID, true)
+	count, err := a.vocapp.State.CountVotes(electionID, true)
+	if err != nil {
+		return err
+	}
 	data, err := json.Marshal(
 		struct {
-			Count uint32 `json:"count"`
+			Count uint64 `json:"count"`
 		}{Count: count},
 	)
 	if err != nil {

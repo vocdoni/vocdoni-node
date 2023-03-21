@@ -91,6 +91,11 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc.setDefaultMethods()
 	vc.app.State.SetHeight(uint32(vc.height.Load()))
 
+	// Set max process size to 0 (unlimited)
+	if err := vc.app.State.SetMaxProcessSize(0); err != nil {
+		return nil, err
+	}
+
 	// Create burn account
 	if err := vc.CreateAccount(state.BurnAddress, &state.Account{}); err != nil {
 		return nil, err

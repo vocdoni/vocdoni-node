@@ -78,7 +78,7 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type (%s)", db.TypePebble))
 	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
-		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.GenesisAvailableChains()))
+		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
 	globalCfg.PprofPort = *flag.Int("pprof", 0,

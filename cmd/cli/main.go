@@ -540,6 +540,7 @@ func electionHandler(cli *vocdoniCLI) error {
 		Census: api.CensusTypeDescription{
 			Type:     "weighted",
 			RootHash: make(types.HexBytes, 32),
+			Size:     100,
 		},
 	}
 	descriptionText, err := json.MarshalIndent(&description, "", " ")

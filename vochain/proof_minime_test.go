@@ -38,6 +38,7 @@ func TestMinimeProof(t *testing.T) {
 		CensusRoot:        testMinimeStorageRoot,
 		CensusOrigin:      models.CensusOrigin_MINI_ME,
 		BlockCount:        1024,
+		MaxCensusSize:     1000,
 		EthIndexSlot:      &testMinimeIndexSlot,
 		SourceBlockHeight: &testMinimeSourceBlockHeight,
 	}
