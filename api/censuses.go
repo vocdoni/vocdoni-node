@@ -661,7 +661,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}
 	leafV, siblings, err := ref.Tree().GenProof(leafKey)
 	if err != nil {
-		return fmt.Errorf("something was wrong during census proof generation: %w", err)
+		return ErrKeyNotFoundInCensus.With(hex.EncodeToString(leafKey))
 	}
 	response := Census{
 		Proof: siblings,
@@ -674,7 +674,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
 		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
 		if err != nil {
-			return fmt.Errorf("error geting the census siblings to circom: %w", err)
+			return ErrCantGetCircomSiblings.WithErr(err)
 		}
 	}
 	if len(leafV) > 0 {
@@ -736,7 +736,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
 	if err != nil {
-		return fmt.Errorf("something was wrong during census proof verification: %w", err)
+		return ErrCensusProofVerificationFailed.WithErr(err)
 	}
 	if !valid {
 		return ctx.Send(nil, apirest.HTTPstatusBadRequest)

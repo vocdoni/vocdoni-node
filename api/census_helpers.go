@@ -2,7 +2,6 @@ package api
 
 import (
 	"encoding/hex"
-	"fmt"
 
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
@@ -40,7 +39,7 @@ func encodeCensusType(t models.Census_Type) string {
 func censusIDparse(censusID string) ([]byte, error) {
 	censusID = util.TrimHex(censusID)
 	if len(censusID) != censusIDsize*2 {
-		return nil, fmt.Errorf("%w (%d != %d)", ErrCensusIDLengthInvalid, len(censusID), censusIDsize*2)
+		return nil, ErrCensusIDLengthInvalid.Withf("(%d != %d)", len(censusID), censusIDsize*2)
 
 	}
 	return hex.DecodeString(censusID)

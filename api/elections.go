@@ -340,7 +340,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		if errors.Is(err, indexer.ErrVoteNotFound) {
 			return ErrVoteNotFound
 		}
-		return fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+		return ErrCantFetchEnvelope.WithErr(err)
 	}
 	votes := []Vote{}
 	for _, v := range votesRaw {
@@ -625,10 +625,10 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 		if errors.Is(err, state.ErrProcessNotFound) {
 			return nil, ErrElectionNotFound
 		}
-		return nil, fmt.Errorf("%w (%x): %v", ErrCantFetchElection, electionID, err)
+		return nil, ErrCantFetchElection.Withf("(%x): %v", electionID, err)
 	}
 	if process == nil {
-		return nil, fmt.Errorf("%w (%x)", ErrElectionIsNil, electionID)
+		return nil, ErrElectionIsNil.Withf("%x", electionID)
 	}
 	return process, nil
 }

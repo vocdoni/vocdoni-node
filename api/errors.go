@@ -65,6 +65,7 @@ var (
 	ErrElectionNotFound                 = apirest.APIerror{Code: 4046, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("election not found")}
 	ErrCensusNotFound                   = apirest.APIerror{Code: 4047, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("census not found")}
 	ErrNoElectionKeys                   = apirest.APIerror{Code: 4048, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("no election keys available")}
+	ErrKeyNotFoundInCensus              = apirest.APIerror{Code: 4049, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("key not found in census")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}
@@ -92,4 +93,6 @@ var (
 	ErrElectionResultsNotYetAvailable   = apirest.APIerror{Code: 5024, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results are not yet available")}
 	ErrElectionResultsIsNil             = apirest.APIerror{Code: 5025, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results is nil")}
 	ErrElectionResultsMismatch          = apirest.APIerror{Code: 5026, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results don't match reported ones")}
+	ErrCantGetCircomSiblings            = apirest.APIerror{Code: 5027, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot get circom siblings")}
+	ErrCensusProofVerificationFailed    = apirest.APIerror{Code: 5028, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("census proof verification failed")}
 )

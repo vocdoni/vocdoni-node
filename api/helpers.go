@@ -24,11 +24,11 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 		// TODO(mvdan): ProcessInfo could give us the results envelope height as well.
 		procInfo, err := a.indexer.ProcessInfo(pid)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrCantFetchElection, err)
+			return nil, ErrCantFetchElection.WithErr(err)
 		}
 		count, err := a.indexer.GetEnvelopeHeight(pid)
 		if err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrCantFetchEnvelopeHeight, err)
+			return nil, ErrCantFetchEnvelopeHeight.WithErr(err)
 		}
 		processes = append(processes, &ElectionSummary{
 			ElectionID:     procInfo.ID,
@@ -135,7 +135,7 @@ func encodeEVMResultsArgs(electionId common.Hash,
 	}
 	abiEncodedResultsBytes, err := args.Pack(electionId, organizationId, censusRoot, sourceContractAddress, resultsStd)
 	if err != nil {
-		return "", fmt.Errorf("%w: %v", ErrCantABIEncodeResults, err)
+		return "", ErrCantABIEncodeResults.WithErr(err)
 	}
 	return fmt.Sprintf("0x%s", hex.EncodeToString(abiEncodedResultsBytes)), nil
 }

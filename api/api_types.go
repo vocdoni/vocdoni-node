@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -272,7 +271,7 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 		root = ctype.RootHash
 	default:
-		return 0, nil, fmt.Errorf("%w: %q", ErrCensusTypeUnknown, ctype)
+		return 0, nil, ErrCensusTypeUnknown.Withf("%q", ctype)
 	}
 	if root == nil {
 		return 0, nil, ErrCensusRootIsNil
