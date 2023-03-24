@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/dvote/types"
@@ -39,7 +38,7 @@ type SignKeys struct {
 }
 
 // Address represents an Ethereum like address
-type Address common.Address
+type Address ethcommon.Address
 
 // NewSignKeys creates an ECDSA pair of keys for signing
 // and initializes the map for authorized keys

@@ -12,7 +12,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
-	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -20,79 +19,79 @@ import (
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
-	forCommit bool) (*models.Process, common.Address, error) {
+	forCommit bool) (*models.Process, ethereum.Address, error) {
 	if vtx.Tx == nil || vtx.Signature == nil || vtx.SignedBody == nil {
-		return nil, common.Address{}, ErrNilTx
+		return nil, ethereum.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetNewProcess()
 	if tx.Process == nil {
-		return nil, common.Address{}, fmt.Errorf("new process data is empty")
+		return nil, ethereum.Address{}, fmt.Errorf("new process data is empty")
 	}
 	// basic required fields check
 	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
-		return nil, common.Address{}, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
+		return nil, ethereum.Address{}, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
 	}
 	if tx.Process.VoteOptions.MaxCount == 0 {
-		return nil, common.Address{}, fmt.Errorf("missing vote maxCount parameter")
+		return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
 	}
 	// Check for maxCount/maxValue overflows
 	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions || tx.Process.VoteOptions.MaxValue > results.MaxOptions {
-		return nil, common.Address{},
+		return nil, ethereum.Address{},
 			fmt.Errorf("maxCount or maxValue overflows hardcoded maximums (%d, %d). Received (%d, %d)",
 				results.MaxQuestions, results.MaxOptions, tx.Process.VoteOptions.MaxCount, tx.Process.VoteOptions.MaxValue)
 	}
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
-		return nil, common.Address{}, fmt.Errorf("status must be READY or PAUSED")
+		return nil, ethereum.Address{}, fmt.Errorf("status must be READY or PAUSED")
 	}
 	// check vtx.Signature available
 	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
-		return nil, common.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
+		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
 	}
 	// start and block count sanity check
 	// if startBlock is zero or one, the process will be enabled on the next block
 	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
 		tx.Process.StartBlock = t.state.CurrentHeight() + 1
 	} else if tx.Process.StartBlock < t.state.CurrentHeight() {
-		return nil, common.Address{}, fmt.Errorf(
+		return nil, ethereum.Address{}, fmt.Errorf(
 			"cannot add process with start block lower than or equal to the current height")
 	}
 	if tx.Process.BlockCount <= 0 {
-		return nil, common.Address{}, fmt.Errorf(
+		return nil, ethereum.Address{}, fmt.Errorf(
 			"cannot add process with duration lower than or equal to the current height")
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range
 	if tx.Process.GetMaxCensusSize() == 0 {
 		log.Warnf("maxCensusSize is zero")
-		return nil, common.Address{}, fmt.Errorf("maxCensusSize is zero")
+		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize is zero")
 	}
 	maxProcessSize, err := t.state.MaxProcessSize()
 	if err != nil {
-		return nil, common.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
+		return nil, ethereum.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
 	}
 	if maxProcessSize > 0 && tx.Process.GetMaxCensusSize() > maxProcessSize {
-		return nil, common.Address{},
+		return nil, ethereum.Address{},
 			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
 	}
 
 	// check tx cost
 	cost, err := t.state.TxCost(models.TxType_NEW_PROCESS, false)
 	if err != nil {
-		return nil, common.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
+		return nil, ethereum.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
 	}
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return nil, common.Address{}, fmt.Errorf("could not get account: %w", err)
+		return nil, ethereum.Address{}, fmt.Errorf("could not get account: %w", err)
 	}
 	if addr == nil {
-		return nil, common.Address{}, fmt.Errorf("cannot get account from vtx.Signature, nil result")
+		return nil, ethereum.Address{}, fmt.Errorf("cannot get account from vtx.Signature, nil result")
 	}
 	// check balance and nonce
 	if acc.Balance < cost {
-		return nil, common.Address{}, vstate.ErrNotEnoughBalance
+		return nil, ethereum.Address{}, vstate.ErrNotEnoughBalance
 	}
 	if acc.Nonce != tx.Nonce {
-		return nil, common.Address{}, vstate.ErrAccountNonceInvalid
+		return nil, ethereum.Address{}, vstate.ErrAccountNonceInvalid
 	}
 
 	// if organization ID is not set, use the sender address
@@ -103,24 +102,24 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	// check if the sender is an Oracle or a Delegate of the organization
 	isOracle, err := t.state.IsOracle(*addr)
 	if err != nil {
-		return nil, common.Address{}, err
+		return nil, ethereum.Address{}, err
 	}
 
 	// check if process entityID matches tx sender
 	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
 		// if not oracle check delegate
-		entityAddress := common.BytesToAddress(tx.Process.EntityId)
+		entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
 		entityAccount, err := t.state.GetAccount(entityAddress, false)
 		if err != nil {
-			return nil, common.Address{}, fmt.Errorf(
+			return nil, ethereum.Address{}, fmt.Errorf(
 				"cannot get organization account for checking if the sender is a delegate: %w", err,
 			)
 		}
 		if entityAccount == nil {
-			return nil, common.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
+			return nil, ethereum.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
 		}
 		if !entityAccount.IsDelegate(*addr) {
-			return nil, common.Address{}, fmt.Errorf(
+			return nil, ethereum.Address{}, fmt.Errorf(
 				"account %s unauthorized to create a new election on this organization", addr.Hex())
 		}
 	}
@@ -135,7 +134,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		}
 		pid, err := processid.BuildProcessID(tx.Process, t.state)
 		if err != nil {
-			return nil, common.Address{}, fmt.Errorf("cannot build processID: %w", err)
+			return nil, ethereum.Address{}, fmt.Errorf("cannot build processID: %w", err)
 		}
 		tx.Process.ProcessId = pid.Marshal()
 		// restore original entityID
@@ -145,12 +144,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	// check if process already exists
 	_, err = t.state.Process(tx.Process.ProcessId, false)
 	if err == nil {
-		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
+		return nil, ethereum.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		if tx.Process.GetMaxCensusSize() >= uint64(t.ZkCircuit.Config.Levels) {
-			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
+			return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the number of levels of the circuit (%d)",
 				t.ZkCircuit.Config.Levels)
 		}
@@ -160,7 +159,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	// all the required changes to support a process with a rolling census
 	// that is not Anonymous.
 	if tx.Process.EnvelopeType.Serial {
-		return nil, common.Address{}, fmt.Errorf("serial process not yet implemented")
+		return nil, ethereum.Address{}, fmt.Errorf("serial process not yet implemented")
 	}
 
 	if tx.Process.EnvelopeType.EncryptedVotes {
@@ -168,36 +167,36 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
-	return tx.Process, *addr, nil
+	return tx.Process, ethereum.Address(*addr), nil
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (common.Address, error) {
+func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (ethereum.Address, error) {
 	// check vtx.Signature available
 	if vtx.Signature == nil || vtx.Tx == nil || vtx.SignedBody == nil {
-		return common.Address{}, ErrNilTx
+		return ethereum.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetSetProcess()
 	// get tx cost
 	cost, err := t.state.TxCost(tx.Txtype, false)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
+		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
 	}
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return common.Address{}, err
+		return ethereum.Address{}, err
 	}
 	// check balance and nonce
 	if acc.Balance < cost {
-		return common.Address{}, vstate.ErrNotEnoughBalance
+		return ethereum.Address{}, vstate.ErrNotEnoughBalance
 	}
 	if acc.Nonce != tx.Nonce {
-		return common.Address{}, vstate.ErrAccountNonceInvalid
+		return ethereum.Address{}, vstate.ErrAccountNonceInvalid
 	}
 	// get process
 	process, err := t.state.Process(tx.ProcessId, false)
 	if err != nil {
-		return common.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
+		return ethereum.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
 	// check process entityID matches tx sender
 	isOracle := false
@@ -206,19 +205,19 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forComm
 		// Oracles can create processes with any entityID
 		isOracle, err = t.state.IsOracle(*addr)
 		if err != nil {
-			return common.Address{}, err
+			return ethereum.Address{}, err
 		}
 		if !isOracle {
 			// check if delegate
-			entityIDAddress := common.BytesToAddress(process.EntityId)
+			entityIDAddress := ethereum.AddrFromBytes(process.EntityId)
 			entityIDAccount, err := t.state.GetAccount(entityIDAddress, true)
 			if err != nil {
-				return common.Address{}, fmt.Errorf(
+				return ethereum.Address{}, fmt.Errorf(
 					"cannot get entityID account for checking if the sender is a delegate: %w", err,
 				)
 			}
 			if !entityIDAccount.IsDelegate(*addr) {
-				return common.Address{}, fmt.Errorf(
+				return ethereum.Address{}, fmt.Errorf(
 					"unauthorized to set process status, recovered addr is %s", addr.Hex(),
 				)
 			} // is delegate
@@ -227,25 +226,25 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forComm
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_RESULTS:
 		if !isOracle {
-			return common.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
+			return ethereum.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
 		}
 		if acc.Balance < cost {
-			return common.Address{}, vstate.ErrNotEnoughBalance
+			return ethereum.Address{}, vstate.ErrNotEnoughBalance
 		}
 		if acc.Nonce != tx.Nonce {
-			return common.Address{}, vstate.ErrAccountNonceInvalid
+			return ethereum.Address{}, vstate.ErrAccountNonceInvalid
 		}
 		results := tx.GetResults()
 		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
-			return common.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
+			return ethereum.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
 		}
-		return *addr, t.state.SetProcessResults(process.ProcessId, results, false)
+		return ethereum.Address(*addr), t.state.SetProcessResults(process.ProcessId, results, false)
 	case models.TxType_SET_PROCESS_STATUS:
-		return *addr, t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
+		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:
-		return *addr, t.state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
+		return ethereum.Address(*addr), t.state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
 	default:
-		return common.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
+		return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
 }
 
@@ -299,7 +298,7 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
 
-	voterID := state.NewVoterID(state.VoterIDTypeECDSA, pubKey)
+	voterID := vstate.NewVoterID(vstate.VoterIDTypeECDSA, pubKey)
 	var valid bool
 	var weight *big.Int
 	valid, weight, err = VerifyProof(process, tx.Proof,
