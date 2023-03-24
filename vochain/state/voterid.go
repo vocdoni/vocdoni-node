@@ -1,8 +1,6 @@
 package state
 
 import (
-	"errors"
-
 	"go.vocdoni.io/dvote/crypto/ethereum"
 )
 
@@ -18,15 +16,20 @@ type VoterIDType = uint8
 const (
 	VoterIDTypeUndefined VoterIDType = 0
 	VoterIDTypeECDSA     VoterIDType = 1
+	VoterIDTypeZkSnark   VoterIDType = 2
 )
 
 // Enum value map for VoterIDType.
 var voterIDTypeName = map[VoterIDType]string{
 	VoterIDTypeUndefined: "UNDEFINED",
 	VoterIDTypeECDSA:     "ECDSA",
+	VoterIDTypeZkSnark:   "ZKSNARK",
 }
 
-var errUnsupportedVoterIDType error = errors.New("voterID type not supported")
+// NewVoterID creates a new VoterID from a VoterIDType and a key.
+func NewVoterID(voterIDType VoterIDType, key []byte) VoterID {
+	return append([]byte{byte(voterIDType)}, key...)
+}
 
 // Type returns the VoterID type defined in VoterIDTypeName
 func (v VoterID) Type() VoterIDType {
@@ -43,21 +46,35 @@ func (v VoterID) Nil() []byte {
 	return []byte{}
 }
 
-// IsNil returns true if the VoterID is empty
+// IsNil returns true if the VoterID is empty.
 func (v VoterID) IsNil() bool {
 	return len(v) == 0
 }
 
-// Address returns the voterID Address depending on the VoterIDType
-func (v VoterID) Address() ([]byte, error) {
+// Bytes returns the bytes of the VoterID without the first byte which indicates the type.
+func (v VoterID) Bytes() []byte {
+	if len(v) < 2 {
+		return nil
+	}
+	return v[1:]
+}
+
+// Address returns the voterID Address depending on the VoterIDType.
+// Returns nil if the VoterIDType is not supported or the address cannot be obtained.
+func (v VoterID) Address() []byte {
+	if len(v) < 2 {
+		return nil
+	}
 	switch v[0] {
 	case VoterIDTypeECDSA:
 		ethAddr, err := ethereum.AddrFromPublicKey(v[1:])
 		if err != nil {
-			return nil, err
+			return nil
 		}
-		return ethAddr.Bytes(), nil
+		return ethAddr.Bytes()
+	case VoterIDTypeZkSnark:
+		return v[1:]
 	default:
-		return nil, errUnsupportedVoterIDType
+		return nil
 	}
 }

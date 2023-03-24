@@ -8,7 +8,6 @@ import (
 	"path"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
@@ -20,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -232,8 +232,7 @@ func TestCensusProof(t *testing.T) {
 		models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		censusData.CensusID,
 		electionID,
-		key,
-		common.Address{},
+		state.NewVoterID(state.VoterIDTypeECDSA, key),
 	)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)

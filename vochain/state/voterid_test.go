@@ -21,8 +21,7 @@ func TestVoterID(t *testing.T) {
 	// check VoterIDType
 	qt.Assert(t, vID2.Type(), qt.Equals, VoterIDTypeECDSA)
 	// check VoterID address
-	vID2Addr, err := vID2.Address()
-	qt.Assert(t, err, qt.IsNil)
+	vID2Addr := vID2.Address()
 	qt.Assert(t, vID2Addr, qt.DeepEquals, signKey.Address().Bytes())
 	// check VoterID type to string
 	qt.Assert(t, vID2.VoterIDTypeToString(), qt.Equals, "ECDSA")
