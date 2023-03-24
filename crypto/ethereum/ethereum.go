@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/dvote/types"
@@ -36,6 +37,9 @@ type SignKeys struct {
 	Authorized map[ethcommon.Address]bool
 	Lock       sync.RWMutex
 }
+
+// Address represents an Ethereum like address
+type Address common.Address
 
 // NewSignKeys creates an ECDSA pair of keys for signing
 // and initializes the map for authorized keys
@@ -207,6 +211,11 @@ func AddrFromPublicKey(pub []byte) (ethcommon.Address, error) {
 		return ethcommon.Address{}, err
 	}
 	return ethcrypto.PubkeyToAddress(*pubkey), nil
+}
+
+// AddrFromBytes returns the Ethereum address from a byte array
+func AddrFromBytes(addr []byte) ethcommon.Address {
+	return ethcommon.BytesToAddress(addr)
 }
 
 // PubKeyFromPrivateKey returns the hex public key given a hex private key

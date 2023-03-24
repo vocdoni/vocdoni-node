@@ -112,7 +112,23 @@ func TestVoteOverwrite(t *testing.T) {
 	var cktxresp abcitypes.ResponseCheckTx
 	var detxresp abcitypes.ResponseDeliverTx
 
-	// First vote
+	// send 9 votes, should be fine
+	for i := 1; i < 10; i++ {
+		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 0, 1}, app.ChainID())
+		cktx.Tx, err = proto.Marshal(stx)
+		qt.Check(t, err, qt.IsNil)
+		cktxresp = app.CheckTx(cktx)
+		qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
+
+		detx.Tx, err = proto.Marshal(stx)
+		qt.Check(t, err, qt.IsNil)
+		detxresp = app.DeliverTx(detx)
+		qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
+
+		app.AdvanceTestBlock()
+	}
+
+	// Send the only missing vote, should be fine
 	stx := testBuildSignedVote(t, pid, keys[0], proofs[0], []int{1, 2, 3}, app.ChainID())
 
 	cktx.Tx, err = proto.Marshal(stx)
@@ -127,7 +143,7 @@ func TestVoteOverwrite(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	// Second vote
+	// Second vote (overwrite)
 	stx = testBuildSignedVote(t, pid, keys[0], proofs[0], []int{1, 2, 1}, app.ChainID())
 
 	cktx.Tx, err = proto.Marshal(stx)
@@ -142,7 +158,7 @@ func TestVoteOverwrite(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	// Third vote
+	// Third vote (overwrite)
 	stx = testBuildSignedVote(t, pid, keys[0], proofs[0], []int{1, 1, 1}, app.ChainID())
 
 	cktx.Tx, err = proto.Marshal(stx)
@@ -167,23 +183,6 @@ func TestVoteOverwrite(t *testing.T) {
 	vote, err := app.State.Vote(pid, detxresp.Data, false)
 	qt.Check(t, err, qt.IsNil)
 	qt.Check(t, vote.GetOverwriteCount(), qt.Equals, uint32(2))
-
-	// send the 9 remaining votes, should be fine
-	for i := 1; i < 10; i++ {
-		stx = testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 0, 1}, app.ChainID())
-		cktx.Tx, err = proto.Marshal(stx)
-		qt.Check(t, err, qt.IsNil)
-		cktxresp = app.CheckTx(cktx)
-		qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
-
-		detx.Tx, err = proto.Marshal(stx)
-		qt.Check(t, err, qt.IsNil)
-		detxresp = app.DeliverTx(detx)
-		qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
-
-		app.AdvanceTestBlock()
-	}
-
 }
 
 func TestMaxCensusSize(t *testing.T) {

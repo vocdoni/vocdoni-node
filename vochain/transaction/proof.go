@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree"
+	"go.vocdoni.io/dvote/vochain/state"
 	"google.golang.org/protobuf/proto"
 
 	blind "github.com/arnaucube/go-blindsecp256k1"
@@ -32,18 +33,18 @@ var (
 // into a census within a process.
 type VerifyProofFunc func(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error)
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error)
 
 // VerifyProof is a wrapper over all VerifyProofFunc(s) available which uses the process.CensusOrigin
 // to execute the correct verification function.
 func VerifyProof(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
 	log.Debugw("verify proof",
 		"censusOrigin", censusOrigin,
 		"electionID", fmt.Sprintf("%x", processID),
-		"pubKey", fmt.Sprintf("%x", pubKey),
-		"addr", addr.Hex(),
+		"voterID", fmt.Sprintf("%x", vID),
+		"addr", vID.Address(),
 		"censusRoot", fmt.Sprintf("%x", censusRoot),
 	)
 	// check census origin and compute vote digest identifier
@@ -65,7 +66,7 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 	}
 	valid, weight, err := verifyProof(process, proof,
 		process.CensusOrigin, process.CensusRoot, process.ProcessId,
-		pubKey, addr)
+		vID)
 	if err != nil {
 		return false, nil, fmt.Errorf("proof not valid: %w", err)
 	}
@@ -76,7 +77,7 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
 	switch proof.Payload.(type) {
 	case *models.Proof_Arbo:
 		p := proof.GetArbo()
@@ -93,10 +94,13 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		default:
 			return false, nil, fmt.Errorf("not recognized ProofArbo type: %s", p.Type)
 		}
-		// check if the proof key is for a publickey (default) or and address
-		key := pubKey
-		if p.GetKeyType().String() == "ADDRESS" {
-			key = addr.Bytes()
+		if vID == nil {
+			return false, nil, fmt.Errorf("voterID is nil")
+		}
+		// check if the proof key is for an address (default) or a pubKey
+		key := vID.Address()
+		if p.GetKeyType().String() == "PUBKEY" {
+			key = vID.Bytes()
 		}
 		hashedKey, err := hashFunc.Hash(key)
 		if err != nil {
@@ -138,8 +142,8 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
-	key := addr.Bytes()
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
+	key := vID.Address()
 
 	p := proof.GetCa()
 	if p == nil {
@@ -226,7 +230,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofERC20(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
 	if process.EthIndexSlot == nil {
 		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 	}
@@ -240,7 +244,7 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 		return false, nil, fmt.Errorf("balance at proof is 0")
 	}
 	log.Debugf("validating erc20 storage proof for key %x and balance %v", p.Key, balance)
-	err := mapbased.VerifyProof(addr, ethcommon.BytesToHash(censusRoot),
+	err := mapbased.VerifyProof(ethereum.AddrFromBytes(vID.Address()), ethcommon.BytesToHash(censusRoot),
 		ethstorageproof.StorageResult{
 			Key:   p.Key,
 			Proof: p.Siblings,
@@ -256,7 +260,7 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 // Returns verification result and weight.
 func VerifyProofMiniMe(process *models.Process, proof *models.Proof,
 	censusOrigin models.CensusOrigin,
-	censusRoot, processID, pubKey []byte, addr ethcommon.Address) (bool, *big.Int, error) {
+	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
 	if process.EthIndexSlot == nil {
 		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 	}
@@ -275,7 +279,7 @@ func VerifyProofMiniMe(process *models.Process, proof *models.Proof,
 	}
 	log.Debugf("validating minime storage proof for key %x and balance %v",
 		p.ProofPrevBlock.Key, proof0Balance)
-	err := minime.VerifyProof(addr, ethcommon.BytesToHash(censusRoot),
+	err := minime.VerifyProof(ethereum.AddrFromBytes(vID.Address()), ethcommon.BytesToHash(censusRoot),
 		[]ethstorageproof.StorageResult{
 			{
 				Key:   p.ProofPrevBlock.Key,

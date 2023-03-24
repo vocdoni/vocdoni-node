@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
+	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -297,20 +298,15 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 	if err != nil {
 		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
-	var addr common.Address
-	addr, err = ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: %w", err)
-	}
 
+	voterID := state.NewVoterID(state.VoterIDTypeECDSA, pubKey)
 	var valid bool
 	var weight *big.Int
 	valid, weight, err = VerifyProof(process, tx.Proof,
 		process.CensusOrigin,
 		process.CensusRoot,
 		process.ProcessId,
-		pubKey,
-		addr,
+		voterID,
 	)
 	if err != nil {
 		return fmt.Errorf("proof not valid: %w", err)
@@ -321,7 +317,10 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 
 	// Validate that this user is not registering more keys than possible
 	// with the users weight.
-	usedWeight, err := t.state.GetPreRegisterAddrUsedWeight(process.ProcessId, addr)
+	usedWeight, err := t.state.GetPreRegisterAddrUsedWeight(
+		process.ProcessId,
+		common.Address(voterID.Address()),
+	)
 	if err != nil {
 		return fmt.Errorf("cannot get address used weight: %w", err)
 	}
@@ -337,7 +336,8 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 	// The following check ensures that weight != 1 is not used, once the above is
 	// implemented we can remove it
 	if usedWeight.Cmp(bigOne) != 0 {
-		return fmt.Errorf("weight != 1 is not yet supported, received %s, used weight: %s", txWeight, usedWeight)
+		return fmt.Errorf("weight != 1 is not yet supported, received %s, used weight: %s",
+			txWeight, usedWeight)
 	}
 
 	if usedWeight.Cmp(weight) > 0 {
@@ -346,7 +346,10 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 			usedWeight, weight)
 	}
 	if forCommit {
-		if err := t.state.SetPreRegisterAddrUsedWeight(process.ProcessId, addr, usedWeight); err != nil {
+		if err := t.state.SetPreRegisterAddrUsedWeight(
+			process.ProcessId,
+			common.Address(voterID.Address()),
+			usedWeight); err != nil {
 			return fmt.Errorf("cannot set address used weight: %w", err)
 		}
 	}

@@ -93,8 +93,7 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 		},
 	}
 	if len(envelopePackage.Meta.VoterID) > 0 {
-		envelopePackage.Meta.VoterID, err = voteRef.VoterID.Address()
-		if err != nil {
+		if envelopePackage.Meta.VoterID = voteRef.VoterID.Address(); envelopePackage.Meta.VoterID == nil {
 			return nil, fmt.Errorf("cannot get voterID from public key: %w", err)
 		}
 	}
@@ -188,10 +187,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 			TxHash:    txHash,
 		}
 		if len(txRef.VoterID) > 0 {
-			envelopeMetadata.VoterID, err = txRef.VoterID.Address()
-			if err != nil {
-				return nil, fmt.Errorf("cannot get voterID from pubkey: %w", err)
-			}
+			envelopeMetadata.VoterID = txRef.VoterID.Address()
 		}
 		envelopes = append(envelopes, envelopeMetadata)
 	}
