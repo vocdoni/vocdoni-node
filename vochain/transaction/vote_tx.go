@@ -68,9 +68,9 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 	}
 
 	// Check if the vote is already in the cache
-	// In order to avoid double vote check (on checkTx and delivoteEnveloperTx), we use a memory vote cache.
+	// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 	// An element can only be added to the vote cache during checkTx.
-	// EvoteEnvelopery N seconds the old votes which are not yet in the blockchain will be removoteEnveloped from cache.
+	// Every N seconds the old votes which are not yet in the blockchain will be removoteEnveloped from cache.
 	// If the same vote (but different transaction) is send to the mempool, the cache will detect it
 	// and vote will be discarted.
 	//

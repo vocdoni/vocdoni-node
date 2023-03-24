@@ -134,7 +134,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			if err := t.state.IncrementAccountProcessIndex(entityAddr); err != nil {
 				return nil, fmt.Errorf("newProcessTx: cannot increment process index: %w", err)
 			}
-			return response, t.state.BurnTxCostIncrementNonce(txSender, models.TxType_NEW_PROCESS)
+			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), models.TxType_NEW_PROCESS)
 		}
 
 	case *models.Tx_SetProcess:
@@ -169,7 +169,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return response, t.state.BurnTxCostIncrementNonce(txSender, tx.Txtype)
+			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype)
 		}
 
 	case *models.Tx_RegisterKey:
