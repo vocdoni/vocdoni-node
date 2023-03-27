@@ -171,7 +171,7 @@ func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes 
 	}
 	hexIDs := make([]types.HexBytes, len(entityIDs))
 	for i, id := range entityIDs {
-		hexIDs[i] = types.HexBytes(id)
+		hexIDs[i] = id
 	}
 	return hexIDs
 }
@@ -330,14 +330,24 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	defer cancel()
 
-	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
-		if _, err := q.CreateProcess(ctx, procParams); err != nil {
+	if s.blockTx == nil {
+		tx, err := s.sqlDB.Begin()
+		if err != nil {
 			return err
 		}
-		return nil
-	}); err != nil {
-		return err
+		s.blockTx = tx
 	}
+
+	queries := indexerdb.New(s.blockTx)
+	queries = queries.WithTx(s.blockTx)
+
+	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
+		if err := s.blockTx.Rollback(); err != nil {
+			return fmt.Errorf("sql rollback create process: %w", err)
+		}
+		return fmt.Errorf("sql create process: %w", err)
+	}
+
 	return nil
 }
 
@@ -348,52 +358,51 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-
 	// TODO: remove from results table
 	// TODO: hold a sql db transaction for multiple queries
-
-	ctx := context.TODO()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-
-	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
-		previousStatus, err := q.GetProcessStatus(ctx, pid)
-		if err != nil {
-			return err
-		}
-		if _, err := q.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
-			ID:                pid,
-			EndBlock:          int64(p.BlockCount + p.StartBlock),
-			CensusRoot:        nonNullBytes(p.CensusRoot),
-			RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
-			RollingCensusSize: int64(p.GetRollingCensusSize()),
-			CensusUri:         p.GetCensusURI(),
-			PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
-			PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
-			Metadata:          p.GetMetadata(),
-			Status:            int64(p.Status),
-		}); err != nil {
-			return err
-		}
-
-		if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
-			p.Status == models.ProcessStatus_CANCELED {
-
-			if _, err := q.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
-				ID:            pid,
-				ResultsHeight: 0,
-			}); err != nil {
-				return err
-			}
-			if _, err := q.SetProcessResultsCancelled(ctx, pid); err != nil {
-				return err
-			}
-		}
-		return nil
+	previousStatus, err := queries.GetProcessStatus(ctx, pid)
+	if err != nil {
+		return err
+	}
+	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
+		ID:                pid,
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
+		CensusRoot:        nonNullBytes(p.CensusRoot),
+		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
+		RollingCensusSize: int64(p.GetRollingCensusSize()),
+		CensusUri:         p.GetCensusURI(),
+		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
+		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+		Metadata:          p.GetMetadata(),
+		Status:            int64(p.Status),
 	}); err != nil {
 		return err
 	}
+	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
+		p.Status == models.ProcessStatus_CANCELED {
 
+		// We use two SQL queries, so use a transaction to apply them together.
+		tx, err := s.sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+		queries = queries.WithTx(tx)
+
+		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
+			ID:            pid,
+			ResultsHeight: 0,
+		}); err != nil {
+			return err
+		}
+		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
+			return err
+		}
+		if err := tx.Commit(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -402,22 +411,13 @@ func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-
-	ctx := context.TODO()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-
-	if err := s.ExecTx(ctx, func(q *indexerdb.Queries) error {
-		if _, err := q.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
-			ID:            pid,
-			ResultsHeight: int64(height),
-		}); err != nil {
-			return err
-		}
-		return nil
+	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
+		ID:            pid,
+		ResultsHeight: int64(height),
 	}); err != nil {
 		return err
 	}
-
 	return nil
 }
