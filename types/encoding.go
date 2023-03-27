@@ -41,3 +41,18 @@ func (b *HexBytes) UnmarshalJSON(data []byte) error {
 	}
 	return nil
 }
+
+// HexStringToHexBytes converts a hex string to a HexBytes.
+// It strips a leading '0x' or '0X' if found, for backwards compatibility.
+// Panics if the string is not a valid hex string.
+func HexStringToHexBytes(hexString string) HexBytes {
+	// Strip a leading "0x" prefix, for backwards compatibility.
+	if len(hexString) >= 2 && hexString[0] == '0' && (hexString[1] == 'x' || hexString[1] == 'X') {
+		hexString = hexString[2:]
+	}
+	b, err := hex.DecodeString(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}

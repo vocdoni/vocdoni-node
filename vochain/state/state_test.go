@@ -87,7 +87,8 @@ func TestStateBasic(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, totalVotes, qt.Equals, uint64(100*10))
 
-	votes := s.CountVotes(pids[40], false)
+	votes, err := s.CountVotes(pids[40], false)
+	qt.Assert(t, err, qt.IsNil)
 	if votes != 10 {
 		t.Errorf("missing votes for process %x (got %d expected %d)", pids[40], votes, 10)
 	}
@@ -222,7 +223,7 @@ func TestOnProcessStart(t *testing.T) {
 			EnvelopeType: &models.EnvelopeType{
 				Anonymous: true,
 			},
-			MaxCensusSize: &maxCensusSize,
+			MaxCensusSize: maxCensusSize,
 		}
 		qt.Assert(t, s.AddProcess(p), qt.IsNil)
 	})

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strconv"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
@@ -414,4 +415,22 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 	}
 
 	return nil
+}
+
+// SetMaxProcessSize sets the global maximum number voters allowed in an election.
+func (v *State) SetMaxProcessSize(size uint64) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet([]byte("maxProcessSize"), []byte(strconv.FormatUint(size, 10)), StateTreeCfg(TreeExtra))
+}
+
+// MaxProcessSize returns the global maximum number voters allowed in an election.
+func (v *State) MaxProcessSize() (uint64, error) {
+	v.Tx.RLock()
+	defer v.Tx.RUnlock()
+	size, err := v.Tx.DeepGet([]byte("maxProcessSize"), StateTreeCfg(TreeExtra))
+	if err != nil {
+		return 0, err
+	}
+	return strconv.ParseUint(string(size), 10, 64)
 }

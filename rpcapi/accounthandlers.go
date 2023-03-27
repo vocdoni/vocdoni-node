@@ -6,7 +6,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -60,7 +60,7 @@ func (r *RPCAPI) getTreasurer(request *api.APIrequest) (*api.APIresponse, error)
 func (r *RPCAPI) getTransactionCost(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	// tx valid tx type
-	txType := vochain.TxCostNameToTxType(request.Type)
+	txType := genesis.TxCostNameToTxType(request.Type)
 	if txType == models.TxType_TX_UNKNOWN {
 		return nil, fmt.Errorf("invalid tx type: %s", request.Type)
 	}

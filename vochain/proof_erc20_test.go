@@ -24,17 +24,18 @@ func TestEthProof(t *testing.T) {
 
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         new(models.ProcessMode),
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 2, MaxVoteOverwrites: 0},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   testEthStorageRoot,
-		CensusOrigin: models.CensusOrigin_ERC20,
-		BlockCount:   1024,
-		EthIndexSlot: &testEthIndexSlot,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          new(models.ProcessMode),
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 2, MaxVoteOverwrites: 0},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    testEthStorageRoot,
+		CensusOrigin:  models.CensusOrigin_ERC20,
+		BlockCount:    1024,
+		MaxCensusSize: 200,
+		EthIndexSlot:  &testEthIndexSlot,
 	}
 	t.Logf("adding process %x", process.ProcessId)
 	if err := app.State.AddProcess(process); err != nil {

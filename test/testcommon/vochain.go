@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -47,15 +48,16 @@ var (
 	}
 
 	ProcessHardcoded = &models.Process{
-		ProcessId:    testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		EntityId:     testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
-		CensusRoot:   testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1000,
-		EnvelopeType: &models.EnvelopeType{},
-		Mode:         &models.ProcessMode{},
-		Status:       models.ProcessStatus_READY,
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		ProcessId:     testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
+		EntityId:      testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
+		CensusRoot:    testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1000,
+		EnvelopeType:  &models.EnvelopeType{},
+		Mode:          &models.ProcessMode{},
+		Status:        models.ProcessStatus_READY,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		MaxCensusSize: 1000,
 	}
 
 	StateDBProcessHardcoded = &models.StateDBProcess{
@@ -192,10 +194,10 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
 	// TO-DO: use tendermint/tendermint/types instead of custom (copied) types
-	consensusParams := &vochain.ConsensusParams{
-		Block:     vochain.BlockParams(tmConsensusParams.Block),
-		Evidence:  vochain.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
-		Validator: vochain.ValidatorParams(tmConsensusParams.Validator),
+	consensusParams := &genesis.ConsensusParams{
+		Block:     genesis.BlockParams{MaxBytes: 100000, MaxGas: 100},
+		Evidence:  genesis.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
+		Validator: genesis.ValidatorParams(tmConsensusParams.Validator),
 	}
 	validator, err := privval.GenFilePV(
 		path.Join(cfg.DataDir, "config", "priv_validator_key.json"),
@@ -220,7 +222,7 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 		accounts,
 		defaultAccountsBalance,
 		treasurer,
-		new(vochain.TransactionCosts), // set all costs to zero
+		new(genesis.TransactionCosts), // set all costs to zero
 	)
 	if err != nil {
 		tb.Fatal(err)

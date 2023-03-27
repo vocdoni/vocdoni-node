@@ -2,7 +2,6 @@ package vochain
 
 import (
 	"context"
-	"crypto/sha256"
 	"math/big"
 	"testing"
 
@@ -11,6 +10,8 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
 )
@@ -23,33 +24,34 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	app.TransactionHandler.ZkCircuit = devCircuit
 
-	processId := sha256.Sum256(big.NewInt(10).Bytes())
-	entityId := []byte("entityid-test")
+	processID := util.RandomBytes(types.ProcessIDsize)
+	entityID := util.RandomBytes(types.EntityIDsize)
 	censusRoot, ok := new(big.Int).SetString("10496064962946632764987634464751340919908597350627468905102211271224127873035", 10)
 	qt.Assert(t, ok, qt.IsTrue)
 
 	process := &models.Process{
-		ProcessId: processId[:],
-		EntityId:  entityId,
+		ProcessId: processID,
+		EntityId:  entityID,
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},
-		Mode:        &models.ProcessMode{},
-		VoteOptions: &models.ProcessVoteOptions{MaxCount: 1},
-		Status:      models.ProcessStatus_READY,
-		CensusRoot:  make([]byte, 32), // emtpy hash
-		StartBlock:  0,
-		BlockCount:  3,
+		Mode:          &models.ProcessMode{},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
+		Status:        models.ProcessStatus_READY,
+		CensusRoot:    make([]byte, 32), // emtpy hash
+		StartBlock:    0,
+		BlockCount:    3,
+		MaxCensusSize: 100,
 	}
 	err = app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
-	_, err = app.State.Process(processId[:], false)
+	_, err = app.State.Process(processID, false)
 	qt.Assert(t, err, qt.IsNil)
 
-	process, err = app.State.Process(processId[:], false)
+	process, err = app.State.Process(processID, false)
 	qt.Assert(t, err, qt.IsNil)
 	process.CensusRoot = arbo.BigIntToBytes(32, censusRoot)
-	err = app.State.UpdateProcess(process, processId[:])
+	err = app.State.UpdateProcess(process, processID)
 	qt.Assert(t, err, qt.IsNil)
 
 	proof := []byte(`{"pi_a":["21158713212294548026677000563764167209272759671976866712664167798559051202646","6034092600241427382393284530371885277965501508874433381064419215945014132128","1"],"pi_b":[["3266693092133849765080082495146214118776772951994743649670105567788500990913","11438329347684113431829025805514334037171052060709551105891698682784042838602"],["15407735792470062236368054442309427192794290489751614407182885978595493069014","19275403188498582245192654060074828094221466750742514931847112746396601405846"],["1","0"]],"pi_c":["2509932769569282676285537767124587450934534958560941562700329085891096418979","12539123792181279555744538589401927950609420421690526254651926376926051596539","1"]}`)
@@ -64,7 +66,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 
 	weight := new(big.Int).SetInt64(1)
 	testVote := &models.VoteEnvelope{
-		ProcessId:   processId[:],
+		ProcessId:   processID,
 		VotePackage: weight.Bytes(),
 		Nullifier:   nullifier,
 	}
@@ -74,7 +76,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 
 	voteValue := big.NewInt(1).Bytes()
 	vtx := &models.VoteEnvelope{
-		ProcessId:   processId[:],
+		ProcessId:   processID,
 		VotePackage: voteValue,
 		Nullifier:   nullifier,
 		Proof: &models.Proof{

@@ -69,11 +69,12 @@ func testEntityList(t *testing.T, entityCount int) {
 		pid := util.RandomBytes(32)
 		eid := util.RandomBytes(20)
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eid,
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      eid,
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -125,11 +126,12 @@ func TestEntitySearch(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      util.RandomBytes(20),
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -144,11 +146,12 @@ func TestEntitySearch(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     entityId,
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      entityId,
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -160,11 +163,12 @@ func TestEntitySearch(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      util.RandomBytes(20),
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -211,10 +215,11 @@ func testProcessList(t *testing.T, procsCount int) {
 		}
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eid,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      eid,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		if i%5 == 1 {
@@ -228,10 +233,11 @@ func testProcessList(t *testing.T, procsCount int) {
 	for i := 0; i < procsCount; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eidProcsCount,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      eidProcsCount,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		if i%5 == 1 {
@@ -279,10 +285,11 @@ func TestProcessSearch(t *testing.T) {
 		pid := util.RandomBytes(32)
 		t.Logf("random process ID: %x", pid)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
+			ProcessId:     pid,
+			EntityId:      util.RandomBytes(20),
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			MaxCensusSize: 1000,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		if i%5 == 1 {
@@ -312,11 +319,12 @@ func TestProcessSearch(t *testing.T) {
 		}
 		encrypted := process == pidExactEncrypted
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eidTest,
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{EncryptedVotes: encrypted},
+			ProcessId:     pid,
+			EntityId:      eidTest,
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{EncryptedVotes: encrypted},
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -336,12 +344,13 @@ func TestProcessSearch(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eidTest,
-			BlockCount:   10,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
-			Status:       models.ProcessStatus_ENDED,
+			ProcessId:     pid,
+			EntityId:      eidTest,
+			BlockCount:    10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			Status:        models.ProcessStatus_ENDED,
+			MaxCensusSize: 1000,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -426,12 +435,13 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     util.RandomBytes(20),
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
-			Namespace:    uint32(10 + i),
-			Status:       models.ProcessStatus_ENDED,
+			ProcessId:     pid,
+			EntityId:      util.RandomBytes(20),
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			Namespace:     uint32(10 + i),
+			Status:        models.ProcessStatus_ENDED,
+			MaxCensusSize: 1000,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		if i%5 == 1 {
@@ -444,12 +454,13 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:    pid,
-			EntityId:     eid20,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType: &models.EnvelopeType{},
-			Namespace:    123,
-			Status:       models.ProcessStatus_READY,
+			ProcessId:     pid,
+			EntityId:      eid20,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+			EnvelopeType:  &models.EnvelopeType{},
+			Namespace:     123,
+			Status:        models.ProcessStatus_READY,
+			MaxCensusSize: 1000,
 		})
 		qt.Assert(t, err, qt.IsNil)
 		if i%5 == 1 {
@@ -500,6 +511,7 @@ func TestResults(t *testing.T) {
 		VoteOptions:           &models.ProcessVoteOptions{MaxCount: 4, MaxValue: 1},
 		CensusOrigin:          models.CensusOrigin_OFF_CHAIN_TREE,
 		CensusRoot:            root,
+		MaxCensusSize:         1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
 
@@ -650,12 +662,13 @@ func TestLiveResults(t *testing.T) {
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		BlockCount:   10,
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
-		Mode:         &models.ProcessMode{AutoStart: true},
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+		Mode:          &models.ProcessMode{AutoStart: true},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -725,12 +738,13 @@ func TestAddVote(t *testing.T) {
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		BlockCount:   10,
-		VoteOptions:  options,
-		Mode:         &models.ProcessMode{AutoStart: true},
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		VoteOptions:   options,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -827,12 +841,13 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		BlockCount:   10,
-		Mode:         &models.ProcessMode{AutoStart: true},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 4},
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 4},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -863,12 +878,13 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false, CostFromWeight: true},
-		Status:       models.ProcessStatus_READY,
-		BlockCount:   10,
-		Mode:         &models.ProcessMode{AutoStart: true},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 0, CostExponent: 2},
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false, CostFromWeight: true},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 2, MaxValue: 0, CostExponent: 2},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -924,6 +940,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 			MaxTotalCost: 3,
 			CostExponent: 1,
 		},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -958,12 +975,13 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
 
 	err = app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		Mode:         &models.ProcessMode{AutoStart: true},
-		StartBlock:   1,
-		BlockCount:   10,
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		StartBlock:    1,
+		BlockCount:    10,
+		MaxCensusSize: 1000,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount: 5,
 			MaxValue: 1,
@@ -1014,11 +1032,12 @@ func TestCountVotes(t *testing.T) {
 	pid := util.RandomBytes(32)
 
 	err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		Mode:         &models.ProcessMode{AutoStart: true},
-		BlockCount:   10,
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    10,
+		MaxCensusSize: 1000,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount:     5,
 			MaxValue:     1,
@@ -1075,13 +1094,14 @@ func TestOverwriteVotes(t *testing.T) {
 	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
 
 	err := app.State.AddProcess(&models.Process{
-		CensusRoot:   root,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		ProcessId:    pid,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Status:       models.ProcessStatus_READY,
-		Mode:         &models.ProcessMode{AutoStart: true},
-		BlockCount:   10,
+		CensusRoot:    root,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    10,
+		MaxCensusSize: 1000,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount:          3,
 			MaxValue:          2,
@@ -1335,11 +1355,12 @@ func TestIndexerConcurrentDB(t *testing.T) {
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
-		ProcessId:    pid,
-		EntityId:     util.RandomBytes(20),
-		BlockCount:   10,
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-		EnvelopeType: &models.EnvelopeType{},
+		ProcessId:     pid,
+		EntityId:      util.RandomBytes(20),
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+		EnvelopeType:  &models.EnvelopeType{},
+		MaxCensusSize: 1000,
 	}); err != nil {
 		t.Fatal(err)
 	}

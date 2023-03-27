@@ -86,7 +86,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	censusRoot := cspKey.PublicKey()
 	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA
 	duration := 100
-	censusSize := 10
+	censusSize := uint64(10)
 	processID, err := cli.NewElectionRaw(
 		&models.Process{
 			EntityId:     entityID,
@@ -102,13 +102,14 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 				AutoStart:     true,
 				Interruptible: true,
 			},
-			BlockCount: uint32(duration),
-			StartBlock: 0,
+			BlockCount:    uint32(duration),
+			StartBlock:    0,
+			MaxCensusSize: censusSize,
 		})
 	if err != nil {
 		return err
 	}
-	voterKeys := util.CreateEthRandomKeysBatch(censusSize)
+	voterKeys := ethereum.NewSignKeysBatch(int(censusSize))
 	proofs, err := testvoteproof.GetCSPproofBatch(voterKeys, &cspKey, processID)
 	if err != nil {
 		return err

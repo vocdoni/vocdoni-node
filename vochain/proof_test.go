@@ -27,17 +27,18 @@ func TestMerkleTreeProof(t *testing.T) {
 	pid := util.RandomBytes(types.ProcessIDsize)
 
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         &models.ProcessMode{},
-		VoteOptions:  &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   root,
-		CensusURI:    &censusURI,
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    root,
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		BlockCount:    1024,
+		MaxCensusSize: 200,
 	}
 	err := app.State.AddProcess(process)
 	qt.Assert(t, err, qt.IsNil)
@@ -130,22 +131,23 @@ func TestCSPproof(t *testing.T) {
 
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:    pid,
-		StartBlock:   0,
-		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-		Mode:         new(models.ProcessMode),
-		Status:       models.ProcessStatus_READY,
-		EntityId:     util.RandomBytes(types.EthereumAddressSize),
-		CensusRoot:   csp.PublicKey(),
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
-		BlockCount:   1024,
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          new(models.ProcessMode),
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    csp.PublicKey(),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		BlockCount:    1024,
+		MaxCensusSize: 1000,
 	}
 	t.Logf("adding process %x", process.ProcessId)
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
 	// Test 20 valid votes
 	vp := []byte("[1,2,3,4]")
-	keys := util.CreateEthRandomKeysBatch(20)
+	keys := ethereum.NewSignKeysBatch(20)
 	for _, k := range keys {
 		bundle := &models.CAbundle{
 			ProcessId: pid,

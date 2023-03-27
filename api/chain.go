@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
@@ -202,7 +203,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 // chainInfoHandler
 //
 //	@Summary		Chain info
-//	@Description	Returns the chain ID, blocktimes, timestamp and height of the blockchain
+//	@Description	Returns the chain parameters and info
 //	@Success		200	{object}	ChainInfo
 //	@Router			/chain/info [get]
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -218,6 +219,11 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
+	maxCensusSize, err := a.vocapp.State.MaxProcessSize()
+	if err != nil {
+		return err
+	}
+
 	data, err := json.Marshal(&ChainInfo{
 		ID:                      a.vocapp.ChainID(),
 		BlockTime:               *a.vocinfo.BlockTimes(),
@@ -231,6 +237,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		VoteCount:               voteCount,
 		GenesisTime:             a.vocapp.Genesis().GenesisTime,
 		CircuitConfigurationTag: a.vocapp.CircuitConfigurationTag(),
+		MaxCensusSize:           maxCensusSize,
 	})
 	if err != nil {
 		return err
@@ -323,7 +330,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		Costs: make(map[string]uint64),
 	}
 	var err error
-	for k, v := range vochain.TxCostNameToTxTypeMap {
+	for k, v := range genesis.TxCostNameToTxTypeMap {
 		txCosts.Costs[k], err = a.vocapp.State.TxCost(v, true)
 		if err != nil {
 			return err
@@ -526,8 +533,10 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Router			/chain/organizations/filter/page/{page} [post]
 func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
-	var organizationId string
-	if err := json.Unmarshal(msg.Data, &organizationId); err != nil {
+	requestData := struct {
+		OrganizationId types.HexBytes `json:"organizationId"`
+	}{}
+	if err := json.Unmarshal(msg.Data, &requestData); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	// get page
@@ -541,7 +550,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 	}
 	page = page * MaxPageSize
 	// get matching organization ids from the indexer
-	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, organizationId)
+	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId.String()))
 	if len(matchingOrganizationIds) == 0 {
 		return ErrOrgNotFound
 	}

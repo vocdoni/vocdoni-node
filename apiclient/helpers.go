@@ -20,23 +20,6 @@ import (
 
 const pollInterval = 4 * time.Second
 
-// ChainInfo returns some information about the chain, such as block height.
-func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "chain", "info")
-	if err != nil {
-		return nil, err
-	}
-	if code != 200 {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	info := &api.ChainInfo{}
-	err = json.Unmarshal(resp, info)
-	if err != nil {
-		return nil, err
-	}
-	return info, nil
-}
-
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "chain", "dateToBlock", fmt.Sprintf("%d", date.Unix()))
 	if err != nil {

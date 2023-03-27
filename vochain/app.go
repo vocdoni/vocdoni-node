@@ -20,6 +20,7 @@ import (
 	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -416,7 +417,7 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
 	// setting the app initial state with validators, oracles, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState GenesisAppState
+	var genesisAppState genesis.GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		fmt.Printf("%s\n", req.AppStateBytes)
@@ -490,6 +491,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// create burn account
 	if err := app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}); err != nil {
 		log.Fatal("unable to set burn address")
+	}
+
+	// set max election size
+	if err := app.State.SetMaxProcessSize(genesisAppState.MaxElectionSize); err != nil {
+		log.Fatal("unable to set max election size")
 	}
 
 	// commit state and get hash

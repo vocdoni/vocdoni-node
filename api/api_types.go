@@ -93,6 +93,13 @@ type ElectionDescription struct {
 	Census       CensusTypeDescription `json:"census"`
 }
 
+type ElectionFilter struct {
+	OrganizationID types.HexBytes `json:"organizationId,omitempty"`
+	ElectionID     types.HexBytes `json:"electionId,omitempty"`
+	WithResults    bool           `json:"withResults"`
+	Status         string         `json:"status,omitempty"`
+}
+
 type Key struct {
 	Index int            `json:"index"`
 	Key   types.HexBytes `json:"key"`
@@ -116,6 +123,7 @@ type Vote struct {
 
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
+	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty"`
 	RootHash  types.HexBytes `json:"rootHash,omitempty"`
@@ -174,7 +182,8 @@ type ChainInfo struct {
 	TransactionCount        uint64    `json:"transactionCount"`
 	ValidatorCount          uint32    `json:"validatorCount"`
 	VoteCount               uint64    `json:"voteCount"`
-	CircuitConfigurationTag string    `json:"cicuitConfigurationTag,omitempty"`
+	CircuitConfigurationTag string    `json:"cicuitConfigurationTag"`
+	MaxCensusSize           uint64    `json:"maxCensusSize"`
 }
 
 type Account struct {

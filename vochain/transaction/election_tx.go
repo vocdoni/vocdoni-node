@@ -59,6 +59,21 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf(
 			"cannot add process with duration lower than or equal to the current height")
 	}
+
+	// check MaxCensusSize is properly set and within the allowed range
+	if tx.Process.GetMaxCensusSize() == 0 {
+		log.Warnf("maxCensusSize is zero")
+		return nil, common.Address{}, fmt.Errorf("maxCensusSize is zero")
+	}
+	maxProcessSize, err := t.state.MaxProcessSize()
+	if err != nil {
+		return nil, common.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
+	}
+	if maxProcessSize > 0 && tx.Process.GetMaxCensusSize() > maxProcessSize {
+		return nil, common.Address{},
+			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
+	}
+
 	// check tx cost
 	cost, err := t.state.TxCost(models.TxType_NEW_PROCESS, false)
 	if err != nil {
@@ -132,16 +147,8 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		return nil, common.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
 	}
 
-	if tx.Process.Mode.PreRegister &&
-		(tx.Process.MaxCensusSize == nil || tx.Process.GetMaxCensusSize() <= 0) {
-		return nil, common.Address{}, fmt.Errorf("pre-register mode requires setting " +
-			"maxCensusSize to be > 0")
-	}
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		if tx.Process.MaxCensusSize == nil {
-			return nil, common.Address{}, fmt.Errorf("maxCensusSize is not provided")
-		}
-		if tx.Process.GetMaxCensusSize() > uint64(t.ZkCircuit.Config.Levels) {
+		if tx.Process.GetMaxCensusSize() >= uint64(t.ZkCircuit.Config.Levels) {
 			return nil, common.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the number of levels of the circuit (%d)",
 				t.ZkCircuit.Config.Levels)
@@ -282,7 +289,7 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCom
 	if err != nil {
 		return err
 	}
-	if censusSize >= *process.MaxCensusSize {
+	if censusSize >= process.MaxCensusSize {
 		return fmt.Errorf("maxCensusSize already reached")
 	}
 

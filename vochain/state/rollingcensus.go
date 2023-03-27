@@ -50,7 +50,7 @@ func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) erro
 	if err != nil {
 		return fmt.Errorf("cannot get ceneusLen: %w", err)
 	}
-	if censusLen >= *process.MaxCensusSize {
+	if censusLen >= process.MaxCensusSize {
 		return fmt.Errorf("maxCensusSize already reached")
 	}
 	// Add key to census

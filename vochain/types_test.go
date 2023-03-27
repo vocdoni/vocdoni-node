@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestTransactionCostsAsMap(t *testing.T) {
-	txCosts := TransactionCosts{
+	txCosts := genesis.TransactionCosts{
 		SetProcessStatus:        100,
 		SetProcessCensus:        200,
 		SetProcessResults:       300,
@@ -57,11 +58,11 @@ func TestTxCostNameToTxType(t *testing.T) {
 		"CreateAccount":           models.TxType_CREATE_ACCOUNT,
 	}
 	for k, v := range fields {
-		qt.Assert(t, TxCostNameToTxType(k), qt.Equals, v)
+		qt.Assert(t, genesis.TxCostNameToTxType(k), qt.Equals, v)
 
 		// check that TransactionCosts struct does have the fields that we
 		// specify in this test
-		_, found := reflect.TypeOf(TransactionCosts{}).FieldByName(k)
+		_, found := reflect.TypeOf(genesis.TransactionCosts{}).FieldByName(k)
 		qt.Assert(t, found, qt.IsTrue)
 	}
 }
