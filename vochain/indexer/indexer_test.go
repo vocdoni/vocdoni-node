@@ -1344,6 +1344,10 @@ func TestIndexerConcurrentDB(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	if err := idx.Commit(app.Height()); err != nil {
+		t.Fatal(err)
+	}
+
 	if err := idx.setResultsHeight(pid, 123); err != nil {
 		t.Error(err)
 	}
