@@ -62,8 +62,14 @@ type Indexer struct {
 	voteIndexPool []*VoteWithIndex
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*state.Vote
-	// newProcessPool is the list of new process IDs on the current block
-	newProcessPool []*indexertypes.IndexerOnProcessData
+
+	// lockPool is the lock for all *Pool and blockTx operations
+	lockPool sync.RWMutex
+
+	// blockTx is an in-progress SQL transaction which is committed or rolled
+	// back along with the current block.
+	blockTx *sql.Tx
+
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
 	// resultsPool is the list of processes that finish on the current block
@@ -72,10 +78,8 @@ type Indexer struct {
 	newTxPool []*indexertypes.TxReference
 	// tokenTransferPool is the list of token transfers to be indexed
 	tokenTransferPool []*indexertypes.TokenTransferMeta
-	// lockPool is the lock for all *Pool operations
-	lockPool sync.RWMutex
 	// list of live processes (those on which the votes will be computed on arrival)
-	liveResultsProcs sync.Map
+	liveResultsProcs sync.Map // TODO: rethink with blockTx
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
 	sqlDB          *sql.DB
@@ -158,8 +162,9 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		return nil, fmt.Errorf("goose up: %w", err)
 	}
 
-	// Subscrive to events
+	// Subscribe to events
 	s.App.State.AddEventListener(s)
+
 	return s, nil
 }
 
@@ -329,16 +334,12 @@ func (idx *Indexer) AfterSyncBootstrap() {
 func (idx *Indexer) Commit(height uint32) error {
 	idx.lockPool.RLock()
 	defer idx.lockPool.RUnlock()
-	// Add Entity and register new active process
-	for _, p := range idx.newProcessPool {
-		if err := idx.newEmptyProcess(p.ProcessID); err != nil {
-			log.Errorw(err, "commit: cannot create new empty process")
-			continue
+
+	if idx.blockTx != nil {
+		if err := idx.blockTx.Commit(); err != nil {
+			log.Errorw(err, "could not commit tx")
 		}
-		if !idx.App.IsSynchronizing() {
-			idx.addProcessToLiveResults(p.ProcessID)
-		}
-		log.Debugw("new process", "processID", hex.EncodeToString(p.ProcessID))
+		idx.blockTx = nil
 	}
 
 	// Update existing processes
@@ -481,8 +482,13 @@ func (idx *Indexer) Rollback() {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
 	idx.votePool = make(map[string][]*state.Vote)
+	if idx.blockTx != nil {
+		if err := idx.blockTx.Rollback(); err != nil {
+			log.Errorw(err, "could not rollback tx")
+		}
+		idx.blockTx = nil
+	}
 	idx.voteIndexPool = []*VoteWithIndex{}
-	idx.newProcessPool = []*indexertypes.IndexerOnProcessData{}
 	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	idx.updateProcessPool = [][]byte{}
 	idx.newTxPool = []*indexertypes.TxReference{}
@@ -493,8 +499,13 @@ func (idx *Indexer) Rollback() {
 func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	data := &indexertypes.IndexerOnProcessData{EntityID: eid, ProcessID: pid}
-	idx.newProcessPool = append(idx.newProcessPool, data)
+	if err := idx.newEmptyProcess(pid); err != nil {
+		log.Errorw(err, "commit: cannot create new empty process")
+	}
+	if !idx.App.IsSynchronizing() {
+		idx.addProcessToLiveResults(pid)
+	}
+	log.Debugw("new process", "processID", hex.EncodeToString(pid))
 }
 
 // OnVote indexer stores the votes if the processId is live results (on going)

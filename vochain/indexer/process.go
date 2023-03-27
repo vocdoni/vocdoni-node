@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -325,8 +326,19 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		"metadata", procParams.Metadata,
 	)
 
-	queries, ctx, cancel := s.timeoutQueries()
+	// The caller must hold lockPool already.
+	if s.blockTx == nil {
+		tx, err := s.sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+		s.blockTx = tx
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
+	queries := indexerdb.New(s.blockTx)
+
 	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}

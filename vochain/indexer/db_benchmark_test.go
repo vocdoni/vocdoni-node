@@ -53,11 +53,10 @@ func benchmarkIndexTx(b *testing.B) {
 	}); err != nil {
 		b.Fatal(err)
 	}
-	err := idx.newEmptyProcess(pid)
-	qt.Assert(b, err, qt.IsNil)
+	app.AdvanceTestBlock()
 
 	s := new(ethereum.SignKeys)
-	err = s.Generate()
+	err := s.Generate()
 	qt.Assert(b, err, qt.IsNil)
 
 	for i := 0; i < b.N; i++ {
@@ -114,11 +113,11 @@ func benchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
+	_ = idx // used via the callbacks; we want to benchmark it too
 	startTime := time.Now()
 	numProcesses := b.N
 	entityID := util.RandomBytes(20)
 	for i := 0; i < numProcesses; i++ {
-
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
 			ProcessId: pid,
@@ -132,10 +131,8 @@ func benchmarkNewProcess(b *testing.B) {
 		}); err != nil {
 			b.Fatal(err)
 		}
-		err := idx.newEmptyProcess(pid)
-		qt.Assert(b, err, qt.IsNil)
-
 	}
+	app.AdvanceTestBlock()
 	log.Infof("indexed %d new processes, took %s",
 		numProcesses, time.Since(startTime))
 }
