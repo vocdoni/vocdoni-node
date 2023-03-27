@@ -1,11 +1,9 @@
 package indexer
 
 import (
-	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -82,7 +80,7 @@ func (s *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex i
 	s.lockPool.Lock()
 	defer s.lockPool.Unlock()
 	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
-		Hash:         types.HexBytes(tx.TxID[:]),
+		Hash:         tx.TxID[:],
 		BlockHeight:  blockHeight,
 		TxBlockIndex: txIndex,
 		TxType:       tx.TxModelType,
@@ -101,26 +99,20 @@ func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
 	}
 
 	// TODO(mvdan): use a single transaction
-
-	ctx := context.TODO()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
+	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
-
-	s.ExecTx(ctx, func(q *indexerdb.Queries) error {
-		for _, tx := range txList {
-			if s.cancelCtx.Err() != nil {
-				return s.cancelCtx.Err()
-			}
-			if _, err := q.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
-				Hash:         tx.Hash,
-				BlockHeight:  int64(tx.BlockHeight),
-				TxBlockIndex: int64(tx.TxBlockIndex),
-				TxType:       tx.TxType,
-			}); err != nil {
-				log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
-				return err
-			}
+	for _, tx := range txList {
+		if s.cancelCtx.Err() != nil {
+			return // closing
 		}
-		return nil
-	})
+		if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
+			Hash:         tx.Hash,
+			BlockHeight:  int64(tx.BlockHeight),
+			TxBlockIndex: int64(tx.TxBlockIndex),
+			TxType:       tx.TxType,
+		}); err != nil {
+			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
+			return
+		}
+	}
 }
