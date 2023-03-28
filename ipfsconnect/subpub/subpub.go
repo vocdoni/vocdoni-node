@@ -14,11 +14,12 @@ import (
 	ipfslog "github.com/ipfs/go-log/v2"
 	"github.com/libp2p/go-libp2p"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p/config"
 	crypto "github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	connmanager "github.com/libp2p/go-libp2p/p2p/net/connmgr"
+	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 )
@@ -122,38 +123,43 @@ func (ps *SubPub) Start(ctx context.Context, receiver chan *Message) {
 		log.Fatal(err)
 	}
 
-	var c libp2p.Config
-	c.Apply(libp2p.Defaults)
-
-	// libp2p will listen on any interface device (both on IPv4 and IPv6)
-	c.ListenAddrs = nil
-	err = c.Apply(libp2p.ListenAddrStrings(
-		fmt.Sprintf("/ip6/::/tcp/%d", ps.Port),
-		fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port),
-	))
+	connmgr, err := connmgr.NewConnManager(
+		ps.MaxDHTpeers/2, // Lowwater
+		ps.MaxDHTpeers,   // HighWater,
+		connmgr.WithGracePeriod(time.Second*10),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	c.RelayCustom = true
-	c.Relay = false
-	c.EnableAutoRelay = false
-	c.PeerKey = prvKey
-	if ps.Private {
-		c.PSK = ps.GroupKey[:32]
-	}
-	c.ConnManager, err = connmanager.NewConnManager(ps.MaxDHTpeers/2, ps.MaxDHTpeers,
-		connmanager.WithGracePeriod(time.Second*10))
+	ps.Host, err = libp2p.New(
+		// Use the keypair we generated
+		libp2p.Identity(prvKey),
+		// libp2p will listen on any interface device (both on IPv4 and IPv6)
+		libp2p.ListenAddrStrings(
+			fmt.Sprintf("/ip6/::/tcp/%d", ps.Port),
+			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", ps.Port),
+		),
+		// support any other default transports (TCP)
+		libp2p.DefaultTransports,
+		// Let's prevent our peer from having too many
+		// connections by attaching a connection manager.
+		libp2p.ConnectionManager(connmgr),
+		// Set RelayCustom = true, Relay = false
+		libp2p.DisableRelay(),
+		// Set PSK = ps.GroupKey[:32]
+		func() config.Option {
+			if ps.Private {
+				return libp2p.PrivateNetwork(ps.GroupKey[:32])
+			}
+			return nil
+		}(),
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	log.Debugf("libp2p config: %+v", c)
 	// Note that we don't use ctx here, since we stop via the Close method.
-	ps.Host, err = c.NewNode()
-	if err != nil {
-		log.Fatal(err)
-	}
+
 	log.Debug("libp2p host created: ", ps.Host.ID())
 	log.Debug("libp2p host addrs: ", ps.Host.Addrs())
 
