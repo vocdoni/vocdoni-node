@@ -54,7 +54,7 @@ require (
 	github.com/tendermint/tm-db v0.6.7
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
-	go.vocdoni.io/proto v1.14.1-0.20230310204412-01b78fa63217
+	go.vocdoni.io/proto v1.14.4
 	golang.org/x/crypto v0.7.0
 	golang.org/x/exp v0.0.0-20230310171629-522b1b587ee0
 	golang.org/x/net v0.8.0
