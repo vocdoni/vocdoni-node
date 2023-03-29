@@ -126,11 +126,6 @@ jobs:
           BUILDARGS: "-cover" # collect code coverage when running binaries
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
-      - name: Convert code coverage profile format
-        run: docker run --rm -v $(pwd):/wd/ golang:1.20
-              go tool covdata textfmt
-              -i=$(find /wd/dockerfiles/testsuite/gocoverage/ -type d -printf '%p,'| sed 's/,$//')
-              -o=/wd/integration.covprofile
       - name: Send integration test coverage to coveralls.io
         # coverallsapp/github-action@v2 fails on our self-hosted since runner has no permissions to write in /usr/local/bin
         # workaround using /tmp
@@ -139,7 +134,7 @@ jobs:
         run: |
           curl -sL https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux.tar.gz | tar xz -C /tmp
           /tmp/coveralls \
-            --file integration.covprofile \
+            --file dockerfiles/testsuite/integration.covprofile \
             --job-flag=integration \
             --parallel
 
