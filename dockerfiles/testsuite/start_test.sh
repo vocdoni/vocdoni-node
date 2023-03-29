@@ -191,8 +191,12 @@ if echo "$BUILDARGS" | grep -q -- "-cover"; then
 	echo "### Collect all coverage files in $hostdir ###"
 	mkdir -p $hostdir
 	$COMPOSE_CMD down
-    $COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/host/ \
-	--entrypoint="cp -rf /app/run/gocoverage/. /host/$hostdir" test
+    docker run --rm --user=`id -u`:`id -g` -v $(pwd):/wd/ golang:1.20 \
+			  cp -rf /app/run/gocoverage/. /wd/$hostdir
+	docker run --rm --user=`id -u`:`id -g` -v $(pwd):/wd/ golang:1.20 \
+              go tool covdata textfmt \
+              -i=$(find /wd/$hostdir/ -type d -printf '%p,'| sed 's/,$//') \
+              -o=/wd/integration.covprofile
 fi
 
 [ $CLEAN -eq 1 ] && {
