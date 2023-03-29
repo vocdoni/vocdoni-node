@@ -18,6 +18,7 @@ ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-debug}
 CONCURRENT=${CONCURRENT:-0}
+[ -n "$GOCOVERDIR" ] && BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
 ### must be splited by lines
 DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11
 be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
@@ -186,17 +187,21 @@ for test in ${tests_to_run[@]} ; do
 	fi
 done
 
-if echo "$BUILDARGS" | grep -q -- "-cover"; then
-	hostdir="./gocoverage/"
-	echo "### Collect all coverage files in $hostdir ###"
-	mkdir -p $hostdir
+if [ -n "$GOCOVERDIR" ] ; then
+	echo "### Collect all coverage files in $GOCOVERDIR ###"
+	mkdir -p $GOCOVERDIR
 	$COMPOSE_CMD down
-    docker run --rm --user=`id -u`:`id -g` -v $(pwd):/wd/ golang:1.20 \
-			  cp -rf /app/run/gocoverage/. /wd/$hostdir
-	docker run --rm --user=`id -u`:`id -g` -v $(pwd):/wd/ golang:1.20 \
-              go tool covdata textfmt \
-              -i=$(find /wd/$hostdir/ -type d -printf '%p,'| sed 's/,$//') \
-              -o=/wd/integration.covprofile
+	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
+	    ls -l /app/run/gocoverage/. /wd/$GOCOVERDIR
+		cp -rf /app/run/gocoverage/. /wd/$GOCOVERDIR
+		ls -la /app/run/gocoverage/. /wd/$GOCOVERDIR
+		whoami
+		touch /wd/whoami
+		go tool covdata textfmt \
+			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/wd/$GOCOVERDIR/covdata.txt
+		"
+	echo "### Coverage data in textfmt left in $GOCOVERDIR/covdata.txt ###"
 fi
 
 [ $CLEAN -eq 1 ] && {

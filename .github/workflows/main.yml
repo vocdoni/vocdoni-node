@@ -80,16 +80,16 @@ jobs:
           go-version: '1.20'
       - name: Run Go test (and collect code coverage)
         if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
-        run: go test -coverprofile=unit.covprofile ./...
+        run: go test -coverprofile=unit.covdata.txt ./...
       - name: Run Go test race
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
         env:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
         run: go test -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
       - name: Send unit test coverage to coveralls.io
-        uses: coverallsapp/github-action@v2
+        uses: shogo82148/actions-goveralls@v1
         with:
-          file: unit.covprofile
+          path-to-profile: unit.covdata.txt
           flag-name: unit
           parallel: true
 
@@ -115,28 +115,20 @@ jobs:
         uses: actions/checkout@v3
       - name: Run compose script
         env:
-          TESTSUITE_BUILD_TAG: ${{ env.GITHUB_SHA | slice(0, 10) }}
-          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }}
+          TESTSUITE_BUILD_TAG: ${{ github.sha }}
+          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }} # unique name for docker-compose (needed for concurrent job runs)
+          COMPOSE_DVOTE_PORT_MAPPING: "9090" # this binds gateway0 to a random available port on docker host (needed for concurrent job runs)
           COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
-          COMPOSE_DOCKER_CLI_BUILD: 1
-          DOCKER_BUILDKIT: 1
-          DOCKER_CLI_EXPERIMENTAL: enabled
-          COMPOSE_DVOTE_PORT_MAPPING: "9090" # Will use a random available port mapping
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
-          BUILDARGS: "-cover" # collect code coverage when running binaries
+          GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
       - name: Send integration test coverage to coveralls.io
-        # coverallsapp/github-action@v2 fails on our self-hosted since runner has no permissions to write in /usr/local/bin
-        # workaround using /tmp
-        env:
-          COVERALLS_REPO_TOKEN: ${{ secrets.github_token }}
-        run: |
-          curl -sL https://github.com/coverallsapp/coverage-reporter/releases/latest/download/coveralls-linux.tar.gz | tar xz -C /tmp
-          /tmp/coveralls \
-            --file dockerfiles/testsuite/integration.covprofile \
-            --job-flag=integration \
-            --parallel
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: dockerfiles/testsuite/gocoverage/covdata.txt
+          flag-name: integration
+          parallel: true
 
   job_docker_release:
     runs-on: ubuntu-latest
@@ -212,7 +204,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: Send coverage to Coveralls.io (finish)
-      uses: coverallsapp/github-action@v2
+      uses: shogo82148/actions-goveralls@v1
       with:
         parallel-finished: true
-        carryforward: "unit,integration"
