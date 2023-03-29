@@ -108,6 +108,13 @@ services:
     links:
       - gateway0
     volumes:
+      - gocoverage-test:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
+    command: "true"
+  gocoverage:
+    image: golang:1.20
+    volumes:
       - gocoverage-seed:/app/run/gocoverage/seed
       - gocoverage-miner0:/app/run/gocoverage/miner0
       - gocoverage-miner1:/app/run/gocoverage/miner1
@@ -116,9 +123,6 @@ services:
       - gocoverage-oracle:/app/run/gocoverage/oracle
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
       - gocoverage-test:/app/run/gocoverage/test
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage/test
-    command: "true"
 
 volumes:
   data-seed: {}
