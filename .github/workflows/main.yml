@@ -1,7 +1,13 @@
 ---
 name: Main
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - dev
+      - stage
+      - master
+  pull_request:
 
 jobs:
   job_go_checks:
