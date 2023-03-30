@@ -129,6 +129,10 @@ jobs:
           GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
+      - name: Set up Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
       - name: Send integration test coverage to coveralls.io
         uses: shogo82148/actions-goveralls@v1
         with:
