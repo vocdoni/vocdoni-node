@@ -647,7 +647,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	// check that at least one filter is set
-	if body.OrganizationID == nil && body.ElectionID == nil && body.Status == "" {
+	if body.OrganizationID == nil && body.ElectionID == nil && body.Status == "" && body.WithResults == nil {
 		return ErrMissingParameter
 	}
 	// get page
@@ -660,7 +660,10 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		}
 	}
 	page = page * MaxPageSize
-
+	if body.WithResults == nil {
+		withResults := false
+		body.WithResults = &withResults
+	}
 	elections, err := a.indexer.ProcessList(
 		body.OrganizationID,
 		page,
@@ -669,7 +672,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		0,
 		0,
 		body.Status,
-		body.WithResults,
+		*body.WithResults,
 	)
 	if err != nil {
 		return ErrCantFetchElectionList.WithErr(err)

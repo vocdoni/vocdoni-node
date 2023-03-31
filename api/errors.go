@@ -66,6 +66,7 @@ var (
 	ErrCensusNotFound                   = apirest.APIerror{Code: 4047, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("census not found")}
 	ErrNoElectionKeys                   = apirest.APIerror{Code: 4048, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("no election keys available")}
 	ErrKeyNotFoundInCensus              = apirest.APIerror{Code: 4049, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("key not found in census")}
+	ErrInvalidStatus                    = apirest.APIerror{Code: 4050, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid status")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}
