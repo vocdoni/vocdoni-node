@@ -44,7 +44,7 @@ func VerifyProof(process *models.Process, proof *models.Proof,
 		"censusOrigin", censusOrigin,
 		"electionID", fmt.Sprintf("%x", processID),
 		"voterID", fmt.Sprintf("%x", vID),
-		"addr", vID.Address(),
+		"address", fmt.Sprintf("%x", vID.Address()),
 		"censusRoot", fmt.Sprintf("%x", censusRoot),
 	)
 	// check census origin and compute vote digest identifier
