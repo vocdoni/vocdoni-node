@@ -201,6 +201,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 			CensusRoot:             proc.CensusRoot,
 			PostRegisterCensusRoot: proc.RollingCensusRoot,
 			CensusURL:              proc.CensusURI,
+			MaxCensusSize:          proc.MaxCensusSize,
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]

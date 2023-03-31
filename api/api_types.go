@@ -69,6 +69,7 @@ type ElectionCensus struct {
 	CensusRoot             types.HexBytes `json:"censusRoot"`
 	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot"`
 	CensusURL              string         `json:"censusURL"`
+	MaxCensusSize          uint64         `json:"maxCensusSize"`
 }
 
 type ElectionCreate struct {
