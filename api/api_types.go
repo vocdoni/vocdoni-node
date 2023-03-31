@@ -95,7 +95,7 @@ type ElectionDescription struct {
 type ElectionFilter struct {
 	OrganizationID types.HexBytes `json:"organizationId,omitempty"`
 	ElectionID     types.HexBytes `json:"electionId,omitempty"`
-	WithResults    bool           `json:"withResults"`
+	WithResults    *bool          `json:"withResults,omitempty"`
 	Status         string         `json:"status,omitempty"`
 }
 
