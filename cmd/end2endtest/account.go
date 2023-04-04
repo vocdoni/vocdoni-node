@@ -103,7 +103,7 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	}
 
 	// create account for bob with faucet package from alice
-	afp, err := vochain.GenerateFaucetPackage(alice, bob.Address(), 50)
+	afp, err := vochain.GenerateFaucetPackage(alice, bob.Address(), aliceAcc.Balance/2)
 	if err != nil {
 		return fmt.Errorf("cannot generate faucet package %v", err)
 	}
@@ -114,8 +114,9 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	}
 
 	// check balance added from payload
-	if bobAcc.Balance != 50 {
-		return fmt.Errorf("expected balance for bob (%s) is %d but got %d", bob.Address(), 50, bobAcc.Balance)
+	if bobAcc.Balance != aliceAcc.Balance/2 {
+		return fmt.Errorf("expected balance for bob (%s) is %d but got %d",
+			bob.Address(), aliceAcc.Balance/2, bobAcc.Balance)
 	}
 	log.Infow("account for bob successfully created with payload signed by alice",
 		"alice", alice.Address(), "bob", bobAcc)
@@ -146,7 +147,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	if aliceAcc == nil {
 		return state.ErrAccountNotExist
 	}
-	log.Infow("alice", "account", aliceKeys.Address(), "nonce", aliceAcc.Nonce, "balance", aliceAcc.Balance)
+	log.Infow("alice before", "account", aliceKeys.Address(), "nonce", aliceAcc.Nonce, "balance", aliceAcc.Balance)
 
 	bobAcc, err := bob.Account("")
 	if err != nil {
@@ -155,21 +156,26 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	if bobAcc == nil {
 		return state.ErrAccountNotExist
 	}
-	log.Infow("bob", "account", bobKeys.Address(), "nonce", bobAcc.Nonce, "balance", bobAcc.Balance)
+	log.Infow("bob before", "account", bobKeys.Address(), "nonce", bobAcc.Nonce, "balance", bobAcc.Balance)
 
-	// try to send tokens at the same time
-	txhasha, err := alice.Transfer(bobKeys.Address(), 19)
+	// try to send tokens at the same time:
+	// alice sends 1/4 of her balance to bob
+	// bob sends 1/3 of his balance to alice
+	amountAtoB := aliceAcc.Balance / 4
+	amountBtoA := bobAcc.Balance / 3
+
+	txhasha, err := alice.Transfer(bobKeys.Address(), amountAtoB)
 	if err != nil {
 		return fmt.Errorf("cannot send tokens: %v", err)
 	}
-	log.Infof("alice sent %d tokens to bob", 19)
+	log.Infof("alice sent %d tokens to bob", amountAtoB)
 	log.Debugf("tx hash is %x", txhasha)
 
-	txhashb, err := bob.Transfer(aliceKeys.Address(), 23)
+	txhashb, err := bob.Transfer(aliceKeys.Address(), amountBtoA)
 	if err != nil {
 		return fmt.Errorf("cannot send tokens: %v", err)
 	}
-	log.Infof("bob sent %d tokens to alice", 23)
+	log.Infof("bob sent %d tokens to alice", amountBtoA)
 	log.Debugf("tx hash is %x", txhashb)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
@@ -185,33 +191,32 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	log.Debugf("mined, tx refs are %+v and %+v", txrefa, txrefb)
 
 	// now check the resulting state
-	bobAccAfter, err := bob.Account("")
+	err = checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
+		(aliceAcc.Balance - amountAtoB - uint64(txCost) + amountBtoA))
 	if err != nil {
 		return err
 	}
-	if bobAccAfter == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infow("bob", "account", bobKeys.Address(), "nonce", bobAcc.Nonce, "balance", bobAcc.Balance)
-	if bobAcc.Balance-23-uint64(txCost)+19 != bobAccAfter.Balance {
-		log.Fatalf("expected %s to have balance %d got %d", bobKeys.Address(), 300, bobAccAfter.Balance)
+	err = checkAccountNonceAndBalance(bob, bobAcc.Nonce+1,
+		(bobAcc.Balance - amountBtoA - uint64(txCost) + amountAtoB))
+	if err != nil {
+		return err
 	}
 
-	aliceAccAfter, err := alice.Account("")
+	return nil
+}
+
+func checkAccountNonceAndBalance(api *apiclient.HTTPclient, expNonce uint32, expBalance uint64) error {
+	acc, err := api.Account("")
 	if err != nil {
 		return err
 	}
-	if aliceAccAfter == nil {
-		return state.ErrAccountNotExist
+	log.Infow("current state", "account", acc.Address.String(), "nonce", acc.Nonce, "balance", acc.Balance)
+
+	if expBalance != acc.Balance {
+		return fmt.Errorf("expected %s to have balance %d got %d", acc.Address.String(), expBalance, acc.Balance)
 	}
-	log.Infow("alice", "account", aliceKeys.Address(), "nonce", aliceAcc.Nonce, "balance", aliceAcc.Balance)
-	if aliceAcc.Balance-19-uint64(txCost)+23 != aliceAccAfter.Balance {
-		log.Fatalf("expected %s to have balance %d got %d",
-			aliceKeys.Address(), aliceAcc.Balance-(100+uint64(txCost)), aliceAccAfter.Balance)
-	}
-	if aliceAcc.Nonce+1 != aliceAccAfter.Nonce {
-		log.Fatalf("expected %s to have nonce %d got %d",
-			aliceKeys.Address(), aliceAcc.Nonce+1, aliceAccAfter.Nonce)
+	if expNonce != acc.Nonce {
+		return fmt.Errorf("expected %s to have nonce %d got %d", acc.Address.String(), expNonce, acc.Nonce)
 	}
 	return nil
 }
