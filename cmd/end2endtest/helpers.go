@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +18,11 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
+)
+
+const (
+	nextBlock = "nextBlock"
+	sameBlock = "sameBlock"
 )
 
 func newTestElectionDescription() *vapi.ElectionDescription {
@@ -43,7 +50,7 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 	}
 }
 
-func (t e2eElection) createAccount(address string) (*vapi.Account, error) {
+func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
 	faucetPkg, err := getFaucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
 	if err != nil {
 		return nil, err
@@ -82,7 +89,7 @@ func (t e2eElection) createAccount(address string) (*vapi.Account, error) {
 
 }
 
-func (t e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
+func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
 	participants := &vapi.CensusParticipants{}
 
 	for i, voterAccount := range t.voterAccounts {
@@ -110,7 +117,7 @@ func (t e2eElection) addParticipantsCensus(censusType string, censusID types.Hex
 	return nil
 }
 
-func (t e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
+func (t *e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 	size, err := t.api.CensusSize(censusID)
 	if err != nil {
 		log.Errorf("unable to get census size from api")
@@ -124,7 +131,7 @@ func (t e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 	return true
 }
 
-func (t e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
+func (t *e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
 	electionID, err := t.api.NewElection(electionDescrip)
 	if err != nil {
 		return nil, err
@@ -144,7 +151,7 @@ func (t e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (
 	return election, nil
 }
 
-func (t e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool) map[string]*apiclient.CensusProof {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool) map[string]*apiclient.CensusProof {
 	type voterProof struct {
 		proof   *apiclient.CensusProof
 		address string
@@ -220,7 +227,7 @@ func (t e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool)
 
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	// Set the account in the API client, so we can sign transactions
-	if err := t.api.SetAccount(hex.EncodeToString(t.config.accountKeys[0].PrivateKey())); err != nil {
+	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
 		return err
 	}
 
@@ -263,7 +270,10 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	log.Infof("census published with root %s", root.String())
 	ed.Census.RootHash = root
 	ed.Census.URL = censusURI
-	ed.Census.Size = uint64(t.config.nvotes)
+
+	if ed.Census.Size == 0 {
+		ed.Census.Size = uint64(t.config.nvotes)
+	}
 
 	// Check census size (of the published census)
 	if !t.isCensusSizeValid(root) {
@@ -288,6 +298,73 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	t.proofs = t.generateProofs(root, ed.ElectionType.Anonymous)
 
 	return nil
+}
+
+func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
+	acc := t.voterAccounts[indexAcct]
+	contextDeadlines := 0
+
+	for i := 0; i < len(choices); i++ {
+		// assign the choices wanted for each overwrite vote
+		choice := []int{choices[i]}
+		ctxDeadLine, err := t.sendVote(acc, choice, nil)
+		if err != nil {
+			// check the error expected for overwrite with waitUntilNextBlock
+			if strings.Contains(err.Error(), "overwrite count reached") {
+				log.Infof("error expected: %s", err.Error())
+			} else {
+				return 0, errors.New("expected overwrite error")
+			}
+		}
+		contextDeadlines += ctxDeadLine
+		switch waitType {
+		case nextBlock:
+			time.Sleep(time.Second * 5)
+
+		case sameBlock:
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			defer cancel()
+			t.api.WaitUntilNextBlock(ctx)
+		}
+	}
+	return contextDeadlines, nil
+}
+
+func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
+	var contextDeadline int
+
+	api := t.api
+	if t.election.VoteMode.Anonymous {
+		apiClientMtx.Lock()
+		privKey := voterAccount.PrivateKey()
+		if err := t.api.SetAccount(privKey.String()); err != nil {
+			apiClientMtx.Unlock()
+			return 0, err
+		}
+	} else {
+		api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+	}
+
+	if _, err := api.Vote(&apiclient.VoteData{
+		ElectionID:  t.election.ElectionID,
+		ProofMkTree: t.proofs[voterAccount.Address().Hex()],
+		Choices:     choice},
+	); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			contextDeadline = 1
+		} else if strings.Contains(err.Error(), "reached") {
+			// this error is expected on overwrite or maxCensusSize test
+			return 0, err
+		} else if !strings.Contains(err.Error(), "already exists") {
+			// if the error is not "vote already exists", we need to print it
+			log.Warn(err)
+		}
+	}
+
+	if t.election.VoteMode.Anonymous {
+		apiClientMtx.Unlock()
+	}
+	return contextDeadline, nil
 }
 
 func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
@@ -315,4 +392,15 @@ func getCensusParticipantKey(voterAccount *ethereum.SignKeys, censusType string)
 		key = zkAddr.Bytes()
 	}
 	return key, nil
+}
+
+// matchResult compare the expected vote results base in the overwrite applied, with the actual result returned by the API
+func matchResult(results [][]*types.BigInt, expectedResult [][]string) bool {
+	// only has 1 question
+	for q := range results[0] {
+		if !(expectedResult[0][q] == results[0][q].String()) {
+			return false
+		}
+	}
+	return true
 }

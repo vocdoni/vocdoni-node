@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"sync"
 	"time"
@@ -14,30 +15,30 @@ import (
 )
 
 func init() {
-	ops["encryptedelection"] = operation{
-		test:        &E2EEncryptedElection{},
-		description: "Publishes a census and a non-anonymous, secret-until-the-end election, emits N votes and verifies the results",
-		example:     os.Args[0] + " --operation=encryptedelection --votes=1000",
+	ops["overwritelection"] = operation{
+		test: &E2EOverwriteElection{},
+		description: "Checks that the MaxVoteOverwrite feature is correctly implemented, even if a vote is consecutive " +
+			"overwrite without wait the next block, that means the error in checkTx: overwrite count reached, it's not raised",
+		example: os.Args[0] + " --operation=overwritelection --votes=1000",
 	}
 }
 
-var _ VochainTest = (*E2EEncryptedElection)(nil)
+var _ VochainTest = (*E2EOverwriteElection)(nil)
 
-type E2EEncryptedElection struct {
+type E2EOverwriteElection struct {
 	e2eElection
 }
 
-func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error {
+func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
 	ed := newTestElectionDescription()
 	ed.ElectionType = vapi.ElectionType{
-		Autostart:         true,
-		Interruptible:     true,
-		SecretUntilTheEnd: true,
+		Autostart:     true,
+		Interruptible: true,
 	}
-	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
+	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 2}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
 	if err := t.setupElection(ed); err != nil {
@@ -48,12 +49,12 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 	return nil
 }
 
-func (t *E2EEncryptedElection) Teardown() error {
+func (t *E2EOverwriteElection) Teardown() error {
 	// nothing to do here
 	return nil
 }
 
-func (t *E2EEncryptedElection) Run() error {
+func (t *E2EOverwriteElection) Run() error {
 	c := t.config
 	api := t.api
 
@@ -66,8 +67,8 @@ func (t *E2EEncryptedElection) Run() error {
 
 		votesSent := 0
 		contextDeadlines := 0
-		for i, acc := range accounts {
-			ctxDeadline, err := t.sendVote(acc, []int{i % 2}, nil)
+		for _, acc := range accounts {
+			ctxDeadline, err := t.sendVote(acc, []int{0}, nil)
 			if err != nil {
 				log.Error(err)
 				break
@@ -92,6 +93,22 @@ func (t *E2EEncryptedElection) Run() error {
 	wg.Wait()
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
+
+	// overwrite the previous vote (choice 0) associated with account of index 0, using enough time to do it in the nextBlock
+	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
+	ctxDeadlines, err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
+	if err != nil {
+		return err
+	}
+	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
+	time.Sleep(time.Second * 5)
+
+	// now the overwrite vote is done in the sameBlock using account of index 1
+	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
+		return err
+	}
+	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
+	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
@@ -120,20 +137,32 @@ func (t *E2EEncryptedElection) Run() error {
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	_, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
-	if err != nil {
+	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
 		return err
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancel()
-	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	elres, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
 		return err
 	}
+
+	firstChoice := fmt.Sprintf("%d", (c.nvotes-2)*10)
+	// should count the firsts overwrite
+	secondChoice := fmt.Sprintf("%d", 20)
+
+	// according to the first overwrite
+	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
+
+	// only the first overwrite should be valid in the results and must math with the expected results
+	if !matchResult(elres.Results, resultExpected) {
+		log.Errorf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
+		return err
+	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
-	log.Infof("election results: %v", election.Results)
+	log.Infof("election results: %v", elres.Results)
 
 	return nil
 }
