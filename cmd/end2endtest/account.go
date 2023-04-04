@@ -4,13 +4,12 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"net/url"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
 	apipkg "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -20,51 +19,76 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func testTokenTransactions(c config) {
+func init() {
+	ops["tokentxs"] = operation{
+		test:        &E2ETokenTxs{},
+		description: "Tests all token related transactions",
+		example: os.Args[0] + " --operation=tokentxs " +
+			"--host http://127.0.0.1:9090/v2",
+	}
+}
+
+var _ VochainTest = (*E2ETokenTxs)(nil)
+
+type E2ETokenTxs struct {
+	api    *apiclient.HTTPclient
+	config *config
+
+	alice, bob *ethereum.SignKeys
+	aliceFP    *models.FaucetPackage
+}
+
+func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
+	t.api = api
+	t.config = config
 
 	// create alice signer
-	alice := &ethereum.SignKeys{}
-	if err := alice.Generate(); err != nil {
-		log.Fatal(err)
+	t.alice = ethereum.NewSignKeys()
+	err := t.alice.Generate()
+	if err != nil {
+		return err
 	}
 
 	// create bob signer
-	bob := &ethereum.SignKeys{}
-	if err := bob.Generate(); err != nil {
-		log.Fatal(err)
+	t.bob = ethereum.NewSignKeys()
+	err = t.bob.Generate()
+	if err != nil {
+		return err
 	}
 
-	// Connect to the API host
-	hostURL, err := url.Parse(c.host)
+	// get faucet package for alice
+	t.aliceFP, err = getFaucetPackage(t.config, t.alice.Address().Hex())
 	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugw("connecting to API", "host", hostURL.String())
-
-	token := uuid.New()
-	api, err := apiclient.NewHTTPclient(hostURL, &token)
-	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// check transaction cost
-	if err := testGetTxCost(api); err != nil {
+	if err := testGetTxCost(t.api); err != nil {
 		log.Fatal(err)
 	}
 
-	fp, err := getFaucetPackage(c, alice.Address().Hex())
-	if err != nil {
-		log.Fatal(err)
-	}
 	// check create and set account
-	if err := testCreateAndSetAccount(api, fp, alice, bob); err != nil {
+	if err := testCreateAndSetAccount(t.api, t.aliceFP, t.alice, t.bob); err != nil {
 		log.Fatal(err)
 	}
+
+	return nil
+}
+
+func (t *E2ETokenTxs) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2ETokenTxs) Run() (duration time.Duration, err error) {
+	start := time.Now()
 
 	// check send tokens
-	if err := testSendTokens(api, alice, bob); err != nil {
+	if err := testSendTokens(t.api, t.alice, t.bob); err != nil {
 		log.Fatal(err)
 	}
+
+	return time.Since(start), nil
 }
 
 func testGetTxCost(api *apiclient.HTTPclient) error {
