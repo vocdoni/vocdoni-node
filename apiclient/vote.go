@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
@@ -45,21 +46,12 @@ type VoteData struct {
 // which contains the electionID, the choices and the proof. The
 // return value is the voteID (nullifier).
 func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
-	votePackage := &vochain.VotePackage{
-		Votes: v.Choices,
-	}
-	votePackageBytes, err := json.Marshal(votePackage)
+	election, err := c.Election(v.ElectionID)
 	if err != nil {
 		return nil, err
 	}
-	vote := &models.VoteEnvelope{
-		Nonce:       util.RandomBytes(16),
-		ProcessId:   v.ElectionID,
-		VotePackage: votePackageBytes,
-	}
 
-	// Get de election metadata
-	election, err := c.Election(v.ElectionID)
+	vote, err := c.prepareVoteEnvelope(v.Choices, election)
 	if err != nil {
 		return nil, err
 	}
@@ -186,6 +178,80 @@ func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
 		return false, nil
 	}
 	return false, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+}
+
+// prepareVoteEnvelope returns a models.VoteEnvelope struct with
+// * a random Nonce
+// * ProcessID set to the passed election
+// * VotePackage with a plaintext or encrypted vochain.VotePackage
+// * EncryptionKeyIndexes filled in, for encrypted votes
+func (c *HTTPclient) prepareVoteEnvelope(choices []int, election *api.Election) (*models.VoteEnvelope, error) {
+	var err error
+	var keys []types.HexBytes
+	var keyIndexes []uint32
+	if election.VoteMode.EncryptedVotes { // Get encryption keys
+		ctx, cancel := context.WithTimeout(context.Background(), WaitTimeout)
+		defer cancel()
+		ek, err := c.WaitUntilElectionKeys(ctx, election.ElectionID)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, k := range ek.PublicKeys {
+			if len(k.Key) > 0 {
+				keys = append(keys, k.Key)
+				keyIndexes = append(keyIndexes, uint32(k.Index))
+			}
+		}
+
+		if len(keys) == 0 {
+			return nil, fmt.Errorf("no keys for election %s", election.ElectionID)
+		}
+	}
+	// if EncryptedVotes is false, keys will be nil and prepareVotePackageBytes returns plaintext
+	vpb, err := c.prepareVotePackageBytes(&vochain.VotePackage{Votes: choices}, keys)
+	if err != nil {
+		return nil, err
+	}
+
+	return &models.VoteEnvelope{
+		Nonce:                util.RandomBytes(32),
+		ProcessId:            election.ElectionID,
+		VotePackage:          vpb,
+		EncryptionKeyIndexes: keyIndexes,
+	}, nil
+
+}
+
+// prepareVotePackageBytes returns a plaintext json.Marshal(vp) if keys is nil,
+// else assigns a random hex string to vp.Nonce
+// and encrypts the vp bytes for each given key as recipient
+func (c *HTTPclient) prepareVotePackageBytes(vp *vochain.VotePackage, keys []types.HexBytes) ([]byte, error) {
+	if len(keys) > 0 {
+		vp.Nonce = fmt.Sprintf("%x", util.RandomHex(32))
+	}
+
+	vpb, err := json.Marshal(vp)
+	if err != nil {
+		return nil, err
+	}
+
+	for i, k := range keys { // skipped if len(keys) == 0
+		if len(k) == 0 {
+			continue
+		}
+		log.Debugw("encrypting vote", "nonce", vp.Nonce, "key", k)
+		pub, err := nacl.DecodePublic(k.String())
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", i, err)
+		}
+		if vpb, err = nacl.Anonymous.Encrypt(vpb, pub); err != nil {
+			return nil, fmt.Errorf("cannot encrypt: (%s)", err)
+		}
+
+	}
+
+	return vpb, nil
 }
 
 // prepareVoteTx prepare an api.Vote struct with the inner transactions encoded
