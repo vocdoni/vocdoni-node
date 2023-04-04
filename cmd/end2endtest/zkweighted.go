@@ -4,12 +4,11 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -20,19 +19,38 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func mkTreeAnonVoteTest(c config) {
-	// Connect to the API host
-	hostURL, err := url.Parse(c.host)
-	if err != nil {
-		log.Fatal(err)
+func init() {
+	ops["anonelection"] = operation{
+		test:        &E2EAnonElection{},
+		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
+		example: os.Args[0] + " --operation=anonelection --votes=1000 " +
+			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
 	}
-	log.Debugf("connecting to %s", hostURL.String())
+}
 
-	token := uuid.New()
-	api, err := apiclient.NewHTTPclient(hostURL, &token)
-	if err != nil {
-		log.Fatal(err)
-	}
+var _ VochainTest = (*E2EAnonElection)(nil)
+
+type E2EAnonElection struct {
+	api    *apiclient.HTTPclient
+	config *config
+}
+
+func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, config *config) error {
+	t.api = api
+	t.config = config
+	return nil
+}
+
+func (t *E2EAnonElection) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2EAnonElection) Run() (duration time.Duration, err error) {
+	start := time.Now()
+
+	c := t.config
+	api := t.api
 
 	// Set the account in the API client, so we can sign transactions
 	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
@@ -350,4 +368,6 @@ func mkTreeAnonVoteTest(c config) {
 	}
 	log.Infof("election %s status is RESULTS", electionID.String())
 	log.Infof("election results: %v", election.Results)
+
+	return time.Since(start), nil
 }

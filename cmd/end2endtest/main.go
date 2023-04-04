@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
@@ -21,32 +23,26 @@ import (
 // * how many times to retry opening a connection to an endpoint before giving up
 const retries = 10
 
+type VochainTest interface {
+	Setup(api *apiclient.HTTPclient, config *config) error
+	Run() (duration time.Duration, err error)
+	Teardown() error
+}
+
 type operation struct {
-	fn func(c config)
+	test VochainTest
 
-	name, description, example string
+	description, example string
 }
 
-var ops = []operation{
-	{
-		fn:          testTokenTransactions,
-		name:        "tokentransactions",
-		description: "Tests all token related transactions",
-		example: os.Args[0] + " --operation=tokentransactions " +
-			"--host http://127.0.0.1:9090/v2",
-	},
-	{
-		fn:          mkTreeAnonVoteTest,
-		name:        "anonvoting",
-		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
-		example: os.Args[0] + " --operation=anonvoting --votes=1000 " +
-			"--oracleKey=6aae1d165dd9776c580b8fdaf8622e39c5f943c715e20690080bbfce2c760223",
-	},
-}
+var ops = map[string]operation{}
 
+func init() {
+	ops = make(map[string]operation)
+}
 func opNames() (names []string) {
-	for _, op := range ops {
-		names = append(names, op.name)
+	for name := range ops {
+		names = append(names, name)
 	}
 	return names
 }
@@ -70,10 +66,10 @@ func main() {
 	// For the sake of including the version in the log, it's also included in a log line later on.
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
-	c := config{}
+	c := &config{}
 	flag.StringVar(&c.host, "host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	flag.StringVar(&c.logLevel, "logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	flag.StringVar(&c.operation, "operation", "vtest",
+	flag.StringVar(&c.operation, "operation", "",
 		fmt.Sprintf("set operation mode: %v", opNames()))
 	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{},
 		"account private key (optional)")
@@ -90,8 +86,8 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
 		fmt.Fprintf(os.Stderr, "\nSome examples of different operation modes:\n")
-		for _, op := range ops {
-			fmt.Fprintf(os.Stderr, "### %s\n", op.name)
+		for name, op := range ops {
+			fmt.Fprintf(os.Stderr, "### %s\n", name)
 			fmt.Fprintf(os.Stderr, "\t"+op.description+"\n")
 			fmt.Fprintf(os.Stderr, op.example+"\n")
 			fmt.Fprintf(os.Stderr, "\n")
@@ -119,18 +115,44 @@ func main() {
 		log.Infof("privkey %x = account %s", ak.PrivateKey(), ak.AddressString())
 	}
 
-	found := false
-	for _, op := range ops {
-		if op.name == c.operation {
-			op.fn(c)
-			found = true
-		}
-	}
-
+	op, found := ops[c.operation]
 	if !found {
 		log.Fatal("no valid operation mode specified")
 	}
 
+	api, err := NewAPIclient(c.host)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = op.test.Setup(api, c)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	duration, err := op.test.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Infow("test finished", "duration", duration.String())
+
+	err = op.test.Teardown()
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+// NewAPIclient connects to the API host and returns the handle
+func NewAPIclient(host string) (*apiclient.HTTPclient, error) {
+	hostURL, err := url.Parse(host)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Debugf("connecting to %s", hostURL.String())
+
+	token := uuid.New()
+	return apiclient.NewHTTPclient(hostURL, &token)
 }
 
 func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
@@ -144,7 +166,7 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 	return skey, nil
 }
 
-func getFaucetPackage(c config, account string) (*models.FaucetPackage, error) {
+func getFaucetPackage(c *config, account string) (*models.FaucetPackage, error) {
 	if c.faucet == "" {
 		return nil, fmt.Errorf("need to pass a valid --faucet")
 	}

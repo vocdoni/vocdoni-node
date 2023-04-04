@@ -6,13 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/url"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -23,27 +21,36 @@ import (
 )
 
 func init() {
-	ops = append(ops, operation{
-		fn:          plaintextElectionTest,
-		name:        "plaintextelection",
+	ops["plaintextelection"] = operation{
+		test:        &E2EPlaintextElection{},
 		description: "Publishes a census and a non-anonymous, non-secret election, emits N votes and verifies the results",
 		example:     os.Args[0] + " --operation=plaintextelection --votes=1000",
-	})
+	}
 }
 
-func plaintextElectionTest(c config) {
-	// Connect to the API host
-	hostURL, err := url.Parse(c.host)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugf("connecting to %s", hostURL.String())
+var _ VochainTest = (*E2EPlaintextElection)(nil)
 
-	token := uuid.New()
-	api, err := apiclient.NewHTTPclient(hostURL, &token)
-	if err != nil {
-		log.Fatal(err)
-	}
+type E2EPlaintextElection struct {
+	api    *apiclient.HTTPclient
+	config *config
+}
+
+func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, config *config) error {
+	t.api = api
+	t.config = config
+	return nil
+}
+
+func (t *E2EPlaintextElection) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2EPlaintextElection) Run() (duration time.Duration, err error) {
+	start := time.Now()
+
+	c := t.config
+	api := t.api
 
 	// Set the account in the API client, so we can sign transactions
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
@@ -369,4 +376,6 @@ func plaintextElectionTest(c config) {
 	}
 	log.Infof("election %s status is RESULTS", electionID.String())
 	log.Infof("election results: %v", election.Results)
+
+	return time.Since(start), nil
 }
