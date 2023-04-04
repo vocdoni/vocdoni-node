@@ -118,6 +118,7 @@ jobs:
           export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
           export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
           export LOG_PANIC_ON_INVALIDCHARS=true
+          export CONCURRENT=1
           cd dockerfiles/testsuite
           docker-compose build
           ./start_test.sh

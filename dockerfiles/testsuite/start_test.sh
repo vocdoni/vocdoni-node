@@ -1,11 +1,11 @@
 #!/bin/bash
 # bash start_test.sh [testname] [testname] [...]
 #  (if no argument is passed, run all tests)
-#  merkle_vote_plaintext: run poll vote test
-#  merkle_vote_encrypted: run encrypted vote test
-#  e2etest_anonvoting: run anonymous vote test
-#  cspvoting: run csp vote test
-#  e2etest_tokentxs: run token transactions test (end-user voting is not included)
+#  legacy_cspvoting: run (rpc_client) csp vote test
+#  e2etest_plaintextelection: run poll vote test
+#  e2etest_encryptedelection: run encrypted vote test
+#  e2etest_anonelection: run anonymous vote test
+#  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 
@@ -41,10 +41,10 @@ RANDOMID="${RANDOM}${RANDOM}"
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"tokentransactions"
-	"merkle_vote_encrypted"
-	"cspvoting"
-	"e2etest_anonvoting"
+	"legacy_cspvoting"
+	"e2etest_plaintextelection"
+	"e2etest_encryptedelection"
+	"e2etest_anonelection"
 	"e2etest_tokentxs"
 )
 
@@ -65,38 +65,7 @@ tests_to_run=(
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
 
-initaccounts() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=initaccounts \
-		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY \
-		  --accountKeys=$(echo -n "$ACCOUNT_KEYS" | tr -d ' ','\t' | tr '\n' ',')
-}
-
-merkle_vote() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=vtest \
-		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY \
-		  --electionSize=$ELECTION_SIZE \
-		  --electionType=$1 \
-		  --withWeight=2 \
-		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
-}
-
-merkle_vote_plaintext() {
-	merkle_vote poll-vote
-}
-
-merkle_vote_encrypted() {
-	merkle_vote encrypted-poll
-}
-
-cspvoting() {
+legacy_cspvoting() {
 	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
@@ -107,31 +76,29 @@ cspvoting() {
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $3}')
 }
 
-tokentransactions() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
+e2etest() {
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
+		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
-		  --operation=tokentransactions \
-		  --oracleKey=$ORACLE_KEY \
-		  --treasurerKey=$TREASURER_KEY \
-		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
+		  --operation=$1
 }
 
-e2etest_anonvoting() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./end2endtest --host $APIHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=anonvoting \
-		  --faucet=$FAUCET
+e2etest_plaintextelection() {
+	e2etest plaintextelection
+}
+
+e2etest_encryptedelection() {
+	e2etest encryptedelection
+}
+
+e2etest_anonelection() {
+	e2etest anonelection
 }
 
 e2etest_tokentxs() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./end2endtest --host $APIHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=tokentransactions \
-		  --faucet=$FAUCET
+	e2etest tokentxs
 }
+
 ### end tests definition
 
 # useful for debugging bash flow
