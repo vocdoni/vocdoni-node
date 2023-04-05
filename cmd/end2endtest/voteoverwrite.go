@@ -366,7 +366,7 @@ func voteOverwriteTest(c config) {
 		log.Warn(err)
 	}
 
-	time.Sleep(time.Second * 1)
+	time.Sleep(time.Second)
 
 	// Third vote (second overwrite, should fail)
 	_, err = cc.Vote(&apiclient.VoteData{
