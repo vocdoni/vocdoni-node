@@ -324,7 +324,7 @@ func voteOverwriteTest(c config) {
 
 	wg.Wait()
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes, time.Since(startTime), int(float64(c.nvotes-1)/time.Since(startTime).Seconds()))
+		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// TODO: remove repeated code
 	// Send the only missing vote, should be fine
@@ -353,7 +353,7 @@ func voteOverwriteTest(c config) {
 	_, err = cc.Vote(&apiclient.VoteData{
 		ElectionID:  electionID,
 		ProofMkTree: proofs[voterAccounts[0].Address().Hex()],
-		Choices:     []int{0},
+		Choices:     []int{1},
 	})
 
 	contextDeadlines = 0
