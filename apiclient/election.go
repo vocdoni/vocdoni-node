@@ -396,3 +396,20 @@ func (c *HTTPclient) ElectionFilterPaginated(organizationId types.HexBytes,
 	}
 	return &elections, nil
 }
+
+// ElectionKeys fetches the encryption keys for an election.
+// Note that only elections that are SecretUntilTheEnd will return keys
+func (c *HTTPclient) ElectionKeys(electionID types.HexBytes) (*api.ElectionKeys, error) {
+	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "keys")
+	if err != nil {
+		return nil, err
+	}
+	if code != 200 {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	electionKeys := &api.ElectionKeys{}
+	if err = json.Unmarshal(resp, &electionKeys); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return electionKeys, nil
+}
