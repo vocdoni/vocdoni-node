@@ -376,13 +376,16 @@ func voteOverwriteTest(c config) {
 	})
 
 	contextDeadlines = 0
-	// if the context deadline is reached, we don't need to print it (let's jus retry)
+
+	// should fail
 	if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
 		contextDeadlines++
 
 	} else if err != nil && !strings.Contains(err.Error(), "already exists") {
 		// if the error is not "vote already exists", we need to print it
 		log.Warn(err)
+	} else if err != nil && !strings.Contains(err.Error(), "overwrite count reached") {
+		log.Debug("overwrite reached detected")
 	}
 
 	time.Sleep(time.Second)
