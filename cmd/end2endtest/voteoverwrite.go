@@ -454,7 +454,7 @@ func voteOverwriteTest(c config) {
 
 }
 
-// checkResult compare the expected vote results in base on to overwrite applied with the actual result returned by the API
+// matchResult compare the expected vote results in base on to overwrite applied with the actual result returned by the API
 func matchResult(results [][]*types.BigInt, expectedResult [][]string) bool {
 	// only have one question
 	for q := range results[0] {
