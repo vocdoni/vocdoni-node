@@ -331,64 +331,59 @@ func voteOverwriteTest(c config) {
 	cc := api.Clone(fmt.Sprintf("%x", voterAccounts[0].PrivateKey()))
 	time.Sleep(time.Second)
 
-	_, err = cc.Vote(&apiclient.VoteData{
+	voteData := apiclient.VoteData{
 		ElectionID:  electionID,
 		ProofMkTree: proofs[voterAccounts[0].Address().Hex()],
 		Choices:     []int{0},
-	})
+	}
 
 	contextDeadlines := 0
-	// if the context deadline is reached, we don't need to print it (let's jus retry)
-	if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-		contextDeadlines++
 
-	} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-		// if the error is not "vote already exists", we need to print it
-		log.Warn(err)
+	if _, err := cc.Vote(&voteData); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			contextDeadlines++
+		} else if !strings.Contains(err.Error(), "already exists") {
+			// if the error is not "vote already exists", we need to print it
+			log.Warn(err)
+		}
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 20)
+	log.Infof("got %d HTTP errors", contextDeadlines)
 
 	// Second vote (firsts overwrite)
-	_, err = cc.Vote(&apiclient.VoteData{
-		ElectionID:  electionID,
-		ProofMkTree: proofs[voterAccounts[0].Address().Hex()],
-		Choices:     []int{1},
-	})
+	voteData.Choices = []int{1}
 
 	contextDeadlines = 0
-	// if the context deadline is reached, we don't need to print it (let's jus retry)
-	if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-		contextDeadlines++
-
-	} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-		// if the error is not "vote already exists", we need to print it
-		log.Warn(err)
+	if _, err := cc.Vote(&voteData); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			contextDeadlines++
+		} else if !strings.Contains(err.Error(), "already exists") {
+			// if the error is not "vote already exists", we need to print it
+			log.Warn(err)
+		}
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 20)
+	log.Infof("got %d HTTP errors", contextDeadlines)
 
 	// Third vote (second overwrite, should fail)
-	_, err = cc.Vote(&apiclient.VoteData{
-		ElectionID:  electionID,
-		ProofMkTree: proofs[voterAccounts[0].Address().Hex()],
-		Choices:     []int{1},
-	})
+	voteData.Choices = []int{0}
 
 	contextDeadlines = 0
 
-	// should fail
-	if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-		contextDeadlines++
-
-	} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-		// if the error is not "vote already exists", we need to print it
-		log.Warn(err)
-	} else if err != nil && !strings.Contains(err.Error(), "overwrite count reached") {
-		log.Debug("overwrite reached detected")
+	if _, err := cc.Vote(&voteData); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			contextDeadlines++
+		} else if !strings.Contains(err.Error(), "overwrite count reached") {
+			log.Fatal("expected overwrite error, got: ", err)
+		} else {
+			// the log should be an overwrite reached error
+			log.Infof("error expected: %s", err.Error())
+		}
 	}
 
-	time.Sleep(time.Second)
+	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
@@ -445,6 +440,26 @@ func voteOverwriteTest(c config) {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	firstQ := fmt.Sprintf("%d", (c.nvotes-1)*10)
+	// should count the firsts overwrite
+	secondQ := fmt.Sprintf("%d", 10)
+
+	if !matchResult(election.Results, [][]string{{firstQ, secondQ, "0"}}) {
+		log.Fatal("election result must match, but got Results:", election.Results)
+	}
 	log.Infof("election %s status is RESULTS", electionID.String())
 	log.Infof("election results: %v", election.Results)
+
+}
+
+// checkResult compare the expected vote results in base on to overwrite applied with the actual result returned by the API
+func matchResult(results [][]*types.BigInt, expectedResult [][]string) bool {
+	// only have one question
+	for q := range results[0] {
+		if !(expectedResult[0][q] == results[0][q].String()) {
+			return false
+		}
+	}
+	return true
 }
