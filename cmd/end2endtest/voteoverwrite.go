@@ -888,8 +888,7 @@ func voteOverwriteWaitNextBlockTest(c config) {
 	// according to the first overwrite
 	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
 
-	// only the first overwrite should be valid in the results and must match with the expected results
-	if !matchResult(election.Results, [][]string{{firstChoice, secondChoice, "0"}}) {
+	if !matchResult(election.Results, resultExpected) {
 		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, election.Results)
 	}
 	log.Infof("election %s status is RESULTS", electionID.String())
