@@ -383,6 +383,7 @@ func voteOverwriteTest(c config) {
 		}
 	}
 
+	log.Info("successfully sent the only missing vote")
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
