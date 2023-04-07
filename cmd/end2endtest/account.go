@@ -193,7 +193,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		return state.ErrAccountNotExist
 	}
 	log.Infow("bob", "account", bobKeys.Address(), "nonce", bobAcc.Nonce, "balance", bobAcc.Balance)
-	if bobAcc.Balance-23-uint64(txCost)+19 != bobAccAfter.Balance {
+	if bobAcc.Balance-23-txCost+19 != bobAccAfter.Balance {
 		log.Fatalf("expected %s to have balance %d got %d", bobKeys.Address(), 300, bobAccAfter.Balance)
 	}
 
@@ -205,9 +205,9 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		return state.ErrAccountNotExist
 	}
 	log.Infow("alice", "account", aliceKeys.Address(), "nonce", aliceAcc.Nonce, "balance", aliceAcc.Balance)
-	if aliceAcc.Balance-19-uint64(txCost)+23 != aliceAccAfter.Balance {
+	if aliceAcc.Balance-19-txCost+23 != aliceAccAfter.Balance {
 		log.Fatalf("expected %s to have balance %d got %d",
-			aliceKeys.Address(), aliceAcc.Balance-(100+uint64(txCost)), aliceAccAfter.Balance)
+			aliceKeys.Address(), aliceAcc.Balance-(100+txCost), aliceAccAfter.Balance)
 	}
 	if aliceAcc.Nonce+1 != aliceAccAfter.Nonce {
 		log.Fatalf("expected %s to have nonce %d got %d",

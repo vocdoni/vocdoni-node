@@ -173,7 +173,7 @@ func UpdateRouterTags(fset *token.FileSet, parsedFile *ast.File, fmap map[string
 				for _, pm := range pms {
 					line := &ast.Comment{
 						Text:  fmt.Sprintf("//\t@Router %s [%s]", pm.path, pm.method),
-						Slash: token.Pos(int(x.Pos() - 1)),
+						Slash: x.Pos() - 1,
 					}
 					list = append(list, line)
 				}
@@ -201,23 +201,23 @@ func InitComments(fset *token.FileSet, parsedFile *ast.File, fmap map[string][]P
 				list := []*ast.Comment{}
 				list = append(list, &ast.Comment{
 					Text:  fmt.Sprintf("// %s", x.Name.Name),
-					Slash: token.Pos(int(x.Pos() - 1)),
+					Slash: x.Pos() - 1,
 				})
 				list = append(list, &ast.Comment{
 					Text:  "//",
-					Slash: token.Pos(int(x.Pos() - 1)),
+					Slash: x.Pos() - 1,
 				})
 				list = append(list, &ast.Comment{
 					Text:  "// @Summary TODO",
-					Slash: token.Pos(int(x.Pos() - 1)),
+					Slash: x.Pos() - 1,
 				})
 				list = append(list, &ast.Comment{
 					Text:  "// @Description TODO",
-					Slash: token.Pos(int(x.Pos() - 1)),
+					Slash: x.Pos() - 1,
 				})
 				list = append(list, &ast.Comment{
 					Text:  "// @Success 200 {object} object",
-					Slash: token.Pos(int(x.Pos() - 1)),
+					Slash: x.Pos() - 1,
 				})
 
 				cmap[x] = []*ast.CommentGroup{
