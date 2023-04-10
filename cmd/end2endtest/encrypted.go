@@ -33,24 +33,15 @@ var _ VochainTest = (*E2EEncryptedElection)(nil)
 type E2EEncryptedElection struct {
 	api    *apiclient.HTTPclient
 	config *config
+
+	election      *vapi.Election
+	voterAccounts []*ethereum.SignKeys
+	proofs        map[string]*apiclient.CensusProof
 }
 
-func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, config *config) error {
+func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
-	t.config = config
-	return nil
-}
-
-func (t *E2EEncryptedElection) Teardown() error {
-	// nothing to do here
-	return nil
-}
-
-func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
-	start := time.Now()
-
-	c := t.config
-	api := t.api
+	t.config = c
 
 	// Set the account in the API client, so we can sign transactions
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
@@ -103,17 +94,17 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 	log.Infof("new census created with id %s", censusID.String())
 
 	// Generate 10 participant accounts
-	voterAccounts := ethereum.NewSignKeysBatch(c.nvotes)
+	t.voterAccounts = ethereum.NewSignKeysBatch(c.nvotes)
 
 	// Add the accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
-	for i, voterAccount := range voterAccounts {
+	for i, voterAccount := range t.voterAccounts {
 		participants.Participants = append(participants.Participants,
 			vapi.CensusParticipant{
 				Key:    voterAccount.Address().Bytes(),
 				Weight: (*types.BigInt)(new(big.Int).SetUint64(10)),
 			})
-		if i == len(voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
+		if i == len(t.voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
 			if err := api.CensusAddParticipants(censusID, participants); err != nil {
 				log.Fatal(err)
 			}
@@ -149,57 +140,6 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 		log.Fatalf("published census size is %d, expected %d", size, c.nvotes)
 	}
 
-	// Generate the voting proofs (parallelized)
-	type voterProof struct {
-		proof   *apiclient.CensusProof
-		address string
-	}
-	proofs := make(map[string]*apiclient.CensusProof, c.nvotes)
-	proofCh := make(chan *voterProof)
-	stopProofs := make(chan bool)
-	go func() {
-		for {
-			select {
-			case p := <-proofCh:
-				proofs[p.address] = p.proof
-			case <-stopProofs:
-				return
-			}
-		}
-	}()
-
-	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("generating %d voting proofs", len(accounts))
-		for _, acc := range accounts {
-			pr, err := api.CensusGenProof(root, acc.Address().Bytes())
-			if err != nil {
-				log.Fatal(err)
-			}
-			pr.KeyType = models.ProofArbo_ADDRESS
-			proofCh <- &voterProof{
-				proof:   pr,
-				address: acc.Address().Hex(),
-			}
-		}
-	}
-
-	pcount := c.nvotes / c.parallelCount
-	var wg sync.WaitGroup
-	for i := 0; i < len(voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(voterAccounts) {
-			end = len(voterAccounts)
-		}
-		wg.Add(1)
-		go addNaccounts(voterAccounts[i:end], &wg)
-	}
-
-	wg.Wait()
-	time.Sleep(time.Second) // wait a grace time for the last proof to be added
-	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(voterAccounts))
-	stopProofs <- true
-
 	// Create a new Election
 	electionID, err := api.NewElection(&vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
@@ -223,7 +163,7 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 			RootHash: root,
 			URL:      censusURI,
 			Type:     "weighted",
-			Size:     uint64(len(voterAccounts)),
+			Size:     uint64(len(t.voterAccounts)),
 		},
 
 		Questions: []vapi.Question{
@@ -246,21 +186,91 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
+	log.Infof("created new election with id %s", electionID.String())
+
+	t.proofs = t.votingProofs(root, t.voterAccounts)
 
 	// Wait for the election to start
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 	defer cancel()
-	election, err := api.WaitUntilElectionStarts(ctx, electionID)
+	t.election, err = api.WaitUntilElectionStarts(ctx, electionID)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Debugf("election details: %+v", *election)
+	log.Debugf("election details: %+v", *t.election)
+
+	return nil
+}
+
+// votingProofs generates the voting proofs (parallelized)
+func (t *E2EEncryptedElection) votingProofs(root types.HexBytes,
+	voterAccounts []*ethereum.SignKeys) map[string]*apiclient.CensusProof {
+	type voterProof struct {
+		proof   *apiclient.CensusProof
+		address string
+	}
+	proofs := make(map[string]*apiclient.CensusProof, t.config.nvotes)
+	proofCh := make(chan *voterProof)
+	stopProofs := make(chan bool)
+	go func() {
+		for {
+			select {
+			case p := <-proofCh:
+				proofs[p.address] = p.proof
+			case <-stopProofs:
+				return
+			}
+		}
+	}()
+
+	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
+		defer wg.Done()
+		log.Infof("generating %d voting proofs", len(accounts))
+		for _, acc := range accounts {
+			pr, err := t.api.CensusGenProof(root, acc.Address().Bytes())
+			if err != nil {
+				log.Fatal(err)
+			}
+			pr.KeyType = models.ProofArbo_ADDRESS
+			proofCh <- &voterProof{
+				proof:   pr,
+				address: acc.Address().Hex(),
+			}
+		}
+	}
+
+	pcount := t.config.nvotes / t.config.parallelCount
+	var wg sync.WaitGroup
+	for i := 0; i < len(t.voterAccounts); i += pcount {
+		end := i + pcount
+		if end > len(t.voterAccounts) {
+			end = len(t.voterAccounts)
+		}
+		wg.Add(1)
+		go addNaccounts(t.voterAccounts[i:end], &wg)
+	}
+
+	wg.Wait()
+	time.Sleep(time.Second) // wait a grace time for the last proof to be added
+	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(t.voterAccounts))
+	stopProofs <- true
+
+	return proofs
+}
+
+func (t *E2EEncryptedElection) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
+	c := t.config
+	api := t.api
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-	wg = sync.WaitGroup{}
+	wg := sync.WaitGroup{}
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("sending %d votes", len(accounts))
@@ -277,8 +287,8 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 			for i, voterAccount := range accountsMap {
 				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
 				_, err := c.Vote(&apiclient.VoteData{
-					ElectionID:  electionID,
-					ProofMkTree: proofs[voterAccount.Address().Hex()],
+					ElectionID:  t.election.ElectionID,
+					ProofMkTree: t.proofs[voterAccount.Address().Hex()],
 					Choices:     []int{i % 2},
 				})
 				// if the context deadline is reached, we don't need to print it (let's just retry)
@@ -305,14 +315,14 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 		time.Sleep(time.Second * 2)
 	}
 
-	pcount = c.nvotes / c.parallelCount
-	for i := 0; i < len(voterAccounts); i += pcount {
+	pcount := c.nvotes / c.parallelCount
+	for i := 0; i < len(t.voterAccounts); i += pcount {
 		end := i + pcount
-		if end > len(voterAccounts) {
-			end = len(voterAccounts)
+		if end > len(t.voterAccounts) {
+			end = len(t.voterAccounts)
 		}
 		wg.Add(1)
-		go voteAccounts(voterAccounts[i:end], &wg)
+		go voteAccounts(t.voterAccounts[i:end], &wg)
 	}
 
 	wg.Wait()
@@ -322,7 +332,7 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")
 	for {
-		count, err := api.ElectionVoteCount(electionID)
+		count, err := api.ElectionVoteCount(t.election.ElectionID)
 		if err != nil {
 			log.Warn(err)
 		}
@@ -346,36 +356,20 @@ func (t *E2EEncryptedElection) Run() (duration time.Duration, err error) {
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	hash, err := api.SetElectionStatus(electionID, "ENDED")
+	_, err = api.SetElectionStatus(t.election.ElectionID, "ENDED")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Check the election status is actually ENDED
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
-	}
-
-	election, err = api.Election(electionID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if election.Status != "ENDED" {
-		log.Fatal("election status is not ENDED")
-	}
-	log.Infof("election %s status is ENDED", electionID.String())
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), apiclient.WaitTimeout)
 	defer cancel()
-	election, err = api.WaitUntilElectionStatus(ctx, electionID, "RESULTS")
+	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Infof("election %s status is RESULTS", electionID.String())
+	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", election.Results)
 
-	return time.Since(start), nil
+	return time.Since(startTime), nil
 }
