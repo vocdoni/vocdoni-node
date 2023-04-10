@@ -41,11 +41,11 @@ RANDOMID="${RANDOM}${RANDOM}"
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"tokentransactions"
-	"merkle_vote_encrypted"
 	"cspvoting"
-	"e2etest_anonvoting"
+	"e2etest_anonelection"
 	"e2etest_tokentxs"
+	"e2etest_plaintextelection"
+	"e2etest_encryptedelection"
 )
 
 # print help
@@ -117,21 +117,29 @@ tokentransactions() {
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $1}')
 }
 
-e2etest_anonvoting() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./end2endtest --host $APIHOST \
+e2etest() {
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
+		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
-		  --operation=anonvoting \
-		  --faucet=$FAUCET
+		  --operation=$1
+}
+
+e2etest_plaintextelection() {
+	e2etest plaintextelection
+}
+
+e2etest_encryptedelection() {
+	e2etest encryptedelection
+}
+
+e2etest_anonelection() {
+	e2etest anonelection
 }
 
 e2etest_tokentxs() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./end2endtest --host $APIHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=tokentransactions \
-		  --faucet=$FAUCET
+	e2etest tokentxs
 }
+
 ### end tests definition
 
 # useful for debugging bash flow
