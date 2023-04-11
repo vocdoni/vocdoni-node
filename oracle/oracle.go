@@ -2,7 +2,6 @@ package oracle
 
 import (
 	"encoding/json"
-	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -37,73 +36,6 @@ func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle
 func (o *Oracle) EnableResults(scr *indexer.Indexer) {
 	log.Infof("oracle results enabled")
 	scr.AddEventListener(o)
-}
-
-func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
-	// Sanity checks
-	if process == nil {
-		return nil, fmt.Errorf("process is nil")
-	}
-	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
-		return nil, fmt.Errorf("invalid process status on process creation: %d", process.Status)
-	}
-	if len(process.EntityId) != types.EntityIDsize {
-		return nil, fmt.Errorf("entityId size is wrong")
-	}
-	if _, ok := state.CensusOrigins[process.CensusOrigin]; !ok {
-		return nil, fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
-	}
-	if state.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
-		return nil, fmt.Errorf("census %s needs URI but none has been provided",
-			state.CensusOrigins[process.CensusOrigin].Name)
-	}
-	if process.BlockCount < types.ProcessesContractMinBlockCount {
-		return nil, fmt.Errorf("block count is too low")
-	}
-	if state.CensusOrigins[process.CensusOrigin].NeedsIndexSlot && process.EthIndexSlot == nil {
-		return nil, fmt.Errorf("censusOrigin needs index slot (not provided)")
-	}
-
-	// get oracle account
-	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
-	if err != nil {
-		return nil, err
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("oracle account does not exist")
-	}
-	// Create, sign a send NewProcess transaction
-	processTx := &models.NewProcessTx{
-		Process: process,
-		Nonce:   acc.Nonce,
-		Txtype:  models.TxType_NEW_PROCESS,
-	}
-
-	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_NewProcess{
-			NewProcess: processTx,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal newProcess tx: %w", err)
-	}
-	stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID())
-	if err != nil {
-		return nil, fmt.Errorf("cannot sign oracle tx: %w", err)
-	}
-	txb, err := proto.Marshal(stx)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling process tx: %w", err)
-	}
-	log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
-
-	res, err := o.VochainApp.SendTx(txb)
-	if err != nil || res == nil {
-		return nil, fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
-	}
-	log.Infof("newProcess transaction sent, processID: %x", res.Data.Bytes())
-	return res.Data.Bytes(), nil
 }
 
 // OnComputeResults is called once a process result is computed by the indexer.
