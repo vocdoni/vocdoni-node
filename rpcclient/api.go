@@ -1254,14 +1254,16 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			if currentSize < 1 {
 				break
 			}
+			var pub []byte
 			if censusSigners != nil {
-				hexpub, _ = censusSigners[currentSize-1].HexString()
+				// hexpub, _ = censusSigners[currentSize-1].HexString()
+				pub = censusSigners[currentSize-1].Address().Bytes()
 			} else {
 				hexpub = censusPubKeys[currentSize-1]
-			}
-			pub, err := hex.DecodeString(hexpub)
-			if err != nil {
-				return nil, "", err
+				pub, err = hex.DecodeString(hexpub)
+				if err != nil {
+					return nil, "", err
+				}
 			}
 			claims = append(claims, pub)
 			if len(censusValues) > 0 {
