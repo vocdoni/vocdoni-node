@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
@@ -194,9 +195,11 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// add the last participant and keep the key for verifying the proof
-	key := rnd.RandomBytes(32)
+	// key := rnd.RandomBytes(32)
+	key := ethereum.NewSignKeys()
+	qt.Assert(t, key.Generate(), qt.IsNil)
 	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
-		Key:    key,
+		Key:    key.Address().Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	}}}, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
@@ -207,7 +210,7 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
 	root := censusData.CensusID.String()
 
-	resp, code = c.Request("GET", nil, root, "proof", fmt.Sprintf("%x", key))
+	resp, code = c.Request("GET", nil, root, "proof", key.Address().String())
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
@@ -232,7 +235,7 @@ func TestCensusProof(t *testing.T) {
 		models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		censusData.CensusID,
 		electionID,
-		state.NewVoterID(state.VoterIDTypeECDSA, key),
+		state.NewVoterID(state.VoterIDTypeECDSA, key.PublicKey()),
 	)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)

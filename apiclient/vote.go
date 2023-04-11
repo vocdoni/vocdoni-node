@@ -30,7 +30,8 @@ import (
 // ProofCSP is the proof of the vote fore a CSP election.
 //
 // KeyType is the type of the key used when the census was created. It can be
-// either models.ProofArbo_ADDRESS or models.ProofArbo_PUBKEY (default).
+// either models.ProofArbo_ADDRESS (default) or models.ProofArbo_PUBKEY
+// (deprecated).
 type VoteData struct {
 	Choices      []int
 	ElectionID   types.HexBytes
