@@ -192,12 +192,12 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 
 	// now check the resulting state
 	err = checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
-		(aliceAcc.Balance - amountAtoB - uint64(txCost) + amountBtoA))
+		(aliceAcc.Balance - amountAtoB - txCost + amountBtoA))
 	if err != nil {
 		return err
 	}
 	err = checkAccountNonceAndBalance(bob, bobAcc.Nonce+1,
-		(bobAcc.Balance - amountBtoA - uint64(txCost) + amountAtoB))
+		(bobAcc.Balance - amountBtoA - txCost + amountAtoB))
 	if err != nil {
 		return err
 	}

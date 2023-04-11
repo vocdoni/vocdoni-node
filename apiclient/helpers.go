@@ -162,7 +162,7 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	}
 }
 
-// GetFaucetPackageFromDefaultDevService returns a faucet package.
+// GetFaucetPackageFromDevService returns a faucet package.
 // Needs just the destination wallet address, the URL and bearer token are hardcoded
 func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
 	return GetFaucetPackageFromRemoteService(
