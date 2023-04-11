@@ -99,9 +99,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		}
 		// check if the proof key is for an address (default) or a pubKey
 		key := vID.Address()
-		if p.GetKeyType().String() == "PUBKEY" {
-			key = vID.Bytes()
-		}
+
 		hashedKey, err := hashFunc.Hash(key)
 		if err != nil {
 			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)

@@ -185,9 +185,9 @@ func TestCensusProof(t *testing.T) {
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
 	cparts := CensusParticipants{}
-	for i := 1; i < 11; i++ {
+	for i, acc := range ethereum.NewSignKeysBatch(11) {
 		cparts.Participants = append(cparts.Participants, CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    acc.Address().Bytes(),
 			Weight: (*types.BigInt)(big.NewInt(int64(i))),
 		})
 	}
@@ -195,7 +195,6 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// add the last participant and keep the key for verifying the proof
-	// key := rnd.RandomBytes(32)
 	key := ethereum.NewSignKeys()
 	qt.Assert(t, key.Generate(), qt.IsNil)
 	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
