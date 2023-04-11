@@ -271,7 +271,7 @@ func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		siblings, value, err := c.GetProof(s.PublicKey(), root, false)
+		siblings, value, err := c.GetProof(s.Address().Bytes(), root, false)
 		if err != nil {
 			if tolerateError {
 				continue
