@@ -4,7 +4,7 @@ name: Deploy dev
 on:
   push:
     branches:
-      - master
+      - main
 
 jobs:
   push-to-dev:
@@ -20,7 +20,7 @@ jobs:
   call-docker-release:
     name: Docker
     needs: push-to-dev
-    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@master
+    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:
       image-tag: dev

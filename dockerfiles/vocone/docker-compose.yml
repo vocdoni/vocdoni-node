@@ -4,7 +4,7 @@ services:
   gateway:
     build:
       context: ../../
-    image: "ghcr.io/vocdoni/voconed:${IMAGE_TAG:-master}"
+    image: "ghcr.io/vocdoni/voconed:${IMAGE_TAG:-main}"
     entrypoint: "/app/voconed"
     env_file: .env
     volumes:

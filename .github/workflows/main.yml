@@ -6,7 +6,7 @@ on:
     branches:
       - dev
       - stage
-      - master
+      - main
       - release**
   pull_request:
 
@@ -131,7 +131,7 @@ jobs:
     name: Docker
     needs: [job_go_checks, job_go_test, job_compose_test]
     if: github.event_name == 'push' # this is limited to selected branches at the beginning of this file
-    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@master
+    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:
       image-tag: ${{ github.ref_name }}
