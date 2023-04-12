@@ -17,6 +17,7 @@ const (
 	VoterIDTypeUndefined VoterIDType = 0
 	VoterIDTypeECDSA     VoterIDType = 1
 	VoterIDTypeZkSnark   VoterIDType = 2
+	VoterIDTypeAddress   VoterIDType = 3
 )
 
 // Enum value map for VoterIDType.
@@ -24,6 +25,7 @@ var voterIDTypeName = map[VoterIDType]string{
 	VoterIDTypeUndefined: "UNDEFINED",
 	VoterIDTypeECDSA:     "ECDSA",
 	VoterIDTypeZkSnark:   "ZKSNARK",
+	VoterIDTypeAddress:   "Address",
 }
 
 // NewVoterID creates a new VoterID from a VoterIDType and a key.
@@ -72,7 +74,7 @@ func (v VoterID) Address() []byte {
 			return nil
 		}
 		return ethAddr.Bytes()
-	case VoterIDTypeZkSnark:
+	case VoterIDTypeZkSnark, VoterIDTypeAddress:
 		return v[1:]
 	default:
 		return nil
