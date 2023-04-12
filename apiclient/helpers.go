@@ -145,6 +145,27 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 	}
 }
 
+// WaitUntilElectionResults waits until the given election has published final results.
+func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
+	electionID types.HexBytes) (*api.ElectionResults, error) {
+	log.Infof("waiting for election %s to publish final results", electionID.String())
+	for {
+		election, err := c.ElectionResults(electionID)
+		if err != nil && !strings.Contains(err.Error(), "5024") { // TODO: proper code matching
+			return nil, err
+		}
+		if election != nil {
+			return election, nil
+		}
+		select {
+		case <-time.After(pollInterval):
+			continue
+		case <-ctx.Done():
+			return nil, fmt.Errorf("election %s never published results: %w", electionID.String(), ctx.Err())
+		}
+	}
+}
+
 // WaitUntilTxIsMined waits until the given transaction is mined (included in a block)
 func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	txHash types.HexBytes) (*api.TransactionReference, error) {

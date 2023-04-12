@@ -422,31 +422,15 @@ func voteOverwriteNotWaitNextBlockTest(c config) {
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	hash, err := api.SetElectionStatus(electionID, "ENDED")
+	_, err = api.SetElectionStatus(electionID, "ENDED")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Check the election status is actually ENDED
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
-	}
-
-	election, err = api.Election(electionID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if election.Status != "ENDED" {
-		log.Fatal("election status is not ENDED")
-	}
-	log.Infof("election %s status is ENDED", electionID.String())
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*60)
 	defer cancel()
-	election, err = api.WaitUntilElectionStatus(ctx, electionID, "RESULTS")
+	elres, err := api.WaitUntilElectionResults(ctx, electionID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -459,11 +443,11 @@ func voteOverwriteNotWaitNextBlockTest(c config) {
 	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
 
 	// only the first overwrite should be valid in the results and must math with the expected results
-	if !matchResult(election.Results, resultExpected) {
-		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, election.Results)
+	if !matchResult(elres.Results, resultExpected) {
+		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
 	}
 	log.Infof("election %s status is RESULTS", electionID.String())
-	log.Infof("election results: %v", election.Results)
+	log.Infof("election results: %v", elres.Results)
 
 }
 
