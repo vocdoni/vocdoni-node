@@ -234,7 +234,7 @@ func TestCensusProof(t *testing.T) {
 		models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		censusData.CensusID,
 		electionID,
-		state.NewVoterID(state.VoterIDTypeAddress, key.Address().Bytes()),
+		state.NewVoterID(state.VoterIDTypeECDSA, key.PublicKey()),
 	)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
