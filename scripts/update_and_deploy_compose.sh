@@ -1,5 +1,5 @@
 #!/bin/bash
-BRANCH=${BRANCH:-master}
+BRANCH=${BRANCH:-main}
 CMD=${CMD:-vocdoninode}
 NAME="$CMD-$BRANCH"
 
