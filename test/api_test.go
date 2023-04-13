@@ -49,7 +49,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	cparts := api.CensusParticipants{}
 	for i := 1; i < 10; i++ {
 		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    rnd.RandomBytes(20),
 			Weight: (*types.BigInt)(big.NewInt(int64(1))),
 		})
 	}
