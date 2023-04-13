@@ -72,7 +72,7 @@ func TestCensus(t *testing.T) {
 	cparts := CensusParticipants{}
 	for i := 1; i < 11; i++ {
 		cparts.Participants = append(cparts.Participants, CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    rnd.RandomBytes(20),
 			Weight: (*types.BigInt)(big.NewInt(int64(i))),
 		})
 		weight += i
@@ -93,7 +93,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Size, qt.Equals, index)
 
 	// add one more key and check proof
-	key := rnd.RandomBytes(32)
+	key := rnd.RandomBytes(20)
 	keyWeight := (*types.BigInt)(big.NewInt(100))
 	_, code = c.Request("POST", &CensusParticipants{
 		Participants: []CensusParticipant{{Key: key, Weight: keyWeight}},
@@ -122,7 +122,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Valid, qt.IsTrue)
 
 	// try an invalid proof
-	proof.Key = rnd.RandomBytes(32)
+	proof.Key = rnd.RandomBytes(20)
 	qt.Assert(t, err, qt.IsNil)
 	_, code = c.Request("POST", proof, id2, "verify")
 	qt.Assert(t, code, qt.Equals, 400)

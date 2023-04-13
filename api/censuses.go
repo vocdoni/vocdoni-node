@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -229,9 +228,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 		leafKey := p.Key
 		if len(leafKey) > censustree.DefaultMaxKeyLen {
-			deprecationMsg = []byte(fmt.Sprintf("census keys must not be longer "+
-				"than %d, the key provided has been truncated to this length",
-				censustree.DefaultMaxKeyLen))
+			return ErrParticipanKeyLengthInvalid.Withf("can not be longer than %d bytes", censustree.DefaultMaxKeyLen)
 		}
 
 		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
@@ -240,12 +237,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 			if err != nil {
 				return ErrCantComputeKeyHash.WithErr(err)
 			}
-			// If the provided key is longer than the defined maximum length
-			// truncate it.
-			// TODO: return an error if the other key lengths are deprecated
-			if len(leafKey) > censustree.DefaultMaxKeyLen {
-				leafKey = leafKey[:censustree.DefaultMaxKeyLen]
-			}
+			leafKey = leafKey[:censustree.DefaultMaxKeyLen]
 		}
 
 		keys = append(keys, leafKey)
