@@ -131,6 +131,7 @@ func (t electionBase) isCensusSizeValid(censusID types.HexBytes) error {
 		return err
 	}
 	if size != uint64(t.config.nvotes) {
+		// TODO: fix log.Error call
 		log.Error("census size is %d, expected %d", size, t.config.nvotes)
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
