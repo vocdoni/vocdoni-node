@@ -31,8 +31,7 @@ func init() {
 var _ VochainTest = (*E2EPlaintextElection)(nil)
 
 type E2EPlaintextElection struct {
-	api    *apiclient.HTTPclient
-	config *config
+	electionBase
 }
 
 func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, config *config) error {

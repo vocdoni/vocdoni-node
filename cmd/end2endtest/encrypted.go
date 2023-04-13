@@ -31,12 +31,7 @@ func init() {
 var _ VochainTest = (*E2EEncryptedElection)(nil)
 
 type E2EEncryptedElection struct {
-	api    *apiclient.HTTPclient
-	config *config
-
-	election      *vapi.Election
-	voterAccounts []*ethereum.SignKeys
-	proofs        map[string]*apiclient.CensusProof
+	electionBase
 }
 
 func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error {

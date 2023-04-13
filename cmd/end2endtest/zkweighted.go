@@ -31,8 +31,7 @@ func init() {
 var _ VochainTest = (*E2EAnonElection)(nil)
 
 type E2EAnonElection struct {
-	api    *apiclient.HTTPclient
-	config *config
+	electionBase
 }
 
 func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, config *config) error {
