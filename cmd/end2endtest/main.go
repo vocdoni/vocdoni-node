@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	vapi "go.vocdoni.io/dvote/api"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -33,6 +34,15 @@ type operation struct {
 	test VochainTest
 
 	description, example string
+}
+
+type electionBase struct {
+	api    *apiclient.HTTPclient
+	config *config
+
+	election      *vapi.Election
+	voterAccounts []*ethereum.SignKeys
+	proofs        map[string]*apiclient.CensusProof
 }
 
 var ops = map[string]operation{}
