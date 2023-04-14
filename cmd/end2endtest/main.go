@@ -9,11 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
+	vapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
-	"go.vocdoni.io/proto/build/go/models"
-
-	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )
@@ -33,6 +32,15 @@ type VochainTest interface {
 	Setup(api *apiclient.HTTPclient, config *config) error
 	Run() error
 	Teardown() error
+}
+
+type e2eElection struct {
+	api    *apiclient.HTTPclient
+	config *config
+
+	election      *vapi.Election
+	voterAccounts []*ethereum.SignKeys
+	proofs        map[string]*apiclient.CensusProof
 }
 
 type operation struct {
@@ -175,16 +183,4 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 		}
 	}
 	return skey, nil
-}
-
-func getFaucetPackage(c *config, account string) (*models.FaucetPackage, error) {
-	if c.faucet == "" {
-		return nil, fmt.Errorf("need to pass a valid --faucet")
-	}
-	if c.faucet == "dev" {
-		return apiclient.GetFaucetPackageFromDevService(account)
-	} else {
-		return apiclient.GetFaucetPackageFromRemoteService(c.faucet+account,
-			c.faucetAuthToken)
-	}
 }
