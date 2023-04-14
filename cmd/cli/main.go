@@ -516,7 +516,7 @@ func accountSetMetadata(cli *vocdoniCLI) error {
 }
 
 func electionHandler(cli *vocdoniCLI) error {
-	infoPrint.Printf("preparing the eletion template...\n")
+	infoPrint.Printf("preparing the election template...\n")
 	description := api.ElectionDescription{
 		Title:        map[string]string{"default": "election title"},
 		Description:  map[string]string{"default": "election description"},

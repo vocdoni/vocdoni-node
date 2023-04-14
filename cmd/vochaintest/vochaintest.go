@@ -1289,7 +1289,7 @@ func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) 
 	}
 	addedDelegate := common.BytesToAddress(acc.DelegateAddrs[0])
 	if addedDelegate != signer2.Address() {
-		log.Fatalf("expeted delegate to be %s got %s", signer2.Address(), addedDelegate)
+		log.Fatalf("expected delegate to be %s got %s", signer2.Address(), addedDelegate)
 	}
 	// delete delegate
 	acc, err = c.GetAccount(signer.Address())

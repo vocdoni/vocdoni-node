@@ -3,6 +3,8 @@ package oracle
 import (
 	"encoding/json"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -20,6 +22,9 @@ import (
 type Oracle struct {
 	VochainApp *vochain.BaseApplication
 	signer     *ethereum.SignKeys
+
+	resultQueue map[string]*models.ProcessResult
+	rqLock      sync.RWMutex
 }
 
 type OracleResults struct {
@@ -35,75 +40,51 @@ func NewOracle(app *vochain.BaseApplication, signer *ethereum.SignKeys) (*Oracle
 }
 
 func (o *Oracle) EnableResults(scr *indexer.Indexer) {
+	go o.resultQueueHandler()
+
 	log.Infof("oracle results enabled")
 	scr.AddEventListener(o)
 }
 
-func (o *Oracle) NewProcess(process *models.Process) ([]byte, error) {
-	// Sanity checks
-	if process == nil {
-		return nil, fmt.Errorf("process is nil")
-	}
-	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
-		return nil, fmt.Errorf("invalid process status on process creation: %d", process.Status)
-	}
-	if len(process.EntityId) != types.EntityIDsize {
-		return nil, fmt.Errorf("entityId size is wrong")
-	}
-	if _, ok := state.CensusOrigins[process.CensusOrigin]; !ok {
-		return nil, fmt.Errorf("census origin: %d not supported", process.CensusOrigin)
-	}
-	if state.CensusOrigins[process.CensusOrigin].NeedsURI && process.CensusURI == nil {
-		return nil, fmt.Errorf("census %s needs URI but none has been provided",
-			state.CensusOrigins[process.CensusOrigin].Name)
-	}
-	if process.BlockCount < types.ProcessesContractMinBlockCount {
-		return nil, fmt.Errorf("block count is too low")
-	}
-	if state.CensusOrigins[process.CensusOrigin].NeedsIndexSlot && process.EthIndexSlot == nil {
-		return nil, fmt.Errorf("censusOrigin needs index slot (not provided)")
-	}
+// enqueueProcessResult pushes procresults to o.resultQueue, to be handled by resultQueueHandler
+func (o *Oracle) enqueueProcessResult(processID types.HexBytes, procresults *models.ProcessResult) {
+	o.rqLock.Lock()
+	o.resultQueue[processID.String()] = procresults
+	o.rqLock.Unlock()
+}
 
-	// get oracle account
-	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
-	if err != nil {
-		return nil, err
-	}
-	if acc == nil {
-		return nil, fmt.Errorf("oracle account does not exist")
-	}
-	// Create, sign a send NewProcess transaction
-	processTx := &models.NewProcessTx{
-		Process: process,
-		Nonce:   acc.Nonce,
-		Txtype:  models.TxType_NEW_PROCESS,
-	}
+// resultQueueHandler runs forever, every 15 seconds inspects the whole resultQueue.
+// if a process reached RESULTS status, the item is removed from the queue
+// otherwise, it broadcasts a TxSetProcess to the network, with a fresh Nonce.
+func (o *Oracle) resultQueueHandler() {
+	o.resultQueue = make(map[string]*models.ProcessResult)
 
-	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_NewProcess{
-			NewProcess: processTx,
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal newProcess tx: %w", err)
-	}
-	stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID())
-	if err != nil {
-		return nil, fmt.Errorf("cannot sign oracle tx: %w", err)
-	}
-	txb, err := proto.Marshal(stx)
-	if err != nil {
-		return nil, fmt.Errorf("error marshaling process tx: %w", err)
-	}
-	log.Debugf("broadcasting tx: %s", log.FormatProto(processTx))
+	for {
+		o.rqLock.Lock()
+		for key, procresults := range o.resultQueue {
+			processID := types.HexStringToHexBytes(key)
 
-	res, err := o.VochainApp.SendTx(txb)
-	if err != nil || res == nil {
-		return nil, fmt.Errorf("cannot broadcast tx: %w, res: %+v", err, res)
+			// check vochain process status
+			vocProcessData, err := o.VochainApp.State.Process(processID, true)
+			if err != nil {
+				log.Errorf("error fetching process %x from the Vochain: %v", processID, err)
+				continue
+			}
+			log.Debugw("resultQueue loop", "pid", processID, "status", vocProcessData.Status)
+
+			if vocProcessData.Status == models.ProcessStatus_RESULTS {
+				delete(o.resultQueue, key)
+				continue
+			}
+
+			err = o.sendTxSetProcessResults(processID, procresults)
+			if err != nil {
+				log.Error(err)
+			}
+		}
+		o.rqLock.Unlock()
+		time.Sleep(time.Second * 15)
 	}
-	log.Infof("newProcess transaction sent, processID: %x", res.Data.Bytes())
-	return res.Data.Bytes(), nil
 }
 
 // OnComputeResults is called once a process result is computed by the indexer.
@@ -133,41 +114,49 @@ func (o *Oracle) OnComputeResults(results *results.Results, proc *indexertypes.P
 			results.ProcessID, vocProcessData.Status)
 		return
 	}
-	// get oracle account
-	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
-	if err != nil {
-		log.Errorf("error fetching oracle account: %s", err)
-		return
-	}
-	if acc == nil {
-		log.Errorf("oracle account does not exist")
-		return
-	}
-	// create setProcessTx
-	setprocessTxArgs := &models.SetProcessTx{
-		ProcessId: results.ProcessID,
-		Results:   indexer.BuildProcessResult(results, vocProcessData.EntityId),
-		Status:    models.ProcessStatus_RESULTS.Enum(),
-		Txtype:    models.TxType_SET_PROCESS_RESULTS,
-		Nonce:     acc.Nonce,
-	}
+
+	procresults := indexer.BuildProcessResult(results, vocProcessData.EntityId)
 
 	// add the signature to the results and own address
-	setprocessTxArgs.Results.OracleAddress = o.signer.Address().Bytes()
 	signedResultsPayload := OracleResults{
 		ChainID:   o.VochainApp.ChainID(),
 		EntityID:  vocProcessData.EntityId,
 		ProcessID: results.ProcessID,
-		Results:   state.GetFriendlyResults(setprocessTxArgs.Results.GetVotes()),
+		Results:   state.GetFriendlyResults(procresults.GetVotes()),
 	}
 	resultsPayload, err := json.Marshal(signedResultsPayload)
 	if err != nil {
 		log.Warnf("cannot marshal signed results: %v", err)
 		return
 	}
-	setprocessTxArgs.Results.Signature, err = o.signer.SignEthereum(resultsPayload)
+	procresults.Signature, err = o.signer.SignEthereum(resultsPayload)
 	if err != nil {
 		log.Warnf("cannot sign results: %v", err)
+	}
+	procresults.OracleAddress = o.signer.Address().Bytes()
+
+	o.enqueueProcessResult(results.ProcessID, procresults)
+}
+
+// sendTxSetProcessResults crafts a SetProcessTx containing the passed procresults,
+// with the most up-to-date oracle Nonce available,
+// signs it and broadcasts it with SendTx
+func (o *Oracle) sendTxSetProcessResults(processID types.HexBytes, procresults *models.ProcessResult) error {
+	// get oracle account
+	acc, err := o.VochainApp.State.GetAccount(o.signer.Address(), false)
+	if err != nil {
+		return fmt.Errorf("error fetching oracle account: %s", err)
+	}
+	if acc == nil {
+		return fmt.Errorf("oracle account does not exist")
+	}
+	// create setProcessTx
+	setprocessTxArgs := &models.SetProcessTx{
+		ProcessId: processID,
+		Results:   procresults,
+		Status:    models.ProcessStatus_RESULTS.Enum(),
+		Txtype:    models.TxType_SET_PROCESS_RESULTS,
+		Nonce:     acc.Nonce,
 	}
 
 	// sign and send the transaction
@@ -177,27 +166,24 @@ func (o *Oracle) OnComputeResults(results *results.Results, proc *indexertypes.P
 			SetProcess: setprocessTxArgs,
 		},
 	}); err != nil {
-		log.Errorf("cannot marshal setProcessResults tx: %v", err)
-		return
+		return fmt.Errorf("cannot marshal setProcessResults tx: %v", err)
 	}
 	if stx.Signature, err = o.signer.SignVocdoniTx(stx.Tx, o.VochainApp.ChainID()); err != nil {
-		log.Errorf("cannot sign oracle tx: %v", err)
-		return
+		return fmt.Errorf("cannot sign oracle tx: %v", err)
 	}
 
 	txb, err := proto.Marshal(stx)
 	if err != nil {
-		log.Errorf("error marshaling setProcessResults tx: %v", err)
-		return
+		return fmt.Errorf("error marshaling setProcessResults tx: %v", err)
 	}
 	log.Debugf("broadcasting Vochain Tx: %s", log.FormatProto(setprocessTxArgs))
 
 	res, err := o.VochainApp.SendTx(txb)
 	if err != nil || res == nil {
-		log.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
-		return
+		return fmt.Errorf("cannot broadcast tx: %v, res: %+v", err, res)
 	}
 	log.Infof("oracle transaction sent, hash: %x", res.Hash)
+	return nil
 }
 
 // OnOracleResults does nothing. Required for implementing the indexer EventListener interface
