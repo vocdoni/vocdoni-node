@@ -129,16 +129,18 @@ func (t electionBase) addParticipantsCensus(censusType string, censusID types.He
 	return nil
 }
 
-func (t electionBase) isCensusSizeValid(censusID types.HexBytes) error {
+func (t electionBase) isCensusSizeValid(censusID types.HexBytes) bool {
 	size, err := t.api.CensusSize(censusID)
 	if err != nil {
-		return err
+		log.Errorf("unable to get census size from api")
+		return false
 	}
 	if size != uint64(t.config.nvotes) {
 		log.Errorf("census size is %d, expected %d", size, t.config.nvotes)
+		return false
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
-	return nil
+	return true
 }
 
 func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {

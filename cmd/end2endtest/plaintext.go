@@ -80,7 +80,7 @@ func (t *E2EPlaintextElection) Run() (duration time.Duration, err error) {
 	}
 
 	// Check census size
-	if err := t.isCensusSizeValid(censusID); err != nil {
+	if !t.isCensusSizeValid(censusID) {
 		log.Fatal(err)
 	}
 
@@ -92,7 +92,7 @@ func (t *E2EPlaintextElection) Run() (duration time.Duration, err error) {
 	log.Infof("census published with root %s", root.String())
 
 	// Check census size (of the published census)
-	if err := t.isCensusSizeValid(root); err != nil {
+	if !t.isCensusSizeValid(root) {
 		log.Fatal(err)
 	}
 
