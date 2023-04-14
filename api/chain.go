@@ -534,7 +534,7 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
 	requestData := struct {
-		OrganizationId types.HexBytes `json:"organizationId"`
+		OrganizationId string `json:"organizationId"`
 	}{}
 	if err := json.Unmarshal(msg.Data, &requestData); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
@@ -550,7 +550,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 	}
 	page = page * MaxPageSize
 	// get matching organization ids from the indexer
-	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId.String()))
+	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId))
 	if len(matchingOrganizationIds) == 0 {
 		return ErrOrgNotFound
 	}
