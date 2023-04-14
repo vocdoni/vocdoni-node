@@ -62,17 +62,20 @@ func newDefaultElectionDescription(root types.HexBytes, censusURI string, size u
 	}
 }
 
-func newDefaultAccountMetadata(address string) *vapi.AccountMetadata {
-	return &vapi.AccountMetadata{
+func (t electionBase) createAccount(address string) error {
+	faucetPkg, err := getFaucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
+	if err != nil {
+		return err
+	}
+
+	accountMetadata := &vapi.AccountMetadata{
 		Name:        map[string]string{"default": "test account " + address},
 		Description: map[string]string{"default": "test description"},
 		Version:     "1.0",
 	}
-}
 
-func (t electionBase) createAccount(faucetPkg *models.FaucetPackage, address string) error {
 	log.Infof("creating Vocdoni account %s", address)
-	hash, err := t.api.AccountBootstrap(faucetPkg, newDefaultAccountMetadata(address))
+	hash, err := t.api.AccountBootstrap(faucetPkg, accountMetadata)
 	if err != nil {
 		return err
 	}
@@ -92,12 +95,13 @@ func (t electionBase) createAccount(faucetPkg *models.FaucetPackage, address str
 	}
 	if t.config.faucet != "" && acc.Balance == 0 {
 		log.Error("account balance is 0")
+		return err
 	}
+	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
 	return nil
 }
 
 func (t electionBase) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
-	// Add the  accounts to the census by batches
 	participants := &vapi.CensusParticipants{}
 
 	for i, voterAccount := range t.voterAccounts {
@@ -131,18 +135,17 @@ func (t electionBase) isCensusSizeValid(censusID types.HexBytes) error {
 		return err
 	}
 	if size != uint64(t.config.nvotes) {
-		// TODO: fix log.Error call
-		log.Error("census size is %d, expected %d", size, t.config.nvotes)
+		log.Errorf("census size is %d, expected %d", size, t.config.nvotes)
 	}
 	log.Infof("census %s size is %d", censusID.String(), size)
 	return nil
 }
 
-func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) error {
+func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) (types.HexBytes, error) {
 	// Create a new Election
 	electionID, err := t.api.NewElection(electionDescrip)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
@@ -152,16 +155,14 @@ func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) 
 	defer cancel()
 	election, err := t.api.WaitUntilElectionStarts(ctx, electionID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	log.Debugf("election details: %+v", *election)
-	return nil
-
+	return electionID, nil
 }
 
-// plaintext
-func (t electionBase) generateProofs(root types.HexBytes) {
+func (t electionBase) generateProofs(root types.HexBytes) map[string]*apiclient.CensusProof {
 	// Generate the voting proofs (parallelized)
 	type voterProof struct {
 		proof   *apiclient.CensusProof
@@ -212,31 +213,19 @@ func (t electionBase) generateProofs(root types.HexBytes) {
 	time.Sleep(time.Second) // wait a grace time for the last proof to be added
 	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(t.voterAccounts))
 	stopProofs <- true
+
+	return proofs
 }
 
-func getFaucetPkg(faucet, myAddress, faucetAuthToken string) (*models.FaucetPackage, error) {
-	var (
-		err       error
-		faucetPkg *models.FaucetPackage
-	)
-
-	if faucet != "" {
-		// Get the faucet package of bootstrap tokens
-		log.Infof("getting faucet package")
-		if faucet == "dev" {
-			faucetPkg, err = apiclient.GetFaucetPackageFromDevService(myAddress)
-		} else {
-			faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(faucet+myAddress, faucetAuthToken)
-		}
-
-		if err != nil {
-			return nil, err
-		}
+func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
+	switch faucet {
+	case "":
+		return nil, fmt.Errorf("need to pass a valid --faucet")
+	case "dev":
+		return apiclient.GetFaucetPackageFromDevService(myAddress)
+	default:
+		return apiclient.GetFaucetPackageFromRemoteService(faucet+myAddress, faucetAuthToken)
 	}
-
-	log.Debugf("faucetPackage is %x", faucetPkg)
-
-	return faucetPkg, err
 }
 
 func getCensusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
@@ -252,6 +241,5 @@ func getCensusParticipantKey(voterAccount *ethereum.SignKeys, censusType string)
 		}
 		key = zkAddr.Bytes()
 	}
-
 	return key, nil
 }
