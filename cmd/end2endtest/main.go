@@ -9,10 +9,10 @@ import (
 
 	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
+	vapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
-
-	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )
