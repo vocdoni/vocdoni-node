@@ -41,12 +41,15 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 
 	// If the account does not exist, create a new one
 	// TODO: check if the account balance is low and use the faucet
-	_, err := t.api.Account("")
+	acc, err := t.api.Account("")
 	if err != nil {
-		if err := t.createAccount(api.MyAddress().Hex()); err != nil {
+		acc, err = t.createAccount(api.MyAddress().Hex())
+		if err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	log.Infof("account %s balance is %d", api.MyAddress().Hex(), acc.Balance)
 
 	// Create a new census
 	censusID, err := t.api.NewCensus(vapi.CensusTypeWeighted)
@@ -82,12 +85,12 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 
 	// Create a new Election
 	description := newDefaultElectionDescription(root, censusURI, uint64(t.config.nvotes))
-	electionID, err := t.createElection(description)
+	_, err = t.createElection(description)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	log.Debugf("created new election with id %s", electionID.String())
+	//log.Debugf("created new election with id %s", electionID.String())
 
 	t.proofs = t.generateProofs(root)
 
