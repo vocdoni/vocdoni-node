@@ -58,41 +58,11 @@ func (t *E2EPlaintextElection) Run() (duration time.Duration, err error) {
 
 	// If the account does not exist, create a new one
 	// TODO: check if the account balance is low and use the faucet
-	acc, err := api.Account("")
-	if err != nil {
-		log.Infof("getting faucet package")
-		faucetPkg, err := getFaucetPackage(c, api.MyAddress().Hex())
-		if err != nil {
+	if err, _ := api.Account(""); err != nil {
+		if err := t.createAccount(api.MyAddress().Hex()); err != nil {
 			log.Fatal(err)
-		}
-
-		// Create the organization account and bootstraping with the faucet package
-		log.Infof("creating Vocdoni account %s", api.MyAddress().Hex())
-		log.Debugf("faucetPackage is %x", faucetPkg)
-		hash, err := api.AccountBootstrap(faucetPkg, &vapi.AccountMetadata{
-			Name:        map[string]string{"default": "test account " + api.MyAddress().Hex()},
-			Description: map[string]string{"default": "test description"},
-			Version:     "1.0",
-		})
-		if err != nil {
-			log.Fatal(err)
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-		defer cancel()
-		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-			log.Fatalf("gave up waiting for tx %x to be mined: %s", hash, err)
-		}
-
-		acc, err = api.Account("")
-		if err != nil {
-			log.Fatal(err)
-		}
-		if c.faucet != "" && acc.Balance == 0 {
-			log.Fatal("account balance is 0")
 		}
 	}
-
-	log.Infof("account %s balance is %d", api.MyAddress().Hex(), acc.Balance)
 
 	// Create a new census
 	censusID, err := api.NewCensus("weighted")
