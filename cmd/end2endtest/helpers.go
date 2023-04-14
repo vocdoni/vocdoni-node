@@ -62,10 +62,10 @@ func newDefaultElectionDescription(root types.HexBytes, censusURI string, size u
 	}
 }
 
-func (t electionBase) createAccount(address string) error {
+func (t electionBase) createAccount(address string) (*vapi.Account, error) {
 	faucetPkg, err := getFaucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	accountMetadata := &vapi.AccountMetadata{
@@ -77,28 +77,28 @@ func (t electionBase) createAccount(address string) error {
 	log.Infof("creating Vocdoni account %s", address)
 	hash, err := t.api.AccountBootstrap(faucetPkg, accountMetadata)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 	defer cancel()
 
 	if _, err := t.api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Error("gave up waiting for tx %x to be mined: %s", hash, err)
-		return err
+		log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
+		return nil, err
 	}
 
 	// check the account
 	acc, err := t.api.Account("")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if t.config.faucet != "" && acc.Balance == 0 {
 		log.Error("account balance is 0")
-		return err
+		return nil, err
 	}
-	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
-	return nil
+	return acc, nil
+
 }
 
 func (t electionBase) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
@@ -141,7 +141,7 @@ func (t electionBase) isCensusSizeValid(censusID types.HexBytes) error {
 	return nil
 }
 
-func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) (types.HexBytes, error) {
+func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
 	// Create a new Election
 	electionID, err := t.api.NewElection(electionDescrip)
 	if err != nil {
@@ -157,9 +157,10 @@ func (t electionBase) createElection(electionDescrip *vapi.ElectionDescription) 
 	if err != nil {
 		return nil, err
 	}
-
+	election.ElectionID = electionID
 	log.Debugf("election details: %+v", *election)
-	return electionID, nil
+
+	return election, nil
 }
 
 func (t electionBase) generateProofs(root types.HexBytes) map[string]*apiclient.CensusProof {
