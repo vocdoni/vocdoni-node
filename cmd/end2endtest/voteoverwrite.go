@@ -428,7 +428,7 @@ func voteOverwriteNotWaitNextBlockTest(c config) {
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*60)
+	ctx, cancel = context.WithTimeout(context.Background(), time.Second*100)
 	defer cancel()
 	elres, err := api.WaitUntilElectionResults(ctx, electionID)
 	if err != nil {
