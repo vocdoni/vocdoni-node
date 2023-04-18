@@ -141,7 +141,7 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	return nil
 }
 
-// Request performs a `method` type raw request to the endpoint specyfied in urlPath parameter.
+// Request performs a `method` type raw request to the endpoint specified in urlPath parameter.
 // Method is either GET or POST. If POST, a JSON struct should be attached.  Returns the response,
 // the status code and an error.
 func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]byte, int, error) {

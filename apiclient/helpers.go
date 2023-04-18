@@ -18,7 +18,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const pollInterval = 4 * time.Second
+const (
+	TimeBetweenBlocks = 6 * time.Second
+	WaitTimeout       = 3 * TimeBetweenBlocks
+	PollInterval      = TimeBetweenBlocks / 6
+)
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "chain", "dateToBlock", fmt.Sprintf("%d", date.Unix()))
@@ -67,7 +71,7 @@ func (c *HTTPclient) WaitUntilNBlocks(ctx context.Context, n uint32) {
 		info, err := c.ChainInfo()
 		if err != nil {
 			log.Error(err)
-			time.Sleep(pollInterval)
+			time.Sleep(PollInterval)
 			continue
 		}
 		c.WaitUntilHeight(ctx, info.Height+n)
@@ -92,7 +96,7 @@ func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 			return nil
 		}
 		select {
-		case <-time.After(pollInterval):
+		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
 			return ctx.Err()
@@ -137,7 +141,7 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 			return election, nil
 		}
 		select {
-		case <-time.After(pollInterval):
+		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
 			return nil, fmt.Errorf("election %v never reached status %s: %w", electionID, status, ctx.Err())
@@ -175,7 +179,7 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 			return tr, nil
 		}
 		select {
-		case <-time.After(pollInterval):
+		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
 			return nil, ctx.Err()
@@ -183,7 +187,26 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	}
 }
 
-// GetFaucetPackageFromDefaultDevService returns a faucet package.
+// WaitUntilElectionKeys waits until the election has published its encryption keys,
+// and returns them.
+func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (
+	*api.ElectionKeys, error) {
+	log.Infof("waiting for election %s to publish keys...", electionID)
+	for {
+		ek, err := c.ElectionKeys(electionID)
+		if err == nil {
+			return ek, nil
+		}
+		select {
+		case <-time.After(PollInterval):
+			continue
+		case <-ctx.Done():
+			return nil, fmt.Errorf("election %s keys not yet published: %w", electionID, ctx.Err())
+		}
+	}
+}
+
+// GetFaucetPackageFromDevService returns a faucet package.
 // Needs just the destination wallet address, the URL and bearer token are hardcoded
 func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
 	return GetFaucetPackageFromRemoteService(

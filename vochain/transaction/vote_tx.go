@@ -197,7 +197,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit boo
 	return vote, nil
 }
 
-// initializeZkVote initializes a zkSNARK vote. It does not check the proof nor includes the the weight of the vote.
+// initializeZkVote initializes a zkSNARK vote. It does not check the proof nor includes the weight of the vote.
 func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) *vstate.Vote {
 	return &vstate.Vote{
 		Height:               height,
@@ -208,7 +208,7 @@ func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) *vstate.
 	}
 }
 
-// initializeSignedVote initializes a signed vote. It does not check the proof nor includes the the weight of the vote.
+// initializeSignedVote initializes a signed vote. It does not check the proof nor includes the weight of the vote.
 func initializeSignedVote(voteEnvelope *models.VoteEnvelope,
 	signedBody, signature []byte, height uint32) (*vstate.Vote, error) {
 	// Create a new vote object with the provided parameters
