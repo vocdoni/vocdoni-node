@@ -228,7 +228,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 		leafKey := p.Key
 		if len(leafKey) > censustree.DefaultMaxKeyLen {
-			return ErrParticipanKeyLengthInvalid.Withf("can not be longer than %d bytes", censustree.DefaultMaxKeyLen)
+			return ErrInvalidCensusKeyLength.Withf("the census key cannot be longer than %d bytes", censustree.DefaultMaxKeyLen)
 		}
 
 		if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
