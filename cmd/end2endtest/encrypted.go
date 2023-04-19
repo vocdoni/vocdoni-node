@@ -34,75 +34,20 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 	t.api = api
 	t.config = c
 
-	// Set the account in the API client, so we can sign transactions
-	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
-		log.Fatal(err)
+	ed := newTestElectionDescription()
+	ed.ElectionType = vapi.ElectionType{
+		Autostart:         true,
+		Interruptible:     true,
+		SecretUntilTheEnd: true,
 	}
+	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	// If the account does not exist, create a new one
-	// TODO: check if the account balance is low and use the faucet
-	acc, err := api.Account("")
-	if err != nil {
-		acc, err = t.createAccount(api.MyAddress().Hex())
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-	log.Infof("account %s balance is %d", api.MyAddress().Hex(), acc.Balance)
-
-	// Create a new census
-	censusID, err := api.NewCensus(vapi.CensusTypeWeighted)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("new census created with id %s", censusID.String())
-
-	// Generate 10 participant accounts
-	t.voterAccounts = ethereum.NewSignKeysBatch(c.nvotes)
-
-	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(vapi.CensusTypeWeighted, censusID); err != nil {
-		log.Fatal(err)
-	}
-
-	// Check census size
-	if !t.isCensusSizeValid(censusID) {
-		log.Fatal(err)
-	}
-
-	// Publish the census
-	root, censusURI, err := api.CensusPublish(censusID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("census published with root %s", root.String())
-
-	// Check census size (of the published census)
-	if !t.isCensusSizeValid(root) {
-		log.Fatal(err)
-	}
-
-	// Create a new Election
-	description := newDefaultElectionDescription(root, censusURI, uint64(t.config.nvotes))
-	t.election, err = t.createElection(description)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Infof("created new election with id %s", t.election.ElectionID.String())
-
-	t.proofs = t.generateProofs(root, false)
-
-	// Wait for the election to start
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	t.election, err = api.WaitUntilElectionStarts(ctx, t.election.ElectionID)
-	if err != nil {
-		log.Fatal(err)
+	if err := t.setupElection(ed); err != nil {
+		return err
 	}
 
 	log.Debugf("election details: %+v", *t.election)
-
 	return nil
 }
 

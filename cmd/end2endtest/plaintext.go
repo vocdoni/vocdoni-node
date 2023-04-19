@@ -30,9 +30,23 @@ type E2EPlaintextElection struct {
 	e2eElection
 }
 
-func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, config *config) error {
+func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
-	t.config = config
+	t.config = c
+
+	ed := newTestElectionDescription()
+	ed.ElectionType = vapi.ElectionType{
+		Autostart:     true,
+		Interruptible: true,
+	}
+	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+
+	if err := t.setupElection(ed); err != nil {
+		return err
+	}
+
+	log.Debugf("election details: %+v", *t.election)
 	return nil
 }
 
@@ -44,67 +58,6 @@ func (t *E2EPlaintextElection) Teardown() error {
 func (t *E2EPlaintextElection) Run() error {
 	c := t.config
 	api := t.api
-
-	// Set the account in the API client, so we can sign transactions
-	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
-		log.Fatal(err)
-	}
-
-	// If the account does not exist, create a new one
-	// TODO: check if the account balance is low and use the faucet
-	acc, err := api.Account("")
-	if err != nil {
-		acc, err = t.createAccount(api.MyAddress().Hex())
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	log.Infof("account %s balance is %d", api.MyAddress().Hex(), acc.Balance)
-
-	// Create a new census
-	censusID, err := api.NewCensus(vapi.CensusTypeWeighted)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("new census created with id %s", censusID.String())
-
-	// Generate 10 participant accounts
-	t.voterAccounts = ethereum.NewSignKeysBatch(c.nvotes)
-
-	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(vapi.CensusTypeWeighted, censusID); err != nil {
-		log.Fatal(err)
-	}
-
-	if !t.isCensusSizeValid(censusID) {
-		log.Fatal(err)
-	}
-
-	// Publish the census
-	root, censusURI, err := api.CensusPublish(censusID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("census published with root %s", root.String())
-
-	// Check census size (of the published census)
-	if !t.isCensusSizeValid(root) {
-		log.Fatal(err)
-	}
-
-	// Generate the voting proofs (parallelized)
-	t.proofs = t.generateProofs(root, false)
-
-	// Create a new Election
-	description := newDefaultElectionDescription(root, censusURI, uint64(t.config.nvotes))
-	election, err := t.createElection(description)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	t.election = election
-	log.Debugf("election details: %+v", *election)
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
@@ -206,11 +159,11 @@ func (t *E2EPlaintextElection) Run() error {
 		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
 	}
 
-	election, err = api.Election(t.election.ElectionID)
+	t.election, err = api.Election(t.election.ElectionID)
 	if err != nil {
 		log.Fatal(err)
 	}
-	if election.Status != "ENDED" {
+	if t.election.Status != "ENDED" {
 		log.Fatal("election status is not ENDED")
 	}
 	log.Infof("election %s status is ENDED", t.election.ElectionID.String())
@@ -218,12 +171,12 @@ func (t *E2EPlaintextElection) Run() error {
 	// Wait for the election to be in RESULTS state
 	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
-	election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	t.election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
-	log.Infof("election results: %v", election.Results)
+	log.Infof("election results: %v", t.election.Results)
 
 	return nil
 }

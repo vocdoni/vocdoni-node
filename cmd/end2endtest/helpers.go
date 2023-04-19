@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"sync"
@@ -17,31 +18,11 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func newDefaultElectionDescription(root types.HexBytes, censusURI string, size uint64) *vapi.ElectionDescription {
+func newTestElectionDescription() *vapi.ElectionDescription {
 	return &vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
 		Description: map[string]string{"default": "Test election description"},
 		EndDate:     time.Now().Add(time.Minute * 20),
-
-		VoteType: vapi.VoteType{
-			UniqueChoices:     false,
-			MaxVoteOverwrites: 1,
-		},
-
-		ElectionType: vapi.ElectionType{
-			Autostart:         true,
-			Interruptible:     true,
-			Anonymous:         false,
-			SecretUntilTheEnd: false,
-			DynamicCensus:     false,
-		},
-
-		Census: vapi.CensusTypeDescription{
-			RootHash: root,
-			URL:      censusURI,
-			Type:     vapi.CensusTypeWeighted,
-			Size:     size,
-		},
 
 		Questions: []vapi.Question{
 			{
@@ -235,6 +216,78 @@ func (t e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool)
 	stopProofs <- true
 
 	return proofs
+}
+
+func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
+	// Set the account in the API client, so we can sign transactions
+	if err := t.api.SetAccount(hex.EncodeToString(t.config.accountKeys[0].PrivateKey())); err != nil {
+		return err
+	}
+
+	// If the account does not exist, create a new one
+	// TODO: check if the account balance is low and use the faucet
+	acc, err := t.api.Account("")
+	if err != nil {
+		acc, err = t.createAccount(t.api.MyAddress().Hex())
+		if err != nil {
+			return err
+		}
+	}
+	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
+
+	// Create a new census
+	censusID, err := t.api.NewCensus(ed.Census.Type)
+	if err != nil {
+		return err
+	}
+	log.Infof("new census created with id %s", censusID.String())
+
+	// Generate 10 participant accounts
+	t.voterAccounts = ethereum.NewSignKeysBatch(t.config.nvotes)
+
+	// Add the accounts to the census by batches
+	if err := t.addParticipantsCensus(ed.Census.Type, censusID); err != nil {
+		return err
+	}
+
+	// Check census size
+	if !t.isCensusSizeValid(censusID) {
+		return err
+	}
+
+	// Publish the census
+	root, censusURI, err := t.api.CensusPublish(censusID)
+	if err != nil {
+		return err
+	}
+	log.Infof("census published with root %s", root.String())
+	ed.Census.RootHash = root
+	ed.Census.URL = censusURI
+	ed.Census.Size = uint64(t.config.nvotes)
+
+	// Check census size (of the published census)
+	if !t.isCensusSizeValid(root) {
+		return err
+	}
+
+	t.election, err = t.createElection(ed)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("created new election with id %s", t.election.ElectionID.String())
+
+	// Wait for the election to start
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	t.election, err = t.api.WaitUntilElectionStarts(ctx, t.election.ElectionID)
+	if err != nil {
+		return err
+	}
+
+	t.proofs = t.generateProofs(root, ed.ElectionType.Anonymous)
+
+	return nil
 }
 
 func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
