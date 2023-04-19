@@ -224,21 +224,6 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forComm
 		} // is oracle
 	}
 	switch tx.Txtype {
-	case models.TxType_SET_PROCESS_RESULTS:
-		if !isOracle {
-			return ethereum.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
-		}
-		if acc.Balance < cost {
-			return ethereum.Address{}, vstate.ErrNotEnoughBalance
-		}
-		if acc.Nonce != tx.Nonce {
-			return ethereum.Address{}, vstate.ErrAccountNonceInvalid
-		}
-		results := tx.GetResults()
-		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
-			return ethereum.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
-		}
-		return ethereum.Address(*addr), t.state.SetProcessResults(process.ProcessId, results, false)
 	case models.TxType_SET_PROCESS_STATUS:
 		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:

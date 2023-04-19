@@ -1,7 +1,6 @@
 package oracle
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -14,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -90,12 +88,12 @@ func (o *Oracle) resultQueueHandler() {
 // OnComputeResults is called once a process result is computed by the indexer.
 // The Oracle will build and send a RESULTS transaction to the Vochain.
 // The transaction includes the final results for the process.
-func (o *Oracle) OnComputeResults(results *results.Results, proc *indexertypes.Process, h uint32) {
-	log.Infof("launching on computeResults callback for process %x", results.ProcessID)
+func (o *Oracle) OnComputeResults(r *results.Results, proc *indexertypes.Process, h uint32) {
+	log.Infof("launching on computeResults callback for process %x", r.ProcessID)
 	// check vochain process status
-	vocProcessData, err := o.VochainApp.State.Process(results.ProcessID, true)
+	vocProcessData, err := o.VochainApp.State.Process(r.ProcessID, true)
 	if err != nil {
-		log.Errorf("error fetching process %x from the Vochain: %v", results.ProcessID, err)
+		log.Errorf("error fetching process %x from the Vochain: %v", r.ProcessID, err)
 		return
 	}
 
@@ -104,38 +102,19 @@ func (o *Oracle) OnComputeResults(results *results.Results, proc *indexertypes.P
 	case models.ProcessStatus_READY:
 		if o.VochainApp.Height() < vocProcessData.StartBlock+vocProcessData.BlockCount {
 			log.Warnf("process %x is in READY state and not yet finished, cannot publish results",
-				results.ProcessID)
+				r.ProcessID)
 			return
 		}
 	case models.ProcessStatus_ENDED, models.ProcessStatus_RESULTS:
 		break
 	default:
 		log.Infof("process %x: invalid status %s for setting the results, skipping",
-			results.ProcessID, vocProcessData.Status)
+			r.ProcessID, vocProcessData.Status)
 		return
 	}
 
-	procresults := indexer.BuildProcessResult(results, vocProcessData.EntityId)
-
-	// add the signature to the results and own address
-	signedResultsPayload := OracleResults{
-		ChainID:   o.VochainApp.ChainID(),
-		EntityID:  vocProcessData.EntityId,
-		ProcessID: results.ProcessID,
-		Results:   state.GetFriendlyResults(procresults.GetVotes()),
-	}
-	resultsPayload, err := json.Marshal(signedResultsPayload)
-	if err != nil {
-		log.Warnf("cannot marshal signed results: %v", err)
-		return
-	}
-	procresults.Signature, err = o.signer.SignEthereum(resultsPayload)
-	if err != nil {
-		log.Warnf("cannot sign results: %v", err)
-	}
-	procresults.OracleAddress = o.signer.Address().Bytes()
-
-	o.enqueueProcessResult(results.ProcessID, procresults)
+	procresults := results.ResultsToProto(r)
+	o.enqueueProcessResult(r.ProcessID, procresults)
 }
 
 // sendTxSetProcessResults crafts a SetProcessTx containing the passed procresults,

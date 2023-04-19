@@ -1,7 +1,6 @@
 package test
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -14,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	models "go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -147,11 +146,11 @@ func sendVote(b *testing.B, cl *client.Client, chainID string, s *ethereum.SignK
 	doRequest := cl.ForTest(b, req)
 
 	// Generate VotePackage and put it in VoteEnvelope
-	votePkg := &vochain.VotePackage{
+	votePkg := &state.VotePackage{
 		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
 		Votes: []int{1},
 	}
-	voteBytes, err := json.Marshal(votePkg)
+	voteBytes, err := votePkg.Encode()
 	if err != nil {
 		b.Fatalf("cannot marshal vote: %s", err)
 	}

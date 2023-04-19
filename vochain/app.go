@@ -21,6 +21,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/genesis"
+	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -42,6 +43,7 @@ var (
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State              *vstate.State
+	Istc               *ist.Controller
 	Service            service.Service
 	Node               *tmcli.Local
 	TransactionHandler *transaction.TransactionHandler
@@ -85,9 +87,13 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
+	istc := ist.NewISTC(state)
+	istc.SetSyncing(true)
+
 	// Create the transaction handler for checking and processing transactions
 	transactionHandler, err := transaction.NewTransactionHandler(
 		state,
+		istc,
 		filepath.Join(dbpath, "txHandler"),
 	)
 	if err != nil {
@@ -99,6 +105,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	}
 	return &BaseApplication{
 		State:              state,
+		Istc:               istc,
 		TransactionHandler: transactionHandler,
 		blockCache:         lru.NewAtomic(32),
 		dataDir:            dbpath,
@@ -603,6 +610,9 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
+	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
+		log.Fatalf("cannot execute ISTC commit: %v", err)
+	}
 	data, err := app.State.Save()
 	if err != nil {
 		log.Fatalf("cannot save state: %v", err)

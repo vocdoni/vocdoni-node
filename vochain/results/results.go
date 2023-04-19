@@ -2,6 +2,7 @@ package results
 
 import (
 	"bytes"
+	"encoding/gob"
 	"fmt"
 	"math/big"
 	"sync"
@@ -44,6 +45,20 @@ func (r *Results) String() string {
 		results.WriteString("]")
 	}
 	return results.String()
+}
+
+// Encode serializes the Results using Gob.
+func (r *Results) Encode() ([]byte, error) {
+	w := bytes.Buffer{}
+	if err := gob.NewEncoder(&w).Encode(r); err != nil {
+		return nil, err
+	}
+	return w.Bytes(), nil
+}
+
+// Decode deserializes the Results using Gob.
+func (r *Results) Decode(data []byte) error {
+	return gob.NewDecoder(bytes.NewReader(data)).Decode(r)
 }
 
 // Add adds the total weight and votes from the given Results to the
@@ -230,4 +245,33 @@ func NewEmptyVotes(questions, options int) [][]*types.BigInt {
 		results = append(results, question)
 	}
 	return results
+}
+
+// ResultsToProto takes the Results type and builds the protobuf type ProcessResult.
+func ResultsToProto(results *Results) *models.ProcessResult {
+	// build the protobuf type for Results
+	qr := []*models.QuestionResult{}
+	for i := range results.Votes {
+		qr = append(qr, &models.QuestionResult{})
+		for j := range results.Votes[i] {
+			qr[i].Question = append(qr[i].Question, results.Votes[i][j].Bytes())
+		}
+	}
+	return &models.ProcessResult{
+		Votes: qr,
+	}
+}
+
+// ProtoToResults takes the protobuf type ProcessResult and builds the Results type.
+func ProtoToResults(pr *models.ProcessResult) *Results {
+	r := &Results{
+		Votes: [][]*types.BigInt{},
+	}
+	for i := range pr.Votes {
+		r.Votes = append(r.Votes, []*types.BigInt{})
+		for j := range pr.Votes[i].Question {
+			r.Votes[i] = append(r.Votes[i], new(types.BigInt).SetBytes(pr.Votes[i].Question[j]))
+		}
+	}
+	return r
 }

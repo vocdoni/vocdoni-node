@@ -482,7 +482,7 @@ func (v *State) setRollingCensusSize(pids [][]byte) error {
 		if err != nil {
 			return err
 		}
-		if !process.Mode.PreRegister {
+		if !process.Mode.GetPreRegister() {
 			continue
 		}
 		censusSize, err := getRollingCensusSize(mainTreeView, pid)
@@ -493,7 +493,6 @@ func (v *State) setRollingCensusSize(pids [][]byte) error {
 		if err := updateProcess(&v.Tx, process, pid); err != nil {
 			return err
 		}
-
 	}
 	return nil
 }
@@ -512,7 +511,6 @@ func (v *State) Save() ([]byte, error) {
 		if err = v.setRollingCensusSize(pidsStartNextBlock); err != nil {
 			return fmt.Errorf("cannot set rollingCensusSize for processes")
 		}
-
 		if err := v.Tx.Commit(height); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
@@ -525,7 +523,6 @@ func (v *State) Save() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	// Notify listeners about processes that start in the next block.
 	if len(pidsStartNextBlock) > 0 {
 		for _, l := range v.eventListeners {

@@ -3,7 +3,7 @@ module go.vocdoni.io/dvote
 go 1.20
 
 // For testing purposes while dvote-protobuf becomes stable
-// replace go.vocdoni.io/proto => ../dvote-protobuf
+replace go.vocdoni.io/proto => ../dvote-protobuf
 
 // Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
 // as it dropped support for GOOS=darwin.

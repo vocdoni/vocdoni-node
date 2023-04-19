@@ -8,6 +8,7 @@ import (
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -35,6 +36,8 @@ type TransactionResponse struct {
 type TransactionHandler struct {
 	// state is the state of the vochain
 	state *vstate.State
+	// istc is the internal state transition controller
+	istc *ist.Controller
 	// dataDir is the path for storing some files
 	dataDir string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
@@ -44,10 +47,11 @@ type TransactionHandler struct {
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
-func NewTransactionHandler(state *vstate.State, dataDir string) (*TransactionHandler, error) {
+func NewTransactionHandler(state *vstate.State, istc *ist.Controller, dataDir string) (*TransactionHandler, error) {
 	return &TransactionHandler{
 		state:   state,
 		dataDir: dataDir,
+		istc:    istc,
 	}, nil
 }
 
@@ -134,6 +138,13 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			if err := t.state.IncrementAccountProcessIndex(entityAddr); err != nil {
 				return nil, fmt.Errorf("newProcessTx: cannot increment process index: %w", err)
 			}
+			// schedule end process on the ISTC
+			if err := t.istc.Schedule(p.StartBlock+p.BlockCount, p.ProcessId, ist.Action{
+				Action:     ist.ActionEndProcess,
+				ElectionID: p.ProcessId,
+			}); err != nil {
+				return nil, fmt.Errorf("newProcessTx: cannot schedule end process: %w", err)
+			}
 			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), models.TxType_NEW_PROCESS)
 		}
 
@@ -152,13 +163,16 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 				if err := t.state.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
-			case models.TxType_SET_PROCESS_RESULTS:
-				if tx.GetResults() == nil {
-					return nil, fmt.Errorf("set process results, results is nil")
+				if tx.GetStatus() == models.ProcessStatus_ENDED {
+					// schedule results computations on the ISTC
+					if err := t.istc.Schedule(t.state.CurrentHeight()+1, tx.ProcessId, ist.Action{
+						Action:     ist.ActionComputeResults,
+						ElectionID: tx.ProcessId,
+					}); err != nil {
+						return nil, fmt.Errorf("setProcessTx: cannot schedule end process: %w", err)
+					}
 				}
-				if err := t.state.SetProcessResults(tx.ProcessId, tx.Results, true); err != nil {
-					return nil, fmt.Errorf("setProcessResults: %s", err)
-				}
+
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return nil, fmt.Errorf("set process census, census root is nil")

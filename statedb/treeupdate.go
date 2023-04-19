@@ -16,6 +16,7 @@ import (
 type Updater interface {
 	Viewer
 	Set(key, value []byte) error
+	Delete(key []byte) error
 }
 
 // treeWithTx is an Arbo merkle tree with the db.WriteTx used for updating it.
@@ -127,6 +128,12 @@ func (u *TreeUpdate) Add(key, value []byte) error {
 func (u *TreeUpdate) Set(key, value []byte) error {
 	u.dirtyTree = true
 	return u.tree.Set(u.tree.tx, key, value)
+}
+
+// Del removes a key-value from this tree.  `key` is the path of the leaf.
+func (u *TreeUpdate) Del(key []byte) error {
+	u.dirtyTree = true
+	return u.tree.Del(u.tree.tx, key)
 }
 
 // SubTree is used to open the subTree (singleton and non-singleton) as a

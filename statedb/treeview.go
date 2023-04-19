@@ -30,6 +30,12 @@ func (v *databaseViewer) Get(key []byte) ([]byte, error) {
 	return tx.Get(key)
 }
 
+// IterateWithPrefix iterates over all the keys that start with the given prefix.
+// The iration stops when the callback returns false.
+func (v *databaseViewer) IterateWithPrefix(prefix []byte, callback func([]byte, []byte) bool) error {
+	return v.db.Iterate(prefix, callback)
+}
+
 // TreeViewer groups the read-only methods that can be made on a subTree.
 type TreeViewer interface {
 	// NoState returns a read-only key-value database associated with this tree

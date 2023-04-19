@@ -619,7 +619,7 @@ func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 			return
 		}
 
-		myVotes := BuildProcessResult(myResults, presults.EntityId).GetVotes()
+		myVotes := results.ResultsToProto(myResults).GetVotes()
 		correct := len(myVotes) == len(presults.Votes)
 		if !correct {
 			log.Errorf("results validation failed: wrong number of votes")

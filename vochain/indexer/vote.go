@@ -3,7 +3,6 @@ package indexer
 import (
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -17,7 +16,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -285,12 +283,12 @@ func (s *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
-// If the vochain.VotePackage is encrypted the list of keys to decrypt it should be provided.
+// If the state.VotePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
 // The function will reverse the order and use the decryption keys starting from the
 // last one provided.
-func unmarshalVote(VotePackage []byte, keys []string) (*vochain.VotePackage, error) {
-	var vote vochain.VotePackage
+func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error) {
+	var vote state.VotePackage
 	rawVote := make([]byte, len(VotePackage))
 	copy(rawVote, VotePackage)
 	// if encryption keys, decrypt the vote
@@ -305,7 +303,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*vochain.VotePackage, err
 			}
 		}
 	}
-	if err := json.Unmarshal(rawVote, &vote); err != nil {
+	if err := vote.Decode(rawVote); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote: %w", err)
 	}
 	return &vote, nil
@@ -316,7 +314,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*vochain.VotePackage, err
 // If encrypted vote, only weight will be updated.
 func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
-	var vote *vochain.VotePackage
+	var vote *state.VotePackage
 	if open, err := s.isOpenProcess(pid); open && err == nil {
 		vote, err = unmarshalVote(VotePackage, []string{})
 		if err != nil {
@@ -478,7 +476,7 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results
 	lock := sync.Mutex{}
 
 	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.StateDBVote) {
-		var vp *vochain.VotePackage
+		var vp *state.VotePackage
 		var err error
 		if p.Envelope.EncryptedVotes {
 			if len(p.PrivateKeys) < len(vote.EncryptionKeyIndexes) {
@@ -520,22 +518,4 @@ func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results
 	}
 	results.EnvelopeHeight = nvotes.Load()
 	return results, err
-}
-
-// BuildProcessResult takes the indexer Results type and builds the protobuf type ProcessResult.
-// EntityId should be provided as addition field to include in ProcessResult.
-func BuildProcessResult(results *results.Results, entityID []byte) *models.ProcessResult {
-	// build the protobuf type for Results
-	qr := []*models.QuestionResult{}
-	for i := range results.Votes {
-		qr = append(qr, &models.QuestionResult{})
-		for j := range results.Votes[i] {
-			qr[i].Question = append(qr[i].Question, results.Votes[i][j].Bytes())
-		}
-	}
-	return &models.ProcessResult{
-		ProcessId: results.ProcessID,
-		EntityId:  entityID,
-		Votes:     qr,
-	}
 }

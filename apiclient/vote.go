@@ -14,7 +14,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -44,10 +44,10 @@ type VoteData struct {
 // which contains the electionID, the choices and the proof. The
 // return value is the voteID (nullifier).
 func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
-	votePackage := &vochain.VotePackage{
+	votePackage := &state.VotePackage{
 		Votes: v.Choices,
 	}
-	votePackageBytes, err := json.Marshal(votePackage)
+	votePackageBytes, err := votePackage.Encode()
 	if err != nil {
 		return nil, err
 	}

@@ -13,8 +13,8 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 const (
@@ -255,7 +255,7 @@ func RandomHex(n int) string {
 }
 
 func genVote(encrypted bool, keys []string) ([]byte, error) {
-	vp := &vochain.VotePackage{
+	vp := &state.VotePackage{
 		Votes: []int{1, 2, 3, 4, 5, 6},
 	}
 	var vpBytes []byte
@@ -275,7 +275,7 @@ func genVote(encrypted bool, keys []string) ([]byte, error) {
 						return nil, err
 					}
 					vp.Nonce = RandomHex(int(randInt.Int64()) + 16)
-					vpBytes, err = json.Marshal(vp)
+					vpBytes, err = vp.Encode()
 					if err != nil {
 						return nil, err
 					}

@@ -2,7 +2,6 @@ package indexer
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	stdlog "log"
@@ -530,10 +529,7 @@ func TestResults(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomBytes(32)),
-		Votes: []int{1, 1, 1, 1},
-	})
+	vp, err := state.NewVotePackage([]int{1, 1, 1, 1}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vp, err = priv.Encrypt(vp, nil)
 	qt.Assert(t, err, qt.IsNil)
@@ -675,10 +671,8 @@ func TestLiveResults(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Add 100 votes
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{1, 1, 1},
-	})
+	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
+
 	qt.Assert(t, err, qt.IsNil)
 	r := &results.Results{
 		Votes:        results.NewEmptyVotes(3, 100),
@@ -799,10 +793,7 @@ func TestAddVote(t *testing.T) {
 }
 
 var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: v,
-	})
+	vp, err := state.NewVotePackage(v).Encode()
 	if err != nil {
 		return err
 	}
@@ -999,10 +990,8 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	app.State.CleanEventListeners()
 
 	// Add 10 votes to the election
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{1, 1, 1},
-	})
+	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
+
 	qt.Assert(t, err, qt.IsNil)
 	for i := 0; i < 10; i++ {
 		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
@@ -1049,10 +1038,7 @@ func TestCountVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Add 100 votes
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{1, 1, 1},
-	})
+	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	for i := 0; i < 100; i++ {
 		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
@@ -1114,10 +1100,7 @@ func TestOverwriteVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Send the first vote
-	vp, err := json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{1, 1, 1},
-	})
+	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote := &models.VoteEnvelope{
 		Nonce: util.RandomBytes(8),
@@ -1161,10 +1144,7 @@ func TestOverwriteVotes(t *testing.T) {
 	})
 
 	// Send the second
-	vp, err = json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{2, 2, 2},
-	})
+	vp, err = state.NewVotePackage([]int{2, 2, 2}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote.VotePackage = vp
 	vote.Nonce = util.RandomBytes(32)
@@ -1209,10 +1189,7 @@ func TestOverwriteVotes(t *testing.T) {
 	})
 
 	// Send a third vote from a different key
-	vp, err = json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{2, 2, 2},
-	})
+	vp, err = state.NewVotePackage([]int{2, 2, 2}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote2 := &models.VoteEnvelope{
 		Nonce: util.RandomBytes(8),
@@ -1251,10 +1228,7 @@ func TestOverwriteVotes(t *testing.T) {
 	})
 
 	// Send the initial vote again (for third time)
-	vp, err = json.Marshal(vochain.VotePackage{
-		Nonce: fmt.Sprintf("%x", util.RandomHex(32)),
-		Votes: []int{0, 0, 0},
-	})
+	vp, err = state.NewVotePackage([]int{0, 0, 0}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote.VotePackage = vp
 	vote.Nonce = util.RandomBytes(32)
