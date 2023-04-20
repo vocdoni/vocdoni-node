@@ -706,7 +706,11 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			VoteCount:      count,
 		})
 	}
-	data, err := json.Marshal(list)
+	data, err := json.Marshal(struct {
+		Elections []ElectionSummary `json:"elections"`
+	}{
+		Elections: list,
+	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
