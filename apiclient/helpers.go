@@ -162,7 +162,7 @@ func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
 			return election, nil
 		}
 		select {
-		case <-time.After(pollInterval):
+		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
 			return nil, fmt.Errorf("election %s never published results: %w", electionID.String(), ctx.Err())
