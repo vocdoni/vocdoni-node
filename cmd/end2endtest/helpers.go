@@ -316,3 +316,14 @@ func getCensusParticipantKey(voterAccount *ethereum.SignKeys, censusType string)
 	}
 	return key, nil
 }
+
+// matchResult compare the expected vote results base in the overwrite applied, with the actual result returned by the API
+func matchResult(results [][]*types.BigInt, expectedResult [][]string) bool {
+	// only has 1 question
+	for q := range results[0] {
+		if !(expectedResult[0][q] == results[0][q].String()) {
+			return false
+		}
+	}
+	return true
+}
