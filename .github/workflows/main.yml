@@ -87,11 +87,11 @@ jobs:
       - name: Run Go test (and collect code coverage)
         if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
         run: go test -coverprofile=unit.covdata.txt ./...
-      - name: Run Go test race
+      - name: Run Go test -race (and collect code coverage)
         if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
         env:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
-        run: go test -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
+        run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
       - name: Send unit test coverage to coveralls.io
         uses: shogo82148/actions-goveralls@v1
         with:
