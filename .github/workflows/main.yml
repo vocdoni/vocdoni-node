@@ -85,10 +85,20 @@ jobs:
         with:
           go-version: '1.20'
       - name: Run Go test (and collect code coverage)
-        if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
+        if: |
+          github.ref != 'refs/heads/master'
+          && github.ref != 'refs/heads/stage'
+          && !startsWith(github.ref, 'refs/heads/release')
+          && github.ref != 'refs/heads/dev'
+          && github.ref != 'refs/heads/apiv2'
         run: go test -coverprofile=unit.covdata.txt ./...
       - name: Run Go test -race (and collect code coverage)
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+        if: |
+          github.ref == 'refs/heads/master'
+          || github.ref == 'refs/heads/stage'
+          || startsWith(github.ref, 'refs/heads/release')
+          || github.ref == 'refs/heads/dev'
+          || github.ref == 'refs/heads/apiv2'
         env:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
@@ -102,7 +112,11 @@ jobs:
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
     if: |
-      github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+      github.ref == 'refs/heads/master'
+      || github.ref == 'refs/heads/stage'
+      || startsWith(github.ref, 'refs/heads/release')
+      || github.ref == 'refs/heads/dev'
+      || github.ref == 'refs/heads/apiv2'
       || (startsWith(github.ref, 'refs/pull/') && endsWith(github.ref, '/merge') )
       || github.ref == 'refs/heads/main'
     steps:
@@ -143,7 +157,12 @@ jobs:
   job_docker_release:
     runs-on: ubuntu-latest
     needs: [job_go_test, job_compose_test]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+    if: |
+      github.ref == 'refs/heads/master'
+      || github.ref == 'refs/heads/stage'
+      || startsWith(github.ref, 'refs/heads/release')
+      || github.ref == 'refs/heads/dev'
+      || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -174,8 +193,14 @@ jobs:
           # platforms: linux/amd64,linux/arm64
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/go-dvote:latest,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push image to Docker Hub and ghcr.io (race enabled)
@@ -187,8 +212,14 @@ jobs:
           build-args: |
             BUILDARGS=-race
           tags: |
-            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/go-dvote:latest-race,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest-race,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
