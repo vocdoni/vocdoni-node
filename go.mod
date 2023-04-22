@@ -31,12 +31,12 @@ require (
 	github.com/iden3/go-rapidsnark/witness v0.0.3
 	github.com/ipfs/go-cid v0.3.2
 	github.com/ipfs/go-ipfs-keystore v0.1.0
-	github.com/ipfs/go-libipfs v0.6.1-0.20230228004237-36918f45f260
+	github.com/ipfs/go-libipfs v0.6.2
 	github.com/ipfs/go-log/v2 v2.5.1
 	github.com/ipfs/interface-go-ipfs-core v0.11.0
-	github.com/ipfs/kubo v0.19.0-rc1
+	github.com/ipfs/kubo v0.19.1
 	github.com/klauspost/compress v1.16.0
-	github.com/libp2p/go-libp2p v0.26.2
+	github.com/libp2p/go-libp2p v0.26.4
 	github.com/libp2p/go-libp2p-kad-dht v0.21.1
 	github.com/libp2p/go-libp2p-pubsub v0.9.0
 	github.com/libp2p/go-reuseport v0.2.0
@@ -149,7 +149,7 @@ require (
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
 	github.com/ipfs/go-block-format v0.1.1 // indirect
-	github.com/ipfs/go-blockservice v0.5.0 // indirect
+	github.com/ipfs/go-blockservice v0.5.1 // indirect
 	github.com/ipfs/go-cidutil v0.1.0 // indirect
 	github.com/ipfs/go-datastore v0.6.0 // indirect
 	github.com/ipfs/go-delegated-routing v0.7.0 // indirect
@@ -215,7 +215,7 @@ require (
 	github.com/libp2p/go-libp2p-kbucket v0.5.0 // indirect
 	github.com/libp2p/go-libp2p-pubsub-router v0.6.0 // indirect
 	github.com/libp2p/go-libp2p-record v0.2.0 // indirect
-	github.com/libp2p/go-libp2p-routing-helpers v0.6.1 // indirect
+	github.com/libp2p/go-libp2p-routing-helpers v0.6.2 // indirect
 	github.com/libp2p/go-libp2p-xor v0.1.0 // indirect
 	github.com/libp2p/go-mplex v0.7.0 // indirect
 	github.com/libp2p/go-msgio v0.3.0 // indirect
