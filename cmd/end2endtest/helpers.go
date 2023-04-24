@@ -304,7 +304,7 @@ func (t e2eElection) overwriteVote(choices []int, indexAcct int, waitType string
 	for i := 0; i < len(choices); i++ {
 		// assign the choices wanted for each overwrite vote
 		choice := []int{choices[i]}
-		ctxDeadLine, err := t.sentVote(acc, choice, nil)
+		ctxDeadLine, err := t.sendVote(acc, choice, nil)
 		if err != nil {
 			// check the error expected for overwrite with waitUntilNextBlock
 			if strings.Contains(err.Error(), "overwrite count reached") {
@@ -327,7 +327,7 @@ func (t e2eElection) overwriteVote(choices []int, indexAcct int, waitType string
 	return contextDeadlines, nil
 }
 
-func (t e2eElection) sentVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
+func (t e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
 	var contextDeadline int
 
 	if t.election.VoteMode.Anonymous {

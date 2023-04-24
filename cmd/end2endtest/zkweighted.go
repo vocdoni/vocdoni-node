@@ -67,7 +67,7 @@ func (t *E2EAnonElection) Run() error {
 		votesSent := 0
 		contextDeadlines := 0
 		for i, acc := range accounts {
-			ctxDeadline, err := t.sentVote(acc, []int{i % 2}, apiClientMtx)
+			ctxDeadline, err := t.sendVote(acc, []int{i % 2}, apiClientMtx)
 			if err != nil {
 				log.Error(err)
 				break

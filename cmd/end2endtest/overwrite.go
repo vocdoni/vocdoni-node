@@ -68,7 +68,7 @@ func (t *E2EOverwriteElection) Run() error {
 		votesSent := 0
 		contextDeadlines := 0
 		for _, acc := range accounts {
-			ctxDeadline, err := t.sentVote(acc, []int{0}, nil)
+			ctxDeadline, err := t.sendVote(acc, []int{0}, nil)
 			if err != nil {
 				log.Error(err)
 				break
@@ -95,7 +95,7 @@ func (t *E2EOverwriteElection) Run() error {
 		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Send the only missing vote, should be fine
-	ctxDeadlines, err := t.sentVote(t.voterAccounts[0], []int{0}, nil)
+	ctxDeadlines, err := t.sendVote(t.voterAccounts[0], []int{0}, nil)
 	if err != nil {
 		return err
 	}
