@@ -2,10 +2,7 @@ package main
 
 import (
 	"context"
-	"errors"
-	"math/big"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -66,54 +63,20 @@ func (t *E2EAnonElection) Run() error {
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("sending %d votes", len(accounts))
-		// We use maps instead of slices to have the capacity of resending votes
-		// without repeating them.
-		accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
-		for i, acc := range accounts {
-			accountsMap[i] = acc
-		}
-		// Send the votes
+
 		votesSent := 0
-		for {
-			contextDeadlines := 0
-			for i, voterAccount := range accountsMap {
-				apiClientMtx.Lock()
-				privKey := voterAccount.PrivateKey()
-				if err := api.SetAccount(privKey.String()); err != nil {
-					apiClientMtx.Unlock()
-					log.Fatal(err)
-					return
-				}
-
-				_, err := api.Vote(&apiclient.VoteData{
-					ElectionID:   t.election.ElectionID,
-					ProofMkTree:  t.proofs[voterAccount.Address().Hex()],
-					Choices:      []int{i % 2},
-					VotingWeight: new(big.Int).SetUint64(8),
-				})
-				apiClientMtx.Unlock()
-				// if the context deadline is reached, we don't need to print it (let's jus retry)
-				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-					contextDeadlines++
-					continue
-				} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-					// if the error is not "vote already exists", we need to print it
-					log.Warn(err)
-					continue
-				}
-				// if the vote was sent successfully or already exists, we remove it from the accounts map
-				votesSent++
-				delete(accountsMap, i)
-
-			}
-			if len(accountsMap) == 0 {
+		contextDeadlines := 0
+		for i, acc := range accounts {
+			ctxDeadline, err := t.sentVote(acc, []int{i % 2}, apiClientMtx)
+			if err != nil {
+				log.Error(err)
 				break
 			}
-			log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
-			time.Sleep(time.Second * 5)
+			contextDeadlines += ctxDeadline
+			votesSent++
 		}
-		log.Infof("successfully sent %d votes", votesSent)
-		time.Sleep(time.Second * 2)
+		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
+		time.Sleep(time.Second * 4)
 	}
 
 	pcount := c.nvotes / c.parallelCount
