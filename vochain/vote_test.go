@@ -28,7 +28,7 @@ func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys,
 	keys := ethereum.NewSignKeysBatch(size)
 	hashedKeys := [][]byte{}
 	for _, k := range keys {
-		c, err := tr.Hash(k.PublicKey())
+		c, err := tr.Hash(k.Address().Bytes())
 		qt.Check(t, err, qt.IsNil)
 		c = c[:censustree.DefaultMaxKeyLen]
 		err = tr.Add(c, nil)
@@ -62,7 +62,7 @@ func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys
 				Arbo: &models.ProofArbo{
 					Type:     models.ProofArbo_BLAKE2B,
 					Siblings: proof,
-					KeyType:  models.ProofArbo_PUBKEY,
+					KeyType:  models.ProofArbo_ADDRESS,
 				},
 			},
 		},

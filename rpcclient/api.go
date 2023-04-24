@@ -271,7 +271,7 @@ func (c *Client) GetMerkleProofBatch(signers []*ethereum.SignKeys,
 	// Generate merkle proofs
 	log.Infof("generating proofs...")
 	for i, s := range signers {
-		siblings, value, err := c.GetProof(s.PublicKey(), root, false)
+		siblings, value, err := c.GetProof(s.Address().Bytes(), root, false)
 		if err != nil {
 			if tolerateError {
 				continue
@@ -1254,14 +1254,16 @@ func (c *Client) CreateCensus(signer *ethereum.SignKeys, censusSigners []*ethere
 			if currentSize < 1 {
 				break
 			}
+			var pub []byte
 			if censusSigners != nil {
-				hexpub, _ = censusSigners[currentSize-1].HexString()
+				// hexpub, _ = censusSigners[currentSize-1].HexString()
+				pub = censusSigners[currentSize-1].Address().Bytes()
 			} else {
 				hexpub = censusPubKeys[currentSize-1]
-			}
-			pub, err := hex.DecodeString(hexpub)
-			if err != nil {
-				return nil, "", err
+				pub, err = hex.DecodeString(hexpub)
+				if err != nil {
+					return nil, "", err
+				}
 			}
 			claims = append(claims, pub)
 			if len(censusValues) > 0 {

@@ -8,6 +8,7 @@
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
+[ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
 
 COMPOSE_CMD=${COMPOSE_CMD:-"docker-compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
@@ -34,6 +35,8 @@ TREASURER_KEY="$VOCDONI_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
 TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
+
+log() { echo $(date --rfc-3339=s) "$@" ; }
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -104,62 +107,90 @@ e2etest_tokentxs() {
 # useful for debugging bash flow
 # docker-compose() { echo "# would do: docker-compose $@" ; sleep 0.2 ;}
 
-echo "### Starting test suite ###"
+log "### Starting test suite ###"
 $COMPOSE_CMD build
 $COMPOSE_CMD up -d
 
 check_gw_is_up() {
+	date
 	$COMPOSE_CMD_RUN test \
 		curl -s --fail $GWHOST \
 		  -X POST \
 		  -d '{"id": "req00'$RANDOM'", "request": {"method": "genProof", "timestamp":'$(date +%s)'}}' 2>/dev/null
 }
 
-echo "### Waiting for test suite to be ready ###"
+log "### Waiting for test suite to be ready ###"
 for i in {1..20}; do
 	check_gw_is_up && break || sleep 2
 done
+log "### Test suite ready ###"
 
 # create temp dir
 results="/tmp/.vochaintest$RANDOM"
 mkdir -p $results
 
-echo "### Test suite ready ###"
 for test in ${tests_to_run[@]}; do
 	if [ $test == "tokentransactions" ] || [ $CONCURRENT -eq 0 ] ; then
-		echo "### Running test $test ###"
+		log "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	else
-		echo "### Running test $test concurrently with others ###"
+		log "### Running test $test concurrently with others ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval ) &
 	fi
 	sleep 6
 done
 
-echo "### Waiting for tests to finish ###"
+log "### Waiting for tests to finish ###"
 wait
 
 failed=""
 for test in ${tests_to_run[@]} ; do
 	RET=$(cat $results/$test.retval)
 	if [ "$RET" == "0" ] ; then
-		echo "Vochain test $test finished correctly!"
+		log "### Vochain test $test finished correctly! ###"
 	else
-		echo "Vochain test $test failed!"
-		echo "### Post run logs ###"
+		log "### Vochain test $test failed! ###"
+		log "### Post run logs ###"
 		$COMPOSE_CMD logs --tail 1000
 		failed="$test"
 		break
 	fi
 done
 
+if [ -n "$GOCOVERDIR" ] ; then
+	log "### Collect all coverage files in $GOCOVERDIR ###"
+	mkdir -p $GOCOVERDIR
+	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
+		find /app/run/gocoverage/
+		find /wd/$GOCOVERDIR/
+		"
+	$COMPOSE_CMD down
+	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
+		find /app/run/gocoverage/
+		find /wd/$GOCOVERDIR/
+	    ls -l /app/run/gocoverage/. /wd/$GOCOVERDIR
+		cp -rf /app/run/gocoverage/. /wd/$GOCOVERDIR
+		ls -la /app/run/gocoverage/. /wd/$GOCOVERDIR
+		whoami
+		touch /wd/whoami
+		echo -- cmd args are \
+			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/wd/$GOCOVERDIR/covdata.txt
+		find /wd/$GOCOVERDIR/
+		go tool covdata textfmt \
+			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/wd/$GOCOVERDIR/covdata.txt
+		"
+	log "### Coverage data in textfmt left in $GOCOVERDIR/covdata.txt ###"
+fi
+
 [ $CLEAN -eq 1 ] && {
-	echo "### Cleaning docker environment ###"
+	log "### Cleaning docker environment ###"
 	$COMPOSE_CMD down -v --remove-orphans
 }
 
 if [ -n "$failed" ]; then
-  echo "### Logs from failed test ($test) ###"
+  log "### Logs from failed test ($test) ###"
   cat $results/$failed.stdout
 fi
 

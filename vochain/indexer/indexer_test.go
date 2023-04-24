@@ -546,7 +546,7 @@ func TestResults(t *testing.T) {
 				Arbo: &models.ProofArbo{
 					Type:     models.ProofArbo_BLAKE2B,
 					Siblings: proofs[i],
-					KeyType:  models.ProofArbo_PUBKEY,
+					KeyType:  models.ProofArbo_ADDRESS,
 				}}},
 			ProcessId:            pid,
 			VotePackage:          vp,
@@ -1125,7 +1125,7 @@ func TestOverwriteVotes(t *testing.T) {
 			Arbo: &models.ProofArbo{
 				Type:     models.ProofArbo_BLAKE2B,
 				Siblings: proofs[0],
-				KeyType:  models.ProofArbo_PUBKEY,
+				KeyType:  models.ProofArbo_ADDRESS,
 			}}},
 		ProcessId:   pid,
 		VotePackage: vp,
@@ -1220,7 +1220,7 @@ func TestOverwriteVotes(t *testing.T) {
 			Arbo: &models.ProofArbo{
 				Type:     models.ProofArbo_BLAKE2B,
 				Siblings: proofs[1],
-				KeyType:  models.ProofArbo_PUBKEY,
+				KeyType:  models.ProofArbo_ADDRESS,
 			}}},
 		ProcessId:   pid,
 		VotePackage: vp,

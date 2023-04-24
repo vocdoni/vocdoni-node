@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -253,8 +254,10 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 	}
 
 	count, err := a.vocapp.State.CountVotes(electionID, true)
-	if err != nil {
-		return err
+	if errors.Is(err, statedb.ErrEmptyTree) {
+		count = 0
+	} else if err != nil {
+		return ErrCantCountVotes.WithErr(err)
 	}
 	data, err := json.Marshal(
 		struct {
@@ -619,7 +622,7 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 }
 
 // getElection retrieves an election from the vochain state.
-// Checks if election exists and return 404 if not
+// If not found or nil, returns an apirest.APIerror
 func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 	process, err := vs.Process(electionID, true)
 	if err != nil {
@@ -703,7 +706,11 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			VoteCount:      count,
 		})
 	}
-	data, err := json.Marshal(list)
+	data, err := json.Marshal(struct {
+		Elections []ElectionSummary `json:"elections"`
+	}{
+		Elections: list,
+	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
