@@ -339,7 +339,6 @@ func (t e2eElection) sentVote(voterAccount *ethereum.SignKeys, choice []int, api
 		}
 	} else {
 		t.api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
-		//time.Sleep(time.Second)
 	}
 
 	if _, err := t.api.Vote(&apiclient.VoteData{
