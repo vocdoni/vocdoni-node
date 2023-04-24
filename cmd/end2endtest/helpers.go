@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/big"
+	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,6 +18,11 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
+)
+
+const (
+	notWaitUntilNextBlock = "notWaitNextBlock"
+	waitUntilNextBlock    = "waitNextBlock"
 )
 
 func newTestElectionDescription() *vapi.ElectionDescription {
@@ -220,7 +227,7 @@ func (t e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool)
 
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	// Set the account in the API client, so we can sign transactions
-	if err := t.api.SetAccount(hex.EncodeToString(t.config.accountKeys[0].PrivateKey())); err != nil {
+	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
 		return err
 	}
 
@@ -288,6 +295,73 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	t.proofs = t.generateProofs(root, ed.ElectionType.Anonymous)
 
 	return nil
+}
+
+func (t e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
+	acc := t.voterAccounts[indexAcct]
+	contextDeadlines := 0
+
+	for i := 0; i < len(choices); i++ {
+		// assign the choices wanted for each overwrite vote
+		choice := []int{choices[i]}
+		ctxDeadLine, err := t.sentVote(acc, choice, nil)
+		if err != nil {
+			// check the error expected for overwrite with waitUntilNextBlock
+			if strings.Contains(err.Error(), "overwrite count reached") {
+				log.Infof("error expected: %s", err.Error())
+			} else {
+				return 0, errors.New("expected overwrite error")
+			}
+		}
+		contextDeadlines += ctxDeadLine
+		switch waitType {
+		case notWaitUntilNextBlock:
+			time.Sleep(time.Second * 5)
+
+		case waitUntilNextBlock:
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+			defer cancel()
+			t.api.WaitUntilNextBlock(ctx)
+		}
+	}
+	return contextDeadlines, nil
+}
+
+func (t e2eElection) sentVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
+	var contextDeadline int
+
+	if t.election.VoteMode.Anonymous {
+		apiClientMtx.Lock()
+		privKey := voterAccount.PrivateKey()
+		if err := t.api.SetAccount(privKey.String()); err != nil {
+			apiClientMtx.Unlock()
+			return 0, err
+		}
+	} else {
+		t.api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+		//time.Sleep(time.Second)
+	}
+
+	if _, err := t.api.Vote(&apiclient.VoteData{
+		ElectionID:  t.election.ElectionID,
+		ProofMkTree: t.proofs[voterAccount.Address().Hex()],
+		Choices:     choice},
+	); err != nil {
+		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
+			contextDeadline = 1
+		} else if strings.Contains(err.Error(), "overwrite count reached") {
+			// this error is expected on overwrite test
+			return 0, err
+		} else if !strings.Contains(err.Error(), "already exists") {
+			// if the error is not "vote already exists", we need to print it
+			log.Warn(err)
+		}
+	}
+
+	if t.election.VoteMode.Anonymous {
+		apiClientMtx.Unlock()
+	}
+	return contextDeadline, nil
 }
 
 func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
