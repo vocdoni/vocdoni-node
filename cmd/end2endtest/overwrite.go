@@ -3,11 +3,9 @@ package main
 import (
 	"context"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
@@ -18,7 +16,7 @@ import (
 
 func init() {
 	ops["overwritewaitnextblock"] = operation{
-		test: &E2EAnonElection{},
+		test: &E2EOverwriteElection{},
 		description: "Checks that the MaxVoteOverwrite feature is correctly implemented, even if a vote is consecutive " +
 			"overwrite without wait the next block, that means the error in checkTx: overwrite count reached, it's not raised",
 		example: os.Args[0] + " --operation=voteoverwritenotwaitnextblock --votes=1000",
@@ -60,52 +58,26 @@ func (t *E2EOverwriteElection) Run() error {
 	c := t.config
 	api := t.api
 
-	// TODO: remove repeated code
 	// Send the votes (parallelized)
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("sending %d votes", len(accounts))
-		// We use maps instead of slices to have the capacity of resending votes
-		// without repeating them.
-		accountsMap := make(map[int]*ethereum.SignKeys, len(accounts))
-		for i, acc := range accounts {
-			accountsMap[i] = acc
-		}
-		// Send the votes
-		votesSent := 0
-		for {
-			contextDeadlines := 0
-			for i, voterAccount := range accountsMap {
-				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
-				_, err := c.Vote(&apiclient.VoteData{
-					ElectionID:  t.election.ElectionID,
-					ProofMkTree: t.proofs[voterAccount.Address().Hex()],
-					Choices:     []int{0},
-				})
-				// if the context deadline is reached, we don't need to print it (let's jus retry)
-				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-					contextDeadlines++
-					continue
-				} else if err != nil && !strings.Contains(err.Error(), "already exists") {
-					// if the error is not "vote already exists", we need to print it
-					log.Warn(err)
-					continue
-				}
-				// if the vote was sent successfully or already exists, we remove it from the accounts map
-				votesSent++
-				delete(accountsMap, i)
 
-			}
-			if len(accountsMap) == 0 {
-				log.Infof("sent %d/%d votes... got %d HTTP errors", votesSent, len(accounts), contextDeadlines)
-				time.Sleep(time.Second * 2)
+		votesSent := 0
+		contextDeadlines := 0
+		for _, acc := range accounts {
+			ctxDeadline, err := t.sentVote(acc, []int{0}, nil)
+			if err != nil {
+				log.Error(err)
 				break
 			}
+			contextDeadlines += ctxDeadline
+			votesSent++
 		}
-		log.Infof("successfully sent %d votes", votesSent)
-		time.Sleep(time.Second * 2)
+		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
+		time.Sleep(time.Second * 4)
 	}
 
 	pcount := c.nvotes / c.parallelCount
@@ -122,70 +94,18 @@ func (t *E2EOverwriteElection) Run() error {
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
-	// TODO: remove repeated code
 	// Send the only missing vote, should be fine
-	cc := api.Clone(fmt.Sprintf("%x", t.voterAccounts[0].PrivateKey()))
-	time.Sleep(time.Second)
-
-	voteData := apiclient.VoteData{
-		ElectionID:  t.election.ElectionID,
-		ProofMkTree: t.proofs[t.voterAccounts[0].Address().Hex()],
-		Choices:     []int{0},
+	ctxDeadlines, err := t.sentVote(t.voterAccounts[0], []int{0}, nil)
+	if err != nil {
+		return err
 	}
+	log.Infof("vote send, got %d HTTP errors", ctxDeadlines)
 
-	contextDeadlines := 0
-
-	if _, err := cc.Vote(&voteData); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-			contextDeadlines++
-		} else if !strings.Contains(err.Error(), "already exists") {
-			// if the error is not "vote already exists", we need to print it
-			log.Warn(err)
-		}
+	// overwrite a vote the amount of choices passed to the method
+	if ctxDeadlines, err = t.overwriteVote([]int{1, 0}, 0, waitUntilNextBlock); err != nil {
+		return err
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*20)
-	defer cancel()
-	api.WaitUntilNextBlock(ctx)
-
-	log.Infof("got %d HTTP errors", contextDeadlines)
-
-	// Second vote (firsts overwrite)
-	voteData.Choices = []int{1}
-
-	contextDeadlines = 0
-	if _, err := cc.Vote(&voteData); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-			contextDeadlines++
-		} else if !strings.Contains(err.Error(), "already exists") {
-			// if the error is not "vote already exists", we need to print it
-			log.Warn(err)
-		}
-	}
-
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*20)
-	defer cancel()
-	api.WaitUntilNextBlock(ctx)
-
-	log.Infof("got %d HTTP errors", contextDeadlines)
-
-	// Third vote (second overwrite, should fail)
-	voteData.Choices = []int{0}
-
-	contextDeadlines = 0
-
-	// an error is expected by checkTx: count overwrite reached
-	if _, err := cc.Vote(&voteData); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-			contextDeadlines++
-		} else if !strings.Contains(err.Error(), "overwrite count reached") {
-			log.Fatal("expected overwrite error, got: ", err)
-		} else {
-			// the log should be the error: count overwrite reached
-			log.Infof("error expected: %s", err.Error())
-		}
-	}
-
+	log.Infof("overwrite vote send, got %d HTTP errors", ctxDeadlines)
 	log.Info("successfully sent the only missing vote")
 	time.Sleep(time.Second * 5)
 
@@ -222,7 +142,7 @@ func (t *E2EOverwriteElection) Run() error {
 	}
 
 	// Check the election status is actually ENDED
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*40)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 	defer cancel()
 	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
 		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
