@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"os"
 	"sync"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -105,8 +105,8 @@ func (t *E2EOverwriteElection) Run() error {
 	if ctxDeadlines, err = t.overwriteVote([]int{1, 0}, 0, waitUntilNextBlock); err != nil {
 		return err
 	}
+
 	log.Infof("overwrite vote send, got %d HTTP errors", ctxDeadlines)
-	log.Info("successfully sent the only missing vote")
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
@@ -131,36 +131,19 @@ func (t *E2EOverwriteElection) Run() error {
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	hash, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
-	if err != nil {
-		log.Fatal(err)
+	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
+		return err
 	}
-
-	// Check the election status is actually ENDED
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
-	}
-
-	t.election, err = api.Election(t.election.ElectionID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if t.election.Status != "ENDED" {
-		log.Fatal("election status is not ENDED")
-	}
-	log.Infof("election %s status is ENDED", t.election.ElectionID.String())
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancel()
-	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	elres, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -172,11 +155,12 @@ func (t *E2EOverwriteElection) Run() error {
 	// according to the first overwrite
 	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
 
-	if !matchResult(election.Results, resultExpected) {
-		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, election.Results)
+	// only the first overwrite should be valid in the results and must math with the expected results
+	if !matchResult(elres.Results, resultExpected) {
+		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
-	log.Infof("election results: %v", election.Results)
+	log.Infof("election results: %v", elres.Results)
 
 	return nil
 }
