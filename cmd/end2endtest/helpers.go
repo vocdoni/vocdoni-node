@@ -50,7 +50,7 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 	}
 }
 
-func (t e2eElection) createAccount(address string) (*vapi.Account, error) {
+func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
 	faucetPkg, err := getFaucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (t e2eElection) createAccount(address string) (*vapi.Account, error) {
 
 }
 
-func (t e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
+func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes) error {
 	participants := &vapi.CensusParticipants{}
 
 	for i, voterAccount := range t.voterAccounts {
@@ -117,7 +117,7 @@ func (t e2eElection) addParticipantsCensus(censusType string, censusID types.Hex
 	return nil
 }
 
-func (t e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
+func (t *e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 	size, err := t.api.CensusSize(censusID)
 	if err != nil {
 		log.Errorf("unable to get census size from api")
@@ -131,7 +131,7 @@ func (t e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 	return true
 }
 
-func (t e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
+func (t *e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
 	electionID, err := t.api.NewElection(electionDescrip)
 	if err != nil {
 		return nil, err
@@ -151,7 +151,7 @@ func (t e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (
 	return election, nil
 }
 
-func (t e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool) map[string]*apiclient.CensusProof {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool) map[string]*apiclient.CensusProof {
 	type voterProof struct {
 		proof   *apiclient.CensusProof
 		address string
@@ -297,7 +297,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	return nil
 }
 
-func (t e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
+func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
 	acc := t.voterAccounts[indexAcct]
 	contextDeadlines := 0
 
@@ -327,7 +327,7 @@ func (t e2eElection) overwriteVote(choices []int, indexAcct int, waitType string
 	return contextDeadlines, nil
 }
 
-func (t e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
+func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
 	var contextDeadline int
 
 	if t.election.VoteMode.Anonymous {
