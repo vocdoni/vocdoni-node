@@ -14,7 +14,7 @@ import (
 type CircuitInputs struct {
 	CensusRoot     string   `json:"censusRoot"`
 	CensusSiblings []string `json:"censusSiblings"`
-	VoteWeight   string   `json:"voteWeight"`
+	VoteWeight     string   `json:"voteWeight"`
 	FactoryWeight  string   `json:"factoryWeight"`
 	PrivateKey     string   `json:"privateKey"`
 	VoteHash       []string `json:"voteHash"`
@@ -44,7 +44,7 @@ func GenerateCircuitInput(zkAddr *zk.ZkAddress, censusRoot, electionId []byte,
 		// Encode census root
 		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
 		CensusSiblings: censusSiblings,
-		VoteWeight:   voteWeight.String(),
+		VoteWeight:     voteWeight.String(),
 		FactoryWeight:  factoryWeight.String(),
 		PrivateKey:     zkAddr.PrivKey.String(),
 		// Encode weight into voteHash

@@ -86,10 +86,10 @@ func (t *E2EAnonElection) Run() error {
 				}
 
 				_, err := api.Vote(&apiclient.VoteData{
-					ElectionID:   t.election.ElectionID,
-					ProofMkTree:  t.proofs[voterAccount.Address().Hex()],
-					Choices:      []int{i % 2},
-					VoteWeight: new(big.Int).SetUint64(8),
+					ElectionID:  t.election.ElectionID,
+					ProofMkTree: t.proofs[voterAccount.Address().Hex()],
+					Choices:     []int{i % 2},
+					VoteWeight:  new(big.Int).SetUint64(8),
 				})
 				apiClientMtx.Unlock()
 				// if the context deadline is reached, we don't need to print it (let's jus retry)
