@@ -16,9 +16,9 @@ type CensusProof struct {
 	Proof types.HexBytes
 	// LeafValue contains the associated value on the census tree
 	LeafValue types.HexBytes
-	// LeafWeight contains the decoded LeafValue as big.Int that represents
+	// AvalaibleWeight contains the decoded LeafValue as big.Int that represents
 	// the associated weight for the voter.
-	LeafWeight *big.Int
+	AvalaibleWeight *big.Int
 	// KeyType defines the type of the census tree key
 	KeyType models.ProofArbo_KeyType
 	// Siblings contains the decoded siblings keys
@@ -116,9 +116,9 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		Siblings:  censusData.Siblings,
 	}
 	if censusData.Weight != nil {
-		cp.LeafWeight = censusData.Weight.MathBigInt()
+		cp.AvalaibleWeight = censusData.Weight.MathBigInt()
 	} else {
-		cp.LeafWeight = new(big.Int).SetUint64(1)
+		cp.AvalaibleWeight = new(big.Int).SetUint64(1)
 	}
 	return &cp, nil
 }

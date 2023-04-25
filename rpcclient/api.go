@@ -538,9 +538,9 @@ func (c *Client) TestPreRegisterKeys(
 			v.Proof = &models.Proof{
 				Payload: &models.Proof_Arbo{
 					Arbo: &models.ProofArbo{
-						Type:       models.ProofArbo_BLAKE2B,
-						Siblings:   proofs[i].Siblings,
-						LeafWeight: proofs[i].Value,
+						Type:            models.ProofArbo_BLAKE2B,
+						Siblings:        proofs[i].Siblings,
+						AvalaibleWeight: proofs[i].Value,
 					},
 				},
 			}
@@ -740,9 +740,9 @@ func (c *Client) TestSendVotes(
 			v.Proof = &models.Proof{
 				Payload: &models.Proof_Arbo{
 					Arbo: &models.ProofArbo{
-						Type:       models.ProofArbo_BLAKE2B,
-						Siblings:   proofs[i].Siblings,
-						LeafWeight: proofs[i].Value,
+						Type:            models.ProofArbo_BLAKE2B,
+						Siblings:        proofs[i].Siblings,
+						AvalaibleWeight: proofs[i].Value,
 					},
 				},
 			}

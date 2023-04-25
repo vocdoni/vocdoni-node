@@ -89,7 +89,7 @@ func (t *E2EAnonElection) Run() error {
 					ElectionID:   t.election.ElectionID,
 					ProofMkTree:  t.proofs[voterAccount.Address().Hex()],
 					Choices:      []int{i % 2},
-					VotingWeight: new(big.Int).SetUint64(8),
+					VoteWeight: new(big.Int).SetUint64(8),
 				})
 				apiClientMtx.Unlock()
 				// if the context deadline is reached, we don't need to print it (let's jus retry)

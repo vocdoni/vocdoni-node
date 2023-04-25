@@ -111,25 +111,25 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if len(leafKey) > censustree.DefaultMaxKeyLen {
 			leafKey = leafKey[:censustree.DefaultMaxKeyLen]
 		}
-		valid, err := tree.VerifyProof(hashFunc, leafKey, p.LeafWeight, p.Siblings, censusRoot)
+		valid, err := tree.VerifyProof(hashFunc, leafKey, p.AvalaibleWeight, p.Siblings, censusRoot)
 		if !valid || err != nil {
 			return false, nil, err
 		}
-		// Legacy: support p.LeafWeight == nil, assume then value=1
-		if p.LeafWeight == nil {
+		// Legacy: support p.AvalaibleWeight == nil, assume then value=1
+		if p.AvalaibleWeight == nil {
 			return true, bigOne, nil
 		}
 
-		factoryWeight := arbo.BytesToBigInt(p.LeafWeight)
-		if p.VotingWeight == nil {
+		factoryWeight := arbo.BytesToBigInt(p.AvalaibleWeight)
+		if p.VoteWeight == nil {
 			return true, factoryWeight, nil
 		}
 
-		votingWeight := new(big.Int).SetBytes(p.VotingWeight)
-		if votingWeight.Cmp(factoryWeight) == 1 {
+		voteWeight := new(big.Int).SetBytes(p.VoteWeight)
+		if voteWeight.Cmp(factoryWeight) == 1 {
 			return false, nil, fmt.Errorf("assigned weight exceeded")
 		}
-		return true, votingWeight, nil
+		return true, voteWeight, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)
