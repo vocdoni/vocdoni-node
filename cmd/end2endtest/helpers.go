@@ -330,6 +330,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
 	var contextDeadline int
 
+	api := t.api
 	if t.election.VoteMode.Anonymous {
 		apiClientMtx.Lock()
 		privKey := voterAccount.PrivateKey()
@@ -338,10 +339,10 @@ func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, ap
 			return 0, err
 		}
 	} else {
-		t.api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+		api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
 	}
 
-	if _, err := t.api.Vote(&apiclient.VoteData{
+	if _, err := api.Vote(&apiclient.VoteData{
 		ElectionID:  t.election.ElectionID,
 		ProofMkTree: t.proofs[voterAccount.Address().Hex()],
 		Choices:     choice},
