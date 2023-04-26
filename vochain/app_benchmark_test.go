@@ -51,7 +51,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 	}
 	claims := []string{}
 	for _, k := range keys {
-		c := k.PublicKey()
+		c := k.Address().Bytes()
 		if err := tr.Add(c, nil); err != nil {
 			b.Error(err)
 		}

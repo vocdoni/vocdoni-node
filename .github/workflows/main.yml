@@ -1,7 +1,13 @@
 ---
 name: Main
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - dev
+      - stage
+      - master
+  pull_request:
 
 jobs:
   job_go_checks:
@@ -78,21 +84,39 @@ jobs:
         uses: actions/setup-go@v4
         with:
           go-version: '1.20'
-      - name: Run Go test
-        if: github.ref != 'refs/heads/master' && github.ref != 'refs/heads/stage' && !startsWith(github.ref, 'refs/heads/release') && github.ref != 'refs/heads/dev' && github.ref != 'refs/heads/apiv2'
-        run: go test ./...
-      - name: Run Go test race
-        if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
-        run: |
-          # check that log lines contains no invalid chars (evidence of format mismatch)
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          # -race can easily make the crypto stuff 10x slower
-          go test -vet=off -timeout=15m -race ./...
+      - name: Run Go test (and collect code coverage)
+        if: |
+          github.ref != 'refs/heads/master'
+          && github.ref != 'refs/heads/stage'
+          && !startsWith(github.ref, 'refs/heads/release')
+          && github.ref != 'refs/heads/dev'
+          && github.ref != 'refs/heads/apiv2'
+        run: go test -coverprofile=unit.covdata.txt ./...
+      - name: Run Go test -race (and collect code coverage)
+        if: |
+          github.ref == 'refs/heads/master'
+          || github.ref == 'refs/heads/stage'
+          || startsWith(github.ref, 'refs/heads/release')
+          || github.ref == 'refs/heads/dev'
+          || github.ref == 'refs/heads/apiv2'
+        env:
+          LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
+        run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
+      - name: Send unit test coverage to coveralls.io
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: unit.covdata.txt
+          flag-name: unit
+          parallel: true
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
     if: |
-      github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+      github.ref == 'refs/heads/master'
+      || github.ref == 'refs/heads/stage'
+      || startsWith(github.ref, 'refs/heads/release')
+      || github.ref == 'refs/heads/dev'
+      || github.ref == 'refs/heads/apiv2'
       || (startsWith(github.ref, 'refs/pull/') && endsWith(github.ref, '/merge') )
       || github.ref == 'refs/heads/main'
     steps:
@@ -110,22 +134,32 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
       - name: Run compose script
+        env:
+          TESTSUITE_BUILD_TAG: ${{ github.sha }}
+          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }} # unique name for docker-compose (needed for concurrent job runs)
+          COMPOSE_DVOTE_PORT_MAPPING: "9090" # this binds gateway0 to a random available port on docker host (needed for concurrent job runs)
+          COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
+          LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
+          GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
+          CONCURRENT: 1 # run all the start_test.sh tests concurrently
         run: |
-          export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1
-          export DOCKER_CLI_EXPERIMENTAL=enabled
-          export COMPOSE_PROJECT_NAME=${RANDOM}${RANDOM}_testsuite
-          export TESTSUITE_BUILD_TAG=${CI_COMMIT_SHA::10}
-          export COMPOSE_HOST_PATH=${PWD}/dockerfiles/testsuite
-          export COMPOSE_DVOTE_PORT_MAPPING="9090" # Will use a random available port mapping
-          export LOG_PANIC_ON_INVALIDCHARS=true
-          cd dockerfiles/testsuite
-          docker-compose build
-          ./start_test.sh
+          cd dockerfiles/testsuite && ./start_test.sh
+      - name: Send integration test coverage to coveralls.io
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: dockerfiles/testsuite/gocoverage/covdata.txt
+          flag-name: integration
+          parallel: true
 
   job_docker_release:
     runs-on: ubuntu-latest
     needs: [job_go_test, job_compose_test]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/stage' || startsWith(github.ref, 'refs/heads/release') || github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/apiv2'
+    if: |
+      github.ref == 'refs/heads/master'
+      || github.ref == 'refs/heads/stage'
+      || startsWith(github.ref, 'refs/heads/release')
+      || github.ref == 'refs/heads/dev'
+      || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -156,8 +190,14 @@ jobs:
           # platforms: linux/amd64,linux/arm64
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:latest, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/go-dvote:latest,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push image to Docker Hub and ghcr.io (race enabled)
@@ -169,8 +209,14 @@ jobs:
           build-args: |
             BUILDARGS=-race
           tags: |
-            vocdoni/go-dvote:latest-race, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest-race, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race, ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }}, ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/go-dvote:latest-race,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest-race,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -189,3 +235,13 @@ jobs:
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
+
+  job_coveralls:
+    needs: [job_go_test, job_compose_test]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+    - name: Send coverage to Coveralls.io (finish)
+      uses: shogo82148/actions-goveralls@v1
+      with:
+        parallel-finished: true

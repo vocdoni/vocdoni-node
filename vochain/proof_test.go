@@ -83,7 +83,7 @@ func TestMerkleTreeProof(t *testing.T) {
 				},
 			},
 		},
-		VotePackage: []byte("[1, 2, 3, 4}]"),
+		VotePackage: []byte("[1, 2, 3, 4]"),
 	}
 
 	for i := 0; i < 10; i++ {

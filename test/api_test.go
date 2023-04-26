@@ -50,7 +50,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	cparts := api.CensusParticipants{}
 	for i := 1; i < 10; i++ {
 		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    rnd.RandomBytes(20),
 			Weight: (*types.BigInt)(big.NewInt(int64(1))),
 		})
 	}
@@ -62,7 +62,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, voterKey.Generate(), qt.IsNil)
 
 	_, code = c.Request("POST", &api.CensusParticipants{Participants: []api.CensusParticipant{{
-		Key:    voterKey.PublicKey(),
+		Key:    voterKey.Address().Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	}}}, "censuses", id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
@@ -73,7 +73,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
 	root := censusData.CensusID
 
-	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", voterKey.PublicKey()))
+	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", voterKey.Address().Bytes()))
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")

@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
@@ -71,7 +72,7 @@ func TestCensus(t *testing.T) {
 	cparts := CensusParticipants{}
 	for i := 1; i < 11; i++ {
 		cparts.Participants = append(cparts.Participants, CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    rnd.RandomBytes(20),
 			Weight: (*types.BigInt)(big.NewInt(int64(i))),
 		})
 		weight += i
@@ -92,7 +93,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Size, qt.Equals, index)
 
 	// add one more key and check proof
-	key := rnd.RandomBytes(32)
+	key := rnd.RandomBytes(20)
 	keyWeight := (*types.BigInt)(big.NewInt(100))
 	_, code = c.Request("POST", &CensusParticipants{
 		Participants: []CensusParticipant{{Key: key, Weight: keyWeight}},
@@ -121,7 +122,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Valid, qt.IsTrue)
 
 	// try an invalid proof
-	proof.Key = rnd.RandomBytes(32)
+	proof.Key = rnd.RandomBytes(20)
 	qt.Assert(t, err, qt.IsNil)
 	_, code = c.Request("POST", proof, id2, "verify")
 	qt.Assert(t, code, qt.Equals, 400)
@@ -184,9 +185,9 @@ func TestCensusProof(t *testing.T) {
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
 	cparts := CensusParticipants{}
-	for i := 1; i < 11; i++ {
+	for i, acc := range ethereum.NewSignKeysBatch(11) {
 		cparts.Participants = append(cparts.Participants, CensusParticipant{
-			Key:    rnd.RandomBytes(32),
+			Key:    acc.Address().Bytes(),
 			Weight: (*types.BigInt)(big.NewInt(int64(i))),
 		})
 	}
@@ -194,9 +195,10 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// add the last participant and keep the key for verifying the proof
-	key := rnd.RandomBytes(32)
+	key := ethereum.NewSignKeys()
+	qt.Assert(t, key.Generate(), qt.IsNil)
 	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
-		Key:    key,
+		Key:    key.Address().Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	}}}, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
@@ -207,7 +209,7 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
 	root := censusData.CensusID.String()
 
-	resp, code = c.Request("GET", nil, root, "proof", fmt.Sprintf("%x", key))
+	resp, code = c.Request("GET", nil, root, "proof", key.Address().String())
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
@@ -232,7 +234,7 @@ func TestCensusProof(t *testing.T) {
 		models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		censusData.CensusID,
 		electionID,
-		state.NewVoterID(state.VoterIDTypeECDSA, key),
+		state.NewVoterID(state.VoterIDTypeECDSA, key.PublicKey()),
 	)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)

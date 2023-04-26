@@ -1,0 +1,24 @@
+name: Deploy dev env
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Deploy main branch to dev env
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0 # the push step needs a full repo, not shallow
+    - name: Push main branch to dev branch
+      uses: ad-m/github-push-action@v0.6.0
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: dev
+        force: true
+        # the force push doesn't really work if `dev` branch is protected
+        # in that case, you need to do `git push -f origin origin/master:dev`
+        # from an account authorized to do force-push, and re-run the action

@@ -2,8 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
-	"math/big"
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -16,53 +17,52 @@ import (
 )
 
 func init() {
-	ops["anonelection"] = operation{
-		test:        &E2EAnonElection{},
-		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
-		example:     os.Args[0] + " --operation=anonelection --votes=1000",
+	ops["encryptedelection"] = operation{
+		test:        &E2EEncryptedElection{},
+		description: "Publishes a census and a non-anonymous, secret-until-the-end election, emits N votes and verifies the results",
+		example:     os.Args[0] + " --operation=encryptedelection --votes=1000",
 	}
 }
 
-var _ VochainTest = (*E2EAnonElection)(nil)
+var _ VochainTest = (*E2EEncryptedElection)(nil)
 
-type E2EAnonElection struct {
+type E2EEncryptedElection struct {
 	e2eElection
 }
 
-func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
+func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
 	ed := newTestElectionDescription()
 	ed.ElectionType = vapi.ElectionType{
-		Autostart:     true,
-		Interruptible: true,
-		Anonymous:     true,
+		Autostart:         true,
+		Interruptible:     true,
+		SecretUntilTheEnd: true,
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
-	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeZKWeighted}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
 	if err := t.setupElection(ed); err != nil {
 		return err
 	}
+
 	log.Debugf("election details: %+v", *t.election)
 	return nil
 }
 
-func (t *E2EAnonElection) Teardown() error {
+func (t *E2EEncryptedElection) Teardown() error {
 	// nothing to do here
 	return nil
 }
 
-func (t *E2EAnonElection) Run() error {
+func (t *E2EEncryptedElection) Run() error {
 	c := t.config
 	api := t.api
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-
 	wg := sync.WaitGroup{}
-	apiClientMtx := &sync.Mutex{}
 	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("sending %d votes", len(accounts))
@@ -77,22 +77,13 @@ func (t *E2EAnonElection) Run() error {
 		for {
 			contextDeadlines := 0
 			for i, voterAccount := range accountsMap {
-				apiClientMtx.Lock()
-				privKey := voterAccount.PrivateKey()
-				if err := api.SetAccount(privKey.String()); err != nil {
-					apiClientMtx.Unlock()
-					log.Fatal(err)
-					return
-				}
-
-				_, err := api.Vote(&apiclient.VoteData{
-					ElectionID:   t.election.ElectionID,
-					ProofMkTree:  t.proofs[voterAccount.Address().Hex()],
-					Choices:      []int{i % 2},
-					VotingWeight: new(big.Int).SetUint64(8),
+				c := api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+				_, err := c.Vote(&apiclient.VoteData{
+					ElectionID:  t.election.ElectionID,
+					ProofMkTree: t.proofs[voterAccount.Address().Hex()],
+					Choices:     []int{i % 2},
 				})
-				apiClientMtx.Unlock()
-				// if the context deadline is reached, we don't need to print it (let's jus retry)
+				// if the context deadline is reached, we don't need to print it (let's just retry)
 				if err != nil && errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
 					contextDeadlines++
 					continue
@@ -147,46 +138,30 @@ func (t *E2EAnonElection) Run() error {
 		}
 	}
 
-	log.Infof("%d votes registered successfully, took %s (%f votes/second)",
-		c.nvotes, time.Since(startTime), float64(c.nvotes)/time.Since(startTime).Seconds())
+	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
+		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
+	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
 		log.Fatal(err)
 	}
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	hash, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
+	_, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	// Check the election status is actually ENDED
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Fatalf("gave up waiting for tx %s to be mined: %s", hash, err)
-	}
-
-	t.election, err = api.Election(t.election.ElectionID)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if t.election.Status != "ENDED" {
-		log.Fatal("election status is not ENDED")
-	}
-	log.Infof("election %s status is ENDED", t.election.ElectionID.String())
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
-	t.election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
 		log.Fatal(err)
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
-	log.Infof("election results: %v", t.election.Results)
+	log.Infof("election results: %v", election.Results)
 
 	return nil
 }
