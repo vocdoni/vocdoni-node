@@ -5,7 +5,6 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -114,47 +113,6 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (ethereum.Ad
 			if err := checkRevealProcessKeys(tx, process); err != nil {
 				return ethereum.Address{}, err
 			}
-		}
-	case models.TxType_ADD_ORACLE:
-		err := t.state.VerifyTreasurer(addr, tx.Nonce)
-		if err != nil {
-			return ethereum.Address{}, fmt.Errorf("tx sender not authorized: %w", err)
-		}
-		// check not empty
-		if len(tx.Address) != types.EthereumAddressSize {
-			return ethereum.Address{}, fmt.Errorf("invalid oracle address: %x", tx.Address)
-		}
-		oracles, err := t.state.Oracles(false)
-		if err != nil {
-			return ethereum.Address{}, fmt.Errorf("cannot get oracles")
-		}
-		for idx, oracle := range oracles {
-			if oracle == ethereum.AddrFromBytes(tx.Address) {
-				return ethereum.Address{}, fmt.Errorf("oracle already added to oracle list at position %d", idx)
-			}
-		}
-	case models.TxType_REMOVE_ORACLE:
-		err := t.state.VerifyTreasurer(addr, tx.Nonce)
-		if err != nil {
-			return ethereum.Address{}, fmt.Errorf("tx sender not authorized: %w", err)
-		}
-		// check not empty
-		if len(tx.Address) != types.EthereumAddressSize {
-			return ethereum.Address{}, fmt.Errorf("invalid oracle address: %x", tx.Address)
-		}
-		oracles, err := t.state.Oracles(false)
-		if err != nil {
-			return ethereum.Address{}, fmt.Errorf("cannot get oracles")
-		}
-		var found bool
-		for _, oracle := range oracles {
-			if oracle == ethereum.AddrFromBytes(tx.Address) {
-				found = true
-				break
-			}
-		}
-		if !found {
-			return ethereum.Address{}, fmt.Errorf("cannot remove oracle, not found")
 		}
 	default:
 		return ethereum.Address{}, fmt.Errorf("tx not supported")

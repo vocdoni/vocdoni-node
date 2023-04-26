@@ -25,7 +25,6 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -48,7 +47,6 @@ const (
 type Vocone struct {
 	sc              *indexer.Indexer
 	kk              *keykeeper.KeyKeeper
-	oracle          *oracle.Oracle
 	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
 	dataDir         string
@@ -114,15 +112,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	if err := vc.SetKeyKeeper(keymanager); err != nil {
 		return nil, fmt.Errorf("could not create keykeeper: %w", err)
 	}
-
-	// Create the Oracle for voting results
-	if err := vc.AddOracle(keymanager); err != nil {
-		return nil, err
-	}
-	if vc.oracle, err = oracle.NewOracle(vc.app, keymanager); err != nil {
-		return nil, err
-	}
-	vc.oracle.EnableResults(vc.sc)
 
 	// Create vochain metrics collector
 	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)

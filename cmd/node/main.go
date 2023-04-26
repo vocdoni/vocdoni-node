@@ -27,7 +27,6 @@ import (
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/metrics"
-	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -92,7 +91,7 @@ func newConfig() (*config.Config, config.Error) {
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
-		"global operation mode. Available options: [gateway,oracle,ethApiOracle,miner,seed]")
+		"global operation mode. Available options: [gateway,miner,seed]")
 	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
@@ -385,11 +384,9 @@ func main() {
 
 	var err error
 	var vochainKeykeeper *keykeeper.KeyKeeper
-	var vochainOracle *oracle.Oracle
 	srv := service.VocdoniService{Config: globalCfg.Vochain}
 
-	if globalCfg.Mode == types.ModeGateway ||
-		globalCfg.Mode == types.ModeOracle {
+	if globalCfg.Mode == types.ModeGateway {
 		// Signing key
 		srv.Signer = ethereum.NewSignKeys()
 
@@ -434,15 +431,11 @@ func main() {
 	//
 	if globalCfg.Mode == types.ModeGateway ||
 		globalCfg.Mode == types.ModeMiner ||
-		globalCfg.Mode == types.ModeOracle ||
 		globalCfg.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		globalCfg.Vochain.IsSeedNode = types.ModeSeed == globalCfg.Mode
 		// do we need indexer?
-		globalCfg.Vochain.Indexer.Enabled = (globalCfg.Mode == types.ModeGateway) ||
-			(globalCfg.Mode == types.ModeOracle)
-		// if oracle mode, we don't need live results
-		globalCfg.Vochain.Indexer.IgnoreLiveResults = (globalCfg.Mode == types.ModeOracle)
+		globalCfg.Vochain.Indexer.Enabled = (globalCfg.Mode == types.ModeGateway)
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway
@@ -513,17 +506,6 @@ func main() {
 				"address", signer.Address().Hex(),
 				"keyIndex", validator.KeyIndex)
 		}
-	}
-
-	//
-	// Oracle
-	//
-	if globalCfg.Mode == types.ModeOracle {
-		if vochainOracle, err = oracle.NewOracle(srv.App, srv.Signer); err != nil {
-			log.Fatal(err)
-		}
-		// Start oracle results indexer
-		vochainOracle.EnableResults(srv.Indexer)
 	}
 
 	//
