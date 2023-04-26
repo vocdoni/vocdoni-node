@@ -212,42 +212,6 @@ func (vc *Vocone) SetBlockSize(txsCount int) {
 	vc.txsPerBlock = txsCount
 }
 
-// AddOracle adds a new oracle to the state. If oracle exists, does nothing.
-func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
-	oracleList, err := vc.app.State.Oracles(true)
-	if err != nil {
-		return err
-	}
-	oracleExist := false
-	for _, o := range oracleList {
-		if oracleKey.Address() == o {
-			oracleExist = true
-			break
-		}
-	}
-	if !oracleExist {
-		log.Infof("adding new oracle %s", oracleKey.Address())
-		vc.vcMtx.Lock()
-		vc.app.State.AddOracle(oracleKey.Address())
-		if _, err := vc.app.State.Save(); err != nil {
-			vc.vcMtx.Unlock()
-			return err
-		}
-		vc.vcMtx.Unlock()
-	}
-	// Create the account and assign balance if does not exist or balance too low
-	oAcc, err := vc.app.State.GetAccount(oracleKey.Address(), true)
-	if err != nil {
-		return err
-	}
-	if oAcc == nil || oAcc.Balance < 10000 {
-		vc.CreateAccount(oracleKey.Address(), &state.Account{Account: models.Account{
-			Balance: 100000,
-		}})
-	}
-	return nil
-}
-
 // CreateAccount creates a new account in the state.
 func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 	vc.vcMtx.Lock()
@@ -373,7 +337,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 func (vc *Vocone) setDefaultMethods() {
 	// first set the default methods, then override some of them
 	vc.app.SetDefaultMethods()
-	vc.app.IsSynchronizing = func() bool { return false }
+	vc.app.SetFnIsSynchronizing(func() bool { return false })
 	vc.app.SetFnSendTx(vc.addTx)
 	vc.app.SetFnGetTx(vc.getTx)
 	vc.app.SetFnGetBlockByHeight(vc.getBlock)

@@ -95,16 +95,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 		if forCommit {
 			tx := vtx.Tx.GetAdmin()
 			switch tx.Txtype {
-			case models.TxType_ADD_ORACLE:
-				if err := t.state.AddOracle(common.BytesToAddress(tx.Address)); err != nil {
-					return nil, fmt.Errorf("addOracle: %w", err)
-				}
-				return response, t.state.IncrementTreasurerNonce()
-			case models.TxType_REMOVE_ORACLE:
-				if err := t.state.RemoveOracle(common.BytesToAddress(tx.Address)); err != nil {
-					return nil, fmt.Errorf("removeOracle: %w", err)
-				}
-				return response, t.state.IncrementTreasurerNonce()
 			// TODO: @jordipainan No cost applied, no nonce increased
 			case models.TxType_ADD_PROCESS_KEYS:
 				if err := t.state.AddProcessKeys(tx); err != nil {

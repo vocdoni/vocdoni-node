@@ -185,6 +185,9 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 	if err != nil {
 		return fmt.Errorf("cannot commit IST actions: %w", err)
 	}
+	if len(actions.Actions) == 0 {
+		return nil
+	}
 	for id, action := range actions.Actions {
 		switch action.Action {
 		case ActionComputeResults:
@@ -226,11 +229,13 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 			hex.EncodeToString([]byte(id)), "action", ActionsToString[action.Action])
 	}
 	// delete the IST actions for the given height
-	c.st.Tx.Lock()
-	defer c.st.Tx.Unlock()
-	if err := c.st.Tx.NoState().Delete(dbIndex(height)); err != nil {
-		return fmt.Errorf("cannot delete IST actions: %w", err)
-	}
+	func() {
+		c.st.Tx.Lock()
+		if err := c.st.Tx.NoState().Delete(dbIndex(height)); err != nil {
+			log.Warnf("cannot delete IST actions: %v", err)
+		}
+		c.st.Tx.Unlock()
+	}()
 	return nil
 }
 

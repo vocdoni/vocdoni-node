@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -47,10 +46,10 @@ type BaseApplication struct {
 	Service            service.Service
 	Node               *tmcli.Local
 	TransactionHandler *transaction.TransactionHandler
-	IsSynchronizing    func() bool
+	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
-	isSyncLock sync.Mutex
+	isSynchronizing uint32
 
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
@@ -166,6 +165,7 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
 func (app *BaseApplication) SetDefaultMethods() {
+	log.Infof("setting default Tendermint methods for blockchain interaction")
 	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
 		resblock, err := app.Node.BlockByHash(context.Background(), hash)
 		if err != nil {
@@ -184,7 +184,7 @@ func (app *BaseApplication) SetDefaultMethods() {
 		return resblock.Block
 	})
 
-	app.IsSynchronizing = app.isSynchronizingTendermint
+	app.isSynchronizingFn = app.isSynchronizingTendermint
 	app.SetFnGetTx(app.getTxTendermint)
 	app.SetFnGetTxHash(app.getTxHashTendermint)
 	app.SetFnMempoolSize(func() int {
@@ -239,7 +239,7 @@ func (app *BaseApplication) SetTestingMethods() {
 		}, nil
 	})
 	app.SetFnMempoolSize(func() int { return 0 })
-	app.IsSynchronizing = func() bool { return false }
+	app.isSynchronizingFn = func() bool { return false }
 	app.SetFnEndBlock(func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
 		height := mockBlockStore.EndBlock()
 		app.endBlock(height, time.Now())
@@ -257,14 +257,13 @@ func (app *BaseApplication) SetTestingMethods() {
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
-	app.isSyncLock.Lock()
-	defer app.isSyncLock.Unlock()
-	status, err := app.Node.Status(context.Background())
-	if err != nil {
-		log.Warnf("error retrieving node status information: %v", err)
-		return true
-	}
-	return status.SyncInfo.CatchingUp
+	return app.Service.(tmcli.NodeService).RPCEnvironment().ConsensusReactor.WaitSync()
+}
+
+// IsSynchronizing informes if the blockchain is synchronizing or not.
+// The value is updated every new block.
+func (app *BaseApplication) IsSynchronizing() bool {
+	return atomic.LoadUint32(&app.isSynchronizing) != 0
 }
 
 // Height returns the current blockchain height
@@ -384,6 +383,13 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 
 // BeginBlock is called at the beginning of every block.
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
+	if app.isSynchronizingFn != nil {
+		if app.isSynchronizingFn() {
+			atomic.StoreUint32(&app.isSynchronizing, 1)
+		} else {
+			atomic.StoreUint32(&app.isSynchronizing, 0)
+		}
+	}
 	return app.fnBeginBlock(req)
 }
 
@@ -422,22 +428,13 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
-	// setting the app initial state with validators, oracles, height = 0 and empty apphash
+	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState genesis.GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		fmt.Printf("%s\n", req.AppStateBytes)
 		log.Fatalf("cannot unmarshal app state bytes: %v", err)
-	}
-	// get oracles
-	for _, v := range genesisAppState.Oracles {
-		log.Infof("adding genesis oracle %x", v)
-		addr := ethcommon.BytesToAddress(v)
-		if err := app.State.AddOracle(addr); err != nil {
-			log.Fatalf("cannot add oracles: %v", err)
-		}
-		app.State.CreateAccount(addr, "", nil, 0)
 	}
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
@@ -686,6 +683,11 @@ func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadc
 // SetFnGetTx sets the getTx method
 func (app *BaseApplication) SetFnGetTx(fn func(height uint32, txIndex int32) (*models.SignedTx, error)) {
 	app.fnGetTx = fn
+}
+
+// SetFnIsSynchronizing sets the is synchronizing method
+func (app *BaseApplication) SetFnIsSynchronizing(fn func() bool) {
+	app.isSynchronizingFn = fn
 }
 
 // SetFnGetTxHash sets the getTxHash method

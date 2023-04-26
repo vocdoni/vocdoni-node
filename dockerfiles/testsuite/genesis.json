@@ -54,15 +54,8 @@
         "name": ""
       }
     ],
-    "oracles": [
-      "0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B"
-    ],
     "accounts":[
-         { 
-          "address":"0xf7FB77ee1F309D9468fB6DCB71aDD0f934a33c6B", 
-          "balance":10000
-         },
-         {
+        {
            "address":"0xccEc2c2D658261Fbdc40b04FEc06d49057242D39",
            "balance":10000
          },

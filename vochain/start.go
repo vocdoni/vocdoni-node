@@ -176,7 +176,7 @@ func newTendermint(app *BaseApplication,
 	tconfig.BlockSync.Enable = true
 	tconfig.StateSync.Enable = false
 
-	// if gateway or oracle
+	// if gateway
 	tconfig.Mode = tmcfg.ModeFull
 	// if seed node
 	if localConfig.IsSeedNode {

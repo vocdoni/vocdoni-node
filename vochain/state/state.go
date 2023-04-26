@@ -147,7 +147,7 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
 	sdb := statedb.NewStateDB(database)
 	startTime := time.Now()
-	defer log.Infof("StateDB load took %s", time.Since(startTime))
+	defer log.Infof("state database load took %s", time.Since(startTime))
 	root, err := sdb.Hash()
 	if err != nil {
 		return nil, err
@@ -161,19 +161,11 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	defer update.Discard()
-	// Create the Extra, Oracles, Validators and Processes subtrees (from
+	// Create the Extra, Validators and Processes subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
 	// time.
 	treeCfg := StateTreeCfg(TreeExtra)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeOracles)
 	if err := update.Add(treeCfg.Key(),
 		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err
@@ -233,74 +225,6 @@ func (v *State) ChainID() string {
 }
 
 var exist = []byte{1}
-
-// AddOracle adds a trusted oracle given its address if not exists
-func (v *State) AddOracle(address common.Address) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(address.Bytes(), exist, StateTreeCfg(TreeOracles))
-}
-
-// RemoveOracle removes a trusted oracle given its address if exists
-func (v *State) RemoveOracle(address common.Address) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	oracles, err := v.Tx.SubTree(StateTreeCfg(TreeOracles))
-	if err != nil {
-		return err
-	}
-	if _, err := oracles.Get(address.Bytes()); errors.Is(err, arbo.ErrKeyNotFound) {
-		return fmt.Errorf("oracle not found: %w", err)
-	} else if err != nil {
-		return err
-	}
-	return oracles.Set(address.Bytes(), nil)
-}
-
-// Oracles returns the current oracles list
-// When committed is false, the operation is executed also on not yet commited
-// data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
-func (v *State) Oracles(committed bool) ([]common.Address, error) {
-	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
-	}
-
-	oraclesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeOracles))
-	if err != nil {
-		return nil, err
-	}
-
-	var oracles []common.Address
-	if err := oraclesTree.Iterate(func(key, value []byte) bool {
-		// removed oracles are still in the tree but with value set to nil
-		if len(value) == 0 {
-			return true
-		}
-		oracles = append(oracles, common.BytesToAddress(key))
-		return true
-	}); err != nil {
-		return nil, err
-	}
-	return oracles, nil
-}
-
-// IsOracle returns true if the address is a valid oracle
-func (v *State) IsOracle(addr common.Address) (bool, error) {
-	oracles, err := v.Oracles(false)
-	if err != nil || len(oracles) == 0 {
-		return false, fmt.Errorf("cannot check authorization against a nil or empty oracle list")
-	}
-	return func() bool {
-		for _, oracle := range oracles {
-			if oracle == addr {
-				return true
-			}
-		}
-		return false
-	}(), nil
-}
 
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {

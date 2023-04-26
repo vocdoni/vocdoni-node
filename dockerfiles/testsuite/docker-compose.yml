@@ -68,21 +68,6 @@ services:
     links:
       - seed
 
-  oracle:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file:
-      - "${COMPOSE_HOST_PATH:-.}/env.oracle"
-      - "${COMPOSE_HOST_PATH:-.}/env.oracle0key"
-    volumes:
-      - data-oracle:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
-      - gocoverage-oracle:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
-
   gateway0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway0"

@@ -76,21 +76,6 @@ func (r *RPCAPI) getValidatorList(request *api.APIrequest) (*api.APIresponse, er
 	return &response, err
 }
 
-func (r *RPCAPI) getOracleList(request *api.APIrequest) (*api.APIresponse, error) {
-	var response api.APIresponse
-	var err error
-	oracleList, err := r.vocapp.State.Oracles(true)
-	if err != nil {
-		return nil, fmt.Errorf("cannot get oracle list")
-	}
-	response.OracleList = new([]string)
-	*response.OracleList = make([]string, len(oracleList))
-	for _, oracle := range oracleList {
-		*response.OracleList = append(*response.OracleList, oracle.String())
-	}
-	return &response, err
-}
-
 func (r *RPCAPI) getBlock(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
 	if request.Height > r.vocapp.Height() {
