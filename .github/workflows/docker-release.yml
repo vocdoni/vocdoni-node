@@ -1,0 +1,97 @@
+---
+name: Docker Releases
+
+on:
+  push:
+    branches:
+      - dev
+      - stage
+      - master
+  pull_request:
+
+jobs:
+  job_docker_release:
+    runs-on: ubuntu-latest
+    needs: [job_go_test, job_compose_test]
+    if: |
+      github.ref == 'refs/heads/master'
+      || github.ref == 'refs/heads/stage'
+      || startsWith(github.ref, 'refs/heads/release')
+      || github.ref == 'refs/heads/dev'
+      || github.ref == 'refs/heads/apiv2'
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+      - name: Get branch name, git commit hash and current time in secs
+        id: vars
+        shell: bash
+        run: |
+          echo "BRANCH_NAME=$(echo ${GITHUB_REF#refs/heads/} | tr '/' '-' )" >> $GITHUB_OUTPUT
+          echo "GIT_HASH_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "DATE_IN_SECS=$(date +%s)" >> $GITHUB_OUTPUT
+      - name: Push image to Docker Hub and ghcr.io
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          # platforms: linux/amd64,linux/arm64
+          push: true     # true to upload image to registry
+          tags: |
+            vocdoni/go-dvote:latest,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - name: Push image to Docker Hub and ghcr.io (race enabled)
+        uses: docker/build-push-action@v3
+        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
+        with:
+          context: .
+          push: true     # true to upload image to registry
+          build-args: |
+            BUILDARGS=-race
+          tags: |
+            vocdoni/go-dvote:latest-race,
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:latest-race,
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
+            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  job_go_build_for_mac:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Go environment
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+      - name: Run go build for Mac
+        run: |
+          # Some of our devs are on Mac. Ensure it builds.
+          # It's surprisingly hard with some deps like bazil.org/fuse.
+          GOOS=darwin go build ./...
+
