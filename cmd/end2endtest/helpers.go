@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	notWaitUntilNextBlock = "notWaitNextBlock"
-	waitUntilNextBlock    = "waitNextBlock"
+	nextBlock = "nextBlock"
+	sameBlock = "sameBlock"
 )
 
 func newTestElectionDescription() *vapi.ElectionDescription {
@@ -315,10 +315,10 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 		}
 		contextDeadlines += ctxDeadLine
 		switch waitType {
-		case notWaitUntilNextBlock:
+		case nextBlock:
 			time.Sleep(time.Second * 5)
 
-		case waitUntilNextBlock:
+		case sameBlock:
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			defer cancel()
 			t.api.WaitUntilNextBlock(ctx)
