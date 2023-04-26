@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	ops["overwritewaitnextblock"] = operation{
+	ops["overwrite"] = operation{
 		test: &E2EOverwriteElection{},
 		description: "Checks that the MaxVoteOverwrite feature is correctly implemented, even if a vote is consecutive " +
 			"overwrite without wait the next block, that means the error in checkTx: overwrite count reached, it's not raised",
@@ -38,7 +38,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 		Autostart:     true,
 		Interruptible: true,
 	}
-	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
+	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 2}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
 	if err := t.setupElection(ed); err != nil {
@@ -81,7 +81,7 @@ func (t *E2EOverwriteElection) Run() error {
 	}
 
 	pcount := c.nvotes / c.parallelCount
-	for i := 1; i < len(t.voterAccounts); i += pcount {
+	for i := 0; i < len(t.voterAccounts); i += pcount {
 		end := i + pcount
 		if end > len(t.voterAccounts) {
 			end = len(t.voterAccounts)
@@ -92,21 +92,23 @@ func (t *E2EOverwriteElection) Run() error {
 
 	wg.Wait()
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
+		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
-	// Send the only missing vote, should be fine
-	ctxDeadlines, err := t.sendVote(t.voterAccounts[0], []int{0}, nil)
+	// overwrite the previous vote (choice 0) associated with account with index 0, with enough time to use the nextBlock
+	// make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
+	ctxDeadlines, err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
 	if err != nil {
 		return err
 	}
-	log.Infof("vote send, got %d HTTP errors", ctxDeadlines)
+	log.Infof("overwrite vote send, associated with the account: %v , got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
+	time.Sleep(time.Second * 5)
 
-	// overwrite a vote the amount of choices passed to the method
-	if ctxDeadlines, err = t.overwriteVote([]int{1, 0}, 0, waitUntilNextBlock); err != nil {
+	// overwrite the previous vote (choice 0) associated with account with index 1, with not enough time to use the sameBlock
+	// make two overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
+	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
 		return err
 	}
-
-	log.Infof("overwrite vote send, got %d HTTP errors", ctxDeadlines)
+	log.Infof("overwrite vote send, associated with the account: %s, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
@@ -148,7 +150,7 @@ func (t *E2EOverwriteElection) Run() error {
 		log.Fatal(err)
 	}
 
-	firstChoice := fmt.Sprintf("%d", (c.nvotes-1)*10)
+	firstChoice := fmt.Sprintf("%d", (c.nvotes-2)*10)
 	// should count the firsts overwrite
 	secondChoice := fmt.Sprintf("%d", 10)
 
