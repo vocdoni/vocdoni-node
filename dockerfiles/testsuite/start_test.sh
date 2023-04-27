@@ -6,6 +6,8 @@
 #  e2etest_encryptedelection: run encrypted vote test
 #  e2etest_anonelection: run anonymous vote test
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
+#  e2etest_overwrite: run overwrite test
+#  e2etest_cenususize: run max census size test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
@@ -48,6 +50,8 @@ tests_to_run=(
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
 	"e2etest_anonelection"
+	"e2etest_overwrite"
+	"e2etest_cenususize"
 	"e2etest_tokentxs"
 )
 
@@ -100,6 +104,14 @@ e2etest_anonelection() {
 
 e2etest_tokentxs() {
 	e2etest tokentxs
+}
+
+e2etest_overwrite () {
+  e2etest overwritelection
+}
+
+e2etest_cenususize () {
+  e2etest censusizelection
 }
 
 ### end tests definition
