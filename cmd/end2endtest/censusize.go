@@ -16,10 +16,10 @@ import (
 )
 
 func init() {
-	ops["censusizeelection"] = operation{
+	ops["censusizelection"] = operation{
 		test:        &E2EMaxCensusSizeElection{},
 		description: "Publishes a census with maxCensusSize smaller than the actual census size validate the maxCensusSize restriction feature",
-		example:     os.Args[0] + " --operation=censusizeelection --votes=1000",
+		example:     os.Args[0] + " --operation=censusizelection --votes=1000",
 	}
 }
 

@@ -15,11 +15,11 @@ import (
 )
 
 func init() {
-	ops["overwrite"] = operation{
+	ops["overwritelection"] = operation{
 		test: &E2EOverwriteElection{},
 		description: "Checks that the MaxVoteOverwrite feature is correctly implemented, even if a vote is consecutive " +
 			"overwrite without wait the next block, that means the error in checkTx: overwrite count reached, it's not raised",
-		example: os.Args[0] + " --operation=voteoverwritenotwaitnextblock --votes=1000",
+		example: os.Args[0] + " --operation=overwritelection --votes=1000",
 	}
 }
 
