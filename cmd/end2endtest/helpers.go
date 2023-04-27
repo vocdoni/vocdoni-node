@@ -270,7 +270,10 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	log.Infof("census published with root %s", root.String())
 	ed.Census.RootHash = root
 	ed.Census.URL = censusURI
-	ed.Census.Size = uint64(t.config.nvotes)
+
+	if ed.Census.Size == 0 {
+		ed.Census.Size = uint64(t.config.nvotes)
+	}
 
 	// Check census size (of the published census)
 	if !t.isCensusSizeValid(root) {
@@ -349,8 +352,8 @@ func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, ap
 	); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
 			contextDeadline = 1
-		} else if strings.Contains(err.Error(), "overwrite count reached") {
-			// this error is expected on overwrite test
+		} else if strings.Contains(err.Error(), "reached") {
+			// this error is expected on overwrite or maxCensusSize test
 			return 0, err
 		} else if !strings.Contains(err.Error(), "already exists") {
 			// if the error is not "vote already exists", we need to print it
