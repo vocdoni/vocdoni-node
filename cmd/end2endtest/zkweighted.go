@@ -122,7 +122,7 @@ func (t *E2EAnonElection) Run() error {
 	log.Infof("ending election...")
 	hash, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Check the election status is actually ENDED
@@ -134,7 +134,7 @@ func (t *E2EAnonElection) Run() error {
 
 	t.election, err = api.Election(t.election.ElectionID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if t.election.Status != "ENDED" {
 		log.Fatal("election status is not ENDED")
@@ -146,7 +146,7 @@ func (t *E2EAnonElection) Run() error {
 	defer cancel()
 	t.election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", t.election.Results)

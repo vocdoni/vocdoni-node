@@ -147,7 +147,7 @@ func (t *E2EOverwriteElection) Run() error {
 	defer cancel()
 	elres, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	firstChoice := fmt.Sprintf("%d", (c.nvotes-2)*10)
@@ -159,7 +159,8 @@ func (t *E2EOverwriteElection) Run() error {
 
 	// only the first overwrite should be valid in the results and must math with the expected results
 	if !matchResult(elres.Results, resultExpected) {
-		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
+		log.Errorf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
+		return err
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", elres.Results)

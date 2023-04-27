@@ -114,14 +114,14 @@ func (t *E2EPlaintextElection) Run() error {
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
 	hash, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Check the election status is actually ENDED
@@ -133,7 +133,7 @@ func (t *E2EPlaintextElection) Run() error {
 
 	t.election, err = api.Election(t.election.ElectionID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	if t.election.Status != "ENDED" {
 		log.Fatal("election status is not ENDED")
@@ -145,7 +145,7 @@ func (t *E2EPlaintextElection) Run() error {
 	defer cancel()
 	t.election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", t.election.Results)

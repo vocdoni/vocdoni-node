@@ -115,14 +115,14 @@ func (t *E2EEncryptedElection) Run() error {
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
 	_, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// Wait for the election to be in RESULTS state
@@ -130,7 +130,7 @@ func (t *E2EEncryptedElection) Run() error {
 	defer cancel()
 	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", election.Results)

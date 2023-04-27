@@ -133,7 +133,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 
 	// Set the account back to the organization account
 	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// End the election by setting the status to ENDED
@@ -147,7 +147,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	defer cancel()
 	elres, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	// should not count the last vote
