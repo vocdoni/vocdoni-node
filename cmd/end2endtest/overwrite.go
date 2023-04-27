@@ -100,14 +100,14 @@ func (t *E2EOverwriteElection) Run() error {
 	if err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote send, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
 	// now the overwrite vote is done in the sameBlock using account of index 1
 	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote send, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
@@ -151,7 +151,7 @@ func (t *E2EOverwriteElection) Run() error {
 
 	firstChoice := fmt.Sprintf("%d", (c.nvotes-2)*10)
 	// should count the firsts overwrite
-	secondChoice := fmt.Sprintf("%d", 10)
+	secondChoice := fmt.Sprintf("%d", 20)
 
 	// according to the first overwrite
 	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
