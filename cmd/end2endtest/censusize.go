@@ -19,7 +19,7 @@ func init() {
 	ops["censusizeelection"] = operation{
 		test:        &E2EMaxCensusSizeElection{},
 		description: "Publishes a census with maxCensusSize smaller than the actual census size validate the maxCensusSize restriction feature",
-		example:     os.Args[0] + " --operation=maxcensusizeelection --votes=1000",
+		example:     os.Args[0] + " --operation=censusizeelection --votes=1000",
 	}
 }
 
@@ -98,7 +98,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes-1)/time.Since(startTime).Seconds()))
 
-	// the last vote should fail due maxCensusSiz constrain
+	// the last vote should fail due maxCensusSize constrain
 	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
 
 	if _, err := t.sendVote(t.voterAccounts[0], []int{0}, nil); err != nil {
