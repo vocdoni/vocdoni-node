@@ -94,21 +94,21 @@ func (t *E2EOverwriteElection) Run() error {
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
-	// overwrite the previous vote (choice 0) associated with account with index 0, with enough time to use the nextBlock
-	// make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
+	// overwrite the previous vote (choice 0) associated with account of index 0, using enough time to do it in the nextBlock
+	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
 	ctxDeadlines, err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
 	if err != nil {
 		return err
 	}
-	log.Infof("overwrite vote send, associated with the account: %v , got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote send, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
-	// overwrite the previous vote (choice 0) associated with account with index 1, with not enough time to use the sameBlock
-	// make two overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
+	// overwrite the previous vote (choice 0) associated with account of index 1, not using enough time to do it in the sameBlock
+	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should be counted due the maxVoteOverwrite constrain
 	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
 		return err
 	}
-	log.Infof("overwrite vote send, associated with the account: %s, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote send, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified
