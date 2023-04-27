@@ -106,11 +106,11 @@ e2etest_tokentxs() {
 	e2etest tokentxs
 }
 
-e2etest_overwrite () {
+e2etest_overwritelection () {
   e2etest overwritelection
 }
 
-e2etest_cenususize () {
+e2etest_cenususizelection () {
   e2etest censusizelection
 }
 
