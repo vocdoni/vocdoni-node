@@ -103,8 +103,7 @@ func (t *E2EOverwriteElection) Run() error {
 	log.Infof("the account %v send an overwrite vote send, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
 	time.Sleep(time.Second * 5)
 
-	// overwrite the previous vote (choice 0) associated with account of index 1, not using enough time to do it in the sameBlock
-	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should be counted due the maxVoteOverwrite constrain
+	// now the overwrite vote is done in the sameBlock using account of index 1
 	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
 		return err
 	}
