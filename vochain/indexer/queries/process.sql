@@ -11,7 +11,7 @@ INSERT INTO processes (
 	source_block_height, source_network_id,
 
 	results_votes, results_weight, results_envelope_height,
-	results_signatures, results_block_height
+	results_block_height
 ) VALUES (
 	?, ?, ?, ?,
 	?, ?, ?,
@@ -24,7 +24,7 @@ INSERT INTO processes (
 	?, ?,
 
 	?, '0', 0,
-	'', 0
+	0
 );
 
 -- name: GetProcess :one
@@ -98,7 +98,6 @@ SET have_results = TRUE, final_results = TRUE,
 	results_votes = sqlc.arg(votes),
 	results_weight = sqlc.arg(weight),
 	results_envelope_height = sqlc.arg(envelope_height),
-	results_signatures = sqlc.arg(signatures),
 	results_block_height = sqlc.arg(block_height)
 WHERE id = sqlc.arg(id);
 
@@ -138,6 +137,5 @@ UPDATE processes
 SET results_votes  = sqlc.arg(votes),
     results_weight = sqlc.arg(weight),
     vote_opts_pb = sqlc.arg(vote_opts_pb),
-    envelope_pb = sqlc.arg(envelope_pb),
-    results_signatures = sqlc.arg(results_signatures)
+    envelope_pb = sqlc.arg(envelope_pb)
 WHERE id = sqlc.arg(id);

@@ -26,7 +26,7 @@ INSERT INTO processes (
 	source_block_height, source_network_id,
 
 	results_votes, results_weight, results_envelope_height,
-	results_signatures, results_block_height
+	results_block_height
 ) VALUES (
 	?, ?, ?, ?,
 	?, ?, ?,
@@ -39,7 +39,7 @@ INSERT INTO processes (
 	?, ?,
 
 	?, '0', 0,
-	'', 0
+	0
 )
 `
 
@@ -127,7 +127,7 @@ func (q *Queries) GetEntityProcessCount(ctx context.Context, entityID types.Enti
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_block, end_block, results_height, have_results, final_results, results_votes, results_weight, results_envelope_height, results_signatures, results_block_height, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+SELECT id, entity_id, start_block, end_block, results_height, have_results, final_results, results_votes, results_weight, results_envelope_height, results_block_height, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -146,7 +146,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.ResultsVotes,
 		&i.ResultsWeight,
 		&i.ResultsEnvelopeHeight,
-		&i.ResultsSignatures,
 		&i.ResultsBlockHeight,
 		&i.CensusRoot,
 		&i.RollingCensusRoot,
@@ -417,7 +416,6 @@ SET have_results = TRUE, final_results = TRUE,
 	results_votes = ?,
 	results_weight = ?,
 	results_envelope_height = ?,
-	results_signatures = ?,
 	results_block_height = ?
 WHERE id = ?
 `
@@ -426,7 +424,6 @@ type SetProcessResultsReadyParams struct {
 	Votes          string
 	Weight         string
 	EnvelopeHeight int64
-	Signatures     string
 	BlockHeight    int64
 	ID             types.ProcessID
 }
@@ -436,7 +433,6 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 		arg.Votes,
 		arg.Weight,
 		arg.EnvelopeHeight,
-		arg.Signatures,
 		arg.BlockHeight,
 		arg.ID,
 	)
@@ -489,18 +485,16 @@ UPDATE processes
 SET results_votes  = ?,
     results_weight = ?,
     vote_opts_pb = ?,
-    envelope_pb = ?,
-    results_signatures = ?
+    envelope_pb = ?
 WHERE id = ?
 `
 
 type UpdateProcessResultByIDParams struct {
-	Votes             string
-	Weight            string
-	VoteOptsPb        types.EncodedProtoBuf
-	EnvelopePb        types.EncodedProtoBuf
-	ResultsSignatures string
-	ID                types.ProcessID
+	Votes      string
+	Weight     string
+	VoteOptsPb types.EncodedProtoBuf
+	EnvelopePb types.EncodedProtoBuf
+	ID         types.ProcessID
 }
 
 func (q *Queries) UpdateProcessResultByID(ctx context.Context, arg UpdateProcessResultByIDParams) (sql.Result, error) {
@@ -509,7 +503,6 @@ func (q *Queries) UpdateProcessResultByID(ctx context.Context, arg UpdateProcess
 		arg.Weight,
 		arg.VoteOptsPb,
 		arg.EnvelopePb,
-		arg.ResultsSignatures,
 		arg.ID,
 	)
 }

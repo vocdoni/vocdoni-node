@@ -20,7 +20,7 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		return nil, fmt.Errorf("process is nil")
 	}
 
-	p, err := st.Process(electionID, true)
+	p, err := st.Process(electionID, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get process: %w", err)
 	}

@@ -350,6 +350,12 @@ func (t *TreeTx) Discard() {
 	t.tx.Discard()
 }
 
+// SaveWithoutCommit saves the changes made from the TreeTx without committing a new state.
+// This is useful for testing purposes and for commiting only nostate changes.
+func (t *TreeTx) SaveWithoutCommit() error {
+	return t.tx.Commit()
+}
+
 // treeUpdateView is a wrapper over TreeUpdate that fulfills the TreeViewer
 // interface.
 type treeUpdateView TreeUpdate

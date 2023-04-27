@@ -142,8 +142,6 @@ const (
 	TxSetProcess        = "setProcess"
 	TxAddValidator      = "addValidator"
 	TxRemoveValidator   = "removeValidator"
-	TxAddOracle         = "addOracle"
-	TxRemoveOracle      = "removeOracle"
 	TxAddProcessKeys    = "addProcessKeys"
 	TxRevealProcessKeys = "revealProcessKeys"
 

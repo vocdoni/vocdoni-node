@@ -19,7 +19,7 @@ const (
 	// the results will be committed two blocks after.
 	// Note that changing this factor might break consensus and backwards
 	// compatibility.
-	BlocksToWaitForResultsFactor = 500
+	BlocksToWaitForResultsFactor = 5000
 
 	// ExtraWaitSecondsForResults is the number of seconds extra to wait for the results
 	ExtraWaitSecondsForResults = time.Second * 20
@@ -36,7 +36,6 @@ func (c *Controller) scheduleCommitResults(electionID []byte) error {
 	}); err != nil {
 		return fmt.Errorf("cannot schedule results commit: %w", err)
 	}
-	log.Infow("scheduling results commit", "electionID", fmt.Sprintf("%x", electionID), "commitHeight", commitHeight)
 	return nil
 }
 
@@ -51,9 +50,7 @@ func (c *Controller) computeAndStoreResults(electionID []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot encode results: %w", err)
 	}
-	c.st.Tx.Lock()
-	defer c.st.Tx.Unlock()
-	if err := c.st.Tx.NoState().Set(dbResultsIndex(electionID), rEncoded); err != nil {
+	if err := c.storeToNoState(dbResultsIndex(electionID), rEncoded); err != nil {
 		return fmt.Errorf("cannot store results: %w", err)
 	}
 	return nil
@@ -69,8 +66,7 @@ func (c *Controller) commitResults(electionID []byte, r *results.Results) error 
 		var err error
 		for {
 			// For safety we compute the results again if the time is up.
-			// We also compute the results con commit if the node is syncing.
-			if time.Since(startTime) > ExtraWaitSecondsForResults || c.IsSyncing() {
+			if time.Since(startTime) > ExtraWaitSecondsForResults {
 				log.Warn("results not available on commit, recomputing")
 				r, err = results.ComputeResults(electionID, c.st)
 				if err != nil {
@@ -78,17 +74,14 @@ func (c *Controller) commitResults(electionID []byte, r *results.Results) error 
 				}
 				break
 			}
-
-			c.st.Tx.RLock()
-			rEncoded, err = c.st.Tx.NoState().Get(dbResultsIndex(electionID))
-			c.st.Tx.RUnlock()
+			rEncoded, err = c.retrieveFromNoState(dbResultsIndex(electionID))
 			if err != nil {
 				if errors.Is(err, db.ErrKeyNotFound) {
 					// Wait until the results are available
 					log.Debugf("results for electionID %x not found, remaining extra waiting time %s",
 						electionID, ExtraWaitSecondsForResults-time.Since(startTime))
 					// Wait before retrying
-					time.Sleep(time.Millisecond * 200)
+					time.Sleep(time.Millisecond * 1000)
 					continue
 				}
 				return fmt.Errorf("cannot get results from no-state: %w", err)
@@ -97,32 +90,24 @@ func (c *Controller) commitResults(electionID []byte, r *results.Results) error 
 			if err := r.Decode(rEncoded); err != nil {
 				return fmt.Errorf("cannot decode results: %w", err)
 			}
-			// Delete the stored results
-			defer func() {
-				c.st.Tx.Lock()
-				if err := c.st.Tx.NoState().Delete(dbResultsIndex(electionID)); err != nil {
-					log.Errorf("cannot delete results from no-state: %v", err)
-				}
-				c.st.Tx.Unlock()
-			}()
 			break
 		}
 	}
+
+	// Delete the stored results
+	_ = c.deleteFromNoState(dbResultsIndex(electionID))
+
 	log.Infow("committing results", "electionID", fmt.Sprintf("%x", electionID))
 	return c.st.SetProcessResults(electionID, results.ResultsToProto(r))
 }
 
 // computeResultsCommitHeight computes the height at which the results will be
 // committed to the state. The formula is:
-// currentHeight + 1 + (number of votes / BlocksToWaitForResultsFactor)
+// currentHeight + 2 + (number of votes / BlocksToWaitForResultsFactor)
 func (c *Controller) computeResultsCommitHeight(electionID []byte) (uint32, error) {
 	nvotes, err := c.st.CountVotes(electionID, true)
 	if err != nil {
 		return 0, err
 	}
-	return c.st.CurrentHeight() + 1 + uint32(nvotes/BlocksToWaitForResultsFactor), nil
-}
-
-func dbResultsIndex(electionID []byte) []byte {
-	return append([]byte("results/"), electionID...)
+	return c.st.CurrentHeight() + 2 + uint32(nvotes/BlocksToWaitForResultsFactor), nil
 }

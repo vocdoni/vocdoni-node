@@ -1,7 +1,6 @@
 package indexertypes
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -131,7 +130,6 @@ func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
 		Votes:          decodeVotes(dbproc.ResultsVotes),
 		Weight:         decodeBigint(dbproc.ResultsWeight),
 		EnvelopeHeight: uint64(dbproc.ResultsEnvelopeHeight),
-		Signatures:     hexSplit(dbproc.ResultsSignatures),
 		Final:          dbproc.FinalResults,
 		BlockHeight:    uint32(dbproc.ResultsBlockHeight),
 	}
@@ -166,22 +164,6 @@ func nonEmptySplit(s, sep string) []string {
 	list := strings.Split(s, sep)
 	if len(list) == 1 && list[0] == "" {
 		return nil // avoid []string{""} for s==""
-	}
-	return list
-}
-
-func hexSplit(joined string) []types.HexBytes {
-	if joined == "" {
-		return nil // match badgerhold
-	}
-	strs := strings.Split(joined, ",")
-	list := make([]types.HexBytes, len(strs))
-	for i, s := range strs {
-		b, err := hex.DecodeString(s)
-		if err != nil {
-			panic(err) // should never happen
-		}
-		list[i] = b
 	}
 	return list
 }

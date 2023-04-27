@@ -87,7 +87,6 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
 	istc := ist.NewISTC(state)
-	istc.SetSyncing(true)
 
 	// Create the transaction handler for checking and processing transactions
 	transactionHandler, err := transaction.NewTransactionHandler(

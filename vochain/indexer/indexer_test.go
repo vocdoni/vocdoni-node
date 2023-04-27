@@ -500,10 +500,12 @@ func TestResults(t *testing.T) {
 	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 30)
 	pid := util.RandomBytes(32)
 	err := app.State.AddProcess(&models.Process{
-		ProcessId:             pid,
-		EnvelopeType:          &models.EnvelopeType{EncryptedVotes: true},
-		Status:                models.ProcessStatus_READY,
-		Mode:                  &models.ProcessMode{AutoStart: true},
+		ProcessId:    pid,
+		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
+		Status:       models.ProcessStatus_READY,
+		Mode: &models.ProcessMode{
+			AutoStart:     true,
+			Interruptible: true},
 		BlockCount:            40,
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
@@ -574,11 +576,19 @@ func TestResults(t *testing.T) {
 		KeyIndex:             &ki,
 	})
 	qt.Assert(t, err, qt.IsNil)
+
+	// Compute and set results to the state
+	r, err := results.ComputeResults(pid, app.State)
+	qt.Assert(t, err, qt.IsNil)
+	err = app.State.SetProcessStatus(pid, models.ProcessStatus_ENDED, true)
+	qt.Assert(t, err, qt.IsNil)
+	err = app.State.SetProcessResults(pid, results.ResultsToProto(r))
+	qt.Assert(t, err, qt.IsNil)
+
+	// Update the process
 	err = idx.updateProcess(pid)
 	qt.Assert(t, err, qt.IsNil)
 	err = idx.setResultsHeight(pid, app.Height())
-	qt.Assert(t, err, qt.IsNil)
-	err = idx.ComputeResult(pid)
 	qt.Assert(t, err, qt.IsNil)
 
 	// GetEnvelopes with a limit

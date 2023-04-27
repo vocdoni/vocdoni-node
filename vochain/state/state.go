@@ -224,8 +224,6 @@ func (v *State) ChainID() string {
 	return v.chainID
 }
 
-var exist = []byte{1}
-
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {
 	v.Tx.Lock()

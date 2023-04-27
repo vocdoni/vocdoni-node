@@ -11,7 +11,6 @@ CREATE TABLE processes (
   results_votes           TEXT NOT NULL,
   results_weight          TEXT NOT NULL,
   results_envelope_height INTEGER NOT NULL,
-  results_signatures      TEXT NOT NULL,
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,

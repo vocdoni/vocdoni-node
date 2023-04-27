@@ -1,12 +1,10 @@
 package indexer
 
 import (
-	"bytes"
 	"context"
 	"database/sql"
 	"embed"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -45,7 +43,6 @@ const (
 // events of the tally of a process.
 type EventListener interface {
 	OnComputeResults(results *results.Results, process *indexertypes.Process, height uint32)
-	OnOracleResults(oracleResults *models.ProcessResult, pid []byte, height uint32)
 }
 
 // AddEventListener adds a new event listener, to receive method calls on block
@@ -72,8 +69,6 @@ type Indexer struct {
 
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
-	// resultsPool is the list of processes that finish on the current block
-	resultsPool []*indexertypes.IndexerOnProcessData
 	// newTxPool is the list of new tx references to be indexed
 	newTxPool []*indexertypes.TxReference
 	// tokenTransferPool is the list of token transfers to be indexed
@@ -289,12 +284,11 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		}
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
-			ID:                indxR.ProcessID,
-			Votes:             encodeVotes(indxR.Votes),
-			Weight:            indxR.Weight.String(),
-			VoteOptsPb:        encodedPb(indxR.VoteOpts),
-			EnvelopePb:        encodedPb(indxR.EnvelopeType),
-			ResultsSignatures: joinHexBytes(indxR.Signatures),
+			ID:         indxR.ProcessID,
+			Votes:      encodeVotes(indxR.Votes),
+			Weight:     indxR.Weight.String(),
+			VoteOptsPb: encodedPb(indxR.VoteOpts),
+			EnvelopePb: encodedPb(indxR.EnvelopeType),
 		}); err != nil {
 			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
@@ -354,16 +348,6 @@ func (idx *Indexer) Commit(height uint32) error {
 	// Index new transactions
 	idx.liveGoroutines.Add(1)
 	go idx.indexNewTxs(idx.newTxPool)
-
-	// Schedule results computation
-	for _, p := range idx.resultsPool {
-		if err := idx.setResultsHeight(p.ProcessID, height+1); err != nil {
-			log.Errorw(err, "commit: cannot update process")
-			continue
-		}
-		idx.delProcessFromLiveResults(p.ProcessID)
-		log.Infow("scheduled results computation on next block", "processID", hex.EncodeToString(p.ProcessID))
-	}
 
 	startTime := time.Now()
 	for _, v := range idx.voteIndexPool {
@@ -465,15 +449,6 @@ func (idx *Indexer) Commit(height uint32) error {
 			overwritedVotes, "time", time.Since(startTime))
 	}
 
-	// Check if there are processes that need results computing.
-	// This can be run asynchronously.
-	// Note that we skip it if height==0, as some tests like TestResults use
-	// an initial results height of 0, and we don't want to compute results
-	// for such an initial height.
-	if height > 0 {
-		idx.liveGoroutines.Add(1)
-		go idx.computePendingProcesses(height)
-	}
 	return nil
 }
 
@@ -489,7 +464,6 @@ func (idx *Indexer) Rollback() {
 		idx.blockTx = nil
 	}
 	idx.voteIndexPool = []*VoteWithIndex{}
-	idx.resultsPool = []*indexertypes.IndexerOnProcessData{}
 	idx.updateProcessPool = [][]byte{}
 	idx.newTxPool = []*indexertypes.TxReference{}
 	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
@@ -540,13 +514,6 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if status == models.ProcessStatus_ENDED {
-		if live, err := idx.isOpenProcess(pid); err != nil {
-			log.Warn(err)
-		} else if live {
-			idx.resultsPool = append(idx.resultsPool, &indexertypes.IndexerOnProcessData{ProcessID: pid})
-		}
-	}
 	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
@@ -564,89 +531,12 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		log.Errorf("keyindex is nil")
 		return
 	}
-	// if all keys have been revealed, compute the results
-	if *p.KeyIndex < 1 {
-		data := indexertypes.IndexerOnProcessData{EntityID: p.EntityId, ProcessID: pid}
-		idx.resultsPool = append(idx.resultsPool, &data)
-	}
 	idx.updateProcessPool = append(idx.updateProcessPool, pid)
 }
 
 // OnProcessResults verifies the results for a process and appends it to the updateProcessPool
 func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	txIndex int32) {
-	// Execute callbacks
-	for _, l := range idx.eventOnResults {
-		go l.OnOracleResults(presults, pid, idx.App.Height())
-	}
-
-	// We don't execute any action if the blockchain is being syncronized
-	if idx.App.IsSynchronizing() {
-		return
-	}
-
-	// TODO: check results are valid and return an error if not.
-	// This is very dangerous since an Oracle would be able to create a consensus failure,
-	// the validators (that do not check the results) and the full-nodes (with the indexer enabled)
-	// would compute different state hash.
-	// As a temporary solution, lets compare results but just print the error.
-
-	// This code must be run async in order to not delay the consensus. The results retrieval
-	// could require some time.
-	go func() {
-		if presults == nil || presults.Votes == nil {
-			log.Errorf("results are nil")
-			return
-		}
-		var myResults *results.Results
-		var err error
-		retries := 50
-		for {
-			if retries == 0 {
-				log.Errorf("could not fetch results after max retries")
-				return
-			}
-			myResults, err = idx.GetResults(pid)
-			if err == nil {
-				break
-			}
-			if errors.Is(err, ErrNoResultsYet) {
-				time.Sleep(2 * time.Second)
-				retries--
-				continue
-			}
-			log.Errorf("cannot validate results: %v", err)
-			return
-		}
-
-		myVotes := results.ResultsToProto(myResults).GetVotes()
-		correct := len(myVotes) == len(presults.Votes)
-		if !correct {
-			log.Errorf("results validation failed: wrong number of votes")
-		}
-		for i, q := range presults.GetVotes() {
-			if !correct {
-				break
-			}
-			if len(q.Question) != len(myVotes[i].Question) {
-				log.Errorf("results validation failed: wrong question size")
-				correct = false
-				break
-			}
-			for j, v := range q.Question {
-				if !bytes.Equal(v, myVotes[i].Question[j]) {
-					log.Errorf("results validation failed: wrong question result")
-					correct = false
-					break
-				}
-			}
-		}
-		if correct {
-			log.Infof("published results for process %x are correct", pid)
-		} else {
-			log.Errorf("published results for process %x are not correct", pid)
-		}
-	}()
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
 	idx.updateProcessPool = append(idx.updateProcessPool, pid)
@@ -662,6 +552,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 
 // NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
+
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()

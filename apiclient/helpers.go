@@ -170,17 +170,17 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 // and returns them.
 func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (
 	*api.ElectionKeys, error) {
-	log.Infof("waiting for election %s to publish keys...", electionID)
+	log.Debugf("fetching election keys for %x", electionID)
 	for {
 		ek, err := c.ElectionKeys(electionID)
 		if err == nil {
 			return ek, nil
 		}
 		select {
-		case <-time.After(PollInterval):
-			continue
 		case <-ctx.Done():
 			return nil, fmt.Errorf("election %s keys not yet published: %w", electionID, ctx.Err())
+		default:
+			time.Sleep(PollInterval)
 		}
 	}
 }

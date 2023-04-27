@@ -6,9 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -212,50 +210,42 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 	return uint64(height), err
 }
 
-// ComputeResult process a finished voting, compute the results and saves it in the Storage.
+// finalizeResults process a finished voting, get the results from the state and saves it in the indexer Storage.
 // Once this function is called, any future live vote event for the processId will be discarted.
-func (s *Indexer) ComputeResult(processID []byte) error {
+func (s *Indexer) finalizeResults(processID []byte) error {
 	height := s.App.Height()
-	log.Debugf("computing results on height %d for %x", height, processID)
+	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
 
-	// TODO(sqlite): use a single tx for everything here
-
-	// Get process from database
-	p, err := s.ProcessInfo(processID)
+	// Get the results
+	process, err := s.App.State.Process(processID, false)
 	if err != nil {
-		return fmt.Errorf("computeResult: cannot load processID %x from database: %w", processID, err)
+		return fmt.Errorf("finalizeResults: cannot load processID %x from state: %w", processID, err)
 	}
-	// Compute the results
-	var results *results.Results
-	if results, err = s.computeFinalResults(p); err != nil {
-		return err
+	if process.Status != models.ProcessStatus_RESULTS {
+		return fmt.Errorf("finalizeResults: processID %x is not in results status", processID)
 	}
-
+	r := results.ProtoToResults(process.Results)
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:             processID,
-		Votes:          encodeVotes(results.Votes),
-		Weight:         results.Weight.String(),
-		EnvelopeHeight: int64(results.EnvelopeHeight),
-		Signatures:     joinHexBytes(results.Signatures),
-		BlockHeight:    int64(results.BlockHeight),
+		Votes:          encodeVotes(r.Votes),
+		Weight:         r.Weight.String(),
+		EnvelopeHeight: int64(r.EnvelopeHeight),
+		BlockHeight:    int64(r.BlockHeight),
 	}); err != nil {
 		return err
 	}
-	// Execute callbacks
-	for _, l := range s.eventOnResults {
-		go l.OnComputeResults(results, p, height)
-	}
-	return nil
-}
 
-func joinHexBytes(list []types.HexBytes) string {
-	strs := make([]string, len(list))
-	for i, b := range list {
-		strs[i] = hex.EncodeToString(b)
+	// Remove the process from the live results
+	s.delProcessFromLiveResults(processID)
+
+	// Set the results height
+	if err := s.setResultsHeight(processID, height); err != nil {
+		return err
 	}
-	return strings.Join(strs, ",")
+
+	return nil
 }
 
 // GetResults returns the current result for a processId
@@ -448,74 +438,4 @@ func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResult
 		return err
 	}
 	return nil
-}
-
-// computeFinalResults walks through the envelopes of a process and computes the results.
-func (s *Indexer) computeFinalResults(p *indexertypes.Process) (*results.Results, error) {
-	if p == nil {
-		return nil, fmt.Errorf("process is nil")
-	}
-	if p.VoteOpts.MaxCount == 0 || p.VoteOpts.MaxValue == 0 {
-		return nil, fmt.Errorf("computeNonLiveResults: maxCount and/or maxValue is zero")
-	}
-	if p.VoteOpts.MaxCount > results.MaxQuestions || p.VoteOpts.MaxValue > results.MaxOptions {
-		return nil, fmt.Errorf("maxCount and/or maxValue overflows hardcoded maximum")
-	}
-	results := &results.Results{
-		Votes:        results.NewEmptyVotes(int(p.VoteOpts.MaxCount), int(p.VoteOpts.MaxValue)+1),
-		ProcessID:    p.ID,
-		Weight:       new(types.BigInt).SetUint64(0),
-		Final:        true,
-		VoteOpts:     p.VoteOpts,
-		EnvelopeType: p.Envelope,
-		BlockHeight:  s.App.Height(),
-	}
-
-	var nvotes atomic.Uint64
-	var err error
-	lock := sync.Mutex{}
-
-	if err = s.WalkEnvelopes(p.ID, true, func(vote *models.StateDBVote) {
-		var vp *state.VotePackage
-		var err error
-		if p.Envelope.EncryptedVotes {
-			if len(p.PrivateKeys) < len(vote.EncryptionKeyIndexes) {
-				log.Error("encryptionKeyIndexes has too many fields")
-				return
-			}
-			keys := []string{}
-			for _, k := range vote.EncryptionKeyIndexes {
-				if k >= types.KeyKeeperMaxKeyIndex {
-					log.Warn("key index overflow")
-					return
-				}
-				keys = append(keys, p.PrivateKeys[k])
-			}
-			if len(keys) == 0 {
-				log.Warn("no keys provided or wrong index")
-				return
-			}
-			vp, err = unmarshalVote(vote.VotePackage, keys)
-		} else {
-			vp, err = unmarshalVote(vote.VotePackage, []string{})
-		}
-		if err != nil {
-			log.Debugf("vote invalid: %v", err)
-			return
-		}
-
-		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.Weight), &lock); err != nil {
-			log.Warnf("addVote failed: %v", err)
-			return
-		}
-		nvotes.Add(1)
-	}); err == nil {
-		log.Infow("computed results",
-			"process", p.ID.String(),
-			"votes", nvotes.Load(),
-			"results", results.String(),
-		)
-	}
-	results.EnvelopeHeight = nvotes.Load()
-	return results, err
 }
