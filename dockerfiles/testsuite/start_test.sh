@@ -50,8 +50,8 @@ tests_to_run=(
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
 	"e2etest_anonelection"
-	"e2etest_overwrite"
-	"e2etest_cenususize"
+	"e2etest_overwritelection"
+	"e2etest_cenususizelection"
 	"e2etest_tokentxs"
 )
 
