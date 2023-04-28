@@ -102,12 +102,6 @@ jobs:
         env:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
-      - name: Send unit test coverage to coveralls.io
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          path-to-profile: unit.covdata.txt
-          flag-name: unit
-          parallel: true
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
@@ -144,12 +138,6 @@ jobs:
           CONCURRENT: 1 # run all the start_test.sh tests concurrently
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
-      - name: Send integration test coverage to coveralls.io
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          path-to-profile: dockerfiles/testsuite/gocoverage/covdata.txt
-          flag-name: integration
-          parallel: true
 
   job_docker_release:
     runs-on: ubuntu-latest
@@ -200,6 +188,19 @@ jobs:
             ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      - name: Push master image to dev tag in Docker Hub and ghcr.io
+        uses: docker/build-push-action@v3
+        if: github.ref == 'refs/heads/master'
+        with:
+          context: .
+          push: true     # true to upload image to registry
+          tags: |
+            vocdoni/go-dvote:dev,
+            vocdoni/go-dvote:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/go-dvote:dev,
+            ghcr.io/vocdoni/go-dvote:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
       - name: Push image to Docker Hub and ghcr.io (race enabled)
         uses: docker/build-push-action@v3
         if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
@@ -236,12 +237,3 @@ jobs:
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
 
-  job_coveralls:
-    needs: [job_go_test, job_compose_test]
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    steps:
-    - name: Send coverage to Coveralls.io (finish)
-      uses: shogo82148/actions-goveralls@v1
-      with:
-        parallel-finished: true
