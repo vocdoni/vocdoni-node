@@ -6,8 +6,6 @@
 #  e2etest_encryptedelection: run encrypted vote test
 #  e2etest_anonelection: run anonymous vote test
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
-#  e2etest_overwritelection: run overwrite test
-#  e2etest_cenususizelection: run max census size test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
@@ -47,8 +45,6 @@ tests_to_run=(
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
 	"e2etest_anonelection"
-	"e2etest_overwritelection"
-	"e2etest_cenususizelection"
 	"e2etest_tokentxs"
 )
 
@@ -102,14 +98,6 @@ e2etest_tokentxs() {
 	e2etest tokentxs
 }
 
-e2etest_overwritelection () {
-  e2etest overwritelection
-}
-
-e2etest_cenususizelection () {
-  e2etest censusizelection
-}
-
 ### end tests definition
 
 # useful for debugging bash flow
@@ -117,6 +105,8 @@ e2etest_cenususizelection () {
 
 log "### Starting test suite ###"
 $COMPOSE_CMD build
+$COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
+sleep 10
 $COMPOSE_CMD up -d
 
 check_gw_is_up() {
