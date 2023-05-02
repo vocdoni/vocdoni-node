@@ -46,7 +46,7 @@ func TestISTCschedule(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	istc.Schedule(2, pid, Action{Action: ActionComputeResults, ElectionID: pid})
+	istc.Schedule(2, pid, Action{ID: ActionComputeResults, ElectionID: pid})
 
 	// commit block 0
 	testAdvanceBlock(t, s, istc, false)
@@ -129,7 +129,7 @@ func TestISTCsyncing(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	istc.Schedule(2, pid, Action{Action: ActionCommitResults, ElectionID: pid})
+	istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
 
 	// commit block 0
 	testAdvanceBlock(t, s, istc, true)

@@ -54,7 +54,7 @@ const (
 
 // Controller is the internal state transition controller.
 type Controller struct {
-	st *state.State
+	state *state.State
 }
 
 // NewISTC creates a new ISTC.
@@ -62,13 +62,16 @@ type Controller struct {
 // It schedule actions to be executed at a specific height that will modify the state.
 func NewISTC(s *state.State) *Controller {
 	return &Controller{
-		st: s,
+		state: s,
 	}
 }
 
+// ActionID is the type used to identify the IST actions.
+type ActionID int32
+
 const (
 	// ActionComputeResults computes and schedules the commit of results, for the given election and height.
-	ActionComputeResults = iota
+	ActionComputeResults ActionID = iota
 	// ActionCommitResults schedules the commit of the results to the state.
 	ActionCommitResults
 	// ActionEndProcess sets a process as ended. It schedules ActionComputeResults.
@@ -76,7 +79,7 @@ const (
 )
 
 // ActionsToString translates the action identifers to its corresponding human friendly string.
-var ActionsToString = map[int]string{
+var ActionsToString = map[ActionID]string{
 	ActionComputeResults: "compute-results",
 	ActionCommitResults:  "commit-results",
 	ActionEndProcess:     "end-process",
@@ -84,13 +87,11 @@ var ActionsToString = map[int]string{
 
 // Actions is the model used to store the list of IST actions for
 // a specific height into state.
-type Actions struct {
-	Actions map[string]Action
-}
+type Actions map[string]Action
 
 // Action is the model used to store the IST actions into state.
 type Action struct {
-	Action     int
+	ID         ActionID
 	ElectionID []byte
 	Attempts   uint32
 }
@@ -120,24 +121,24 @@ func (c *Controller) Schedule(height uint32, id []byte, action Action) error {
 		return err
 	}
 	// set the IST action
-	actions.Actions[string(id)] = action
+	actions[string(id)] = action
 
 	// store the IST actions
-	log.Debugw("schedule IST action", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.Action])
+	log.Debugw("schedule IST action", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 	return c.storeToNoState(dbIndex(height), actions.encode())
 }
 
 // Actions returns the IST actions scheduled for the given height.
 // If no actions are scheduled, it returns an empty IstActions.
-func (c *Controller) Actions(height uint32) (*Actions, error) {
+func (c *Controller) Actions(height uint32) (Actions, error) {
 	// get the IST actions
 	actions := Actions{}
 	actionsBytes, err := c.retrieveFromNoState(dbIndex(height))
 	if err != nil {
 		if errors.Is(err, db.ErrKeyNotFound) {
 			// no IST actions scheduled for this height, we return empty
-			actions.Actions = make(map[string]Action)
-			return &actions, nil
+			actions = make(map[string]Action)
+			return actions, nil
 		}
 		return nil, fmt.Errorf("cannot get IST actions on height %d: %w", height, err)
 	}
@@ -145,12 +146,12 @@ func (c *Controller) Actions(height uint32) (*Actions, error) {
 	if err := actions.decode(actionsBytes); err != nil {
 		return nil, fmt.Errorf("could not decode actions: %w", err)
 	}
-	return &actions, nil
+	return actions, nil
 }
 
 // Reschedule reschedules an IST action to the given new height.
 func (c *Controller) Reschedule(id []byte, oldHeight, newHeight uint32) error {
-	if id == nil {
+	if len(id) == 0 {
 		return fmt.Errorf("cannot reschedule IST action: nil id")
 	}
 	if oldHeight >= newHeight {
@@ -161,23 +162,18 @@ func (c *Controller) Reschedule(id []byte, oldHeight, newHeight uint32) error {
 		return err
 	}
 	// find the IST action
-	var actID string
-	for actID = range actions.Actions {
-		if string(id) == actID {
-			break
-		}
-	}
-	if actID == "" {
+	_, ok := actions[string(id)]
+	if !ok {
 		return fmt.Errorf("cannot reschedule IST action: action not found")
 	}
 	// store the IST action
-	a := actions.Actions[actID]
+	a := actions[string(id)]
 	a.Attempts++
 	if err := c.Schedule(newHeight, id, a); err != nil {
 		return err
 	}
 	// delete the IST action
-	delete(actions.Actions, actID)
+	delete(actions, string(id))
 
 	// update the IST actions for the old height
 	if err := c.storeToNoState(dbIndex(oldHeight), actions.encode()); err != nil {
@@ -192,11 +188,11 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 	if err != nil {
 		return fmt.Errorf("cannot commit IST actions: %w", err)
 	}
-	if len(actions.Actions) == 0 {
+	if len(actions) == 0 {
 		return nil
 	}
-	for id, action := range actions.Actions {
-		switch action.Action {
+	for id, action := range actions {
+		switch action.ID {
 		case ActionComputeResults:
 			log.Debugw("compute results", "height", height, "id", fmt.Sprintf("%x", id), "attempt", action.Attempts)
 			// check if we have all the revealed keys, else reschedule
@@ -204,7 +200,7 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 				// we are missing some keys, we cannot compute the results yet
 				newHeight := height + (1 + action.Attempts*2)
 				log.Infow("missing keys, rescheduling IST action", "newHeight", newHeight, "id",
-					fmt.Sprintf("%x", id), "action", ActionsToString[action.Action], "attempt", action.Attempts)
+					fmt.Sprintf("%x", id), "action", ActionsToString[action.ID], "attempt", action.Attempts)
 				if err := c.Reschedule([]byte(id), height, newHeight); err != nil {
 					return fmt.Errorf("cannot reschedule IST action: %w", err)
 				}
@@ -224,7 +220,7 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 					action.ElectionID, err)
 			}
 		case ActionCommitResults:
-			log.Debugw("commit results", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.Action])
+			log.Debugw("commit results", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 			var r *results.Results
 			// if we are synchronizing, we compute the results here, otherwise we get them from the store
 			if isSynchronizing {
@@ -232,13 +228,13 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 					// we are missing some keys, we cannot compute the results yet
 					newHeight := height + (1 + action.Attempts*2)
 					log.Infow("missing keys, rescheduling IST action", "newHeight", newHeight, "id",
-						fmt.Sprintf("%x", id), "action", ActionsToString[action.Action], "attempt", action.Attempts)
+						fmt.Sprintf("%x", id), "action", ActionsToString[action.ID], "attempt", action.Attempts)
 					if err := c.Reschedule([]byte(id), height, newHeight); err != nil {
 						return fmt.Errorf("cannot reschedule IST action: %w", err)
 					}
 					continue
 				}
-				r, err = results.ComputeResults(action.ElectionID, c.st)
+				r, err = results.ComputeResults(action.ElectionID, c.state)
 				if err != nil {
 					return fmt.Errorf("cannot compute results on commit: %w", err)
 				}
@@ -248,13 +244,13 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 					action.ElectionID, err)
 			}
 		case ActionEndProcess:
-			log.Debugw("end process", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.Action])
+			log.Debugw("end process", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 			if err := c.endElection(action.ElectionID); err != nil {
 				return fmt.Errorf("cannot end election %x: %w",
 					action.ElectionID, err)
 			}
 		default:
-			return fmt.Errorf("unknown IST action %d", action.Action)
+			return fmt.Errorf("unknown IST action %d", action.ID)
 		}
 	}
 	// delete the IST actions for the given height
@@ -265,7 +261,7 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 }
 
 func (c *Controller) checkRevealedKeys(electionID []byte) bool {
-	process, err := c.st.Process(electionID, false)
+	process, err := c.state.Process(electionID, false)
 	if err != nil {
 		log.Warnw("cannot get process", "electionID", hex.EncodeToString(electionID), "err", err.Error())
 		return false
@@ -277,24 +273,26 @@ func (c *Controller) checkRevealedKeys(electionID []byte) bool {
 }
 
 func (c *Controller) endElection(electionID []byte) error {
-	process, err := c.st.Process(electionID, false)
+	process, err := c.state.Process(electionID, false)
 	if err != nil {
 		return fmt.Errorf("cannot get process: %w", err)
 	}
 	// if the process is canceled, ended or in results, we don't need to do
 	// anything else, smooth return.
-	if process.Status == models.ProcessStatus_CANCELED ||
-		process.Status == models.ProcessStatus_RESULTS ||
-		process.Status == models.ProcessStatus_ENDED {
+	switch process.Status {
+	case models.ProcessStatus_CANCELED,
+		models.ProcessStatus_ENDED,
+		models.ProcessStatus_RESULTS:
 		return nil
 	}
+
 	// set the election to ended
-	if err := c.st.SetProcessStatus(electionID, models.ProcessStatus_ENDED, true); err != nil {
+	if err := c.state.SetProcessStatus(electionID, models.ProcessStatus_ENDED, true); err != nil {
 		return fmt.Errorf("cannot end election: %w", err)
 	}
 	// schedule the IST action to compute the results
-	return c.Schedule(c.st.CurrentHeight()+1, electionID, Action{
-		Action:     ActionComputeResults,
+	return c.Schedule(c.state.CurrentHeight()+1, electionID, Action{
+		ID:         ActionComputeResults,
 		ElectionID: electionID,
 	})
 }

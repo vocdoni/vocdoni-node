@@ -130,7 +130,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 			}
 			// schedule end process on the ISTC
 			if err := t.istc.Schedule(p.StartBlock+p.BlockCount, p.ProcessId, ist.Action{
-				Action:     ist.ActionEndProcess,
+				ID:         ist.ActionEndProcess,
 				ElectionID: p.ProcessId,
 			}); err != nil {
 				return nil, fmt.Errorf("newProcessTx: cannot schedule end process: %w", err)
@@ -156,7 +156,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (
 				if tx.GetStatus() == models.ProcessStatus_ENDED {
 					// schedule results computations on the ISTC
 					if err := t.istc.Schedule(t.state.CurrentHeight()+1, tx.ProcessId, ist.Action{
-						Action:     ist.ActionComputeResults,
+						ID:         ist.ActionComputeResults,
 						ElectionID: tx.ProcessId,
 					}); err != nil {
 						return nil, fmt.Errorf("setProcessTx: cannot schedule end process: %w", err)

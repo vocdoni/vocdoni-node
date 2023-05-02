@@ -7,7 +7,7 @@ import (
 )
 
 func (c *Controller) storeToNoState(key, value []byte) error {
-	tx, err := c.st.Store.BeginTx()
+	tx, err := c.state.Store.BeginTx()
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func (c *Controller) storeToNoState(key, value []byte) error {
 }
 
 func (c *Controller) deleteFromNoState(key []byte) error {
-	tx, err := c.st.Store.BeginTx()
+	tx, err := c.state.Store.BeginTx()
 	if err != nil {
 		return err
 	}
@@ -31,7 +31,7 @@ func (c *Controller) deleteFromNoState(key []byte) error {
 }
 
 func (c *Controller) retrieveFromNoState(key []byte) ([]byte, error) {
-	tx, err := c.st.Store.BeginTx()
+	tx, err := c.state.Store.BeginTx()
 	if err != nil {
 		return nil, err
 	}
@@ -41,9 +41,7 @@ func (c *Controller) retrieveFromNoState(key []byte) ([]byte, error) {
 
 // dbIndex returns the IST action index in the state database.
 func dbIndex(height uint32) []byte {
-	hBytes := make([]byte, 4)
-	binary.LittleEndian.PutUint32(hBytes, height)
-	return append([]byte(dbPrefix), hBytes...)
+	return binary.LittleEndian.AppendUint32([]byte(dbPrefix), height)
 }
 
 // dbResultsIndex returns the IST results index in the state database.

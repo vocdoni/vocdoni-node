@@ -31,7 +31,7 @@ func (c *Controller) scheduleCommitResults(electionID []byte) error {
 		return fmt.Errorf("cannot compute results commit height: %w", err)
 	}
 	if err := c.Schedule(commitHeight, electionID, Action{
-		Action:     ActionCommitResults,
+		ID:         ActionCommitResults,
 		ElectionID: electionID,
 	}); err != nil {
 		return fmt.Errorf("cannot schedule results commit: %w", err)
@@ -42,7 +42,7 @@ func (c *Controller) scheduleCommitResults(electionID []byte) error {
 // computeAndStoreResults computes the results for an election.
 // The results will be stored in the no-state once available.
 func (c *Controller) computeAndStoreResults(electionID []byte) error {
-	r, err := results.ComputeResults(electionID, c.st)
+	r, err := results.ComputeResults(electionID, c.state)
 	if err != nil {
 		return fmt.Errorf("cannot compute results: %w", err)
 	}
@@ -68,7 +68,7 @@ func (c *Controller) commitResults(electionID []byte, r *results.Results) error 
 			// For safety we compute the results again if the time is up.
 			if time.Since(startTime) > ExtraWaitSecondsForResults {
 				log.Warn("results not available on commit, recomputing")
-				r, err = results.ComputeResults(electionID, c.st)
+				r, err = results.ComputeResults(electionID, c.state)
 				if err != nil {
 					return err
 				}
@@ -98,16 +98,16 @@ func (c *Controller) commitResults(electionID []byte, r *results.Results) error 
 	_ = c.deleteFromNoState(dbResultsIndex(electionID))
 
 	log.Infow("committing results", "electionID", fmt.Sprintf("%x", electionID))
-	return c.st.SetProcessResults(electionID, results.ResultsToProto(r))
+	return c.state.SetProcessResults(electionID, results.ResultsToProto(r))
 }
 
 // computeResultsCommitHeight computes the height at which the results will be
 // committed to the state. The formula is:
 // currentHeight + 2 + (number of votes / BlocksToWaitForResultsFactor)
 func (c *Controller) computeResultsCommitHeight(electionID []byte) (uint32, error) {
-	nvotes, err := c.st.CountVotes(electionID, true)
+	nvotes, err := c.state.CountVotes(electionID, true)
 	if err != nil {
 		return 0, err
 	}
-	return c.st.CurrentHeight() + 2 + uint32(nvotes/BlocksToWaitForResultsFactor), nil
+	return c.state.CurrentHeight() + 2 + uint32(nvotes/BlocksToWaitForResultsFactor), nil
 }
