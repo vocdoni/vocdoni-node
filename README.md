@@ -33,8 +33,6 @@ Currently the node can operate in three modes:
 
 - **miner** provides a block validation node (full node), without providing any external service but capable of proposing new blocks.
 
-- **oracle** mode provides special capabilities such as computing election results and storing encryption keys.
-
 The most common mode is the `gateway`, that's probably what you are looking for.
 
 One of the design primitives of vocdoni-node is to run everything as a single process in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, vocdoni node uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
@@ -80,21 +78,31 @@ docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml down
 
 Once the node has finished the blockchain fast sync process, you can connect query the API:
 
-```
-$ curl http://127.0.0.1:9090/v2/chain/info
+`$ curl http://127.0.0.1:9090/v2/chain/info`
 
+```json
 {
-  "chainId": "vocdoni-development-71",
+  "chainId": "test-chain-1",
   "blockTime": [
-    10000,
-    11320,
-    0,
+    12000,
+    12000,
+    11650,
     0,
     0
   ],
-  "height": 43544,
-  "blockTimestamp": 1669205270
+  "electionCount": 61,
+  "organizationCount": 18,
+  "genesisTime": "2023-02-28T22:40:43.668920539Z",
+  "height": 1546,
+  "syncing": false,
+  "blockTimestamp": 1683056444,
+  "transactionCount": 418935,
+  "validatorCount": 4,
+  "voteCount": 51201,
+  "cicuitConfigurationTag": "dev",
+  "maxCensusSize": 10000
 }
+
 ```
 
 API methods, SDK and documentation can be found at [the developer portal](https://developer.vocdoni.io)
