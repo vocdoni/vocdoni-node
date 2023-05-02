@@ -28,7 +28,7 @@ var (
 	valuesPrint = color.New(color.FgMagenta)
 	infoPrint   = color.New(color.FgGreen)
 
-	errAccountNotConfgirued = "account not configured, please select or add a new one"
+	errAccountNotConfigured = "account not configured, please select or add a new one"
 )
 
 func main() {
@@ -99,7 +99,7 @@ func main() {
 			}
 		case 1:
 			if !accountIsSet(cli) {
-				errorp.Println(errAccountNotConfgirued)
+				errorp.Println(errAccountNotConfigured)
 				break
 			}
 			if err := accountInfo(cli); err != nil {
@@ -107,7 +107,7 @@ func main() {
 			}
 		case 2:
 			if !accountIsSet(cli) {
-				errorp.Println(errAccountNotConfgirued)
+				errorp.Println(errAccountNotConfigured)
 				break
 			}
 			if err := accountSetMetadata(cli); err != nil {
@@ -115,7 +115,7 @@ func main() {
 			}
 		case 3:
 			if !accountIsSet(cli) {
-				errorp.Println(errAccountNotConfgirued)
+				errorp.Println(errAccountNotConfigured)
 				break
 			}
 			if err := bootStrapAccount(cli); err != nil {
@@ -123,7 +123,7 @@ func main() {
 			}
 		case 4:
 			if !accountIsSet(cli) {
-				errorp.Println(errAccountNotConfgirued)
+				errorp.Println(errAccountNotConfigured)
 				break
 			}
 			if err := transfer(cli); err != nil {
@@ -135,7 +135,7 @@ func main() {
 			}
 		case 7:
 			if !accountIsSet(cli) {
-				errorp.Println(errAccountNotConfgirued)
+				errorp.Println(errAccountNotConfigured)
 				break
 			}
 			if err := electionHandler(cli); err != nil {
