@@ -198,10 +198,10 @@ func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types
 			return ek, nil
 		}
 		select {
+		case <-time.After(PollInterval):
+			continue
 		case <-ctx.Done():
 			return nil, fmt.Errorf("election %s keys not yet published: %w", electionID, ctx.Err())
-		default:
-			time.Sleep(PollInterval)
 		}
 	}
 }
