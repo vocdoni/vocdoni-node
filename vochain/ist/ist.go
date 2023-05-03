@@ -100,7 +100,7 @@ type Action struct {
 func (m *Actions) encode() []byte {
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(m); err != nil {
-		// should never happend
+		// should never happen
 		panic(err)
 	}
 	return buf.Bytes()

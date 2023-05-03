@@ -56,9 +56,9 @@ func (c *Controller) computeAndStoreResults(electionID []byte) error {
 	return nil
 }
 
-// commitResults commits the results to the state. If the reults parameter is nil, it will
-// try to get the results from the no-state. If the results are not available, it will
-// compute them again.
+// commitResults commits the results to the state. If the `r` parameter is nil, it will
+// try to get the results from the no-state database and if the results are not available,
+// it will compute them again.
 func (c *Controller) commitResults(electionID []byte, r *results.Results) error {
 	if r == nil {
 		var rEncoded []byte
