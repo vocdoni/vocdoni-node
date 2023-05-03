@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"strings"
@@ -98,7 +97,8 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
 		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes-1)/time.Since(startTime).Seconds()))
 
-	// the last vote should fail due maxCensusSize constrain
+	// the missing vote should fail due maxCensusSize constrain
+	time.Sleep(time.Second * 4)
 	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
 
 	if _, err := t.sendVote(t.voterAccounts[0], []int{0}, nil); err != nil {
@@ -132,7 +132,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		return err
 	}
 

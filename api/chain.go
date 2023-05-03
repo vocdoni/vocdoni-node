@@ -143,6 +143,14 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions/count",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxCountHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -562,5 +570,28 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainTransactionCountHandler
+//
+//	@Summary		Transactions count
+//	@Description	Returns the number of transactions
+//	@Success		200	{object}	uint64
+//	@Router			/chain/transactions/count [get]
+func (a *API) chainTxCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	count, err := a.indexer.TransactionCount()
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(
+		struct {
+			Count uint64 `json:"count"`
+		}{Count: count},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
