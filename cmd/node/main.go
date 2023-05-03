@@ -91,7 +91,7 @@ func newConfig() (*config.Config, config.Error) {
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
-		"global operation mode. Available options: [gateway,miner,seed]")
+		"global operation mode. Available options: [gateway, miner, seed]")
 	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
