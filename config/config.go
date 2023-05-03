@@ -5,7 +5,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-// Config stores global configs for dvote
+// Config stores global configurations for vocdoni-node
 type Config struct {
 	// Vochain config options
 	Vochain *VochainCfg
