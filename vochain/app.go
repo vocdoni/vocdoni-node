@@ -49,7 +49,7 @@ type BaseApplication struct {
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
-	isSynchronizing uint32
+	isSynchronizing atomic.Bool
 
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
@@ -262,7 +262,7 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 // The value is updated every new block.
 func (app *BaseApplication) IsSynchronizing() bool {
-	return atomic.LoadUint32(&app.isSynchronizing) != 0
+	return app.isSynchronizing.Load()
 }
 
 // Height returns the current blockchain height
@@ -384,9 +384,9 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
 	if app.isSynchronizingFn != nil {
 		if app.isSynchronizingFn() {
-			atomic.StoreUint32(&app.isSynchronizing, 1)
+			app.isSynchronizing.Store(true)
 		} else {
-			atomic.StoreUint32(&app.isSynchronizing, 0)
+			app.isSynchronizing.Store(false)
 		}
 	}
 	return app.fnBeginBlock(req)

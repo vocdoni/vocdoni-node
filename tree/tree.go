@@ -132,9 +132,7 @@ func (t *Tree) Del(wTx db.WriteTx, key []byte) error {
 		return err
 	}
 	if !givenTx {
-		if err := wTx.Commit(); err != nil {
-			return err
-		}
+		return wTx.Commit()
 	}
 	return nil
 }
