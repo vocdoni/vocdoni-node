@@ -22,7 +22,6 @@ type Process struct {
 	ResultsVotes          string
 	ResultsWeight         string
 	ResultsEnvelopeHeight int64
-	ResultsSignatures     string
 	ResultsBlockHeight    int64
 	CensusRoot            types.CensusRoot
 	RollingCensusRoot     types.CensusRoot

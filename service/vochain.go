@@ -130,8 +130,10 @@ func (vs *VocdoniService) Start() error {
 		log.Infof("waiting for vochain to synchronize")
 		var lastHeight int64
 		i := 0
+		timeSyncCounter := time.Now()
 		timeCounter := time.Now()
-		for !vs.Stats.Sync() {
+		syncCounter := 20
+		for syncCounter > 0 {
 			time.Sleep(time.Second * 1)
 			if i%10 == 0 {
 				log.Monitor("vochain fastsync", map[string]interface{}{
@@ -143,8 +145,13 @@ func (vs *VocdoniService) Start() error {
 				lastHeight = vs.Stats.Height()
 			}
 			i++
+			if vs.App.IsSynchronizing() {
+				syncCounter = 20
+			} else {
+				syncCounter--
+			}
 		}
-		log.Infof("vochain fastsync completed!")
+		log.Infow("vochain fastsync completed", "height", vs.Stats.Height(), "time", time.Since(timeSyncCounter))
 	}
 	go VochainPrintInfo(20, vs.Stats)
 

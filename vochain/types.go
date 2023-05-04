@@ -11,12 +11,6 @@ var (
 // PrefixDBCacheSize is the size of the cache for the MutableTree IAVL databases
 var PrefixDBCacheSize = 0
 
-// VotePackage represents the payload of a vote (usually base64 encoded)
-type VotePackage struct {
-	Nonce string `json:"nonce,omitempty"`
-	Votes []int  `json:"votes"`
-}
-
 // ________________________ QUERIES ________________________
 
 // QueryData is an abstraction of any kind of data a query request could have

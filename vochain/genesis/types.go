@@ -115,7 +115,6 @@ type GenesisAccount struct {
 // GenesisAppState is the main application state in the genesis file.
 type GenesisAppState struct {
 	Validators      []AppStateValidators `json:"validators"`
-	Oracles         []types.HexBytes     `json:"oracles"`
 	Accounts        []GenesisAccount     `json:"accounts"`
 	Treasurer       types.HexBytes       `json:"treasurer"`
 	TxCost          TransactionCosts     `json:"tx_cost"`

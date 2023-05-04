@@ -15,7 +15,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -209,7 +209,7 @@ func (c *HTTPclient) prepareVoteEnvelope(choices []int, election *api.Election) 
 		}
 	}
 	// if EncryptedVotes is false, keys will be nil and prepareVotePackageBytes returns plaintext
-	vpb, err := c.prepareVotePackageBytes(&vochain.VotePackage{Votes: choices}, keys)
+	vpb, err := c.prepareVotePackageBytes(&state.VotePackage{Votes: choices}, keys)
 	if err != nil {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ func (c *HTTPclient) prepareVoteEnvelope(choices []int, election *api.Election) 
 // prepareVotePackageBytes returns a plaintext json.Marshal(vp) if keys is nil,
 // else assigns a random hex string to vp.Nonce
 // and encrypts the vp bytes for each given key as recipient
-func (c *HTTPclient) prepareVotePackageBytes(vp *vochain.VotePackage, keys []types.HexBytes) ([]byte, error) {
+func (c *HTTPclient) prepareVotePackageBytes(vp *state.VotePackage, keys []types.HexBytes) ([]byte, error) {
 	if len(keys) > 0 {
 		vp.Nonce = fmt.Sprintf("%x", util.RandomHex(32))
 	}

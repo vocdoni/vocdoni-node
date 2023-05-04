@@ -73,7 +73,7 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
 
 // NewGenesis creates a new genesis and return its bytes
 func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *genesis.ConsensusParams,
-	validators []privval.FilePV, oracles, accounts []string, initAccountsBalance int,
+	validators []privval.FilePV, accounts []string, initAccountsBalance int,
 	treasurer string, txCosts *genesis.TransactionCosts) ([]byte, error) {
 	// default consensus params
 	appState := genesis.GenesisAppState{}
@@ -93,13 +93,6 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *genesis
 			Power:   10,
 			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
 		}
-	}
-	for _, os := range oracles {
-		os, err := hex.DecodeString(util.TrimHex(os))
-		if err != nil {
-			return nil, err
-		}
-		appState.Oracles = append(appState.Oracles, os)
 	}
 	for _, acc := range accounts {
 		accAddressBytes, err := hex.DecodeString(util.TrimHex(acc))
@@ -162,7 +155,7 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount
 }
 
 // NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
-// Also includes an oracle, treasurer and faucet account.
+// Also includes treasurer and faucet account.
 // The genesis document is returned.
 func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, error) {
 	gd := tmtypes.GenesisDoc{}
@@ -207,15 +200,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		})
 	}
 
-	// Generate oracle, treasurer and faucet accounts
-	oracle := ethereum.SignKeys{}
-	if err := oracle.Generate(); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "oracle_hex_key"),
-		[]byte(fmt.Sprintf("%x", oracle.PrivateKey())), 0o600); err != nil {
-		return nil, err
-	}
+	// Generate treasurer and faucet accounts
 	treasurer := ethereum.SignKeys{}
 	if err := treasurer.Generate(); err != nil {
 		return nil, err
@@ -256,7 +241,6 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	// Build genesis app state and create genesis file
 	appState := genesis.GenesisAppState{
 		Validators: appStateValidators,
-		Oracles:    []types.HexBytes{oracle.Address().Bytes()},
 		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
 		Accounts: []genesis.GenesisAccount{
 			{

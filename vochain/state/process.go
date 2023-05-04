@@ -237,8 +237,8 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x already in ready state", pid)
 		}
 	case models.ProcessStatus_ENDED:
-		if currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("process %x can only be ended from ready status", pid)
+		if currentStatus != models.ProcessStatus_READY && currentStatus != models.ProcessStatus_PAUSED {
+			return fmt.Errorf("process %x can only be ended from ready or paused status", pid)
 		}
 		if !process.Mode.Interruptible {
 			if v.CurrentHeight() <= process.BlockCount+process.StartBlock {
@@ -295,8 +295,8 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 	return nil
 }
 
-// SetProcessResults sets the results for a given process
-func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, commit bool) error {
+// SetProcessResults sets the results for a given process and calls the event listeners.
+func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -304,57 +304,22 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult, comm
 	// Check if the state transition is valid
 	// process must be ended, ready or results for setting the results
 	if process.Status != models.ProcessStatus_ENDED &&
-		process.Status != models.ProcessStatus_READY &&
-		process.Status != models.ProcessStatus_RESULTS {
+		process.Status != models.ProcessStatus_READY {
 		return fmt.Errorf("cannot set results, invalid status: %s", process.Status)
 	}
 	if process.Status == models.ProcessStatus_READY &&
 		process.StartBlock+process.BlockCount > v.CurrentHeight() {
 		return fmt.Errorf("cannot set state to results, process is still alive")
 	}
-	if !bytes.Equal(result.ProcessId, process.ProcessId) {
-		return fmt.Errorf(
-			"invalid process id on result provided, expected: %x got: %x",
-			process.ProcessId, result.ProcessId)
-	}
-	if !bytes.Equal(result.EntityId, process.EntityId) {
-		return fmt.Errorf(
-			"invalid entity id on result provided, expected: %x got: %x",
-			process.EntityId, result.EntityId)
-	}
-	if result.OracleAddress == nil {
-		return fmt.Errorf("cannot set results, oracle address is nil")
-	}
 
-	if commit {
-		// Warning: if we don't set a maximum block number on which results can be
-		// set by oracles, once oracles become third party contributed (by staking an
-		// amount of tokens), there will be a potential risk of overflow on the
-		// process.Results slice
-		if process.Results == nil {
-			n, err := v.Oracles(false)
-			if err != nil {
-				return fmt.Errorf("cannot set results: %w", err)
-			}
-			// use len*2 for security, a new oracle could be registered during
-			// the time window from the first results tx to the last one
-			process.Results = make([]*models.ProcessResult, len(n)*2)
-		}
-		// check the oracle has not already sent a results
-		for _, pr := range process.Results {
-			if bytes.Equal(pr.GetOracleAddress(), result.OracleAddress) {
-				return fmt.Errorf("results already set for this oracle address")
-			}
-		}
-		process.Results = append(process.Results, result)
-		process.Status = models.ProcessStatus_RESULTS
-		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
-			return fmt.Errorf("cannot set results: %w", err)
-		}
-		// Call event listeners
-		for _, l := range v.eventListeners {
-			l.OnProcessResults(process.ProcessId, result, v.TxCounter())
-		}
+	process.Results = result
+	process.Status = models.ProcessStatus_RESULTS
+	if err := v.UpdateProcess(process, process.ProcessId); err != nil {
+		return fmt.Errorf("cannot set results: %w", err)
+	}
+	// Call event listeners
+	for _, l := range v.eventListeners {
+		l.OnProcessResults(process.ProcessId, result, v.TxCounter())
 	}
 	return nil
 }
@@ -366,11 +331,10 @@ func (v *State) GetProcessResults(pid []byte) ([][]*types.BigInt, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(process.Results) > 0 {
-		// TO-DO (pau): return the whole list of oracle results
-		return GetFriendlyResults(process.Results[0].GetVotes()), nil
+	if process.Results == nil {
+		return nil, fmt.Errorf("no results for process %x", pid)
 	}
-	return nil, fmt.Errorf("no results for process %x", pid)
+	return GetFriendlyResults(process.Results.GetVotes()), nil
 }
 
 // SetProcessCensus sets the census for a given process, only if that process enables dynamic census

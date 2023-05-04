@@ -191,7 +191,7 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 // and returns them.
 func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (
 	*api.ElectionKeys, error) {
-	log.Infof("waiting for election %s to publish keys...", electionID)
+	log.Debugf("fetching election keys for %x", electionID)
 	for {
 		ek, err := c.ElectionKeys(electionID)
 		if err == nil {

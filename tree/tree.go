@@ -121,6 +121,22 @@ func (t *Tree) Add(wTx db.WriteTx, key, value []byte) error {
 	return nil
 }
 
+// Del deletes a key from the Tree.
+func (t *Tree) Del(wTx db.WriteTx, key []byte) error {
+	givenTx := wTx != nil
+	if !givenTx {
+		wTx = t.DB().WriteTx()
+		defer wTx.Discard()
+	}
+	if err := wTx.Delete(key); err != nil {
+		return err
+	}
+	if !givenTx {
+		return wTx.Commit()
+	}
+	return nil
+}
+
 // AddBatch adds a batch of key-values to the Tree. Returns an array containing
 // the indexes of the keys failed to add. Supports empty values as input
 // parameters, which is equivalent to 0 valued byte array.

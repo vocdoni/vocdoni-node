@@ -14,7 +14,6 @@ import (
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -213,38 +212,6 @@ func (s *Indexer) isOpenProcess(processID []byte) (bool, error) {
 	return !p.EnvelopeType.EncryptedVotes, nil
 }
 
-// compute results if the current heigh has scheduled ending processes
-func (s *Indexer) computePendingProcesses(height uint32) {
-	defer s.liveGoroutines.Add(-1)
-	// We wait a random number of blocks (between 0 and 5) in order to decrease the collision risk
-	// between several Oracles.
-	targetHeight := s.App.Height() + uint32(util.RandomInt(0, 5))
-	for !s.skipTargetHeightSleeps {
-		if s.cancelCtx.Err() != nil {
-			return // closing
-		}
-		if s.App.Height() >= targetHeight {
-			break
-		}
-		time.Sleep(5 * time.Second)
-	}
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
-	procIDs, err := queries.GetProcessIDsByResultsHeight(ctx, int64(height))
-	if err != nil {
-		log.Warn(err)
-		return
-	}
-	for _, pid := range procIDs {
-		start := time.Now()
-		if err := s.ComputeResult(pid); err != nil {
-			log.Warnf("cannot compute results for %x: (%v)", pid, err)
-			continue
-		}
-		log.Infof("results computation on %x took %s", pid, time.Since(start).String())
-	}
-}
-
 // newEmptyProcess creates a new empty process and stores it into the database.
 // The process must exist on the Vochain state, else an error is returned.
 func (s *Indexer) newEmptyProcess(pid []byte) error {
@@ -375,6 +342,16 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	}); err != nil {
 		return err
 	}
+
+	// If the process is in RESULTS status, and it was not in RESULTS status before, then finalize the results
+	if p.Status == models.ProcessStatus_RESULTS &&
+		models.ProcessStatus(previousStatus) != models.ProcessStatus_RESULTS {
+		if err := s.finalizeResults(pid); err != nil {
+			return err
+		}
+	}
+
+	// If the process is in CANCELED status, and it was not in CANCELED status before, then remove the results
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.Status == models.ProcessStatus_CANCELED {
 

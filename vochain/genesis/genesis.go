@@ -79,21 +79,7 @@ var devGenesis = GenesisDoc{
 				KeyIndex: 4,
 			},
 		},
-		Oracles: []types.HexBytes{
-			// oracle1
-			types.HexStringToHexBytes("0xb926be24A9ca606B515a835E91298C7cF0f2846f"),
-			// oracle2
-			types.HexStringToHexBytes("0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c"),
-		},
 		Accounts: []GenesisAccount{
-			{ // oracle1
-				Address: types.HexStringToHexBytes("0xb926be24A9ca606B515a835E91298C7cF0f2846f"),
-				Balance: 10000,
-			},
-			{ // oracle2
-				Address: types.HexStringToHexBytes("0x4a081070E9D555b5D19629a6bcc8B77f4aE6d39c"),
-				Balance: 10000,
-			},
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
 				Balance: 1000000,
@@ -118,8 +104,8 @@ var devGenesis = GenesisDoc{
 }
 
 var stageGenesis = GenesisDoc{
-	GenesisTime: time.Date(2023, time.March, 10, 10, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-stage-3",
+	GenesisTime: time.Date(2023, time.April, 10, 10, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-stage-4",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 5242880,
@@ -210,21 +196,7 @@ var stageGenesis = GenesisDoc{
 				KeyIndex: 4,
 			},
 		},
-		Oracles: []types.HexBytes{
-			// oracle1
-			types.HexStringToHexBytes("0x81ff945dda4b94690a13f49fdc8f0819970b2db0"),
-			// oracle2
-			types.HexStringToHexBytes("0x08acAbAfc667c21a82b07C87A269E701381641FC"),
-		},
 		Accounts: []GenesisAccount{
-			{ // oracle1
-				Address: types.HexStringToHexBytes("0x81ff945dda4b94690a13f49fdc8f0819970b2db0"),
-				Balance: 10000,
-			},
-			{ // oracle2
-				Address: types.HexStringToHexBytes("0x08acAbAfc667c21a82b07C87A269E701381641FC"),
-				Balance: 10000,
-			},
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
 				Balance: 1000000,

@@ -43,7 +43,7 @@ func NewBatchMaxSize(db Database, maxSize uint) *Batch {
 	}
 }
 
-// Get implements the WriteTx.Get interface method
+// Get implements the WriteTx.Get() interface method.
 func (t *Batch) Get(key []byte) ([]byte, error) {
 	return t.tx.Get(key)
 }

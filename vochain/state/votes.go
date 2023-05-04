@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -13,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -32,6 +34,30 @@ type Vote struct {
 	Weight               *big.Int
 	VoterID              VoterID
 	Overwrites           uint32
+}
+
+// VotePackage represents the payload of a vote (usually base64 encoded).
+type VotePackage struct {
+	Nonce string `json:"nonce,omitempty"`
+	Votes []int  `json:"votes"`
+}
+
+// NewVotePackage creates a new vote package with the given vote slice.
+func NewVotePackage(votes []int) *VotePackage {
+	return &VotePackage{
+		Nonce: util.RandomHex(16),
+		Votes: votes,
+	}
+}
+
+// Encode returns the json encoded vote package.
+func (vp *VotePackage) Encode() ([]byte, error) {
+	return json.Marshal(vp)
+}
+
+// Decode decodes the json encoded vote package.
+func (vp *VotePackage) Decode(data []byte) error {
+	return json.Unmarshal(data, vp)
 }
 
 // WeightBytes returns the vote weight as a byte slice. If the weight is nil, it returns a byte slice of 1.

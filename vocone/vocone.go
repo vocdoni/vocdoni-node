@@ -25,7 +25,6 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/oracle"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -48,7 +47,6 @@ const (
 type Vocone struct {
 	sc              *indexer.Indexer
 	kk              *keykeeper.KeyKeeper
-	oracle          *oracle.Oracle
 	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
 	dataDir         string
@@ -114,15 +112,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	if err := vc.SetKeyKeeper(keymanager); err != nil {
 		return nil, fmt.Errorf("could not create keykeeper: %w", err)
 	}
-
-	// Create the Oracle for voting results
-	if err := vc.AddOracle(keymanager); err != nil {
-		return nil, err
-	}
-	if vc.oracle, err = oracle.NewOracle(vc.app, keymanager); err != nil {
-		return nil, err
-	}
-	vc.oracle.EnableResults(vc.sc)
 
 	// Create vochain metrics collector
 	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)
@@ -221,42 +210,6 @@ func (vc *Vocone) SetBlockTimeTarget(targetTime time.Duration) {
 // SetBlockSize configures the maximum number of transactions per block.
 func (vc *Vocone) SetBlockSize(txsCount int) {
 	vc.txsPerBlock = txsCount
-}
-
-// AddOracle adds a new oracle to the state. If oracle exists, does nothing.
-func (vc *Vocone) AddOracle(oracleKey *ethereum.SignKeys) error {
-	oracleList, err := vc.app.State.Oracles(true)
-	if err != nil {
-		return err
-	}
-	oracleExist := false
-	for _, o := range oracleList {
-		if oracleKey.Address() == o {
-			oracleExist = true
-			break
-		}
-	}
-	if !oracleExist {
-		log.Infof("adding new oracle %s", oracleKey.Address())
-		vc.vcMtx.Lock()
-		vc.app.State.AddOracle(oracleKey.Address())
-		if _, err := vc.app.State.Save(); err != nil {
-			vc.vcMtx.Unlock()
-			return err
-		}
-		vc.vcMtx.Unlock()
-	}
-	// Create the account and assign balance if does not exist or balance too low
-	oAcc, err := vc.app.State.GetAccount(oracleKey.Address(), true)
-	if err != nil {
-		return err
-	}
-	if oAcc == nil || oAcc.Balance < 10000 {
-		vc.CreateAccount(oracleKey.Address(), &state.Account{Account: models.Account{
-			Balance: 100000,
-		}})
-	}
-	return nil
 }
 
 // CreateAccount creates a new account in the state.
@@ -384,7 +337,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 func (vc *Vocone) setDefaultMethods() {
 	// first set the default methods, then override some of them
 	vc.app.SetDefaultMethods()
-	vc.app.IsSynchronizing = func() bool { return false }
+	vc.app.SetFnIsSynchronizing(func() bool { return false })
 	vc.app.SetFnSendTx(vc.addTx)
 	vc.app.SetFnGetTx(vc.getTx)
 	vc.app.SetFnGetBlockByHeight(vc.getBlock)
