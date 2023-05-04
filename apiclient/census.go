@@ -41,8 +41,7 @@ func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
+	if err := json.Unmarshal(resp, censusData); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	return censusData.CensusID, nil
@@ -71,8 +70,7 @@ func (c *HTTPclient) CensusSize(censusID types.HexBytes) (uint64, error) {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
+	if err := json.Unmarshal(resp, censusData); err != nil {
 		return 0, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	return censusData.Size, nil
@@ -89,8 +87,7 @@ func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, str
 		return nil, "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
+	if err := json.Unmarshal(resp, censusData); err != nil {
 		return nil, "", fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	return censusData.CensusID, censusData.URI, nil
@@ -106,8 +103,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
-	err = json.Unmarshal(resp, censusData)
-	if err != nil {
+	if err := json.Unmarshal(resp, censusData); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	cp := CensusProof{
