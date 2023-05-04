@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/dvote/log"
@@ -69,8 +68,6 @@ type Indexer struct {
 
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
-	// newTxPool is the list of new tx references to be indexed
-	newTxPool []*indexertypes.TxReference
 	// tokenTransferPool is the list of token transfers to be indexed
 	tokenTransferPool []*indexertypes.TokenTransferMeta
 	// list of live processes (those on which the votes will be computed on arrival)
@@ -83,8 +80,6 @@ type Indexer struct {
 	recoveryBootLock sync.RWMutex
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
-
-	liveGoroutines atomic.Int64
 
 	// In the tests, the extra 5s sleeps can make CI really slow at times, to
 	// the point that it times out. Skip that in the tests.
@@ -165,32 +160,10 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 func (idx *Indexer) Close() error {
 	idx.cancelFunc()
-	idx.WaitIdle()
 	if err := idx.sqlDB.Close(); err != nil {
 		return err
 	}
 	return nil
-}
-
-// WaitIdle waits until there are no live asynchronous goroutines, such as those
-// started by the Commit method.
-//
-// Note that this method is racy by nature if the indexer keeps committing
-// more blocks, as it simply waits for any goroutines already started to stop.
-func (idx *Indexer) WaitIdle() {
-	var slept time.Duration
-	for {
-		const debounce = 100 * time.Millisecond
-		time.Sleep(debounce)
-		slept += debounce
-		if idx.liveGoroutines.Load() == 0 {
-			break
-		}
-		if slept > 10*time.Second {
-			log.Warnf("giving up on WaitIdle after 10s")
-			return
-		}
-	}
 }
 
 func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, context.CancelFunc) {
@@ -345,10 +318,6 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Debugw("updated process", "processID", hex.EncodeToString(p))
 	}
 
-	// Index new transactions
-	idx.liveGoroutines.Add(1)
-	go idx.indexNewTxs(idx.newTxPool)
-
 	startTime := time.Now()
 	for _, v := range idx.voteIndexPool {
 		if err := idx.addVoteIndex(v.vote, v.txIndex); err != nil {
@@ -465,7 +434,6 @@ func (idx *Indexer) Rollback() {
 	}
 	idx.voteIndexPool = []*VoteWithIndex{}
 	idx.updateProcessPool = [][]byte{}
-	idx.newTxPool = []*indexertypes.TxReference{}
 	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 }
 
