@@ -1290,7 +1290,6 @@ func TestTxIndexer(t *testing.T) {
 		}
 	}
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
-	idx.WaitIdle()
 
 	count, err := idx.TransactionCount()
 	qt.Assert(t, err, qt.IsNil)

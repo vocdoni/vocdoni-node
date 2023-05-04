@@ -16,7 +16,7 @@ func (i BigInt) MarshalText() ([]byte, error) {
 func (i *BigInt) UnmarshalText(data []byte) error {
 	i2, ok := new(big.Int).SetString(string(data), 0)
 	if !ok {
-		return fmt.Errorf("wrong format for bigInt")
+		return fmt.Errorf("wrong format for bigInt: %q", string(data))
 	}
 	*i = (BigInt)(*i2)
 	return nil

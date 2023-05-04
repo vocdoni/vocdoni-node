@@ -1,9 +1,11 @@
 package indexer
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -77,42 +79,33 @@ func (s *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxRe
 
 // OnNewTx stores the transaction reference in the indexer database
 func (s *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	s.newTxPool = append(s.newTxPool, &indexertypes.TxReference{
-		Hash:         tx.TxID[:],
-		BlockHeight:  blockHeight,
-		TxBlockIndex: txIndex,
-		TxType:       tx.TxModelType,
-	})
+	if err := s.indexNewTx(tx, blockHeight, txIndex); err != nil {
+		log.Errorw(err, "cannot index new transaction")
+	}
 }
 
-// indexNewTxs indexes the txs pending in the newTxPool and updates the transaction count
-// this function should only be called within Commit(), on a new block.
-func (s *Indexer) indexNewTxs(txList []*indexertypes.TxReference) {
-	defer s.liveGoroutines.Add(-1)
-	if len(txList) == 0 {
-		return
-	}
-	if s.cancelCtx.Err() != nil {
-		return // closing
+func (s *Indexer) indexNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) error {
+	s.lockPool.Lock()
+	defer s.lockPool.Unlock()
+	if s.blockTx == nil {
+		tx, err := s.sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+		s.blockTx = tx
 	}
 
-	// TODO(mvdan): use a single transaction
-	queries, ctx, cancel := s.timeoutQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	for _, tx := range txList {
-		if s.cancelCtx.Err() != nil {
-			return // closing
-		}
-		if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
-			Hash:         tx.Hash,
-			BlockHeight:  int64(tx.BlockHeight),
-			TxBlockIndex: int64(tx.TxBlockIndex),
-			TxType:       tx.TxType,
-		}); err != nil {
-			log.Errorf("cannot store tx at height %d: %v", tx.Index, err)
-			return
-		}
+	queries := indexerdb.New(s.blockTx)
+
+	if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
+		Hash:         tx.TxID[:],
+		BlockHeight:  int64(blockHeight),
+		TxBlockIndex: int64(txIndex),
+		TxType:       tx.TxModelType,
+	}); err != nil {
+		return err
 	}
+	return nil
 }
