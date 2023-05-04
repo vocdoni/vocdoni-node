@@ -43,49 +43,37 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 
 	var nvotes atomic.Uint64
 	lock := sync.Mutex{}
-	starTime := time.Now()
-
-	if err = st.IterateVotes(electionID, true, func(vote *models.StateDBVote) bool {
-		var vp *state.VotePackage
-		var err error
+	startTime := time.Now()
+	err = st.IterateVotes(electionID, true, func(vote *models.StateDBVote) bool {
+		keys := []string{}
 		if p.EnvelopeType.EncryptedVotes {
-			if len(p.EncryptionPrivateKeys) < len(vote.EncryptionKeyIndexes) {
-				log.Warn("wrong vote: encryptionKeyIndexes has too many fields")
-				return false
-			}
-			keys := []string{}
 			for _, k := range vote.EncryptionKeyIndexes {
-				if k >= types.KeyKeeperMaxKeyIndex {
-					log.Warn("wrong vote: key index overflow")
+				if k < types.KeyKeeperMaxKeyIndex && k < uint32(len(p.EncryptionPrivateKeys)) {
+					keys = append(keys, p.EncryptionPrivateKeys[k])
+				} else {
+					log.Warn("wrong vote: key index overflow or too many fields")
 					return false
 				}
-				keys = append(keys, p.EncryptionPrivateKeys[k])
 			}
-			if len(keys) == 0 {
-				log.Warn("wrong vote: no keys provided or wrong index")
-				return false
-			}
-			vp, err = unmarshalVote(vote.VotePackage, keys)
-		} else {
-			vp, err = unmarshalVote(vote.VotePackage, []string{})
 		}
+		vp, err := unmarshalVote(vote.VotePackage, keys)
 		if err != nil {
 			log.Debugf("vote invalid: %v", err)
 			return false
 		}
-
 		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.Weight), &lock); err != nil {
 			log.Warnf("addVote failed: %v", err)
 			return false
 		}
 		nvotes.Add(1)
 		return false
-	}); err == nil {
+	})
+	if err == nil {
 		log.Infow("computed results",
 			"process", fmt.Sprintf("%x", electionID),
 			"votes", nvotes.Load(),
 			"results", results.String(),
-			"elapsed", time.Since(starTime).String(),
+			"elapsed", time.Since(startTime).String(),
 		)
 	}
 	results.EnvelopeHeight = nvotes.Load()
