@@ -13,7 +13,7 @@ package test
 //	"go.vocdoni.io/dvote/test/testcommon/testutil"
 //	"go.vocdoni.io/dvote/vochain"
 //	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
-//	models "go.vocdoni.io/proto/build/go/models"
+//	"go.vocdoni.io/proto/build/go/models"
 //)
 
 //func TestRollingCensus(t *testing.T) {
