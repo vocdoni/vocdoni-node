@@ -8,6 +8,8 @@ services:
       args:
         - BUILDARGS
     env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
+    networks:
+      - blockchain
     volumes:
       - data-seed:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -19,6 +21,8 @@ services:
   miner0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
+    networks:
+      - blockchain
     volumes:
       - data-miner0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -26,12 +30,12 @@ services:
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
 
   miner1:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner1"
+    networks:
+      - blockchain
     volumes:
       - data-miner1:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -39,12 +43,12 @@ services:
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
 
   miner2:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner2"
+    networks:
+      - blockchain
     volumes:
       - data-miner2:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -52,12 +56,12 @@ services:
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
 
   miner3:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
+    networks:
+      - blockchain
     volumes:
       - data-miner3:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -65,29 +69,14 @@ services:
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
-
-  oracle:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file:
-      - "${COMPOSE_HOST_PATH:-.}/env.oracle"
-      - "${COMPOSE_HOST_PATH:-.}/env.oracle0key"
-    volumes:
-      - data-oracle:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - ${COMPOSE_HOST_PATH:-.}/zkCircuits:/app/run/dev/vochain/data/txHandler/zkCircuits/
-      - gocoverage-oracle:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
 
   gateway0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway0"
     ports:
       - "${COMPOSE_DVOTE_PORT_MAPPING:-9090:9090}"
+    networks:
+      - blockchain
     volumes:
       - data-gateway0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
@@ -95,8 +84,6 @@ services:
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
-    links:
-      - seed
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
@@ -105,13 +92,14 @@ services:
       target: test
       args:
         - BUILDARGS
-    links:
-      - gateway0
+    networks:
+      - blockchain
     volumes:
       - gocoverage-test:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
     command: "true"
+
   gocoverage:
     image: golang:1.20
     volumes:
@@ -120,9 +108,43 @@ services:
       - gocoverage-miner1:/app/run/gocoverage/miner1
       - gocoverage-miner2:/app/run/gocoverage/miner2
       - gocoverage-miner3:/app/run/gocoverage/miner3
-      - gocoverage-oracle:/app/run/gocoverage/oracle
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
       - gocoverage-test:/app/run/gocoverage/test
+
+  prometheus:
+    image: prom/prometheus:v2.26.0
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--log.level=debug"
+    networks:
+      - blockchain
+
+  grafana:
+    image: grafana/grafana
+    user: "104"
+    depends_on:
+      - prometheus
+    networks:
+      - blockchain
+    ports:
+      - 3000:3000
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+
+networks:
+  blockchain:
 
 volumes:
   data-seed: {}
@@ -130,13 +152,14 @@ volumes:
   data-miner1: {}
   data-miner2: {}
   data-miner3: {}
-  data-oracle: {}
   data-gateway0: {}
   gocoverage-seed: {}
   gocoverage-miner0: {}
   gocoverage-miner1: {}
   gocoverage-miner2: {}
   gocoverage-miner3: {}
-  gocoverage-oracle: {}
   gocoverage-gateway0: {}
   gocoverage-test: {}
+  prometheus_data: {}
+  grafana_data: {}
+

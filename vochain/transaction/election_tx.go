@@ -34,7 +34,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 	if tx.Process.VoteOptions.MaxCount == 0 {
 		return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
 	}
-	// Check for maxCount/maxValue overflows
+	// check for maxCount/maxValue overflows
 	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions || tx.Process.VoteOptions.MaxValue > results.MaxOptions {
 		return nil, ethereum.Address{},
 			fmt.Errorf("maxCount or maxValue overflows hardcoded maximums (%d, %d). Received (%d, %d)",
@@ -62,7 +62,6 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 
 	// check MaxCensusSize is properly set and within the allowed range
 	if tx.Process.GetMaxCensusSize() == 0 {
-		log.Warnf("maxCensusSize is zero")
 		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize is zero")
 	}
 	maxProcessSize, err := t.state.MaxProcessSize()
@@ -99,15 +98,9 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		tx.Process.EntityId = addr.Bytes()
 	}
 
-	// check if the sender is an Oracle or a Delegate of the organization
-	isOracle, err := t.state.IsOracle(*addr)
-	if err != nil {
-		return nil, ethereum.Address{}, err
-	}
-
 	// check if process entityID matches tx sender
-	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) && !isOracle {
-		// if not oracle check delegate
+	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
+		// check for a delegate
 		entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
 		entityAccount, err := t.state.GetAccount(entityAddress, false)
 		if err != nil {
@@ -124,29 +117,14 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 		}
 	}
 
-	// if no Oracle, build the processID (Oracles are allowed to use any processID)
-	if !isOracle || tx.Process.ProcessId == nil {
-		// if Oracle but processID empty, switch the entityID temporary to the Oracle address
-		// this way we ensure the account creating the process exists
-		entityID := tx.Process.EntityId
-		if isOracle {
-			tx.Process.EntityId = addr.Bytes()
-		}
-		pid, err := processid.BuildProcessID(tx.Process, t.state)
-		if err != nil {
-			return nil, ethereum.Address{}, fmt.Errorf("cannot build processID: %w", err)
-		}
-		tx.Process.ProcessId = pid.Marshal()
-		// restore original entityID
-		tx.Process.EntityId = entityID
+	// build the deterministic process ID
+	pid, err := processid.BuildProcessID(tx.Process, t.state)
+	if err != nil {
+		return nil, ethereum.Address{}, fmt.Errorf("cannot build processID: %w", err)
 	}
+	tx.Process.ProcessId = pid.Marshal()
 
-	// check if process already exists
-	_, err = t.state.Process(tx.Process.ProcessId, false)
-	if err == nil {
-		return nil, ethereum.Address{}, fmt.Errorf("process with id (%x) already exists", tx.Process.ProcessId)
-	}
-
+	// if pre-register is enabled, check that the census size is not bigger than the circuit levels
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
 		if tx.Process.GetMaxCensusSize() >= uint64(t.ZkCircuit.Config.Levels) {
 			return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
@@ -199,46 +177,22 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forComm
 		return ethereum.Address{}, fmt.Errorf("cannot get process %x: %w", tx.ProcessId, err)
 	}
 	// check process entityID matches tx sender
-	isOracle := false
 	if !bytes.Equal(process.EntityId, addr.Bytes()) {
-		// Check if the transaction comes from an oracle
-		// Oracles can create processes with any entityID
-		isOracle, err = t.state.IsOracle(*addr)
+		// check if delegate
+		entityIDAddress := ethereum.AddrFromBytes(process.EntityId)
+		entityIDAccount, err := t.state.GetAccount(entityIDAddress, true)
 		if err != nil {
-			return ethereum.Address{}, err
+			return ethereum.Address{}, fmt.Errorf(
+				"cannot get entityID account for checking if the sender is a delegate: %w", err,
+			)
 		}
-		if !isOracle {
-			// check if delegate
-			entityIDAddress := ethereum.AddrFromBytes(process.EntityId)
-			entityIDAccount, err := t.state.GetAccount(entityIDAddress, true)
-			if err != nil {
-				return ethereum.Address{}, fmt.Errorf(
-					"cannot get entityID account for checking if the sender is a delegate: %w", err,
-				)
-			}
-			if !entityIDAccount.IsDelegate(*addr) {
-				return ethereum.Address{}, fmt.Errorf(
-					"unauthorized to set process status, recovered addr is %s", addr.Hex(),
-				)
-			} // is delegate
-		} // is oracle
+		if !entityIDAccount.IsDelegate(*addr) {
+			return ethereum.Address{}, fmt.Errorf(
+				"unauthorized to set process status, recovered addr is %s", addr.Hex(),
+			)
+		} // is delegate
 	}
 	switch tx.Txtype {
-	case models.TxType_SET_PROCESS_RESULTS:
-		if !isOracle {
-			return ethereum.Address{}, fmt.Errorf("only oracles can execute set process results transaction")
-		}
-		if acc.Balance < cost {
-			return ethereum.Address{}, vstate.ErrNotEnoughBalance
-		}
-		if acc.Nonce != tx.Nonce {
-			return ethereum.Address{}, vstate.ErrAccountNonceInvalid
-		}
-		results := tx.GetResults()
-		if !bytes.Equal(results.OracleAddress, addr.Bytes()) {
-			return ethereum.Address{}, fmt.Errorf("cannot set results, oracle address provided in results does not match")
-		}
-		return ethereum.Address(*addr), t.state.SetProcessResults(process.ProcessId, results, false)
 	case models.TxType_SET_PROCESS_STATUS:
 		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:

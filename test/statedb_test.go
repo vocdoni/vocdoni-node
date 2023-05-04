@@ -6,7 +6,6 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"github.com/tendermint/tendermint/privval"
 	models "go.vocdoni.io/proto/build/go/models"
@@ -41,29 +40,6 @@ func TestVochainState(t *testing.T) {
 
 	_, err = s.Store.Hash()
 	qt.Assert(t, err, qt.IsNil)
-}
-
-func TestAddOracle(t *testing.T) {
-	t.Parallel()
-	s := testcommon.NewVochainStateWithOracles(t)
-	err := s.AddOracle(common.HexToAddress("414896B0BC763b8762456DB00F9c76EBd49979C4"))
-	qt.Assert(t, err, qt.IsNil)
-}
-
-func TestRemoveOracle(t *testing.T) {
-	t.Parallel()
-	s := testcommon.NewVochainStateWithOracles(t)
-	err := s.RemoveOracle(testcommon.OracleListHardcoded[0])
-	qt.Assert(t, err, qt.IsNil)
-}
-
-func TestGetOracles(t *testing.T) {
-	t.Parallel()
-
-	s := testcommon.NewVochainStateWithOracles(t)
-	oracles, err := s.Oracles(false)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, oracles, qt.ContentEquals, testcommon.OracleListHardcoded)
 }
 
 func TestAddValidator(t *testing.T) {

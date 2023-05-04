@@ -307,44 +307,6 @@ func (pa *ProcessArchive) OnComputeResults(results *results.Results,
 	}
 }
 
-// OnOracleResults implements the indexer event callback.
-// On this event the process status is set to Results.
-func (pa *ProcessArchive) OnOracleResults(oracleResults *models.ProcessResult, pid []byte, height uint32) {
-	jsProc, err := pa.storage.GetProcess(pid)
-	if err != nil {
-		if os.IsNotExist(err) { // if it does not exist yet, we create it
-			proc, err := pa.indexer.ProcessInfo(pid)
-			if err != nil {
-				log.Errorf("cannot get process info %x from indexer: %v", pid, err)
-				return
-			}
-			jsProc = &Process{ProcessInfo: proc, Results: nil}
-		} else {
-			log.Errorf("cannot get json store process: %v", err)
-			return
-		}
-	}
-	// Ensure the status is set to RESULTS since OnOracleResults event is called on setProcessResultsTx
-	jsProc.ProcessInfo.Status = int32(models.ProcessStatus_RESULTS)
-	jsProc.ProcessInfo.FinalResults = true
-	// TODO: add signatures from oracles
-	//jsProc.Results.Signatures = append(jsProc.results.Signatures, oracleResults.Signature)
-
-	// Store the process
-	if err := pa.storage.AddProcess(jsProc); err != nil {
-		log.Errorf("cannot add json process: %v", err)
-		return
-	}
-	log.Infof("stored json process %x for oracle results transaction event", pid)
-
-	// Send publish signal
-	log.Debugf("sending archive publish signal for height %d", height)
-	select {
-	case pa.publish <- true:
-	default: // do nothing
-	}
-}
-
 // Close closes the process archive
 func (pa *ProcessArchive) Close() {
 	pa.close <- true

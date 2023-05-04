@@ -13,7 +13,6 @@ import (
 // StateDB Tree hierarchy
 // - Main
 //   - Extra (key: string, value: []byte)
-//   - Oracles (key: address, value: []byte{1} if exists)
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
 //   - Processes (key: ProcessId, value: models.StateDBProcess)
@@ -25,7 +24,6 @@ import (
 const (
 	TreeProcess                    = "Processes"
 	TreeExtra                      = "Extra"
-	TreeOracles                    = "Oracles"
 	TreeValidators                 = "Validators"
 	TreeAccounts                   = "Accounts"
 	TreeFaucet                     = "FaucetNonce"
@@ -76,15 +74,6 @@ var (
 		"Extra": statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "xtra",
-			MaxLevels:         256,
-			ParentLeafGetRoot: rootLeafGetRoot,
-			ParentLeafSetRoot: rootLeafSetRoot,
-		}),
-
-		// Oracles is the Oracles subTree configuration.
-		"Oracles": statedb.NewTreeSingletonConfig(statedb.TreeParams{
-			HashFunc:          arbo.HashFunctionSha256,
-			KindID:            "oracs",
 			MaxLevels:         256,
 			ParentLeafGetRoot: rootLeafGetRoot,
 			ParentLeafSetRoot: rootLeafSetRoot,

@@ -5,7 +5,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-// DvoteCfg stores global configs for dvote
+// Config stores global configurations for vocdoni-node
 type Config struct {
 	// Vochain config options
 	Vochain *VochainCfg
@@ -52,8 +52,6 @@ type Config struct {
 func (c *Config) ValidMode() bool {
 	switch c.Mode {
 	case types.ModeGateway:
-		break
-	case types.ModeOracle:
 		break
 	case types.ModeMiner:
 		break
@@ -158,27 +156,6 @@ type IndexerCfg struct {
 	Enabled bool
 	// Disables live results computation on indexer
 	IgnoreLiveResults bool
-}
-
-// OracleCfg includes all possible config params needed by the Oracle
-type OracleCfg struct {
-	// Dev indicates we use the development mode
-	Dev bool
-	// DataDir directory where data and config files are stored
-	DataDir string
-	// VochainConfig vochain node config parameters
-	VochainConfig *VochainCfg
-	// LogLevel logging level
-	LogLevel string
-	// LogOutput logging output
-	LogOutput string
-}
-
-// NewOracleCfg initializes the Oracle config
-func NewOracleCfg() *OracleCfg {
-	return &OracleCfg{
-		VochainConfig: new(VochainCfg),
-	}
 }
 
 // MetricsCfg initializes the metrics config

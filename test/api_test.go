@@ -17,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -129,10 +130,10 @@ func TestAPIcensusAndVote(t *testing.T) {
 	waitUntilHeight(t, c, 2)
 
 	// Send a vote
-	votePackage := &vochain.VotePackage{
+	votePackage := &state.VotePackage{
 		Votes: []int{1},
 	}
-	votePackageBytes, err := json.Marshal(votePackage)
+	votePackageBytes, err := votePackage.Encode()
 	qt.Assert(t, err, qt.IsNil)
 
 	vote := &models.VoteEnvelope{

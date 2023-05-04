@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/tendermint/tendermint/privval"
 	tmtypes "github.com/tendermint/tendermint/types"
 	"google.golang.org/protobuf/proto"
@@ -27,14 +26,6 @@ import (
 
 var (
 	SignerPrivKey = "e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5"
-
-	OracleListHardcoded = []common.Address{
-		common.HexToAddress("0fA7A3FdB5C7C611646a535BDDe669Db64DC03d2"),
-		common.HexToAddress("00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
-		common.HexToAddress("237B54D0163Aa131254fA260Fc12DB0E6DC76FC7"),
-		common.HexToAddress("F904848ea36c46817096E94f932A9901E377C8a5"),
-		common.HexToAddress("06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0"),
-	}
 
 	// NewVoteHardcoded needs to be a constructor, since multiple tests will
 	// modify its value. We need a different pointer for each test.
@@ -82,17 +73,6 @@ var (
 		VotePackage: testutil.B642byte(nil, "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19"),
 	}
 
-	HardcodedAdminTxAddOracle = &models.AdminTx{
-		Txtype:  models.TxType_ADD_ORACLE,
-		Address: testutil.Hex2byte(nil, "39106af1fF18bD60a38a296fd81B1f28f315852B"), // oracle address or pubkey validator
-		Nonce:   0,
-	}
-
-	HardcodedAdminTxRemoveOracle = &models.AdminTx{
-		Txtype:  models.TxType_REMOVE_ORACLE,
-		Address: testutil.Hex2byte(nil, "00192Fb10dF37c9FB26829eb2CC623cd1BF599E8"),
-		Nonce:   0,
-	}
 	power                        = uint64(10)
 	HardcodedAdminTxAddValidator = &models.AdminTx{
 		Txtype:  models.TxType_ADD_VALIDATOR,
@@ -114,16 +94,6 @@ func NewVochainState(tb testing.TB) *state.State {
 		tb.Fatal(err)
 	}
 	tb.Cleanup(func() { s.Close() })
-	return s
-}
-
-func NewVochainStateWithOracles(tb testing.TB) *state.State {
-	s := NewVochainState(tb)
-	for _, o := range OracleListHardcoded {
-		if err := s.AddOracle(o); err != nil {
-			tb.Fatal(err)
-		}
-	}
 	return s
 }
 
@@ -162,11 +132,6 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	}
 	if err := s.AddValidator(validator1); err != nil {
 		tb.Fatal(err)
-	}
-	for _, o := range OracleListHardcoded {
-		if err := s.AddOracle(o); err != nil {
-			tb.Fatal(err)
-		}
 	}
 	return s
 }
@@ -209,7 +174,6 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 		tb.Fatal(err)
 	}
 
-	oracles := []string{mngKey.AddressString()}
 	accounts := []string{mngKey.AddressString()}
 	defaultAccountsBalance := int(1000000)
 	treasurer := mngKey.AddressString()
@@ -218,7 +182,6 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 		strconv.Itoa(rand.Int()),
 		consensusParams,
 		[]privval.FilePV{*validator},
-		oracles,
 		accounts,
 		defaultAccountsBalance,
 		treasurer,

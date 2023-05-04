@@ -8,7 +8,7 @@
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 #  e2etest_overwritelection: run overwrite test
 #  e2etest_cenususizelection: run max census size test
-
+#
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
 
@@ -29,9 +29,6 @@ ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 APIHOST="http://gateway0:9090/v2"
 FAUCET="$APIHOST/faucet/dev/"
-. env.oracle0key # contains var VOCDONI_SIGNINGKEY, import into current env
-ORACLE_KEY="$VOCDONI_SIGNINGKEY"
-[ -n "$TESTSUITE_ORACLE_KEY" ] && ORACLE_KEY="$TESTSUITE_ORACLE_KEY"
 . env.treasurerkey # contains var VOCDONI_SIGNINGKEY, import into current env
 TREASURER_KEY="$VOCDONI_SIGNINGKEY"
 [ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
@@ -77,7 +74,6 @@ legacy_cspvoting() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
-		  --oracleKey=$ORACLE_KEY \
 		  --treasurerKey=$TREASURER_KEY \
 		  --electionSize=$ELECTION_SIZE \
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $3}')
@@ -121,6 +117,8 @@ e2etest_cenususizelection () {
 
 log "### Starting test suite ###"
 $COMPOSE_CMD build
+$COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
+sleep 10
 $COMPOSE_CMD up -d
 
 check_gw_is_up() {

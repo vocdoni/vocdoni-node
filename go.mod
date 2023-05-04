@@ -2,7 +2,7 @@ module go.vocdoni.io/dvote
 
 go 1.20
 
-// For testing purposes while dvote-protobuf becomes stable
+// For testing purposes
 // replace go.vocdoni.io/proto => ../dvote-protobuf
 
 // Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
@@ -54,7 +54,7 @@ require (
 	github.com/tendermint/tm-db v0.6.7
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
-	go.vocdoni.io/proto v1.14.4
+	go.vocdoni.io/proto v1.14.5-0.20230426091403-1c1475660dc8
 	golang.org/x/crypto v0.8.0
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
 	golang.org/x/net v0.9.0

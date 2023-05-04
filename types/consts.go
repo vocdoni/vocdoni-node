@@ -18,8 +18,6 @@ const (
 
 	// The mode defines the behaviour of the vocdoninode
 
-	// ModeOracle starts vocdoninode as an oracle
-	ModeOracle = "oracle"
 	// ModeMiner starts vocdoninode as a miner
 	ModeMiner = "miner"
 	// ModeSeed starts vocdoninode as a seed node
@@ -144,8 +142,6 @@ const (
 	TxSetProcess        = "setProcess"
 	TxAddValidator      = "addValidator"
 	TxRemoveValidator   = "removeValidator"
-	TxAddOracle         = "addOracle"
-	TxRemoveOracle      = "removeOracle"
 	TxAddProcessKeys    = "addProcessKeys"
 	TxRevealProcessKeys = "revealProcessKeys"
 

@@ -1,12 +1,10 @@
 package api
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
-	"fmt" // required for evm encoding
+	"errors" // required for evm encoding
 	"strconv"
 	"strings"
 	"time"
@@ -390,87 +388,12 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrElectionResultsIsNil
 	}
 
-	// intermediateResults is an array of the results that are signed
-	// by oracles. There can be void results see vochain/state/process.go#L330
-	// but we want to ignore them. The way we can know if a result is void is
-	// by checking if the oracle address is empty.
-	intermediateResults := []*models.ProcessResult{}
-	for k, processResult := range process.Results {
-		if processResult == nil {
-			log.Warnw("nil process result",
-				"electionID", fmt.Sprintf("%x", electionID),
-				"results index", k,
-			)
-			continue
-		}
-		if len(processResult.OracleAddress) == 0 { // check oracle sent the results otherwise ignore
-			continue
-		}
-		intermediateResults = append(intermediateResults, processResult)
-	} // now we have an array of non void results set by a set of oracles via SetProcessResults
-
-	if len(intermediateResults) == 0 {
-		return ErrElectionResultsIsNil
-	}
-
-	// Results are being compared because we want to make sure that
-	// all oracles are sending the same results.
-	equalResults := func(baseResult, otherResult *models.ProcessResult) bool {
-		// if the number of votes is different, the results are different
-		if len(baseResult.Votes) != len(otherResult.Votes) {
-			log.Warnw("different number of votes",
-				"baseResult", len(baseResult.Votes),
-				"otherResult", len(otherResult.Votes),
-			)
-			return false
-		}
-		for k, vote1 := range otherResult.Votes {
-			vote2 := baseResult.Votes[k]
-			if vote1 == nil {
-				log.Warnw("invalid question result (nil) at index", k)
-				continue
-			}
-			if len(vote1.Question) != len(vote2.Question) {
-				log.Warnw("question length do not match",
-					"baseResult", len(vote2.Question),
-					"otherResult", len(vote1.Question),
-				)
-				continue
-			}
-			for kk, question1 := range vote1.Question {
-				question2 := vote2.Question[kk]
-				if question1 == nil {
-					log.Warnw("invalid question option (nil) at index", kk)
-					continue
-				}
-				if !bytes.Equal(question1, question2) {
-					log.Warnw("question option bytes do not match",
-						"baseResult", fmt.Sprintf("%x", question2),
-						"otherResult", fmt.Sprintf("%x", question1),
-					)
-					return false
-				}
-			}
-		}
-		return true
-	}
-
-	firstResult := intermediateResults[0]
-	// compare only if there are more than one result
-	if len(intermediateResults) > 1 {
-		for _, processResult := range intermediateResults[1:] {
-			if !equalResults(firstResult, processResult) {
-				return ErrElectionResultsMismatch
-			}
-		}
-	} // at this point results are equal
-
 	electionResults := &ElectionResults{
 		CensusRoot:            process.CensusRoot,
 		ElectionID:            electionID,
 		SourceContractAddress: process.SourceNetworkContractAddr,
 		OrganizationID:        process.EntityId,
-		Results:               state.GetFriendlyResults(firstResult.Votes),
+		Results:               state.GetFriendlyResults(process.Results.Votes),
 	}
 
 	// add the abi encoded results

@@ -13,20 +13,16 @@ global:
 # Here it's Prometheus itself.
 scrape_configs:
 
-  - job_name: "dvote nodes stage 2"
+  - job_name: "vocdoni testsuit nodes"
     scrape_interval: 20s
     scheme: http
     static_configs:
       - targets:
-          -  gateway:9090
-          -  oracle:9090
+          -  gateway0:9090
           -  seed:9090
           -  miner0:9090
           -  miner1:9090
           -  miner2:9090
           -  miner3:9090
-          -  miner4:9090
-          -  miner5:9090
-          -  miner6:9090
         labels:
           environment: "test"

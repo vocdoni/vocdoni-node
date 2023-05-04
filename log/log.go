@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -69,6 +70,9 @@ func Init(logLevel string, output string) {
 	// Include caller, increasing SkipFrameCount to account for this log package wrapper
 	log = log.With().Caller().Logger()
 	zerolog.CallerSkipFrameCount = 3
+	zerolog.CallerMarshalFunc = func(pc uintptr, file string, line int) string {
+		return fmt.Sprintf("%s/%s:%d", path.Base(path.Dir(file)), path.Base(file), line)
+	}
 
 	switch logLevel {
 	case LogLevelDebug:
