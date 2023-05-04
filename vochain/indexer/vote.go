@@ -211,7 +211,7 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 }
 
 // finalizeResults process a finished voting, get the results from the state and saves it in the indexer Storage.
-// Once this function is called, any future live vote event for the processId will be discarted.
+// Once this function is called, any future live vote event for the processId will be discarded.
 func (s *Indexer) finalizeResults(processID []byte) error {
 	height := s.App.Height()
 	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
