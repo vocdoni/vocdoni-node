@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
@@ -127,4 +128,20 @@ func (c *HTTPclient) OrganizationsBySearchTermPaginated(
 		return nil, err
 	}
 	return orgs.Organizations, nil
+}
+
+// TransactionCount returns the count of transactions
+func (c *HTTPclient) TransactionCount() (uint64, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	txsCount := new(struct {
+		Count uint64 `json:"count"`
+	})
+
+	return txsCount.Count, json.Unmarshal(resp, txsCount)
 }
