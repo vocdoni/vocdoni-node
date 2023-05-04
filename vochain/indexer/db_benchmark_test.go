@@ -13,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // LOG_LEVEL=info go test -v -benchmem -run=- -bench=CheckTx -benchtime=20s

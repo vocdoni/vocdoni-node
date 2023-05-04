@@ -21,7 +21,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 var (

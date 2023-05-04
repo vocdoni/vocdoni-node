@@ -11,7 +11,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -11,7 +11,7 @@ import (
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 

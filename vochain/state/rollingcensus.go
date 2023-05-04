@@ -12,7 +12,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // keyCensusLen is the census.NoState key used to store the census size.
