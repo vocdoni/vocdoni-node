@@ -35,8 +35,7 @@ func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
 	var h struct {
 		Height uint32 `json:"height"`
 	}
-	err = json.Unmarshal(resp, &h)
-	if err != nil {
+	if err := json.Unmarshal(resp, &h); err != nil {
 		return 0, err
 	}
 	return h.Height, nil

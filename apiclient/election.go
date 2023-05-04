@@ -77,8 +77,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
-	err = json.Unmarshal(resp, electionCreate)
-	if err != nil {
+	if err := json.Unmarshal(resp, electionCreate); err != nil {
 		return nil, err
 	}
 
@@ -252,8 +251,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionCreate = new(api.ElectionCreate)
-	err = json.Unmarshal(resp, electionCreate)
-	if err != nil {
+	if err := json.Unmarshal(resp, electionCreate); err != nil {
 		return nil, err
 	}
 	if electionCreate.MetadataURL == "" {
@@ -323,8 +321,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	txResp := new(api.Transaction)
-	err = json.Unmarshal(resp, txResp)
-	if err != nil {
+	if err := json.Unmarshal(resp, txResp); err != nil {
 		return nil, err
 	}
 	return txResp.Hash, nil
@@ -343,8 +340,7 @@ func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error
 		Count uint32 `json:"count"`
 	})
 
-	err = json.Unmarshal(resp, votes)
-	if err != nil {
+	if err := json.Unmarshal(resp, votes); err != nil {
 		return 0, err
 	}
 	return votes.Count, nil
