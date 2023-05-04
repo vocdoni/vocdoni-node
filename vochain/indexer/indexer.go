@@ -68,8 +68,6 @@ type Indexer struct {
 
 	// updateProcessPool is the list of process IDs that require sync with the state database
 	updateProcessPool [][]byte
-	// tokenTransferPool is the list of token transfers to be indexed
-	tokenTransferPool []*indexertypes.TokenTransferMeta
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map // TODO: rethink with blockTx
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
@@ -328,13 +326,6 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Infof("indexed %d new envelopes, took %s",
 			len(idx.voteIndexPool), time.Since(startTime))
 	}
-	// index token transfers
-	for _, tt := range idx.tokenTransferPool {
-		if err := idx.newTokenTransfer(tt); err != nil {
-			log.Errorw(err, "commit: cannot create new token transfer")
-		}
-	}
-	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 
 	// Add votes collected by onVote (live results)
 	newVotes := 0
@@ -434,7 +425,6 @@ func (idx *Indexer) Rollback() {
 	}
 	idx.voteIndexPool = []*VoteWithIndex{}
 	idx.updateProcessPool = [][]byte{}
-	idx.tokenTransferPool = []*indexertypes.TokenTransferMeta{}
 }
 
 // OnProcess indexer stores the processID and entityID
@@ -522,36 +512,40 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
-	idx.tokenTransferPool = append(idx.tokenTransferPool, &indexertypes.TokenTransferMeta{
-		From:      tx.FromAddress.Bytes(),
-		To:        tx.ToAddress.Bytes(),
-		Amount:    tx.Amount,
-		Height:    uint64(idx.App.Height()),
-		TxHash:    tx.TxHash,
-		Timestamp: time.Now(),
-	})
+	if err := idx.indexTokenTransfer(tx); err != nil {
+		log.Errorw(err, "cannot index new transaction")
+	}
 }
 
 // newTokenTransfer creates a new token transfer and stores it in the database
-func (idx *Indexer) newTokenTransfer(tt *indexertypes.TokenTransferMeta) error {
-	queries, ctx, cancel := idx.timeoutQueries()
+func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	if idx.blockTx == nil {
+		tx, err := idx.sqlDB.Begin()
+		if err != nil {
+			return err
+		}
+		idx.blockTx = tx
+	}
+
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
+	queries := indexerdb.New(idx.blockTx)
 	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
-		TxHash:       tt.TxHash,
-		Height:       int64(tt.Height),
-		FromAccount:  tt.From,
-		ToAccount:    tt.To,
-		Amount:       int64(tt.Amount),
-		TransferTime: tt.Timestamp,
+		TxHash:       tx.TxHash,
+		Height:       int64(idx.App.Height()),
+		FromAccount:  tx.FromAddress.Bytes(),
+		ToAccount:    tx.ToAddress.Bytes(),
+		Amount:       int64(tx.Amount),
+		TransferTime: time.Now(),
 	}); err != nil {
 		return err
 	}
 	log.Debugw("new token transfer",
-		"from", fmt.Sprintf("%x", tt.From),
-		"to", fmt.Sprintf("%x", tt.To),
-		"amount", fmt.Sprintf("%d", tt.Amount),
+		"from", fmt.Sprintf("%x", tx.FromAddress),
+		"to", fmt.Sprintf("%x", tx.ToAddress),
+		"amount", fmt.Sprintf("%d", tx.Amount),
 	)
 	return nil
 }
