@@ -43,7 +43,7 @@ import (
 	client "go.vocdoni.io/dvote/rpcclient"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/types"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/test/testcommon"
 )

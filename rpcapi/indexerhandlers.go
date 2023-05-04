@@ -7,7 +7,7 @@ import (
 	tmtypes "github.com/tendermint/tendermint/types"
 	api "go.vocdoni.io/dvote/rpctypes"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )

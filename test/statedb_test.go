@@ -8,7 +8,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/tendermint/tendermint/privval"
-	models "go.vocdoni.io/proto/build/go/models"
+	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon"
