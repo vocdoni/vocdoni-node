@@ -157,8 +157,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	err = json.Unmarshal(resp, &voteAPI)
-	if err != nil {
+	if err := json.Unmarshal(resp, &voteAPI); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %v", err)
 	}
 	// return the voteID received from the API as result of success vote
