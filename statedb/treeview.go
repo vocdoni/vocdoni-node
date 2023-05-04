@@ -31,7 +31,7 @@ func (v *databaseViewer) Get(key []byte) ([]byte, error) {
 }
 
 // IterateWithPrefix iterates over all the keys that start with the given prefix.
-// The iration stops when the callback returns false.
+// The iteration stops when the callback returns false.
 func (v *databaseViewer) IterateWithPrefix(prefix []byte, callback func([]byte, []byte) bool) error {
 	return v.db.Iterate(prefix, callback)
 }
