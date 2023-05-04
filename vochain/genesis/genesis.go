@@ -29,11 +29,11 @@ var Genesis = map[string]VochainGenesis{
 }
 
 var devGenesis = GenesisDoc{
-	GenesisTime: time.Date(2023, time.March, 10, 10, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-dev-3",
+	GenesisTime: time.Date(2023, time.April, 10, 10, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-dev-4",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
-			MaxBytes: 5242880,
+			MaxBytes: 2097152,
 			MaxGas:   -1,
 		},
 		Evidence: EvidenceParams{
@@ -48,7 +48,7 @@ var devGenesis = GenesisDoc{
 		},
 	},
 	AppState: GenesisAppState{
-		MaxElectionSize: 20000,
+		MaxElectionSize: 50000,
 		Validators: []AppStateValidators{
 			{ // 0
 				Address:  types.HexStringToHexBytes("04cc36be85a0a6e2bfd09295396625e6302d7c60"),
@@ -105,10 +105,10 @@ var devGenesis = GenesisDoc{
 
 var stageGenesis = GenesisDoc{
 	GenesisTime: time.Date(2023, time.April, 10, 10, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-stage-4",
+	ChainID:     "vocdoni-stage-5",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
-			MaxBytes: 5242880,
+			MaxBytes: 2097152,
 			MaxGas:   -1,
 		},
 		Evidence: EvidenceParams{
@@ -123,7 +123,7 @@ var stageGenesis = GenesisDoc{
 		},
 	},
 	AppState: GenesisAppState{
-		MaxElectionSize: 1000,
+		MaxElectionSize: 2000,
 		Validators: []AppStateValidators{
 			{ // 0
 				Address:  types.HexStringToHexBytes("321d141cf1fcb41d7844af611b5347afc380a03f"),
