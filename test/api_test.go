@@ -257,6 +257,15 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 		chainInfo := api.ChainInfo{}
 		err := json.Unmarshal(resp, &chainInfo)
 		qt.Assert(t, err, qt.IsNil)
+		// check transaction count
+		resp, code = c.Request("GET", nil, "chain", "transactions", "count")
+		qt.Assert(t, code, qt.Equals, 200)
+		txsCount := new(struct {
+			Count uint64 `json:"count"`
+		})
+		err = json.Unmarshal(resp, txsCount)
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, txsCount.Count, qt.Equals, chainInfo.TransactionCount)
 		if chainInfo.Height >= h {
 			break
 		}
