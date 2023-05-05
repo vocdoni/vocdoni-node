@@ -94,16 +94,16 @@ func (v *Vote) DeepCopy() *Vote {
 	return voteCopy
 }
 
-// VoteCount return the global vote count.
+// CountTotalVotes return the global vote count.
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) VoteCount(committed bool) (uint64, error) {
+func (s *State) CountTotalVotes(committed bool) (uint64, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		s.Tx.RLock()
+		defer s.Tx.RUnlock()
 	}
-	noState := v.mainTreeViewer(committed).NoState()
+	noState := s.mainTreeViewer(committed).NoState()
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
@@ -114,8 +114,8 @@ func (v *State) VoteCount(committed bool) (uint64, error) {
 }
 
 // voteCountInc increases by 1 the global vote count.
-func (v *State) voteCountInc() error {
-	noState := v.Tx.NoState()
+func (s *State) voteCountInc() error {
+	noState := s.Tx.NoState()
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		voteCountLE = make([]byte, 8)
@@ -196,7 +196,7 @@ func (s *State) AddVote(vote *Vote) error {
 // NOTE(Edu): Changed this from byte(processID+nullifier) to
 // hash(processID+nullifier) to allow using it as a key in Arbo tree.
 // voteID = hash(processID+nullifier)
-func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
+func (s *State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("wrong processID size %d", len(pid))
 	}
@@ -219,8 +219,8 @@ func (v *State) voteID(pid, nullifier []byte) ([]byte, error) {
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.StateDBVote, error) {
-	vid, err := v.voteID(processID, nullifier)
+func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.StateDBVote, error) {
+	vid, err := s.voteID(processID, nullifier)
 	if err != nil {
 		return nil, err
 	}
@@ -228,11 +228,11 @@ func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 		// acquire a write lock, since DeepSubTree will create some temporary trees in memory
 		// that might be read concurrently by DeliverTx path during block commit, leading to race #581
 		// https://github.com/vocdoni/vocdoni-node/issues/581
-		v.Tx.Lock()
-		defer v.Tx.Unlock()
+		s.Tx.Lock()
+		defer s.Tx.Unlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
-	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
 		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrProcessNotFound
@@ -254,13 +254,13 @@ func (v *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 
 // IterateVotes iterates over all the votes of a process. The callback function is executed for each vote.
 // Once the callback returns true, the iteration stops.
-func (v *State) IterateVotes(processID []byte, committed bool, callback func(vote *models.StateDBVote) bool) error {
+func (s *State) IterateVotes(processID []byte, committed bool, callback func(vote *models.StateDBVote) bool) error {
 	if !committed {
-		v.Tx.Lock()
-		defer v.Tx.Unlock()
+		s.Tx.Lock()
+		defer s.Tx.Unlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
-	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
 		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return ErrProcessNotFound
@@ -282,8 +282,8 @@ func (v *State) IterateVotes(processID []byte, committed bool, callback func(vot
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) VoteExists(processID, nullifier []byte, committed bool) (bool, error) {
-	_, err := v.Vote(processID, nullifier, committed)
+func (s *State) VoteExists(processID, nullifier []byte, committed bool) (bool, error) {
+	_, err := s.Vote(processID, nullifier, committed)
 	if errors.Is(err, ErrProcessNotFound) {
 		return false, nil
 	} else if errors.Is(err, ErrVoteNotFound) {
@@ -298,14 +298,14 @@ func (v *State) VoteExists(processID, nullifier []byte, committed bool) (bool, e
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) iterateVotes(processID []byte,
+func (s *State) iterateVotes(processID []byte,
 	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool) error {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		s.Tx.RLock()
+		defer s.Tx.RUnlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
-	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
 		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
 	if err != nil {
 		return err
@@ -331,12 +331,15 @@ func (v *State) iterateVotes(processID []byte,
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) CountVotes(processID []byte, committed bool) (uint64, error) {
-	votesTree, err := v.mainTreeViewer(committed).DeepSubTree(
+func (s *State) CountVotes(processID []byte, committed bool) (uint64, error) {
+	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
 		StateTreeCfg(TreeProcess),
 		StateChildTreeCfg(ChildTreeVotes).WithKey(processID),
 	)
 	if err != nil {
+		if errors.Is(err, statedb.ErrEmptyTree) {
+			return 0, nil
+		}
 		return 0, err
 	}
 	size, err := votesTree.Size()
@@ -350,10 +353,10 @@ func (v *State) CountVotes(processID []byte, committed bool) (uint64, error) {
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) EnvelopeList(processID []byte, from, listSize int,
+func (s *State) EnvelopeList(processID []byte, from, listSize int,
 	committed bool) (nullifiers [][]byte) {
 	idx := 0
-	v.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
+	s.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		if idx >= from+listSize {
 			return true
 		}

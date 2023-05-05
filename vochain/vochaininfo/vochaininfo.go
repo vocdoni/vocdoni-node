@@ -266,7 +266,7 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			if err != nil {
 				log.Errorf("cannot count processes: %s", err)
 			}
-			vi.voteTreeSize, err = vi.vnode.State.VoteCount(true)
+			vi.voteTreeSize, err = vi.vnode.State.CountTotalVotes(true)
 			if err != nil {
 				log.Errorf("cannot access vote count: %s", err)
 			}
