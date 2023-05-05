@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -338,7 +339,11 @@ func (v *State) CountVotes(processID []byte, committed bool) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return votesTree.Size()
+	size, err := votesTree.Size()
+	if errors.Is(err, statedb.ErrEmptyTree) {
+		return 0, nil
+	}
+	return size, err
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
