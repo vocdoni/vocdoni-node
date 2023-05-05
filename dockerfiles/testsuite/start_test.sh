@@ -2,6 +2,7 @@
 # bash start_test.sh [testname] [testname] [...]
 #  (if no argument is passed, run all tests)
 #  legacy_cspvoting: run (rpc_client) csp vote test
+#  e2etest_plaintextelection_empty: run poll vote test, with no votes
 #  e2etest_plaintextelection: run poll vote test
 #  e2etest_encryptedelection: run encrypted vote test
 #  e2etest_anonelection: run anonymous vote test
@@ -44,6 +45,7 @@ log() { echo $(date --rfc-3339=s) "$@" ; }
 
 tests_to_run=(
 	"legacy_cspvoting"
+	"e2etest_plaintextelection_empty"
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
 	"e2etest_anonelection"
@@ -80,14 +82,23 @@ legacy_cspvoting() {
 }
 
 e2etest() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
+	op=$1
+	shift
+	args=$@
+	id="${op}_$(echo $args | md5sum | awk '{print $1}')"
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 300 \
 		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
-		  --operation=$1
+		  --operation=$op \
+		  $args
 }
 
 e2etest_plaintextelection() {
-	e2etest plaintextelection
+	e2etest plaintextelection --votes=100
+}
+
+e2etest_plaintextelection_empty() {
+	e2etest plaintextelection --votes=0
 }
 
 e2etest_encryptedelection() {

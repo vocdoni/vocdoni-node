@@ -1,6 +1,7 @@
 package results
 
 import (
+	"errors"
 	"fmt"
 	"math/big"
 	"sync"
@@ -9,6 +10,7 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
@@ -75,6 +77,10 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 			"results", results.String(),
 			"elapsed", time.Since(startTime).String(),
 		)
+	}
+	if errors.Is(err, statedb.ErrEmptyTree) {
+		// no votes, return empty results
+		return results, nil
 	}
 	results.EnvelopeHeight = nvotes.Load()
 	return results, err
