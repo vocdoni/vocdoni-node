@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -37,7 +38,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 	if err != nil {
 		log.Fatal(err)
 	}
-	app.SetDefaultMethods()
 	// Set the vote cache at least as big as the mempool size
 	if app.State.CacheSize() < vochaincfg.MempoolSize {
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
@@ -141,7 +141,6 @@ func newTendermint(app *BaseApplication,
 		tconfig.P2P.HandshakeTimeout = time.Second * 10
 	}
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
-	log.Infof("announcing external address %s", tconfig.P2P.ExternalAddress)
 	tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
 	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
 		!localConfig.IsSeedNode && ok {
@@ -186,9 +185,12 @@ func newTendermint(app *BaseApplication,
 		tconfig.Mode = tmcfg.ModeValidator
 	}
 
-	log.Infof("tendermint configured as %s node", tconfig.Mode)
-	log.Infof("consensus block time target: commit=%.2fs propose=%.2fs",
-		tconfig.Consensus.TimeoutCommit.Seconds(), tconfig.Consensus.TimeoutPropose.Seconds())
+	log.Infow("consensus time target",
+		"precommit", tconfig.Consensus.TimeoutPrecommit.Seconds(),
+		"propose", tconfig.Consensus.TimeoutPropose.Seconds(),
+		"prevote", tconfig.Consensus.TimeoutPrevote.Seconds(),
+		"commit", tconfig.Consensus.TimeoutCommit.Seconds(),
+		"block", blockTime)
 
 	// disable transaction indexer (we don't use it)
 	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: []string{"null"}}
@@ -204,13 +206,11 @@ func newTendermint(app *BaseApplication,
 	// Set mempool TTL to 15 minutes
 	tconfig.Mempool.TTLDuration = time.Minute * 15
 	tconfig.Mempool.TTLNumBlocks = 100
-	log.Infof("mempool config: %+v", tconfig.Mempool)
+	log.Debugf("mempool config: %+v", tconfig.Mempool)
 
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
 	// -tags=cleveldb is used. See tmdb_*.go.
 	tconfig.DBBackend = string(tmdbBackend)
-	log.Infof("using db backend %s", tconfig.DBBackend)
-
 	if localConfig.Genesis != "" {
 		tconfig.Genesis = localConfig.Genesis
 	}
@@ -231,7 +231,6 @@ func newTendermint(app *BaseApplication,
 	}
 	pv.Save()
 
-	log.Infof("tendermint validator pubkey: %x", pv.Key.PubKey.Bytes())
 	//aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
 	//if err != nil {
 	//	return nil, err
@@ -252,8 +251,14 @@ func newTendermint(app *BaseApplication,
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Infof("tendermint p2p node ID: %s", nodeKey.ID)
 	log.Debugf("tendermint p2p config: %+v", tconfig.P2P)
+
+	log.Infow("tendermint config",
+		"db-backend", tconfig.DBBackend,
+		"pubkey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
+		"external-address", tconfig.P2P.ExternalAddress,
+		"nodeId", nodeKey.ID,
+		"mode", tconfig.Mode)
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.GenesisFile()) {
@@ -277,7 +282,6 @@ func newTendermint(app *BaseApplication,
 
 	// We need to fetch chain_id in order to make Replay work,
 	// since signatures depend on it.
-	log.Infof("genesis file at %s", tconfig.GenesisFile())
 	type genesisChainID struct {
 		ChainID string `json:"chain_id"`
 	}
@@ -289,8 +293,11 @@ func newTendermint(app *BaseApplication,
 	if err := json.Unmarshal(genesisData, genesisCID); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
 	}
-	log.Infof("found chainID %s", genesisCID.ChainID)
+	log.Infow("genesis file", "genesis", tconfig.GenesisFile(), "chainID", genesisCID.ChainID)
 	app.chainID = genesisCID.ChainID
+
+	// assign the default tendermint methods
+	app.SetDefaultMethods()
 
 	// create node
 	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file

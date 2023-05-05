@@ -272,7 +272,12 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	ed.Census.URL = censusURI
 
 	if ed.Census.Size == 0 {
-		ed.Census.Size = uint64(t.config.nvotes)
+		ed.Census.Size = func() uint64 {
+			if t.config.nvotes == 0 {
+				return 1 // allows to test with no voters
+			}
+			return uint64(t.config.nvotes)
+		}()
 	}
 
 	// Check census size (of the published census)
