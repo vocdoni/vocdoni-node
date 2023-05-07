@@ -20,16 +20,16 @@ var (
 )
 
 // TransactionCount returns the number of transactions indexed
-func (s *Indexer) TransactionCount() (uint64, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) TransactionCount() (uint64, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	count, err := queries.CountTxReferences(ctx)
 	return uint64(count), err
 }
 
 // GetTxReference fetches the txReference for the given tx height
-func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlTxRef, err := queries.GetTxReference(ctx, int64(height))
 	if err != nil {
@@ -42,8 +42,8 @@ func (s *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, erro
 }
 
 // GetTxHashReference fetches the txReference for the given tx hash
-func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlTxRef, err := queries.GetTxReferenceByHash(ctx, hash)
 	if err != nil {
@@ -57,8 +57,8 @@ func (s *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxRefer
 
 // GetLastTxReferences fetches a number of the latest indexed transactions.
 // The first one returned is the newest, so they are in descending order.
-func (s *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxReference, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxReference, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlTxRefs, err := queries.GetLastTxReferences(ctx, indexerdb.GetLastTxReferencesParams{
 		Limit:  limit,
@@ -78,26 +78,26 @@ func (s *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxRe
 }
 
 // OnNewTx stores the transaction reference in the indexer database
-func (s *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {
-	if err := s.indexNewTx(tx, blockHeight, txIndex); err != nil {
+func (idx *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {
+	if err := idx.indexNewTx(tx, blockHeight, txIndex); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
 }
 
-func (s *Indexer) indexNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) error {
-	s.lockPool.Lock()
-	defer s.lockPool.Unlock()
-	if s.blockTx == nil {
-		tx, err := s.sqlDB.Begin()
+func (idx *Indexer) indexNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) error {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	if idx.blockTx == nil {
+		tx, err := idx.sqlDB.Begin()
 		if err != nil {
 			return err
 		}
-		s.blockTx = tx
+		idx.blockTx = tx
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(s.blockTx)
+	queries := indexerdb.New(idx.blockTx)
 
 	if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
 		Hash:         tx.TxID[:],
