@@ -586,10 +586,7 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Update the process
-	err = idx.updateProcess(pid)
-	qt.Assert(t, err, qt.IsNil)
-	err = idx.setResultsHeight(pid, app.Height())
-	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// GetEnvelopes with a limit
 	envelopes, err := idx.GetEnvelopes(pid, 10, 0, "")
