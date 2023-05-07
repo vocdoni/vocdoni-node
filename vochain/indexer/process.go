@@ -283,17 +283,9 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	)
 
 	// The caller must hold lockPool already.
-	if idx.blockTx == nil {
-		tx, err := idx.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		idx.blockTx = tx
-	}
-
+	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(idx.blockTx)
 
 	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
