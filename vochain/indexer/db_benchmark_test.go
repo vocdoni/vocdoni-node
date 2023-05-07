@@ -60,7 +60,6 @@ func benchmarkIndexTx(b *testing.B) {
 	qt.Assert(b, err, qt.IsNil)
 
 	for i := 0; i < b.N; i++ {
-		idx.Rollback()
 		for j := int32(0); j < 2000; j++ {
 			vote := &state.Vote{
 				Height:      uint32(util.RandomInt(10, 10000)),
@@ -83,7 +82,6 @@ func benchmarkFetchTx(b *testing.B) {
 	idx := newTestIndexer(b, app, true)
 
 	for i := 0; i < b.N; i++ {
-		idx.Rollback()
 		for j := 0; j < numTxs; j++ {
 			idx.OnNewTx(&vochaintx.VochainTx{TxID: util.Random32()}, uint32(i), int32(j))
 		}
