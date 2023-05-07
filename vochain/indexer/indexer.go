@@ -171,6 +171,18 @@ func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, conte
 	return queries, ctx, cancel
 }
 
+// blockTxQueries assumes that lockPool is locked.
+func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
+	if idx.blockTx == nil {
+		tx, err := idx.sqlDB.Begin()
+		if err != nil {
+			panic(err) // shouldn't happen, use an error return if it ever does
+		}
+		idx.blockTx = tx
+	}
+	return indexerdb.New(idx.blockTx)
+}
+
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
 // If no CountStore model is stored for the type, it counts all db entries of that type.
 func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
@@ -527,17 +539,11 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if idx.blockTx == nil {
-		tx, err := idx.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		idx.blockTx = tx
-	}
 
+	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(idx.blockTx)
+
 	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
 		Height:       int64(idx.App.Height()),

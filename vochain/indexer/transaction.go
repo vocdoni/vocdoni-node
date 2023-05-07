@@ -87,17 +87,10 @@ func (idx *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex
 func (idx *Indexer) indexNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if idx.blockTx == nil {
-		tx, err := idx.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		idx.blockTx = tx
-	}
 
+	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(idx.blockTx)
 
 	if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
 		Hash:         tx.TxID[:],
