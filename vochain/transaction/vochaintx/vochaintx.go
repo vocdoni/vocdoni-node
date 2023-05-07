@@ -4,7 +4,7 @@ import (
 	"crypto/sha256"
 
 	"github.com/ethereum/go-ethereum/common"
-	tmtypes "github.com/tendermint/tendermint/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/proto/build/go/models"

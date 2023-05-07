@@ -13,16 +13,16 @@ import (
 	"go.vocdoni.io/dvote/config"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
-	abciclient "github.com/tendermint/tendermint/abci/client"
-	tmcfg "github.com/tendermint/tendermint/config"
-	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
+	tmcfg "github.com/cometbft/cometbft/config"
+	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/p2p"
+	"github.com/cometbft/cometbft/proxy"
 
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmlog "github.com/tendermint/tendermint/libs/log"
-	tmos "github.com/tendermint/tendermint/libs/os"
-	"github.com/tendermint/tendermint/libs/service"
-	tmnode "github.com/tendermint/tendermint/node"
-	tmtypes "github.com/tendermint/tendermint/types"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	tmlog "github.com/cometbft/cometbft/libs/log"
+	tmos "github.com/cometbft/cometbft/libs/os"
+	"github.com/cometbft/cometbft/libs/service"
+	tmnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -141,13 +141,13 @@ func newTendermint(app *BaseApplication,
 		tconfig.P2P.HandshakeTimeout = time.Second * 10
 	}
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
-	tconfig.P2P.BootstrapPeers = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.BootstrapPeers) < 8 &&
+	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
+	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
 		!localConfig.IsSeedNode && ok {
-		tconfig.P2P.BootstrapPeers = strings.Join(vocdoniGenesis.Genesis[localConfig.Chain].SeedNodes, ",")
+		tconfig.P2P.Seeds = strings.Join(vocdoniGenesis.Genesis[localConfig.Chain].SeedNodes, ",")
 	}
-	if len(tconfig.P2P.BootstrapPeers) > 0 {
-		log.Infof("seed nodes: %s", tconfig.P2P.BootstrapPeers)
+	if len(tconfig.P2P.Seeds) > 0 {
+		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
 	}
 
 	if len(localConfig.Peers) > 0 {
@@ -172,17 +172,12 @@ func newTendermint(app *BaseApplication,
 	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
 
 	// Enable only FastSync (until StateSync is implemented)
-	tconfig.BlockSync.Enable = true
+	tconfig.BlockSyncMode = true
 	tconfig.StateSync.Enable = false
 
-	// if gateway
-	tconfig.Mode = tmcfg.ModeFull
 	// if seed node
 	if localConfig.IsSeedNode {
-		tconfig.Mode = tmcfg.ModeSeed
-	} else if len(localConfig.MinerKey) > 0 {
-		// if validator
-		tconfig.Mode = tmcfg.ModeValidator
+		tconfig.P2P.SeedMode = true
 	}
 
 	log.Infow("consensus time target",
@@ -193,7 +188,7 @@ func newTendermint(app *BaseApplication,
 		"block", blockTime)
 
 	// disable transaction indexer (we don't use it)
-	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: []string{"null"}}
+	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: "null"}
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = false
@@ -219,35 +214,27 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	logger := NewTenderLogger("tendermint", tconfig.LogLevel)
+	logger := NewTenderLogger("comet", tconfig.LogLevel)
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(
 		localConfig.MinerKey,
-		tconfig.PrivValidator.KeyFile(),
-		tconfig.PrivValidator.StateFile())
+		tconfig.PrivValidatorKeyFile(),
+		tconfig.PrivValidatorStateFile())
 	if err != nil {
 		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
 	pv.Save()
 
-	//aminoPrivKey, aminoPubKey, err := AminoKeys(pv.Key.PrivKey.(crypto25519.PrivKey))
-	//if err != nil {
-	//	return nil, err
-	//}
-	//log.Infof("amino private key: %s", aminoPrivKey)
-	//log.Infof("amino public key: %s", aminoPubKey)
-	//log.Infof("using keyfile %s", tconfig.PrivValidator.KeyFile())
-
 	// nodekey is used for the p2p transport layer
-	nodeKey := new(tmtypes.NodeKey)
+	nodeKey := new(p2p.NodeKey)
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig.NodeKeyFile())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create node key: %w", err)
 		}
 	} else {
-		if *nodeKey, err = tmtypes.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
+		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
@@ -257,8 +244,8 @@ func newTendermint(app *BaseApplication,
 		"db-backend", tconfig.DBBackend,
 		"pubkey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
 		"external-address", tconfig.P2P.ExternalAddress,
-		"nodeId", nodeKey.ID,
-		"mode", tconfig.Mode)
+		"nodeId", nodeKey.ID(),
+		"seed", tconfig.P2P.SeedMode)
 
 	// read or create genesis file
 	if tmos.FileExists(tconfig.GenesisFile()) {
@@ -275,8 +262,8 @@ func newTendermint(app *BaseApplication,
 		tconfig.Instrumentation = &tmcfg.InstrumentationConfig{
 			Prometheus:           true,
 			PrometheusListenAddr: "",
-			MaxOpenConnections:   1,
-			Namespace:            "tendermint",
+			MaxOpenConnections:   2,
+			Namespace:            "comet",
 		}
 	}
 
@@ -301,7 +288,18 @@ func newTendermint(app *BaseApplication,
 
 	// create node
 	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file
-	service, err := tmnode.New(tconfig, logger, abciclient.NewLocalCreator(app), nil)
+
+	//service, err := tmnode.DefaultNewNode(tconfig, logger) // I'M NOT SURE OF THIS,
+	service, err := tmnode.NewNode(tconfig,
+		pv,
+		nodeKey,
+		proxy.NewLocalClientCreator(app),
+		tmnode.DefaultGenesisDocProviderFunc(tconfig),
+		tmnode.DefaultDBProvider,
+		tmnode.DefaultMetricsProvider(tconfig.Instrumentation),
+		logger,
+	)
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}

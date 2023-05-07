@@ -1,13 +1,13 @@
 package test
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
 	"testing"
 
+	secp "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/privval"
 	qt "github.com/frankban/quicktest"
-	"github.com/tendermint/tendermint/privval"
 	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/db"
@@ -48,14 +48,13 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	tmp := t.TempDir()
-	val, err := privval.GenFilePV(
+	val := privval.NewFilePV(
+		secp.GenPrivKey(),
 		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
 		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
-		"secp256k1",
 	)
 
-	qt.Assert(t, err, qt.IsNil)
-	pubk, err := val.GetPubKey(context.Background())
+	pubk, err := val.GetPubKey()
 	qt.Assert(t, err, qt.IsNil)
 	validator := &models.Validator{
 		Address: pubk.Address(),

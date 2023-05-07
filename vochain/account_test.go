@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/util"

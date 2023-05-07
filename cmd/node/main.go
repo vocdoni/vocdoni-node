@@ -467,8 +467,16 @@ func main() {
 			log.Fatal(err)
 		}
 		defer func() {
-			srv.App.Service.Stop()
-			srv.App.Service.Wait()
+			if err := srv.App.Service.Stop(); err != nil {
+				log.Warn(err)
+			}
+			ch := srv.App.Service.Quit()
+			select {
+			case <-ch:
+				log.Info("vochain service stopped")
+			case <-time.After(30 * time.Second):
+				log.Warn("vochain service stop timeout")
+			}
 		}()
 	}
 

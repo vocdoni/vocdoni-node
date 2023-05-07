@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
