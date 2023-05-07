@@ -537,7 +537,6 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	for i := int32(0); i < 30; i++ {
-		idx.Rollback()
 		vote := &models.VoteEnvelope{
 			Nonce: util.RandomBytes(32),
 			Proof: &models.Proof{Payload: &models.Proof_Arbo{
