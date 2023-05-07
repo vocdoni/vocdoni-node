@@ -19,7 +19,7 @@ import (
 // valid or not since the Vochain State do not validate results.
 type EventListener interface {
 	OnVote(vote *Vote, txIndex int32)
-	OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32)
+	OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)
 	OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
 	OnCancel(pid []byte, txIndex int32)

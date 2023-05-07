@@ -1283,7 +1283,7 @@ func TestTxIndexer(t *testing.T) {
 	const txsPerBlock = 10
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			idx.OnNewTx(&vochaintx.VochainTx{
+			idx.OnNewTx(&vochaintx.Tx{
 				TxID:        getTxID(i, j),
 				TxModelType: "setAccount",
 			}, uint32(i), int32(j))

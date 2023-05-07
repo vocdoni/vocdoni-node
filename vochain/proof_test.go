@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -23,7 +23,7 @@ func TestMerkleTreeProof(t *testing.T) {
 	lastProof := proofs[len(proofs)-1]
 	proofs = proofs[:len(proofs)-2]
 
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 
 	process := &models.Process{

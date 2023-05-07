@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	qt "github.com/frankban/quicktest"
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
@@ -81,7 +81,7 @@ func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys
 func TestVoteOverwrite(t *testing.T) {
 	app := TestBaseApplication(t)
 	keys, root, proofs := testCreateKeysAndBuildCensus(t, 10)
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
@@ -194,7 +194,7 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// create a census with 10 keys
 	keys, root, proofs := testCreateKeysAndBuildCensus(t, 11)
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 
 	// create a process with max census size 10
 	pid := util.RandomBytes(types.ProcessIDsize)

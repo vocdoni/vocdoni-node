@@ -57,7 +57,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		}
 		claims = append(claims, string(c))
 	}
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	root, err := tr.Root()
 	if err != nil {

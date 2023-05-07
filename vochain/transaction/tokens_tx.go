@@ -13,7 +13,7 @@ import (
 )
 
 // SetTransactionCostsTxCheck is an abstraction of ABCI checkTx for a SetTransactionCosts transaction
-func (t *TransactionHandler) SetTransactionCostsTxCheck(vtx *vochaintx.VochainTx) (uint64, error) {
+func (t *TransactionHandler) SetTransactionCostsTxCheck(vtx *vochaintx.Tx) (uint64, error) {
 	if vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
 		return 0, ErrNilTx
 	}
@@ -52,7 +52,7 @@ func (t *TransactionHandler) SetTransactionCostsTxCheck(vtx *vochaintx.VochainTx
 }
 
 // MintTokensTxCheck checks if a given MintTokensTx and its data are valid
-func (t *TransactionHandler) MintTokensTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) MintTokensTxCheck(vtx *vochaintx.Tx) error {
 	if vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
@@ -101,7 +101,7 @@ func (t *TransactionHandler) MintTokensTxCheck(vtx *vochaintx.VochainTx) error {
 }
 
 // SendTokensTxCheck checks if a given SendTokensTx and its data are valid
-func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.Tx) error {
 	if vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
@@ -162,7 +162,7 @@ func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.VochainTx) error {
 }
 
 // CollectFaucetTxCheck checks if a CollectFaucetTx and its data are valid
-func (t *TransactionHandler) CollectFaucetTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) CollectFaucetTxCheck(vtx *vochaintx.Tx) error {
 	if vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // AdminTxCheck is an abstraction of ABCI checkTx for an admin transaction
-func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.VochainTx) (ethereum.Address, error) {
+func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.Tx) (ethereum.Address, error) {
 	if vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
 		return ethereum.Address{}, ErrNilTx
 	}

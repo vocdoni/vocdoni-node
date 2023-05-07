@@ -18,7 +18,7 @@ import (
 )
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
-func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
+func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx,
 	forCommit bool) (*models.Process, ethereum.Address, error) {
 	if vtx.Tx == nil || vtx.Signature == nil || vtx.SignedBody == nil {
 		return nil, ethereum.Address{}, ErrNilTx
@@ -149,7 +149,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.VochainTx,
 }
 
 // SetProcessTxCheck is an abstraction of ABCI checkTx for canceling an existing process
-func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (ethereum.Address, error) {
+func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx, forCommit bool) (ethereum.Address, error) {
 	// check vtx.Signature available
 	if vtx.Signature == nil || vtx.Tx == nil || vtx.SignedBody == nil {
 		return ethereum.Address{}, ErrNilTx
@@ -203,7 +203,7 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.VochainTx, forComm
 }
 
 // RegisterKeyTxCheck validates a registerKeyTx transaction against the state
-func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.VochainTx, forCommit bool) error {
+func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.Tx, forCommit bool) error {
 	if vtx.Signature == nil || vtx.Tx == nil || vtx.SignedBody == nil {
 		return ErrNilTx
 	}
