@@ -201,15 +201,8 @@ func (s *Indexer) EntityCount() uint64 {
 }
 
 // Return whether a process must have live results or not
-func (s *Indexer) isOpenProcess(processID []byte) (bool, error) {
-	p, err := s.App.State.Process(processID, false)
-	if err != nil {
-		return false, err
-	}
-	if p == nil || p.EnvelopeType == nil {
-		return false, fmt.Errorf("cannot fetch process %x or envelope type not defined", processID)
-	}
-	return !p.EnvelopeType.EncryptedVotes, nil
+func isOpenProcess(process *models.Process) bool {
+	return !process.EnvelopeType.EncryptedVotes
 }
 
 // newEmptyProcess creates a new empty process and stores it into the database.
@@ -237,12 +230,8 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
 
 	compResultsHeight := uint32(0)
-	if live, err := s.isOpenProcess(pid); err != nil {
-		return fmt.Errorf("cannot check if process is live: %w", err)
-	} else {
-		if live {
-			compResultsHeight = p.BlockCount + p.StartBlock + 1
-		}
+	if isOpenProcess(p) {
+		compResultsHeight = p.BlockCount + p.StartBlock + 1
 	}
 
 	// Create and store process in the indexer database
@@ -346,7 +335,7 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	// If the process is in RESULTS status, and it was not in RESULTS status before, then finalize the results
 	if p.Status == models.ProcessStatus_RESULTS &&
 		models.ProcessStatus(previousStatus) != models.ProcessStatus_RESULTS {
-		if err := s.finalizeResults(pid); err != nil {
+		if err := s.finalizeResults(p); err != nil {
 			return err
 		}
 	}
