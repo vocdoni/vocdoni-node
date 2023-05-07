@@ -678,6 +678,10 @@ func TestLiveResults(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
+	process, err := idx.App.State.Process(pid, false)
+	if err != nil {
+		t.Fatal(err)
+	}
 	app.AdvanceTestBlock()
 
 	// Add 100 votes
@@ -693,7 +697,7 @@ func TestLiveResults(t *testing.T) {
 	idx.addProcessToLiveResults(pid)
 	for i := 0; i < 100; i++ {
 		qt.Assert(t, idx.addLiveVote(
-			pid,
+			process,
 			vp,
 			new(big.Int).SetUint64(1),
 			r),
@@ -701,8 +705,8 @@ func TestLiveResults(t *testing.T) {
 	}
 	qt.Assert(t, idx.commitVotes(pid, r, nil, 1), qt.IsNil)
 
-	if live, err := idx.isOpenProcess(pid); !live || err != nil {
-		t.Fatal(fmt.Errorf("isLiveResultsProcess returned false: %v", err))
+	if !isOpenProcess(process) {
+		t.Fatal("isOpenProcess returned false")
 	}
 
 	// Test results
@@ -817,6 +821,10 @@ var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 	if err != nil {
 		return err
 	}
+	process, err := idx.App.State.Process(pid, false)
+	if err != nil {
+		return err
+	}
 	r := &results.Results{
 		ProcessID: pid,
 		Votes: results.NewEmptyVotes(
@@ -827,7 +835,7 @@ var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 		EnvelopeType: proc.Envelope,
 	}
 	idx.addProcessToLiveResults(pid)
-	if err := idx.addLiveVote(pid, vp, weight, r); err != nil {
+	if err := idx.addLiveVote(process, vp, weight, r); err != nil {
 		return err
 	}
 	return idx.commitVotes(pid, r, nil, 1)
