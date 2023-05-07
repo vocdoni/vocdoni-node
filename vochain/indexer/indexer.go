@@ -273,7 +273,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		}
 		// Get the votes from the state
 		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
-			if err := idx.addLiveVote(p, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
+			if err := idx.addLiveVote(process, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
 				log.Errorw(err, "could not add live vote")
 			}
 			return false
@@ -332,11 +332,17 @@ func (idx *Indexer) Commit(height uint32) error {
 	overwritedVotes := 0
 	startTime = time.Now()
 
-	for pid, votes := range idx.votePool {
+	for pidStr, votes := range idx.votePool {
+		pid := []byte(pidStr)
 		// Get the process information
-		proc, err := idx.ProcessInfo([]byte(pid))
+		proc, err := idx.ProcessInfo(pid)
 		if err != nil {
-			log.Warnf("cannot get process %x", []byte(pid))
+			log.Warnf("cannot get process %x", pid)
+			continue
+		}
+		process, err := idx.App.State.Process(pid, false)
+		if err != nil {
+			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
 
@@ -378,7 +384,7 @@ func (idx *Indexer) Commit(height uint32) error {
 					continue
 				}
 				// add the live vote to substracted results
-				if err := idx.addLiveVote(v.ProcessID,
+				if err := idx.addLiveVote(process,
 					previousVote.VotePackage,
 					new(big.Int).SetBytes(previousVote.Weight),
 					substratedResults); err != nil {
@@ -390,7 +396,7 @@ func (idx *Indexer) Commit(height uint32) error {
 				newVotes++
 			}
 			// add the new vote to results
-			if err := idx.addLiveVote(v.ProcessID,
+			if err := idx.addLiveVote(process,
 				v.VotePackage,
 				v.Weight,
 				addedResults); err != nil {
@@ -399,7 +405,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes([]byte(pid), addedResults, substratedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(pid, addedResults, substratedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}

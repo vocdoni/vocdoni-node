@@ -212,18 +212,12 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 
 // finalizeResults process a finished voting, get the results from the state and saves it in the indexer Storage.
 // Once this function is called, any future live vote event for the processId will be discarded.
-func (s *Indexer) finalizeResults(processID []byte) error {
+func (s *Indexer) finalizeResults(process *models.Process) error {
 	height := s.App.Height()
+	processID := process.ProcessId
 	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
 
 	// Get the results
-	process, err := s.App.State.Process(processID, false)
-	if err != nil {
-		return fmt.Errorf("finalizeResults: cannot load processID %x from state: %w", processID, err)
-	}
-	if process.Status != models.ProcessStatus_RESULTS {
-		return fmt.Errorf("finalizeResults: processID %x is not in results status", processID)
-	}
 	r := results.ProtoToResults(process.Results)
 	queries, ctx, cancel := s.timeoutQueries()
 	defer cancel()
@@ -302,17 +296,16 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Indexer) addLiveVote(pid []byte, VotePackage []byte, weight *big.Int, results *results.Results) error {
+func (s *Indexer) addLiveVote(process *models.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
 	var vote *state.VotePackage
-	if open, err := s.isOpenProcess(pid); open && err == nil {
+	if isOpenProcess(process) {
+		var err error
 		vote, err = unmarshalVote(VotePackage, []string{})
 		if err != nil {
 			log.Warnf("cannot unmarshal vote: %v", err)
 			vote = nil
 		}
-	} else if err != nil {
-		return fmt.Errorf("cannot check if process is open: %v", err)
 	}
 
 	// Add the vote only if the election is unencrypted
