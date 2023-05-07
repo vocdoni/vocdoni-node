@@ -29,10 +29,10 @@ var ErrVoteNotFound = fmt.Errorf("vote not found")
 
 // GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
+func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
 	sqlStartTime := time.Now()
 
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlTxRefInner, err := queries.GetVoteReference(ctx, nullifier)
 	if err != nil {
@@ -57,18 +57,18 @@ func (s *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRefe
 
 // GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
-func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
+func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
 	t := time.Now()
-	voteRef, err := s.GetEnvelopeReference(nullifier)
+	voteRef, err := idx.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, err
 	}
-	vote, err := s.App.State.Vote(voteRef.ProcessID, nullifier, true)
+	vote, err := idx.App.State.Vote(voteRef.ProcessID, nullifier, true)
 	if err != nil {
 		return nil, ErrVoteNotFound
 	}
 	// TODO: get the txHash from another place, not the blockstore
-	_, txHash, err := s.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
+	_, txHash, err := idx.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (s *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, 
 // WalkEnvelopes executes callback for each envelopes of the ProcessId.
 // The callback function is executed async (in a goroutine) if async=true.
 // The method will return once all goroutines have finished the work.
-func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
+func (idx *Indexer) WalkEnvelopes(processId []byte, async bool,
 	callback func(*models.StateDBVote)) error {
 	wg := sync.WaitGroup{}
 
@@ -111,7 +111,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 	const limitConcurrentProcessing = 20
 	semaphore := make(chan bool, limitConcurrentProcessing)
 
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	// TODO(sqlite): getting all votes as a single slice is not scalable.
 	txRefs, err := queries.GetVoteReferencesByProcessID(ctx, processId)
@@ -123,7 +123,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 		txRef := txRef // do not reuse the range var in case async==true
 		processVote := func() {
 			defer wg.Done()
-			v, err := s.App.State.Vote(processId, txRef.Nullifier, true)
+			v, err := idx.App.State.Vote(processId, txRef.Nullifier, true)
 			if err != nil {
 				log.Errorw(err, "cannot get vote from state")
 				return
@@ -147,7 +147,7 @@ func (s *Indexer) WalkEnvelopes(processId []byte, async bool,
 
 // GetEnvelopes retrieves all envelope metadata for a ProcessId.
 // Returns ErrVoteNotFound if the envelope reference is not found.
-func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
+func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: from is invalid value %d", from)
@@ -156,7 +156,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	txRefs, err := queries.SearchVoteReferences(ctx, indexerdb.SearchVoteReferencesParams{
 		ProcessID:       processId,
@@ -171,7 +171,7 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, err
 	}
 	for _, txRef := range txRefs {
-		_, txHash, err := s.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
+		_, txHash, err := idx.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
 		if err != nil {
 			return nil, err
 		}
@@ -193,8 +193,8 @@ func (s *Indexer) GetEnvelopes(processId []byte, max, from int,
 
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
-func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	if len(processID) == 0 {
 		height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
@@ -212,14 +212,14 @@ func (s *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 
 // finalizeResults process a finished voting, get the results from the state and saves it in the indexer Storage.
 // Once this function is called, any future live vote event for the processId will be discarded.
-func (s *Indexer) finalizeResults(process *models.Process) error {
-	height := s.App.Height()
+func (idx *Indexer) finalizeResults(process *models.Process) error {
+	height := idx.App.Height()
 	processID := process.ProcessId
 	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
 
 	// Get the results
 	r := results.ProtoToResults(process.Results)
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:             processID,
@@ -232,10 +232,10 @@ func (s *Indexer) finalizeResults(process *models.Process) error {
 	}
 
 	// Remove the process from the live results
-	s.delProcessFromLiveResults(processID)
+	idx.delProcessFromLiveResults(processID)
 
 	// Set the results height
-	if err := s.setResultsHeight(processID, height); err != nil {
+	if err := idx.setResultsHeight(processID, height); err != nil {
 		return err
 	}
 
@@ -243,13 +243,13 @@ func (s *Indexer) finalizeResults(process *models.Process) error {
 }
 
 // GetResults returns the current result for a processId
-func (s *Indexer) GetResults(processID []byte) (*results.Results, error) {
+func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
 	startTime := time.Now()
 	defer func() { log.Debugf("GetResults sqlite took %s", time.Since(startTime)) }()
 
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlProcInner, err := queries.GetProcess(ctx, processID)
 	if err != nil {
@@ -261,7 +261,7 @@ func (s *Indexer) GetResults(processID []byte) (*results.Results, error) {
 }
 
 // GetResultsWeight returns the current weight of cast votes for a processId.
-func (s *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
+func (idx *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
 	// TODO(mvdan): implement on sqlite if needed
 	return nil, nil
 }
@@ -296,7 +296,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (s *Indexer) addLiveVote(process *models.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
+func (idx *Indexer) addLiveVote(process *models.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
 	var vote *state.VotePackage
 	if isOpenProcess(process) {
@@ -324,8 +324,8 @@ func (s *Indexer) addLiveVote(process *models.Process, VotePackage []byte, weigh
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
-	creationTime := s.App.TimestampFromBlock(int64(vote.Height))
+func (idx *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
+	creationTime := idx.App.TimestampFromBlock(int64(vote.Height))
 	if creationTime == nil {
 		t := time.Now()
 		creationTime = &t
@@ -342,7 +342,7 @@ func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
 
 	// TODO(mvdan): badgerhold shared a transaction via a parameter, consider
 	// doing the same with sqlite
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
 		Nullifier:      vote.Nullifier,
@@ -373,37 +373,37 @@ func (s *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
-func (s *Indexer) addProcessToLiveResults(pid []byte) {
-	s.liveResultsProcs.Store(string(pid), true)
+func (idx *Indexer) addProcessToLiveResults(pid []byte) {
+	idx.liveResultsProcs.Store(string(pid), true)
 }
 
 // delProcessFromLiveResults removes the process id from the liveResultsProcs map
-func (s *Indexer) delProcessFromLiveResults(pid []byte) {
-	s.liveResultsProcs.Delete(string(pid))
+func (idx *Indexer) delProcessFromLiveResults(pid []byte) {
+	idx.liveResultsProcs.Delete(string(pid))
 }
 
 // isProcessLiveResults returns true if the process id is in the liveResultsProcs map
-func (s *Indexer) isProcessLiveResults(pid []byte) bool {
-	_, ok := s.liveResultsProcs.Load(string(pid))
+func (idx *Indexer) isProcessLiveResults(pid []byte) bool {
+	_, ok := idx.liveResultsProcs.Load(string(pid))
 	return ok
 }
 
 // commitVotes adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (s *Indexer) commitVotes(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
+func (idx *Indexer) commitVotes(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// If the recovery bootstrap is running, wait
-	s.recoveryBootLock.RLock()
-	defer s.recoveryBootLock.RUnlock()
-	return s.commitVotesUnsafe(pid, partialResults, partialSubResults, height)
+	idx.recoveryBootLock.RLock()
+	defer idx.recoveryBootLock.RUnlock()
+	return idx.commitVotesUnsafe(pid, partialResults, partialSubResults, height)
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (s *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
+func (idx *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// TODO(sqlite): use a tx
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlProcInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
