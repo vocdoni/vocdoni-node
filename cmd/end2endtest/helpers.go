@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -29,6 +30,13 @@ type voteInfo struct {
 	voterAccount *ethereum.SignKeys
 	choice       []int
 	keys         []vapi.Key
+}
+
+type ballotData struct {
+	maxValue     uint32
+	maxTotalCost uint32
+	costExponent uint32
+	maxCount     uint32
 }
 
 func newTestElectionDescription() *vapi.ElectionDescription {
@@ -137,26 +145,8 @@ func (t *e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 	return true
 }
 
-func (t *e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
-	price, err := t.api.ElectionPrice(electionDescrip)
-	if err != nil {
-		return nil, fmt.Errorf("could not get election price: %w", err)
-	}
-	acc, err := t.api.Account("")
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch own account: %w", err)
-	}
-	if acc.Balance < price {
-		return nil, fmt.Errorf("not enough balance to create election (needed %d): %w", price, err)
-	}
-	log.Infow("creating new election", "price", price, "balance", acc.Balance)
-
-	electionID, err := t.api.NewElection(electionDescrip)
-	if err != nil {
-		return nil, err
-	}
-	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
-
+func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.Election, error) {
+	log.Infof("wait until the election: %s, starts", electionID.String())
 	// Wait for the election to start
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
 	defer cancel()
@@ -243,10 +233,10 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 	return proofs
 }
 
-func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
+func (t *e2eElection) setupCensus(censusType string) (types.HexBytes, error) {
 	// Set the account in the API client, so we can sign transactions
 	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
-		return err
+		return nil, err
 	}
 
 	// If the account does not exist, create a new one
@@ -255,15 +245,15 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	if err != nil {
 		acc, err = t.createAccount(t.api.MyAddress().Hex())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
 
 	// Create a new census
-	censusID, err := t.api.NewCensus(ed.Census.Type)
+	censusID, err := t.api.NewCensus(censusType)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	log.Infof("new census created with id %s", censusID.String())
 
@@ -271,23 +261,30 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	t.voterAccounts = ethereum.NewSignKeysBatch(t.config.nvotes)
 
 	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(ed.Census.Type, censusID); err != nil {
-		return err
+	if err := t.addParticipantsCensus(censusType, censusID); err != nil {
+		return nil, err
 	}
 
 	// Check census size
 	if !t.isCensusSizeValid(censusID) {
+		return nil, err
+	}
+
+	return censusID, nil
+}
+
+func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
+	censusID, err := t.setupCensus(ed.Census.Type)
+	if err != nil {
 		return err
 	}
 
 	// Publish the census
-	root, censusURI, err := t.api.CensusPublish(censusID)
+	ed.Census.RootHash, ed.Census.URL, err = t.api.CensusPublish(censusID)
 	if err != nil {
 		return err
 	}
-	log.Infof("census published with root %s", root.String())
-	ed.Census.RootHash = root
-	ed.Census.URL = censusURI
+	log.Infof("census published with root %x", ed.Census.RootHash.String())
 
 	if ed.Census.Size == 0 {
 		ed.Census.Size = func() uint64 {
@@ -299,31 +296,89 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	}
 
 	// Check census size (of the published census)
-	if !t.isCensusSizeValid(root) {
+	if !t.isCensusSizeValid(ed.Census.RootHash) {
 		return err
 	}
 
-	t.election, err = t.createElection(ed)
+	if err := t.checkElectionPrice(ed); err != nil {
+		return err
+	}
+
+	electionID, err := t.api.NewElection(ed)
 	if err != nil {
 		return err
 	}
+	log.Infof("created new election with id %s", electionID.String())
 
-	log.Infof("created new election with id %s", t.election.ElectionID.String())
-
-	// Wait for the election to start
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	t.election, err = t.api.WaitUntilElectionStarts(ctx, t.election.ElectionID)
+	election, err := t.waitUntilElectionStarts(electionID)
 	if err != nil {
 		return err
 	}
-
-	t.proofs = t.generateProofs(root, ed.ElectionType.Anonymous)
+	t.election = election
+	t.proofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous)
 
 	return nil
 }
 
-// overwriteVote allow to try to overwrite a previous vote given the index of the account, it can use the sameBlock or the nextBlock
+func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
+	var censusURI string
+	// default census type
+	censusType := vapi.CensusTypeWeighted
+
+	censusID, err := t.setupCensus(censusType)
+	if err != nil {
+		return err
+	}
+
+	// Publish the census
+	prc.CensusRoot, censusURI, err = t.api.CensusPublish(censusID)
+	if err != nil {
+		return err
+	}
+	log.Infof("census published with root %x", prc.CensusRoot)
+
+	prc.EntityId = t.api.MyAddress().Bytes()
+	prc.CensusURI = &censusURI
+
+	// Check census size (of the published census)
+	if !t.isCensusSizeValid(prc.CensusRoot) {
+		return err
+	}
+
+	electionID, err := t.api.NewElectionRaw(prc)
+	if err != nil {
+		return err
+	}
+	log.Infof("created new electionRaw with id %s", electionID.String())
+
+	election, err := t.waitUntilElectionStarts(electionID)
+	if err != nil {
+		return err
+	}
+	t.election = election
+	prc.ProcessId = t.election.ElectionID
+
+	t.proofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous)
+
+	return nil
+}
+
+func (t *e2eElection) checkElectionPrice(ed *vapi.ElectionDescription) error {
+	price, err := t.api.ElectionPrice(ed)
+	if err != nil {
+		return fmt.Errorf("could not get election price: %w", err)
+	}
+	acc, err := t.api.Account("")
+	if err != nil {
+		return fmt.Errorf("could not fetch own account: %w", err)
+	}
+	if acc.Balance < price {
+		return fmt.Errorf("not enough balance to create election (needed %d): %w", price, err)
+	}
+	log.Infow("creating new election", "price", price, "balance", acc.Balance)
+	return nil
+}
+
 func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
 	acc := t.voterAccounts[indexAcct]
 	contextDeadlines := 0
@@ -393,6 +448,76 @@ func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error
 	return contextDeadline, nil
 }
 
+// ballotVotes from a default list of 10 vote values that exceed the max value, max total cost and is not unique will
+func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
+	votes := make([][]int, 0, nvotes)
+	var resultsCh1, resultsCh2 []*types.BigInt
+
+	// initial 10 votes to be sent by the ballot test
+	var v = [][]int{
+		{0, 0}, {0, 7}, {5, 7}, {2, 0}, {2, 3},
+		{1, 6}, {0, 8}, {6, 5}, {2, 7}, {6, 4},
+	}
+
+	switch {
+	// less than 10 votes
+	case nvotes < 10:
+		// default results on choice 1 for less than 10 votes
+		resultsCh1 = votesToBigInt([]uint64{0, 0, 0, 0, 0, 0, 0})
+		// default results on choice 2 for less than 10 votes
+		resultsCh2 = votesToBigInt([]uint64{0, 0, 0, 0, 0, 0, 0})
+
+	// greater o equal than 10 votes
+	default:
+		for i := 0; i < nvotes/10; i++ {
+			votes = append(votes, v...)
+		}
+		// default results on choice 1 for 10 votes
+		resultsCh1 = votesToBigInt([]uint64{0, 10, 20, 0, 0, 0, 10})
+		// default results on choice 2 for 10 votes
+		resultsCh2 = votesToBigInt([]uint64{10, 0, 0, 10, 10, 0, 10})
+
+		// nvotes split 10, for example for 44 nvotes, nvoteDid10 will be 4
+		// and that number will be multiplied by each default result to obtain the results for 40 votes
+		nvotesDiv10 := new(types.BigInt).SetUint64(uint64(nvotes / 10))
+
+		for i := 0; i <= int(b.maxValue); i++ {
+			newvalCh1 := new(types.BigInt).Mul(resultsCh1[i], nvotesDiv10)
+			newvalCh2 := new(types.BigInt).Mul(resultsCh2[i], nvotesDiv10)
+
+			resultsCh1[i] = newvalCh1
+			resultsCh2[i] = newvalCh2
+		}
+	}
+
+	// remainVotes check if exists remain votes to add and count, note that if nvotes < 10 raminVote will be nvotes
+	remainVotes := nvotes % 10
+	if remainVotes != 0 {
+		votes = append(votes, v[:remainVotes]...)
+		// update expected results
+		for i := 0; i < remainVotes; i++ {
+			isValidTotalCost := math.Pow(float64(v[i][0]), float64(b.costExponent))+
+				math.Pow(float64(v[i][1]), float64(b.costExponent)) <= float64(b.maxTotalCost)
+			isValidValues := v[i][0] <= int(b.maxValue) && v[i][1] <= int(b.maxValue)
+			isUniqueValues := v[i][0] != v[i][1]
+
+			if isValidTotalCost && isValidValues && isUniqueValues {
+				newvalCh1 := new(types.BigInt).Add(resultsCh1[v[i][0]], new(types.BigInt).SetUint64(10))
+				newvalCh2 := new(types.BigInt).Add(resultsCh2[v[i][1]], new(types.BigInt).SetUint64(10))
+
+				resultsCh1[v[i][0]] = newvalCh1
+				resultsCh2[v[i][1]] = newvalCh2
+			}
+		}
+	}
+
+	expectedResults := [][]*types.BigInt{resultsCh1, resultsCh2}
+
+	log.Debug("vote values generated", votes)
+	log.Debug("results expected", expectedResults)
+	return votes, expectedResults
+}
+
 func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
 	switch faucet {
 	case "":
@@ -420,13 +545,22 @@ func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([
 	return key, nil
 }
 
-// matchResult compare the expected vote results base in the overwrite applied, with the actual result returned by the API
-func matchResult(results [][]*types.BigInt, expectedResult [][]string) bool {
-	// only has 1 question
-	for q := range results[0] {
-		if !(expectedResult[0][q] == results[0][q].String()) {
-			return false
+func matchResults(results [][]*types.BigInt, expectedResults [][]*types.BigInt) bool {
+	// iterate over each question to check if the results match with the expected results
+	for i := 0; i < len(results); i++ {
+		for q := range results[i] {
+			if !(expectedResults[i][q].String() == results[i][q].String()) {
+				return false
+			}
 		}
 	}
 	return true
+}
+
+func votesToBigInt(votes []uint64) []*types.BigInt {
+	vBigInt := make([]*types.BigInt, len(votes))
+	for i, v := range votes {
+		vBigInt[i] = new(types.BigInt).SetUint64(v)
+	}
+	return vBigInt
 }

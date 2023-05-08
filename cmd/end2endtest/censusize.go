@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 func init() {
@@ -155,12 +156,12 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	}
 
 	// should not count the last vote
-	firstChoice := fmt.Sprintf("%d", (c.nvotes-1)*10)
-	secondChoice := fmt.Sprintf("%d", 0)
-	resultExpected := [][]string{{firstChoice, secondChoice, "0"}}
+	expectedResults := [][]*types.BigInt{
+		votesToBigInt([]uint64{uint64(c.nvotes-1) * 10, 0, 0}),
+	}
 
-	if !matchResult(elres.Results, resultExpected) {
-		log.Fatalf("election result must match, expected Results: %s but got Results: %v", resultExpected, elres.Results)
+	if !matchResults(elres.Results, expectedResults) {
+		return fmt.Errorf("election result must match, expected Results: %s but got Results: %v", expectedResults, elres.Results)
 	}
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", elres.Results)

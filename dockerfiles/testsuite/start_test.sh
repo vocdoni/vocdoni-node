@@ -50,6 +50,7 @@ tests_to_run=(
 	"e2etest_anonelection"
 	"e2etest_overwritelection"
 	"e2etest_censusizelection"
+	"e2etest_ballotelection"
 	"e2etest_tokentxs"
 )
 
@@ -110,6 +111,10 @@ e2etest_overwritelection() {
 
 e2etest_censusizelection() {
   e2etest censusizelection
+}
+
+e2etest_ballotelection() {
+  e2etest ballotelection
 }
 
 ### end tests definition
