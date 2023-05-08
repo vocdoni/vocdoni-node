@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
+	"golang.org/x/exp/maps"
+
 	// modernc is a pure-Go version, but its errors have less useful info.
 	// We use mattn while developing and testing, and we can swap them later.
 	// _ "modernc.org/sqlite"
@@ -66,8 +69,10 @@ type Indexer struct {
 	// back along with the current block.
 	blockTx *sql.Tx
 
-	// updateProcessPool is the list of process IDs that require sync with the state database
-	updateProcessPool [][]byte
+	// blockUpdateProcs is the list of process IDs that require sync with the state database.
+	// The key is a types.ProcessID as a string, so that it can be used as a map key.
+	blockUpdateProcs map[string]bool
+
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map // TODO: rethink with blockTx
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
@@ -103,6 +108,8 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 	s := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
+
+		blockUpdateProcs: make(map[string]bool),
 
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
@@ -312,21 +319,26 @@ func (idx *Indexer) Commit(height uint32) error {
 	idx.lockPool.RLock()
 	defer idx.lockPool.RUnlock()
 
-	if idx.blockTx != nil {
-		if err := idx.blockTx.Commit(); err != nil {
-			log.Errorw(err, "could not commit tx")
-		}
-		idx.blockTx = nil
-	}
-
 	// Update existing processes
-	for _, p := range idx.updateProcessPool {
-		if err := idx.updateProcess(p); err != nil {
+	updateProcs := maps.Keys(idx.blockUpdateProcs)
+	sort.Strings(updateProcs)
+	queries := idx.blockTxQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+	defer cancel()
+	for _, pidStr := range updateProcs {
+		pid := types.ProcessID(pidStr)
+		if err := idx.updateProcess(ctx, queries, pid); err != nil {
 			log.Errorw(err, "commit: cannot update process")
 			continue
 		}
-		log.Debugw("updated process", "processID", hex.EncodeToString(p))
+		log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 	}
+	maps.Clear(idx.blockUpdateProcs)
+
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
 
 	startTime := time.Now()
 	for _, v := range idx.voteIndexPool {
@@ -442,7 +454,7 @@ func (idx *Indexer) Rollback() {
 		idx.blockTx = nil
 	}
 	idx.voteIndexPool = []*VoteWithIndex{}
-	idx.updateProcessPool = [][]byte{}
+	maps.Clear(idx.blockUpdateProcs)
 }
 
 // OnProcess indexer stores the processID and entityID
@@ -475,22 +487,22 @@ func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessKeys does nothing
 func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
+// OnProcessStatusChange adds the process to blockUpdateProcs and, if ended, the resultsPool
 func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
@@ -507,23 +519,25 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		log.Errorf("keyindex is nil")
 		return
 	}
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessResults verifies the results for a process and appends it to the updateProcessPool
+// OnProcessResults verifies the results for a process and appends it to blockUpdateProcs
 func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessesStart adds the processes to the updateProcessPool.
+// OnProcessesStart adds the processes to blockUpdateProcs.
 // This is required to update potential changes when a process is started, such as the rolling census.
 func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pids...)
+	for _, pid := range pids {
+		idx.blockUpdateProcs[string(pid)] = true
+	}
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface

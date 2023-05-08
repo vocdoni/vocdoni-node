@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"context"
 	"database/sql"
 	"encoding/hex"
 	"errors"
@@ -212,15 +213,13 @@ func (idx *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 
 // finalizeResults process a finished voting, get the results from the state and saves it in the indexer Storage.
 // Once this function is called, any future live vote event for the processId will be discarded.
-func (idx *Indexer) finalizeResults(process *models.Process) error {
+func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Queries, process *models.Process) error {
 	height := idx.App.Height()
 	processID := process.ProcessId
 	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
 
 	// Get the results
 	r := results.ProtoToResults(process.Results)
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:             processID,
 		Votes:          encodeVotes(r.Votes),

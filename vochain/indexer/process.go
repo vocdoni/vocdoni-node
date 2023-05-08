@@ -296,15 +296,12 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
-func (idx *Indexer) updateProcess(pid []byte) error {
+func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Queries, pid []byte) error {
 	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	// TODO: remove from results table
-	// TODO: hold a sql db transaction for multiple queries
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
+
 	previousStatus, err := queries.GetProcessStatus(ctx, pid)
 	if err != nil {
 		return err
@@ -327,7 +324,7 @@ func (idx *Indexer) updateProcess(pid []byte) error {
 	// If the process is in RESULTS status, and it was not in RESULTS status before, then finalize the results
 	if p.Status == models.ProcessStatus_RESULTS &&
 		models.ProcessStatus(previousStatus) != models.ProcessStatus_RESULTS {
-		if err := idx.finalizeResults(p); err != nil {
+		if err := idx.finalizeResults(ctx, queries, p); err != nil {
 			return err
 		}
 	}
@@ -336,13 +333,6 @@ func (idx *Indexer) updateProcess(pid []byte) error {
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.Status == models.ProcessStatus_CANCELED {
 
-		// We use two SQL queries, so use a transaction to apply them together.
-		tx, err := idx.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		queries = queries.WithTx(tx)
-
 		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 			ID:            pid,
 			ResultsHeight: 0,
@@ -350,9 +340,6 @@ func (idx *Indexer) updateProcess(pid []byte) error {
 			return err
 		}
 		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
-			return err
-		}
-		if err := tx.Commit(); err != nil {
 			return err
 		}
 	}
@@ -364,7 +351,9 @@ func (idx *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-	queries, ctx, cancel := idx.timeoutQueries()
+	// The caller must hold lockPool already.
+	queries := idx.blockTxQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
 	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 		ID:            pid,
