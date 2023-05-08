@@ -190,19 +190,16 @@ func newTendermint(app *BaseApplication,
 	// disable transaction indexer (we don't use it)
 	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: "null"}
 	// mempool config
+	tconfig.Mempool.Version = "v0"
 	tconfig.Mempool.Size = localConfig.MempoolSize
-	tconfig.Mempool.Recheck = false
+	tconfig.Mempool.Recheck = true
 	tconfig.Mempool.KeepInvalidTxsInCache = false
 	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
 	tconfig.Mempool.Broadcast = true
 	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
-	// Set mempool TTL to 15 minutes
-	tconfig.Mempool.TTLDuration = time.Minute * 15
-	tconfig.Mempool.TTLNumBlocks = 100
 	log.Debugf("mempool config: %+v", tconfig.Mempool)
-
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
 	// -tags=cleveldb is used. See tmdb_*.go.
 	tconfig.DBBackend = string(tmdbBackend)
@@ -285,9 +282,6 @@ func newTendermint(app *BaseApplication,
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
-
-	// create node
-	// TO-DO: the last parameter can be used for adding a custom (user provided) genesis file
 
 	//service, err := tmnode.DefaultNewNode(tconfig, logger) // I'M NOT SURE OF THIS,
 	service, err := tmnode.NewNode(tconfig,

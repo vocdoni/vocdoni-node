@@ -1,10 +1,12 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -28,6 +30,13 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+const (
+	// MempoolLaunchPruneIntervalBlocks is the number of blocks after which the mempool is pruned.
+	MempoolLaunchPruneIntervalBlocks = 12 // 2 minutes
+	// MempoolTxTTLBlocks is the maximum live time in blocks for a transaction before is pruned from the mempool.
+	MempoolTxTTLBlocks = 60 // 10 minutes
+)
+
 var (
 	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
 	ErrTransactionNotFound = fmt.Errorf("transaction not found")
@@ -45,6 +54,13 @@ type BaseApplication struct {
 	// data races when querying about the sync status of the blockchain.
 	isSynchronizing atomic.Bool
 
+	// mempoolTxRef is a map of tx hashes to the block height when they were added to the mempool.
+	mempoolTxRef map[[32]byte]uint32
+	// mempoolTxRefLock is a mutex to protect the mempoolTxRef map.
+	mempoolTxRefLock sync.RWMutex
+	// mempoolTxRefToGC is a slice of tx hashes to be removed from the mempoolTxRef map on Commit().
+	mempoolTxRefToGC [][32]byte
+
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
@@ -52,6 +68,7 @@ type BaseApplication struct {
 	fnGetTx            func(height uint32, txIndex int32) (*models.SignedTx, error)
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
+	fnMempoolPrune     func(txKey [32]byte) error
 	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
 	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
 
@@ -104,6 +121,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		chainID:            "test",
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
+		mempoolTxRef:       make(map[[32]byte]uint32),
 	}, nil
 }
 
@@ -116,6 +134,29 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 			app.isSynchronizing.Store(false)
 		}
 	}
+	if app.Height()%MempoolLaunchPruneIntervalBlocks == 0 {
+		// remove all expired txs from mempool
+		count := 0
+		app.mempoolTxRefLock.Lock()
+		for txKey, height := range app.mempoolTxRef {
+			if height+MempoolTxTTLBlocks > height {
+				if app.fnMempoolPrune != nil {
+					if err := app.fnMempoolPrune(txKey); err != nil {
+						log.Warnw("mempool prune", "err", err.Error(), "tx", hex.EncodeToString(txKey[:]))
+					}
+				}
+				delete(app.mempoolTxRef, txKey)
+			}
+		}
+		app.mempoolTxRefLock.Unlock()
+		if count > 0 {
+			log.Infow("mempool prune", "txs", count, "height", app.Height())
+		}
+	}
+
+	app.mempoolTxRefLock.Lock()
+	app.mempoolTxRefToGC = [][32]byte{}
+	app.mempoolTxRefLock.Unlock()
 	return app.fnBeginBlock(req)
 }
 
@@ -243,6 +284,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var response *transaction.TransactionResponse
 	var err error
+	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0}
 	}
@@ -258,6 +300,11 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
+	// add tx to mempool reference map for recheck prunning
+	app.mempoolTxRefLock.Lock()
+	app.mempoolTxRef[tx.TxID] = height
+	app.mempoolTxRefLock.Unlock()
+
 	return abcitypes.ResponseCheckTx{
 		Code: 0,
 		Data: response.Data,
@@ -280,10 +327,16 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			"height", app.Height(),
 			"tx", tx.Tx,
 		)
+		// add tx to mempool reference map for prunning on Commit()
+		app.mempoolTxRefLock.Lock()
+		app.mempoolTxRefToGC = append(app.mempoolTxRefToGC, tx.TxID)
+		app.mempoolTxRefLock.Unlock()
+		// check tx is correct on the current state
 		if response, err = app.TransactionHandler.CheckTx(tx, true); err != nil {
 			log.Errorw(err, "rejected tx")
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
+		// call event listeners
 		for _, e := range app.State.EventListeners() {
 			e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
 		}
@@ -300,13 +353,16 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
+	// execute internal state transition commit
 	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
 		log.Fatalf("cannot execute ISTC commit: %v", err)
 	}
+	// save state
 	data, err := app.State.Save()
 	if err != nil {
 		log.Fatalf("cannot save state: %v", err)
 	}
+	// perform state snapshot (DISABLED)
 	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
@@ -316,6 +372,12 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
 	}
+	// prune pending mempool tx references
+	app.mempoolTxRefLock.Lock()
+	for _, txID := range app.mempoolTxRefToGC {
+		delete(app.mempoolTxRef, txID)
+	}
+	app.mempoolTxRefLock.Unlock()
 	return abcitypes.ResponseCommit{
 		Data: data,
 	}
@@ -404,61 +466,6 @@ func (app *BaseApplication) LoadSnapshotChunk(
 func (app *BaseApplication) OfferSnapshot(
 	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
 	return abcitypes.ResponseOfferSnapshot{}
-}
-
-// fnEndBlockDefault updates the app height and timestamp at the end of the current block
-func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	app.endBlock(req.Height, time.Now())
-	return abcitypes.ResponseEndBlock{}
-}
-
-func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
-	app.height.Store(uint32(height))
-	app.endBlockTimestamp.Store(timestamp.Unix())
-	return abcitypes.ResponseEndBlock{}
-}
-
-// SetFnGetBlockByHash sets the getter for blocks by hash
-func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
-	app.fnGetBlockByHash = fn
-}
-
-// SetFnGetBlockByHeight sets the getter for blocks by height
-func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
-	app.fnGetBlockByHeight = fn
-}
-
-// SetFnSendTx sets the sendTx method
-func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
-	app.fnSendTx = fn
-}
-
-// SetFnGetTx sets the getTx method
-func (app *BaseApplication) SetFnGetTx(fn func(height uint32, txIndex int32) (*models.SignedTx, error)) {
-	app.fnGetTx = fn
-}
-
-// SetFnIsSynchronizing sets the is synchronizing method
-func (app *BaseApplication) SetFnIsSynchronizing(fn func() bool) {
-	app.isSynchronizingFn = fn
-}
-
-// SetFnGetTxHash sets the getTxHash method
-func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)) {
-	app.fnGetTxHash = fn
-}
-
-// SetFnMempoolSize sets the mempool size method method
-func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
-	app.fnMempoolSize = fn
-}
-
-func (app *BaseApplication) SetFnBeginBlock(fn func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock) {
-	app.fnBeginBlock = fn
-}
-
-func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock) {
-	app.fnEndBlock = fn
 }
 
 // ChainID returns the Node ChainID

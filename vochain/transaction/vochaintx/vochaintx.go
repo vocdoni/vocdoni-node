@@ -1,8 +1,6 @@
 package vochaintx
 
 import (
-	"crypto/sha256"
-
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -41,8 +39,8 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 }
 
 // TxKey computes the checksum of the tx
-func TxKey(tx tmtypes.Tx) [32]byte {
-	return sha256.Sum256(tx)
+func TxKey(tx []byte) [32]byte {
+	return tmtypes.Tx(tx).Key()
 }
 
 // TokenTransfer wraps information about a token transfer.

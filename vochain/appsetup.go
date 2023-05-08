@@ -3,6 +3,7 @@ package vochain
 import (
 	"context"
 	"fmt"
+	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/node"
@@ -63,6 +64,7 @@ func (app *BaseApplication) SetDefaultMethods() {
 	app.SetFnMempoolSize(func() int {
 		return app.Service.(*node.Node).Mempool().Size()
 	})
+	app.SetFnMempoolPrune(app.fnMempoolRemoveTxTendermint)
 	app.SetFnBeginBlock(app.fnBeginBlockDefault)
 	app.SetFnEndBlock(app.fnEndBlockDefault)
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
@@ -126,4 +128,72 @@ func (app *BaseApplication) fnBeginBlockDefault(
 	go app.State.CachePurge(height)
 
 	return abcitypes.ResponseBeginBlock{}
+}
+
+// fnEndBlockDefault updates the app height and timestamp at the end of the current block
+func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
+	app.endBlock(req.Height, time.Now())
+	return abcitypes.ResponseEndBlock{}
+}
+
+func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
+	app.height.Store(uint32(height))
+	app.endBlockTimestamp.Store(timestamp.Unix())
+	return abcitypes.ResponseEndBlock{}
+}
+
+// SetFnGetBlockByHash sets the getter for blocks by hash
+func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
+	app.fnGetBlockByHash = fn
+}
+
+// SetFnGetBlockByHeight sets the getter for blocks by height
+func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
+	app.fnGetBlockByHeight = fn
+}
+
+// SetFnSendTx sets the sendTx method
+func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
+	app.fnSendTx = fn
+}
+
+// SetFnGetTx sets the getTx method
+func (app *BaseApplication) SetFnGetTx(fn func(height uint32, txIndex int32) (*models.SignedTx, error)) {
+	app.fnGetTx = fn
+}
+
+// SetFnIsSynchronizing sets the is synchronizing method
+func (app *BaseApplication) SetFnIsSynchronizing(fn func() bool) {
+	app.isSynchronizingFn = fn
+}
+
+// SetFnGetTxHash sets the getTxHash method
+func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)) {
+	app.fnGetTxHash = fn
+}
+
+// SetFnMempoolSize sets the mempool size method method
+func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
+	app.fnMempoolSize = fn
+}
+
+// SetFnMempoolPrune sets the mempool prune method for a transaction.
+func (app *BaseApplication) SetFnMempoolPrune(fn func([32]byte) error) {
+	app.fnMempoolPrune = fn
+}
+
+// SetFnBeginBlock sets the begin block method.
+func (app *BaseApplication) SetFnBeginBlock(fn func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock) {
+	app.fnBeginBlock = fn
+}
+
+// SetFnEndBlock sets the end block method.
+func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock) {
+	app.fnEndBlock = fn
+}
+
+// fnMempoolRemoveTxTendermint removes a transaction (identifier by its vochain.TxKey() hash)
+// from the Tendermint mempool.
+func (app *BaseApplication) fnMempoolRemoveTxTendermint(txKey [tmtypes.TxKeySize]byte) error {
+	return app.Service.(*node.Node).Mempool().RemoveTxByKey(txKey)
 }
