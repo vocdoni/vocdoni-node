@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -95,55 +94,6 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		}
 	}
 	return envelopePackage, nil
-}
-
-// WalkEnvelopes executes callback for each envelopes of the ProcessId.
-// The callback function is executed async (in a goroutine) if async=true.
-// The method will return once all goroutines have finished the work.
-func (idx *Indexer) WalkEnvelopes(processId []byte, async bool,
-	callback func(*models.StateDBVote)) error {
-	wg := sync.WaitGroup{}
-
-	// There might be tens of thousands of votes.
-	// When async==true, we don't want to process all of them at once,
-	// as that could easily result in running out of memory.
-	// Limit it to a relatively small amount of goroutines,
-	// but also large enough to be faster than sequential processing.
-	const limitConcurrentProcessing = 20
-	semaphore := make(chan bool, limitConcurrentProcessing)
-
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	// TODO(sqlite): getting all votes as a single slice is not scalable.
-	txRefs, err := queries.GetVoteReferencesByProcessID(ctx, processId)
-	if err != nil {
-		return err
-	}
-	for _, txRef := range txRefs {
-		wg.Add(1)
-		txRef := txRef // do not reuse the range var in case async==true
-		processVote := func() {
-			defer wg.Done()
-			v, err := idx.App.State.Vote(processId, txRef.Nullifier, true)
-			if err != nil {
-				log.Errorw(err, "cannot get vote from state")
-				return
-			}
-			callback(v)
-		}
-		if async {
-			go func() {
-				semaphore <- true
-				processVote()
-				<-semaphore
-			}()
-		} else {
-			processVote()
-		}
-	}
-
-	wg.Wait()
-	return nil
 }
 
 // GetEnvelopes retrieves all envelope metadata for a ProcessId.
