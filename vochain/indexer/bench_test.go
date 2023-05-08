@@ -16,7 +16,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func BenchmarkCheckTx(b *testing.B) {
+func BenchmarkIndexVotes(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
@@ -51,8 +51,7 @@ func BenchmarkCheckTx(b *testing.B) {
 			}
 			idx.OnVote(vote, j)
 		}
-		err := idx.Commit(uint32(i))
-		qt.Assert(b, err, qt.IsNil)
+		app.AdvanceTestBlock()
 	}
 }
 
