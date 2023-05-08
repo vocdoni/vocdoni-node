@@ -69,7 +69,7 @@ func (t *TransactionHandler) LoadZkCircuit(configTag string) error {
 //
 //	Tx_Vote: vote nullifier
 //	default: []byte{}
-func (t *TransactionHandler) CheckTx(vtx *vochaintx.VochainTx, forCommit bool) (*TransactionResponse, error) {
+func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*TransactionResponse, error) {
 	if vtx.Tx == nil || vtx.Tx.Payload == nil {
 		return nil, fmt.Errorf("transaction is empty")
 	}

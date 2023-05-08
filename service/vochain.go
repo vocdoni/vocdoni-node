@@ -23,7 +23,7 @@ func (vs *VocdoniService) Vochain() error {
 	// node + app layer
 	if len(vs.Config.PublicAddr) == 0 {
 		// tendermint doesn't have support for finding out it's own external address (as of v0.35.0)
-		// there's some background discussion https://github.com/tendermint/tendermint/issues/758
+		// there's some background discussion https://github.com/cometbft/cometbft/issues/758
 		// so we need to find it ourselves out somehow
 		// (PublicAddr ends up being passed to tendermint as ExternalAddress)
 		ip, err := util.PublicIP(4)
@@ -219,7 +219,7 @@ func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		}
 		peers := make(map[string]interface{})
 		for _, peer := range ni.Peers {
-			peers[peer.ID.AddressString("")] = peer.URL
+			peers[string(peer.NodeInfo.ID())] = peer.RemoteIP
 		}
 		log.Monitor("vochain peers", peers)
 	}

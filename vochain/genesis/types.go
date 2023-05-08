@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -20,7 +20,7 @@ type VochainGenesis struct {
 }
 
 // The genesis app state types are copied from
-// github.com/tendermint/tendermint/types, for the sake of making this package
+// github.com/cometbft/cometbft/types, for the sake of making this package
 // lightweight and not have it import heavy indirect dependencies like grpc or
 // crypto/*.
 

@@ -5,9 +5,9 @@ import (
 	"math/rand"
 	"testing"
 
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/util"

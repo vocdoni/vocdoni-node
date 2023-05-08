@@ -1,37 +1,40 @@
 package vochain
 
 import (
-	"context"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
-	"testing"
 	"time"
 
+	abcitypes "github.com/cometbft/cometbft/abci/types"
+	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/libs/service"
+	"github.com/cometbft/cometbft/node"
+	tmcli "github.com/cometbft/cometbft/rpc/client/local"
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
-	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
-	"github.com/tendermint/tendermint/libs/service"
-	tmprototypes "github.com/tendermint/tendermint/proto/tendermint/types"
-	tmcli "github.com/tendermint/tendermint/rpc/client/local"
-	ctypes "github.com/tendermint/tendermint/rpc/coretypes"
-	tmtypes "github.com/tendermint/tendermint/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
-	"google.golang.org/protobuf/proto"
 
-	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/db/lru"
-	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/proto/build/go/models"
+)
+
+const (
+	// MempoolLaunchPruneIntervalBlocks is the number of blocks after which the mempool is pruned.
+	MempoolLaunchPruneIntervalBlocks = 12 // 2 minutes
+	// MempoolTxTTLBlocks is the maximum live time in blocks for a transaction before is pruned from the mempool.
+	MempoolTxTTLBlocks = 60 // 10 minutes
 )
 
 var (
@@ -51,6 +54,13 @@ type BaseApplication struct {
 	// data races when querying about the sync status of the blockchain.
 	isSynchronizing atomic.Bool
 
+	// mempoolTxRef is a map of tx hashes to the block height when they were added to the mempool.
+	mempoolTxRef map[[32]byte]uint32
+	// mempoolTxRefLock is a mutex to protect the mempoolTxRef map.
+	mempoolTxRefLock sync.Mutex
+	// mempoolTxRefToGC is a slice of tx hashes to be removed from the mempoolTxRef map on Commit().
+	mempoolTxRefToGC [][32]byte
+
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
 	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
@@ -58,6 +68,7 @@ type BaseApplication struct {
 	fnGetTx            func(height uint32, txIndex int32) (*models.SignedTx, error)
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
+	fnMempoolPrune     func(txKey [32]byte) error
 	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
 	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
 
@@ -110,274 +121,8 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		chainID:            "test",
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
+		mempoolTxRef:       make(map[[32]byte]uint32),
 	}, nil
-}
-
-// TestBaseApplication creates a new BaseApplication for testing purposes.
-// It initializes the State, TransactionHandler and all the callback functions.
-// Once the application is create, it is the caller's responsibility to call
-// app.AdvanceTestBlock() to advance the block height and commit the state.
-func TestBaseApplication(tb testing.TB) *BaseApplication {
-	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
-	if err != nil {
-		tb.Fatal(err)
-	}
-	app.SetTestingMethods()
-	genesisDoc, err := NewTemplateGenesisFile(tb.TempDir(), 4)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	app.InitChain(abcitypes.RequestInitChain{
-		Time:          time.Now(),
-		ChainId:       "test",
-		Validators:    []abcitypes.ValidatorUpdate{},
-		AppStateBytes: genesisDoc.AppState,
-	})
-	// TODO: should this be a Close on the entire BaseApplication?
-	tb.Cleanup(func() {
-		if err := app.State.Close(); err != nil {
-			tb.Error(err)
-		}
-	})
-	return app
-}
-
-func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
-	var err error
-	if app.Service, err = newTendermint(app, vochaincfg, genesis); err != nil {
-		return fmt.Errorf("could not set tendermint node service: %s", err)
-	}
-	if vochaincfg.IsSeedNode {
-		return nil
-	}
-	if app.Node, err = tmcli.New(app.Service.(tmcli.NodeService)); err != nil {
-		return fmt.Errorf("could not start tendermint node client: %w", err)
-	}
-	nodeGenesis, err := app.Node.Genesis(context.TODO())
-	if err != nil {
-		log.Fatal(err)
-	}
-	app.genesisInfo = nodeGenesis.Genesis
-	return nil
-}
-
-// SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
-// BlockStore from app.Node to load blocks. Assumes app.Node has been set.
-func (app *BaseApplication) SetDefaultMethods() {
-	log.Infof("setting default Tendermint methods for blockchain interaction")
-	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
-		resblock, err := app.Node.BlockByHash(context.Background(), hash)
-		if err != nil {
-			log.Warnf("cannot fetch block by hash: %v", err)
-			return nil
-		}
-		return resblock.Block
-	})
-
-	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
-		resblock, err := app.Node.Block(context.Background(), &height)
-		if err != nil {
-			log.Warnf("cannot fetch block by height: %v", err)
-			return nil
-		}
-		return resblock.Block
-	})
-
-	app.isSynchronizingFn = app.isSynchronizingTendermint
-	app.SetFnGetTx(app.getTxTendermint)
-	app.SetFnGetTxHash(app.getTxHashTendermint)
-	app.SetFnMempoolSize(func() int {
-		// TODO: find the way to return correctly the mempool size
-		return 0
-	})
-	app.SetFnBeginBlock(app.fnBeginBlockDefault)
-	app.SetFnEndBlock(app.fnEndBlockDefault)
-	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-		return app.Node.BroadcastTxSync(context.Background(), tx)
-	})
-}
-
-// SetTestingMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
-func (app *BaseApplication) SetTestingMethods() {
-	mockBlockStore := new(testutil.MockBlockStore)
-	mockBlockStore.Init()
-	app.SetFnGetBlockByHash(mockBlockStore.GetByHash)
-	app.SetFnGetBlockByHeight(mockBlockStore.Get)
-	app.SetFnGetTx(func(height uint32, txIndex int32) (*models.SignedTx, error) {
-		blk := mockBlockStore.Get(int64(height))
-		if blk == nil {
-			return nil, fmt.Errorf("block not found")
-		}
-		if len(blk.Txs) <= int(txIndex) {
-			return nil, fmt.Errorf("txIndex out of range")
-		}
-		stx := models.SignedTx{}
-		return &stx, proto.Unmarshal(blk.Txs[txIndex], &stx)
-	})
-	app.SetFnGetTxHash(func(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
-		blk := mockBlockStore.Get(int64(height))
-		if blk == nil {
-			return nil, nil, fmt.Errorf("block not found")
-		}
-		if len(blk.Txs) <= int(txIndex) {
-			return nil, nil, fmt.Errorf("txIndex out of range")
-		}
-		stx := models.SignedTx{}
-		tx := blk.Txs[txIndex]
-		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
-	})
-	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-		resp := app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
-		if resp.Code == 0 {
-			mockBlockStore.AddTxToBlock(tx)
-		}
-		return &ctypes.ResultBroadcastTx{
-			Hash: tmtypes.Tx(tx).Hash(),
-			Code: resp.Code,
-			Data: resp.Data,
-		}, nil
-	})
-	app.SetFnMempoolSize(func() int { return 0 })
-	app.isSynchronizingFn = func() bool { return false }
-	app.SetFnEndBlock(func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-		height := mockBlockStore.EndBlock()
-		app.endBlock(height, time.Now())
-		//app.State.SetHeight(uint32(height))
-		return abcitypes.ResponseEndBlock{}
-	})
-	app.SetFnBeginBlock(func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-		mockBlockStore.NewBlock(req.Header.Height)
-		app.fnBeginBlockDefault(req)
-		return abcitypes.ResponseBeginBlock{}
-	})
-	app.State.SetHeight(0)
-	app.endBlockTimestamp.Store(time.Now().Unix())
-}
-
-// IsSynchronizing informes if the blockchain is synchronizing or not.
-func (app *BaseApplication) isSynchronizingTendermint() bool {
-	return app.Service.(tmcli.NodeService).RPCEnvironment().ConsensusReactor.WaitSync()
-}
-
-// IsSynchronizing informes if the blockchain is synchronizing or not.
-// The value is updated every new block.
-func (app *BaseApplication) IsSynchronizing() bool {
-	return app.isSynchronizing.Load()
-}
-
-// Height returns the current blockchain height
-func (app *BaseApplication) Height() uint32 {
-	return app.height.Load()
-}
-
-// Timestamp returns the last block end timestamp
-func (app *BaseApplication) Timestamp() int64 {
-	return app.endBlockTimestamp.Load()
-}
-
-// TimestampStartBlock returns the current block start timestamp
-func (app *BaseApplication) TimestampStartBlock() int64 {
-	return app.startBlockTimestamp.Load()
-}
-
-// TimestampFromBlock returns the timestamp for a specific block height.
-// If the block is not found, it returns nil.
-// If the block is the current block, it returns the current block start timestamp.
-func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
-	if int64(app.Height()) == height {
-		t := time.Unix(app.TimestampStartBlock(), 0)
-		return &t
-	}
-	blk := app.fnGetBlockByHeight(height)
-	if blk == nil {
-		return nil
-	}
-	return &blk.Time
-}
-
-// ChainID returns the Node ChainID
-func (app *BaseApplication) ChainID() string {
-	return app.chainID
-}
-
-// CircuitConfigurationTag returns the Node CircuitConfigurationTag
-func (app *BaseApplication) CircuitConfigurationTag() string {
-	return app.circuitConfigTag
-}
-
-// MempoolSize returns the size of the transaction mempool
-func (app *BaseApplication) MempoolSize() int {
-	return app.fnMempoolSize()
-}
-
-// GetBlockByHeight retrieves a full Tendermint block indexed by its height.
-// This method uses an LRU cache for the blocks so in general it is more
-// convinient for high load operations than GetBlockByHash(), which does not use cache.
-func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
-	if app.fnGetBlockByHeight == nil {
-		log.Error("application getBlockByHeight method not assigned")
-		return nil
-	}
-	cachedBlock := app.blockCache.GetAndUpdate(height, func(prev interface{}) interface{} {
-		if prev != nil {
-			// If it's already in the cache, use it as-is.
-			return prev
-		}
-		return app.fnGetBlockByHeight(height)
-	})
-	return cachedBlock.(*tmtypes.Block)
-}
-
-// GetBlockByHash retreies a full Tendermint block indexed by its Hash
-func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
-	if app.fnGetBlockByHash == nil {
-		log.Error("application getBlockByHash method not assigned")
-		return nil
-	}
-	return app.fnGetBlockByHash(hash)
-}
-
-// GetTx retrieves a vochain transaction from the blockstore
-func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
-	return app.fnGetTx(height, txIndex)
-}
-
-func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*models.SignedTx, error) {
-	block := app.GetBlockByHeight(int64(height))
-	if block == nil {
-		return nil, ErrTransactionNotFound
-	}
-	if int32(len(block.Txs)) <= txIndex {
-		return nil, ErrTransactionNotFound
-	}
-	tx := &models.SignedTx{}
-	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
-}
-
-// GetTxHash retrieves a vochain transaction, with its hash, from the blockstore
-func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
-	return app.fnGetTxHash(height, txIndex)
-}
-
-func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
-	block := app.GetBlockByHeight(int64(height))
-	if block == nil {
-		return nil, nil, ErrTransactionNotFound
-	}
-	if int32(len(block.Txs)) <= txIndex {
-		return nil, nil, ErrTransactionNotFound
-	}
-	tx := &models.SignedTx{}
-	return tx, block.Txs[txIndex].Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
-}
-
-// SendTx sends a transaction to the mempool (sync)
-func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
-	if app.fnSendTx == nil {
-		log.Error("application sendTx method not assigned")
-		return nil, nil
-	}
-	return app.fnSendTx(tx)
 }
 
 // BeginBlock is called at the beginning of every block.
@@ -389,6 +134,29 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 			app.isSynchronizing.Store(false)
 		}
 	}
+	if app.Height()%MempoolLaunchPruneIntervalBlocks == 0 {
+		// remove all expired txs from mempool
+		count := 0
+		app.mempoolTxRefLock.Lock()
+		for txKey, height := range app.mempoolTxRef {
+			if height+MempoolTxTTLBlocks > height {
+				if app.fnMempoolPrune != nil {
+					if err := app.fnMempoolPrune(txKey); err != nil {
+						log.Warnw("mempool prune", "err", err.Error(), "tx", hex.EncodeToString(txKey[:]))
+					}
+				}
+				delete(app.mempoolTxRef, txKey)
+			}
+		}
+		app.mempoolTxRefLock.Unlock()
+		if count > 0 {
+			log.Infow("mempool prune", "txs", count, "height", app.Height())
+		}
+	}
+
+	app.mempoolTxRefLock.Lock()
+	app.mempoolTxRefToGC = [][32]byte{}
+	app.mempoolTxRefLock.Unlock()
 	return app.fnBeginBlock(req)
 }
 
@@ -512,47 +280,15 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 }
 
-// fnBeginBlockDefault signals the beginning of a new block. Called prior to any DeliverTxs.
-// The header contains the height, timestamp, and more - it exactly matches the
-// Tendermint block header.
-// The LastCommitInfo and ByzantineValidators can be used to determine rewards and
-// punishments for the validators.
-func (app *BaseApplication) fnBeginBlockDefault(
-	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	app.State.Rollback()
-	app.startBlockTimestamp.Store(req.Header.GetTime().Unix())
-	height := uint32(req.Header.GetHeight())
-	app.State.SetHeight(height)
-	go app.State.CachePurge(height)
-
-	return abcitypes.ResponseBeginBlock{}
-}
-
-// AdvanceTestBlock commits the current state, ends the current block and starts a new one.
-// Advances the block height and timestamp.
-func (app *BaseApplication) AdvanceTestBlock() {
-	app.Commit()
-	endingHeight := int64(app.Height())
-	app.EndBlock(abcitypes.RequestEndBlock{Height: endingHeight})
-
-	// The next block begins a second later.
-	nextHeight := endingHeight + 1
-	nextStartTime := time.Now()
-
-	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
-		Time:   nextStartTime,
-		Height: nextHeight,
-	}})
-}
-
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	var response *transaction.TransactionResponse
 	var err error
+	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0}
 	}
-	tx := new(vochaintx.VochainTx)
+	tx := new(vochaintx.Tx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		if response, err = app.TransactionHandler.CheckTx(tx, false); err != nil {
 			if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
@@ -564,6 +300,11 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 	} else {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
 	}
+	// add tx to mempool reference map for recheck prunning
+	app.mempoolTxRefLock.Lock()
+	app.mempoolTxRef[tx.TxID] = height
+	app.mempoolTxRefLock.Unlock()
+
 	return abcitypes.ResponseCheckTx{
 		Code: 0,
 		Data: response.Data,
@@ -578,7 +319,7 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
-	tx := new(vochaintx.VochainTx)
+	tx := new(vochaintx.Tx)
 	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
 		log.Debugw("deliver tx",
 			"hash", fmt.Sprintf("%x", tx.TxID),
@@ -586,10 +327,16 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 			"height", app.Height(),
 			"tx", tx.Tx,
 		)
+		// add tx to mempool reference map for prunning on Commit()
+		app.mempoolTxRefLock.Lock()
+		app.mempoolTxRefToGC = append(app.mempoolTxRefToGC, tx.TxID)
+		app.mempoolTxRefLock.Unlock()
+		// check tx is correct on the current state
 		if response, err = app.TransactionHandler.CheckTx(tx, true); err != nil {
 			log.Errorw(err, "rejected tx")
 			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
 		}
+		// call event listeners
 		for _, e := range app.State.EventListeners() {
 			e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
 		}
@@ -606,13 +353,16 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
+	// execute internal state transition commit
 	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
 		log.Fatalf("cannot execute ISTC commit: %v", err)
 	}
+	// save state
 	data, err := app.State.Save()
 	if err != nil {
 		log.Fatalf("cannot save state: %v", err)
 	}
+	// perform state snapshot (DISABLED)
 	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
@@ -622,9 +372,61 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
 	}
+	// prune pending mempool tx references
+	app.mempoolTxRefLock.Lock()
+	for _, txID := range app.mempoolTxRefToGC {
+		delete(app.mempoolTxRef, txID)
+	}
+	app.mempoolTxRefLock.Unlock()
 	return abcitypes.ResponseCommit{
 		Data: data,
 	}
+}
+
+// GetBlockByHeight retrieves a full block indexed by its height.
+// This method uses an LRU cache for the blocks so in general it is more
+// convinient for high load operations than GetBlockByHash(), which does not use cache.
+func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
+	if app.fnGetBlockByHeight == nil {
+		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
+		return nil
+	}
+	cachedBlock := app.blockCache.GetAndUpdate(height, func(prev interface{}) interface{} {
+		if prev != nil {
+			// If it's already in the cache, use it as-is.
+			return prev
+		}
+		return app.fnGetBlockByHeight(height)
+	})
+	return cachedBlock.(*tmtypes.Block)
+}
+
+// GetBlockByHash retreies a full block indexed by its Hash
+func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
+	if app.fnGetBlockByHash == nil {
+		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHash")
+		return nil
+	}
+	return app.fnGetBlockByHash(hash)
+}
+
+// GetTx retrieves a vochain transaction from the blockstore
+func (app *BaseApplication) GetTx(height uint32, txIndex int32) (*models.SignedTx, error) {
+	return app.fnGetTx(height, txIndex)
+}
+
+// GetTxHash retrieves a vochain transaction, with its hash, from the blockstore
+func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
+	return app.fnGetTxHash(height, txIndex)
+}
+
+// SendTx sends a transaction to the mempool (sync)
+func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	if app.fnSendTx == nil {
+		log.Errorw(fmt.Errorf("method not assigned"), "sendTx")
+		return nil, nil
+	}
+	return app.fnSendTx(tx)
 }
 
 // Query does nothing
@@ -632,16 +434,18 @@ func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.Response
 	return abcitypes.ResponseQuery{}
 }
 
-// fnEndBlockDefault updates the app height and timestamp at the end of the current block
-func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	app.endBlock(req.Height, time.Now())
-	return abcitypes.ResponseEndBlock{}
+// PrepareProposal does nothing
+func (app *BaseApplication) PrepareProposal(req abcitypes.RequestPrepareProposal) abcitypes.ResponsePrepareProposal {
+	return abcitypes.ResponsePrepareProposal{
+		Txs: req.GetTxs(),
+	}
 }
 
-func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
-	app.height.Store(uint32(height))
-	app.endBlockTimestamp.Store(timestamp.Unix())
-	return abcitypes.ResponseEndBlock{}
+// ProcessProposal does nothing
+func (app *BaseApplication) ProcessProposal(req abcitypes.RequestProcessProposal) abcitypes.ResponseProcessProposal {
+	return abcitypes.ResponseProcessProposal{
+		Status: abcitypes.ResponseProcessProposal_ACCEPT,
+	}
 }
 
 func (app *BaseApplication) ApplySnapshotChunk(
@@ -664,53 +468,20 @@ func (app *BaseApplication) OfferSnapshot(
 	return abcitypes.ResponseOfferSnapshot{}
 }
 
-// SetFnGetBlockByHash sets the getter for blocks by hash
-func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
-	app.fnGetBlockByHash = fn
-}
-
-// SetFnGetBlockByHeight sets the getter for blocks by height
-func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
-	app.fnGetBlockByHeight = fn
-}
-
-// SetFnSendTx sets the sendTx method
-func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
-	app.fnSendTx = fn
-}
-
-// SetFnGetTx sets the getTx method
-func (app *BaseApplication) SetFnGetTx(fn func(height uint32, txIndex int32) (*models.SignedTx, error)) {
-	app.fnGetTx = fn
-}
-
-// SetFnIsSynchronizing sets the is synchronizing method
-func (app *BaseApplication) SetFnIsSynchronizing(fn func() bool) {
-	app.isSynchronizingFn = fn
-}
-
-// SetFnGetTxHash sets the getTxHash method
-func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)) {
-	app.fnGetTxHash = fn
-}
-
-// SetFnMempoolSize sets the mempool size method method
-func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
-	app.fnMempoolSize = fn
-}
-
-func (app *BaseApplication) SetFnBeginBlock(fn func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock) {
-	app.fnBeginBlock = fn
-}
-
-func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock) {
-	app.fnEndBlock = fn
+// ChainID returns the Node ChainID
+func (app *BaseApplication) ChainID() string {
+	return app.chainID
 }
 
 // SetChainID sets the app and state chainID
 func (app *BaseApplication) SetChainID(chainId string) {
 	app.chainID = chainId
 	app.State.SetChainID(chainId)
+}
+
+// Genesis returns the tendermint genesis information
+func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
+	return app.genesisInfo
 }
 
 // SetCircuitConfigTag sets the current BaseApplication circuit config tag
@@ -726,7 +497,56 @@ func (app *BaseApplication) SetCircuitConfigTag(tag string) error {
 	return nil
 }
 
-// Genesis returns the tendermint genesis information
-func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
-	return app.genesisInfo
+// CircuitConfigurationTag returns the Node CircuitConfigurationTag
+func (app *BaseApplication) CircuitConfigurationTag() string {
+	return app.circuitConfigTag
+}
+
+// IsSynchronizing informes if the blockchain is synchronizing or not.
+func (app *BaseApplication) isSynchronizingTendermint() bool {
+	if app.Service == nil {
+		return true
+	}
+	return app.Service.(*node.Node).ConsensusReactor().WaitSync()
+}
+
+// IsSynchronizing informes if the blockchain is synchronizing or not.
+// The value is updated every new block.
+func (app *BaseApplication) IsSynchronizing() bool {
+	return app.isSynchronizing.Load()
+}
+
+// Height returns the current blockchain height
+func (app *BaseApplication) Height() uint32 {
+	return app.height.Load()
+}
+
+// Timestamp returns the last block end timestamp
+func (app *BaseApplication) Timestamp() int64 {
+	return app.endBlockTimestamp.Load()
+}
+
+// TimestampStartBlock returns the current block start timestamp
+func (app *BaseApplication) TimestampStartBlock() int64 {
+	return app.startBlockTimestamp.Load()
+}
+
+// TimestampFromBlock returns the timestamp for a specific block height.
+// If the block is not found, it returns nil.
+// If the block is the current block, it returns the current block start timestamp.
+func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
+	if int64(app.Height()) == height {
+		t := time.Unix(app.TimestampStartBlock(), 0)
+		return &t
+	}
+	blk := app.fnGetBlockByHeight(height)
+	if blk == nil {
+		return nil
+	}
+	return &blk.Time
+}
+
+// MempoolSize returns the size of the transaction mempool
+func (app *BaseApplication) MempoolSize() int {
+	return app.fnMempoolSize()
 }
