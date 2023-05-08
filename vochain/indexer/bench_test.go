@@ -16,28 +16,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// LOG_LEVEL=info go test -v -benchmem -run=- -bench=CheckTx -benchtime=20s
-func BenchmarkCheckTx(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.Run("indexTx", benchmarkIndexTx)
-}
-
-// LOG_LEVEL=info go test -v -benchmem -run=- -bench=FetchTx -benchtime=20s
-func BenchmarkFetchTx(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.Run("fetchTx", benchmarkFetchTx)
-}
-
-// LOG_LEVEL=info go test -v -benchmem -run=- -bench=NewProcess -benchtime=20s
-func BenchmarkNewProcess(b *testing.B) {
-	b.ReportAllocs()
-	b.ResetTimer()
-	b.Run("newProcess", benchmarkNewProcess)
-}
-
-func benchmarkIndexTx(b *testing.B) {
+func BenchmarkIndexVotes(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
@@ -59,28 +38,31 @@ func benchmarkIndexTx(b *testing.B) {
 	err := s.Generate()
 	qt.Assert(b, err, qt.IsNil)
 
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := int32(0); j < 2000; j++ {
 			vote := &state.Vote{
 				Height:      uint32(util.RandomInt(10, 10000)),
 				ProcessID:   pid,
 				Nullifier:   util.RandomBytes(32),
-				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
+				VotePackage: []byte(`{"votes": [1,0,1]}`),
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
 			}
 			idx.OnVote(vote, j)
 		}
-		err := idx.Commit(uint32(i))
-		qt.Assert(b, err, qt.IsNil)
+		app.AdvanceTestBlock()
 	}
 }
 
-func benchmarkFetchTx(b *testing.B) {
+func BenchmarkFetchTx(b *testing.B) {
 	numTxs := 1000
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
 
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < numTxs; j++ {
 			idx.OnNewTx(&vochaintx.Tx{TxID: util.Random32()}, uint32(i), int32(j))
@@ -107,7 +89,7 @@ func benchmarkFetchTx(b *testing.B) {
 	}
 }
 
-func benchmarkNewProcess(b *testing.B) {
+func BenchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
@@ -115,6 +97,9 @@ func benchmarkNewProcess(b *testing.B) {
 	startTime := time.Now()
 	numProcesses := b.N
 	entityID := util.RandomBytes(20)
+
+	b.ReportAllocs()
+	b.ResetTimer()
 	for i := 0; i < numProcesses; i++ {
 		pid := util.RandomBytes(32)
 		if err := app.State.AddProcess(&models.Process{
