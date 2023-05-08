@@ -63,7 +63,7 @@ type Indexer struct {
 	votePool map[string][]*state.Vote
 
 	// lockPool is the lock for all *Pool and blockTx operations
-	lockPool sync.RWMutex
+	lockPool sync.Mutex
 
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
@@ -180,6 +180,9 @@ func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, conte
 
 // blockTxQueries assumes that lockPool is locked.
 func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
+	if idx.lockPool.TryLock() {
+		panic("Indexer.blockTxQueries was called without locking Indexer.lockPool")
+	}
 	if idx.blockTx == nil {
 		tx, err := idx.sqlDB.Begin()
 		if err != nil {
@@ -316,8 +319,8 @@ func (idx *Indexer) AfterSyncBootstrap() {
 
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (idx *Indexer) Commit(height uint32) error {
-	idx.lockPool.RLock()
-	defer idx.lockPool.RUnlock()
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 
 	// Update existing processes
 	updateProcs := maps.Keys(idx.blockUpdateProcs)

@@ -282,7 +282,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		"metadata", procParams.Metadata,
 	)
 
-	// The caller must hold lockPool already.
 	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
@@ -351,7 +350,6 @@ func (idx *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-	// The caller must hold lockPool already.
 	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
