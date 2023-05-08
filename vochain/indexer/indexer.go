@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"time"
 
@@ -21,6 +22,8 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
+	"golang.org/x/exp/maps"
+
 	// modernc is a pure-Go version, but its errors have less useful info.
 	// We use mattn while developing and testing, and we can swap them later.
 	// _ "modernc.org/sqlite"
@@ -60,14 +63,16 @@ type Indexer struct {
 	votePool map[string][]*state.Vote
 
 	// lockPool is the lock for all *Pool and blockTx operations
-	lockPool sync.RWMutex
+	lockPool sync.Mutex
 
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
 	blockTx *sql.Tx
 
-	// updateProcessPool is the list of process IDs that require sync with the state database
-	updateProcessPool [][]byte
+	// blockUpdateProcs is the list of process IDs that require sync with the state database.
+	// The key is a types.ProcessID as a string, so that it can be used as a map key.
+	blockUpdateProcs map[string]bool
+
 	// list of live processes (those on which the votes will be computed on arrival)
 	liveResultsProcs sync.Map // TODO: rethink with blockTx
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
@@ -103,6 +108,8 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 	s := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
+
+		blockUpdateProcs: make(map[string]bool),
 
 		cancelCtx:  cancelCtx,
 		cancelFunc: cancelFunc,
@@ -169,6 +176,21 @@ func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, conte
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
 	queries := indexerdb.New(idx.sqlDB)
 	return queries, ctx, cancel
+}
+
+// blockTxQueries assumes that lockPool is locked.
+func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
+	if idx.lockPool.TryLock() {
+		panic("Indexer.blockTxQueries was called without locking Indexer.lockPool")
+	}
+	if idx.blockTx == nil {
+		tx, err := idx.sqlDB.Begin()
+		if err != nil {
+			panic(err) // shouldn't happen, use an error return if it ever does
+		}
+		idx.blockTx = tx
+	}
+	return indexerdb.New(idx.blockTx)
 }
 
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
@@ -273,7 +295,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		}
 		// Get the votes from the state
 		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
-			if err := idx.addLiveVote(p, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
+			if err := idx.addLiveVote(process, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
 				log.Errorw(err, "could not add live vote")
 			}
 			return false
@@ -297,24 +319,29 @@ func (idx *Indexer) AfterSyncBootstrap() {
 
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (idx *Indexer) Commit(height uint32) error {
-	idx.lockPool.RLock()
-	defer idx.lockPool.RUnlock()
-
-	if idx.blockTx != nil {
-		if err := idx.blockTx.Commit(); err != nil {
-			log.Errorw(err, "could not commit tx")
-		}
-		idx.blockTx = nil
-	}
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 
 	// Update existing processes
-	for _, p := range idx.updateProcessPool {
-		if err := idx.updateProcess(p); err != nil {
+	updateProcs := maps.Keys(idx.blockUpdateProcs)
+	sort.Strings(updateProcs)
+	queries := idx.blockTxQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+	defer cancel()
+	for _, pidStr := range updateProcs {
+		pid := types.ProcessID(pidStr)
+		if err := idx.updateProcess(ctx, queries, pid); err != nil {
 			log.Errorw(err, "commit: cannot update process")
 			continue
 		}
-		log.Debugw("updated process", "processID", hex.EncodeToString(p))
+		log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 	}
+	maps.Clear(idx.blockUpdateProcs)
+
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
 
 	startTime := time.Now()
 	for _, v := range idx.voteIndexPool {
@@ -332,11 +359,17 @@ func (idx *Indexer) Commit(height uint32) error {
 	overwritedVotes := 0
 	startTime = time.Now()
 
-	for pid, votes := range idx.votePool {
+	for pidStr, votes := range idx.votePool {
+		pid := []byte(pidStr)
 		// Get the process information
-		proc, err := idx.ProcessInfo([]byte(pid))
+		proc, err := idx.ProcessInfo(pid)
 		if err != nil {
-			log.Warnf("cannot get process %x", []byte(pid))
+			log.Warnf("cannot get process %x", pid)
+			continue
+		}
+		process, err := idx.App.State.Process(pid, false)
+		if err != nil {
+			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
 
@@ -378,7 +411,7 @@ func (idx *Indexer) Commit(height uint32) error {
 					continue
 				}
 				// add the live vote to substracted results
-				if err := idx.addLiveVote(v.ProcessID,
+				if err := idx.addLiveVote(process,
 					previousVote.VotePackage,
 					new(big.Int).SetBytes(previousVote.Weight),
 					substratedResults); err != nil {
@@ -390,7 +423,7 @@ func (idx *Indexer) Commit(height uint32) error {
 				newVotes++
 			}
 			// add the new vote to results
-			if err := idx.addLiveVote(v.ProcessID,
+			if err := idx.addLiveVote(process,
 				v.VotePackage,
 				v.Weight,
 				addedResults); err != nil {
@@ -399,7 +432,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes([]byte(pid), addedResults, substratedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(pid, addedResults, substratedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
@@ -424,7 +457,7 @@ func (idx *Indexer) Rollback() {
 		idx.blockTx = nil
 	}
 	idx.voteIndexPool = []*VoteWithIndex{}
-	idx.updateProcessPool = [][]byte{}
+	maps.Clear(idx.blockUpdateProcs)
 }
 
 // OnProcess indexer stores the processID and entityID
@@ -457,22 +490,22 @@ func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
 func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessKeys does nothing
 func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessStatusChange adds the process to the updateProcessPool and, if ended, the resultsPool
+// OnProcessStatusChange adds the process to blockUpdateProcs and, if ended, the resultsPool
 func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
@@ -489,23 +522,25 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		log.Errorf("keyindex is nil")
 		return
 	}
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessResults verifies the results for a process and appends it to the updateProcessPool
+// OnProcessResults verifies the results for a process and appends it to blockUpdateProcs
 func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pid)
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// OnProcessesStart adds the processes to the updateProcessPool.
+// OnProcessesStart adds the processes to blockUpdateProcs.
 // This is required to update potential changes when a process is started, such as the rolling census.
 func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.updateProcessPool = append(idx.updateProcessPool, pids...)
+	for _, pid := range pids {
+		idx.blockUpdateProcs[string(pid)] = true
+	}
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
@@ -521,17 +556,11 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if idx.blockTx == nil {
-		tx, err := idx.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		idx.blockTx = tx
-	}
 
+	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(idx.blockTx)
+
 	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
 		Height:       int64(idx.App.Height()),

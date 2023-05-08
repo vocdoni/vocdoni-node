@@ -64,10 +64,10 @@ func encodeVotes(votes [][]*types.BigInt) string {
 }
 
 // ProcessInfo returns the available information regarding an election process id
-func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
+func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	startTime := time.Now()
 
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	procInner, err := queries.GetProcess(ctx, pid)
 	if err != nil {
@@ -84,7 +84,7 @@ func (s *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // EntityID, searchTerm, namespace, status, and withResults are optional filters, if
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (s *Indexer) ProcessList(entityID []byte,
+func (idx *Indexer) ProcessList(entityID []byte,
 	from,
 	max int,
 	searchTerm string,
@@ -108,7 +108,7 @@ func (s *Indexer) ProcessList(entityID []byte,
 	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
 		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
 	}
-	queries, ctx, cancel := s.timeoutQueries()
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
 	startTime := time.Now()
@@ -132,8 +132,8 @@ func (s *Indexer) ProcessList(entityID []byte,
 
 // ProcessCount returns the number of processes of a given entityID indexed.
 // If entityID is zero-value, returns the total number of processes of all entities.
-func (s *Indexer) ProcessCount(entityID []byte) uint64 {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
 	if len(entityID) == 0 {
@@ -144,7 +144,7 @@ func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 		}
 		return uint64(count)
 	}
-	count, err := s.EntityProcessCount(entityID)
+	count, err := idx.EntityProcessCount(entityID)
 	if err != nil {
 		log.Errorf("processCount: cannot fetch entity process count: %v", err)
 		return 0
@@ -155,8 +155,8 @@ func (s *Indexer) ProcessCount(entityID []byte) uint64 {
 // EntityList returns the list of entities indexed by the indexer
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
-func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
 	entityIDs, err := queries.SearchEntities(ctx, indexerdb.SearchEntitiesParams{
@@ -176,8 +176,8 @@ func (s *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes 
 }
 
 // EntityProcessCount returns the number of processes that an entity holds
-func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
 	count, err := queries.GetEntityProcessCount(ctx, entityId)
@@ -188,8 +188,8 @@ func (s *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
 }
 
 // EntityCount return the number of entities indexed by the indexer
-func (s *Indexer) EntityCount() uint64 {
-	queries, ctx, cancel := s.timeoutQueries()
+func (idx *Indexer) EntityCount() uint64 {
+	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
 	count, err := queries.GetEntityCount(ctx)
@@ -201,21 +201,14 @@ func (s *Indexer) EntityCount() uint64 {
 }
 
 // Return whether a process must have live results or not
-func (s *Indexer) isOpenProcess(processID []byte) (bool, error) {
-	p, err := s.App.State.Process(processID, false)
-	if err != nil {
-		return false, err
-	}
-	if p == nil || p.EnvelopeType == nil {
-		return false, fmt.Errorf("cannot fetch process %x or envelope type not defined", processID)
-	}
-	return !p.EnvelopeType.EncryptedVotes, nil
+func isOpenProcess(process *models.Process) bool {
+	return !process.EnvelopeType.EncryptedVotes
 }
 
 // newEmptyProcess creates a new empty process and stores it into the database.
 // The process must exist on the Vochain state, else an error is returned.
-func (s *Indexer) newEmptyProcess(pid []byte) error {
-	p, err := s.App.State.Process(pid, false)
+func (idx *Indexer) newEmptyProcess(pid []byte) error {
+	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
@@ -234,15 +227,11 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 
 	eid := p.EntityId
 	// Get the block time from the Header
-	currentBlockTime := time.Unix(s.App.TimestampStartBlock(), 0)
+	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
 
 	compResultsHeight := uint32(0)
-	if live, err := s.isOpenProcess(pid); err != nil {
-		return fmt.Errorf("cannot check if process is live: %w", err)
-	} else {
-		if live {
-			compResultsHeight = p.BlockCount + p.StartBlock + 1
-		}
+	if isOpenProcess(p) {
+		compResultsHeight = p.BlockCount + p.StartBlock + 1
 	}
 
 	// Create and store process in the indexer database
@@ -293,18 +282,9 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 		"metadata", procParams.Metadata,
 	)
 
-	// The caller must hold lockPool already.
-	if s.blockTx == nil {
-		tx, err := s.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		s.blockTx = tx
-	}
-
+	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
-	queries := indexerdb.New(s.blockTx)
 
 	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
@@ -315,15 +295,12 @@ func (s *Indexer) newEmptyProcess(pid []byte) error {
 
 // updateProcess synchronize those fields that can be updated on a existing process
 // with the information obtained from the Vochain state
-func (s *Indexer) updateProcess(pid []byte) error {
-	p, err := s.App.State.Process(pid, false)
+func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Queries, pid []byte) error {
+	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
-	// TODO: remove from results table
-	// TODO: hold a sql db transaction for multiple queries
-	queries, ctx, cancel := s.timeoutQueries()
-	defer cancel()
+
 	previousStatus, err := queries.GetProcessStatus(ctx, pid)
 	if err != nil {
 		return err
@@ -346,7 +323,7 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	// If the process is in RESULTS status, and it was not in RESULTS status before, then finalize the results
 	if p.Status == models.ProcessStatus_RESULTS &&
 		models.ProcessStatus(previousStatus) != models.ProcessStatus_RESULTS {
-		if err := s.finalizeResults(pid); err != nil {
+		if err := idx.finalizeResults(ctx, queries, p); err != nil {
 			return err
 		}
 	}
@@ -354,13 +331,6 @@ func (s *Indexer) updateProcess(pid []byte) error {
 	// If the process is in CANCELED status, and it was not in CANCELED status before, then remove the results
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.Status == models.ProcessStatus_CANCELED {
-
-		// We use two SQL queries, so use a transaction to apply them together.
-		tx, err := s.sqlDB.Begin()
-		if err != nil {
-			return err
-		}
-		queries = queries.WithTx(tx)
 
 		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 			ID:            pid,
@@ -371,19 +341,17 @@ func (s *Indexer) updateProcess(pid []byte) error {
 		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
 			return err
 		}
-		if err := tx.Commit(); err != nil {
-			return err
-		}
 	}
 	return nil
 }
 
 // setResultsHeight updates the Rheight of any process whose ID is pid.
-func (s *Indexer) setResultsHeight(pid []byte, height uint32) error {
+func (idx *Indexer) setResultsHeight(pid []byte, height uint32) error {
 	if height == 0 {
 		panic("setting results height to 0?")
 	}
-	queries, ctx, cancel := s.timeoutQueries()
+	queries := idx.blockTxQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
 	defer cancel()
 	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
 		ID:            pid,

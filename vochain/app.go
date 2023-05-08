@@ -57,7 +57,7 @@ type BaseApplication struct {
 	// mempoolTxRef is a map of tx hashes to the block height when they were added to the mempool.
 	mempoolTxRef map[[32]byte]uint32
 	// mempoolTxRefLock is a mutex to protect the mempoolTxRef map.
-	mempoolTxRefLock sync.RWMutex
+	mempoolTxRefLock sync.Mutex
 	// mempoolTxRefToGC is a slice of tx hashes to be removed from the mempoolTxRef map on Commit().
 	mempoolTxRefToGC [][32]byte
 
