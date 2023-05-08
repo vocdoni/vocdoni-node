@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	tmtypes "github.com/tendermint/tendermint/types"
+	tmtypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/log"
 )
 

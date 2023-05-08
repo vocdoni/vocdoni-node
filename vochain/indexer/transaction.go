@@ -78,13 +78,13 @@ func (idx *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.Tx
 }
 
 // OnNewTx stores the transaction reference in the indexer database
-func (idx *Indexer) OnNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) {
+func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {
 	if err := idx.indexNewTx(tx, blockHeight, txIndex); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
 }
 
-func (idx *Indexer) indexNewTx(tx *vochaintx.VochainTx, blockHeight uint32, txIndex int32) error {
+func (idx *Indexer) indexNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
 

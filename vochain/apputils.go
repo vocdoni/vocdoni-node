@@ -1,7 +1,6 @@
 package vochain
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -13,30 +12,26 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
+	crypto25519 "github.com/cometbft/cometbft/crypto/ed25519"
+	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
+	tmjson "github.com/cometbft/cometbft/libs/json"
+	tmp2p "github.com/cometbft/cometbft/p2p"
+	"github.com/cometbft/cometbft/privval"
+	tmtypes "github.com/cometbft/cometbft/types"
+	tmtime "github.com/cometbft/cometbft/types/time"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-
-	crypto25519 "github.com/tendermint/tendermint/crypto/ed25519"
-	crypto256k1 "github.com/tendermint/tendermint/crypto/secp256k1"
-	tmjson "github.com/tendermint/tendermint/libs/json"
-	tmtime "github.com/tendermint/tendermint/libs/time"
-	"github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
 )
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval.FilePV, error) {
-	pv, err := privval.LoadOrGenFilePV(keyFilePath, stateFilePath)
-	if err != nil {
-		log.Fatal(err)
-	}
+	pv := privval.LoadOrGenFilePV(keyFilePath, stateFilePath)
 	if len(tmPrivKey) > 0 {
 		var privKey crypto256k1.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
@@ -54,19 +49,20 @@ func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval
 	return pv, nil
 }
 
-// NewNodeKey returns and saves to the disk storage a tendermint node key
-func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmtypes.NodeKey, error) {
-	if tmPrivKey == "" {
-		return nil, fmt.Errorf("nodekey not specified")
+// NewNodeKey returns and saves to the disk storage a tendermint node key.
+// If tmPrivKey not specified, generates a new one
+func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmp2p.NodeKey, error) {
+	nodeKey := &tmp2p.NodeKey{}
+	if tmPrivKey != "" {
+		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
+		}
+		// We need to use ed25519 curve for node key since tendermint does not support secp256k1
+		nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
+	} else {
+		nodeKey.PrivKey = crypto25519.GenPrivKey()
 	}
-	nodeKey := &tmtypes.NodeKey{}
-	keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
-	if err != nil {
-		return nodeKey, fmt.Errorf("cannot decode private key: (%s)", err)
-	}
-	// We need to use ed25519 curve for node key since tendermint does not support secp256k1
-	nodeKey.PrivKey = crypto25519.PrivKey(keyBytes)
-	nodeKey.ID = tmtypes.NodeIDFromPubKey(nodeKey.PrivKey.PubKey())
 	// Write nodeKey to disk
 	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
 }
@@ -79,7 +75,7 @@ func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *genesis
 	appState := genesis.GenesisAppState{}
 	appState.Validators = make([]genesis.AppStateValidators, len(validators))
 	for idx, val := range validators {
-		pubk, err := val.GetPubKey(context.Background())
+		pubk, err := val.GetPubKey()
 		if err != nil {
 			return nil, err
 		}
@@ -219,22 +215,21 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	}
 
 	// Create seed node
-	seedKey := util.RandomHex(64)
 	seedDir := filepath.Join(dir, "seed")
 	if err := os.MkdirAll(seedDir, 0o700); err != nil {
 		return nil, err
 	}
-	seedNodeKey, err := NewNodeKey(seedKey, filepath.Join(seedDir, "node_key.json"))
+	seedNodeKey, err := NewNodeKey("", filepath.Join(seedDir, "node_key.json"))
 	if err != nil {
 		return nil, err
 	}
 	if err := os.WriteFile(filepath.Join(
 		seedDir, "seed_address"),
-		[]byte(seedNodeKey.ID.AddressString("seed1.foo.bar:26656")),
+		[]byte(fmt.Sprintf("%s@seed1.foo.bar:26656", seedNodeKey.ID())),
 		0o600); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), []byte(seedKey), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), seedNodeKey.PrivKey.Bytes(), 0o600); err != nil {
 		return nil, err
 	}
 

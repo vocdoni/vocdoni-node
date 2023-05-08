@@ -13,7 +13,7 @@ import (
 )
 
 // VoteTxCheck performs basic checks on a vote transaction.
-func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.VochainTx, forCommit bool) (*vstate.Vote, error) {
+func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vstate.Vote, error) {
 	// Get the vote envelope from the transaction
 	voteEnvelope := vtx.Tx.GetVote()
 	if voteEnvelope == nil {

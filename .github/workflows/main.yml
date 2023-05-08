@@ -90,7 +90,6 @@ jobs:
           && github.ref != 'refs/heads/stage'
           && !startsWith(github.ref, 'refs/heads/release')
           && github.ref != 'refs/heads/dev'
-          && github.ref != 'refs/heads/apiv2'
         run: go test -coverprofile=unit.covdata.txt ./...
       - name: Run Go test -race (and collect code coverage)
         if: |
@@ -98,7 +97,6 @@ jobs:
           || github.ref == 'refs/heads/stage'
           || startsWith(github.ref, 'refs/heads/release')
           || github.ref == 'refs/heads/dev'
-          || github.ref == 'refs/heads/apiv2'
         env:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
@@ -110,7 +108,6 @@ jobs:
       || github.ref == 'refs/heads/stage'
       || startsWith(github.ref, 'refs/heads/release')
       || github.ref == 'refs/heads/dev'
-      || github.ref == 'refs/heads/apiv2'
       || (startsWith(github.ref, 'refs/pull/') && endsWith(github.ref, '/merge') )
       || github.ref == 'refs/heads/main'
     steps:
@@ -135,7 +132,7 @@ jobs:
           COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
           GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
-          CONCURRENT: 0 # run all the start_test.sh tests concurrently
+          CONCURRENT: 1 # run all the start_test.sh tests concurrently
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
 
@@ -147,7 +144,6 @@ jobs:
       || github.ref == 'refs/heads/stage'
       || startsWith(github.ref, 'refs/heads/release')
       || github.ref == 'refs/heads/dev'
-      || github.ref == 'refs/heads/apiv2'
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -178,14 +174,14 @@ jobs:
           # platforms: linux/amd64,linux/arm64
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:latest,
-            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
-            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
-            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest,
-            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }},
-            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
-            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/vocdoni-node:latest,
+            vocdoni/vocdoni-node:${{ steps.vars.outputs.BRANCH_NAME }},
+            vocdoni/vocdoni-node:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            vocdoni/vocdoni-node:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/vocdoni-node:latest,
+            ghcr.io/vocdoni/vocdoni-node:${{ steps.vars.outputs.BRANCH_NAME }},
+            ghcr.io/vocdoni/vocdoni-node:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
+            ghcr.io/vocdoni/vocdoni-node:${{ steps.vars.outputs.BRANCH_NAME }}-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
       - name: Push master image to dev tag in Docker Hub and ghcr.io
@@ -195,29 +191,10 @@ jobs:
           context: .
           push: true     # true to upload image to registry
           tags: |
-            vocdoni/go-dvote:dev,
-            vocdoni/go-dvote:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:dev,
-            ghcr.io/vocdoni/go-dvote:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-      - name: Push image to Docker Hub and ghcr.io (race enabled)
-        uses: docker/build-push-action@v3
-        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
-        with:
-          context: .
-          push: true     # true to upload image to registry
-          build-args: |
-            BUILDARGS=-race
-          tags: |
-            vocdoni/go-dvote:latest-race,
-            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
-            vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
-            vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
-            ghcr.io/vocdoni/go-dvote:latest-race,
-            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race,
-            ghcr.io/vocdoni/go-dvote:commit-${{ steps.vars.outputs.GIT_HASH_SHORT }},
-            ghcr.io/vocdoni/go-dvote:${{ steps.vars.outputs.BRANCH_NAME }}-race-${{ steps.vars.outputs.DATE_IN_SECS }}
+            vocdoni/vocdoni-node:dev,
+            vocdoni/vocdoni-node:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
+            ghcr.io/vocdoni/vocdoni-node:dev,
+            ghcr.io/vocdoni/vocdoni-node:dev-${{ steps.vars.outputs.DATE_IN_SECS }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 

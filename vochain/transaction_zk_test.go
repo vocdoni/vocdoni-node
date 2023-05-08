@@ -90,7 +90,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	txID := [32]byte{}
 	commit := false
 
-	_, err = app.TransactionHandler.VoteTxCheck(&vochaintx.VochainTx{
+	_, err = app.TransactionHandler.VoteTxCheck(&vochaintx.Tx{
 		Tx:         &models.Tx{Payload: &models.Tx_Vote{Vote: vtx}},
 		Signature:  signature,
 		SignedBody: txBytes,

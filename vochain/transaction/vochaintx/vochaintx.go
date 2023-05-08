@@ -1,18 +1,16 @@
 package vochaintx
 
 import (
-	"crypto/sha256"
-
+	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
-	tmtypes "github.com/tendermint/tendermint/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-// VochainTx is a wrapper around a protobuf transaction with some helpers
-type VochainTx struct {
+// Tx is a wrapper around a protobuf transaction with some helpers
+type Tx struct {
 	Tx          *models.Tx
 	SignedBody  []byte
 	Signature   []byte
@@ -23,7 +21,7 @@ type VochainTx struct {
 // Unmarshal unarshal the content of a bytes serialized transaction.
 // Returns the transaction struct, the original bytes and the signature
 // of those bytes.
-func (tx *VochainTx) Unmarshal(content []byte, chainID string) error {
+func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	stx := new(models.SignedTx)
 	if err := proto.Unmarshal(content, stx); err != nil {
 		return err
@@ -41,8 +39,8 @@ func (tx *VochainTx) Unmarshal(content []byte, chainID string) error {
 }
 
 // TxKey computes the checksum of the tx
-func TxKey(tx tmtypes.Tx) [32]byte {
-	return sha256.Sum256(tx)
+func TxKey(tx []byte) [32]byte {
+	return tmtypes.Tx(tx).Key()
 }
 
 // TokenTransfer wraps information about a token transfer.

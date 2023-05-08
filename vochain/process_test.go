@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
-	abcitypes "github.com/tendermint/tendermint/abci/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -15,13 +15,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const ipfsUrl = "ipfs://123456789"
+const ipfsUrlTest = "ipfs://123456789"
 
 func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
 
 	// define process
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:     pid,
@@ -121,7 +121,7 @@ func testNewProcess(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	app, keys := createTestBaseApplicationAndAccounts(t, 10)
 	// add a process with status=READY and interruptible=true
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:     pid,
@@ -167,7 +167,7 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Add a process with status=PAUSED and interruptible=true
-	censusURI = ipfsUrl
+	censusURI = ipfsUrlTest
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:     pid,
@@ -202,7 +202,7 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Add a process with status=PAUSE and interruptible=false
-	censusURI = ipfsUrl
+	censusURI = ipfsUrlTest
 	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
 		ProcessId:     pid,
@@ -266,7 +266,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	app, keys := createTestBaseApplicationAndAccounts(t, 10)
 
 	// Add a process with status=READY and interruptible=true
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	censusURI2 := "ipfs://987654321"
 	pid := util.RandomBytes(types.ProcessIDsize)
 	pid2 := util.RandomBytes(types.ProcessIDsize)
@@ -455,7 +455,7 @@ func TestGlobalMaxProcessSize(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// define process
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:     pid,

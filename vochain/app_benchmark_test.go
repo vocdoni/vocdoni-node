@@ -7,7 +7,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	abcitypes "github.com/tendermint/tendermint/abci/types"
+	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
@@ -57,7 +57,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		}
 		claims = append(claims, string(c))
 	}
-	censusURI := ipfsUrl
+	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
 	root, err := tr.Root()
 	if err != nil {

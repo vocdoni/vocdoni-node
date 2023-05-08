@@ -3,6 +3,6 @@
 
 package vochain
 
-import tmdb "github.com/tendermint/tm-db"
+import tmdb "github.com/cometbft/cometbft-db"
 
 const tmdbBackend = tmdb.CLevelDBBackend

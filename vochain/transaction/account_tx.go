@@ -15,7 +15,7 @@ import (
 )
 
 // CreateAccountTxCheck checks if an account creation tx is valid
-func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if vtx == nil || vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
@@ -107,7 +107,7 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.VochainTx) erro
 }
 
 // SetAccountDelegateTxCheck checks if a SetAccountDelegateTx and its data are valid
-func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
@@ -166,7 +166,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.VochainTx)
 }
 
 // SetAccountInfoTxCheck checks if a set account info tx is valid
-func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.VochainTx) error {
+func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}

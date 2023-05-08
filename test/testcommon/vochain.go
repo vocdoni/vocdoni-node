@@ -7,9 +7,11 @@ import (
 	"path"
 	"strconv"
 	"testing"
+	"time"
 
-	"github.com/tendermint/tendermint/privval"
-	tmtypes "github.com/tendermint/tendermint/types"
+	secp "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/privval"
+	tmtypes "github.com/cometbft/cometbft/types"
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/config"
@@ -102,17 +104,19 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	vals := make([]*privval.FilePV, 2)
 	rint := rand.Int()
 	var err error
-	vals[0], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+	vals[0] = privval.NewFilePV(
+		secp.GenPrivKey(),
 		"/tmp/"+strconv.Itoa(rint),
-		tmtypes.ABCIPubKeyTypeSecp256k1,
+		"/tmp/"+strconv.Itoa(rint),
 	)
 	if err != nil {
 		tb.Fatal(err)
 	}
 	rint = rand.Int()
-	vals[1], err = privval.GenFilePV("/tmp/"+strconv.Itoa(rint),
+	vals[1] = privval.NewFilePV(
+		secp.GenPrivKey(),
 		"/tmp/"+strconv.Itoa(rint),
-		tmtypes.ABCIPubKeyTypeSecp256k1,
+		"/tmp/"+strconv.Itoa(rint),
 	)
 	if err != nil {
 		tb.Fatal(err)
@@ -158,21 +162,17 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	cfg.DataDir = tb.TempDir()
 	// create genesis file
 	tmConsensusParams := tmtypes.DefaultConsensusParams()
-	// TO-DO: use tendermint/tendermint/types instead of custom (copied) types
+	// TO-DO: use cometbft/cometbft/types instead of custom (copied) types
 	consensusParams := &genesis.ConsensusParams{
 		Block:     genesis.BlockParams{MaxBytes: 100000, MaxGas: 100},
 		Evidence:  genesis.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
 		Validator: genesis.ValidatorParams(tmConsensusParams.Validator),
 	}
-	validator, err := privval.GenFilePV(
+	validator := privval.NewFilePV(
+		secp.GenPrivKey(),
 		path.Join(cfg.DataDir, "config", "priv_validator_key.json"),
 		path.Join(cfg.DataDir, "data", "priv_validator_state.json"),
-		tmtypes.ABCIPubKeyTypeSecp256k1,
 	)
-
-	if err != nil {
-		tb.Fatal(err)
-	}
 
 	accounts := []string{mngKey.AddressString()}
 	defaultAccountsBalance := int(1000000)
@@ -208,7 +208,12 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 		if err := vnode.Service.Stop(); err != nil {
 			tb.Error(err)
 		}
-		vnode.Service.Wait()
+		ch := vnode.Service.Quit()
+		select {
+		case <-ch:
+		case <-time.After(5 * time.Second):
+			tb.Error("timeout waiting for node to stop")
+		}
 	})
 	vnode.SetTestingMethods()
 	return vnode
