@@ -133,6 +133,9 @@ func checkInvalidChars(args ...interface{}) {
 
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
+	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+		return
+	}
 	log.Debug().Msg(fmt.Sprint(args...))
 	checkInvalidChars(args...)
 }
@@ -217,6 +220,9 @@ func Fatalf(template string, args ...interface{}) {
 
 // Debugw sends a debug level log message with key-value pairs.
 func Debugw(msg string, keyvalues ...interface{}) {
+	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+		return
+	}
 	Logger().Debug().Fields(keyvalues).Msg(msg)
 	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
