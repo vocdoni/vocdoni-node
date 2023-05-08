@@ -241,7 +241,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x can only be ended from ready or paused status", pid)
 		}
 		if !process.Mode.Interruptible {
-			if v.CurrentHeight() <= process.BlockCount+process.StartBlock {
+			if v.CurrentHeight() < process.BlockCount+process.StartBlock {
 				return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
 					pid, newstatus.String())
 			}
@@ -275,7 +275,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("cannot set state to results from %s", currentStatus.String())
 		}
 		if currentStatus == models.ProcessStatus_READY &&
-			process.StartBlock+process.BlockCount <= v.CurrentHeight() {
+			process.StartBlock+process.BlockCount < v.CurrentHeight() {
 			return fmt.Errorf("cannot set state to results from %s, process is still alive",
 				currentStatus.String())
 		}
