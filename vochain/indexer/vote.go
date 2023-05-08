@@ -300,7 +300,7 @@ func (idx *Indexer) addLiveVote(process *models.Process, VotePackage []byte, wei
 	var vote *state.VotePackage
 	if isOpenProcess(process) {
 		var err error
-		vote, err = unmarshalVote(VotePackage, []string{})
+		vote, err = unmarshalVote(VotePackage, nil)
 		if err != nil {
 			log.Warnf("cannot unmarshal vote: %v", err)
 			vote = nil

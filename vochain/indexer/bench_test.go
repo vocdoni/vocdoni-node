@@ -46,7 +46,7 @@ func BenchmarkIndexVotes(b *testing.B) {
 				Height:      uint32(util.RandomInt(10, 10000)),
 				ProcessID:   pid,
 				Nullifier:   util.RandomBytes(32),
-				VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
+				VotePackage: []byte(`{"votes": [1,0,1]}`),
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
 			}
 			idx.OnVote(vote, j)
