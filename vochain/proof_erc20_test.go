@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -42,7 +43,10 @@ func TestEthProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp := []byte("[1,2,3,4]")
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Test wrong vote (change amount value)
 	wrongSp := sp.StorageProofs[0]
@@ -163,8 +167,7 @@ type testStorageProof struct {
 	StorageProof ethstorageproof.StorageResult `json:"storageProof"`
 }
 
-var ethVotingProofs = string(
-	`
+var ethVotingProofs = `
   {
     "storageProofs": [
       {
@@ -226,4 +229,4 @@ var ethVotingProofs = string(
       }
     ]
   }  
-  `)
+  `

@@ -38,6 +38,9 @@ func BenchmarkIndexVotes(b *testing.B) {
 	err := s.Generate()
 	qt.Assert(b, err, qt.IsNil)
 
+	vp, err := state.NewVotePackage([]int{1, 0, 1}).Encode()
+	qt.Assert(b, err, qt.IsNil)
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -46,7 +49,7 @@ func BenchmarkIndexVotes(b *testing.B) {
 				Height:      uint32(util.RandomInt(10, 10000)),
 				ProcessID:   pid,
 				Nullifier:   util.RandomBytes(32),
-				VotePackage: []byte(`{"votes": [1,0,1]}`),
+				VotePackage: vp,
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
 			}
 			idx.OnVote(vote, j)

@@ -51,10 +51,11 @@ func TestISTCschedule(t *testing.T) {
 	// commit block 0
 	testAdvanceBlock(t, s, istc, false)
 
+	vp, err := state.NewVotePackage([]int{1, 0}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
 	// cast 10 votes
 	for j := 0; j < 10; j++ {
-		vp, err := state.NewVotePackage([]int{1, 0}).Encode()
-		qt.Assert(t, err, qt.IsNil)
 		v := &state.Vote{
 			ProcessID:   pid,
 			Nullifier:   rng.RandomBytes(32),
@@ -134,10 +135,11 @@ func TestISTCsyncing(t *testing.T) {
 	// commit block 0
 	testAdvanceBlock(t, s, istc, true)
 
+	vp, err := state.NewVotePackage([]int{1, 0}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
 	// cast 10 votes
 	for j := 0; j < 10; j++ {
-		vp, err := state.NewVotePackage([]int{1, 0}).Encode()
-		qt.Assert(t, err, qt.IsNil)
 		v := &state.Vote{
 			ProcessID:   pid,
 			Nullifier:   rng.RandomBytes(32),

@@ -52,10 +52,14 @@ func TestStateBasic(t *testing.T) {
 		}
 
 		for j := 0; j < 10; j++ {
+			vp, err := NewVotePackage([]int{i, j}).Encode()
+			if err != nil {
+				t.Error(err)
+			}
 			v := &Vote{
 				ProcessID:   pids[i],
 				Nullifier:   rng.RandomBytes(32),
-				VotePackage: []byte(fmt.Sprintf("%d%d", i, j)),
+				VotePackage: vp,
 			}
 			if err := s.AddVote(v); err != nil {
 				t.Error(err)

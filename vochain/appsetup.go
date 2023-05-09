@@ -195,5 +195,9 @@ func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock)
 // fnMempoolRemoveTxTendermint removes a transaction (identifier by its vochain.TxKey() hash)
 // from the Tendermint mempool.
 func (app *BaseApplication) fnMempoolRemoveTxTendermint(txKey [tmtypes.TxKeySize]byte) error {
+	if app.Service == nil {
+		log.Errorw(fmt.Errorf("method not assigned"), "mempoolRemoveTxTendermint")
+		return nil
+	}
 	return app.Service.(*node.Node).Mempool().RemoveTxByKey(txKey)
 }
