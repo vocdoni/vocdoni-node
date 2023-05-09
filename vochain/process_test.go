@@ -380,7 +380,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	txCostNumber uint64) (*BaseApplication, []*ethereum.SignKeys) {
 	app := TestBaseApplication(t)
 	keys := make([]*ethereum.SignKeys, 0)
-	for i := 0; i < int(4); i++ {
+	for i := 0; i < 4; i++ {
 		key := &ethereum.SignKeys{}
 		qt.Assert(t, key.Generate(), qt.IsNil)
 		keys = append(keys, key)

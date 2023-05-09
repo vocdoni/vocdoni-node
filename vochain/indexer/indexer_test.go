@@ -227,7 +227,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	}
 
-	// For a entity, add entityCount processes (this will be the queried entity)
+	// For an entity, add entityCount processes (this will be the queried entity)
 	eidProcsCount := util.RandomBytes(20) // entity ID with procsCount processes
 	for i := 0; i < procsCount; i++ {
 		pid := util.RandomBytes(32)
@@ -309,7 +309,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	pidExact := processIds[3]
 	pidExactEncrypted := processIds[5]
-	// For a entity, add 25 processes (this will be the queried entity)
+	// For an entity, add 25 processes (this will be the queried entity)
 	eidTest := util.RandomBytes(20)
 	for i, process := range processIds {
 		pid, err := hex.DecodeString(process)
@@ -336,7 +336,7 @@ func TestProcessSearch(t *testing.T) {
 		"10c6ca22d2c175a1fbdd15d7595ae532bb1094b5",
 		"20c6ca22d2c175a1fbdd15d7595ae532bb1094b5",
 	}
-	// For a entity, add 25 processes (this will be the queried entity)
+	// For an entity, add 25 processes (this will be the queried entity)
 	for i, process := range endedPIDs {
 		pid, err := hex.DecodeString(process)
 		if err != nil {
@@ -448,7 +448,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 		}
 	}
 
-	// For a entity, add 10 processes on namespace 123 and status READY
+	// For an entity, add 10 processes on namespace 123 and status READY
 	eid20 := util.RandomBytes(20)
 	for i := 0; i < 10; i++ {
 		pid := util.RandomBytes(32)
@@ -859,7 +859,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	// Rate a product, exepected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
+	// Rate a product, expected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
 	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
 	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
 	qt.Assert(t, vote([]int{2, 4}, idx, pid, nil), qt.IsNil)
@@ -1005,6 +1005,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 
 	// Add 10 votes to the election
 	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
 
 	qt.Assert(t, err, qt.IsNil)
 	for i := 0; i < 10; i++ {

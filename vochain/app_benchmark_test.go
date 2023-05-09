@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -79,6 +80,11 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 		b.Error(err)
 	}
 
+	vp, err := state.NewVotePackage([]int{1, 2, 3}).Encode()
+	if err != nil {
+		b.Error(err)
+	}
+
 	var proof []byte
 	for i, s := range keys {
 		_, proof, err = tr.GenProof([]byte(claims[i]))
@@ -90,7 +96,7 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 			ProcessId: pid,
 			Proof: &models.Proof{Payload: &models.Proof_Graviton{
 				Graviton: &models.ProofGraviton{Siblings: proof}}},
-			VotePackage: []byte("{[\"1\",\"2\",\"3\"]}"),
+			VotePackage: vp,
 		}
 
 		stx := models.SignedTx{}
