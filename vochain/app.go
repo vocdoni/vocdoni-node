@@ -145,6 +145,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 						log.Warnw("mempool prune", "err", err.Error(), "tx", hex.EncodeToString(txKey[:]))
 					}
 				}
+				count++
 				delete(app.mempoolTxRef, txKey)
 			}
 		}
@@ -214,7 +215,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 				log.Fatal(err)
 			}
 		}
-		log.Infow("created acccount", "addr", addr.Hex(), "tokens", acc.Balance)
+		log.Infow("created account", "addr", addr.Hex(), "tokens", acc.Balance)
 	}
 	// get validators
 	// TODO pau: unify this code with the one on apputils.go that essentially does the same
@@ -385,7 +386,7 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 
 // GetBlockByHeight retrieves a full block indexed by its height.
 // This method uses an LRU cache for the blocks so in general it is more
-// convinient for high load operations than GetBlockByHash(), which does not use cache.
+// convenient for high load operations than GetBlockByHash(), which does not use cache.
 func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 	if app.fnGetBlockByHeight == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
