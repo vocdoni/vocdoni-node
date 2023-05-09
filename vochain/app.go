@@ -139,7 +139,7 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 		count := 0
 		app.mempoolTxRefLock.Lock()
 		for txKey, height := range app.mempoolTxRef {
-			if height+MempoolTxTTLBlocks > height {
+			if height+MempoolTxTTLBlocks > app.Height() {
 				if app.fnMempoolPrune != nil {
 					if err := app.fnMempoolPrune(txKey); err != nil {
 						log.Warnw("mempool prune", "err", err.Error(), "tx", hex.EncodeToString(txKey[:]))
