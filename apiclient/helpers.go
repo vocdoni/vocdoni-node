@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	TimeBetweenBlocks = 6 * time.Second
+	TimeBetweenBlocks = 8 * time.Second
 	WaitTimeout       = 3 * TimeBetweenBlocks
-	PollInterval      = TimeBetweenBlocks / 6
+	PollInterval      = TimeBetweenBlocks / 2
 )
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
@@ -175,6 +175,7 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	for {
 		tr, err := c.TransactionReference(txHash)
 		if err == nil {
+			time.Sleep(PollInterval / 2) // wait a bit longer to make sure the tx is committed
 			return tr, nil
 		}
 		select {
