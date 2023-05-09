@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -47,7 +48,10 @@ func TestMinimeProof(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	vp := []byte("[1,2,3,4]")
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	testHolders := make([]common.Address, len(testHoldersHex))
 	for i, addrHex := range testHoldersHex {

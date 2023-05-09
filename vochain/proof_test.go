@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -70,8 +71,10 @@ func TestMerkleTreeProof(t *testing.T) {
 		}
 	}
 	app.AdvanceTestBlock()
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
 
-	// send the las vote multiple time, first attempt should be ok. The rest sould fail.
+	// send the las vote multiple time, first attempt should be ok. The rest should fail.
 	// we modify the nonce on each attempt to avoid the cache
 	vote := &models.VoteEnvelope{
 		ProcessId: pid,
@@ -83,7 +86,7 @@ func TestMerkleTreeProof(t *testing.T) {
 				},
 			},
 		},
-		VotePackage: []byte("[1, 2, 3, 4]"),
+		VotePackage: vp,
 	}
 
 	for i := 0; i < 10; i++ {
@@ -146,7 +149,9 @@ func TestCSPproof(t *testing.T) {
 	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
 
 	// Test 20 valid votes
-	vp := []byte("[1,2,3,4]")
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
 	keys := ethereum.NewSignKeysBatch(20)
 	for _, k := range keys {
 		bundle := &models.CAbundle{
