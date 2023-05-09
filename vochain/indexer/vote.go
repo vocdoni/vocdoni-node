@@ -30,8 +30,6 @@ var ErrVoteNotFound = fmt.Errorf("vote not found")
 // GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
-	sqlStartTime := time.Now()
-
 	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	sqlTxRefInner, err := queries.GetVoteReference(ctx, nullifier)
@@ -41,15 +39,6 @@ func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRe
 		}
 		return nil, err
 	}
-	log.Debugw(fmt.Sprintf("envelope reference on sqlite took %s", time.Since(sqlStartTime)),
-		"nullifier", hex.EncodeToString(nullifier),
-		"height", sqlTxRefInner.Height,
-		"txIndex", sqlTxRefInner.TxIndex,
-		"weight", sqlTxRefInner.Weight,
-		"processId", hex.EncodeToString(sqlTxRefInner.ProcessID),
-		"overwriteCount", sqlTxRefInner.OverwriteCount,
-		"voterId", hex.EncodeToString(sqlTxRefInner.VoterID),
-	)
 
 	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
 	return sqlTxRef, nil
@@ -58,7 +47,6 @@ func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRe
 // GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
 // Returns the envelope and the signature (if any).
 func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
-	t := time.Now()
 	voteRef, err := idx.GetEnvelopeReference(nullifier)
 	if err != nil {
 		return nil, err
@@ -73,7 +61,6 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		return nil, err
 	}
 
-	log.Debugw("getEnvelope", "took", time.Since(t), "nullifier", hex.EncodeToString(nullifier))
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          vote.VotePackage,
 		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
@@ -193,9 +180,6 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 
 // GetResults returns the current result for a processId
 func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
-	startTime := time.Now()
-	defer func() { log.Debugf("GetResults sqlite took %s", time.Since(startTime)) }()
-
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
 	queries, ctx, cancel := idx.timeoutQueries()
@@ -287,8 +271,6 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 			panic(err) // should never happen
 		}
 	}
-	sqlStartTime := time.Now()
-
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
 		Nullifier:      vote.Nullifier,
 		ProcessID:      vote.ProcessID,
@@ -303,17 +285,6 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 	}); err != nil {
 		return err
 	}
-
-	log.Debugw("addVoteIndex sqlite",
-		"nullifier", vote.Nullifier,
-		"pid", vote.ProcessID,
-		"blockHeight", vote.Height,
-		"weight", weightStr,
-		"voterID", hex.EncodeToString(vote.VoterID),
-		"txIndex", txIndex,
-		"overwrites", vote.Overwrites,
-		"duration", time.Since(sqlStartTime).String(),
-	)
 	return nil
 }
 
