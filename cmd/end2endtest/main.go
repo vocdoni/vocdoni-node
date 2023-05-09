@@ -111,7 +111,13 @@ func main() {
 	flag.Parse()
 
 	log.Init(c.logLevel, "stdout")
-	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
+	log.Infow("starting "+filepath.Base(os.Args[0]),
+		"version", internal.Version,
+		"operation", c.operation,
+		"host", c.host,
+		"parallel", c.parallelCount,
+		"timeout", c.timeout,
+		"votes", c.nvotes)
 
 	if len(c.accountPrivKeys) == 0 {
 		c.accountPrivKeys = []string{util.RandomHex(32)}

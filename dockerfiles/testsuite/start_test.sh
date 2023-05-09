@@ -21,7 +21,8 @@ ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-30}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-debug}
-CONCURRENT=${CONCURRENT:-0}
+CONCURRENT=${CONCURRENT:-1}
+CONCURRENT_CONNECTIONS=${CONCURRENT_CONNECTIONS:-1}
 ### must be splited by lines
 DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d4293a0b11
 be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
@@ -65,6 +66,7 @@ tests_to_run=(
 	echo "  CONCURRENT=0"
 	echo "  LOGLEVEL=debug"
 	echo "  GWHOST=http://gateway0:9090/dvote"
+	echo "  CONCURRENT_CONNECTIONS=1"
 	exit 0
 }
 
@@ -90,6 +92,7 @@ e2etest() {
 		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
 		  --operation=$op \
+		  --parallel=$CONCURRENT_CONNECTIONS \
 		  $args
 }
 
