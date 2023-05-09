@@ -126,7 +126,8 @@ func (c *HTTPclient) WaitUntilElectionStarts(ctx context.Context,
 // WaitUntilElectionStatus waits until the given election has the given status.
 func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 	electionID types.HexBytes, status string) (*api.Election, error) {
-	log.Infof("waiting for election %s to reach status %s", electionID.String(), status)
+	log.Infow("waiting for election status", "election", electionID.String(), "status", status)
+	startTime := time.Now()
 	for {
 		election, err := c.Election(electionID)
 		if err != nil {
@@ -137,13 +138,16 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 			}
 		}
 		if election != nil && election.Status == status {
+			log.Infow("election reached status", "election", electionID.String(),
+				"status", status, "duration", time.Since(startTime).String())
 			return election, nil
 		}
 		select {
 		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
-			return nil, fmt.Errorf("election %v never reached status %s: %w", electionID, status, ctx.Err())
+			return nil, fmt.Errorf("election %x never reached status %s after %s: %w",
+				electionID, status, time.Since(startTime).String(), ctx.Err())
 		}
 	}
 }
@@ -152,19 +156,23 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
 	electionID types.HexBytes) (*api.ElectionResults, error) {
 	log.Infof("waiting for election %s to publish final results", electionID.String())
+	startTime := time.Now()
 	for {
 		election, err := c.ElectionResults(electionID)
 		if err != nil && !strings.Contains(err.Error(), "5024") { // TODO: proper code matching
 			return nil, err
 		}
 		if election != nil {
+			log.Infow("election published results", "election",
+				electionID.String(), "duration", time.Since(startTime).String())
 			return election, nil
 		}
 		select {
 		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
-			return nil, fmt.Errorf("election %s never published results: %w", electionID.String(), ctx.Err())
+			return nil, fmt.Errorf("election %s never published resuls after %s: %w",
+				electionID.String(), time.Since(startTime).String(), ctx.Err())
 		}
 	}
 }
@@ -172,17 +180,21 @@ func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
 // WaitUntilTxIsMined waits until the given transaction is mined (included in a block)
 func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 	txHash types.HexBytes) (*api.TransactionReference, error) {
+	startTime := time.Now()
 	for {
 		tr, err := c.TransactionReference(txHash)
 		if err == nil {
 			time.Sleep(PollInterval / 2) // wait a bit longer to make sure the tx is committed
+			log.Infow("transaction mined", "tx",
+				txHash.String(), "duration", time.Since(startTime).String())
 			return tr, nil
 		}
 		select {
 		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
-			return nil, ctx.Err()
+			return nil, fmt.Errorf("transaction %s never mined after %s: %w",
+				txHash.String(), time.Since(startTime).String(), ctx.Err())
 		}
 	}
 }
@@ -192,16 +204,20 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (
 	*api.ElectionKeys, error) {
 	log.Debugf("fetching election keys for %x", electionID)
+	startTime := time.Now()
 	for {
 		ek, err := c.ElectionKeys(electionID)
 		if err == nil {
+			log.Infow("election keys published", "election", electionID.String(),
+				"duration", time.Since(startTime).String())
 			return ek, nil
 		}
 		select {
 		case <-time.After(PollInterval):
 			continue
 		case <-ctx.Done():
-			return nil, fmt.Errorf("election %s keys not yet published: %w", electionID, ctx.Err())
+			return nil, fmt.Errorf("election %s keys not yet published after %s: %w",
+				electionID, time.Since(startTime).String(), ctx.Err())
 		}
 	}
 }
