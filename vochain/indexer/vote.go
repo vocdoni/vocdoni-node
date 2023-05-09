@@ -273,7 +273,7 @@ func (idx *Indexer) addLiveVote(process *models.Process, VotePackage []byte, wei
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (idx *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
+func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
 	creationTime := idx.App.TimestampFromBlock(int64(vote.Height))
 	if creationTime == nil {
 		t := time.Now()
@@ -289,10 +289,6 @@ func (idx *Indexer) addVoteIndex(vote *state.Vote, txIndex int32) error {
 	}
 	sqlStartTime := time.Now()
 
-	// TODO(mvdan): badgerhold shared a transaction via a parameter, consider
-	// doing the same with sqlite
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
 	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
 		Nullifier:      vote.Nullifier,
 		ProcessID:      vote.ProcessID,
