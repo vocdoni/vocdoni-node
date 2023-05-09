@@ -558,11 +558,6 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	}); err != nil {
 		return err
 	}
-	log.Debugw("new token transfer",
-		"from", fmt.Sprintf("%x", tx.FromAddress),
-		"to", fmt.Sprintf("%x", tx.ToAddress),
-		"amount", fmt.Sprintf("%d", tx.Amount),
-	)
 	return nil
 }
 
