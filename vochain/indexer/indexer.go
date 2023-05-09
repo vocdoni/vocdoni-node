@@ -57,8 +57,6 @@ func (idx *Indexer) AddEventListener(l EventListener) {
 // and keeps it indexed in a local database.
 type Indexer struct {
 	App *vochain.BaseApplication
-	// voteIndexPool is the list of votes that will be indexed in the database
-	voteIndexPool []*VoteWithIndex
 	// votePool is the list of votes that should be live counted, grouped by processId
 	votePool map[string][]*state.Vote
 
@@ -93,12 +91,6 @@ type Indexer struct {
 	// like entire calls to Commit.
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
-}
-
-// VoteWithIndex holds a Vote and a txIndex. Model for the VotePool.
-type VoteWithIndex struct {
-	vote    *state.Vote
-	txIndex int32
 }
 
 // NewIndexer returns an instance of the Indexer
@@ -343,21 +335,10 @@ func (idx *Indexer) Commit(height uint32) error {
 	}
 	idx.blockTx = nil
 
-	startTime := time.Now()
-	for _, v := range idx.voteIndexPool {
-		if err := idx.addVoteIndex(v.vote, v.txIndex); err != nil {
-			log.Errorw(err, "could not index vote")
-		}
-	}
-	if len(idx.voteIndexPool) > 0 {
-		log.Infof("indexed %d new envelopes, took %s",
-			len(idx.voteIndexPool), time.Since(startTime))
-	}
-
 	// Add votes collected by onVote (live results)
 	newVotes := 0
 	overwritedVotes := 0
-	startTime = time.Now()
+	startTime := time.Now()
 
 	for pidStr, votes := range idx.votePool {
 		pid := []byte(pidStr)
@@ -456,7 +437,6 @@ func (idx *Indexer) Rollback() {
 		}
 		idx.blockTx = nil
 	}
-	idx.voteIndexPool = []*VoteWithIndex{}
 	maps.Clear(idx.blockUpdateProcs)
 }
 
@@ -477,13 +457,20 @@ func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txI
 // and the blockchain is not synchronizing.
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
-func (idx *Indexer) OnVote(v *state.Vote, txIndex int32) {
+func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	if !idx.ignoreLiveResults && idx.isProcessLiveResults(v.ProcessID) {
-		idx.votePool[string(v.ProcessID)] = append(idx.votePool[string(v.ProcessID)], v)
+	if !idx.ignoreLiveResults && idx.isProcessLiveResults(vote.ProcessID) {
+		idx.votePool[string(vote.ProcessID)] = append(idx.votePool[string(vote.ProcessID)], vote)
 	}
-	idx.voteIndexPool = append(idx.voteIndexPool, &VoteWithIndex{vote: v, txIndex: txIndex})
+
+	queries := idx.blockTxQueries()
+	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
+	defer cancel()
+
+	if err := idx.addVoteIndex(ctx, queries, vote, txIndex); err != nil {
+		log.Errorw(err, "could not index vote")
+	}
 }
 
 // OnCancel indexer stores the processID and entityID
