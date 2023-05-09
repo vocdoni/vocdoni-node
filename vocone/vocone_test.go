@@ -135,8 +135,9 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	if _, err = cli.SetElectionStatus(processID, "ENDED"); err != nil {
 		return err
 	}
-
-	election, err := cli.WaitUntilElectionStatus(context.Background(), processID, "RESULTS")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel()
+	election, err := cli.WaitUntilElectionStatus(ctx, processID, "RESULTS")
 	if err != nil {
 		return err
 	}
