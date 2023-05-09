@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -168,6 +169,12 @@ type Transaction struct {
 type TransactionReference struct {
 	Height uint32 `json:"blockHeight"`
 	Index  uint32 `json:"transactionIndex"`
+}
+
+type BlockTransactionsInfo struct {
+	BlockNumber        uint64                    `json:"blockNumber"`
+	TransactionsNumber uint32                    `json:"transactionNumber"`
+	Transactions       []indexertypes.TxMetadata `json:"transactions"`
 }
 
 type ChainInfo struct {

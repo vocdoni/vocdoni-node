@@ -16,6 +16,8 @@ import (
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -84,6 +86,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTxByIndexHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/transactions/reference/height/{height}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxByHeightHandler,
 	); err != nil {
 		return err
 	}
@@ -455,6 +465,53 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	data, err := json.Marshal(ref)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainTxByHeightHandler
+//
+// @Summary	Returns the list of transactions for a given block
+// @Description	Given a block returns the list of transactions for that block
+// @Success	200	{object}	TransactionList
+// @Router	/chain/transactions/reference/height/{height} [get]
+func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
+	if err != nil {
+		return err
+	}
+	block := a.vocapp.GetBlockByHeight(int64(height))
+	if block == nil {
+		return ErrBlockNotFound
+	}
+	blockTxs := &BlockTransactionsInfo{
+		BlockNumber:        height,
+		TransactionsNumber: uint32(len(block.Txs)),
+		Transactions:       make([]indexertypes.TxMetadata, len(block.Txs)),
+	}
+	for i, _ := range block.Txs {
+		signedTx := new(models.SignedTx)
+		tx := new(models.Tx)
+		var err error
+		if err = proto.Unmarshal(block.Txs[i], signedTx); err != nil {
+			return ErrUnmarshalingServerProto.WithErr(err)
+		}
+		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
+			return ErrUnmarshalingServerProto.WithErr(err)
+		}
+		txType := string(
+			tx.ProtoReflect().WhichOneof(
+				tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
+
+		blockTxs.Transactions = append(blockTxs.Transactions, indexertypes.TxMetadata{
+			Type:  txType,
+			Index: int32(i),
+			Hash:  block.Txs[i].Hash(),
+		})
+	}
+	data, err := json.Marshal(blockTxs)
 	if err != nil {
 		return err
 	}
