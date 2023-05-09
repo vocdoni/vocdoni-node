@@ -3,7 +3,6 @@ package indexer
 import (
 	"context"
 	"database/sql"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -65,8 +64,6 @@ func encodeVotes(votes [][]*types.BigInt) string {
 
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	startTime := time.Now()
-
 	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 	procInner, err := queries.GetProcess(ctx, pid)
@@ -76,7 +73,6 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 		}
 		return nil, err
 	}
-	log.Debugf("processInfo sqlite took %s", time.Since(startTime))
 	return indexertypes.ProcessFromDB(&procInner), nil
 }
 
@@ -111,7 +107,6 @@ func (idx *Indexer) ProcessList(entityID []byte,
 	queries, ctx, cancel := idx.timeoutQueries()
 	defer cancel()
 
-	startTime := time.Now()
 	procs, err := queries.SearchProcesses(ctx, indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
@@ -123,7 +118,6 @@ func (idx *Indexer) ProcessList(entityID []byte,
 		Limit:           int32(max),
 		WithResults:     withResults,
 	})
-	log.Debugf("ProcessList sqlite took %s", time.Since(startTime))
 	if err != nil {
 		return nil, err
 	}
@@ -261,26 +255,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		Metadata:          p.GetMetadata(),
 		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
-	log.Debugw("new indexer process",
-		"processID", hex.EncodeToString(pid),
-		"entityID", hex.EncodeToString(eid),
-		"startBlock", procParams.StartBlock,
-		"endBlock", procParams.EndBlock,
-		"resultsHeight", procParams.ResultsHeight,
-		"haveResults", procParams.HaveResults,
-		"censusRoot", hex.EncodeToString(p.CensusRoot),
-		"rollingCensusRoot", hex.EncodeToString(p.RollingCensusRoot),
-		"rollingCensusSize", procParams.RollingCensusSize,
-		"maxCensusSize", procParams.MaxCensusSize,
-		"censusUri", p.GetCensusURI(),
-		"censusOrigin", procParams.CensusOrigin,
-		"status", procParams.Status,
-		"namespace", procParams.Namespace,
-		"creationTime", procParams.CreationTime,
-		"sourceBlockHeight", procParams.SourceBlockHeight,
-		"sourceNetworkID", procParams.SourceNetworkID,
-		"metadata", procParams.Metadata,
-	)
 
 	queries := idx.blockTxQueries()
 	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
