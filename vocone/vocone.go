@@ -343,6 +343,7 @@ func (vc *Vocone) setDefaultMethods() {
 	vc.app.SetFnGetBlockByHeight(vc.getBlock)
 	vc.app.SetFnGetTxHash(vc.getTxWithHash)
 	vc.app.SetFnMempoolSize(vc.mempoolSize)
+	vc.app.SetFnMempoolPrune(nil)
 }
 
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
