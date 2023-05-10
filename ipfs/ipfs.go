@@ -7,7 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
-	coreiface "github.com/ipfs/interface-go-ipfs-core"
+	coreiface "github.com/ipfs/boxo/coreiface"
 	"github.com/ipfs/kubo/commands"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
@@ -81,7 +81,6 @@ func StartNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		log.Warn("error constructing core API")
 		return nil, nil, err
 	}
-
 	return node, api, nil
 }
 
