@@ -30,9 +30,7 @@ var ErrVoteNotFound = fmt.Errorf("vote not found")
 // GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	sqlTxRefInner, err := queries.GetVoteReference(ctx, nullifier)
+	sqlTxRefInner, err := idx.oneQuery().GetVoteReference(context.TODO(), nullifier)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrVoteNotFound
@@ -94,9 +92,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	txRefs, err := queries.SearchVoteReferences(ctx, indexerdb.SearchVoteReferencesParams{
+	txRefs, err := idx.oneQuery().SearchVoteReferences(context.TODO(), indexerdb.SearchVoteReferencesParams{
 		ProcessID:       processId,
 		NullifierSubstr: searchTerm,
 		Limit:           int32(max),
@@ -132,10 +128,8 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 // GetEnvelopeHeight returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
 func (idx *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
 	if len(processID) == 0 {
-		height, err := queries.GetTotalProcessEnvelopeHeight(ctx)
+		height, err := idx.oneQuery().GetTotalProcessEnvelopeHeight(context.TODO())
 		if err != nil {
 			return 0, err
 		}
@@ -144,7 +138,7 @@ func (idx *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
 		}
 		return uint64(height.(int64)), nil
 	}
-	height, err := queries.GetProcessEnvelopeHeight(ctx, processID)
+	height, err := idx.oneQuery().GetProcessEnvelopeHeight(context.TODO(), processID)
 	return uint64(height), err
 }
 
@@ -182,9 +176,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	sqlProcInner, err := queries.GetProcess(ctx, processID)
+	sqlProcInner, err := idx.oneQuery().GetProcess(context.TODO(), processID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,12 +308,10 @@ func (idx *Indexer) commitVotes(pid []byte, partialResults, partialSubResults *r
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
 func (idx *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
-	// TODO(sqlite): use a tx
+	queries := idx.oneQuery() // TODO(sqlite): use a tx
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	sqlProcInner, err := queries.GetProcess(ctx, pid)
+	sqlProcInner, err := queries.GetProcess(context.TODO(), pid)
 	if err != nil {
 		return err
 	}
@@ -337,7 +327,7 @@ func (idx *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResu
 		}
 	}
 
-	if _, err := queries.UpdateProcessResults(ctx, indexerdb.UpdateProcessResultsParams{
+	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:             pid,
 		Votes:          encodeVotes(results.Votes),
 		Weight:         results.Weight.String(),
