@@ -163,11 +163,8 @@ func (idx *Indexer) Close() error {
 	return nil
 }
 
-func (idx *Indexer) timeoutQueries() (*indexerdb.Queries, context.Context, context.CancelFunc) {
-	ctx := context.TODO()
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	queries := indexerdb.New(idx.sqlDB)
-	return queries, ctx, cancel
+func (idx *Indexer) oneQuery() *indexerdb.Queries {
+	return indexerdb.New(idx.sqlDB)
 }
 
 // blockTxQueries assumes that lockPool is locked.
@@ -234,10 +231,9 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
 
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
+	queries := idx.oneQuery() // TODO: use a tx
 
-	prcIDs, err := queries.GetProcessIDsByFinalResults(ctx, false)
+	prcIDs, err := queries.GetProcessIDsByFinalResults(context.TODO(), false)
 	if err != nil {
 		log.Error(err)
 	}
@@ -268,7 +264,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			Signatures:   []types.HexBytes{},
 		}
 
-		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
+		if _, err := queries.UpdateProcessResultByID(context.TODO(), indexerdb.UpdateProcessResultByIDParams{
 			ID:         indxR.ProcessID,
 			Votes:      encodeVotes(indxR.Votes),
 			Weight:     indxR.Weight.String(),
@@ -564,9 +560,7 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
 // from the database, ordered by timestamp and paginated by maxItems and offset
 func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	queries, ctx, cancel := idx.timeoutQueries()
-	defer cancel()
-	ttFromDB, err := queries.GetTokenTransfersByFromAccount(ctx, indexerdb.GetTokenTransfersByFromAccountParams{
+	ttFromDB, err := idx.oneQuery().GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
 		FromAccount: from,
 		Limit:       maxItems,
 		Offset:      offset,
