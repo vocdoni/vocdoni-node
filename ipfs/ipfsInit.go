@@ -6,7 +6,6 @@ import (
 	"os"
 	"path"
 	"sync"
-	"time"
 
 	config "github.com/ipfs/kubo/config"
 	"github.com/ipfs/kubo/plugin/loader"
@@ -50,15 +49,6 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 		return nil, err
 	}
 
-	// Some optimizations to avoid using too much resources
-	conf.Datastore.BloomFilterSize = 1 << 20 // 1MiB
-	conf.Swarm.ConnMgr.LowWater = config.NewOptionalInteger(20)
-	conf.Swarm.ConnMgr.HighWater = config.NewOptionalInteger(100)
-	conf.Swarm.ConnMgr.GracePeriod = config.NewOptionalDuration(2 * time.Second)
-	conf.Swarm.DisableBandwidthMetrics = true
-	conf.Swarm.RelayClient.Enabled = config.False
-	conf.Swarm.Transports.Network.Relay = 0
-	conf.Datastore.GCPeriod = "5m"
 	conf.Discovery.MDNS.Enabled = false
 
 	// Prevent from scanning local networks which can trigger netscan alerts.

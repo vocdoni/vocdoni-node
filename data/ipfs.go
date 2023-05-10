@@ -7,13 +7,14 @@ import (
 	"strings"
 	"time"
 
+	coreiface "github.com/ipfs/boxo/coreiface"
 	ipfscid "github.com/ipfs/go-cid"
 	keystore "github.com/ipfs/go-ipfs-keystore"
 	files "github.com/ipfs/go-libipfs/files"
 	ipfslog "github.com/ipfs/go-log/v2"
-	coreiface "github.com/ipfs/interface-go-ipfs-core"
-	"github.com/ipfs/interface-go-ipfs-core/options"
-	corepath "github.com/ipfs/interface-go-ipfs-core/path"
+
+	"github.com/ipfs/boxo/coreiface/options"
+	corepath "github.com/ipfs/boxo/coreiface/path"
 	ipfscmds "github.com/ipfs/kubo/commands"
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
@@ -32,7 +33,9 @@ import (
 // TODO: this package should be refactored and updated to the latest IPFS version and config options
 
 const (
-	MaxFileSizeBytes       = 1024 * 1024 * 50 // 50 MB
+	// MaxFileSizeBytes is the maximum size of a file to be published to IPFS
+	MaxFileSizeBytes = 1024 * 1024 * 100 // 100 MB
+	// RetrievedFileCacheSize is the maximum number of files to be cached in memory
 	RetrievedFileCacheSize = 128
 )
 
@@ -56,7 +59,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	ipfslog.SetLogLevel("*", i.LogLevel)
 	ipfs.InstallDatabasePlugins()
 	ipfs.ConfigRoot = d.Datadir
-	os.Setenv("IPFS_FD_MAX", "1024")
+	os.Setenv("IPFS_FD_MAX", "4096")
 
 	// check if needs init
 	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
@@ -73,8 +76,11 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	i.cancel = cancel
 
 	// Start garbage collector, with our cancellable context.
-	go corerepo.PeriodicGC(ctx, node)
-
+	go func() {
+		if err := corerepo.PeriodicGC(ctx, node); err != nil {
+			log.Errorw(err, "error running ipfs garbage collector")
+		}
+	}()
 	log.Infow("IPFS initialization",
 		"peerID", node.Identity.Pretty(),
 		"addresses", node.PeerHost.Addrs(),
@@ -84,7 +90,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	cctx := ipfs.CmdCtx(node, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
-	gatewayOpt := corehttp.GatewayOption(true, corehttp.WebUIPaths...)
+	gatewayOpt := corehttp.GatewayOption(corehttp.WebUIPaths...)
 	opts := []corehttp.ServeOption{
 		corehttp.CommandsOption(cctx),
 		corehttp.WebUIOption,
@@ -138,14 +144,17 @@ func (i *IPFSHandle) URIprefix() string {
 // Publish publishes a message to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
 	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
-	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg), options.Unixfs.CidVersion(1))
+	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg),
+		options.Unixfs.CidVersion(1),
+		options.Unixfs.Pin(true))
 	if err != nil {
 		return "", fmt.Errorf("could not publish: %s", err)
 	}
+
 	// Unixfs().Add() returns a CIDv1 with codec "raw", but the content is actually json,
 	// so recalculate the CIDv1 using "json" as codec
 	cid = IPFSCIDv1json(rpath.Cid()).String()
-	log.Infof("published file: %s", cid)
+	log.Infow("published file", "protocol", "ipfs", "cid", cid, "size", len(msg))
 	return cid, nil
 }
 
