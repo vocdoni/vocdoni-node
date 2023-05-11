@@ -8,6 +8,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -31,7 +32,7 @@ func (d *DataMockTest) Init(ds *types.DataStore) error {
 func (d *DataMockTest) Publish(ctx context.Context, o []byte) (string, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
-	cid := CalculateIPFSCIDv1json(o)
+	cid := ipfs.CalculateCIDv1json(o)
 	d.files[cid] = string(o)
 	return d.prefix + cid, nil
 }

@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
@@ -464,9 +464,9 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		}
 
 		// set metadataCID from metadata bytes
-		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
+		metadataCID = ipfs.CalculateCIDv1json(req.Metadata)
 		// check metadata URI matches metadata content
-		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
+		if !ipfs.CIDequals(metadataCID, metadataURI) {
 			return ErrMetadataURINotMatchContent
 		}
 	}
@@ -536,7 +536,7 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrCantParsePayloadAsJSON
 	}
 	data, err := json.Marshal(&File{
-		CID: "ipfs://" + data.CalculateIPFSCIDv1json(req.Payload),
+		CID: "ipfs://" + ipfs.CalculateCIDv1json(req.Payload),
 	})
 	if err != nil {
 		return err

@@ -131,6 +131,22 @@ func checkInvalidChars(args ...interface{}) {
 	}
 }
 
+// Level returns the current log level
+func Level() string {
+	switch zerolog.GlobalLevel() {
+	case zerolog.DebugLevel:
+		return LogLevelDebug
+	case zerolog.InfoLevel:
+		return LogLevelInfo
+	case zerolog.WarnLevel:
+		return LogLevelWarn
+	case zerolog.ErrorLevel:
+		return LogLevelError
+	default:
+		panic("invalid log level")
+	}
+}
+
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
 	if zerolog.GlobalLevel() > zerolog.DebugLevel {
@@ -188,6 +204,9 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
+	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+		return
+	}
 	Logger().Debug().Msgf(template, args...)
 	checkInvalidChars(fmt.Sprintf(template, args...))
 }

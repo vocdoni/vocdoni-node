@@ -179,7 +179,11 @@ func (a *API) ProcessData(req *http.Request) (interface{}, error) {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
 	}
 	if len(reqBody) > 0 {
-		log.Debugf("request: %s", reqBody)
+		req := string(reqBody)
+		if len(req) > 1024 {
+			req = req[:1024] + "..." // truncate
+		}
+		log.Debugf("request: %s", req)
 	}
 	msg := &APIdata{
 		Data:      reqBody,

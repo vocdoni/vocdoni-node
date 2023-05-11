@@ -11,7 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -86,7 +86,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 		})
 
 	qt.Assert(t, err, qt.IsNil)
-	metadataURI := data.CalculateIPFSCIDv1json(metadataBytes)
+	metadataURI := ipfs.CalculateCIDv1json(metadataBytes)
 
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
@@ -217,7 +217,7 @@ func TestAPIaccount(t *testing.T) {
 	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), 50)
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
-	infoURI := server.Storage.URIprefix() + data.CalculateIPFSCIDv1json(metaData)
+	infoURI := server.Storage.URIprefix() + ipfs.CalculateCIDv1json(metaData)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
