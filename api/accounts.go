@@ -5,13 +5,12 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -21,7 +20,8 @@ import (
 )
 
 const (
-	AccountHandler = "accounts"
+	AccountHandler                     = "accounts"
+	AccountFetchMetadataTimeoutSeconds = 5
 )
 
 func (a *API) enableAccountHandlers() error {
@@ -104,7 +104,7 @@ func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	// Try to retrieve the account info metadata
 	accMetadata := &AccountMetadata{}
 	if a.storage != nil {
-		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		stgCtx, cancel := context.WithTimeout(context.Background(), AccountFetchMetadataTimeoutSeconds*time.Second)
 		defer cancel()
 		metadataBytes, err := a.storage.Retrieve(stgCtx, acc.InfoURI, MaxOffchainFileSize)
 		if err != nil {
@@ -177,9 +177,9 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		}
 
 		// set metadataCID from metadata bytes
-		metadataCID = data.CalculateIPFSCIDv1json(req.Metadata)
+		metadataCID = ipfs.CalculateCIDv1json(req.Metadata)
 		// check metadata URI matches metadata content
-		if !data.IPFSCIDequals(metadataCID, strings.TrimPrefix(metadataURI, "ipfs://")) {
+		if !ipfs.CIDequals(metadataCID, metadataURI) {
 			return ErrMetadataURINotMatchContent
 		}
 	}
@@ -211,7 +211,7 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
-		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(metadataCID, "ipfs://") {
+		if !ipfs.CIDequals(cid, metadataCID) {
 			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
 		}
 	}

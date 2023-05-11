@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/types"
 	indexertypes "go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -103,7 +103,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
-		metadataURI = "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
 	}
 
 	// Build the transaction
@@ -160,7 +160,7 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
-		metadataURI = "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
 	}
 
 	acc, err := c.Account("")

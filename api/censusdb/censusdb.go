@@ -10,9 +10,9 @@ import (
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
-	storagelayer "go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -173,7 +173,7 @@ func BuildExportDump(root, data []byte, typ models.Census_Type, maxLevels int) (
 func (c *CensusDB) ImportAsPublic(data []byte) error {
 	cdata := CensusDump{}
 	if err := json.Unmarshal(data, &cdata); err != nil {
-		return err
+		return fmt.Errorf("could not unmarshal census: %w", err)
 	}
 	if cdata.Data == nil || cdata.RootHash == nil {
 		return fmt.Errorf("missing dump or root parameters")
@@ -182,7 +182,7 @@ func (c *CensusDB) ImportAsPublic(data []byte) error {
 	if c.Exists(cdata.RootHash) {
 		return ErrCensusAlreadyExists
 	}
-	uri := "ipfs://" + storagelayer.CalculateIPFSCIDv1json(data)
+	uri := "ipfs://" + ipfs.CalculateCIDv1json(data)
 	ref, err := c.New(cdata.RootHash, cdata.Type, uri, nil, cdata.MaxLevels)
 	if err != nil {
 		return err
