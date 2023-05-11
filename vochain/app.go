@@ -283,23 +283,21 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
-	var response *transaction.TransactionResponse
-	var err error
 	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		return abcitypes.ResponseCheckTx{Code: 0}
 	}
 	tx := new(vochaintx.Tx)
-	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		if response, err = app.TransactionHandler.CheckTx(tx, false); err != nil {
-			if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
-				return abcitypes.ResponseCheckTx{Code: 0}
-			}
-			log.Errorw(err, "checkTx")
-			return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}
-		}
-	} else {
+	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
+	}
+	response, err := app.TransactionHandler.CheckTx(tx, false)
+	if err != nil {
+		if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
+			return abcitypes.ResponseCheckTx{Code: 0}
+		}
+		log.Errorw(err, "checkTx")
+		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}
 	}
 	// add tx to mempool reference map for recheck prunning
 	app.mempoolTxRefLock.Lock()
@@ -316,33 +314,31 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 
 // DeliverTx unmarshals req.Tx and adds it to the State if it is valid
 func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
-	var response *transaction.TransactionResponse
-	var err error
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
 	tx := new(vochaintx.Tx)
-	if err = tx.Unmarshal(req.Tx, app.ChainID()); err == nil {
-		log.Debugw("deliver tx",
-			"hash", fmt.Sprintf("%x", tx.TxID),
-			"type", tx.TxModelType,
-			"height", app.Height(),
-			"tx", tx.Tx,
-		)
-		// add tx to mempool reference map for prunning on Commit()
-		app.mempoolTxRefLock.Lock()
-		app.mempoolTxRefToGC = append(app.mempoolTxRefToGC, tx.TxID)
-		app.mempoolTxRefLock.Unlock()
-		// check tx is correct on the current state
-		if response, err = app.TransactionHandler.CheckTx(tx, true); err != nil {
-			log.Errorw(err, "rejected tx")
-			return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
-		}
-		// call event listeners
-		for _, e := range app.State.EventListeners() {
-			e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
-		}
-	} else {
+	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
 		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
+	}
+	log.Debugw("deliver tx",
+		"hash", fmt.Sprintf("%x", tx.TxID),
+		"type", tx.TxModelType,
+		"height", app.Height(),
+		"tx", tx.Tx,
+	)
+	// add tx to mempool reference map for prunning on Commit()
+	app.mempoolTxRefLock.Lock()
+	app.mempoolTxRefToGC = append(app.mempoolTxRefToGC, tx.TxID)
+	app.mempoolTxRefLock.Unlock()
+	// check tx is correct on the current state
+	response, err := app.TransactionHandler.CheckTx(tx, true)
+	if err != nil {
+		log.Errorw(err, "rejected tx")
+		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
+	}
+	// call event listeners
+	for _, e := range app.State.EventListeners() {
+		e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
 	}
 	return abcitypes.ResponseDeliverTx{
 		Code: 0,
