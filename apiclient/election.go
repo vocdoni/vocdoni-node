@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -187,7 +187,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		return nil, fmt.Errorf("cannot format metadata: %w", err)
 	}
 	log.Debugf("election metadata: %s", string(metadataBytes))
-	metadataURI := "ipfs://" + data.CalculateIPFSCIDv1json(metadataBytes)
+	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
 	log.Debugf("metadataURI: %s", metadataURI)
 
 	// get the own account details

@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -19,18 +20,18 @@ import (
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/ipfs/kubo/core/corerepo"
+	"github.com/ipfs/kubo/core/coreunix"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	ipfscrypto "github.com/libp2p/go-libp2p/core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multicodec"
+	"github.com/multiformats/go-multihash"
 	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
-
-// TODO: this package should be refactored and updated to the latest IPFS version and config options
 
 const (
 	// MaxFileSizeBytes is the maximum size of a file to be published to IPFS
@@ -141,31 +142,31 @@ func (i *IPFSHandle) URIprefix() string {
 	return "ipfs://"
 }
 
-// Publish publishes a message to ipfs and returns the resulting CID v1.
+// Publish publishes a file or message to ipfs and returns the resulting CID v1.
 func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
-	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
-	rpath, err := i.CoreAPI.Unixfs().Add(ctx, files.NewBytesFile(msg),
-		options.Unixfs.CidVersion(1),
-		options.Unixfs.Pin(true))
+	adder, err := coreunix.NewAdder(ctx, i.Node.Pinning, i.Node.Blockstore, i.Node.DAG)
 	if err != nil {
-		return "", fmt.Errorf("could not publish: %s", err)
+		return "", err
 	}
-
-	// Unixfs().Add() returns a CIDv1 with codec "raw", but the content is actually json,
-	// so recalculate the CIDv1 using "json" as codec
-	cid = IPFSCIDv1json(rpath.Cid()).String()
+	adder.Chunker = ipfs.ChunkerTypeSize
+	adder.CidBuilder = ipfscid.V1Builder{
+		Codec:  uint64(multicodec.DagJson),
+		MhType: uint64(multihash.SHA2_256),
+	}
+	msgFile := files.NewBytesFile(msg)
+	format, err := adder.AddAllAndPin(ctx, msgFile)
+	if err != nil {
+		return "", err
+	}
+	cid = format.Cid().String()
 	log.Infow("published file", "protocol", "ipfs", "cid", cid, "size", len(msg))
 	return cid, nil
 }
 
-// AddAndPin adds a file to ipfs and returns the resulting CID v1.
-func (i *IPFSHandle) AddAndPin(ctx context.Context, path string) (cid string, err error) {
+// Pin adds a file to ipfs and returns the resulting CID v1.
+func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-	rpath, err := i.addAndPin(ctx, path)
-	if err != nil {
-		return "", err
-	}
-	return rpath.Root().String(), nil
+	return i.CoreAPI.Pin().Add(ctx, corepath.New(path))
 }
 
 func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resolved, error) {
@@ -175,8 +176,8 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 	}
 	defer f.Close()
 
-	// needs options.Unixfs.CidVersion(1) since CID v0 calculation is broken (differs from ipfscid.Sum)
-	rpath, err := i.CoreAPI.Unixfs().Add(ctx, f, options.Unixfs.CidVersion(1),
+	rpath, err := i.CoreAPI.Unixfs().Add(ctx, f,
+		options.Unixfs.CidVersion(1),
 		options.Unixfs.Pin(true))
 	if err != nil {
 		return nil, err
@@ -185,16 +186,12 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 	return rpath, nil
 }
 
-func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
-	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-	cpath := corepath.New(path)
-	log.Debugf("adding pin %s", cpath.String())
-	return i.CoreAPI.Pin().Add(ctx, cpath, options.Pin.Recursive(true))
-}
-
 func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	cpath := corepath.New(path)
+	if err := cpath.IsValid(); err != nil {
+		return fmt.Errorf("invalid path %s: %w", path, err)
+	}
 	log.Debugf("removing pin %s", cpath.String())
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
@@ -234,6 +231,7 @@ func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
 	return count, nil
 }
 
+// ListPins returns a map of all pinned CIDs and their types
 func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 	// Note that pins is a channel that gets closed when finished.
 	// We MUST range over the entire channel to not leak goroutines.
@@ -251,7 +249,8 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 	return pinMap, nil
 }
 
-// Retrieve gets an IPFS file (either from the p2p network or from the local cache)
+// Retrieve gets an IPFS file (either from the p2p network or from the local cache).
+// If maxSize is 0, it is set to the hardcoded maximum of MaxFileSizeBytes.
 func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 
@@ -262,25 +261,57 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) (
 		return ccontent.([]byte), nil
 	}
 
-	cnode, err := i.CoreAPI.ResolveNode(ctx, corepath.New(path))
+	// first resolve the path
+	cpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve node: %w", err)
+		return nil, fmt.Errorf("could not resolve path %s", path)
 	}
-	log.Debugf("rawdata received: %s", cnode.RawData())
+
+	// then get the file
+	f, err := i.CoreAPI.Unixfs().Get(ctx, cpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve unixfs file: %w", err)
+	}
+	file := files.ToFile(f)
+	if file == nil {
+		return nil, fmt.Errorf("object is not a file")
+	}
+	defer file.Close()
+
+	fsize, err := file.Size()
+	if err != nil {
+		return nil, err
+	}
+
 	if maxSize == 0 {
 		maxSize = MaxFileSizeBytes
 	}
-	if s, err := cnode.Size(); s > uint64(maxSize) || err != nil {
-		return nil, fmt.Errorf("file too big or size cannot be obtained: (size:%d)", s)
+
+	if fsize > int64(maxSize) {
+		return nil, fmt.Errorf("file too big: %d", fsize)
 	}
-	content := cnode.RawData()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(content) == 0 {
 		return nil, fmt.Errorf("retrieved file is empty")
+	}
+
+	if log.Level() >= log.LogLevelDebug {
+		toLog := string(content)
+		if len(toLog) > 1024 {
+			toLog = toLog[:1024] + "..."
+		}
+		log.Debugf("rawdata received: %s", toLog)
 	}
 
 	// Save file to cache for future attempts
 	i.retrieveCache.Add(path, content)
 
+	log.Infow("retrieved file", "path", path, "size", fsize)
 	return content, nil
 }
 
@@ -347,42 +378,6 @@ func NewIPFSkey() []byte {
 		panic(err)
 	}
 	return encPrivKey
-}
-
-// CalculateIPFSCIDv1json calculates the IPFS Cid hash (v1) from a bytes buffer,
-// using parameters Codec: JSON, MhType: SHA2_256
-func CalculateIPFSCIDv1json(data []byte) (cid string) {
-	format := ipfscid.V1Builder{
-		MhType: uint64(multicodec.Sha2_256),
-	}
-	c, err := format.Sum(data)
-	if err != nil {
-		log.Warnf("%v", err)
-		return ""
-	}
-	log.Debugf("computed cid: %s", IPFSCIDv1json(c).String())
-	return IPFSCIDv1json(c).String()
-}
-
-// IPFSCIDv1json converts any given Cid (v0 or v1) into a v1 with Codec: JSON (0x0200)
-func IPFSCIDv1json(cid ipfscid.Cid) ipfscid.Cid {
-	// The multicodec indicates the format of the target content
-	// it helps people and software to know how to interpret that
-	// content after the content is fetched
-	return ipfscid.NewCidV1(uint64(multicodec.Json), cid.Hash())
-}
-
-// IPFSCIDequals compares two Cids (v0 or v1) and returns true if they are equal
-func IPFSCIDequals(cid1, cid2 string) bool {
-	c1, err := ipfscid.Decode(cid1)
-	if err != nil {
-		return false
-	}
-	c2, err := ipfscid.Decode(cid2)
-	if err != nil {
-		return false
-	}
-	return c1.Equals(c2)
 }
 
 // unixfsFilesNode returns a go-ipfs files.Node given a unix path
