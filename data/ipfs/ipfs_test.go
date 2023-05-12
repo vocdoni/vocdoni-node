@@ -1,4 +1,4 @@
-package data
+package ipfs
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	ipfscid "github.com/ipfs/go-cid"
-	"go.vocdoni.io/dvote/ipfs"
 )
 
 func TestIPFSCIDv1(t *testing.T) {
@@ -22,7 +21,7 @@ func TestIPFSCIDv1(t *testing.T) {
 	t.Logf("CID: %s, Hash: %s, Version: %d, MhType: %x, Codec: %x",
 		cid.String(), cid.Hash(), cid.Version(), cid.Prefix().MhType, cid.Type())
 
-	cidFromCalculateIPFSCIDv1json := ipfs.CalculateCIDv1json(msg)
+	cidFromCalculateIPFSCIDv1json := CalculateCIDv1json(msg)
 	cid, err = ipfscid.Decode(cidFromCalculateIPFSCIDv1json)
 	qt.Assert(t, err, qt.IsNil)
 	t.Log("CalculateCIDv1json returned:")
@@ -30,9 +29,9 @@ func TestIPFSCIDv1(t *testing.T) {
 		cid.String(), cid.Hash(), cid.Version(), cid.Prefix().MhType, cid.Type())
 
 	qt.Assert(t,
-		ipfs.CIDequals(expectedCid, cidFromCalculateIPFSCIDv1json),
+		CIDequals(expectedCid, cidFromCalculateIPFSCIDv1json),
 		qt.Equals, true)
 	qt.Assert(t,
-		ipfs.CIDequals(cidFromPublish, cidFromCalculateIPFSCIDv1json),
+		CIDequals(cidFromPublish, cidFromCalculateIPFSCIDv1json),
 		qt.Equals, true)
 }

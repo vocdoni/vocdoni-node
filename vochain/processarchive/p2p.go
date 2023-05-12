@@ -6,7 +6,7 @@ import (
 	"time"
 
 	ipfscrypto "github.com/libp2p/go-libp2p/core/crypto"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -25,7 +25,7 @@ func (pa *ProcessArchive) AddKey(b64key string) error {
 			return nil
 		}
 		// else generate a new key
-		ipnsPk = data.NewIPFSkey()
+		ipnsPk = ipfs.NewIPFSkey()
 	} else {
 		var err error
 		ipnsPk, err = base64.StdEncoding.DecodeString(b64key)

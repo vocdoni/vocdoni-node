@@ -3,7 +3,7 @@ package service
 import (
 	"fmt"
 
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/processarchive"
 )
@@ -13,7 +13,7 @@ func (vs *VocdoniService) ProcessArchiver() error {
 	if vs.Indexer == nil {
 		return fmt.Errorf("process archive needs indexer enabled")
 	}
-	ipfs, ok := vs.Storage.(*data.IPFSHandle)
+	ipfs, ok := vs.Storage.(*ipfs.Handler)
 	if !ok {
 		return fmt.Errorf("ipfsStorage is not IPFS")
 	}

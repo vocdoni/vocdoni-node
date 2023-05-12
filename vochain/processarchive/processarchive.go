@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -20,7 +20,7 @@ import (
 
 type ProcessArchive struct {
 	indexer    *indexer.Indexer
-	ipfs       *data.IPFSHandle
+	ipfs       *ipfs.Handler
 	storage    *jsonStorage
 	publish    chan (bool)
 	lastUpdate time.Time
@@ -163,7 +163,7 @@ func BuildIndex(datadir string) (*Index, error) {
 // The key parameter must be either a valid IPFS base64 encoded private key
 // or empty (a new key will be generated).
 // If ipfs is nil, only JSON archive storage will be performed.
-func NewProcessArchive(s *indexer.Indexer, ipfs *data.IPFSHandle,
+func NewProcessArchive(s *indexer.Indexer, ipfs *ipfs.Handler,
 	datadir, key string) (*ProcessArchive, error) {
 	js, err := NewJsonStorage(datadir)
 	if err != nil {

@@ -17,15 +17,10 @@ import (
 
 	"github.com/ipfs/boxo/ipld/merkledag"
 
-	"github.com/multiformats/go-multicodec"
-	"github.com/multiformats/go-multihash"
 	"go.vocdoni.io/dvote/log"
 )
 
-const (
-	// ChunkerTypeSize is the chunker type used by IPFS to calculate to build the DAG.
-	ChunkerTypeSize = "size-262144"
-)
+var dAGbuilder = ihelper.DagBuilderParams{}
 
 // dAG returns a new, thread-safe, dummy DAGService.
 func dAG() ipld.DAGService {
@@ -34,7 +29,9 @@ func dAG() ipld.DAGService {
 
 // bserv returns a new, thread-safe, mock BlockService.
 func bserv() blockservice.BlockService {
-	bstore := blockstore.NewBlockstore(dssync.MutexWrap(ds.NewMapDatastore()))
+	bstore := blockstore.NewBlockstore(
+		dssync.MutexWrap(ds.NewMapDatastore()),
+		blockstore.NoPrefix())
 	return blockservice.New(bstore, offline.Exchange(bstore))
 }
 
@@ -53,19 +50,7 @@ func CalculateCIDv1json(data []byte) string {
 		log.Errorw(err, "could not create chunk")
 	}
 
-	format := ipfscid.V1Builder{
-		Codec:  uint64(multicodec.DagJson),
-		MhType: uint64(multihash.SHA2_256),
-	}
-	params := ihelper.DagBuilderParams{
-		Dagserv:    dAG(),
-		RawLeaves:  false,
-		Maxlinks:   ihelper.DefaultLinksPerBlock,
-		NoCopy:     false,
-		CidBuilder: &format,
-	}
-
-	dbh, err := params.New(chnk)
+	dbh, err := dAGbuilder.New(chnk)
 	if err != nil {
 		log.Errorw(err, "could not create dag builder")
 	}
@@ -93,21 +78,5 @@ func CIDequals(cid1, cid2 string) bool {
 		log.Errorw(err, "could not decode cid2 "+cid2)
 		return false
 	}
-
-	// skip version length
-	/*	b := c1.Bytes()
-		_, n1, _ := varint.FromUvarint(b)
-		// skip codec length
-		_, n2, _ := varint.FromUvarint(b[n1:])
-		log.Warnf("==1==> %x", b[n1+n2:])
-
-		b = c2.Bytes()
-		_, n1, _ = varint.FromUvarint(b)
-		// skip codec length
-		_, n2, _ = varint.FromUvarint(b[n1:])
-		log.Warnf("==2==> %x", b[n1+n2:])
-
-		log.Warnf("cid1=%s cid2=%s | cid1hash=%s cid2hash=%s", c1.String(), c2.String(), c1.Hash().String(), c2.Hash().String())
-	*/
 	return c1.Hash().String() == c2.Hash().String()
 }

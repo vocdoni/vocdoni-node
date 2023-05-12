@@ -8,7 +8,7 @@ import (
 
 	"golang.org/x/exp/maps"
 
-	"go.vocdoni.io/dvote/ipfs"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
