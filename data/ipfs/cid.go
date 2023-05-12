@@ -30,7 +30,7 @@ func dAG() ipld.DAGService {
 // bserv returns a new, thread-safe, mock BlockService.
 func bserv() blockservice.BlockService {
 	bstore := blockstore.NewBlockstore(
-		dssync.MutexWrap(ds.NewMapDatastore()),
+		dssync.MutexWrap(ds.NewNullDatastore()),
 		blockstore.NoPrefix())
 	return blockservice.New(bstore, offline.Exchange(bstore))
 }
