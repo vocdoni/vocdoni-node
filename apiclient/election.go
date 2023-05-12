@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"

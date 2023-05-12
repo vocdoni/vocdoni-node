@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
@@ -56,7 +57,7 @@ func (d *DvoteAPIServer) Start(tb testing.TB, apis ...string) {
 	// Create the API router
 	d.IpfsDir = tb.TempDir()
 	ipfsStore := data.IPFSNewConfig(d.IpfsDir)
-	ipfs := data.IPFSHandle{}
+	ipfs := ipfs.Handler{}
 	d.IpfsPort = 14000 + rand.Intn(2048)
 	if err := ipfs.SetMultiAddress(fmt.Sprintf("/ip4/127.0.0.1/tcp/%d", d.IpfsPort)); err != nil {
 		tb.Fatal(err)

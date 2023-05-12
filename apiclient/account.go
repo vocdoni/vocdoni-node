@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/ipfs"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/types"
 	indexertypes "go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"

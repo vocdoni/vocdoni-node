@@ -16,7 +16,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
@@ -45,7 +45,7 @@ func BenchmarkZkCensus(b *testing.B) {
 	qt.Assert(b, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.MockIPFS(b)
+	storage := ipfs.MockIPFS(b)
 
 	vocapp := vochain.TestBaseApplication(b)
 	vocApi.Attach(vocapp, nil, nil, storage, censusDB)
