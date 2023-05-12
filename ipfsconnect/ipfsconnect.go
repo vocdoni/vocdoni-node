@@ -10,6 +10,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -30,7 +31,7 @@ type IPFSConnect struct {
 	Port            int16
 	HelloInterval   time.Duration
 	Bootnodes       []string
-	IPFS            *data.IPFSHandle
+	IPFS            *ipfs.Handler
 	Transport       *subpub.SubPub
 	GroupKey        string
 	TimestampWindow int32
@@ -46,7 +47,7 @@ func New(groupKey, privKeyHex, transport string, storage data.Storage) *IPFSConn
 		PrivKey:         privKeyHex,
 		Port:            4171,
 		HelloInterval:   time.Second * 60,
-		IPFS:            storage.(*data.IPFSHandle),
+		IPFS:            storage.(*ipfs.Handler),
 		TimestampWindow: 180, // seconds
 		Messages:        make(chan *subpub.Message),
 	}

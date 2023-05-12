@@ -1,4 +1,4 @@
-package data
+package ipfs
 
 import (
 	"context"
@@ -28,7 +28,6 @@ import (
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 	"go.vocdoni.io/dvote/db/lru"
-	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -40,7 +39,8 @@ const (
 	RetrievedFileCacheSize = 128
 )
 
-type IPFSHandle struct {
+// Handler is the IPFS data storage node handler.
+type Handler struct {
 	Node          *ipfscore.IpfsNode
 	CoreAPI       coreiface.CoreAPI
 	DataDir       string
@@ -53,22 +53,23 @@ type IPFSHandle struct {
 	maddr  ma.Multiaddr
 }
 
-func (i *IPFSHandle) Init(d *types.DataStore) error {
+// Init initializes the IPFS node handler and repository.
+func (i *Handler) Init(d *types.DataStore) error {
 	if i.LogLevel == "" {
 		i.LogLevel = "ERROR"
 	}
 	ipfslog.SetLogLevel("*", i.LogLevel)
-	ipfs.InstallDatabasePlugins()
-	ipfs.ConfigRoot = d.Datadir
+	installDatabasePlugins()
+	ConfigRoot = d.Datadir
 	os.Setenv("IPFS_FD_MAX", "4096")
 
 	// check if needs init
-	if !fsrepo.IsInitialized(ipfs.ConfigRoot) {
-		if err := ipfs.Init(); err != nil {
+	if !fsrepo.IsInitialized(ConfigRoot) {
+		if err := initRepository(); err != nil {
 			return err
 		}
 	}
-	node, coreAPI, err := ipfs.StartNode()
+	node, coreAPI, err := startNode()
 	if err != nil {
 		return err
 	}
@@ -88,7 +89,7 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 		"pubKey", node.PrivateKey.GetPublic(),
 	)
 	// start http
-	cctx := ipfs.CmdCtx(node, d.Datadir)
+	cctx := cmdCtx(node, d.Datadir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
 	gatewayOpt := corehttp.GatewayOption(corehttp.WebUIPaths...)
@@ -127,28 +128,30 @@ func (i *IPFSHandle) Init(d *types.DataStore) error {
 	return nil
 }
 
-func (i *IPFSHandle) Stop() error {
+// Stop stops the IPFS node handler.
+func (i *Handler) Stop() error {
 	i.cancel()
 	return i.Node.Close()
 }
 
-func (i *IPFSHandle) SetMultiAddress(addr string) (err error) {
+// SetMultiAddress sets the multiaddress of the IPFS node.
+func (i *Handler) SetMultiAddress(addr string) (err error) {
 	i.maddr, err = ma.NewMultiaddr(addr)
 	return err
 }
 
 // URIprefix returns the URI prefix which identifies the protocol
-func (i *IPFSHandle) URIprefix() string {
+func (i *Handler) URIprefix() string {
 	return "ipfs://"
 }
 
 // Publish publishes a file or message to ipfs and returns the resulting CID v1.
-func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err error) {
+func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err error) {
 	adder, err := coreunix.NewAdder(ctx, i.Node.Pinning, i.Node.Blockstore, i.Node.DAG)
 	if err != nil {
 		return "", err
 	}
-	adder.Chunker = ipfs.ChunkerTypeSize
+	adder.Chunker = ChunkerTypeSize
 	adder.CidBuilder = ipfscid.V1Builder{
 		Codec:  uint64(multicodec.DagJson),
 		MhType: uint64(multihash.SHA2_256),
@@ -164,12 +167,12 @@ func (i *IPFSHandle) Publish(ctx context.Context, msg []byte) (cid string, err e
 }
 
 // Pin adds a file to ipfs and returns the resulting CID v1.
-func (i *IPFSHandle) Pin(ctx context.Context, path string) error {
+func (i *Handler) Pin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	return i.CoreAPI.Pin().Add(ctx, corepath.New(path))
 }
 
-func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resolved, error) {
+func (i *Handler) addAndPin(ctx context.Context, path string) (corepath.Resolved, error) {
 	f, err := unixfsFilesNode(path)
 	if err != nil {
 		return nil, err
@@ -186,7 +189,8 @@ func (i *IPFSHandle) addAndPin(ctx context.Context, path string) (corepath.Resol
 	return rpath, nil
 }
 
-func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
+// Unpin removes a file pin from ipfs.
+func (i *Handler) Unpin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	cpath := corepath.New(path)
 	if err := cpath.IsValid(); err != nil {
@@ -196,7 +200,8 @@ func (i *IPFSHandle) Unpin(ctx context.Context, path string) error {
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
 
-func (i *IPFSHandle) Stats(ctx context.Context) map[string]interface{} {
+// Stats returns stats about the IPFS node.
+func (i *Handler) Stats(ctx context.Context) map[string]interface{} {
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
 		return map[string]interface{}{"error": err.Error()}
@@ -212,7 +217,7 @@ func (i *IPFSHandle) Stats(ctx context.Context) map[string]interface{} {
 	return map[string]interface{}{"peers": len(peers), "addresses": len(addresses), "pins": pins}
 }
 
-func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
+func (i *Handler) countPins(ctx context.Context) (int, error) {
 	// Note that pins is a channel that gets closed when finished.
 	// We MUST range over the entire channel to not leak goroutines.
 	// Maybe there is a way to get the total number of pins without
@@ -232,7 +237,7 @@ func (i *IPFSHandle) countPins(ctx context.Context) (int, error) {
 }
 
 // ListPins returns a map of all pinned CIDs and their types
-func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
+func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
 	// Note that pins is a channel that gets closed when finished.
 	// We MUST range over the entire channel to not leak goroutines.
 	pins, err := i.CoreAPI.Pin().Ls(ctx)
@@ -251,7 +256,7 @@ func (i *IPFSHandle) ListPins(ctx context.Context) (map[string]string, error) {
 
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache).
 // If maxSize is 0, it is set to the hardcoded maximum of MaxFileSizeBytes.
-func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
+func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 
 	// check if we have the file in the local cache
@@ -325,7 +330,7 @@ func (i *IPFSHandle) Retrieve(ctx context.Context, path string, maxSize int64) (
 // The execution of this method might take a while (some minutes),
 // so the caller must handle properly the logic by using goroutines, channels or other
 // mechanisms in order to not block the whole program execution.
-func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
+func (i *Handler) PublishIPNSpath(ctx context.Context, path string,
 	keyalias string) (coreiface.IpnsEntry, error) {
 	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
@@ -350,7 +355,7 @@ func (i *IPFSHandle) PublishIPNSpath(ctx context.Context, path string,
 // The key is identified by a unique alias name which can be used for referncing
 // that key when using some other IPFS methods.
 // Compatible Keys can be generated with NewIPFSkey() function.
-func (i *IPFSHandle) AddKeyToKeystore(keyalias string, privkey []byte) error {
+func (i *Handler) AddKeyToKeystore(keyalias string, privkey []byte) error {
 	pk, err := ipfscrypto.UnmarshalPrivateKey(privkey)
 	if err != nil {
 		return err

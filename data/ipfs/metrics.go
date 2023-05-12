@@ -1,4 +1,4 @@
-package data
+package ipfs
 
 import (
 	"context"
@@ -32,14 +32,14 @@ var (
 )
 
 // RegisterMetrics to initialize the metrics to the agent
-func (i *IPFSHandle) registerMetrics(ma *metrics.Agent) {
+func (i *Handler) registerMetrics(ma *metrics.Agent) {
 	ma.Register(FilePeers)
 	ma.Register(FileAddresses)
 	ma.Register(FilePins)
 }
 
 // GetMetrics to be called as a loop and grab metrics
-func (i *IPFSHandle) getMetrics(ctx context.Context) error {
+func (i *Handler) getMetrics(ctx context.Context) error {
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (i *IPFSHandle) getMetrics(ctx context.Context) error {
 // CollectMetrics constantly updates the metric values for prometheus
 // The function is blocking, should be called in a go routine
 // If the metrics Agent is nil, do nothing
-func (i *IPFSHandle) CollectMetrics(ctx context.Context, ma *metrics.Agent) error {
+func (i *Handler) CollectMetrics(ctx context.Context, ma *metrics.Agent) error {
 	if ma != nil {
 		i.registerMetrics(ma)
 		for {

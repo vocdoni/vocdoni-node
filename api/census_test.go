@@ -13,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
@@ -39,7 +39,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.MockIPFS(t)
+	storage := ipfs.MockIPFS(t)
 	app := vochain.TestBaseApplication(t)
 	api.Attach(app, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
@@ -255,7 +255,7 @@ func TestCensusZk(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
-	storage := data.MockIPFS(t)
+	storage := ipfs.MockIPFS(t)
 	app := vochain.TestBaseApplication(t)
 	api.Attach(app, nil, nil, storage, censusDB)
 	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)

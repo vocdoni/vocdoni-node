@@ -1,4 +1,4 @@
-package data
+package ipfs
 
 import (
 	"context"
@@ -10,10 +10,10 @@ import (
 	"go.vocdoni.io/dvote/db/lru"
 )
 
-// MockIPFS returns a IPFSHandle with a (offline, nilrepo) IPFS node
+// MockIPFS returns a Handler with a (offline, nilrepo) IPFS node
 // with a functional CoreAPI
-func MockIPFS(t testing.TB) Storage {
-	storage := IPFSHandle{}
+func MockIPFS(t testing.TB) *Handler {
+	storage := Handler{}
 	n, err := ipfscore.NewNode(context.Background(), &ipfscore.BuildCfg{
 		Online:    false,
 		Permanent: false,

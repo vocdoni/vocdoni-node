@@ -11,8 +11,8 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/data/compressor"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/ipfs"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
