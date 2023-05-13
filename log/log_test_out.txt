@@ -1,0 +1,5 @@
+2006-01-02 15:04:05 +0000 UTC INF log/log_test.go:61 > logger construction succeeded at level debug with output log_test_writer
+2006-01-02 15:04:05 +0000 UTC INF log/log_test.go:26 > added 3 keys to census 313233
+2006-01-02 15:04:05 +0000 UTC DBG log/log_test.go:27 > importing census root=abc123 type=type1
+2006-01-02 15:04:05 +0000 UTC ERR log/log_test.go:28 > cannot commit to blockstore: some error
+2006-01-02 15:04:05 +0000 UTC WRN log/log_test.go:29 > various types duration=1000 list=[10,0,-10]
