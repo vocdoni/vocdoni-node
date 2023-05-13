@@ -36,14 +36,16 @@ func doLogs() {
 }
 
 func TestCheckInvalidChars(t *testing.T) {
+	t.Cleanup(func() { panicOnInvalidChars = false })
+
 	v := []byte{'h', 'e', 'l', 'l', 'o', 0xff, 'w', 'o', 'r', 'l', 'd'}
-	_ = os.Setenv("LOG_PANIC_ON_INVALIDCHARS", "false")
+	panicOnInvalidChars = false
 	Init("debug", "stderr")
 	Debugf("%s", v)
 	// should not panic since env var is false. if it panics, test will fail
 
 	// now enable panic and try again: should recover() and never reach t.Errorf()
-	_ = os.Setenv("LOG_PANIC_ON_INVALIDCHARS", "true")
+	panicOnInvalidChars = true
 	Init("debug", "stderr")
 	defer func() { recover() }()
 	Debugf("%s", v)
