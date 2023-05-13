@@ -1,11 +1,11 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -54,6 +54,24 @@ func (h testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	e.Stringer("time", logTestTime)
 }
 
+// invalidCharChecker checks if the formatted string contains the Unicode replacement char (U+FFFD)
+// and panics if env LOG_PANIC_ON_INVALIDCHARS bool is true.
+//
+// In production (LOG_PANIC_ON_INVALIDCHARS != true), this function returns immediately,
+// i.e. no performance hit
+//
+// If the log string contains the "replacement char"
+// https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+// this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
+type invalidCharChecker struct{}
+
+func (invalidCharChecker) Write(p []byte) (int, error) {
+	if bytes.ContainsRune(p, '\uFFFD') {
+		panic(fmt.Sprintf("log line with invalid chars: %q", string(p)))
+	}
+	return len(p), nil
+}
+
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
 func Init(logLevel string, output string) {
@@ -72,14 +90,18 @@ func Init(logLevel string, output string) {
 		}
 		out = errorLog
 	}
+	if panicOnInvalidChars {
+		out = io.MultiWriter(out, invalidCharChecker{})
+	}
+	logWriter := zerolog.ConsoleWriter{
+		Out:        out,
+		TimeFormat: time.RFC3339Nano,
+		// Color in the test output is noisy and unhelpful.
+		NoColor: output == logTestWriterName,
+	}
 
 	// Init the global logger var, with millisecond timestamps
-	log = zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
-		w.Out = out
-		w.TimeFormat = time.RFC3339Nano
-		// Color in the test output is noisy and unhelpful.
-		w.NoColor = output == logTestWriterName
-	})).With().Timestamp().Logger()
+	log = zerolog.New(logWriter).With().Timestamp().Logger()
 	if output == logTestWriterName {
 		log = log.Hook(testHook{})
 	}
@@ -125,24 +147,6 @@ func writeErrorToFile(msg string) {
 	go errorLog.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("2006/0102/150405"), msg))
 }
 
-// checkInvalidChars checks if the formatted string contains the Unicode replacement char (U+FFFD)
-// and panics if env LOG_PANIC_ON_INVALIDCHARS bool is true.
-//
-// In production (LOG_PANIC_ON_INVALIDCHARS != true), this function returns immediately,
-// i.e. no performance hit
-//
-// If the log string contains the "replacement char"
-// https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-// this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
-func checkInvalidChars(args ...interface{}) {
-	if panicOnInvalidChars {
-		s := fmt.Sprint(args...)
-		if strings.ContainsRune(s, '\uFFFD') {
-			panic(fmt.Sprintf("log line with invalid chars: %s", s))
-		}
-	}
-}
-
 // Level returns the current log level
 func Level() string {
 	switch log.GetLevel() {
@@ -165,13 +169,11 @@ func Debug(args ...interface{}) {
 		return
 	}
 	log.Debug().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Info sends an info level log message
 func Info(args ...interface{}) {
 	log.Info().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Monitor is a wrapper around Info that allows passing a map of key-value pairs.
@@ -185,20 +187,17 @@ func Monitor(msg string, args map[string]interface{}) {
 func Warn(args ...interface{}) {
 	log.Warn().Msg(fmt.Sprint(args...))
 	writeErrorToFile(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error().Msg(fmt.Sprint(args...))
 	writeErrorToFile(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
@@ -220,33 +219,28 @@ func Debugf(template string, args ...interface{}) {
 		return
 	}
 	Logger().Debug().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Infof sends a formatted info level log message
 func Infof(template string, args ...interface{}) {
 	Logger().Info().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	Logger().Warn().Msgf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	Logger().Error().Msgf(template, args...)
 	writeErrorToFile(fmt.Sprintf(template, args...))
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	Logger().Fatal().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Debugw sends a debug level log message with key-value pairs.
@@ -255,19 +249,16 @@ func Debugw(msg string, keyvalues ...interface{}) {
 		return
 	}
 	Logger().Debug().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Infow sends an info level log message with key-value pairs.
 func Infow(msg string, keyvalues ...interface{}) {
 	Logger().Info().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Warnw sends a warning level log message with key-value pairs.
 func Warnw(msg string, keyvalues ...interface{}) {
 	Logger().Warn().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Errorw sends an error level log message with a special format for errors.
