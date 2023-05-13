@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -25,7 +24,7 @@ var (
 	log      zerolog.Logger
 	errorLog *os.File
 	// panicOnInvalidChars is set based on env LOG_PANIC_ON_INVALIDCHARS (parsed as bool)
-	panicOnInvalidChars bool
+	panicOnInvalidChars = os.Getenv("LOG_PANIC_ON_INVALIDCHARS") == "true"
 )
 
 func init() {
@@ -107,12 +106,6 @@ func Init(logLevel string, output string) {
 	}
 
 	log.Info().Msgf("logger construction succeeded at level %s with output %s", logLevel, output)
-
-	if s := os.Getenv("LOG_PANIC_ON_INVALIDCHARS"); s != "" {
-		// ignore ParseBool errors, if anything fails panicOnInvalidChars will stay false which is good
-		b, _ := strconv.ParseBool(s)
-		panicOnInvalidChars = b
-	}
 }
 
 // SetFileErrorLog if set writes the Warning and Error messages to a file.
