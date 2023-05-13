@@ -35,7 +35,7 @@ func TestStateReopen(t *testing.T) {
 
 func TestStateBasic(t *testing.T) {
 	rng := testutil.NewRandom(0)
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -107,7 +107,7 @@ func TestStateBasic(t *testing.T) {
 }
 
 func TestBalanceTransfer(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -195,7 +195,7 @@ func (l *Listener) Commit(height uint32) (err error) {
 func (l *Listener) Rollback() {}
 
 func TestOnProcessStart(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -251,7 +251,7 @@ func TestOnProcessStart(t *testing.T) {
 // database transaction in the StateDB in a real scenario.
 func TestBlockMemoryUsage(t *testing.T) {
 	rng := testutil.NewRandom(0)
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -310,7 +310,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 }
 
 func TestStateTreasurer(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -344,7 +344,7 @@ func TestStateTreasurer(t *testing.T) {
 }
 
 func TestStateIsTreasurer(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -366,7 +366,7 @@ func TestStateIsTreasurer(t *testing.T) {
 }
 
 func TestIncrementTreasurerNonce(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
@@ -389,7 +389,7 @@ func TestIncrementTreasurerNonce(t *testing.T) {
 }
 
 func TestStateSetGetTxCostByTxType(t *testing.T) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()

@@ -44,7 +44,7 @@ func main() {
 	logLevel := flag.String("logLevel", "error", "log level")
 	cfgFile := flag.String("config", filepath.Join(home, ".vocdoni-cli.json"), "config file")
 	flag.Parse()
-	log.Init(*logLevel, "stdout")
+	log.Init(*logLevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	cli, err := NewVocdoniCLI(*cfgFile, *host)

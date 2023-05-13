@@ -1,0 +1,3 @@
+2006-01-02 15:04:05 +0000 UTC ERR log/log_test.go:29 > cannot commit to blockstore: some error
+2006-01-02 15:04:05 +0000 UTC WRN log/log_test.go:30 > various types duration=1000 list=[10,0,-10]
+2006-01-02 15:04:05 +0000 UTC ERR log/log_test.go:35 > some error

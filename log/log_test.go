@@ -40,13 +40,13 @@ func TestCheckInvalidChars(t *testing.T) {
 
 	v := []byte{'h', 'e', 'l', 'l', 'o', 0xff, 'w', 'o', 'r', 'l', 'd'}
 	panicOnInvalidChars = false
-	Init("debug", "stderr")
+	Init("debug", "stderr", nil)
 	Debugf("%s", v)
 	// should not panic since env var is false. if it panics, test will fail
 
 	// now enable panic and try again: should recover() and never reach t.Errorf()
 	panicOnInvalidChars = true
-	Init("debug", "stderr")
+	Init("debug", "stderr", nil)
 	defer func() { recover() }()
 	Debugf("%s", v)
 	t.Errorf("Debugf(%s) should have panicked because of invalid char", v)
@@ -60,25 +60,35 @@ func TestLoggerOutput(t *testing.T) {
 	want := string(wantBytes)
 	qt.Assert(t, err, qt.IsNil)
 
-	var buf bytes.Buffer
+	wantErrorPath := "log_error_test_out.txt"
+	wantErrorBytes, err := os.ReadFile(wantErrorPath)
+	wantError := string(wantErrorBytes)
+	qt.Assert(t, err, qt.IsNil)
+
+	var buf, errorBuf bytes.Buffer
 	logTestWriter = &buf
-	Init("debug", logTestWriterName)
+	Init("debug", logTestWriterName, &errorBuf)
 
 	doLogs()
 
 	got := buf.String()
+	gotError := errorBuf.String()
 
 	if *update {
-		err := os.WriteFile(wantPath, []byte(got), 0o666)
+		var err error
+		err = os.WriteFile(wantPath, []byte(got), 0o666)
+		qt.Assert(t, err, qt.IsNil)
+		err = os.WriteFile(wantErrorPath, []byte(gotError), 0o666)
 		qt.Assert(t, err, qt.IsNil)
 	} else {
 		qt.Assert(t, got, qt.Equals, want)
+		qt.Assert(t, gotError, qt.Equals, wantError)
 	}
 }
 
 func BenchmarkLogger(b *testing.B) {
 	logTestWriter = io.Discard // to not grow a buffer
-	Init("debug", logTestWriterName)
+	Init("debug", logTestWriterName, nil)
 
 	b.ResetTimer()
 	b.ReportAllocs()

@@ -26,7 +26,7 @@ const (
 )
 
 func BenchmarkVochainBatchProof(b *testing.B) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	b.ReportAllocs()
 	var dvoteServer testcommon.DvoteAPIServer
 	host := *hostFlag
@@ -81,7 +81,7 @@ func BenchmarkVochainBatchProof(b *testing.B) {
 }
 
 func BenchmarkVochainSingleProof(b *testing.B) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	b.ReportAllocs()
 	var dvoteServer testcommon.DvoteAPIServer
 	host := *hostFlag

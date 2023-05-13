@@ -1,6 +1,6 @@
-2006-01-02 15:04:05 +0000 UTC INF log/log_test.go:65 > logger construction succeeded at level debug with output log_test_writer
-2006-01-02 15:04:05 +0000 UTC INF log/log_test.go:27 > added 3 keys to census 313233
-2006-01-02 15:04:05 +0000 UTC DBG log/log_test.go:28 > importing census root=abc123 type=type1
-2006-01-02 15:04:05 +0000 UTC ERR log/log_test.go:29 > cannot commit to blockstore: some error
-2006-01-02 15:04:05 +0000 UTC WRN log/log_test.go:30 > various types duration=1000 list=[10,0,-10]
-2006-01-02 15:04:05 +0000 UTC ERR log/log_test.go:35 > some error
+[90m2006-01-02 15:04:05 +0000 UTC[0m [32mINF[0m [1mlog/log_test.go:70[0m[36m >[0m logger construction succeeded at level debug with output log_test_writer
+[90m2006-01-02 15:04:05 +0000 UTC[0m [32mINF[0m [1mlog/log_test.go:27[0m[36m >[0m added 3 keys to census 313233
+[90m2006-01-02 15:04:05 +0000 UTC[0m [33mDBG[0m [1mlog/log_test.go:28[0m[36m >[0m importing census [36mroot=[0mabc123 [36mtype=[0mtype1
+[90m2006-01-02 15:04:05 +0000 UTC[0m [1m[31mERR[0m[0m [1mlog/log_test.go:29[0m[36m >[0m cannot commit to blockstore: some error
+[90m2006-01-02 15:04:05 +0000 UTC[0m [31mWRN[0m [1mlog/log_test.go:30[0m[36m >[0m various types [36mduration=[0m1000 [36mlist=[0m[10,0,-10]
+[90m2006-01-02 15:04:05 +0000 UTC[0m [1m[31mERR[0m[0m [1mlog/log_test.go:35[0m[36m >[0m some error

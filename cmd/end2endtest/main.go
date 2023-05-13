@@ -110,7 +110,7 @@ func main() {
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
-	log.Init(c.logLevel, "stdout")
+	log.Init(c.logLevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]),
 		"version", internal.Version,
 		"operation", c.operation,
