@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"flag"
+	"io"
 	"os"
 	"testing"
 	"time"
@@ -31,6 +32,7 @@ func doLogs() {
 		"duration", sampleDuration,
 		"time", sampleTime,
 	)
+	Error(errSample)
 }
 
 func TestCheckInvalidChars(t *testing.T) {
@@ -69,5 +71,16 @@ func TestLoggerOutput(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 	} else {
 		qt.Assert(t, got, qt.Equals, want)
+	}
+}
+
+func BenchmarkLogger(b *testing.B) {
+	logTestWriter = io.Discard // to not grow a buffer
+	Init("debug", logTestWriterName)
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		doLogs()
 	}
 }
