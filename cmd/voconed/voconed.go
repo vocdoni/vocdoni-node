@@ -158,7 +158,7 @@ func main() {
 	}
 
 	// start the program
-	log.Init(config.logLevel, "stdout")
+	log.Init(config.logLevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	log.Infof("using data directory at %s", config.dir)

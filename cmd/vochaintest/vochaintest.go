@@ -108,7 +108,7 @@ func main() {
 				"wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
-	log.Init(*loglevel, "stdout")
+	log.Init(*loglevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	accountKeys := make([]*ethereum.SignKeys, len(*accountPrivKeys))

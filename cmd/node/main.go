@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	_ "net/http/pprof" // for the pprof endpoints
@@ -303,11 +304,18 @@ func main() {
 	if globalCfg == nil {
 		log.Fatal("cannot read configuration")
 	}
-	log.Init(globalCfg.LogLevel, globalCfg.LogOutput)
+	var errorOutput io.Writer
 	if path := globalCfg.LogErrorFile; path != "" {
-		if err := log.SetFileErrorLog(path); err != nil {
-			log.Fatal(err)
+		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		if err != nil {
+			panic(fmt.Sprintf("cannot create error log output: %v", err))
 		}
+		errorOutput = f
+	}
+	log.Init(globalCfg.LogLevel, globalCfg.LogOutput, errorOutput)
+	if path := globalCfg.LogErrorFile; path != "" {
+		// Once the logger has been initialized.
+		log.Infof("using file %s for logging warning and errors", path)
 	}
 
 	// Check if we need to create a vochain genesis file with validators and exit.
