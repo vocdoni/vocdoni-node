@@ -94,13 +94,13 @@ func Init(logLevel string, output string) {
 
 	switch logLevel {
 	case LogLevelDebug:
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log.Level(zerolog.DebugLevel)
 	case LogLevelInfo:
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		log.Level(zerolog.InfoLevel)
 	case LogLevelWarn:
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		log.Level(zerolog.WarnLevel)
 	case LogLevelError:
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		log.Level(zerolog.ErrorLevel)
 	default:
 		panic("invalid log level")
 	}
@@ -145,7 +145,7 @@ func checkInvalidChars(args ...interface{}) {
 
 // Level returns the current log level
 func Level() string {
-	switch zerolog.GlobalLevel() {
+	switch log.GetLevel() {
 	case zerolog.DebugLevel:
 		return LogLevelDebug
 	case zerolog.InfoLevel:
@@ -161,7 +161,7 @@ func Level() string {
 
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+	if log.GetLevel() > zerolog.DebugLevel {
 		return
 	}
 	log.Debug().Msg(fmt.Sprint(args...))
@@ -216,7 +216,7 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+	if log.GetLevel() > zerolog.DebugLevel {
 		return
 	}
 	Logger().Debug().Msgf(template, args...)
@@ -251,7 +251,7 @@ func Fatalf(template string, args ...interface{}) {
 
 // Debugw sends a debug level log message with key-value pairs.
 func Debugw(msg string, keyvalues ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+	if log.GetLevel() > zerolog.DebugLevel {
 		return
 	}
 	Logger().Debug().Fields(keyvalues).Msg(msg)
