@@ -223,9 +223,6 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
-	if log.GetLevel() > zerolog.DebugLevel {
-		return
-	}
 	Logger().Debug().Msgf(template, args...)
 }
 
@@ -251,9 +248,6 @@ func Fatalf(template string, args ...interface{}) {
 
 // Debugw sends a debug level log message with key-value pairs.
 func Debugw(msg string, keyvalues ...interface{}) {
-	if log.GetLevel() > zerolog.DebugLevel {
-		return
-	}
 	Logger().Debug().Fields(keyvalues).Msg(msg)
 }
 
