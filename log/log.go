@@ -43,6 +43,18 @@ func init() {
 // Logger provides access to the global logger (zerolog).
 func Logger() *zerolog.Logger { return &log }
 
+var logTestWriter io.Writer // for TestLogger
+const logTestWriterName = "log_test_writer"
+
+var logTestTime, _ = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+
+type testHook struct{}
+
+// To ensure that the log output in the test is deterministic.
+func (h testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	e.Stringer("time", logTestTime)
+}
+
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
 func Init(logLevel string, output string) {
@@ -52,6 +64,8 @@ func Init(logLevel string, output string) {
 		out = os.Stdout
 	case "stderr":
 		out = os.Stderr
+	case logTestWriterName:
+		out = logTestWriter
 	default:
 		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
@@ -64,7 +78,12 @@ func Init(logLevel string, output string) {
 	log = zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
 		w.Out = out
 		w.TimeFormat = time.RFC3339Nano
+		// Color in the test output is noisy and unhelpful.
+		w.NoColor = output == logTestWriterName
 	})).With().Timestamp().Logger()
+	if output == logTestWriterName {
+		log = log.Hook(testHook{})
+	}
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 
 	// Include caller, increasing SkipFrameCount to account for this log package wrapper
