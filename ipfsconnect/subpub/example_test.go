@@ -9,7 +9,7 @@ import (
 )
 
 func Example() {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 
 	messages := make(chan *subpub.Message)
 	groupKey := []byte("test")

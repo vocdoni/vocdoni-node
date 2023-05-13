@@ -21,8 +21,7 @@ const (
 )
 
 var (
-	log      zerolog.Logger
-	errorLog *os.File
+	log zerolog.Logger
 	// panicOnInvalidChars is set based on env LOG_PANIC_ON_INVALIDCHARS (parsed as bool)
 	panicOnInvalidChars = os.Getenv("LOG_PANIC_ON_INVALIDCHARS") == "true"
 )
@@ -36,7 +35,7 @@ func init() {
 	if s := os.Getenv("LOG_LEVEL"); s != "" {
 		level = s
 	}
-	Init(level, "stderr")
+	Init(level, "stderr", nil)
 }
 
 // Logger provides access to the global logger (zerolog).
@@ -50,8 +49,25 @@ var logTestTime, _ = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
 type testHook struct{}
 
 // To ensure that the log output in the test is deterministic.
-func (h testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+func (h *testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 	e.Stringer("time", logTestTime)
+}
+
+type errorLevelWriter struct {
+	io.Writer
+}
+
+var _ zerolog.LevelWriter = &errorLevelWriter{}
+
+func (w *errorLevelWriter) Write(p []byte) (int, error) {
+	panic("should be calling WriteLevel")
+}
+
+func (w *errorLevelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	if level < zerolog.WarnLevel {
+		return len(p), nil
+	}
+	return w.Writer.Write(p)
 }
 
 // invalidCharChecker checks if the formatted string contains the Unicode replacement char (U+FFFD)
@@ -65,7 +81,7 @@ func (h testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
 // this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
 type invalidCharChecker struct{}
 
-func (invalidCharChecker) Write(p []byte) (int, error) {
+func (*invalidCharChecker) Write(p []byte) (int, error) {
 	if bytes.ContainsRune(p, '\uFFFD') {
 		panic(fmt.Sprintf("log line with invalid chars: %q", string(p)))
 	}
@@ -74,7 +90,8 @@ func (invalidCharChecker) Write(p []byte) (int, error) {
 
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
-func Init(logLevel string, output string) {
+// errorOutput is an optional filename which only receives Warning and Error messages.
+func Init(logLevel, output string, errorOutput io.Writer) {
 	var out io.Writer
 	switch output {
 	case "stdout":
@@ -84,26 +101,36 @@ func Init(logLevel string, output string) {
 	case logTestWriterName:
 		out = logTestWriter
 	default:
-		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		f, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
-			panic(fmt.Sprintf("invalid log output: %v", err))
+			panic(fmt.Sprintf("cannot create log output: %v", err))
 		}
-		out = errorLog
+		out = f
 	}
-	if panicOnInvalidChars {
-		out = io.MultiWriter(out, invalidCharChecker{})
-	}
-	logWriter := zerolog.ConsoleWriter{
+	out = zerolog.ConsoleWriter{
 		Out:        out,
 		TimeFormat: time.RFC3339Nano,
-		// Color in the test output is noisy and unhelpful.
-		NoColor: output == logTestWriterName,
+	}
+	outputs := []io.Writer{out}
+
+	if errorOutput != nil {
+		outputs = append(outputs, &errorLevelWriter{zerolog.ConsoleWriter{
+			Out:        errorOutput,
+			TimeFormat: time.RFC3339Nano,
+			NoColor:    true, // error log files should not be colored
+		}})
+	}
+	if panicOnInvalidChars {
+		outputs = append(outputs, zerolog.ConsoleWriter{Out: &invalidCharChecker{}})
+	}
+	if len(outputs) > 1 {
+		out = zerolog.MultiLevelWriter(outputs...)
 	}
 
 	// Init the global logger var, with millisecond timestamps
-	log = zerolog.New(logWriter).With().Timestamp().Logger()
+	log = zerolog.New(out).With().Timestamp().Logger()
 	if output == logTestWriterName {
-		log = log.Hook(testHook{})
+		log = log.Hook(&testHook{})
 	}
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 
@@ -128,23 +155,6 @@ func Init(logLevel string, output string) {
 	}
 
 	log.Info().Msgf("logger construction succeeded at level %s with output %s", logLevel, output)
-}
-
-// SetFileErrorLog if set writes the Warning and Error messages to a file.
-func SetFileErrorLog(path string) error {
-	Logger().Info().Msgf("using file %s for logging warning and errors", path)
-	var err error
-	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	return err
-}
-
-func writeErrorToFile(msg string) {
-	if errorLog == nil {
-		return
-	}
-	// Use a separate goroutine, to ensure we don't block.
-	// Ignore the error, as we're logging errors anyway.
-	go errorLog.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("2006/0102/150405"), msg))
 }
 
 // Level returns the current log level
@@ -186,13 +196,11 @@ func Monitor(msg string, args map[string]interface{}) {
 // Warn sends a warn level log message
 func Warn(args ...interface{}) {
 	log.Warn().Msg(fmt.Sprint(args...))
-	writeErrorToFile(fmt.Sprint(args...))
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error().Msg(fmt.Sprint(args...))
-	writeErrorToFile(fmt.Sprint(args...))
 }
 
 // Fatal sends a fatal level log message
@@ -229,13 +237,11 @@ func Infof(template string, args ...interface{}) {
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	Logger().Warn().Msgf(template, args...)
-	writeErrorToFile(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	Logger().Error().Msgf(template, args...)
-	writeErrorToFile(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
