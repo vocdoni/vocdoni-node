@@ -16,7 +16,6 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -42,11 +41,11 @@ type IPFSConnect struct {
 }
 
 // New creates a new IPFSConnect instance
-func New(groupKey string, port int, storage data.Storage) *IPFSConnect {
+func New(groupKey string, port int, ipfsHandler *ipfs.Handler) *IPFSConnect {
 	is := &IPFSConnect{
 		Port:            port,
 		HelloInterval:   time.Second * HelloIntervalSeconds,
-		IPFS:            storage.(*ipfs.Handler),
+		IPFS:            ipfsHandler,
 		TimestampWindow: TimeToLiveForMessageSeconds, // seconds
 		Messages:        make(chan *subpub.Message),
 	}
@@ -147,7 +146,7 @@ func (is *IPFSConnect) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 
 // Start initializes and starts an IPFSConnect instance.
 func (is *IPFSConnect) Start() {
-	is.Transport = subpub.NewSubPub(is.GroupKey, int32(is.Port))
+	is.Transport = subpub.NewSubPub(is.GroupKey, int32(is.Port), is.IPFS.Node)
 	is.Transport.BootNodes = is.Bootnodes
 	is.Transport.Start(context.Background(), is.Messages)
 	go is.handleEvents() // this spawns a single background task per IPFSConnect instance

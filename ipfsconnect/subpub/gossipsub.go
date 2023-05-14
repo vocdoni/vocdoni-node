@@ -36,7 +36,6 @@ func (ps *SubPub) setupGossip(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-
 	// join the topic
 	ps.Gossip, err = JoinGossip(ctx, gs, ps.Host.ID(), ps.Topic)
 	if err != nil {
@@ -59,8 +58,6 @@ func JoinGossip(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topic st
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("with gossipsub I just joined topic %s", sub.Topic())
-
 	g := &Gossip{
 		ctx:      ctx,
 		ps:       ps,
@@ -69,6 +66,7 @@ func JoinGossip(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topic st
 		self:     selfID,
 		Messages: make(chan *Message, GossipBufSize),
 	}
+	log.Infow("joined to gossipsub topic", "topic", sub.Topic(), "peer", selfID.Pretty())
 
 	// start reading messages from the subscription in a loop
 	go g.readLoop() // this spawns a single background task per instance (since a single gossip topic is used)
@@ -77,11 +75,7 @@ func JoinGossip(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topic st
 
 // Publish sends a message to the pubsub topic.
 func (g *Gossip) Publish(message []byte) error {
-	log.Debugf("gossiping %d bytes to peers in topic %v: %v",
-		len(message),
-		g.topic,
-		g.topic.ListPeers())
-
+	log.Debugw("gossiping message", "size", len(message), "topic", g.topic, "peers", g.topic.ListPeers())
 	m := &Message{
 		Data: message,
 		Peer: g.self.Pretty(),
@@ -109,11 +103,11 @@ func (g *Gossip) readLoop() {
 		}
 
 		m := new(Message)
+		log.Warnw("gossipsub: received message", "peer", m.Peer, "message", m.Data)
 		if err := bare.Unmarshal(msg.Data, m); err != nil {
 			log.Warnf("gossipsub: err %v, couldn't unmarshal %q", err, msg.Data)
 			continue
 		}
-		log.Warnw("gossipsub: received message", "peer", m.Peer, "message", m.Data)
 		// send valid messages onto the Messages channel
 		g.Messages <- m
 	}

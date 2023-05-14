@@ -2,19 +2,22 @@ package subpub_test
 
 import (
 	"context"
+	"testing"
 
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )
 
-func Example() {
+func Test_example(t *testing.T) {
 	log.Init("info", "stdout")
 
 	messages := make(chan *subpub.Message)
 	port := 6543
 	groupKey := util.Random32()
 
-	sp := subpub.NewSubPub(groupKey, int32(port))
+	handler := ipfs.MockIPFS(t)
+	sp := subpub.NewSubPub(groupKey, int32(port), handler.Node)
 	sp.Start(context.Background(), messages)
 }

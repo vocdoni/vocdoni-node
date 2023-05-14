@@ -9,12 +9,11 @@ import (
 
 	"git.sr.ht/~sircmpwn/go-bare"
 	ipfslog "github.com/ipfs/go-log/v2"
-	"github.com/libp2p/go-libp2p"
+	"github.com/ipfs/kubo/core"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/libp2p/go-libp2p/core/host"
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
-	"github.com/libp2p/go-libp2p/p2p/net/connmgr"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 )
@@ -58,6 +57,7 @@ type SubPub struct {
 	OnPeerRemove func(id libpeer.ID)
 }
 
+// Message is the type of messages passed around by SubPub.
 type Message struct {
 	Data []byte
 	Peer string
@@ -66,15 +66,15 @@ type Message struct {
 // NewSubPub creates a new SubPub instance.
 // The groupKey is a secret shared among the PubSub participants.
 // Only those with the key will be able to join.
-func NewSubPub(groupKey [32]byte, port int32) *SubPub {
+func NewSubPub(groupKey [32]byte, port int32, node *core.IpfsNode) *SubPub {
 	s := SubPub{
 		GroupKey:        groupKey,
 		Topic:           fmt.Sprintf("%x", groupKey),
 		NodeID:          util.RandomHex(32),
 		DiscoveryPeriod: time.Second * 10,
 		Port:            port,
-		Host:            nil,
-		MaxDHTpeers:     128,
+		Host:            node.PeerHost,
+		MaxDHTpeers:     1024,
 		close:           make(chan bool),
 		UnicastMsgs:     make(chan *Message, UnicastBufSize),
 	}
@@ -91,39 +91,40 @@ func (s *SubPub) Start(ctx context.Context, receiver chan *Message) {
 		log.Fatal("no group key provided")
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
+	/*	connmgr, err := connmgr.NewConnManager(
+			s.MaxDHTpeers/2, // Lowwater
+			s.MaxDHTpeers,   // HighWater,
+			connmgr.WithGracePeriod(time.Second*60),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
 
-	connmgr, err := connmgr.NewConnManager(
-		s.MaxDHTpeers/2, // Lowwater
-		s.MaxDHTpeers,   // HighWater,
-		connmgr.WithGracePeriod(time.Second*10),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	s.Host, err = libp2p.New(
-		// libp2p will listen on any interface device (both on IPv4 and IPv6)
-		libp2p.ListenAddrStrings(
-			fmt.Sprintf("/ip6/::/tcp/%d", s.Port),
-			fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", s.Port),
-		),
-		// support any other default transports (TCP)
-		libp2p.DefaultTransports,
-		// Let's prevent our peer from having too many
-		// connections by attaching a connection manager.
-		libp2p.ConnectionManager(connmgr),
-		// Set RelayCustom = true, Relay = false
-		libp2p.DisableRelay(),
-	)
-	if err != nil {
-		log.Fatal(err)
-	}
+		s.Host, err = libp2p.New(
+			// libp2p will listen on any interface device (both on IPv4 and IPv6)
+			libp2p.ListenAddrStrings(
+				fmt.Sprintf("/ip6/::/tcp/%d", s.Port),
+				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", s.Port),
+			),
+			// support any other default transports (TCP)
+			libp2p.DefaultTransports,
+			// Let's prevent our peer from having too many
+			// connections by attaching a connection manager.
+			libp2p.ConnectionManager(connmgr),
+			// Set RelayCustom = true, Relay = false
+			libp2p.DisableRelay(),
+		)
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
 	// Note that we don't use ctx here, since we stop via the Close method.
 
 	s.NodeID = s.Host.ID().String()
 	s.Messages = receiver
 	log.Infow("libp2p host listening", "port", s.Port, "id", s.NodeID)
 
+	s.setupDiscovery(ctx)
 	s.setupGossip(ctx)
 	go s.listen(receiver)
 	go s.printStats() // this spawns a single background task per instance, that just prints logs
