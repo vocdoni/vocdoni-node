@@ -375,6 +375,9 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		delete(app.mempoolTxRef, txID)
 	}
 	app.mempoolTxRefLock.Unlock()
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
 	return abcitypes.ResponseCommit{
 		Data: data,
 	}

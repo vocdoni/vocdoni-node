@@ -12,10 +12,9 @@ func Example() {
 	log.Init("info", "stdout")
 
 	messages := make(chan *subpub.Message)
-	groupKey := []byte("test")
 	port := 6543
-	privKey := util.RandomHex(32)
+	groupKey := util.Random32()
 
-	sp := subpub.NewSubPub(privKey, groupKey, int32(port), false)
+	sp := subpub.NewSubPub(groupKey, int32(port))
 	sp.Start(context.Background(), messages)
 }

@@ -154,7 +154,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}
 
-		log.Infow("new vote",
+		log.Debugw("new vote",
 			"type", "zkSNARK",
 			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
@@ -170,7 +170,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		addr := ethereum.AddrFromBytes(vote.VoterID.Address())
 
 		// if not in cache, full check
-		log.Infow("new vote",
+		log.Debugw("new vote",
 			"type", "signature",
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"address", addr.Hex(),

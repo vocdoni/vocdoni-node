@@ -10,6 +10,7 @@ import (
 
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/multiformats/go-multiaddr"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/ipfsconnect/subpub"
 	"go.vocdoni.io/proto/build/go/models"
@@ -20,41 +21,37 @@ import (
 )
 
 const (
-	MaxKeySize = 64
-	IPv4       = 4
-	IPv6       = 6
+	// HelloIntervalSeconds is the interval between HELLO messages.
+	HelloIntervalSeconds = 60
+	// TimeToLiveForMessageSeconds is the time window for messages to be considered valid.
+	TimeToLiveForMessageSeconds = 180
 )
 
+// IPFSConnect is the service that discover and maintains persistent connections between IPFS nodes.
+// It uses a gossip protocol to broadcast messages to all peers sharing a same group key.
+// The messages are encrypted with the group key.
 type IPFSConnect struct {
-	Key             string
-	PrivKey         string
-	Port            int16
+	Port            int
 	HelloInterval   time.Duration
 	Bootnodes       []string
 	IPFS            *ipfs.Handler
 	Transport       *subpub.SubPub
-	GroupKey        string
+	GroupKey        [32]byte
 	TimestampWindow int32
 	Messages        chan *subpub.Message
-
-	private bool
 }
 
-// New creates a new IPFSConnect instance. Transports supported are "libp2p" or "privlibp2p"
-func New(groupKey, privKeyHex, transport string, storage data.Storage) *IPFSConnect {
+// New creates a new IPFSConnect instance
+func New(groupKey string, port int, storage data.Storage) *IPFSConnect {
 	is := &IPFSConnect{
-		GroupKey:        groupKey,
-		PrivKey:         privKeyHex,
-		Port:            4171,
-		HelloInterval:   time.Second * 60,
+		Port:            port,
+		HelloInterval:   time.Second * HelloIntervalSeconds,
 		IPFS:            storage.(*ipfs.Handler),
-		TimestampWindow: 180, // seconds
+		TimestampWindow: TimeToLiveForMessageSeconds, // seconds
 		Messages:        make(chan *subpub.Message),
 	}
-	if transport == "privlibp2p" {
-		transport = "libp2p"
-		is.private = true
-	}
+	keyHash := ethereum.HashRaw([]byte(groupKey))
+	copy(is.GroupKey[:], keyHash[:])
 	return is
 }
 
@@ -64,12 +61,15 @@ func (is *IPFSConnect) broadcastMsg(imsg *models.IpfsSync) error {
 	if err != nil {
 		return fmt.Errorf("broadcastMsg: %w", err)
 	}
-	log.Debugf("broadcasting message %s {Address:%s Hash:%x MA:%s PL:%v Ts:%d}",
-		imsg.Msgtype.String(), imsg.Address, imsg.Hash, imsg.Multiaddress, imsg.PinList, imsg.Timestamp)
+	log.Debugw("broadcasting message",
+		"msgtype", imsg.Msgtype.String(),
+		"address", imsg.Address,
+		"multiaddress", imsg.Multiaddress,
+		"timestamp", imsg.Timestamp)
 	return is.Transport.SendBroadcast(subpub.Message{Data: d})
 }
 
-// Handle handles a Message in a thread-safe way
+// Handle handles a Message in a thread-safe way.
 func (is *IPFSConnect) Handle(msg *models.IpfsSync) error {
 	if msg.Address == is.Transport.Address() {
 		return nil
@@ -92,7 +92,7 @@ func (is *IPFSConnect) Handle(msg *models.IpfsSync) error {
 			}
 		}
 		if !found {
-			log.Infof("connecting IPFS to peer %s", msg.Multiaddress)
+			log.Infow("connecting IPFS to peer", "peer", msg.Multiaddress)
 			multiAddr, err := multiaddr.NewMultiaddr(msg.Multiaddress)
 			if err != nil {
 				return err
@@ -115,7 +115,7 @@ func (is *IPFSConnect) sendHelloWithAddr(multiaddress string) {
 	msg.Multiaddress = multiaddress
 	err := is.broadcastMsg(&msg)
 	if err != nil {
-		log.Warnf("sendHello: %v", err)
+		log.Warnw("sendHello: error broadcasting message", "error", err.Error())
 	}
 }
 
@@ -125,6 +125,7 @@ func (is *IPFSConnect) sendHello() {
 	}
 }
 
+// ipfsAddrs returns a list of peer multiaddresses for the IPFS node.
 func (is *IPFSConnect) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 	ipfs, err := multiaddr.NewMultiaddr("/ipfs/" + is.IPFS.Node.PeerHost.ID().String())
 	if err != nil {
@@ -144,14 +145,11 @@ func (is *IPFSConnect) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 	return maddrs
 }
 
-// Start initializes and start an IPFSConnect instance
+// Start initializes and starts an IPFSConnect instance.
 func (is *IPFSConnect) Start() {
-	// Init SubPub
-	is.Transport = subpub.NewSubPub(is.PrivKey, []byte(is.GroupKey), int32(is.Port), is.private)
+	is.Transport = subpub.NewSubPub(is.GroupKey, int32(is.Port))
 	is.Transport.BootNodes = is.Bootnodes
 	is.Transport.Start(context.Background(), is.Messages)
-	// end Init SubPub
-
 	go is.handleEvents() // this spawns a single background task per IPFSConnect instance
 }
 

@@ -32,12 +32,10 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 	go storage.CollectMetrics(context.Background(), vs.MetricsAgent)
 
 	if len(ipfsconfig.ConnectKey) > 0 {
-		log.Info("enabling ipfsconnect cluster")
-		_, priv := vs.Signer.HexString()
+		log.Infow("starting ipfsconnect service", "key", ipfsconfig.ConnectKey, "port", 4171)
 		ipfsconn := ipfsconnect.New(
 			ipfsconfig.ConnectKey,
-			priv,
-			"libp2p",
+			4171,
 			storage,
 		)
 		if len(ipfsconfig.ConnectPeers) > 0 && len(ipfsconfig.ConnectPeers[0]) > 8 {

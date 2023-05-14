@@ -59,7 +59,7 @@ func JoinGossip(ctx context.Context, ps *pubsub.PubSub, selfID peer.ID, topic st
 	if err != nil {
 		return nil, err
 	}
-	log.Debugf("with gossipsub i just joined topic %s", sub.Topic())
+	log.Debugf("with gossipsub I just joined topic %s", sub.Topic())
 
 	g := &Gossip{
 		ctx:      ctx,
@@ -113,6 +113,7 @@ func (g *Gossip) readLoop() {
 			log.Warnf("gossipsub: err %v, couldn't unmarshal %q", err, msg.Data)
 			continue
 		}
+		log.Warnw("gossipsub: received message", "peer", m.Peer, "message", m.Data)
 		// send valid messages onto the Messages channel
 		g.Messages <- m
 	}

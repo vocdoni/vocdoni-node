@@ -45,8 +45,7 @@ func (ps *SubPub) Unicast(address string, message []byte) error {
 		return fmt.Errorf("stream for peer %s not found", peerID)
 	}
 
-	log.Debugf("sending %d bytes to %s = %s", len(message), address, peerID)
-
+	log.Debugw("sending message", "size", len(message), "peer", peerID)
 	stream.Lock()
 	defer stream.Unlock()
 	if err := ps.SendMessage(stream.Writer, message); err != nil {
