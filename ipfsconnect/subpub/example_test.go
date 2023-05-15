@@ -14,10 +14,9 @@ func Test_example(t *testing.T) {
 	log.Init("info", "stdout")
 
 	messages := make(chan *subpub.Message)
-	port := 6543
 	groupKey := util.Random32()
 
 	handler := ipfs.MockIPFS(t)
-	sp := subpub.NewSubPub(groupKey, int32(port), handler.Node)
+	sp := subpub.NewSubPub(groupKey, handler.Node)
 	sp.Start(context.Background(), messages)
 }

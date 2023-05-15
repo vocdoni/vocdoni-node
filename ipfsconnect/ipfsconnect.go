@@ -65,7 +65,7 @@ func (is *IPFSConnect) broadcastMsg(imsg *models.IpfsSync) error {
 		"address", imsg.Address,
 		"multiaddress", imsg.Multiaddress,
 		"timestamp", imsg.Timestamp)
-	return is.Transport.SendBroadcast(subpub.Message{Data: d})
+	return is.Transport.SendBroadcast(d)
 }
 
 // Handle handles a Message in a thread-safe way.
@@ -146,7 +146,7 @@ func (is *IPFSConnect) ipfsAddrs() (maddrs []multiaddr.Multiaddr) {
 
 // Start initializes and starts an IPFSConnect instance.
 func (is *IPFSConnect) Start() {
-	is.Transport = subpub.NewSubPub(is.GroupKey, int32(is.Port), is.IPFS.Node)
+	is.Transport = subpub.NewSubPub(is.GroupKey, is.IPFS.Node)
 	is.Transport.BootNodes = is.Bootnodes
 	is.Transport.Start(context.Background(), is.Messages)
 	go is.handleEvents() // this spawns a single background task per IPFSConnect instance

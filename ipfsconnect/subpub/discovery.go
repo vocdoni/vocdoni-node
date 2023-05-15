@@ -119,7 +119,8 @@ func (s *SubPub) discover(ctx context.Context) {
 	peerChan, err := s.routing.FindPeers(ctx, s.Topic,
 		corediscovery.Limit(4*s.MaxDHTpeers))
 	if err != nil {
-		log.Fatal(err)
+		log.Errorw(err, "error finding peers")
+		return
 	}
 	for peer := range peerChan {
 		select {
@@ -137,7 +138,7 @@ func (s *SubPub) discover(ctx context.Context) {
 		}
 		// new peer; let's connect to it
 		if err := peer.ID.Validate(); err == nil {
-			stream, err := s.Host.NewStream(context.Background(), peer.ID, protocol.ID(s.Topic))
+			stream, err := s.Host.NewStream(ctx, peer.ID, protocol.ID(s.Topic))
 			if err != nil {
 				// Since this error is pretty common in p2p networks.
 				continue

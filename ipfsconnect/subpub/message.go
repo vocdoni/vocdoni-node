@@ -7,10 +7,13 @@ import (
 	"git.sr.ht/~sircmpwn/go-bare"
 )
 
-// SendMessage encrypts and writes a message on the readwriter buffer.
-func (ps *SubPub) SendMessage(w *bufio.Writer, msg []byte) error {
+// writeMessage encrypts and writes a message on the readwriter buffer.
+func (ps *SubPub) writeMessage(w *bufio.Writer, msg []byte) error {
 	msg = ps.encrypt(msg)
-	message := &Message{Data: msg}
+	message := &Message{
+		Data: msg,
+		Peer: ps.NodeID,
+	}
 	data, err := bare.Marshal(message)
 	if err != nil {
 		return err
@@ -22,7 +25,7 @@ func (ps *SubPub) SendMessage(w *bufio.Writer, msg []byte) error {
 }
 
 // ReadMessage reads a message from the readwriter buffer.
-func (ps *SubPub) ReadMessage(r *bufio.Reader) (*Message, error) {
+func (ps *SubPub) readMessage(r *bufio.Reader) (*Message, error) {
 	message := new(Message)
 	if err := bare.UnmarshalReader(r, message); err != nil {
 		return nil, fmt.Errorf("error unmarshaling: %w", err)

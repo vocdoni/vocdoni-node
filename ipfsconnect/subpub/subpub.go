@@ -1,6 +1,8 @@
 package subpub
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"fmt"
@@ -15,7 +17,6 @@ import (
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/util"
 )
 
 const (
@@ -36,14 +37,13 @@ type SubPub struct {
 	NoBootStrap bool
 	BootNodes   []string
 	NodeID      string
-	Port        int32
 	Host        host.Host
 	MaxDHTpeers int
 
-	Gossip      *Gossip       // Gossip deals with broadcasts
-	Streams     sync.Map      // this is a thread-safe map[libpeer.ID]bufioWithMutex
-	UnicastMsgs chan *Message // UnicastMsgs passes unicasts around
-	Messages    chan *Message // both unicasts and broadcasts end up being passed to Messages
+	gossip      *Gossip       // Gossip deals with broadcasts
+	streams     sync.Map      // this is a thread-safe map[libpeer.ID]bufioWithMutex
+	unicastMsgs chan *Message // UnicastMsgs passes unicasts around
+	messages    chan *Message // both unicasts and broadcasts end up being passed to Messages
 
 	DiscoveryPeriod time.Duration
 
@@ -66,17 +66,15 @@ type Message struct {
 // NewSubPub creates a new SubPub instance.
 // The groupKey is a secret shared among the PubSub participants.
 // Only those with the key will be able to join.
-func NewSubPub(groupKey [32]byte, port int32, node *core.IpfsNode) *SubPub {
+func NewSubPub(groupKey [32]byte, node *core.IpfsNode) *SubPub {
 	s := SubPub{
 		GroupKey:        groupKey,
 		Topic:           fmt.Sprintf("%x", groupKey),
-		NodeID:          util.RandomHex(32),
 		DiscoveryPeriod: time.Second * 10,
-		Port:            port,
 		Host:            node.PeerHost,
 		MaxDHTpeers:     1024,
 		close:           make(chan bool),
-		UnicastMsgs:     make(chan *Message, UnicastBufSize),
+		unicastMsgs:     make(chan *Message, UnicastBufSize),
 	}
 	bare.MaxArrayLength(bareMaxArrayLength)
 	bare.MaxUnmarshalBytes(bareMaxUnmarshalBytes)
@@ -91,39 +89,8 @@ func (s *SubPub) Start(ctx context.Context, receiver chan *Message) {
 		log.Fatal("no group key provided")
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
-	/*	connmgr, err := connmgr.NewConnManager(
-			s.MaxDHTpeers/2, // Lowwater
-			s.MaxDHTpeers,   // HighWater,
-			connmgr.WithGracePeriod(time.Second*60),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		s.Host, err = libp2p.New(
-			// libp2p will listen on any interface device (both on IPv4 and IPv6)
-			libp2p.ListenAddrStrings(
-				fmt.Sprintf("/ip6/::/tcp/%d", s.Port),
-				fmt.Sprintf("/ip4/0.0.0.0/tcp/%d", s.Port),
-			),
-			// support any other default transports (TCP)
-			libp2p.DefaultTransports,
-			// Let's prevent our peer from having too many
-			// connections by attaching a connection manager.
-			libp2p.ConnectionManager(connmgr),
-			// Set RelayCustom = true, Relay = false
-			libp2p.DisableRelay(),
-		)
-		if err != nil {
-			log.Fatal(err)
-		}
-	*/
-	// Note that we don't use ctx here, since we stop via the Close method.
-
-	s.NodeID = s.Host.ID().String()
-	s.Messages = receiver
-	log.Infow("libp2p host listening", "port", s.Port, "id", s.NodeID)
-
+	s.NodeID = s.Host.ID().Pretty()
+	s.messages = receiver
 	s.setupDiscovery(ctx)
 	s.setupGossip(ctx)
 	go s.listen(receiver)
@@ -136,9 +103,9 @@ func (s *SubPub) listen(receiver chan<- *Message) {
 		select {
 		case <-s.close:
 			return
-		case spmsg := <-s.Gossip.Messages:
+		case spmsg := <-s.gossip.Messages:
 			receiver <- spmsg
-		case spmsg := <-s.UnicastMsgs:
+		case spmsg := <-s.unicastMsgs:
 			receiver <- spmsg
 		}
 	}
@@ -165,7 +132,7 @@ func (s *SubPub) String() string {
 	return fmt.Sprintf("dhtPeers:%d dhtKnown:%d clusterPeers:%d",
 		len(s.Host.Network().Peers()),
 		len(s.Host.Peerstore().PeersWithAddrs()),
-		len(s.Gossip.topic.ListPeers()))
+		len(s.gossip.topic.ListPeers()))
 }
 
 // Stats returns the current stats of the SubPub instance.
@@ -173,7 +140,7 @@ func (s *SubPub) Stats() map[string]interface{} {
 	return map[string]interface{}{
 		"peers":   len(s.Host.Network().Peers()),
 		"known":   len(s.Host.Peerstore().PeersWithAddrs()),
-		"cluster": len(s.Gossip.topic.ListPeers())}
+		"cluster": len(s.gossip.topic.ListPeers())}
 }
 
 // Address returns the node's ID.
@@ -182,18 +149,23 @@ func (s *SubPub) Address() string {
 }
 
 // SendBroadcast sends a message to all peers in the cluster.
-func (s *SubPub) SendBroadcast(msg Message) error {
-	return s.Gossip.Publish(msg.Data)
+func (s *SubPub) SendBroadcast(data []byte) error {
+	var buf bytes.Buffer
+	writer := bufio.NewWriter(&buf)
+	if err := s.writeMessage(writer, data); err != nil {
+		return err
+	}
+	return s.gossip.Publish(buf.Bytes())
 }
 
-// SendUniCast sends a message to a specific peer in the cluster.
-func (s *SubPub) SendUnicast(address string, msg Message) error {
-	return s.Unicast(address, msg.Data)
+// SendUnicast sends a message to a specific peer in the cluster.
+func (s *SubPub) SendUnicast(address string, data []byte) error {
+	return s.sendStreamMessage(address, data)
 }
 
-func (ps *SubPub) printStats() {
+func (s *SubPub) printStats() {
 	for {
 		time.Sleep(120 * time.Second)
-		log.Monitor("subpub network", ps.Stats())
+		log.Monitor("subpub network", s.Stats())
 	}
 }
