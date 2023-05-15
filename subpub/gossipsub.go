@@ -33,12 +33,12 @@ type Gossip struct {
 // the resulting Gossip is available at ps.Gossip
 func (s *SubPub) setupGossip(ctx context.Context) error {
 	// create a new PubSub service using the GossipSub router
-	gs, err := pubsub.NewGossipSub(ctx, s.Host)
+	gs, err := pubsub.NewGossipSub(ctx, s.node.PeerHost)
 	if err != nil {
 		return err
 	}
 	// join the topic
-	if err = s.joinGossip(ctx, gs, s.Host.ID(), s.Topic); err != nil {
+	if err = s.joinGossip(ctx, gs, s.node.PeerHost.ID(), s.Topic); err != nil {
 		return err
 	}
 	return nil
@@ -98,7 +98,6 @@ func (s *SubPub) readGossipLoop() {
 			log.Warnf("gossipsub: err %v, couldn't read message %q", err, msg.Data)
 			continue
 		}
-		log.Debugw("gossipsub: received message", "peer", m.Peer, "message", m.Data)
 		// send valid messages onto the Messages channel
 		s.gossip.Messages <- m
 	}

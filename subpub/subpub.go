@@ -12,8 +12,6 @@ import (
 	"git.sr.ht/~sircmpwn/go-bare"
 	ipfslog "github.com/ipfs/go-log/v2"
 	"github.com/ipfs/kubo/core"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	"github.com/libp2p/go-libp2p/core/host"
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	"go.vocdoni.io/dvote/log"
@@ -22,6 +20,9 @@ import (
 const (
 	// UnicastBufSize is the number of unicast incoming messages to buffer.
 	UnicastBufSize = 128
+
+	// DiscoveryPeriodSeconds is the time between discovery rounds.
+	DiscoveryPeriodSeconds = 120
 
 	// We use go-bare for export/import the trie. In order to support
 	// big census (up to 8 Million entries) we need to increase the maximums.
@@ -41,7 +42,7 @@ type SubPub struct {
 	NoBootStrap  bool
 	BootNodes    []string
 	NodeID       string
-	Host         host.Host
+	node         *core.IpfsNode
 	MaxDHTpeers  int
 	OnlyDiscover bool
 
@@ -54,7 +55,6 @@ type SubPub struct {
 
 	// TODO(mvdan): replace with a context
 	close   chan bool
-	dht     *dht.IpfsDHT
 	routing *discrouting.RoutingDiscovery
 
 	// These are used in testing
@@ -75,8 +75,8 @@ func NewSubPub(groupKey [32]byte, node *core.IpfsNode) *SubPub {
 	s := SubPub{
 		GroupKey:        groupKey,
 		Topic:           fmt.Sprintf("%x", groupKey),
-		DiscoveryPeriod: time.Second * 10,
-		Host:            node.PeerHost,
+		DiscoveryPeriod: time.Second * DiscoveryPeriodSeconds,
+		node:            node,
 		MaxDHTpeers:     1024,
 		close:           make(chan bool),
 		unicastMsgs:     make(chan *Message, UnicastBufSize),
@@ -94,7 +94,7 @@ func (s *SubPub) Start(ctx context.Context, receiver chan *Message) {
 		log.Fatal("no group key provided")
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
-	s.NodeID = s.Host.ID().Pretty()
+	s.NodeID = s.node.PeerHost.ID().Pretty()
 	s.messages = receiver
 	s.setupDiscovery(ctx)
 	s.setupGossip(ctx)
@@ -125,26 +125,24 @@ func (s *SubPub) Close() error {
 		return nil
 	default:
 		close(s.close)
-		if err := s.dht.Close(); err != nil {
-			return err
-		}
-		return s.Host.Close()
+		close(s.messages)
+		return nil
 	}
 }
 
 // String returns a string representation of the SubPub instance.
 func (s *SubPub) String() string {
 	return fmt.Sprintf("dhtPeers:%d dhtKnown:%d clusterPeers:%d",
-		len(s.Host.Network().Peers()),
-		len(s.Host.Peerstore().PeersWithAddrs()),
+		len(s.node.PeerHost.Network().Peers()),
+		len(s.node.PeerHost.Peerstore().PeersWithAddrs()),
 		len(s.gossip.topic.ListPeers()))
 }
 
 // Stats returns the current stats of the SubPub instance.
 func (s *SubPub) Stats() map[string]interface{} {
 	return map[string]interface{}{
-		"peers":   len(s.Host.Network().Peers()),
-		"known":   len(s.Host.Peerstore().PeersWithAddrs()),
+		"peers":   len(s.node.PeerHost.Network().Peers()),
+		"known":   len(s.node.PeerHost.Peerstore().PeersWithAddrs()),
 		"cluster": len(s.gossip.topic.ListPeers())}
 }
 

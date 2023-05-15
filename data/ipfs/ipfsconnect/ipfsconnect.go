@@ -3,6 +3,7 @@ package ipfsconnect
 
 import (
 	"context"
+	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data/ipfs"
@@ -37,6 +38,7 @@ func (is *IPFSConnect) Start() {
 			select {
 			case <-ch:
 			default:
+				time.Sleep(time.Second * 10)
 			}
 		}
 	}()

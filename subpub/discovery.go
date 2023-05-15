@@ -2,11 +2,8 @@ package subpub
 
 import (
 	"context"
-	"sync"
 	"time"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
-	dhtopts "github.com/libp2p/go-libp2p-kad-dht/opts"
 	corediscovery "github.com/libp2p/go-libp2p/core/discovery"
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -19,80 +16,17 @@ import (
 // setupDiscovery creates a DHT discovery service and attaches it to the libp2p Host.
 // This lets us automatically discover peers and connect to them.
 func (s *SubPub) setupDiscovery(ctx context.Context) {
-	var err error
 
 	// Set a function as stream handler. This function is called when a peer
 	// initiates a connection and starts a stream with this peer.
-	s.Host.SetStreamHandler(protocol.ID(s.Topic), s.handleStream)
-
-	// Start a DHT, for use in peer discovery. We can't just make a new DHT
-	// client because we want each peer to maintain its own local copy of the
-	// DHT, so that the bootstrapping node of the DHT can go down without
-	// inhibiting future peer discovery.
-
-	// Let's try to apply some tunning for reducing the DHT fingerprint
-	opts := []dhtopts.Option{
-		dht.RoutingTableLatencyTolerance(time.Second * 20),
-		dht.BucketSize(20),
-		dht.MaxRecordAge(1 * time.Hour),
-	}
-
-	// Note that we don't use ctx here, since we stop via the Close method.
-	s.dht, err = dht.New(context.Background(), s.Host, opts...)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if !s.NoBootStrap {
-		// Bootstrap the DHT. In the default configuration, this spawns a Background
-		// thread that will refresh the peer table every five minutes.
-		log.Info("bootstrapping the DHT")
-		// Note that we don't use ctx here, since we stop via the Close method.
-		if err := s.dht.Bootstrap(context.Background()); err != nil {
-			log.Fatal(err)
-		}
-
-		// Let's connect to the bootstrap nodes first. They will tell us about the
-		// other nodes in the network.
-		bootnodes := dht.DefaultBootstrapPeers
-		if len(s.BootNodes) > 0 {
-			bootnodes, err = parseMultiaddress(s.BootNodes)
-			if err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		log.Infow("connecting to bootstrap nodes...", "bootnodes", bootnodes)
-		var wg sync.WaitGroup
-		for _, peerAddr := range bootnodes {
-			if peerAddr == nil {
-				continue
-			}
-			peerinfo, err := libpeer.AddrInfoFromP2pAddr(peerAddr)
-			if err != nil {
-				log.Fatal(err)
-			}
-			if peerinfo == nil {
-				continue // nothing to do
-			}
-			wg.Add(1)
-			go func() { // try to connect to every bootnode in parallel, since ps.Host.Connect() is thread-safe
-				defer wg.Done()
-				log.Debugf("trying %s", *peerinfo)
-				if err := s.Host.Connect(ctx, *peerinfo); err != nil {
-					log.Debug(err)
-				} else {
-					log.Infof("connection established with bootstrap node: %s", peerinfo)
-				}
-			}()
-		}
-		wg.Wait()
+	if !s.OnlyDiscover {
+		s.node.PeerHost.SetStreamHandler(protocol.ID(s.Topic), s.handleStream)
 	}
 
 	// We use a rendezvous point "meet me here" to announce our location.
 	// This is like telling your friends to meet you at the Eiffel Tower.
 	log.Infof("advertising myself periodically in topic %s", s.Topic)
-	s.routing = discrouting.NewRoutingDiscovery(s.dht)
+	s.routing = discrouting.NewRoutingDiscovery(s.node.DHT)
 	discutil.Advertise(ctx, s.routing, s.Topic)
 
 	// Discover new peers periodically
@@ -128,17 +62,15 @@ func (s *SubPub) discover(ctx context.Context) {
 		default:
 			// continues below
 		}
-		if peer.ID == s.Host.ID() {
+		if peer.ID == s.node.PeerHost.ID() {
 			continue // this is us; skip
 		}
 		if s.connectedPeer(peer.ID) {
 			continue
 		}
 		// new peer; let's connect to it
-		log.Infow("found peer", "address", peer.ID.Pretty())
 		connectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-		if err := s.Host.Connect(connectCtx, peer); err != nil {
-			log.Debugw("failed to connect to peer", "address", peer.ID.Pretty(), "error", err.Error())
+		if err := s.node.PeerHost.Connect(connectCtx, peer); err != nil {
 			cancel()
 			continue
 		}
@@ -146,7 +78,7 @@ func (s *SubPub) discover(ctx context.Context) {
 		log.Infow("connected to cluster peer!", "address", peer.ID.Pretty())
 
 		// protect the peer from being disconnected by the connection manager
-		s.Host.ConnManager().Protect(peer.ID, "discoveredPeer")
+		s.node.PeerHost.ConnManager().Protect(peer.ID, "discoveredPeer")
 
 		// if only discover is set, we don't need to open a stream
 		if s.OnlyDiscover {
@@ -154,7 +86,7 @@ func (s *SubPub) discover(ctx context.Context) {
 		}
 
 		// open a stream to the peer to start sending messages
-		stream, err := s.Host.NewStream(ctx, peer.ID, protocol.ID(s.Topic))
+		stream, err := s.node.PeerHost.NewStream(ctx, peer.ID, protocol.ID(s.Topic))
 		if err != nil {
 			// Since this error is pretty common in p2p networks.
 			continue
@@ -165,7 +97,7 @@ func (s *SubPub) discover(ctx context.Context) {
 
 // connectedPeer returns true if the peer has some stream
 func (s *SubPub) connectedPeer(pid libpeer.ID) bool {
-	for _, conn := range s.Host.Network().ConnsToPeer(pid) {
+	for _, conn := range s.node.PeerHost.Network().ConnsToPeer(pid) {
 		if len(conn.GetStreams()) > 0 {
 			return true
 		}
@@ -183,17 +115,6 @@ func (s *SubPub) AddPeer(peer string) error {
 	if err != nil {
 		return err
 	}
-	s.Host.ConnManager().Protect(ai.ID, "customPeer")
-	return s.Host.Connect(context.Background(), *ai)
-}
-
-func parseMultiaddress(maddress []string) (ma []multiaddr.Multiaddr, err error) {
-	for _, m := range maddress {
-		mad, err := multiaddr.NewMultiaddr(m)
-		if err != nil {
-			return nil, err
-		}
-		ma = append(ma, mad)
-	}
-	return ma, nil
+	s.node.PeerHost.ConnManager().Protect(ai.ID, "customPeer")
+	return s.node.PeerHost.Connect(context.Background(), *ai)
 }
