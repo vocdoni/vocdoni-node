@@ -62,8 +62,7 @@ func (s *SubPub) setupDiscovery(ctx context.Context) {
 			}
 		}
 
-		log.Info("connecting to bootstrap nodes...")
-		log.Debugf("bootnodes: %+v", bootnodes)
+		log.Infow("connecting to bootstrap nodes...", "bootnodes", bootnodes)
 		var wg sync.WaitGroup
 		for _, peerAddr := range bootnodes {
 			if peerAddr == nil {
@@ -132,21 +131,35 @@ func (s *SubPub) discover(ctx context.Context) {
 		if peer.ID == s.Host.ID() {
 			continue // this is us; skip
 		}
-
 		if s.connectedPeer(peer.ID) {
 			continue
 		}
 		// new peer; let's connect to it
-		if err := peer.ID.Validate(); err == nil {
-			stream, err := s.Host.NewStream(ctx, peer.ID, protocol.ID(s.Topic))
-			if err != nil {
-				// Since this error is pretty common in p2p networks.
-				continue
-			}
-			log.Debugf("found peer %s: %v", peer.ID.Pretty(), peer.Addrs)
-			s.Host.ConnManager().Protect(peer.ID, "discoveredPeer")
-			s.handleStream(stream)
+		log.Infow("found peer", "address", peer.ID.Pretty())
+		connectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
+		if err := s.Host.Connect(connectCtx, peer); err != nil {
+			log.Debugw("failed to connect to peer", "address", peer.ID.Pretty(), "error", err.Error())
+			cancel()
+			continue
 		}
+		cancel()
+		log.Infow("connected to cluster peer!", "address", peer.ID.Pretty())
+
+		// protect the peer from being disconnected by the connection manager
+		s.Host.ConnManager().Protect(peer.ID, "discoveredPeer")
+
+		// if only discover is set, we don't need to open a stream
+		if s.OnlyDiscover {
+			continue
+		}
+
+		// open a stream to the peer to start sending messages
+		stream, err := s.Host.NewStream(ctx, peer.ID, protocol.ID(s.Topic))
+		if err != nil {
+			// Since this error is pretty common in p2p networks.
+			continue
+		}
+		s.handleStream(stream)
 	}
 }
 

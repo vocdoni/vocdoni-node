@@ -35,14 +35,15 @@ const (
 // It allows for broadcasting messages to all peers in the group, and sending messages to specific peers.
 // Peers are discovered using the DHT, and automatically set as protected peers.
 type SubPub struct {
-	Key         ecdsa.PrivateKey
-	GroupKey    [32]byte
-	Topic       string
-	NoBootStrap bool
-	BootNodes   []string
-	NodeID      string
-	Host        host.Host
-	MaxDHTpeers int
+	Key          ecdsa.PrivateKey
+	GroupKey     [32]byte
+	Topic        string
+	NoBootStrap  bool
+	BootNodes    []string
+	NodeID       string
+	Host         host.Host
+	MaxDHTpeers  int
+	OnlyDiscover bool
 
 	gossip      *Gossip       // Gossip deals with broadcasts
 	streams     sync.Map      // this is a thread-safe map[libpeer.ID]bufioWithMutex

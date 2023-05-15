@@ -29,6 +29,7 @@ func New(groupKey string, ipfsHandler *ipfs.Handler) *IPFSConnect {
 // Start initializes and starts an IPFSConnect instance.
 func (is *IPFSConnect) Start() {
 	is.Transport = subpub.NewSubPub(is.GroupKey, is.IPFS.Node)
+	is.Transport.OnlyDiscover = true
 	// Do nothing with the messages, we just want to keep the connections alive.
 	ch := make(chan *subpub.Message)
 	go func() {
