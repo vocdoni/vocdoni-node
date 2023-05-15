@@ -69,6 +69,8 @@ func TestLoggerOutput(t *testing.T) {
 	logTestWriter = &buf
 	Init("debug", logTestWriterName, &errorBuf)
 
+	qt.Assert(t, Level(), qt.Equals, "debug")
+
 	doLogs()
 
 	got := buf.String()
