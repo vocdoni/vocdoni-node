@@ -293,12 +293,6 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
-		log.Infow("partial results recovered",
-			"electionID", fmt.Sprintf("%x", p),
-			"weight", results.Weight,
-			"votes", len(results.Votes),
-			"results", results.String(),
-		)
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}
