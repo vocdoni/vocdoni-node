@@ -1,12 +1,11 @@
 package log
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -22,10 +21,9 @@ const (
 )
 
 var (
-	log      zerolog.Logger
-	errorLog *os.File
+	log zerolog.Logger
 	// panicOnInvalidChars is set based on env LOG_PANIC_ON_INVALIDCHARS (parsed as bool)
-	panicOnInvalidChars bool
+	panicOnInvalidChars = os.Getenv("LOG_PANIC_ON_INVALIDCHARS") == "true"
 )
 
 func init() {
@@ -37,34 +35,103 @@ func init() {
 	if s := os.Getenv("LOG_LEVEL"); s != "" {
 		level = s
 	}
-	Init(level, "stderr")
+	Init(level, "stderr", nil)
 }
 
 // Logger provides access to the global logger (zerolog).
 func Logger() *zerolog.Logger { return &log }
 
+var logTestWriter io.Writer // for TestLogger
+const logTestWriterName = "log_test_writer"
+
+var logTestTime, _ = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
+
+type testHook struct{}
+
+// To ensure that the log output in the test is deterministic.
+func (h *testHook) Run(e *zerolog.Event, level zerolog.Level, msg string) {
+	e.Stringer("time", logTestTime)
+}
+
+type errorLevelWriter struct {
+	io.Writer
+}
+
+var _ zerolog.LevelWriter = &errorLevelWriter{}
+
+func (w *errorLevelWriter) Write(p []byte) (int, error) {
+	panic("should be calling WriteLevel")
+}
+
+func (w *errorLevelWriter) WriteLevel(level zerolog.Level, p []byte) (int, error) {
+	if level < zerolog.WarnLevel {
+		return len(p), nil
+	}
+	return w.Writer.Write(p)
+}
+
+// invalidCharChecker checks if the formatted string contains the Unicode replacement char (U+FFFD)
+// and panics if env LOG_PANIC_ON_INVALIDCHARS bool is true.
+//
+// In production (LOG_PANIC_ON_INVALIDCHARS != true), this function returns immediately,
+// i.e. no performance hit
+//
+// If the log string contains the "replacement char"
+// https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+// this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
+type invalidCharChecker struct{}
+
+func (*invalidCharChecker) Write(p []byte) (int, error) {
+	if bytes.ContainsRune(p, '\uFFFD') {
+		panic(fmt.Sprintf("log line with invalid chars: %q", string(p)))
+	}
+	return len(p), nil
+}
+
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
-func Init(logLevel string, output string) {
+// errorOutput is an optional filename which only receives Warning and Error messages.
+func Init(level, output string, errorOutput io.Writer) {
 	var out io.Writer
 	switch output {
 	case "stdout":
 		out = os.Stdout
 	case "stderr":
 		out = os.Stderr
+	case logTestWriterName:
+		out = logTestWriter
 	default:
-		errorLog, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
+		f, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
-			panic(fmt.Sprintf("invalid log output: %v", err))
+			panic(fmt.Sprintf("cannot create log output: %v", err))
 		}
-		out = errorLog
+		out = f
+	}
+	out = zerolog.ConsoleWriter{
+		Out:        out,
+		TimeFormat: time.RFC3339Nano,
+	}
+	outputs := []io.Writer{out}
+
+	if errorOutput != nil {
+		outputs = append(outputs, &errorLevelWriter{zerolog.ConsoleWriter{
+			Out:        errorOutput,
+			TimeFormat: time.RFC3339Nano,
+			NoColor:    true, // error log files should not be colored
+		}})
+	}
+	if panicOnInvalidChars {
+		outputs = append(outputs, zerolog.ConsoleWriter{Out: &invalidCharChecker{}})
+	}
+	if len(outputs) > 1 {
+		out = zerolog.MultiLevelWriter(outputs...)
 	}
 
 	// Init the global logger var, with millisecond timestamps
-	log = zerolog.New(zerolog.NewConsoleWriter(func(w *zerolog.ConsoleWriter) {
-		w.Out = out
-		w.TimeFormat = time.RFC3339Nano
-	})).With().Timestamp().Logger()
+	log = zerolog.New(out).With().Timestamp().Logger()
+	if output == logTestWriterName {
+		log = log.Hook(&testHook{})
+	}
 	zerolog.TimeFieldFormat = zerolog.TimeFormatUnixMs
 
 	// Include caller, increasing SkipFrameCount to account for this log package wrapper
@@ -74,66 +141,25 @@ func Init(logLevel string, output string) {
 		return fmt.Sprintf("%s/%s:%d", path.Base(path.Dir(file)), path.Base(file), line)
 	}
 
-	switch logLevel {
+	switch level {
 	case LogLevelDebug:
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	case LogLevelInfo:
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
+		log = log.Level(zerolog.InfoLevel)
 	case LogLevelWarn:
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		log = log.Level(zerolog.WarnLevel)
 	case LogLevelError:
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
+		log = log.Level(zerolog.ErrorLevel)
 	default:
-		panic("invalid log level")
+		panic(fmt.Sprintf("invalid log level: %q", level))
 	}
 
-	log.Info().Msgf("logger construction succeeded at level %s with output %s", logLevel, output)
-
-	if s := os.Getenv("LOG_PANIC_ON_INVALIDCHARS"); s != "" {
-		// ignore ParseBool errors, if anything fails panicOnInvalidChars will stay false which is good
-		b, _ := strconv.ParseBool(s)
-		panicOnInvalidChars = b
-	}
-}
-
-// SetFileErrorLog if set writes the Warning and Error messages to a file.
-func SetFileErrorLog(path string) error {
-	Logger().Info().Msgf("using file %s for logging warning and errors", path)
-	var err error
-	errorLog, err = os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
-	return err
-}
-
-func writeErrorToFile(msg string) {
-	if errorLog == nil {
-		return
-	}
-	// Use a separate goroutine, to ensure we don't block.
-	// Ignore the error, as we're logging errors anyway.
-	go errorLog.WriteString(fmt.Sprintf("[%s] %s\n", time.Now().Format("2006/0102/150405"), msg))
-}
-
-// checkInvalidChars checks if the formatted string contains the Unicode replacement char (U+FFFD)
-// and panics if env LOG_PANIC_ON_INVALIDCHARS bool is true.
-//
-// In production (LOG_PANIC_ON_INVALIDCHARS != true), this function returns immediately,
-// i.e. no performance hit
-//
-// If the log string contains the "replacement char"
-// https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-// this most likely means a bug in the caller (a format mismatch in fmt.Sprintf())
-func checkInvalidChars(args ...interface{}) {
-	if panicOnInvalidChars {
-		s := fmt.Sprint(args...)
-		if strings.ContainsRune(s, '\uFFFD') {
-			panic(fmt.Sprintf("log line with invalid chars: %s", s))
-		}
-	}
+	log.Info().Msgf("logger construction succeeded at level %s with output %s", level, output)
 }
 
 // Level returns the current log level
 func Level() string {
-	switch zerolog.GlobalLevel() {
+	switch level := log.GetLevel(); level {
 	case zerolog.DebugLevel:
 		return LogLevelDebug
 	case zerolog.InfoLevel:
@@ -143,23 +169,21 @@ func Level() string {
 	case zerolog.ErrorLevel:
 		return LogLevelError
 	default:
-		panic("invalid log level")
+		panic(fmt.Sprintf("invalid log level: %q", level))
 	}
 }
 
 // Debug sends a debug level log message
 func Debug(args ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
+	if log.GetLevel() > zerolog.DebugLevel {
 		return
 	}
 	log.Debug().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Info sends an info level log message
 func Info(args ...interface{}) {
 	log.Info().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Monitor is a wrapper around Info that allows passing a map of key-value pairs.
@@ -172,21 +196,16 @@ func Monitor(msg string, args map[string]interface{}) {
 // Warn sends a warn level log message
 func Warn(args ...interface{}) {
 	log.Warn().Msg(fmt.Sprint(args...))
-	writeErrorToFile(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Error sends an error level log message
 func Error(args ...interface{}) {
 	log.Error().Msg(fmt.Sprint(args...))
-	writeErrorToFile(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 }
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
 	log.Fatal().Msg(fmt.Sprint(args...))
-	checkInvalidChars(args...)
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
@@ -204,58 +223,42 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 
 // Debugf sends a formatted debug level log message
 func Debugf(template string, args ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
-		return
-	}
 	Logger().Debug().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Infof sends a formatted info level log message
 func Infof(template string, args ...interface{}) {
 	Logger().Info().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Warnf sends a formatted warn level log message
 func Warnf(template string, args ...interface{}) {
 	Logger().Warn().Msgf(template, args...)
-	writeErrorToFile(fmt.Sprintf(template, args...))
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Errorf sends a formatted error level log message
 func Errorf(template string, args ...interface{}) {
 	Logger().Error().Msgf(template, args...)
-	writeErrorToFile(fmt.Sprintf(template, args...))
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
 	Logger().Fatal().Msgf(template, args...)
-	checkInvalidChars(fmt.Sprintf(template, args...))
 }
 
 // Debugw sends a debug level log message with key-value pairs.
 func Debugw(msg string, keyvalues ...interface{}) {
-	if zerolog.GlobalLevel() > zerolog.DebugLevel {
-		return
-	}
 	Logger().Debug().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Infow sends an info level log message with key-value pairs.
 func Infow(msg string, keyvalues ...interface{}) {
 	Logger().Info().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Warnw sends a warning level log message with key-value pairs.
 func Warnw(msg string, keyvalues ...interface{}) {
 	Logger().Warn().Fields(keyvalues).Msg(msg)
-	checkInvalidChars(fmt.Sprintf("%s %+v", msg, keyvalues))
 }
 
 // Errorw sends an error level log message with a special format for errors.

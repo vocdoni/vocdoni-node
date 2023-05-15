@@ -55,7 +55,7 @@ func main() {
 	flag.StringVar(&pid, "processId", "", "processId as hexadecimal string")
 
 	flag.Parse()
-	log.Init(logLevel, "stdout")
+	log.Init(logLevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	switch action {

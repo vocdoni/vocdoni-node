@@ -17,7 +17,7 @@ import (
 )
 
 func BenchmarkVochainCSP(b *testing.B) {
-	log.Init("info", "stdout")
+	log.Init("info", "stdout", nil)
 	b.ReportAllocs()
 	var dvoteServer testcommon.DvoteAPIServer
 	host := *hostFlag
