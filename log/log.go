@@ -91,7 +91,7 @@ func (*invalidCharChecker) Write(p []byte) (int, error) {
 // Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
 // Log level can be "debug/info/warn/error".
 // errorOutput is an optional filename which only receives Warning and Error messages.
-func Init(logLevel, output string, errorOutput io.Writer) {
+func Init(level, output string, errorOutput io.Writer) {
 	var out io.Writer
 	switch output {
 	case "stdout":
@@ -141,25 +141,25 @@ func Init(logLevel, output string, errorOutput io.Writer) {
 		return fmt.Sprintf("%s/%s:%d", path.Base(path.Dir(file)), path.Base(file), line)
 	}
 
-	switch logLevel {
+	switch level {
 	case LogLevelDebug:
-		log.Level(zerolog.DebugLevel)
+		log = log.Level(zerolog.DebugLevel)
 	case LogLevelInfo:
-		log.Level(zerolog.InfoLevel)
+		log = log.Level(zerolog.InfoLevel)
 	case LogLevelWarn:
-		log.Level(zerolog.WarnLevel)
+		log = log.Level(zerolog.WarnLevel)
 	case LogLevelError:
-		log.Level(zerolog.ErrorLevel)
+		log = log.Level(zerolog.ErrorLevel)
 	default:
-		panic("invalid log level")
+		panic(fmt.Sprintf("invalid log level: %q", level))
 	}
 
-	log.Info().Msgf("logger construction succeeded at level %s with output %s", logLevel, output)
+	log.Info().Msgf("logger construction succeeded at level %s with output %s", level, output)
 }
 
 // Level returns the current log level
 func Level() string {
-	switch log.GetLevel() {
+	switch level := log.GetLevel(); level {
 	case zerolog.DebugLevel:
 		return LogLevelDebug
 	case zerolog.InfoLevel:
@@ -169,7 +169,7 @@ func Level() string {
 	case zerolog.ErrorLevel:
 		return LogLevelError
 	default:
-		panic("invalid log level")
+		panic(fmt.Sprintf("invalid log level: %q", level))
 	}
 }
 
