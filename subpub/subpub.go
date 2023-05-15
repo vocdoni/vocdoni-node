@@ -29,7 +29,11 @@ const (
 	bareMaxUnmarshalBytes uint64 = bareMaxArrayLength * 32 // Assuming 32 bytes per entry
 )
 
-// SubPub is a simplified PubSub protocol using libp2p
+// SubPub is a simplified PubSub protocol using libp2p.
+// It uses a shared secret to encrypt messages.
+// The shared secret is derived from a group key, which is also used to discover peers.
+// It allows for broadcasting messages to all peers in the group, and sending messages to specific peers.
+// Peers are discovered using the DHT, and automatically set as protected peers.
 type SubPub struct {
 	Key         ecdsa.PrivateKey
 	GroupKey    [32]byte

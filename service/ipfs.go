@@ -8,7 +8,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/ipfs"
-	"go.vocdoni.io/dvote/ipfsconnect"
+	"go.vocdoni.io/dvote/data/ipfs/ipfsconnect"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -34,10 +34,9 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 	go storage.CollectMetrics(context.Background(), vs.MetricsAgent)
 
 	if len(ipfsconfig.ConnectKey) > 0 {
-		log.Infow("starting ipfsconnect service", "key", ipfsconfig.ConnectKey, "port", 4171)
+		log.Infow("starting ipfsconnect service", "key", ipfsconfig.ConnectKey)
 		ipfsconn := ipfsconnect.New(
 			ipfsconfig.ConnectKey,
-			4171,
 			storage.(*ipfs.Handler),
 		)
 		if len(ipfsconfig.ConnectPeers) > 0 && len(ipfsconfig.ConnectPeers[0]) > 8 {
