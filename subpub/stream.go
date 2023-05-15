@@ -27,29 +27,29 @@ func (ps *SubPub) handleStream(stream network.Stream) {
 	go ps.readHandler(stream) // ps.readHandler just deals with chans so is thread-safe
 
 	// Create a buffer stream for concurrent, non blocking writes.
-	ps.Streams.Store(peer, bufioWithMutex{bufio.NewWriter(stream), new(sync.Mutex)})
+	ps.streams.Store(peer, bufioWithMutex{bufio.NewWriter(stream), new(sync.Mutex)})
 
 	if fn := ps.OnPeerAdd; fn != nil {
 		fn(peer)
 	}
 }
 
-func (ps *SubPub) Unicast(address string, message []byte) error {
+// sendStreamMessage sends a message to a single peer.
+func (ps *SubPub) sendStreamMessage(address string, message []byte) error {
 	peerID, err := libpeer.Decode(address)
 	if err != nil {
 		return fmt.Errorf("cannot decode %s into a peerID: %w", address, err)
 	}
-	value, found := ps.Streams.Load(peerID)
+	value, found := ps.streams.Load(peerID)
 	stream, ok := value.(bufioWithMutex) // check type to avoid panics
 	if !found || !ok {
 		return fmt.Errorf("stream for peer %s not found", peerID)
 	}
 
-	log.Debugf("sending %d bytes to %s = %s", len(message), address, peerID)
-
+	log.Debugw("sending message", "size", len(message), "peer", peerID)
 	stream.Lock()
 	defer stream.Unlock()
-	if err := ps.SendMessage(stream.Writer, message); err != nil {
+	if err := ps.writeMessage(stream.Writer, message); err != nil {
 		return fmt.Errorf("error trying to unicast to %s: %v", peerID, err)
 	}
 	return nil
@@ -70,7 +70,7 @@ func (ps *SubPub) readHandler(stream network.Stream) {
 		default:
 			// continues below
 		}
-		message, err := ps.ReadMessage(r)
+		message, err := ps.readMessage(r)
 		if err != nil {
 			if strings.Contains(err.Error(), "stream reset") {
 				log.Infof("peer %s disconnected (stream reset)", peer)
@@ -84,6 +84,6 @@ func (ps *SubPub) readHandler(stream network.Stream) {
 		}
 
 		message.Peer = peer.String()
-		ps.UnicastMsgs <- message
+		ps.unicastMsgs <- message
 	}
 }

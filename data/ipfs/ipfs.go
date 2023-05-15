@@ -73,7 +73,6 @@ func (i *Handler) Init(d *types.DataStore) error {
 	if err != nil {
 		return err
 	}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	i.cancel = cancel
 
