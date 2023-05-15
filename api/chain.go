@@ -492,7 +492,7 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 //
 //	@Summary		Get block (by height)
 //	@Description	Returns the block at the given height
-//	@Success		200	{object}	types.Block
+//	@Success		200	{object}	object
 //	@Router			/chain/blocks/{height} [get]
 func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
@@ -515,7 +515,7 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 //	@Summary		Get block (by hash)
 //	@Description	Returns the block from the given hash
-//	@Success		200	{object}	types.Block
+//	@Success		200	{object}	object
 //	@Router			/chain/blocks/hash/{hash} [get]
 func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
