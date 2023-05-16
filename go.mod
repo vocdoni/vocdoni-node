@@ -24,7 +24,7 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/google/go-cmp v0.5.9
 	github.com/google/uuid v1.3.0
-	github.com/hashicorp/golang-lru v0.6.0
+	github.com/hashicorp/golang-lru/v2 v2.0.2
 	github.com/iancoleman/strcase v0.2.0
 	github.com/iden3/go-iden3-crypto v0.0.13
 	github.com/iden3/go-rapidsnark/prover v0.0.9
@@ -144,7 +144,7 @@ require (
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-bexpr v0.1.11 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
-	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/hashicorp/golang-lru v0.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
 	github.com/holiman/uint256 v1.2.2 // indirect
 	github.com/huin/goupnp v1.1.0 // indirect
