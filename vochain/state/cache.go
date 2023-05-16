@@ -25,7 +25,7 @@ func (v *State) CacheAdd(id [32]byte, vote *Vote) {
 	if vote == nil || vote.Nullifier == nil {
 		return
 	}
-	v.voteCache.Add(id, vote)
+	v.voteCache.Add(string(id[:]), vote)
 	v.voteCache.Add(cacheGetNullifierKey(vote.Nullifier), nil)
 }
 
@@ -38,7 +38,7 @@ func (v *State) CacheDel(id [32]byte) {
 	if vote != nil {
 		v.voteCache.Remove(cacheGetNullifierKey(vote.Nullifier))
 	}
-	v.voteCache.Remove(id)
+	v.voteCache.Remove(string(id[:]))
 }
 
 // CacheGet fetch an existing vote from the local cache and returns it.
@@ -46,11 +46,8 @@ func (v *State) CacheGet(id [32]byte) *Vote {
 	if v.cacheDisabled() {
 		return nil
 	}
-	record, ok := v.voteCache.Get(id)
-	if !ok || record == nil {
-		return nil
-	}
-	return record.(*Vote)
+	vote, _ := v.voteCache.Get(string(id[:]))
+	return vote
 }
 
 // CacheGetCopy fetch an existing vote from the local cache and returns a copy
@@ -87,17 +84,13 @@ func (v *State) CachePurge(height uint32) {
 	keys := v.voteCache.Keys()
 	removed := 0
 	for _, id := range keys {
-		record, ok := v.voteCache.Get(id)
+		vote, ok := v.voteCache.Get(id)
 		if !ok {
 			// vote have been already deleted?
 			continue
 		}
-		vote, ok := record.(*Vote)
-		if !ok {
-			continue
-		}
-		if !ok {
-			log.Warn("vote cache index is not [32]byte")
+		if vote == nil {
+			// each vote is already deleted with the nullifier key as well
 			continue
 		}
 		if height >= vote.Height+voteCachePurgeThreshold {

@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	lru "github.com/hashicorp/golang-lru"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
@@ -90,7 +90,7 @@ type State struct {
 	Tx                treeTxWithMutex
 	mainTreeViewValue atomic.Pointer[statedb.TreeView]
 	DisableVoteCache  atomic.Bool
-	voteCache         *lru.Cache
+	voteCache         *lru.Cache[string, *Vote]
 	txCounter         atomic.Int32
 	// currentHeight is the height of the current started block
 	currentHeight atomic.Uint32
@@ -108,7 +108,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
 	}
-	voteCache, err := lru.New(voteCacheSize)
+	voteCache, err := lru.New[string, *Vote](voteCacheSize)
 	if err != nil {
 		return nil, err
 	}

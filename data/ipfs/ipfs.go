@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/hashicorp/golang-lru/v2/simplelru"
 	coreiface "github.com/ipfs/boxo/coreiface"
 	ipfscid "github.com/ipfs/go-cid"
 	keystore "github.com/ipfs/go-ipfs-keystore"
@@ -27,7 +28,6 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
-	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -45,7 +45,7 @@ type Handler struct {
 	CoreAPI       coreiface.CoreAPI
 	DataDir       string
 	LogLevel      string
-	retrieveCache *lru.Cache
+	retrieveCache *simplelru.LRU[string, []byte]
 
 	// cancel helps us stop extra goroutines and listeners which complement
 	// the IpfsNode above.
@@ -122,7 +122,10 @@ func (i *Handler) Init(d *types.DataStore) error {
 	i.Node = node
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
-	i.retrieveCache = lru.New(RetrievedFileCacheSize)
+	i.retrieveCache, err = simplelru.NewLRU[string, []byte](RetrievedFileCacheSize, nil)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -259,10 +262,10 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 
 	// check if we have the file in the local cache
-	ccontent := i.retrieveCache.Get(path)
+	ccontent, _ := i.retrieveCache.Get(path)
 	if ccontent != nil {
 		log.Debugf("retrieved file %s from cache", path)
-		return ccontent.([]byte), nil
+		return ccontent, nil
 	}
 
 	// first resolve the path
