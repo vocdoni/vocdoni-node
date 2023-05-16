@@ -72,7 +72,7 @@ type BaseApplication struct {
 	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
 	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
 
-	blockCache *lru.AtomicCache
+	blockCache *lru.AtomicCache[int64, *tmtypes.Block]
 	// height of the last ended block
 	height atomic.Uint32
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
@@ -116,7 +116,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		State:              state,
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
-		blockCache:         lru.NewAtomic(32),
+		blockCache:         lru.NewAtomic[int64, *tmtypes.Block](32),
 		dataDir:            dbpath,
 		chainID:            "test",
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
@@ -391,14 +391,13 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
 		return nil
 	}
-	cachedBlock := app.blockCache.GetAndUpdate(height, func(prev interface{}) interface{} {
+	return app.blockCache.GetAndUpdate(height, func(prev *tmtypes.Block) *tmtypes.Block {
 		if prev != nil {
 			// If it's already in the cache, use it as-is.
 			return prev
 		}
 		return app.fnGetBlockByHeight(height)
 	})
-	return cachedBlock.(*tmtypes.Block)
 }
 
 // GetBlockByHash retreies a full block indexed by its Hash
