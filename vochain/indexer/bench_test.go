@@ -9,6 +9,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -41,6 +42,8 @@ func BenchmarkIndexVotes(b *testing.B) {
 	vp, err := state.NewVotePackage([]int{1, 0, 1}).Encode()
 	qt.Assert(b, err, qt.IsNil)
 
+	rnd := testutil.NewRandom(1234)
+
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -49,11 +52,11 @@ func BenchmarkIndexVotes(b *testing.B) {
 		var oneVote *state.Vote
 		for j := 0; j < numVotes; j++ {
 			vote := &state.Vote{
-				Height:      uint32(util.RandomInt(10, 10000)),
+				Height:      uint32(500 + rnd.RandomIntn(10000)),
 				ProcessID:   pid,
-				Nullifier:   util.RandomBytes(32),
+				Nullifier:   rnd.RandomBytes(32),
 				VotePackage: vp,
-				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
+				Weight:      new(big.Int).SetUint64(1 + uint64(rnd.RandomIntn(9999))),
 			}
 			if j == numVotes/2 {
 				oneVote = vote
