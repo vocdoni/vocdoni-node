@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	tmtypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -499,15 +500,23 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-	block := a.vocapp.GetBlockByHeight(height)
-	if block == nil {
+	tmblock := a.vocapp.GetBlockByHeight(height)
+	if tmblock == nil {
 		return ErrBlockNotFound
+	}
+	block := &Block{
+		Block: tmtypes.Block{
+			Header:     tmblock.Header,
+			Data:       tmblock.Data,
+			Evidence:   tmblock.Evidence,
+			LastCommit: tmblock.LastCommit,
+		},
+		Hash: types.HexBytes(tmblock.Hash()),
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
 		return err
 	}
-
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
@@ -522,9 +531,18 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	block := a.vocapp.GetBlockByHash(hash)
-	if block == nil {
+	tmblock := a.vocapp.GetBlockByHash(hash)
+	if tmblock == nil {
 		return ErrBlockNotFound
+	}
+	block := &Block{
+		Block: tmtypes.Block{
+			Header:     tmblock.Header,
+			Data:       tmblock.Data,
+			Evidence:   tmblock.Evidence,
+			LastCommit: tmblock.LastCommit,
+		},
+		Hash: types.HexBytes(tmblock.Hash()),
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
