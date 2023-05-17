@@ -3,6 +3,7 @@ package api
 import (
 	"time"
 
+	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -278,4 +279,9 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		return 0, nil, ErrCensusRootIsNil
 	}
 	return origin, root, nil
+}
+
+type Block struct {
+	tmtypes.Block `json:",inline"`
+	Hash          types.HexBytes `json:"hash"`
 }
