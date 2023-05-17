@@ -44,7 +44,10 @@ func BenchmarkIndexVotes(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		for j := int32(0); j < 2000; j++ {
+		// Index a number of votes, then run a couple of queries.
+		const numVotes = 100
+		var oneVote *state.Vote
+		for j := 0; j < numVotes; j++ {
 			vote := &state.Vote{
 				Height:      uint32(util.RandomInt(10, 10000)),
 				ProcessID:   pid,
@@ -52,9 +55,16 @@ func BenchmarkIndexVotes(b *testing.B) {
 				VotePackage: vp,
 				Weight:      new(big.Int).SetUint64(uint64(util.RandomInt(1, 10000))),
 			}
-			idx.OnVote(vote, j)
+			if j == numVotes/2 {
+				oneVote = vote
+			}
+			idx.OnVote(vote, int32(j))
 		}
 		app.AdvanceTestBlock()
+
+		voteRef, err := idx.GetEnvelopeReference(oneVote.Nullifier)
+		qt.Assert(b, err, qt.IsNil)
+		qt.Assert(b, voteRef.Height, qt.Equals, oneVote.Height)
 	}
 }
 
