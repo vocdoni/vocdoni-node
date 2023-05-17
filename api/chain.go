@@ -474,10 +474,11 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 // chainTxByHeightHandler
 //
-// @Summary	Returns the list of transactions for a given block
-// @Description	Given a block returns the list of transactions for that block
-// @Success	200	{object}	TransactionList
-// @Router	/chain/transactions/reference/height/{height} [get]
+//	@Summary		Returns the list of transactions for a given block
+//	@Description	Given a block returns the list of transactions for that block
+//	@Success		200	{object}	TransactionList
+//
+//	@Router			/chain/transactions/reference/height/{height} [get]
 func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
@@ -488,28 +489,33 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 		return ErrBlockNotFound
 	}
 	blockTxs := &BlockTransactionsInfo{
-		BlockNumber:        height,
-		TransactionsNumber: uint32(len(block.Txs)),
-		Transactions:       make([]indexertypes.TxMetadata, len(block.Txs)),
+		BlockNumber:       height,
+		TransactionsCount: uint32(len(block.Txs)),
+		Transactions:      make([]TransactionMetadata, len(block.Txs)),
 	}
-	for i, _ := range block.Txs {
+	for i := range block.Txs {
 		signedTx := new(models.SignedTx)
 		tx := new(models.Tx)
 		var err error
-		if err = proto.Unmarshal(block.Txs[i], signedTx); err != nil {
+		if err := proto.Unmarshal(block.Txs[i], signedTx); err != nil {
 			return ErrUnmarshalingServerProto.WithErr(err)
 		}
-		if err = proto.Unmarshal(signedTx.Tx, tx); err != nil {
+		if err := proto.Unmarshal(signedTx.Tx, tx); err != nil {
 			return ErrUnmarshalingServerProto.WithErr(err)
 		}
 		txType := string(
 			tx.ProtoReflect().WhichOneof(
 				tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
 
-		blockTxs.Transactions = append(blockTxs.Transactions, indexertypes.TxMetadata{
-			Type:  txType,
-			Index: int32(i),
-			Hash:  block.Txs[i].Hash(),
+		txRef, err := a.indexer.GetTxHashReference(block.Txs[i].Hash())
+		if err != nil {
+			return ErrTransactionNotFound
+		}
+		blockTxs.Transactions = append(blockTxs.Transactions, TransactionMetadata{
+			Type:   txType,
+			Index:  int32(i),
+			Height: uint32(txRef.Index),
+			Hash:   block.Txs[i].Hash(),
 		})
 	}
 	data, err := json.Marshal(blockTxs)

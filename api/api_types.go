@@ -6,7 +6,6 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 )
@@ -172,10 +171,17 @@ type TransactionReference struct {
 	Index  uint32 `json:"transactionIndex"`
 }
 
+type TransactionMetadata struct {
+	Type   string         `json:"type"`
+	Height uint32         `json:"height"`
+	Index  int32          `json:"index"`
+	Hash   types.HexBytes `json:"hash"`
+}
+
 type BlockTransactionsInfo struct {
-	BlockNumber        uint64                    `json:"blockNumber"`
-	TransactionsNumber uint32                    `json:"transactionNumber"`
-	Transactions       []indexertypes.TxMetadata `json:"transactions"`
+	BlockNumber       uint64                `json:"blockNumber"`
+	TransactionsCount uint32                `json:"transactionCount"`
+	Transactions      []TransactionMetadata `json:"transactions"`
 }
 
 type ChainInfo struct {
