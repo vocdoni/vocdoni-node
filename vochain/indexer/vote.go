@@ -197,11 +197,11 @@ func (idx *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
 // The function will reverse the order and use the decryption keys starting from the
 // last one provided.
 func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error) {
-	var vote state.VotePackage
-	rawVote := make([]byte, len(VotePackage))
-	copy(rawVote, VotePackage)
+	var rawVote []byte
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
+		rawVote = make([]byte, len(VotePackage))
+		copy(rawVote, VotePackage)
 		for i := len(keys) - 1; i >= 0; i-- {
 			priv, err := nacl.DecodePrivate(keys[i])
 			if err != nil {
@@ -211,7 +211,10 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 				return nil, fmt.Errorf("cannot decrypt vote with index key %d: %w", i, err)
 			}
 		}
+	} else {
+		rawVote = VotePackage
 	}
+	var vote state.VotePackage
 	if err := vote.Decode(rawVote); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal vote: %w", err)
 	}
