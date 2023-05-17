@@ -241,10 +241,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	}
 
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
-
-	if _, err := queries.CreateProcess(ctx, procParams); err != nil {
+	if _, err := queries.CreateProcess(context.TODO(), procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}
 
@@ -309,9 +306,7 @@ func (idx *Indexer) setResultsHeight(pid []byte, height uint32) error {
 		panic("setting results height to 0?")
 	}
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
-	if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
+	if _, err := queries.SetProcessResultsHeight(context.TODO(), indexerdb.SetProcessResultsHeightParams{
 		ID:            pid,
 		ResultsHeight: int64(height),
 	}); err != nil {

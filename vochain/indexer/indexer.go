@@ -307,9 +307,10 @@ func (idx *Indexer) Commit(height uint32) error {
 	// Update existing processes
 	updateProcs := maps.Keys(idx.blockUpdateProcs)
 	sort.Strings(updateProcs)
+
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
+	ctx := context.TODO()
+
 	for _, pidStr := range updateProcs {
 		pid := types.ProcessID(pidStr)
 		if err := idx.updateProcess(ctx, queries, pid); err != nil {
@@ -455,10 +456,7 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 	}
 
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
-
-	if err := idx.addVoteIndex(ctx, queries, vote, txIndex); err != nil {
+	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
 		log.Errorw(err, "could not index vote")
 	}
 }
@@ -535,10 +533,7 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	defer idx.lockPool.Unlock()
 
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
-
-	if _, err := queries.CreateTokenTransfer(ctx, indexerdb.CreateTokenTransferParams{
+	if _, err := queries.CreateTokenTransfer(context.TODO(), indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
 		Height:       int64(idx.App.Height()),
 		FromAccount:  tx.FromAddress.Bytes(),
