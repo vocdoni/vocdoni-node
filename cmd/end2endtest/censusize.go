@@ -71,7 +71,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		contextDeadlines := 0
 		// send nvotes - 1 votes should be fine, due the censusSize was defined previously with nvotes - 1
 		for _, acc := range accounts {
-			ctxDeadline, err := t.sendVote(acc, []int{0}, nil)
+			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{0}}, nil)
 			if err != nil {
 				log.Error(err)
 				break
@@ -101,7 +101,11 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	time.Sleep(time.Second * 4)
 	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
 
-	if _, err := t.sendVote(t.voterAccounts[0], []int{0}, nil); err != nil {
+	v := voteInfo{
+		voterAccount: t.voterAccounts[0],
+		choice:       []int{0},
+	}
+	if _, err := t.sendVote(v, nil); err != nil {
 		// check the error expected for maxCensusSize
 		if strings.Contains(err.Error(), "maxCensusSize reached") {
 			log.Infof("error expected: %s", err.Error())

@@ -57,6 +57,12 @@ func (t *E2EEncryptedElection) Run() error {
 	c := t.config
 	api := t.api
 
+	// get the encryption key, that will be use each voter
+	keys, err := api.EncryptionKeys(t.election.ElectionID)
+	if err != nil {
+		return err
+	}
+
 	// Send the votes (parallelized)
 	startTime := time.Now()
 	wg := sync.WaitGroup{}
@@ -67,7 +73,7 @@ func (t *E2EEncryptedElection) Run() error {
 		votesSent := 0
 		contextDeadlines := 0
 		for i, acc := range accounts {
-			ctxDeadline, err := t.sendVote(acc, []int{i % 2}, nil)
+			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{i % 2}, keys: keys}, nil)
 			if err != nil {
 				log.Error(err)
 				break
@@ -120,8 +126,7 @@ func (t *E2EEncryptedElection) Run() error {
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	_, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
-	if err != nil {
+	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
 		return err
 	}
 

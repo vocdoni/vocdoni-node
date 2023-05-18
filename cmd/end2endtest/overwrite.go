@@ -68,7 +68,7 @@ func (t *E2EOverwriteElection) Run() error {
 		votesSent := 0
 		contextDeadlines := 0
 		for _, acc := range accounts {
-			ctxDeadline, err := t.sendVote(acc, []int{0}, nil)
+			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{0}}, nil)
 			if err != nil {
 				log.Error(err)
 				break
