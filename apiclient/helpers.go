@@ -222,6 +222,27 @@ func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types
 	}
 }
 
+func (c *HTTPclient) EncryptionKeys(electionID types.HexBytes) ([]api.Key, error) {
+	keysEnc := []api.Key{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), WaitTimeout)
+	defer cancel()
+	ek, err := c.WaitUntilElectionKeys(ctx, electionID)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, k := range ek.PublicKeys {
+		if len(k.Key) > 0 {
+			keysEnc = append(keysEnc, api.Key{
+				Key:   k.Key,
+				Index: k.Index,
+			})
+		}
+	}
+	return keysEnc, nil
+}
+
 // GetFaucetPackageFromDevService returns a faucet package.
 // Needs just the destination wallet address, the URL and bearer token are hardcoded
 func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
