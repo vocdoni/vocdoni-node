@@ -27,8 +27,8 @@ import (
 // VotingWeight is the desired weight for voting. It can be less than or equal
 // to the  weight registered in the census. If is defined as nil, it will be
 // equal to the registered one.
-// ProofMkTree is the proof of the vote for a off chain tree, weighted election.
-// ProofCSP is the proof of the vote fore a CSP election.
+// ProofMkTree is the proof of the vote for an off chain tree, weighted election.
+// ProofCSP is the proof of the vote for a CSP election.
 //
 // KeyType is the type of the key used when the census was created. It can be
 // either models.ProofArbo_ADDRESS (default) or models.ProofArbo_PUBKEY
@@ -40,6 +40,7 @@ type VoteData struct {
 
 	ProofMkTree *CensusProof
 	ProofCSP    types.HexBytes
+	Keys        []api.Key
 }
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
@@ -51,7 +52,12 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		return nil, err
 	}
 
-	vote, err := c.prepareVoteEnvelope(v.Choices, election)
+	var vote *models.VoteEnvelope
+	if v.Keys != nil {
+		vote, err = c.voteEnvelopeWithKeys(v.Choices, v.Keys, election)
+	} else {
+		vote, err = c.prepareVoteEnvelope(v.Choices, election)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -129,7 +135,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				},
 			},
 		}
-		// prepare an signed vote transaction with the VoteEnvelope
+		// prepare a signed vote transaction with the VoteEnvelope
 		voteAPI, err = c.prepareVoteTx(vote, true)
 		if err != nil {
 			return nil, err
@@ -143,7 +149,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Ca{Ca: &p},
 		}
-		// prepare an signed vote transaction with the VoteEnvelope
+		// prepare a signed vote transaction with the VoteEnvelope
 		voteAPI, err = c.prepareVoteTx(vote, true)
 		if err != nil {
 			return nil, err
@@ -186,27 +192,34 @@ func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
 // * EncryptionKeyIndexes filled in, for encrypted votes
 func (c *HTTPclient) prepareVoteEnvelope(choices []int, election *api.Election) (*models.VoteEnvelope, error) {
 	var err error
-	var keys []types.HexBytes
-	var keyIndexes []uint32
+	keysEnc := []api.Key{}
+
 	if election.VoteMode.EncryptedVotes { // Get encryption keys
-		ctx, cancel := context.WithTimeout(context.Background(), WaitTimeout)
-		defer cancel()
-		ek, err := c.WaitUntilElectionKeys(ctx, election.ElectionID)
+		keysEnc, err = c.EncryptionKeys(election.ElectionID)
 		if err != nil {
 			return nil, err
 		}
+	}
 
-		for _, k := range ek.PublicKeys {
+	return c.voteEnvelopeWithKeys(choices, keysEnc, election)
+}
+
+func (c *HTTPclient) voteEnvelopeWithKeys(choices []int, keysEnc []api.Key, election *api.Election) (*models.VoteEnvelope, error) {
+	var keys []types.HexBytes
+	var keyIndexes []uint32
+
+	if election.VoteMode.EncryptedVotes {
+		for _, k := range keysEnc {
 			if len(k.Key) > 0 {
 				keys = append(keys, k.Key)
 				keyIndexes = append(keyIndexes, uint32(k.Index))
 			}
 		}
-
 		if len(keys) == 0 {
 			return nil, fmt.Errorf("no keys for election %s", election.ElectionID)
 		}
 	}
+
 	// if EncryptedVotes is false, keys will be nil and prepareVotePackageBytes returns plaintext
 	vpb, err := c.prepareVotePackageBytes(&state.VotePackage{Votes: choices}, keys)
 	if err != nil {
@@ -219,7 +232,6 @@ func (c *HTTPclient) prepareVoteEnvelope(choices []int, election *api.Election) 
 		VotePackage:          vpb,
 		EncryptionKeyIndexes: keyIndexes,
 	}, nil
-
 }
 
 // prepareVotePackageBytes returns a plaintext json.Marshal(vp) if keys is nil,

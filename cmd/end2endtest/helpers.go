@@ -25,6 +25,12 @@ const (
 	sameBlock = "sameBlock"
 )
 
+type voteInfo struct {
+	voterAccount *ethereum.SignKeys
+	choice       []int
+	keys         []vapi.Key
+}
+
 func newTestElectionDescription() *vapi.ElectionDescription {
 	return &vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
@@ -312,7 +318,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 	for i := 0; i < len(choices); i++ {
 		// assign the choices wanted for each overwrite vote
 		choice := []int{choices[i]}
-		ctxDeadLine, err := t.sendVote(acc, choice, nil)
+		ctxDeadLine, err := t.sendVote(voteInfo{voterAccount: acc, choice: choice}, nil)
 		if err != nil {
 			// check the error expected for overwrite with waitUntilNextBlock
 			if strings.Contains(err.Error(), "overwrite count reached") {
@@ -335,25 +341,26 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 	return contextDeadlines, nil
 }
 
-func (t *e2eElection) sendVote(voterAccount *ethereum.SignKeys, choice []int, apiClientMtx *sync.Mutex) (int, error) {
+func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error) {
 	var contextDeadline int
 
 	api := t.api
 	if t.election.VoteMode.Anonymous {
 		apiClientMtx.Lock()
-		privKey := voterAccount.PrivateKey()
+		privKey := v.voterAccount.PrivateKey()
 		if err := t.api.SetAccount(privKey.String()); err != nil {
 			apiClientMtx.Unlock()
 			return 0, err
 		}
 	} else {
-		api = t.api.Clone(fmt.Sprintf("%x", voterAccount.PrivateKey()))
+		api = t.api.Clone(fmt.Sprintf("%x", v.voterAccount.PrivateKey()))
 	}
 
 	if _, err := api.Vote(&apiclient.VoteData{
 		ElectionID:  t.election.ElectionID,
-		ProofMkTree: t.proofs[voterAccount.Address().Hex()],
-		Choices:     choice},
+		ProofMkTree: t.proofs[v.voterAccount.Address().Hex()],
+		Choices:     v.choice,
+		Keys:        v.keys},
 	); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
 			contextDeadline = 1

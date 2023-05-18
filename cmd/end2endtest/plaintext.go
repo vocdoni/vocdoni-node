@@ -66,7 +66,7 @@ func (t *E2EPlaintextElection) Run() error {
 		votesSent := 0
 		contextDeadlines := 0
 		for i, acc := range accounts {
-			ctxDeadline, err := t.sendVote(acc, []int{i % 2}, nil)
+			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{i % 2}}, nil)
 			if err != nil {
 				log.Error(err)
 				break
