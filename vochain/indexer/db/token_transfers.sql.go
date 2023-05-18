@@ -64,7 +64,7 @@ func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (Toke
 const getTokenTransfersByFromAccount = `-- name: GetTokenTransfersByFromAccount :many
 SELECT tx_hash, height, from_account, to_account, amount, transfer_time FROM token_transfers
 WHERE from_account = ?
-ORDER BY transfer_time ASC
+ORDER BY transfer_time DESC
 LIMIT ?
 OFFSET ?
 `
