@@ -74,7 +74,7 @@ const searchVoteReferences = `-- name: SearchVoteReferences :many
 SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
 WHERE (? = '' OR process_id = ?)
 	AND (? = '' OR (INSTR(LOWER(HEX(nullifier)), ?) > 0))
-ORDER BY height ASC, nullifier ASC
+ORDER BY height DESC, nullifier ASC
 LIMIT ?
 OFFSET ?
 `

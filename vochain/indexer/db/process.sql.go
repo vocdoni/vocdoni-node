@@ -276,7 +276,7 @@ func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{
 const searchEntities = `-- name: SearchEntities :many
 SELECT entity_id FROM processes
 WHERE (? = '' OR (INSTR(LOWER(HEX(entity_id)), ?) > 0))
-ORDER BY creation_time ASC, id ASC
+ORDER BY creation_time DESC, id ASC
 LIMIT ?
 OFFSET ?
 `
@@ -324,7 +324,7 @@ WHERE (? = 0 OR entity_id = ?)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (? = '' OR (INSTR(LOWER(HEX(id)), ?) > 0))
 	AND (? = FALSE OR have_results)
-ORDER BY creation_time ASC, id ASC
+ORDER BY creation_time DESC, id ASC
 LIMIT ?
 OFFSET ?
 `
