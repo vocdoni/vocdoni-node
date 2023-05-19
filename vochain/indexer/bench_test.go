@@ -49,10 +49,11 @@ func BenchmarkIndexVotes(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Index a number of votes, then run a couple of queries.
 		height := uint32(500 + i)
-		const totalVotes = 100
+		const numInserts = 100
+		const numFetches = 20
 		var oneVote *state.Vote
 		var oneTx *vochaintx.Tx
-		for j := 0; j < totalVotes; j++ {
+		for j := 0; j < numInserts; j++ {
 			txBlockIndex := int32(j)
 
 			vote := &state.Vote{
@@ -69,17 +70,23 @@ func BenchmarkIndexVotes(b *testing.B) {
 				TxModelType: "vote",
 			}
 			idx.OnNewTx(tx, height, txBlockIndex)
-			if j == totalVotes/2 {
+			if j == numInserts/2 {
 				oneVote = vote
 				oneTx = tx
 			}
 		}
 		app.AdvanceTestBlock()
 
-		voteRef, err := idx.GetEnvelopeReference(oneVote.Nullifier)
-		qt.Assert(b, err, qt.IsNil)
-		qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(oneVote.Weight), qt.Equals, 0)
-		qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, oneTx.TxID[:])
+		for j := 0; j < numFetches; j++ {
+			voteRef, err := idx.GetEnvelopeReference(oneVote.Nullifier)
+			qt.Assert(b, err, qt.IsNil)
+			qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(oneVote.Weight), qt.Equals, 0)
+			qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, oneTx.TxID[:])
+
+			txRef, err := idx.GetTxHashReference(oneTx.TxID[:])
+			qt.Assert(b, err, qt.IsNil)
+			qt.Assert(b, txRef.BlockHeight, qt.Equals, oneVote.Height)
+		}
 	}
 }
 

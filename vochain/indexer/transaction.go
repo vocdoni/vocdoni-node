@@ -25,13 +25,13 @@ func (idx *Indexer) TransactionCount() (uint64, error) {
 }
 
 // GetTxReference fetches the txReference for the given tx height
-func (idx *Indexer) GetTxReference(height uint64) (*indexertypes.TxReference, error) {
-	sqlTxRef, err := idx.oneQuery.GetTxReference(context.TODO(), int64(height))
+func (idx *Indexer) GetTxReference(id uint64) (*indexertypes.TxReference, error) {
+	sqlTxRef, err := idx.oneQuery.GetTxReference(context.TODO(), int64(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
 		}
-		return nil, fmt.Errorf("tx height %d not found: %v", height, err)
+		return nil, fmt.Errorf("tx wiht id %d not found: %v", id, err)
 	}
 	return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
 }
