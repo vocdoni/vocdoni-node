@@ -48,26 +48,38 @@ func BenchmarkIndexVotes(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		// Index a number of votes, then run a couple of queries.
-		const numVotes = 100
+		height := uint32(500 + i)
+		const totalVotes = 100
 		var oneVote *state.Vote
-		for j := 0; j < numVotes; j++ {
+		var oneTx *vochaintx.Tx
+		for j := 0; j < totalVotes; j++ {
+			txBlockIndex := int32(j)
+
 			vote := &state.Vote{
-				Height:      uint32(500 + rnd.RandomIntn(10000)),
+				Height:      height,
 				ProcessID:   pid,
 				Nullifier:   rnd.RandomBytes(32),
 				VotePackage: vp,
 				Weight:      new(big.Int).SetUint64(1 + uint64(rnd.RandomIntn(9999))),
 			}
-			if j == numVotes/2 {
-				oneVote = vote
+			idx.OnVote(vote, txBlockIndex)
+
+			tx := &vochaintx.Tx{
+				TxID:        rnd.Random32(),
+				TxModelType: "vote",
 			}
-			idx.OnVote(vote, int32(j))
+			idx.OnNewTx(tx, height, txBlockIndex)
+			if j == totalVotes/2 {
+				oneVote = vote
+				oneTx = tx
+			}
 		}
 		app.AdvanceTestBlock()
 
 		voteRef, err := idx.GetEnvelopeReference(oneVote.Nullifier)
 		qt.Assert(b, err, qt.IsNil)
-		qt.Assert(b, voteRef.Height, qt.Equals, oneVote.Height)
+		qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(oneVote.Weight), qt.Equals, 0)
+		qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, oneTx.TxID[:])
 	}
 }
 

@@ -49,14 +49,29 @@ func (q *Queries) CreateVoteReference(ctx context.Context, arg CreateVoteReferen
 }
 
 const getVoteReference = `-- name: GetVoteReference :one
-SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
+SELECT vote_references.nullifier, vote_references.process_id, vote_references.height, vote_references.weight, vote_references.tx_index, vote_references.creation_time, vote_references.voter_id, vote_references.overwrite_count, tx_references.hash FROM vote_references
+LEFT JOIN tx_references
+	ON vote_references.height = tx_references.block_height
+	AND vote_references.tx_index = tx_references.tx_block_index
 WHERE nullifier = ?
 LIMIT 1
 `
 
-func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifier) (VoteReference, error) {
+type GetVoteReferenceRow struct {
+	Nullifier      types.Nullifier
+	ProcessID      types.ProcessID
+	Height         int64
+	Weight         string
+	TxIndex        int64
+	CreationTime   time.Time
+	VoterID        state.VoterID
+	OverwriteCount int64
+	Hash           types.Hash
+}
+
+func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifier) (GetVoteReferenceRow, error) {
 	row := q.db.QueryRowContext(ctx, getVoteReference, nullifier)
-	var i VoteReference
+	var i GetVoteReferenceRow
 	err := row.Scan(
 		&i.Nullifier,
 		&i.ProcessID,
@@ -66,12 +81,16 @@ func (q *Queries) GetVoteReference(ctx context.Context, nullifier types.Nullifie
 		&i.CreationTime,
 		&i.VoterID,
 		&i.OverwriteCount,
+		&i.Hash,
 	)
 	return i, err
 }
 
 const searchVoteReferences = `-- name: SearchVoteReferences :many
-SELECT nullifier, process_id, height, weight, tx_index, creation_time, voter_id, overwrite_count FROM vote_references
+SELECT vote_references.nullifier, vote_references.process_id, vote_references.height, vote_references.weight, vote_references.tx_index, vote_references.creation_time, vote_references.voter_id, vote_references.overwrite_count, tx_references.hash FROM vote_references
+LEFT JOIN tx_references
+	ON vote_references.height = tx_references.block_height
+	AND vote_references.tx_index = tx_references.tx_block_index
 WHERE (? = '' OR process_id = ?)
 	AND (? = '' OR (INSTR(LOWER(HEX(nullifier)), ?) > 0))
 ORDER BY height DESC, nullifier ASC
@@ -86,7 +105,19 @@ type SearchVoteReferencesParams struct {
 	Offset          int32
 }
 
-func (q *Queries) SearchVoteReferences(ctx context.Context, arg SearchVoteReferencesParams) ([]VoteReference, error) {
+type SearchVoteReferencesRow struct {
+	Nullifier      types.Nullifier
+	ProcessID      types.ProcessID
+	Height         int64
+	Weight         string
+	TxIndex        int64
+	CreationTime   time.Time
+	VoterID        state.VoterID
+	OverwriteCount int64
+	Hash           types.Hash
+}
+
+func (q *Queries) SearchVoteReferences(ctx context.Context, arg SearchVoteReferencesParams) ([]SearchVoteReferencesRow, error) {
 	rows, err := q.db.QueryContext(ctx, searchVoteReferences,
 		arg.ProcessID,
 		arg.ProcessID,
@@ -99,9 +130,9 @@ func (q *Queries) SearchVoteReferences(ctx context.Context, arg SearchVoteRefere
 		return nil, err
 	}
 	defer rows.Close()
-	var items []VoteReference
+	var items []SearchVoteReferencesRow
 	for rows.Next() {
-		var i VoteReference
+		var i SearchVoteReferencesRow
 		if err := rows.Scan(
 			&i.Nullifier,
 			&i.ProcessID,
@@ -111,6 +142,7 @@ func (q *Queries) SearchVoteReferences(ctx context.Context, arg SearchVoteRefere
 			&i.CreationTime,
 			&i.VoterID,
 			&i.OverwriteCount,
+			&i.Hash,
 		); err != nil {
 			return nil, err
 		}

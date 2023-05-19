@@ -57,6 +57,13 @@ func (r *Random) RandomBytes(n int) []byte {
 	return b
 }
 
+func (r *Random) Random32() [32]byte {
+	b := r.RandomBytes(32)
+	var p [32]byte
+	copy(p[:], b)
+	return p
+}
+
 func (r *Random) RandomIntn(n int) int {
 	r.randMu.Lock()
 	defer r.randMu.Unlock()

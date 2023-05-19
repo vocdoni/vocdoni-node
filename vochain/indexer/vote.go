@@ -53,11 +53,6 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 	if err != nil {
 		return nil, ErrVoteNotFound
 	}
-	// TODO: get the txHash from another place, not the blockstore
-	_, txHash, err := idx.App.GetTxHash(voteRef.Height, voteRef.TxIndex)
-	if err != nil {
-		return nil, err
-	}
 
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          vote.VotePackage,
@@ -70,7 +65,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 			Nullifier: nullifier,
 			TxIndex:   voteRef.TxIndex,
 			Height:    voteRef.Height,
-			TxHash:    txHash,
+			TxHash:    voteRef.TxHash,
 		},
 	}
 	if len(envelopePackage.Meta.VoterID) > 0 {
@@ -105,16 +100,12 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, err
 	}
 	for _, txRef := range txRefs {
-		_, txHash, err := idx.App.GetTxHash(uint32(txRef.Height), int32(txRef.TxIndex))
-		if err != nil {
-			return nil, err
-		}
 		envelopeMetadata := &indexertypes.EnvelopeMetadata{
 			ProcessId: txRef.ProcessID,
 			Nullifier: txRef.Nullifier,
 			TxIndex:   int32(txRef.TxIndex),
 			Height:    uint32(txRef.Height),
-			TxHash:    txHash,
+			TxHash:    txRef.Hash,
 		}
 		if len(txRef.VoterID) > 0 {
 			envelopeMetadata.VoterID = txRef.VoterID.Address()
