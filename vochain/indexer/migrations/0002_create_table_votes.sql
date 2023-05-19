@@ -12,5 +12,10 @@ CREATE TABLE vote_references (
   FOREIGN KEY(process_id) REFERENCES processes(id)
 );
 
+CREATE INDEX index_vote_references_height_tx_index
+ON vote_references(height, tx_index);
+
 -- +goose Down
 DROP TABLE vote_references
+
+DROP INDEX index_vote_references_height_tx_index
