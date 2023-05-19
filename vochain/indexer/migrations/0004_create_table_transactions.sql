@@ -12,7 +12,12 @@ CREATE TABLE tx_references (
 CREATE INDEX tx_references_hash
 ON tx_references(hash);
 
+CREATE INDEX tx_references_height_index
+ON tx_references(block_height, tx_block_index);
+
 -- +goose Down
 DROP TABLE tx_references
 
 DROP INDEX tx_references_hash
+
+DROP INDEX tx_references_height_index
