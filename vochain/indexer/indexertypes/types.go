@@ -194,11 +194,12 @@ type VoteReference struct {
 	Height         uint32
 	Weight         *types.BigInt
 	TxIndex        int32
+	TxHash         types.HexBytes
 	CreationTime   time.Time
 	OverwriteCount uint32
 }
 
-func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
+func VoteReferenceFromDB(dbvote *indexerdb.GetVoteReferenceRow) *VoteReference {
 	weightInt := new(types.BigInt)
 	if err := weightInt.UnmarshalText([]byte(dbvote.Weight)); err != nil {
 		panic(err) // should never happen
@@ -210,6 +211,7 @@ func VoteReferenceFromDB(dbvote *indexerdb.VoteReference) *VoteReference {
 		Height:         uint32(dbvote.Height),
 		Weight:         weightInt,
 		TxIndex:        int32(dbvote.TxIndex),
+		TxHash:         dbvote.Hash,
 		CreationTime:   dbvote.CreationTime,
 		OverwriteCount: uint32(dbvote.OverwriteCount),
 	}
