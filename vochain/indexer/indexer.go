@@ -67,7 +67,8 @@ type Indexer struct {
 
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
-	blockTx *sql.Tx
+	blockTx      *sql.Tx
+	blockQueries *indexerdb.Queries
 
 	// blockUpdateProcs is the list of process IDs that require sync with the state database.
 	// The key is a types.ProcessID as a string, so that it can be used as a map key.
@@ -178,8 +179,9 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 			panic(err) // shouldn't happen, use an error return if it ever does
 		}
 		idx.blockTx = tx
+		idx.blockQueries = indexerdb.New(idx.blockTx)
 	}
-	return indexerdb.New(idx.blockTx)
+	return idx.blockQueries
 }
 
 // retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
