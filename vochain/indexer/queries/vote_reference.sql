@@ -8,12 +8,18 @@ REPLACE INTO vote_references (
 );
 
 -- name: GetVoteReference :one
-SELECT * FROM vote_references
+SELECT vote_references.*, tx_references.hash FROM vote_references
+LEFT JOIN tx_references
+	ON vote_references.height = tx_references.block_height
+	AND vote_references.tx_index = tx_references.tx_block_index
 WHERE nullifier = ?
 LIMIT 1;
 
 -- name: SearchVoteReferences :many
-SELECT * FROM vote_references
+SELECT vote_references.*, tx_references.hash FROM vote_references
+LEFT JOIN tx_references
+	ON vote_references.height = tx_references.block_height
+	AND vote_references.tx_index = tx_references.tx_block_index
 WHERE (sqlc.arg(process_id) = '' OR process_id = sqlc.arg(process_id))
 	AND (sqlc.arg(nullifier_substr) = '' OR (INSTR(LOWER(HEX(nullifier)), sqlc.arg(nullifier_substr)) > 0))
 ORDER BY height DESC, nullifier ASC
