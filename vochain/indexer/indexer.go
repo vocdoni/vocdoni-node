@@ -63,6 +63,8 @@ type Indexer struct {
 	// lockPool is the lock for all *Pool and blockTx operations
 	lockPool sync.Mutex
 
+	oneQuery *indexerdb.Queries
+
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
 	blockTx *sql.Tx
@@ -97,7 +99,7 @@ type Indexer struct {
 // using the local storage database of dbPath and integrated into the state vochain instance
 func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
 	cancelCtx, cancelFunc := context.WithCancel(context.Background())
-	s := &Indexer{
+	idx := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
 
@@ -109,7 +111,7 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 	startTime := time.Now()
 
-	countMap, err := s.retrieveCounts()
+	countMap, err := idx.retrieveCounts()
 	if err != nil {
 		return nil, fmt.Errorf("could not create indexer: %v", err)
 	}
@@ -126,7 +128,7 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 	sqlPath := dbPath + "-sqlite"
 	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
-	s.sqlDB, err = sql.Open("sqlite3", sqlPath) // mattn
+	idx.sqlDB, err = sql.Open("sqlite3", sqlPath) // mattn
 	if err != nil {
 		return nil, err
 	}
@@ -135,24 +137,26 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 	// connections may lead to concurrent writes, resulting in confusing
 	// "database is locked" errors. See TestIndexerConcurrentDB.
 	// While here, also set other reasonable maximum values.
-	s.sqlDB.SetMaxOpenConns(1)
-	s.sqlDB.SetMaxIdleConns(2)
-	s.sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-	s.sqlDB.SetConnMaxLifetime(time.Hour)
+	idx.sqlDB.SetMaxOpenConns(1)
+	idx.sqlDB.SetMaxIdleConns(2)
+	idx.sqlDB.SetConnMaxIdleTime(5 * time.Minute)
+	idx.sqlDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
 	}
 	// goose.SetLogger(log.Logger()) // TODO: interfaces aren't compatible
 	goose.SetBaseFS(embedMigrations)
-	if err := goose.Up(s.sqlDB, "migrations"); err != nil {
+	if err := goose.Up(idx.sqlDB, "migrations"); err != nil {
 		return nil, fmt.Errorf("goose up: %w", err)
 	}
 
-	// Subscribe to events
-	s.App.State.AddEventListener(s)
+	idx.oneQuery = indexerdb.New(idx.sqlDB)
 
-	return s, nil
+	// Subscribe to events
+	idx.App.State.AddEventListener(idx)
+
+	return idx, nil
 }
 
 func (idx *Indexer) Close() error {
@@ -161,10 +165,6 @@ func (idx *Indexer) Close() error {
 		return err
 	}
 	return nil
-}
-
-func (idx *Indexer) oneQuery() *indexerdb.Queries {
-	return indexerdb.New(idx.sqlDB)
 }
 
 // blockTxQueries assumes that lockPool is locked.
@@ -231,7 +231,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
 
-	queries := idx.oneQuery() // TODO: use a tx
+	queries := idx.oneQuery // TODO: use a tx
 
 	prcIDs, err := queries.GetProcessIDsByFinalResults(context.TODO(), false)
 	if err != nil {
@@ -549,7 +549,7 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
 // from the database, ordered by timestamp and paginated by maxItems and offset
 func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.oneQuery().GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
+	ttFromDB, err := idx.oneQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
 		FromAccount: from,
 		Limit:       maxItems,
 		Offset:      offset,
