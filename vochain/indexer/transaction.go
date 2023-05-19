@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -81,10 +80,7 @@ func (idx *Indexer) indexNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int
 	defer idx.lockPool.Unlock()
 
 	queries := idx.blockTxQueries()
-	ctx, cancel := context.WithTimeout(context.TODO(), time.Minute)
-	defer cancel()
-
-	if _, err := queries.CreateTxReference(ctx, indexerdb.CreateTxReferenceParams{
+	if _, err := queries.CreateTxReference(context.TODO(), indexerdb.CreateTxReferenceParams{
 		Hash:         tx.TxID[:],
 		BlockHeight:  int64(blockHeight),
 		TxBlockIndex: int64(txIndex),
