@@ -90,6 +90,7 @@ func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 		info, err := c.ChainInfo()
 		if err != nil {
 			log.Warn(err)
+			continue
 		}
 		if info.Height >= height {
 			return nil
