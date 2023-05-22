@@ -1,10 +1,10 @@
 -- +goose Up
 CREATE TABLE token_transfers (
-  tx_hash BLOB NOT NULL PRIMARY KEY,
-  height INTEGER NOT NULL,
-  from_account BLOB NOT NULL,
-  to_account BLOB NOT NULL,
-  amount INTEGER NOT NULL,
+  tx_hash       BLOB NOT NULL PRIMARY KEY,
+  block_height  INTEGER NOT NULL,
+  from_account  BLOB NOT NULL,
+  to_account    BLOB NOT NULL,
+  amount        INTEGER NOT NULL,
   transfer_time DATETIME NOT NULL
 );
 

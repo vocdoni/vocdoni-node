@@ -1,8 +1,10 @@
 -- name: CreateTokenTransfer :execresult
 INSERT INTO token_transfers (
-	tx_hash, height, from_account, to_account, amount, transfer_time
+	tx_hash, block_height, from_account,
+	to_account, amount, transfer_time
 ) VALUES (
-	?, ?, ?, ?, ?, ?
+	?, ?, ?,
+	?, ?, ?
 );
 
 -- name: GetTokenTransfer :one
