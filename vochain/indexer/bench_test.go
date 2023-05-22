@@ -109,7 +109,7 @@ func BenchmarkFetchTx(b *testing.B) {
 
 		startTime := time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = idx.GetTxReference(uint64((i * numTxs) + j + 1))
+			_, err = idx.GetTransaction(uint64((i * numTxs) + j + 1))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by index, took %s",

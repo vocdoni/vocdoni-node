@@ -1,26 +1,26 @@
--- name: CreateTxReference :execresult
-INSERT INTO tx_references (
-	hash, block_height, tx_block_index, tx_type
+-- name: CreateTransaction :execresult
+INSERT INTO transactions (
+	hash, block_height, block_index, type
 ) VALUES (
 	?, ?, ?, ?
 );
 
--- name: GetTxReference :one
-SELECT * FROM tx_references
+-- name: GetTransaction :one
+SELECT * FROM transactions
 WHERE id = ?
 LIMIT 1;
 
--- name: GetTxReferenceByHash :one
-SELECT * FROM tx_references
+-- name: GetTransactionByHash :one
+SELECT * FROM transactions
 WHERE hash = ?
 LIMIT 1;
 
--- name: GetLastTxReferences :many
-SELECT * FROM tx_references
+-- name: GetLastTransactions :many
+SELECT * FROM transactions
 ORDER BY id DESC
 LIMIT ?
 OFFSET ?
 ;
 
--- name: CountTxReferences :one
-SELECT COUNT(*) FROM tx_references;
+-- name: CountTransactions :one
+SELECT COUNT(*) FROM transactions;

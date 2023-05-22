@@ -29,8 +29,8 @@ var ErrVoteNotFound = fmt.Errorf("vote not found")
 
 // GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteReference, error) {
-	sqlTxRefInner, err := idx.oneQuery.GetVoteReference(context.TODO(), nullifier)
+func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote, error) {
+	sqlTxRefInner, err := idx.oneQuery.GetVote(context.TODO(), nullifier)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrVoteNotFound
@@ -38,7 +38,7 @@ func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.VoteRe
 		return nil, err
 	}
 
-	sqlTxRef := indexertypes.VoteReferenceFromDB(&sqlTxRefInner)
+	sqlTxRef := indexertypes.VoteFromDB(&sqlTxRefInner)
 	return sqlTxRef, nil
 }
 
@@ -87,7 +87,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	txRefs, err := idx.oneQuery.SearchVoteReferences(context.TODO(), indexerdb.SearchVoteReferencesParams{
+	txRefs, err := idx.oneQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
 		ProcessID:       processId,
 		NullifierSubstr: searchTerm,
 		Limit:           int32(max),
@@ -103,8 +103,8 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		envelopeMetadata := &indexertypes.EnvelopeMetadata{
 			ProcessId: txRef.ProcessID,
 			Nullifier: txRef.Nullifier,
-			TxIndex:   int32(txRef.TxIndex),
-			Height:    uint32(txRef.Height),
+			TxIndex:   int32(txRef.BlockIndex),
+			Height:    uint32(txRef.BlockHeight),
 			TxHash:    txRef.Hash,
 		}
 		if len(txRef.VoterID) > 0 {
@@ -257,12 +257,12 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 			panic(err) // should never happen
 		}
 	}
-	if _, err := queries.CreateVoteReference(ctx, indexerdb.CreateVoteReferenceParams{
+	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
 		Nullifier:      vote.Nullifier,
 		ProcessID:      vote.ProcessID,
-		Height:         int64(vote.Height),
+		BlockHeight:    int64(vote.Height),
+		BlockIndex:     int64(txIndex),
 		Weight:         string(weightStr),
-		TxIndex:        int64(txIndex),
 		OverwriteCount: int64(vote.Overwrites),
 		// VoterID has a NOT NULL constraint, so we need to provide
 		// a zero value for it since nil is not allowed

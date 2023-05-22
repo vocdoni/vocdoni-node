@@ -186,8 +186,8 @@ type VotePackage struct {
 	Votes []int  `json:"votes"`
 }
 
-// VoteReference holds the db reference for a single vote
-type VoteReference struct {
+// Vote holds the db reference for a single vote
+type Vote struct {
 	Nullifier      types.HexBytes
 	ProcessID      types.HexBytes
 	VoterID        state.VoterID
@@ -199,18 +199,18 @@ type VoteReference struct {
 	OverwriteCount uint32
 }
 
-func VoteReferenceFromDB(dbvote *indexerdb.GetVoteReferenceRow) *VoteReference {
+func VoteFromDB(dbvote *indexerdb.GetVoteRow) *Vote {
 	weightInt := new(types.BigInt)
 	if err := weightInt.UnmarshalText([]byte(dbvote.Weight)); err != nil {
 		panic(err) // should never happen
 	}
-	return &VoteReference{
+	return &Vote{
 		Nullifier:      dbvote.Nullifier,
 		ProcessID:      dbvote.ProcessID,
 		VoterID:        dbvote.VoterID,
-		Height:         uint32(dbvote.Height),
+		Height:         uint32(dbvote.BlockHeight),
+		TxIndex:        int32(dbvote.BlockIndex),
 		Weight:         weightInt,
-		TxIndex:        int32(dbvote.TxIndex),
 		TxHash:         dbvote.Hash,
 		CreationTime:   dbvote.CreationTime,
 		OverwriteCount: uint32(dbvote.OverwriteCount),
@@ -257,8 +257,8 @@ type TxMetadata struct {
 	Hash        types.HexBytes `json:"hash"`
 }
 
-// TxReference holds the db reference for a single transaction
-type TxReference struct {
+// Transaction holds the db reference for a single transaction
+type Transaction struct {
 	Index        uint64         `json:"transactionNumber"`
 	Hash         types.HexBytes `json:"transactionHash"`
 	BlockHeight  uint32         `json:"blockHeight"`
@@ -266,13 +266,13 @@ type TxReference struct {
 	TxType       string         `json:"transactionType"`
 }
 
-func TxReferenceFromDB(dbtx *indexerdb.TxReference) *TxReference {
-	return &TxReference{
+func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
+	return &Transaction{
 		Index:        uint64(dbtx.ID),
 		Hash:         dbtx.Hash,
 		BlockHeight:  uint32(dbtx.BlockHeight),
-		TxBlockIndex: int32(dbtx.TxBlockIndex),
-		TxType:       dbtx.TxType,
+		TxBlockIndex: int32(dbtx.BlockIndex),
+		TxType:       dbtx.Type,
 	}
 }
 

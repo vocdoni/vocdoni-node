@@ -45,27 +45,27 @@ type Process struct {
 
 type TokenTransfer struct {
 	TxHash       types.Hash
-	Height       int64
+	BlockHeight  int64
 	FromAccount  types.AccountID
 	ToAccount    types.AccountID
 	Amount       int64
 	TransferTime time.Time
 }
 
-type TxReference struct {
-	ID           int64
-	Hash         types.Hash
-	BlockHeight  int64
-	TxBlockIndex int64
-	TxType       string
+type Transaction struct {
+	ID          int64
+	Hash        types.Hash
+	BlockHeight int64
+	BlockIndex  int64
+	Type        string
 }
 
-type VoteReference struct {
+type Vote struct {
 	Nullifier      types.Nullifier
 	ProcessID      types.ProcessID
-	Height         int64
+	BlockHeight    int64
+	BlockIndex     int64
 	Weight         string
-	TxIndex        int64
 	CreationTime   time.Time
 	VoterID        state.VoterID
 	OverwriteCount int64

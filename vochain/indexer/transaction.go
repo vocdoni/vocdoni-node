@@ -20,38 +20,38 @@ var (
 
 // TransactionCount returns the number of transactions indexed
 func (idx *Indexer) TransactionCount() (uint64, error) {
-	count, err := idx.oneQuery.CountTxReferences(context.TODO())
+	count, err := idx.oneQuery.CountTransactions(context.TODO())
 	return uint64(count), err
 }
 
-// GetTxReference fetches the txReference for the given tx height
-func (idx *Indexer) GetTxReference(id uint64) (*indexertypes.TxReference, error) {
-	sqlTxRef, err := idx.oneQuery.GetTxReference(context.TODO(), int64(id))
+// GetTransaction fetches the txReference for the given tx height
+func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error) {
+	sqlTxRef, err := idx.oneQuery.GetTransaction(context.TODO(), int64(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
 		}
 		return nil, fmt.Errorf("tx wiht id %d not found: %v", id, err)
 	}
-	return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
+	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
 // GetTxHashReference fetches the txReference for the given tx hash
-func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.TxReference, error) {
-	sqlTxRef, err := idx.oneQuery.GetTxReferenceByHash(context.TODO(), hash)
+func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Transaction, error) {
+	sqlTxRef, err := idx.oneQuery.GetTransactionByHash(context.TODO(), hash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
 		}
 		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
 	}
-	return indexertypes.TxReferenceFromDB(&sqlTxRef), nil
+	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
-// GetLastTxReferences fetches a number of the latest indexed transactions.
+// GetLastTransactions fetches a number of the latest indexed transactions.
 // The first one returned is the newest, so they are in descending order.
-func (idx *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.TxReference, error) {
-	sqlTxRefs, err := idx.oneQuery.GetLastTxReferences(context.TODO(), indexerdb.GetLastTxReferencesParams{
+func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Transaction, error) {
+	sqlTxRefs, err := idx.oneQuery.GetLastTransactions(context.TODO(), indexerdb.GetLastTransactionsParams{
 		Limit:  limit,
 		Offset: offset,
 	})
@@ -61,9 +61,9 @@ func (idx *Indexer) GetLastTxReferences(limit, offset int32) ([]*indexertypes.Tx
 		}
 		return nil, fmt.Errorf("could not get last %d tx refs: %v", limit, err)
 	}
-	txRefs := make([]*indexertypes.TxReference, len(sqlTxRefs))
+	txRefs := make([]*indexertypes.Transaction, len(sqlTxRefs))
 	for i, sqlTxRef := range sqlTxRefs {
-		txRefs[i] = indexertypes.TxReferenceFromDB(&sqlTxRef)
+		txRefs[i] = indexertypes.TransactionFromDB(&sqlTxRef)
 	}
 	return txRefs, nil
 }
@@ -80,11 +80,11 @@ func (idx *Indexer) indexNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int
 	defer idx.lockPool.Unlock()
 
 	queries := idx.blockTxQueries()
-	if _, err := queries.CreateTxReference(context.TODO(), indexerdb.CreateTxReferenceParams{
-		Hash:         tx.TxID[:],
-		BlockHeight:  int64(blockHeight),
-		TxBlockIndex: int64(txIndex),
-		TxType:       tx.TxModelType,
+	if _, err := queries.CreateTransaction(context.TODO(), indexerdb.CreateTransactionParams{
+		Hash:        tx.TxID[:],
+		BlockHeight: int64(blockHeight),
+		BlockIndex:  int64(txIndex),
+		Type:        tx.TxModelType,
 	}); err != nil {
 		return err
 	}
