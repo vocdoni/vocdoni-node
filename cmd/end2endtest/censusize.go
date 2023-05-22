@@ -5,12 +5,10 @@ import (
 	"fmt"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -63,50 +61,35 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-	wg := sync.WaitGroup{}
-	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("sending %d votes", len(accounts))
 
-		votesSent := 0
-		contextDeadlines := 0
-		// send nvotes - 1 votes should be fine, due the censusSize was defined previously with nvotes - 1
-		for _, acc := range accounts {
-			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{0}}, nil)
-			if err != nil {
-				log.Error(err)
-				break
-			}
-			contextDeadlines += ctxDeadline
-			votesSent++
-		}
-		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
-		time.Sleep(time.Second * 4)
+	// send nvotes - 1 votes should be fine, due the censusSize was defined previously with nvotes - 1
+	log.Infow("enqueuing votes", "n", len(t.voterAccounts[1:]), "election", t.election.ElectionID)
+	votes := []*apiclient.VoteData{}
+	for _, acct := range t.voterAccounts[1:] {
+		votes = append(votes, &apiclient.VoteData{
+			ElectionID:   t.election.ElectionID,
+			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			Choices:      []int{0},
+			VoterAccount: acct,
+		})
 	}
+	t.sendVotes(votes)
 
-	pcount := c.nvotes / c.parallelCount
-	for i := 1; i < len(t.voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(t.voterAccounts) {
-			end = len(t.voterAccounts)
-		}
-		wg.Add(1)
-		go voteAccounts(t.voterAccounts[i:end], &wg)
-	}
-
-	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes-1)/time.Since(startTime).Seconds()))
+	log.Infow("votes submitted successfully",
+		"n", len(t.voterAccounts[1:]), "time", time.Since(startTime),
+		"vps", int(float64(len(t.voterAccounts[1:]))/time.Since(startTime).Seconds()))
 
 	// the missing vote should fail due maxCensusSize constrain
 	time.Sleep(time.Second * 4)
 	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
 
-	v := voteInfo{
-		voterAccount: t.voterAccounts[0],
-		choice:       []int{0},
+	v := apiclient.VoteData{
+		ElectionID:   t.election.ElectionID,
+		ProofMkTree:  t.proofs[t.voterAccounts[0].Address().Hex()],
+		VoterAccount: t.voterAccounts[0],
+		Choices:      []int{0},
 	}
-	if _, err := t.sendVote(v, nil); err != nil {
+	if _, err := t.api.Vote(&v); err != nil {
 		// check the error expected for maxCensusSize
 		if strings.Contains(err.Error(), "maxCensusSize reached") {
 			log.Infof("error expected: %s", err.Error())
