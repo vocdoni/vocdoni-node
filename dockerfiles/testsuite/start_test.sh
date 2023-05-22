@@ -31,9 +31,6 @@ ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 APIHOST="http://gateway0:9090/v2"
 FAUCET="$APIHOST/faucet/dev/"
-. env.treasurerkey # contains var VOCDONI_SIGNINGKEY, import into current env
-TREASURER_KEY="$VOCDONI_SIGNINGKEY"
-[ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
 TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
 
@@ -78,7 +75,6 @@ legacy_cspvoting() {
 		./vochaintest --gwHost $GWHOST \
 		  --logLevel=$LOGLEVEL \
 		  --operation=cspvoting \
-		  --treasurerKey=$TREASURER_KEY \
 		  --electionSize=$ELECTION_SIZE \
 		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $3}')
 }

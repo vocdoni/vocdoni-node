@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
 	apipkg "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
@@ -90,13 +89,6 @@ func (t *E2ETokenTxs) Run() error {
 }
 
 func testGetTxCost(api *apiclient.HTTPclient) error {
-	// get treasurer nonce
-	treasurer, err := api.Treasurer()
-	if err != nil {
-		return err
-	}
-	log.Infof("treasurer is %s", common.BytesToAddress(treasurer.Address))
-
 	// get current tx cost
 	txCost, err := api.TransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
 	if err != nil {

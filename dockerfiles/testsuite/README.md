@@ -35,10 +35,8 @@ when the network is up and running, the tool `vochaintest` is used to simulate a
 Gateway is exposed on `localhost:9090`.
 ```
 $ cd dockerfiles/testsuite && docker-compose up
-vochaintest --oracleKey=... --treasurerKey=... --gwHost=http://localhost:9090/dvote --operation=tokentransactions
+vochaintest --gwHost=http://localhost:9090/dvote --operation=tokentransactions
 ```
-The oracle and treasurer keys are in the `env.oracle0key` and `env.treasurerkey` files.
-
 
 ### Adding integration tests
 When adding a new integration test to `start_test.sh`, please name the container after your test, including the RANDOMID to allow concurrent test runs in CI servers. Example:

@@ -12,7 +12,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -38,14 +37,6 @@ func (a *API) enableAccountHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.accountSetHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
-		"/accounts/treasurer",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.treasurerHandler,
 	); err != nil {
 		return err
 	}
@@ -218,30 +209,6 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// treasurerHandler
-//
-//	@Summary		Get treasurer address
-//	@Description	Get treasurer address
-//	@Success		200	{object}	object
-//	@Router			/accounts/treasurer [get]
-func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	acc, err := a.vocapp.State.Treasurer(true)
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return ErrTreasurerNotFound
-	}
-	data, err := json.Marshal(struct {
-		Address types.HexBytes `json:"address"`
-	}{Address: acc.GetAddress()})
-
-	if err != nil {
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)

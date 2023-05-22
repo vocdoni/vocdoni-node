@@ -20,18 +20,16 @@ import (
 	"go.vocdoni.io/dvote/log"
 	client "go.vocdoni.io/dvote/rpcclient"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
 var ops = map[string]bool{
-	"vtest":             true,
-	"cspvoting":         true,
-	"anonvoting":        true,
-	"censusImport":      true,
-	"censusGenerate":    true,
-	"tokentransactions": true,
-	"initaccounts":      true,
+	"vtest":          true,
+	"cspvoting":      true,
+	"anonvoting":     true,
+	"censusImport":   true,
+	"censusGenerate": true,
+	"initaccounts":   true,
 }
 
 // how many times to retry flaky transactions
@@ -62,8 +60,6 @@ func main() {
 
 	loglevel := flag.String("logLevel", "info", "log level")
 	opmode := flag.String("operation", "vtest", fmt.Sprintf("set operation mode: %v", opsAvailable()))
-	oraclePrivKey := flag.String("oracleKey", "", "hexadecimal oracle private key")
-	treasurerPrivKey := flag.String("treasurerKey", "", "hexadecimal treasurer private key")
 	accountPrivKeys := flag.StringSlice("accountKeys", []string{}, "hexadecimal account private keys array")
 	host := flag.String("gwHost", "http://127.0.0.1:9090/dvote", "gateway websockets endpoint")
 	electionType := flag.String("electionType", "encrypted-poll", "encrypted-poll or poll-vote")
@@ -100,12 +96,6 @@ func main() {
 		fmt.Fprintf(os.Stderr,
 			"\t./test --operation=censusGenerate --gwHost "+
 				"wss://gw1test.vocdoni.net/dvote --electionSize=10000 --keysFile=keys.json\n")
-		fmt.Fprintf(os.Stderr,
-			"=> tokentransactions\n\tTests all token "+
-				"related transactions\n")
-		fmt.Fprintf(os.Stderr,
-			"\t./test --operation=tokentransactions --gwHost "+
-				"wss://gw1test.vocdoni.net/dvote\n")
 	}
 	flag.Parse()
 	log.Init(*loglevel, "stdout", nil)
@@ -121,11 +111,6 @@ func main() {
 	}
 
 	switch *opmode {
-	case "initaccounts":
-		log.Infof("initializing accounts ...")
-		if err := initAccounts(*treasurerPrivKey, *oraclePrivKey, accountKeys, *host); err != nil {
-			log.Fatalf("cannot init accounts: %s", err)
-		}
 	case "anonvoting":
 		mkTreeAnonVoteTest(*host,
 			accountKeys[0],
@@ -173,9 +158,6 @@ func main() {
 		censusImport(*host, accountKeys[0])
 	case "censusGenerate":
 		censusGenerate(*host, accountKeys[0], *electionSize, *keysfile, 1)
-	case "tokentransactions":
-		// end-user voting is not tested here
-		testTokenTransactions(*host, *treasurerPrivKey, accountKeys[0])
 	default:
 		log.Fatal("no valid operation mode specified")
 	}
@@ -270,42 +252,6 @@ func censusImport(host string, signer *ethereum.SignKeys) {
 	log.Infof("Census created and published\nRoot: %x\nURI: %s", root, uri)
 }
 
-func (c *testClient) ensureTxCostEquals(signer *ethereum.SignKeys, txType models.TxType, cost uint64) error {
-	for i := 0; i < retries; i++ {
-		// if cost equals expected, we're done
-		newTxCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
-		if err != nil {
-			log.Warn(err)
-		}
-		if newTxCost == cost {
-			return nil
-		}
-
-		// else, try to set
-		treasurerAccount, err := c.GetTreasurer()
-		if err != nil {
-			return fmt.Errorf("cannot get treasurer: %w", err)
-		}
-
-		log.Infof("will set %s txcost=%d (treasurer nonce: %d)", txType, cost, treasurerAccount.Nonce)
-		txhash, err := c.SetTransactionCost(
-			signer,
-			txType,
-			cost,
-			treasurerAccount.Nonce)
-		if err != nil {
-			log.Warn(err)
-			time.Sleep(time.Second)
-			continue
-		}
-		err = c.WaitUntilTxMined(txhash)
-		if err != nil {
-			log.Warn(err)
-		}
-	}
-	return fmt.Errorf("tried to set %s txcost=%d but failed %d times", txType, cost, retries)
-}
-
 func (c *testClient) ensureProcessCreated(
 	signer *ethereum.SignKeys,
 	entityID common.Address,
@@ -369,105 +315,6 @@ func (c *testClient) ensureProcessEnded(signer *ethereum.SignKeys, processID typ
 		c.WaitUntilNextBlock()
 	}
 	return fmt.Errorf("ensureProcessEnded: process could not be ended after %d retries", retries)
-}
-
-func initAccounts(treasurer, oracle string, accountKeys []*ethereum.SignKeys, host string) error {
-	var err error
-	treasurerSigner, err := privKeyToSigner(treasurer)
-	if err != nil {
-		log.Fatal(err)
-	}
-	oracleSigner, err := privKeyToSigner(oracle)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("connecting to main gateway %s", host)
-	// connecting to endpoint
-	c, err := newTestClient(host)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() { _ = c.Close() }()
-
-	// create and top up accounts
-	if err := c.ensureAccountExists(oracleSigner, nil); err != nil {
-		log.Fatal(err)
-	}
-	log.Infof("created oracle account with address %s", oracleSigner.Address())
-	if err := c.ensureAccountHasTokens(treasurerSigner, oracleSigner.Address(), 100000); err != nil {
-		return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", oracleSigner.Address(), treasurerSigner.Address(), err)
-	}
-	log.Infof("minted 100000 tokens to oracle")
-
-	for _, k := range accountKeys {
-		if err := c.ensureAccountExists(k, nil); err != nil {
-			return fmt.Errorf("cannot check if account exists: %w", err)
-		}
-		log.Infof("created entity key account with addresses: %s", k.Address())
-		if err := c.ensureAccountHasTokens(treasurerSigner, k.Address(), 100000); err != nil {
-			return fmt.Errorf("cannot mint tokens for account %s with treasurer %s: %w", k.Address(), treasurerSigner.Address(), err)
-		}
-		log.Infof("minted 100000 tokens to account %s", k.Address())
-	}
-	return nil
-}
-
-func (c *testClient) ensureAccountExists(account *ethereum.SignKeys, faucetPkg *models.FaucetPackage) error {
-	for i := 0; i < retries; i++ {
-		acct, err := c.GetAccount(account.Address())
-		if err != nil {
-			log.Debugf("GetAccount try %d: %v", i, err)
-		}
-		// if account exists, we're done
-		if acct != nil {
-			return nil
-		}
-
-		err = c.SetAccount(account, common.Address{}, "ipfs://", 0, faucetPkg, true)
-		if err != nil {
-			if strings.Contains(err.Error(), "tx already exists in cache") {
-				// don't worry then, someone else created it in a race, nevermind, job done.
-			} else {
-				return fmt.Errorf("cannot create account %s: %w", account.Address(), err)
-			}
-		}
-
-		c.WaitUntilNextBlock()
-	}
-	return fmt.Errorf("cannot create account %s after %d retries", account.Address(), retries)
-}
-
-func (c *testClient) ensureAccountHasTokens(
-	treasurer *ethereum.SignKeys,
-	accountAddr common.Address,
-	amount uint64,
-) error {
-	for i := 0; i < retries; i++ {
-		acct, err := c.GetAccount(accountAddr)
-		if err != nil {
-			log.Debugf("GetAccount try %d: %v", i, err)
-		}
-		// if balance is enough, we're done
-		if acct != nil && acct.Balance >= amount {
-			return nil
-		}
-
-		// else, try to mint with treasurer
-		treasurerAccount, err := c.GetTreasurer()
-		if err != nil {
-			return fmt.Errorf("cannot get treasurer: %w", err)
-		}
-
-		// MintTokens can return OK and then the tx be rejected anyway later.
-		// So, don't panic on errors, we only care about acct.Balance in the end
-		err = c.MintTokens(treasurer, accountAddr, treasurerAccount.GetNonce(), amount)
-		if err != nil {
-			log.Debugf("MintTokens try %d: %v", i, err)
-		}
-
-		c.WaitUntilNextBlock()
-	}
-	return fmt.Errorf("tried to mint %d times, yet balance still not enough", retries)
 }
 
 func mkTreeVoteTest(host string,
@@ -1099,297 +946,4 @@ func cspVoteTest(
 		log.Infof("results: %+v", r)
 	}
 	log.Infof("all done!")
-}
-
-// enduser voting is not tested here
-func testTokenTransactions(
-	host,
-	treasurerPrivKey string,
-	keySigner *ethereum.SignKeys,
-) {
-	treasurerSigner, err := privKeyToSigner(treasurerPrivKey)
-	if err != nil {
-		log.Fatal(err)
-	}
-	// create main signer
-	mainSigner := &ethereum.SignKeys{}
-	if err := mainSigner.Generate(); err != nil {
-		log.Fatal(err)
-	}
-
-	// create other signer
-	otherSigner := &ethereum.SignKeys{}
-	if err := otherSigner.Generate(); err != nil {
-		log.Fatal(err)
-	}
-
-	log.Infof("connecting to main gateway %s", host)
-	mainClient, err := newTestClient(host)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer mainClient.Close()
-
-	// check set transaction cost
-	if err := mainClient.testSetTxCost(treasurerSigner); err != nil {
-		log.Fatal(err)
-	}
-
-	// check create and set account
-	if err := mainClient.testCreateAndSetAccount(treasurerSigner, keySigner, mainSigner, otherSigner); err != nil {
-		log.Fatal(err)
-	}
-
-	// check set account delegate
-	if err := mainClient.testSetAccountDelegate(mainSigner, otherSigner); err != nil {
-		log.Fatal(err)
-	}
-
-	// check collect faucet tx
-	if err := mainClient.testCollectFaucet(mainSigner, otherSigner); err != nil {
-		log.Fatal(err)
-	}
-}
-
-func (c *testClient) testSetTxCost(treasurerSigner *ethereum.SignKeys) error {
-	// get treasurer none
-	treasurer, err := c.GetTreasurer()
-	if err != nil {
-		return err
-	}
-	log.Infof("treasurer fetched %s with nonce %d", common.BytesToAddress(treasurer.Address), treasurer.Nonce)
-
-	// get current tx cost
-	txCost, err := c.GetTransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s fetched successfully (%d)", models.TxType_SET_ACCOUNT_INFO_URI, txCost)
-
-	// check tx cost changes
-	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO_URI, 1000)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s changed successfully from %d to %d", models.TxType_SET_ACCOUNT_INFO_URI, txCost, 1000)
-
-	// get new treasurer nonce
-	treasurer2, err := c.GetTreasurer()
-	if err != nil {
-		return err
-	}
-	log.Infof("treasurer nonce changed successfully from %d to %d", treasurer.Nonce, treasurer2.Nonce)
-
-	// set tx cost back to default
-	err = c.ensureTxCostEquals(treasurerSigner, models.TxType_SET_ACCOUNT_INFO_URI, 10)
-	if err != nil {
-		return fmt.Errorf("cannot set transaction cost: %v", err)
-	}
-
-	return nil
-}
-
-func (c *testClient) testCreateAndSetAccount(treasurer, keySigner, signer, signer2 *ethereum.SignKeys) error {
-	// generate faucet package
-	fp, err := c.GenerateFaucetPackage(keySigner, signer.Address(), 500)
-	if err != nil {
-		return fmt.Errorf("cannot generate faucet package: %v", err)
-	}
-	// create account with faucet package
-	if err := c.ensureAccountExists(signer, fp); err != nil {
-		return err
-	}
-
-	// mint tokens to signer
-	if err := c.ensureAccountHasTokens(treasurer, signer.Address(), 1000000); err != nil {
-		return fmt.Errorf("cannot mint tokens for account %s: %v", signer.Address(), err)
-	}
-	log.Infof("minted 1000000 tokens to %s", signer.Address())
-
-	// check account created
-	acc, err := c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("account %s successfully created: %+v", signer.Address(), acc)
-
-	// create account with faucet package
-	faucetPkg, err := c.GenerateFaucetPackage(signer, signer2.Address(), 5000)
-	if err != nil {
-		return fmt.Errorf("cannot generate faucet package %v", err)
-	}
-
-	if err := c.ensureAccountExists(signer2, faucetPkg); err != nil {
-		return err
-	}
-
-	// check account created
-	acc2, err := c.GetAccount(signer2.Address())
-	if err != nil {
-		return err
-	}
-	if acc2 == nil {
-		return state.ErrAccountNotExist
-	}
-	// check balance added from payload
-	if acc2.Balance != 5000 {
-		return fmt.Errorf("expected balance for account %s is %d but got %d", signer2.Address(), 5000, acc2.Balance)
-	}
-	log.Infof("account %s (%+v) successfully created with payload signed by %s", signer2.Address(), acc2, signer.Address())
-	return nil
-}
-
-func (c *testClient) testSetAccountDelegate(signer, signer2 *ethereum.SignKeys) error {
-	txCostAdd, err := c.GetTransactionCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT)
-	if err != nil {
-		return err
-	}
-	txCostDel, err := c.GetTransactionCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s is %d", models.TxType_ADD_DELEGATE_FOR_ACCOUNT, txCostAdd)
-	log.Infof("tx cost of %s is %d", models.TxType_DEL_DELEGATE_FOR_ACCOUNT, txCostDel)
-
-	acc, err := c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched from account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
-	// add delegate
-	txhash, err := c.SetAccountDelegate(signer,
-		signer2.Address(),
-		true,
-		acc.Nonce)
-	if err != nil {
-		return fmt.Errorf("cannot set account delegate: %v", err)
-	}
-
-	err = c.WaitUntilTxMined(txhash)
-	if err != nil {
-		return err
-	}
-
-	acc, err = c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
-	if len(acc.DelegateAddrs) != 1 {
-		log.Fatalf("expected %s to have 1 delegate got %d", signer.Address(), len(acc.DelegateAddrs))
-	}
-	addedDelegate := common.BytesToAddress(acc.DelegateAddrs[0])
-	if addedDelegate != signer2.Address() {
-		log.Fatalf("expected delegate to be %s got %s", signer2.Address(), addedDelegate)
-	}
-	// delete delegate
-	acc, err = c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	txhash, err = c.SetAccountDelegate(signer,
-		signer2.Address(),
-		false,
-		acc.Nonce)
-	if err != nil {
-		return fmt.Errorf("cannot set account delegate: %v", err)
-	}
-
-	err = c.WaitUntilTxMined(txhash)
-	if err != nil {
-		return err
-	}
-
-	acc, err = c.GetAccount(signer.Address())
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched account %s with nonce %d and delegates %v", signer.Address(), acc.Nonce, acc.DelegateAddrs)
-	if len(acc.DelegateAddrs) != 0 {
-		log.Fatalf("expected %s to have 0 delegates got %d", signer.Address(), len(acc.DelegateAddrs))
-	}
-	return nil
-}
-
-func (c *testClient) testCollectFaucet(from, to *ethereum.SignKeys) error {
-	// get tx cost
-	txCost, err := c.GetTransactionCost(models.TxType_COLLECT_FAUCET)
-	if err != nil {
-		return err
-	}
-	log.Infof("tx cost of %s is %d", models.TxType_COLLECT_FAUCET, txCost)
-	// fetch from account
-	accFrom, err := c.GetAccount(from.Address())
-	if err != nil {
-		return err
-	}
-	if accFrom == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
-
-	// fetch to account
-	accTo, err := c.GetAccount(to.Address())
-	if err != nil {
-		return err
-	}
-	if accTo == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accFrom.Balance)
-
-	// generate faucet pkg
-	faucetPkg, err := c.GenerateFaucetPackage(from, to.Address(), 10)
-	if err != nil {
-		return err
-	}
-
-	// collect faucet tx
-	txhash, err := c.CollectFaucet(to, accTo.Nonce, faucetPkg)
-	if err != nil {
-		return fmt.Errorf("error on collect faucet tx: %v", err)
-	}
-
-	// wait until tx is mined
-	err = c.WaitUntilTxMined(txhash)
-	if err != nil {
-		return fmt.Errorf("CollectFaucet tx was never mined: %v", err)
-	}
-
-	// check values changed correctly on both from and to accounts
-	accFrom, err = c.GetAccount(from.Address())
-	if err != nil {
-		return err
-	}
-	if accFrom == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched from account %s with nonce %d and balance %d", from.Address(), accFrom.Nonce, accFrom.Balance)
-
-	// fetch to account
-	accTo, err = c.GetAccount(to.Address())
-	if err != nil {
-		return err
-	}
-	if accTo == nil {
-		return state.ErrAccountNotExist
-	}
-	log.Infof("fetched to account %s with nonce %d and balance %d", to.Address(), accTo.Nonce, accTo.Balance)
-
-	return nil
 }
