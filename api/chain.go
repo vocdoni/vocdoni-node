@@ -378,7 +378,7 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		}
 	}
 	offset := int32(page * MaxPageSize)
-	refs, err := a.indexer.GetLastTxReferences(MaxPageSize, offset)
+	refs, err := a.indexer.GetLastTransactions(MaxPageSize, offset)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -388,7 +388,7 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
 	data, err := json.Marshal(struct {
-		Txs []*indexertypes.TxReference `json:"transactions"`
+		Txs []*indexertypes.Transaction `json:"transactions"`
 	}{refs})
 	if err != nil {
 		return err
@@ -458,7 +458,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTxReference(index)
+	ref, err := a.indexer.GetTransaction(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound

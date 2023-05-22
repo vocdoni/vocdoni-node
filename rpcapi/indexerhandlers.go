@@ -154,7 +154,7 @@ func (r *RPCAPI) getTx(request *api.APIrequest) (*api.APIresponse, error) {
 // TODO @pau: the transaction payload is returned twice, base64 and json
 func (r *RPCAPI) getTxById(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	txRef, err := r.indexer.GetTxReference(uint64(request.ID))
+	txRef, err := r.indexer.GetTransaction(uint64(request.ID))
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx reference with ID %d: %w", request.ID, err)
 	}

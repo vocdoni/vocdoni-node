@@ -1303,7 +1303,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			ref, err := idx.GetTxReference(uint64(i*txsPerBlock + j + 1))
+			ref, err := idx.GetTransaction(uint64(i*txsPerBlock + j + 1))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
@@ -1318,7 +1318,7 @@ func TestTxIndexer(t *testing.T) {
 		}
 	}
 
-	txs, err := idx.GetLastTxReferences(15, 0)
+	txs, err := idx.GetLastTransactions(15, 0)
 	qt.Assert(t, err, qt.IsNil)
 	for i, tx := range txs {
 		// Index is between 1 and totalCount.
@@ -1329,7 +1329,7 @@ func TestTxIndexer(t *testing.T) {
 		qt.Assert(t, tx.TxType, qt.Equals, "setAccount")
 	}
 
-	txs, err = idx.GetLastTxReferences(1, 5)
+	txs, err = idx.GetLastTransactions(1, 5)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
 	qt.Assert(t, txs[0].Index, qt.Equals, uint64(95))

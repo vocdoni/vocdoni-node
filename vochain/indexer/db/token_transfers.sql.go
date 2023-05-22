@@ -15,15 +15,17 @@ import (
 
 const createTokenTransfer = `-- name: CreateTokenTransfer :execresult
 INSERT INTO token_transfers (
-	tx_hash, height, from_account, to_account, amount, transfer_time
+	tx_hash, block_height, from_account,
+	to_account, amount, transfer_time
 ) VALUES (
-	?, ?, ?, ?, ?, ?
+	?, ?, ?,
+	?, ?, ?
 )
 `
 
 type CreateTokenTransferParams struct {
 	TxHash       types.Hash
-	Height       int64
+	BlockHeight  int64
 	FromAccount  types.AccountID
 	ToAccount    types.AccountID
 	Amount       int64
@@ -33,7 +35,7 @@ type CreateTokenTransferParams struct {
 func (q *Queries) CreateTokenTransfer(ctx context.Context, arg CreateTokenTransferParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, createTokenTransfer,
 		arg.TxHash,
-		arg.Height,
+		arg.BlockHeight,
 		arg.FromAccount,
 		arg.ToAccount,
 		arg.Amount,
@@ -42,7 +44,7 @@ func (q *Queries) CreateTokenTransfer(ctx context.Context, arg CreateTokenTransf
 }
 
 const getTokenTransfer = `-- name: GetTokenTransfer :one
-SELECT tx_hash, height, from_account, to_account, amount, transfer_time FROM token_transfers
+SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time FROM token_transfers
 WHERE tx_hash = ?
 LIMIT 1
 `
@@ -52,7 +54,7 @@ func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (Toke
 	var i TokenTransfer
 	err := row.Scan(
 		&i.TxHash,
-		&i.Height,
+		&i.BlockHeight,
 		&i.FromAccount,
 		&i.ToAccount,
 		&i.Amount,
@@ -62,7 +64,7 @@ func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (Toke
 }
 
 const getTokenTransfersByFromAccount = `-- name: GetTokenTransfersByFromAccount :many
-SELECT tx_hash, height, from_account, to_account, amount, transfer_time FROM token_transfers
+SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time FROM token_transfers
 WHERE from_account = ?
 ORDER BY transfer_time DESC
 LIMIT ?
@@ -89,7 +91,7 @@ func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTok
 		var i TokenTransfer
 		if err := rows.Scan(
 			&i.TxHash,
-			&i.Height,
+			&i.BlockHeight,
 			&i.FromAccount,
 			&i.ToAccount,
 			&i.Amount,

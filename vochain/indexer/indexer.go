@@ -537,7 +537,7 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTokenTransfer(context.TODO(), indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
-		Height:       int64(idx.App.Height()),
+		BlockHeight:  int64(idx.App.Height()),
 		FromAccount:  tx.FromAddress.Bytes(),
 		ToAccount:    tx.ToAddress.Bytes(),
 		Amount:       int64(tx.Amount),
@@ -565,7 +565,7 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 			Amount:    uint64(t.Amount),
 			From:      t.FromAccount,
 			To:        t.ToAccount,
-			Height:    uint64(t.Height),
+			Height:    uint64(t.BlockHeight),
 			TxHash:    t.TxHash,
 			Timestamp: t.TransferTime,
 		})

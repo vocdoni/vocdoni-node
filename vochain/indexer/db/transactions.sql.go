@@ -12,68 +12,68 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-const countTxReferences = `-- name: CountTxReferences :one
-SELECT COUNT(*) FROM tx_references
+const countTransactions = `-- name: CountTransactions :one
+SELECT COUNT(*) FROM transactions
 `
 
-func (q *Queries) CountTxReferences(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTxReferences)
+func (q *Queries) CountTransactions(ctx context.Context) (int64, error) {
+	row := q.db.QueryRowContext(ctx, countTransactions)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
 }
 
-const createTxReference = `-- name: CreateTxReference :execresult
-INSERT INTO tx_references (
-	hash, block_height, tx_block_index, tx_type
+const createTransaction = `-- name: CreateTransaction :execresult
+INSERT INTO transactions (
+	hash, block_height, block_index, type
 ) VALUES (
 	?, ?, ?, ?
 )
 `
 
-type CreateTxReferenceParams struct {
-	Hash         types.Hash
-	BlockHeight  int64
-	TxBlockIndex int64
-	TxType       string
+type CreateTransactionParams struct {
+	Hash        types.Hash
+	BlockHeight int64
+	BlockIndex  int64
+	Type        string
 }
 
-func (q *Queries) CreateTxReference(ctx context.Context, arg CreateTxReferenceParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createTxReference,
+func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, createTransaction,
 		arg.Hash,
 		arg.BlockHeight,
-		arg.TxBlockIndex,
-		arg.TxType,
+		arg.BlockIndex,
+		arg.Type,
 	)
 }
 
-const getLastTxReferences = `-- name: GetLastTxReferences :many
-SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
+const getLastTransactions = `-- name: GetLastTransactions :many
+SELECT id, hash, block_height, block_index, type FROM transactions
 ORDER BY id DESC
 LIMIT ?
 OFFSET ?
 `
 
-type GetLastTxReferencesParams struct {
+type GetLastTransactionsParams struct {
 	Limit  int32
 	Offset int32
 }
 
-func (q *Queries) GetLastTxReferences(ctx context.Context, arg GetLastTxReferencesParams) ([]TxReference, error) {
-	rows, err := q.db.QueryContext(ctx, getLastTxReferences, arg.Limit, arg.Offset)
+func (q *Queries) GetLastTransactions(ctx context.Context, arg GetLastTransactionsParams) ([]Transaction, error) {
+	rows, err := q.db.QueryContext(ctx, getLastTransactions, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TxReference
+	var items []Transaction
 	for rows.Next() {
-		var i TxReference
+		var i Transaction
 		if err := rows.Scan(
 			&i.ID,
 			&i.Hash,
 			&i.BlockHeight,
-			&i.TxBlockIndex,
-			&i.TxType,
+			&i.BlockIndex,
+			&i.Type,
 		); err != nil {
 			return nil, err
 		}
@@ -88,40 +88,40 @@ func (q *Queries) GetLastTxReferences(ctx context.Context, arg GetLastTxReferenc
 	return items, nil
 }
 
-const getTxReference = `-- name: GetTxReference :one
-SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
+const getTransaction = `-- name: GetTransaction :one
+SELECT id, hash, block_height, block_index, type FROM transactions
 WHERE id = ?
 LIMIT 1
 `
 
-func (q *Queries) GetTxReference(ctx context.Context, id int64) (TxReference, error) {
-	row := q.db.QueryRowContext(ctx, getTxReference, id)
-	var i TxReference
+func (q *Queries) GetTransaction(ctx context.Context, id int64) (Transaction, error) {
+	row := q.db.QueryRowContext(ctx, getTransaction, id)
+	var i Transaction
 	err := row.Scan(
 		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
-		&i.TxBlockIndex,
-		&i.TxType,
+		&i.BlockIndex,
+		&i.Type,
 	)
 	return i, err
 }
 
-const getTxReferenceByHash = `-- name: GetTxReferenceByHash :one
-SELECT id, hash, block_height, tx_block_index, tx_type FROM tx_references
+const getTransactionByHash = `-- name: GetTransactionByHash :one
+SELECT id, hash, block_height, block_index, type FROM transactions
 WHERE hash = ?
 LIMIT 1
 `
 
-func (q *Queries) GetTxReferenceByHash(ctx context.Context, hash types.Hash) (TxReference, error) {
-	row := q.db.QueryRowContext(ctx, getTxReferenceByHash, hash)
-	var i TxReference
+func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Transaction, error) {
+	row := q.db.QueryRowContext(ctx, getTransactionByHash, hash)
+	var i Transaction
 	err := row.Scan(
 		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
-		&i.TxBlockIndex,
-		&i.TxType,
+		&i.BlockIndex,
+		&i.Type,
 	)
 	return i, err
 }
