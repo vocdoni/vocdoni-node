@@ -18,6 +18,9 @@ import (
 
 // Election returns the election details given its ID.
 func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) {
+	if electionID == nil {
+		return nil, fmt.Errorf("passed electionID is nil")
+	}
 	resp, code, err := c.Request("GET", nil, "elections", electionID.String())
 	if err != nil {
 		return nil, err

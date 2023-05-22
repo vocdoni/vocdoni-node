@@ -2,11 +2,13 @@ package apiclient
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -41,12 +43,22 @@ type VoteData struct {
 	ProofMkTree *CensusProof
 	ProofCSP    types.HexBytes
 	Keys        []api.Key
+
+	// if VoterAccount is set, it will be used to sign the vote
+	// instead of the keys found in HTTPclient.account
+	VoterAccount *ethereum.SignKeys
 }
 
 // Vote sends a vote to the Vochain. The vote is a VoteData struct,
-// which contains the electionID, the choices and the proof. The
-// return value is the voteID (nullifier).
-func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
+// which contains the electionID, the choices and the proof.
+// if VoterAccount is set, it's used to sign the vote, else it defaults
+// to signing with the account set in HTTPclient.
+// The return value is the voteID (nullifier).
+func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
+	c := cl
+	if v.VoterAccount != nil {
+		c = cl.Clone(hex.EncodeToString(v.VoterAccount.PrivateKey()))
+	}
 	election, err := c.Election(v.ElectionID)
 	if err != nil {
 		return nil, err
@@ -62,7 +74,7 @@ func (c *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		return nil, err
 	}
 
-	log.Debugw("generating a new vote", "electionId", v.ElectionID)
+	log.Debugw("generating a new vote", "electionId", v.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}
 	censusOriginCSP := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA)]
 	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]

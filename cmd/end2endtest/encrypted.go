@@ -4,12 +4,10 @@ import (
 	"context"
 	"encoding/hex"
 	"os"
-	"sync"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -65,39 +63,23 @@ func (t *E2EEncryptedElection) Run() error {
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-	wg := sync.WaitGroup{}
-	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("sending %d votes", len(accounts))
 
-		votesSent := 0
-		contextDeadlines := 0
-		for i, acc := range accounts {
-			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{i % 2}, keys: keys}, nil)
-			if err != nil {
-				log.Error(err)
-				break
-			}
-			contextDeadlines += ctxDeadline
-			votesSent++
-		}
-		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
-		time.Sleep(time.Second * 4)
+	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	votes := []*apiclient.VoteData{}
+	for i, acct := range t.voterAccounts {
+		votes = append(votes, &apiclient.VoteData{
+			ElectionID:   t.election.ElectionID,
+			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			Choices:      []int{i % 2},
+			VoterAccount: acct,
+			Keys:         keys,
+		})
 	}
+	t.sendVotes(votes)
 
-	pcount := c.nvotes / c.parallelCount
-	for i := 0; i < len(t.voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(t.voterAccounts) {
-			end = len(t.voterAccounts)
-		}
-		wg.Add(1)
-		go voteAccounts(t.voterAccounts[i:end], &wg)
-	}
-
-	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
+	log.Infow("votes submitted successfully",
+		"n", len(t.voterAccounts), "time", time.Since(startTime),
+		"vps", int(float64(len(t.voterAccounts))/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")

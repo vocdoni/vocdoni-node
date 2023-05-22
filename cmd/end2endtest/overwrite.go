@@ -5,12 +5,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -61,54 +59,37 @@ func (t *E2EOverwriteElection) Run() error {
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
-	wg := sync.WaitGroup{}
-	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("sending %d votes", len(accounts))
 
-		votesSent := 0
-		contextDeadlines := 0
-		for _, acc := range accounts {
-			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: []int{0}}, nil)
-			if err != nil {
-				log.Error(err)
-				break
-			}
-			contextDeadlines += ctxDeadline
-			votesSent++
-		}
-		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
-		time.Sleep(time.Second * 4)
+	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	votes := []*apiclient.VoteData{}
+	for _, acct := range t.voterAccounts {
+		votes = append(votes, &apiclient.VoteData{
+			ElectionID:   t.election.ElectionID,
+			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			Choices:      []int{0},
+			VoterAccount: acct,
+		})
 	}
+	t.sendVotes(votes)
 
-	pcount := c.nvotes / c.parallelCount
-	for i := 0; i < len(t.voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(t.voterAccounts) {
-			end = len(t.voterAccounts)
-		}
-		wg.Add(1)
-		go voteAccounts(t.voterAccounts[i:end], &wg)
-	}
-
-	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
+	log.Infow("votes submitted successfully",
+		"n", c.nvotes, "time", time.Since(startTime),
+		"vps", int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// overwrite the previous vote (choice 0) associated with account of index 0, using enough time to do it in the nextBlock
 	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
-	ctxDeadlines, err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
+	err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
 	if err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[0].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote", t.voterAccounts[0].Address())
 	time.Sleep(time.Second * 5)
 
 	// now the overwrite vote is done in the sameBlock using account of index 1
-	if ctxDeadlines, err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
+	if err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote, got %d HTTP errors", t.voterAccounts[1].Address(), ctxDeadlines)
+	log.Infof("the account %v send an overwrite vote", t.voterAccounts[1].Address())
 	time.Sleep(time.Second * 5)
 
 	// Wait for all the votes to be verified

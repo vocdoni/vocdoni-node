@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
@@ -25,12 +26,6 @@ const (
 	nextBlock = "nextBlock"
 	sameBlock = "sameBlock"
 )
-
-type voteInfo struct {
-	voterAccount *ethereum.SignKeys
-	choice       []int
-	keys         []vapi.Key
-}
 
 type ballotData struct {
 	maxValue     uint32
@@ -379,23 +374,23 @@ func (t *e2eElection) checkElectionPrice(ed *vapi.ElectionDescription) error {
 	return nil
 }
 
-func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
-	acc := t.voterAccounts[indexAcct]
-	contextDeadlines := 0
-
+// overwriteVote allow to try to overwrite a previous vote given the index of the account, it can use the sameBlock or the nextBlock
+func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) error {
 	for i := 0; i < len(choices); i++ {
 		// assign the choices wanted for each overwrite vote
-		choice := []int{choices[i]}
-		ctxDeadLine, err := t.sendVote(voteInfo{voterAccount: acc, choice: choice}, nil)
-		if err != nil {
+		errs := t.sendVotes([]*apiclient.VoteData{{
+			ElectionID:   t.election.ElectionID,
+			ProofMkTree:  t.proofs[t.voterAccounts[indexAcct].Address().Hex()],
+			VoterAccount: t.voterAccounts[indexAcct],
+			Choices:      []int{choices[i]}}})
+		for _, err := range errs {
 			// check the error expected for overwrite with waitUntilNextBlock
 			if strings.Contains(err.Error(), "overwrite count reached") {
 				log.Debug("error expected: ", err.Error())
 			} else {
-				return 0, errors.New("expected overwrite error")
+				return fmt.Errorf("unexpected overwrite error: %w", err)
 			}
 		}
-		contextDeadlines += ctxDeadLine
 		switch waitType {
 		case sameBlock:
 			time.Sleep(time.Second * 5)
@@ -404,46 +399,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 			_ = t.api.WaitUntilNextBlock()
 		}
 	}
-	return contextDeadlines, nil
-}
-
-// sendVote send one vote using the api client without waiting for the next block
-func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error) {
-	var contextDeadline int
-
-	api := t.api
-	if t.election.VoteMode.Anonymous {
-		apiClientMtx.Lock()
-		privKey := v.voterAccount.PrivateKey()
-		if err := t.api.SetAccount(privKey.String()); err != nil {
-			apiClientMtx.Unlock()
-			return 0, err
-		}
-	} else {
-		api = t.api.Clone(fmt.Sprintf("%x", v.voterAccount.PrivateKey()))
-	}
-
-	if _, err := api.Vote(&apiclient.VoteData{
-		ElectionID:  t.election.ElectionID,
-		ProofMkTree: t.proofs[v.voterAccount.Address().Hex()],
-		Choices:     v.choice,
-		Keys:        v.keys},
-	); err != nil {
-		if errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err) {
-			contextDeadline = 1
-		} else if strings.Contains(err.Error(), "reached") {
-			// this error is expected on overwrite or maxCensusSize test
-			return 0, err
-		} else if !strings.Contains(err.Error(), "already exists") {
-			// if the error is not "vote already exists", we need to print it
-			log.Warn(err)
-		}
-	}
-
-	if t.election.VoteMode.Anonymous {
-		apiClientMtx.Unlock()
-	}
-	return contextDeadline, nil
+	return nil
 }
 
 // ballotVotes from a default list of 10 vote values that exceed the max value, max total cost and is not unique will
@@ -512,6 +468,61 @@ func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
 	log.Debug("vote values generated", votes)
 	log.Debug("results expected", expectedResults)
 	return votes, expectedResults
+}
+
+// sendVotes sends a batch of votes concurrently
+// (number of goroutines defined in t.config.parallelCount)
+func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error) {
+	errs = make(map[int]error)
+	var timeouts atomic.Uint32
+	var wg sync.WaitGroup
+	var queues []map[int]*apiclient.VoteData
+	for p := 0; p < t.config.parallelCount; p++ {
+		queues = append(queues, make(map[int]*apiclient.VoteData, len(votes)))
+	}
+	for i, v := range votes {
+		if v.ElectionID == nil {
+			v.ElectionID = t.election.ElectionID
+		}
+		queues[i%t.config.parallelCount][i] = v
+	}
+
+	for p := 0; p < t.config.parallelCount; p++ {
+		wg.Add(1)
+		go func(queue map[int]*apiclient.VoteData) {
+			defer wg.Done()
+			for len(queue) > 0 {
+				log.Infow("thread sending votes", "queue", len(queue))
+				for i, vote := range queue {
+					_, err := t.api.Vote(vote)
+					switch {
+					case err == nil:
+						delete(queue, i)
+					case errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err):
+						// if the context deadline is reached, no need to print it, just retry
+						timeouts.Add(1)
+					case strings.Contains(err.Error(), "mempool is full"):
+						log.Warn(err)
+						// wait and retry
+						_ = t.api.WaitUntilNextBlock()
+					case strings.Contains(err.Error(), "already exists") ||
+						strings.Contains(err.Error(), "overwrite count reached"):
+						// don't retry
+						delete(queue, i)
+						errs[i] = err
+					default:
+						// any other error, print it and wait a bit
+						log.Warn(err)
+						time.Sleep(100 * time.Millisecond)
+					}
+				}
+			}
+		}(queues[p])
+	}
+	wg.Wait()
+	log.Infow("sent votes",
+		"n", len(votes), "timeouts", timeouts.Load(), "failed", len(errs))
+	return errs
 }
 
 func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {

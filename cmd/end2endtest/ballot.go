@@ -5,11 +5,9 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"go.vocdoni.io/dvote/apiclient"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -77,49 +75,26 @@ func (t *E2EBallotElection) Run() error {
 		costExponent: t.election.TallyMode.CostExponent,
 	}
 
-	votes, expectedResults := ballotVotes(bdata, t.config.nvotes)
+	choices, expectedResults := ballotVotes(bdata, len(t.voterAccounts))
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	wg := sync.WaitGroup{}
-	apiClientMtx := &sync.Mutex{}
-	indexv := 0
-	voteAccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
-		defer wg.Done()
-		log.Infof("sending %d votes", len(accounts))
-
-		votesSent := 0
-		contextDeadlines := 0
-		for _, acc := range accounts {
-			apiClientMtx.Lock()
-			ctxDeadline, err := t.sendVote(voteInfo{voterAccount: acc, choice: votes[indexv]}, nil)
-			if err != nil {
-				apiClientMtx.Unlock()
-				log.Error(err)
-				break
-			}
-			indexv++
-			contextDeadlines += ctxDeadline
-			votesSent++
-
-			apiClientMtx.Unlock()
-		}
-		log.Infof("successfully sent %d votes... got %d HTTP errors", votesSent, contextDeadlines)
+	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	votes := []*apiclient.VoteData{}
+	for i, acct := range t.voterAccounts {
+		votes = append(votes, &apiclient.VoteData{
+			ElectionID:   t.election.ElectionID,
+			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			Choices:      choices[i],
+			VoterAccount: acct,
+		})
 	}
+	t.sendVotes(votes)
 
-	pcount := c.nvotes / c.parallelCount
-	for i := 0; i < len(t.voterAccounts); i += pcount {
-		end := i + pcount
-		if end > len(t.voterAccounts) {
-			end = len(t.voterAccounts)
-		}
-		wg.Add(1)
-		go voteAccounts(t.voterAccounts[i:end], &wg)
-	}
-	wg.Wait()
-	log.Infof("%d votes submitted successfully, took %s (%d votes/second)",
-		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
+	log.Infow("votes submitted successfully",
+		"n", len(t.voterAccounts), "time", time.Since(startTime),
+		"vps", int(float64(len(t.voterAccounts))/time.Since(startTime).Seconds()))
 
 	// Wait for all the votes to be verified
 	log.Infof("waiting for all the votes to be registered...")

@@ -106,8 +106,8 @@ func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 // Panics if the accountPrivateKey is not valid.
 func (c *HTTPclient) Clone(accountPrivateKey string) *HTTPclient {
 	clone := *c
-	clone.account = new(ethereum.SignKeys)
-	if err := clone.account.AddHexKey(accountPrivateKey); err != nil {
+	err := clone.SetAccount(accountPrivateKey)
+	if err != nil {
 		panic(err)
 	}
 	return &clone
