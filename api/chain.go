@@ -449,7 +449,22 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		}
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
-	return ctx.Send([]byte(protoFormat(stx.Tx)), apirest.HTTPstatusOK)
+	ref, err := a.indexer.GetTxReferenceByBlockHeightAndBlockIndex(height, index)
+	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ErrTransactionNotFound
+		}
+		return ErrVochainGetTxFailed.WithErr(err)
+	}
+	tx := &GenericTransactionWithInfo{
+		TxContent: []byte(protoFormat(stx.Tx)),
+		TxInfo:    *ref,
+	}
+	data, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // chainTxByIndexHandler

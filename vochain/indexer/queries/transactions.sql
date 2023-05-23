@@ -24,3 +24,9 @@ OFFSET ?
 
 -- name: CountTransactions :one
 SELECT COUNT(*) FROM transactions;
+
+-- name: GetTxReferenceByBlockHeightAndBlockIndex :one
+SELECT * FROM transactions
+WHERE block_height = ? AND block_index = ?
+LIMIT 1;
+

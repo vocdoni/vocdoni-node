@@ -36,6 +36,21 @@ func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error)
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
+// GetTxReferenceByBlockHeightAndBlockIndex fetches the txReference for the given tx height and block tx index
+func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
+	sqlTxRef, err := idx.oneQuery.GetTxReferenceByBlockHeightAndBlockIndex(context.TODO(), indexerdb.GetTxReferenceByBlockHeightAndBlockIndexParams{
+		BlockHeight: blockHeight,
+		BlockIndex:  blockIndex,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTransactionNotFound
+		}
+		return nil, fmt.Errorf("tx at block %d and index %d not found: %v", blockHeight, blockIndex, err)
+	}
+	return indexertypes.TransactionFromDB(&sqlTxRef), nil
+}
+
 // GetTxHashReference fetches the txReference for the given tx hash
 func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.oneQuery.GetTransactionByHash(context.TODO(), hash)
