@@ -57,7 +57,7 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 }
 
 func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
-	faucetPkg, err := getFaucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
+	faucetPkg, err := faucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.He
 	participants := &vapi.CensusParticipants{}
 
 	for i, voterAccount := range t.voterAccounts {
-		keyAddr, err := getCensusParticipantKey(voterAccount, censusType)
+		keyAddr, err := censusParticipantKey(voterAccount, censusType)
 		if err != nil {
 			return err
 		}
@@ -323,6 +323,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	return nil
 }
 
+// overwriteVote allow to try to overwrite a previous vote given the index of the account, it can use the sameBlock or the nextBlock
 func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType string) (int, error) {
 	acc := t.voterAccounts[indexAcct]
 	contextDeadlines := 0
@@ -334,17 +335,17 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 		if err != nil {
 			// check the error expected for overwrite with waitUntilNextBlock
 			if strings.Contains(err.Error(), "overwrite count reached") {
-				log.Infof("error expected: %s", err.Error())
+				log.Debug("error expected: ", err.Error())
 			} else {
 				return 0, errors.New("expected overwrite error")
 			}
 		}
 		contextDeadlines += ctxDeadLine
 		switch waitType {
-		case nextBlock:
+		case sameBlock:
 			time.Sleep(time.Second * 5)
 
-		case sameBlock:
+		case nextBlock:
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 			defer cancel()
 			t.api.WaitUntilNextBlock(ctx)
@@ -353,6 +354,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 	return contextDeadlines, nil
 }
 
+// sendVote send one vote using the api client without waiting for the next block
 func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error) {
 	var contextDeadline int
 
@@ -391,7 +393,7 @@ func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error
 	return contextDeadline, nil
 }
 
-func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
+func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
 	switch faucet {
 	case "":
 		return nil, fmt.Errorf("need to pass a valid --faucet")
@@ -402,7 +404,7 @@ func getFaucetPackage(faucet, faucetAuthToken, myAddress string) (*models.Faucet
 	}
 }
 
-func getCensusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
+func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
 	var key []byte
 
 	switch censusType {
