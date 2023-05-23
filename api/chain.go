@@ -638,16 +638,24 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 		}
 	}
 	page = page * MaxPageSize
+
+	organizations := []*OrganizationList{}
 	// get matching organization ids from the indexer
 	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId))
 	if len(matchingOrganizationIds) == 0 {
 		return ErrOrgNotFound
 	}
+
+	for _, orgID := range matchingOrganizationIds {
+		organizations = append(organizations, &OrganizationList{
+			OrganizationID: orgID,
+			ElectionCount:  a.indexer.ProcessCount(orgID),
+		})
+	}
+
 	data, err := json.Marshal(struct {
-		Organizations []types.HexBytes `json:"organizations"`
-	}{
-		Organizations: matchingOrganizationIds,
-	})
+		Organizations []*OrganizationList `json:"organizations"`
+	}{organizations})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
