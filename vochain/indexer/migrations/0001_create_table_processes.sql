@@ -5,7 +5,7 @@ CREATE TABLE processes (
   start_block  INTEGER NOT NULL,
   end_block    INTEGER NOT NULL,
 
-  results_height          INTEGER NOT NULL, -- TODO: now unnecessary?
+  results_height          INTEGER NOT NULL, -- TODO: unused; remove
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
   results_votes           TEXT NOT NULL,

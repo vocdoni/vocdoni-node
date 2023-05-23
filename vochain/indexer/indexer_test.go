@@ -1354,9 +1354,9 @@ func TestIndexerConcurrentDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	app.AdvanceTestBlock()
-	if err := idx.setResultsHeight(pid, 123); err != nil {
-		t.Error(err)
-	}
+	// if err := idx.setResultsHeight(pid, 123); err != nil {
+	// 	t.Error(err)
+	// }
 
 	const concurrency = 300
 	var wg sync.WaitGroup
@@ -1366,9 +1366,9 @@ func TestIndexerConcurrentDB(t *testing.T) {
 		i := i
 		go func() {
 			defer wg.Done()
-			if err := idx.setResultsHeight(pid, 123); err != nil {
-				t.Errorf("iteration %d: %v", i, err)
-			}
+			// if err := idx.setResultsHeight(pid, 123); err != nil {
+			// 	t.Errorf("iteration %d: %v", i, err)
+			// }
 			if _, err := idx.ProcessInfo(pid); err != nil {
 				t.Errorf("iteration %d: %v", i, err)
 			}

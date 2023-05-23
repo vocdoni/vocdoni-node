@@ -155,11 +155,6 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	// Remove the process from the live results
 	idx.delProcessFromLiveResults(processID)
 
-	// Set the results height
-	if err := idx.setResultsHeight(processID, height); err != nil {
-		return err
-	}
-
 	return nil
 }
 
