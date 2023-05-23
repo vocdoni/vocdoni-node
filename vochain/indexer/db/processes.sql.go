@@ -29,7 +29,7 @@ INSERT INTO processes (
 	results_block_height
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?,
+	0, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -48,7 +48,6 @@ type CreateProcessParams struct {
 	EntityID          types.EntityID
 	StartBlock        int64
 	EndBlock          int64
-	ResultsHeight     int64
 	HaveResults       bool
 	FinalResults      bool
 	CensusRoot        types.CensusRoot
@@ -78,7 +77,6 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.EntityID,
 		arg.StartBlock,
 		arg.EndBlock,
-		arg.ResultsHeight,
 		arg.HaveResults,
 		arg.FinalResults,
 		arg.CensusRoot,
@@ -200,34 +198,6 @@ WHERE final_results = ?
 
 func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
 	rows, err := q.db.QueryContext(ctx, getProcessIDsByFinalResults, finalResults)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []types.ProcessID
-	for rows.Next() {
-		var id types.ProcessID
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		items = append(items, id)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getProcessIDsByResultsHeight = `-- name: GetProcessIDsByResultsHeight :many
-SELECT id FROM processes
-WHERE results_height = ?
-`
-
-func (q *Queries) GetProcessIDsByResultsHeight(ctx context.Context, resultsHeight int64) ([]types.ProcessID, error) {
-	rows, err := q.db.QueryContext(ctx, getProcessIDsByResultsHeight, resultsHeight)
 	if err != nil {
 		return nil, err
 	}
@@ -393,21 +363,6 @@ WHERE id = ?
 
 func (q *Queries) SetProcessResultsCancelled(ctx context.Context, id types.ProcessID) (sql.Result, error) {
 	return q.db.ExecContext(ctx, setProcessResultsCancelled, id)
-}
-
-const setProcessResultsHeight = `-- name: SetProcessResultsHeight :execresult
-UPDATE processes
-SET results_height = ?
-WHERE id = ?
-`
-
-type SetProcessResultsHeightParams struct {
-	ResultsHeight int64
-	ID            types.ProcessID
-}
-
-func (q *Queries) SetProcessResultsHeight(ctx context.Context, arg SetProcessResultsHeightParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, setProcessResultsHeight, arg.ResultsHeight, arg.ID)
 }
 
 const setProcessResultsReady = `-- name: SetProcessResultsReady :execresult

@@ -220,7 +220,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		EntityID:          nonNullBytes(eid),
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
-		ResultsHeight:     int64(compResultsHeight),
 		HaveResults:       compResultsHeight > 0,
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
@@ -288,31 +287,9 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	// If the process is in CANCELED status, and it was not in CANCELED status before, then remove the results
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.Status == models.ProcessStatus_CANCELED {
-
-		if _, err := queries.SetProcessResultsHeight(ctx, indexerdb.SetProcessResultsHeightParams{
-			ID:            pid,
-			ResultsHeight: 0,
-		}); err != nil {
-			return err
-		}
 		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// setResultsHeight updates the Rheight of any process whose ID is pid.
-func (idx *Indexer) setResultsHeight(pid []byte, height uint32) error {
-	if height == 0 {
-		panic("setting results height to 0?")
-	}
-	queries := idx.blockTxQueries()
-	if _, err := queries.SetProcessResultsHeight(context.TODO(), indexerdb.SetProcessResultsHeightParams{
-		ID:            pid,
-		ResultsHeight: int64(height),
-	}); err != nil {
-		return err
 	}
 	return nil
 }
