@@ -295,7 +295,7 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.SetTxCost(txType, cost); err != nil {
+	if err := vc.app.State.SetTxBaseCost(txType, cost); err != nil {
 		return err
 	}
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
@@ -316,19 +316,29 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 	defer vc.vcMtx.Unlock()
 	for k := range state.TxTypeCostToStateKey {
 		if !force {
-			_, err := vc.app.State.TxCost(k, true)
+			_, err := vc.app.State.TxBaseCost(k, true)
 			if err == nil || errors.Is(err, state.ErrTxCostNotFound) {
 				continue
 			}
 			// If error is not ErrTxCostNotFound, return it
 			return err
 		}
-		log.Infow("setting tx cost", "txtype", models.TxType_name[int32(k)], "cost", txCost)
-		if err := vc.app.State.SetTxCost(k, txCost); err != nil {
+		log.Infow("setting tx base cost", "txtype", models.TxType_name[int32(k)], "cost", txCost)
+		if err := vc.app.State.SetTxBaseCost(k, txCost); err != nil {
 			return err
 		}
 	}
 	if _, err := vc.app.State.Save(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SetElectionPrice sets the election price.
+func (vc *Vocone) SetElectionPrice() error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	if err := vc.app.State.SetElectionPriceCalc(); err != nil {
 		return err
 	}
 	return nil

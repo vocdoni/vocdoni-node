@@ -132,11 +132,23 @@ func (t *e2eElection) isCensusSizeValid(censusID types.HexBytes) bool {
 }
 
 func (t *e2eElection) createElection(electionDescrip *vapi.ElectionDescription) (*vapi.Election, error) {
+	price, err := t.api.ElectionPrice(electionDescrip)
+	if err != nil {
+		return nil, fmt.Errorf("could not get election price: %w", err)
+	}
+	acc, err := t.api.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch own account: %w", err)
+	}
+	if acc.Balance < price {
+		return nil, fmt.Errorf("not enough balance to create election (needed %d): %w", price, err)
+	}
+	log.Infow("creating new election", "price", price, "balance", acc.Balance)
+
 	electionID, err := t.api.NewElection(electionDescrip)
 	if err != nil {
 		return nil, err
 	}
-
 	log.Infof("created new election with id %s - now wait until it starts", electionID.String())
 
 	// Wait for the election to start

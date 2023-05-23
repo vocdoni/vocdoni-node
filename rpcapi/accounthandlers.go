@@ -64,7 +64,7 @@ func (r *RPCAPI) getTransactionCost(request *api.APIrequest) (*api.APIresponse, 
 	if txType == models.TxType_TX_UNKNOWN {
 		return nil, fmt.Errorf("invalid tx type: %s", request.Type)
 	}
-	c, err := r.vocapp.State.TxCost(txType, true)
+	c, err := r.vocapp.State.TxBaseCost(txType, true)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get tx cost: %w", err)
 	}

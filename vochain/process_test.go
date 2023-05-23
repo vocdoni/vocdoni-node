@@ -413,7 +413,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 
 	// set tx costs
 	for _, cost := range genesis.TxCostNameToTxTypeMap {
-		qt.Assert(t, app.State.SetTxCost(cost, txCostNumber), qt.IsNil)
+		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
 
 	}
 	app.Commit()

@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -362,20 +363,19 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 	return electionResults, nil
 }
 
+// ElectionFilterPaginated returns a list of elections filtered by the given parameters.
 // POST /elections/filter/page/<page>
 // Retuns a list of elections filtered by the given parameters.
-func (c *HTTPclient) ElectionFilterPaginated(organizationId types.HexBytes,
-	electionId types.HexBytes,
-	status models.ProcessStatus,
-	withResults bool, page int) (*[]api.ElectionSummary, error) {
+func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, electionID types.HexBytes,
+	status models.ProcessStatus, withResults bool, page int) (*[]api.ElectionSummary, error) {
 	body := struct {
 		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
 		ElectionID     types.HexBytes `json:"electionId,omitempty"`
 		WithResults    bool           `json:"withResults,omitempty"`
 		Status         string         `json:"status,omitempty"`
 	}{
-		OrganizationID: organizationId,
-		ElectionID:     electionId,
+		OrganizationID: organizationID,
+		ElectionID:     electionID,
 		WithResults:    withResults,
 		Status:         status.String(),
 	}
@@ -408,4 +408,46 @@ func (c *HTTPclient) ElectionKeys(electionID types.HexBytes) (*api.ElectionKeys,
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	return electionKeys, nil
+}
+
+// ElectionPrice returns the price of an election.
+func (c *HTTPclient) ElectionPrice(election *api.ElectionDescription) (uint64, error) {
+	endBlock, err := c.DateToHeight(election.EndDate)
+	if err != nil {
+		return 0, err
+	}
+	startBlock := uint32(0)
+	if election.StartDate.IsZero() {
+		info, err := c.ChainInfo()
+		if err != nil {
+			return 0, err
+		}
+		startBlock = info.Height
+	} else {
+		startBlock, err = c.DateToHeight(election.StartDate)
+		if err != nil {
+			return 0, err
+		}
+	}
+	params := electionprice.ElectionParameters{
+		MaxCensusSize:    election.Census.Size,
+		ElectionDuration: endBlock - startBlock,
+		EncryptedVotes:   election.ElectionType.SecretUntilTheEnd,
+		AnonymousVotes:   election.ElectionType.Anonymous,
+		MaxVoteOverwrite: uint32(election.VoteType.MaxVoteOverwrites),
+	}
+	resp, code, err := c.Request("POST", params, "elections", "price")
+	if err != nil {
+		return 0, err
+	}
+	if code != 200 {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	price := struct {
+		Price uint64 `json:"price"`
+	}{}
+	if err := json.Unmarshal(resp, &price); err != nil {
+		return 0, err
+	}
+	return price.Price, nil
 }

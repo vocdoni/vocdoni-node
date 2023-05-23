@@ -151,7 +151,7 @@ func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.Tx) error {
 	if tx.Nonce != acc.Nonce {
 		return fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
-	cost, err := t.state.TxCost(models.TxType_SEND_TOKENS, false)
+	cost, err := t.state.TxBaseCost(models.TxType_SEND_TOKENS, false)
 	if err != nil {
 		return err
 	}
@@ -236,7 +236,7 @@ func (t *TransactionHandler) CollectFaucetTxCheck(vtx *vochaintx.Tx) error {
 	if issuerAcc == nil {
 		return fmt.Errorf("the account signing the faucet payload does not exist")
 	}
-	cost, err := t.state.TxCost(models.TxType_COLLECT_FAUCET, false)
+	cost, err := t.state.TxBaseCost(models.TxType_COLLECT_FAUCET, false)
 	if err != nil {
 		return fmt.Errorf("cannot get %s tx cost: %w", models.TxType_COLLECT_FAUCET, err)
 	}

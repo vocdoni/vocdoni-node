@@ -39,11 +39,11 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 	// create burn account
 	app.State.SetAccount(state.BurnAddress, &state.Account{})
 	// set tx costs
-	app.State.SetTxCost(models.TxType_SET_ACCOUNT_INFO_URI, 100)
-	app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
-	app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 100)
-	app.State.SetTxCost(models.TxType_CREATE_ACCOUNT, 100)
-	app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 100)
+	app.State.SetTxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, 100)
+	app.State.SetTxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
+	app.State.SetTxBaseCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 100)
+	app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 100)
+	app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 100)
 	// save state
 	app.Commit()
 	return app, signers, nil
@@ -317,7 +317,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer7Account, qt.IsNil)
 
 	// should ignore tx cost if tx cost is set to 0
-	qt.Assert(t, app.State.SetTxCost(models.TxType_CREATE_ACCOUNT, 0), qt.IsNil)
+	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 0), qt.IsNil)
 	app.Commit()
 	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[7].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
@@ -359,7 +359,7 @@ func TestSetAccountTx(t *testing.T) {
 	qt.Assert(t, signer8Account.DelegateAddrs, qt.DeepEquals, [][]byte(nil))
 
 	// should not work if tx cost is not 0 and no faucet package is provided
-	qt.Assert(t, app.State.SetTxCost(models.TxType_CREATE_ACCOUNT, 1), qt.IsNil)
+	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 1), qt.IsNil)
 	app.Commit()
 	qt.Assert(t, testSetAccountTx(t,
 		signers[9], common.Address{}, nil, app, infoURI, 0, true),
@@ -519,7 +519,7 @@ func TestSetTransactionsCosts(t *testing.T) {
 		t.Fatal(err)
 	}
 	// set tx cost for Tx
-	if err := app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
+	if err := app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
 		t.Fatal(err)
 	}
 	// set treasurer account (same as signer for testing purposes)
@@ -538,7 +538,7 @@ func TestSetTransactionsCosts(t *testing.T) {
 	if err := testSetTransactionCostsTx(t, app, &notTreasurer, 0, 30); err == nil {
 		t.Fatal("should not change tx costs if not treasurer")
 	}
-	if cost, err := app.State.TxCost(models.TxType_COLLECT_FAUCET, false); err != nil {
+	if cost, err := app.State.TxBaseCost(models.TxType_COLLECT_FAUCET, false); err != nil {
 		t.Fatal(err)
 	} else {
 		qt.Assert(t, cost, qt.Equals, uint64(20))
@@ -672,7 +672,7 @@ func TestSendTokensTx(t *testing.T) {
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.SetTxCost(models.TxType_SEND_TOKENS, 10)
+	err = app.State.SetTxBaseCost(models.TxType_SEND_TOKENS, 10)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
@@ -762,9 +762,9 @@ func TestSetAccountDelegateTx(t *testing.T) {
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.SetTxCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 10)
+	err = app.State.SetTxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 10)
 	qt.Assert(t, err, qt.IsNil)
-	err = app.State.SetTxCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 10)
+	err = app.State.SetTxBaseCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 10)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
@@ -869,7 +869,7 @@ func TestCollectFaucetTx(t *testing.T) {
 	err = app.State.SetTreasurer(signer.Address(), 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	err = app.State.SetTxCost(models.TxType_COLLECT_FAUCET, 10)
+	err = app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 10)
 	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
