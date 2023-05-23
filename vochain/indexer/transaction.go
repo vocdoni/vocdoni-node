@@ -68,17 +68,9 @@ func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Tr
 	return txRefs, nil
 }
 
-// OnNewTx stores the transaction reference in the indexer database
 func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {
-	if err := idx.indexNewTx(tx, blockHeight, txIndex); err != nil {
-		log.Errorw(err, "cannot index new transaction")
-	}
-}
-
-func (idx *Indexer) indexNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTransaction(context.TODO(), indexerdb.CreateTransactionParams{
 		Hash:        tx.TxID[:],
@@ -86,7 +78,6 @@ func (idx *Indexer) indexNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int
 		BlockIndex:  int64(txIndex),
 		Type:        tx.TxModelType,
 	}); err != nil {
-		return err
+		log.Errorw(err, "cannot index new transaction")
 	}
-	return nil
 }
