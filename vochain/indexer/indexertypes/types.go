@@ -190,11 +190,11 @@ type TxMetadata struct {
 
 // Transaction holds the db reference for a single transaction
 type Transaction struct {
-	Index        uint64         `json:"transactionNumber"`
-	Hash         types.HexBytes `json:"transactionHash"`
-	BlockHeight  uint32         `json:"blockHeight"`
-	TxBlockIndex int32          `json:"transactionIndex"`
-	TxType       string         `json:"transactionType"`
+	Index        uint64         `json:"transactionNumber" format:"int64" example:"944"`
+	Hash         types.HexBytes `json:"transactionHash" swaggertype:"string" example:"75e8f822f5dd13973ac5158d600f0a2a5fea4bfefce9712ab5195bf17884cfad"`
+	BlockHeight  uint32         `json:"blockHeight" format:"int32" example:"64924"`
+	TxBlockIndex int32          `json:"transactionIndex" format:"int32" example:"0"`
+	TxType       string         `json:"transactionType" enums:"vote,newProcess,admin,setProcess,registerKey,mintTokens,sendTokens,setTransactionCosts,setAccount,collectFaucet,setKeykeeper" example:"Vote"`
 }
 
 func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {

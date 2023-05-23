@@ -132,8 +132,12 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 // walletAddHandler
 //
 //	@Summary		Add account
-//	@Description	Add a new account to the local store
-//	@Success		200	{object}	Account
+//	@Description	Add a new account to the local store. It return a token used to manage this account on the future.
+//	@Tags			Wallet
+//	@Accept			json
+//	@Produce		json
+//	@Param			privateKey	path		string	true	"Private key to add"
+//	@Success		200			{object}	object{token=string,address=string}
 //	@Router			/wallet/add/{privateKey} [post]
 func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
@@ -192,8 +196,12 @@ func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 // walletCreateHandler
 //
-//	@Summary		Set account
-//	@Description	Set a new account
+//	@Summary		Set wallet account
+//	@Description	Set a new account. Needed the bearer token associated the account.
+//	@Security		BasicAuth
+//	@Tags			Wallet
+//	@Accept			json
+//	@Produce		json
 //	@Success		200	{object}	Transaction
 //	@Router			/wallet/bootstrap [get]
 func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -236,8 +244,14 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 // walletTransferHandler
 //
 //	@Summary		Transfer tokens
-//	@Description	Transfer balance to another account
-//	@Success		200	{object}	Transaction
+//	@Description	Transfer balance to another account. Needed the bearer token associated the account.
+//	@Security		BasicAuth
+//	@Tags			Wallet
+//	@Accept			json
+//	@Produce		json
+//	@Param			dstAddress	path		string	true	"Destination address"
+//	@Param			amount		path		string	true	"Amount of tokens to transfer"
+//	@Success		200			{object}	Transaction
 //	@Router			/wallet/transfer/{dstAddress}/{amount} [get]
 func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)
@@ -289,9 +303,14 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 // walletElectionHandler
 //
-//	@Summary		Create election
-//	@Description	Creates an election
-//	@Success		200	{object}	Transaction
+//	@Summary		Create election for wallet
+//	@Description	Creates an election. Requires the bearer token of the account you want to create the election.
+//	@Security		BasicAuth
+//	@Tags			Wallet
+//	@Accept			json
+//	@Produce		json
+//	@Param			description	body		ElectionDescription	true	"Election description"
+//	@Success		200			{object}	Transaction
 //	@Router			/wallet/election [post]
 func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	wallet, err := a.walletFromToken(msg.AuthToken)

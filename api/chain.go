@@ -184,10 +184,14 @@ func (a *API) enableChainHandlers() error {
 
 // organizationListHandler
 //
-//	@Summary		List organizations
-//	@Description	List the existing organizations
-//	@Success		200	{object}	object
-//	@Router			/chain/organizations/page/{page} [get]
+//	@Summary				List organizations
+//	@Description.markdown	organizationListHandler
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Param					page	path		int	true	"Page number"
+//	@Success				200		{object}	api.organizationListHandler.response
+//	@Router					/chain/organizations/page/{page} [get]
 func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	var err error
 	page := 0
@@ -208,9 +212,11 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		})
 	}
 
-	data, err := json.Marshal(struct {
+	type response struct {
 		Organizations []*OrganizationList `json:"organizations"`
-	}{organizations})
+	}
+
+	data, err := json.Marshal(response{organizations})
 	if err != nil {
 		return err
 	}
@@ -220,9 +226,12 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 
 // organizationCountHandler
 //
-//	@Summary		Organizations count
+//	@Summary		Count organizations
 //	@Description	Return the number of organizations
-//	@Success		200	{object}	Organization
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{count=int}	"Number of registered organizations"
 //	@Router			/chain/organizations/count [get]
 func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.EntityCount()
@@ -237,10 +246,13 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 
 // chainInfoHandler
 //
-//	@Summary		Chain info
-//	@Description	Returns the chain parameters and info
-//	@Success		200	{object}	ChainInfo
-//	@Router			/chain/info [get]
+//	@Summary				Vochain information
+//	@Description.markdown	chainInfoHandler
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Success				200	{object}	api.ChainInfo
+//	@Router					/chain/info [get]
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	transactionCount, err := a.indexer.TransactionCount()
 	if err != nil {
@@ -289,6 +301,9 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //
 //	@Summary		Circuit info
 //	@Description	Returns the circuit configuration according to the current circuit
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
 //	@Success		200	{object}	circuit.ZkCircuitConfig
 //	@Router			/chain/info/circuit [get]
 func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -304,10 +319,13 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 
 // chainInfoPriceFactors
 //
-//	@Summary		Election price factors info
-//	@Description	Returns the factors and values used to calculate the election price
-//	@Success		200	{object}	election	price	factors
-//	@Router			/chain/info/electionPriceFactors [get]
+//	@Summary				Price factors information
+//	@Description.markdown	chainInfoPriceFactors
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Success				200	{object}	electionprice.Calculator
+//	@Router					/chain/info/electionPriceFactors [get]
 func (a *API) chainInfoPriceFactors(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// Encode the values and factors to JSON
 	data, err := json.Marshal(a.vocapp.State.ElectionPriceCalc)
@@ -319,9 +337,13 @@ func (a *API) chainInfoPriceFactors(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 // chainEstimateHeightHandler
 //
-//	@Summary		Estimate block for timestamp
+//	@Summary		Estimate date to block
 //	@Description	Returns the estimated block height for the timestamp provided
-//	@Success		200	{object}	object
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			timestamp	path		string					true	"Timestamp on unix format"
+//	@Success		200			{object}	object{height=number}	"Estimated block height"
 //	@Router			/chain/dateToBlock/{timestamp} [get]
 func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	timestamp, err := strconv.ParseInt(ctx.URLParam("timestamp"), 10, 64)
@@ -344,9 +366,13 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 
 // chainEstimateDateHandler
 //
-//	@Summary		Estimate timestamp for block
+//	@Summary		Estimate block to date
 //	@Description	Returns the estimated timestamp for the block height provided
-//	@Success		200	{object}	object
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			height	path		number	true	"Block height"
+//	@Success		200		{object}	object{date=string}
 //	@Router			/chain/blockToDate/{height} [get]
 func (a *API) chainEstimateDateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
@@ -366,10 +392,14 @@ func (a *API) chainEstimateDateHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 
 // chainSendTxHandler
 //
-//	@Summary		Submit transaction
-//	@Description	Submits a blockchain transaction
-//	@Success		200	{object}	Transaction
-//	@Router			/chain/transactions [post]
+//	@Summary				Submit transaction
+//	@Description.markdown	chainSendTxHandler
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Param					transaction	body		object{payload=string}	true	"Base64 payload string containing transaction data and signature"
+//	@Success				200			{object}	api.Transaction			"Return blockchain response. `response` could differ depending of transaction type."
+//	@Router					/chain/transactions [post]
 func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Transaction{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -394,7 +424,10 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 //
 //	@Summary		Transaction costs
 //	@Description	Returns the list of transactions and its cost
-//	@Success		200	{object}	Transaction
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	genesis.TransactionCosts
 //	@Router			/chain/transactions/cost [get]
 func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCosts := &Transaction{
@@ -416,9 +449,13 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 
 // chainTxListPaginated
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	object
+//	@Summary		List Transactions
+//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		int									true	"Page number"
+//	@Success		200		{object}	api.chainTxListPaginated.response	"It return a list of transactions references"
 //	@Router			/chain/transactions/page/{page} [get]
 func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
@@ -439,9 +476,10 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
-	data, err := json.Marshal(struct {
+	type response struct {
 		Txs []*indexertypes.Transaction `json:"transactions"`
-	}{refs})
+	}
+	data, err := json.Marshal(response{refs})
 	if err != nil {
 		return err
 	}
@@ -450,10 +488,15 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 // chainTxbyHashHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	indexertypes.TxReference
-//	@Router			/chain/transactions/reference/{hash} [get]
+//	@Summary				Transaction by hash
+//	@Description.markdown	chainTxbyHashHandler
+//	@Accept					json
+//	@Produce				json
+//	@Tags					Chain
+//	@Param					hash	path		string	true	"Transaction hash"
+//	@Success				200		{object}	indexertypes.Transaction
+//	@Success				204		"See [errors](vocdoni-api#errors) section"
+//	@Router					/chain/transactions/reference/{hash} [get]
 func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
@@ -476,9 +519,15 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 // chainTxHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	object
+//	@Summary		Transaction by block height and index
+//	@Description	Get transaction full information by block height and index. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			height	path		int	true	"Block height"
+//	@Param			index	path		int	true	"Transaction index on block"
+//	@Success		200		{object}	GenericTransactionWithInfo
+//	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/{height}/{index} [get]
 func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
@@ -516,9 +565,14 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 
 // chainTxByIndexHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	indexertypes.TxReference
+//	@Summary		Transaction by index
+//	@Description	Get transaction by its index. This is not transaction reference (hash), and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			index	path		int	true	"Index of the transaction"
+//	@Success		200		{object}	indexertypes.Transaction
+//	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/reference/index/{index} [get]
 func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
@@ -541,10 +595,14 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 // chainTxByHeightHandler
 //
-//	@Summary		Returns the list of transactions for a given block
+//	@Summary		Transactions in a block
 //	@Description	Given a block returns the list of transactions for that block
-//	@Success		200	{object}	TransactionList
-//
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			height	path		number	true	"Block height"
+//	@Param			page	path		number	true	"Page to paginate"
+//	@Success		200		{object}	[]TransactionMetadata
 //	@Router			/chain/blocks/{height}/transactions/page/{page} [get]
 func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
@@ -609,8 +667,11 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 
 // chainValidatorsHandler
 //
-//	@Summary		Validators list
+//	@Summary		List validators
 //	@Description	Returns the list of validators
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
 //	@Success		200	{object}	ValidatorList
 //	@Router			/chain/validators [get]
 func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -637,8 +698,12 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 // chainBlockHandler
 //
 //	@Summary		Get block (by height)
-//	@Description	Returns the block at the given height
-//	@Success		200	{object}	types.Block
+//	@Description	Returns the full block information at the given height
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			height	path		int	true	"Block height"
+//	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/{height} [get]
 func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
@@ -669,7 +734,11 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 //	@Summary		Get block (by hash)
 //	@Description	Returns the block from the given hash
-//	@Success		200	{object}	types.Block
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			hash	path		string	true	"Block hash"
+//	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/hash/{hash} [get]
 func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
@@ -698,9 +767,14 @@ func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 
 // chainOrganizationsFilterPaginatedHandler
 //
-//	@Summary		Organizations list (paginated)
-//	@Description	Returns a list of organizations paginated by the given page
-//	@Success		200	{object}	object
+//	@Summary		List organizations (filtered)
+//	@Description	Returns a list of organizations filtered by its partial id, paginated by the given page
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			organizationId	body		object{organizationId=string}	true	"Partial organizationId to filter by"
+//	@Param			page			path		int								true	"Current page"
+//	@Success		200				{object}	object{organizations=[]api.OrganizationList}
 //	@Router			/chain/organizations/filter/page/{page} [post]
 func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
@@ -748,7 +822,11 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 //
 //	@Summary		Transactions count
 //	@Description	Returns the number of transactions
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
 //	@Success		200	{object}	uint64
+//	@Success		200	{object}	object{count=number}
 //	@Router			/chain/transactions/count [get]
 func (a *API) chainTxCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count, err := a.indexer.TransactionCount()
