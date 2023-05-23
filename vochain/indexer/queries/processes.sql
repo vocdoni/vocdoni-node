@@ -14,7 +14,7 @@ INSERT INTO processes (
 	results_block_height
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?,
+	0, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -79,11 +79,6 @@ LIMIT 1;
 -- name: GetTotalProcessEnvelopeHeight :one
 SELECT SUM(results_envelope_height) FROM processes;
 
--- name: SetProcessResultsHeight :execresult
-UPDATE processes
-SET results_height = sqlc.arg(results_height)
-WHERE id = sqlc.arg(id);
-
 -- name: UpdateProcessResults :execresult
 UPDATE processes
 SET results_votes = sqlc.arg(votes),
@@ -123,10 +118,6 @@ ORDER BY creation_time DESC, id ASC
 LIMIT ?
 OFFSET ?
 ;
-
--- name: GetProcessIDsByResultsHeight :many
-SELECT id FROM processes
-WHERE results_height = ?;
 
 -- name: GetProcessIDsByFinalResults :many
 SELECT id FROM processes
