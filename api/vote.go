@@ -47,8 +47,12 @@ func (a *API) enableVoteHandlers() error {
 // submitVoteHandler
 //
 //	@Summary		Submit a vote
-//	@Description	Submit a vote
-//	@Success		200	{object}	Vote
+//	@Description	Submit a vote using a protobuf signed transaction. The corresponding result are the vote id and transaction hash where the vote is registered.
+//	@Tags			Votes
+//	@Accept			json
+//	@Produce		json
+//	@Param			transaction	body		object{txPayload=string}	true	"Requires a protobuf signed transaction"
+//	@Success		200			{object}	object{txHash=string, voteID=string}
 //	@Router			/votes [post]
 func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &Vote{}
@@ -78,10 +82,14 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 // getVoteHandler
 //
-//	@Summary		Get vote (by voteID)
-//	@Description	Get a vote by its voteID (nullifier)
-//	@Success		200	{object}	Vote
-//	@Router			/votes/{voteID} [get]
+//	@Summary				Get vote
+//	@Description.markdown	getVoteHandler
+//	@Tags					Votes
+//	@Accept					json
+//	@Produce				json
+//	@Param					voteID	path		string	true	"Nullifier of the vote"
+//	@Success				200		{object}	Vote
+//	@Router					/votes/{voteID} [get]
 func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
@@ -127,8 +135,14 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 // verifyVoteHandler
 //
 //	@Summary		Verify vote
-//	@Description	Verify a vote (get basic information)
-//	@Success		200	"(empty body)"
+//	@Description	Check if vote is registered on the blockchain on specific election. Just return Ok status code
+//	@Tags			Votes
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionID	path	string	true	"Election id"
+//	@Param			voteID		path	string	true	"Nullifier of the vote"
+//	@Success		200			"(empty body)"
+//	@Failure		404			{object}	apirest.APIerror
 //	@Router			/votes/verify/{electionID}/{voteID} [get]
 func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))

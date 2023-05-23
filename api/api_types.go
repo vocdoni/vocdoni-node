@@ -13,20 +13,20 @@ import (
 )
 
 type Organization struct {
-	OrganizationID types.HexBytes      `json:"organizationID,omitempty"`
+	OrganizationID types.HexBytes      `json:"organizationID,omitempty" `
 	Elections      []*ElectionSummary  `json:"elections,omitempty"`
 	Organizations  []*OrganizationList `json:"organizations,omitempty"`
-	Count          *uint64             `json:"count,omitempty"`
+	Count          *uint64             `json:"count,omitempty" example:"1"`
 }
 
 type OrganizationList struct {
-	OrganizationID types.HexBytes `json:"organizationID"`
-	ElectionCount  uint64         `json:"electionCount"`
+	OrganizationID types.HexBytes `json:"organizationID"  example:"0x370372b92514d81a0e3efb8eba9d036ae0877653"`
+	ElectionCount  uint64         `json:"electionCount" example:"1"`
 }
 
 type ElectionSummary struct {
-	ElectionID     types.HexBytes    `json:"electionId"`
-	OrganizationID types.HexBytes    `json:"organizationId"`
+	ElectionID     types.HexBytes    `json:"electionId" `
+	OrganizationID types.HexBytes    `json:"organizationId" `
 	Status         string            `json:"status"`
 	StartDate      time.Time         `json:"startDate"`
 	EndDate        time.Time         `json:"endDate"`
@@ -38,17 +38,17 @@ type ElectionSummary struct {
 // ElectionResults is the struct used to wrap the results of an election
 type ElectionResults struct {
 	// ABIEncoded is the abi encoded election results
-	ABIEncoded string `json:"abiEncoded"`
+	ABIEncoded string `json:"abiEncoded" swaggerignore:"true"`
 	// CensusRoot is the root of the census tree
-	CensusRoot types.HexBytes `json:"censusRoot"`
+	CensusRoot types.HexBytes `json:"censusRoot" `
 	// ElectionID is the ID of the election
-	ElectionID types.HexBytes `json:"electionId"`
+	ElectionID types.HexBytes `json:"electionId" `
 	// OrganizationID is the ID of the organization that created the election
-	OrganizationID types.HexBytes `json:"organizationId"`
+	OrganizationID types.HexBytes `json:"organizationId" `
 	// Results is the list of votes
 	Results [][]*types.BigInt `json:"results"`
 	// SourceContractAddress is the address of the smart contract containing the census
-	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty"`
+	SourceContractAddress types.HexBytes `json:"sourceContractAddress,omitempty" `
 }
 
 type Election struct {
@@ -63,14 +63,14 @@ type Election struct {
 }
 
 type ElectionKeys struct {
-	PublicKeys  []Key `json:"publicKeys,omitempty"`
-	PrivateKeys []Key `json:"privateKeys,omitempty"`
+	PublicKeys  []Key `json:"publicKeys,omitempty" swaggertype:"string"`
+	PrivateKeys []Key `json:"privateKeys,omitempty" swaggertype:"string"`
 }
 
 type ElectionCensus struct {
 	CensusOrigin           string         `json:"censusOrigin"`
-	CensusRoot             types.HexBytes `json:"censusRoot"`
-	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot"`
+	CensusRoot             types.HexBytes `json:"censusRoot" `
+	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot" `
 	CensusURL              string         `json:"censusURL"`
 	MaxCensusSize          uint64         `json:"maxCensusSize"`
 }
@@ -78,8 +78,8 @@ type ElectionCensus struct {
 type ElectionCreate struct {
 	TxPayload   []byte         `json:"txPayload,omitempty"`
 	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash"`
-	ElectionID  types.HexBytes `json:"electionID"`
+	TxHash      types.HexBytes `json:"txHash" `
+	ElectionID  types.HexBytes `json:"electionID" `
 	MetadataURL string         `json:"metadataURL"`
 }
 
@@ -97,39 +97,42 @@ type ElectionDescription struct {
 }
 
 type ElectionFilter struct {
-	OrganizationID types.HexBytes `json:"organizationId,omitempty"`
-	ElectionID     types.HexBytes `json:"electionId,omitempty"`
+	OrganizationID types.HexBytes `json:"organizationId,omitempty" `
+	ElectionID     types.HexBytes `json:"electionId,omitempty" `
 	WithResults    *bool          `json:"withResults,omitempty"`
 	Status         string         `json:"status,omitempty"`
 }
 
 type Key struct {
 	Index int            `json:"index"`
-	Key   types.HexBytes `json:"key"`
+	Key   types.HexBytes `json:"key" `
 }
 
 type Vote struct {
-	TxPayload            []byte          `json:"txPayload,omitempty"`
-	TxHash               types.HexBytes  `json:"txHash,omitempty"`
-	VoteID               types.HexBytes  `json:"voteID,omitempty"`
-	EncryptionKeyIndexes []uint32        `json:"encryptionKeys,omitempty"`
-	VotePackage          json.RawMessage `json:"package,omitempty"`
-	VoteWeight           string          `json:"weight,omitempty"`
-	VoteNumber           *uint32         `json:"number,omitempty"`
-	ElectionID           types.HexBytes  `json:"electionID,omitempty"`
-	VoterID              types.HexBytes  `json:"voterID,omitempty"`
-	BlockHeight          uint32          `json:"blockHeight,omitempty"`
-	TransactionIndex     *int32          `json:"transactionIndex,omitempty"`
-	OverwriteCount       *uint32         `json:"overwriteCount,omitempty"`
-	Date                 *time.Time      `json:"date,omitempty"`
+	TxPayload []byte         `json:"txPayload,omitempty"  extensions:"x-omitempty" swaggerignore:"true"`
+	TxHash    types.HexBytes `json:"txHash,omitempty"  extensions:"x-omitempty" `
+	VoteID    types.HexBytes `json:"voteID,omitempty"  extensions:"x-omitempty" `
+	// Sent only for encrypted elections (no results until the end)
+	EncryptionKeyIndexes []uint32 `json:"encryptionKeys,omitempty" extensions:"x-omitempty"`
+	// For encrypted elections this will be codified
+	VotePackage      json.RawMessage `json:"package,omitempty" extensions:"x-omitempty"`
+	VoteWeight       string          `json:"weight,omitempty" extensions:"x-omitempty"`
+	VoteNumber       *uint32         `json:"number,omitempty" extensions:"x-omitempty"`
+	ElectionID       types.HexBytes  `json:"electionID,omitempty" extensions:"x-omitempty" `
+	VoterID          types.HexBytes  `json:"voterID,omitempty" extensions:"x-omitempty" `
+	BlockHeight      uint32          `json:"blockHeight,omitempty" extensions:"x-omitempty"`
+	TransactionIndex *int32          `json:"transactionIndex,omitempty" extensions:"x-omitempty"`
+	OverwriteCount   *uint32         `json:"overwriteCount,omitempty" extensions:"x-omitempty"`
+	// Date when the vote was emitted
+	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
 }
 
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
 	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
-	PublicKey types.HexBytes `json:"publicKey,omitempty"`
-	RootHash  types.HexBytes `json:"rootHash,omitempty"`
+	PublicKey types.HexBytes `json:"publicKey,omitempty" `
+	RootHash  types.HexBytes `json:"rootHash,omitempty" `
 }
 
 type CensusParticipants struct {
@@ -137,7 +140,7 @@ type CensusParticipants struct {
 }
 
 type CensusParticipant struct {
-	Key    types.HexBytes `json:"key"`
+	Key    types.HexBytes `json:"key" `
 	Weight *types.BigInt  `json:"weight"`
 }
 
@@ -159,13 +162,13 @@ type ElectionType struct {
 }
 
 type Transaction struct {
-	Payload   []byte            `json:"payload,omitempty"`
-	Hash      types.HexBytes    `json:"hash,omitempty"`
-	Response  []byte            `json:"response,omitempty"`
-	Code      *uint32           `json:"code,omitempty"`
-	Costs     map[string]uint64 `json:"costs,omitempty"`
-	Address   types.HexBytes    `json:"address,omitempty"`
-	ProcessID types.HexBytes    `json:"processId,omitempty"`
+	Payload   []byte            `json:"payload,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
+	Hash      types.HexBytes    `json:"hash,omitempty" extensions:"x-omitempty" `
+	Response  []byte            `json:"response,omitempty" extensions:"x-omitempty" swaggertype:"string" format:"base64"`
+	Code      *uint32           `json:"code,omitempty" extensions:"x-omitempty"`
+	Costs     map[string]uint64 `json:"costs,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
+	Address   types.HexBytes    `json:"address,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
+	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
 }
 
 type TransactionReference struct {
@@ -177,7 +180,7 @@ type TransactionMetadata struct {
 	Type   string         `json:"transactionType"`
 	Number uint32         `json:"transactionNumber"`
 	Index  int32          `json:"transactionIndex"`
-	Hash   types.HexBytes `json:"transactionHash"`
+	Hash   types.HexBytes `json:"transactionHash" `
 }
 
 type BlockTransactionsInfo struct {
@@ -192,47 +195,47 @@ type GenericTransactionWithInfo struct {
 }
 
 type ChainInfo struct {
-	ID                      string    `json:"chainId"`
-	BlockTime               [5]int32  `json:"blockTime"`
-	ElectionCount           uint64    `json:"electionCount"`
-	OrganizationCount       uint64    `json:"organizationCount"`
-	GenesisTime             time.Time `json:"genesisTime"`
-	Height                  uint32    `json:"height"`
-	Syncing                 bool      `json:"syncing"`
-	Timestamp               int64     `json:"blockTimestamp"`
-	TransactionCount        uint64    `json:"transactionCount"`
-	ValidatorCount          uint32    `json:"validatorCount"`
-	VoteCount               uint64    `json:"voteCount"`
-	CircuitConfigurationTag string    `json:"cicuitConfigurationTag"`
-	MaxCensusSize           uint64    `json:"maxCensusSize"`
-	NetworkCapacity         uint64    `json:"networkCapacity"`
+	ID                      string    `json:"chainId" example:"azeno"`
+	BlockTime               [5]int32  `json:"blockTime" example:"12000,11580,11000,11100,11100"`
+	ElectionCount           uint64    `json:"electionCount" example:"120"`
+	OrganizationCount       uint64    `json:"organizationCount" example:"20"`
+	GenesisTime             time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	Height                  uint32    `json:"height" example:"5467"`
+	Syncing                 bool      `json:"syncing" example:"true"`
+	Timestamp               int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	TransactionCount        uint64    `json:"transactionCount" example:"554"`
+	ValidatorCount          uint32    `json:"validatorCount" example:"5"`
+	VoteCount               uint64    `json:"voteCount" example:"432"`
+	CircuitConfigurationTag string    `json:"cicuitConfigurationTag" example:"dev"`
+	MaxCensusSize           uint64    `json:"maxCensusSize" example:"50000"`
+	NetworkCapacity         uint64    `json:"networkCapacity" example:"2000"`
 }
 
 type Account struct {
-	Address       types.HexBytes   `json:"address"`
+	Address       types.HexBytes   `json:"address" `
 	Nonce         uint32           `json:"nonce"`
 	Balance       uint64           `json:"balance"`
 	ElectionIndex uint32           `json:"electionIndex"`
 	InfoURL       string           `json:"infoURL,omitempty"`
-	Token         *uuid.UUID       `json:"token,omitempty"`
+	Token         *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
 	Metadata      *AccountMetadata `json:"metadata,omitempty"`
 }
 
 type AccountSet struct {
-	TxPayload   []byte         `json:"txPayload,omitempty"`
-	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash"`
-	MetadataURL string         `json:"metadataURL"`
+	TxPayload   []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
+	Metadata    []byte         `json:"metadata,omitempty" swaggerignore:"true"`
+	TxHash      types.HexBytes `json:"txHash" `
+	MetadataURL string         `json:"metadataURL" swaggertype:"string"`
 }
 
 type Census struct {
-	CensusID types.HexBytes `json:"censusID,omitempty"`
+	CensusID types.HexBytes `json:"censusID,omitempty" `
 	Type     string         `json:"type,omitempty"`
-	Root     types.HexBytes `json:"root,omitempty"`
+	Root     types.HexBytes `json:"root,omitempty" `
 	Weight   *types.BigInt  `json:"weight,omitempty"`
-	Key      types.HexBytes `json:"key,omitempty"`
-	Proof    types.HexBytes `json:"proof,omitempty"`
-	Value    types.HexBytes `json:"value,omitempty"`
+	Key      types.HexBytes `json:"key,omitempty" `
+	Proof    types.HexBytes `json:"proof,omitempty" `
+	Value    types.HexBytes `json:"value,omitempty" `
 	Size     uint64         `json:"size,omitempty"`
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
@@ -240,7 +243,7 @@ type Census struct {
 }
 
 type File struct {
-	Payload []byte `json:"payload,omitempty"`
+	Payload []byte `json:"payload,omitempty" swaggerignore:"true"`
 	CID     string `json:"cid,omitempty"`
 }
 
@@ -249,8 +252,8 @@ type ValidatorList struct {
 }
 type Validator struct {
 	Power   uint64         `json:"power"`
-	PubKey  types.HexBytes `json:"pubKey"`
-	Address types.HexBytes `json:"address"`
+	PubKey  types.HexBytes `json:"pubKey" `
+	Address types.HexBytes `json:"address" `
 	Name    string         `json:"name"`
 }
 
@@ -304,5 +307,5 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 
 type Block struct {
 	tmtypes.Block `json:",inline"`
-	Hash          types.HexBytes `json:"hash"`
+	Hash          types.HexBytes `json:"hash" `
 }
