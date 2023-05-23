@@ -143,6 +143,8 @@ func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
 func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
+	// TODO: EntityList callers in the api package want the process count as well;
+	// work it out here so that the api package doesn't cause N sql queries.
 	entityIDs, err := idx.oneQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: searchTerm,
 		Offset:         int32(from),

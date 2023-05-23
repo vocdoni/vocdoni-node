@@ -57,10 +57,13 @@ func (idx *Indexer) AddEventListener(l EventListener) {
 // and keeps it indexed in a local database.
 type Indexer struct {
 	App *vochain.BaseApplication
+
 	// votePool is the list of votes that should be live counted, grouped by processId
+	// TODO: try using blockTx directly, after some more refactors
 	votePool map[string][]*state.Vote
 
 	// lockPool is the lock for all *Pool and blockTx operations
+	// TODO: rename to blockMu
 	lockPool sync.Mutex
 
 	oneQuery *indexerdb.Queries
@@ -75,7 +78,9 @@ type Indexer struct {
 	blockUpdateProcs map[string]bool
 
 	// list of live processes (those on which the votes will be computed on arrival)
-	liveResultsProcs sync.Map // TODO: rethink with blockTx
+	// TODO: we could query the procs table, perhaps memoizing to avoid querying the same over and over again?
+	liveResultsProcs sync.Map
+
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
 	sqlDB          *sql.DB
@@ -92,6 +97,7 @@ type Indexer struct {
 	// Note that cancelling currently only stops asynchronous goroutines started
 	// by Commit. In the future we could make it stop all other work as well,
 	// like entire calls to Commit.
+	// TODO: unused, remove
 	cancelCtx  context.Context
 	cancelFunc context.CancelFunc
 }
@@ -341,6 +347,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			log.Warnf("cannot get process %x", pid)
 			continue
 		}
+		// TODO: remove this state fetch
 		process, err := idx.App.State.Process(pid, false)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)

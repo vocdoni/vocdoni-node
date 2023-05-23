@@ -5,11 +5,11 @@ CREATE TABLE processes (
   start_block  INTEGER NOT NULL,
   end_block    INTEGER NOT NULL,
 
-  results_height          INTEGER NOT NULL,
+  results_height          INTEGER NOT NULL, -- TODO: now unnecessary?
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
   results_votes           TEXT NOT NULL,
-  results_weight          TEXT NOT NULL,
+  results_weight          TEXT NOT NULL, -- TODO: store as math/big.Int.Bytes?
   results_envelope_height INTEGER NOT NULL,
   results_block_height    INTEGER NOT NULL,
 
@@ -23,10 +23,12 @@ CREATE TABLE processes (
   status              INTEGER NOT NULL,
   namespace           INTEGER NOT NULL,
 
+  -- TODO: don't store protobuf
   envelope_pb  BLOB NOT NULL,
   mode_pb      BLOB NOT NULL,
   vote_opts_pb BLOB NOT NULL,
 
+  -- TODO: store as a proper list
   private_keys TEXT NOT NULL, -- comma-separated list of hex keys
   public_keys  TEXT NOT NULL, -- comma-separated list of hex keys
 
