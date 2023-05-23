@@ -125,3 +125,27 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 	)
 	return i, err
 }
+
+const getTxReferenceByBlockHeightAndBlockIndex = `-- name: GetTxReferenceByBlockHeightAndBlockIndex :one
+SELECT id, hash, block_height, block_index, type FROM transactions
+WHERE block_height = ? AND block_index = ?
+LIMIT 1
+`
+
+type GetTxReferenceByBlockHeightAndBlockIndexParams struct {
+	BlockHeight int64
+	BlockIndex  int64
+}
+
+func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, arg GetTxReferenceByBlockHeightAndBlockIndexParams) (Transaction, error) {
+	row := q.db.QueryRowContext(ctx, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.Hash,
+		&i.BlockHeight,
+		&i.BlockIndex,
+		&i.Type,
+	)
+	return i, err
+}
