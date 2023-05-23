@@ -93,27 +93,16 @@ type Indexer struct {
 	// In the tests, the extra 5s sleeps can make CI really slow at times, to
 	// the point that it times out. Skip that in the tests.
 	skipTargetHeightSleeps bool
-
-	// Note that cancelling currently only stops asynchronous goroutines started
-	// by Commit. In the future we could make it stop all other work as well,
-	// like entire calls to Commit.
-	// TODO: unused, remove
-	cancelCtx  context.Context
-	cancelFunc context.CancelFunc
 }
 
 // NewIndexer returns an instance of the Indexer
 // using the local storage database of dbPath and integrated into the state vochain instance
 func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
-	cancelCtx, cancelFunc := context.WithCancel(context.Background())
 	idx := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
 
 		blockUpdateProcs: make(map[string]bool),
-
-		cancelCtx:  cancelCtx,
-		cancelFunc: cancelFunc,
 	}
 
 	startTime := time.Now()
@@ -167,7 +156,6 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 }
 
 func (idx *Indexer) Close() error {
-	idx.cancelFunc()
 	if err := idx.sqlDB.Close(); err != nil {
 		return err
 	}
