@@ -430,8 +430,6 @@ func (idx *Indexer) Rollback() {
 
 // OnProcess indexer stores the processID and entityID
 func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
@@ -446,12 +444,12 @@ func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txI
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
 func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(vote.ProcessID) {
 		idx.votePool[string(vote.ProcessID)] = append(idx.votePool[string(vote.ProcessID)], vote)
 	}
 
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 	queries := idx.blockTxQueries()
 	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
 		log.Errorw(err, "could not index vote")
@@ -483,8 +481,6 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
 	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)
@@ -494,6 +490,8 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		log.Errorf("keyindex is nil")
 		return
 	}
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
@@ -528,7 +526,6 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTokenTransfer(context.TODO(), indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
