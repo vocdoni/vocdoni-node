@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -82,6 +83,14 @@ func (a *API) enableElectionHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.electionCreateHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/elections/price",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.electionPriceHandler,
 	); err != nil {
 		return err
 	}
@@ -538,6 +547,28 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	data, err := json.Marshal(&File{
 		CID: "ipfs://" + ipfs.CalculateCIDv1json(req.Payload),
 	})
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// electionPriceHandler
+//
+//	@Summary		Compute election price
+//	@Description	Helper endpoint to get the election price.
+//	@Success		200	{object}	Price
+//	@Router			/elections/price [post]
+func (a *API) electionPriceHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	req := &electionprice.ElectionParameters{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return err
+	}
+	price := a.vocapp.State.ElectionPriceCalc.Price(req)
+	data, err := json.Marshal(struct {
+		Price uint64 `json:"price"`
+	}{price},
+	)
 	if err != nil {
 		return err
 	}

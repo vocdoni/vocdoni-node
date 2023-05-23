@@ -118,7 +118,6 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		TransactionHandler: transactionHandler,
 		blockCache:         lru.NewAtomic[int64, *tmtypes.Block](32),
 		dataDir:            dbpath,
-		chainID:            "test",
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
 		mempoolTxRef:       make(map[[32]byte]uint32),
@@ -171,11 +170,9 @@ func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Re
 // The returned AppVersion will be included in the Header of every block.
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
+//
+// We use this method to initialize some state variables.
 func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
-	// print some basic version info about tendermint components
-	log.Infof("tendermint Core version: %s", req.Version)
-	log.Infof("tendermint P2P protocol version: %d", req.P2PVersion)
-	log.Infof("tendermint Block protocol version: %d", req.BlockVersion)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		log.Fatalf("cannot get State.LastHeight: %v", err)
@@ -184,8 +181,15 @@ func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseIn
 	if err != nil {
 		log.Fatalf("cannot get Store.Hash: %v", err)
 	}
-	log.Infof("replaying blocks. Current height %d, current APP hash %x",
-		lastHeight, appHash)
+	if err := app.State.SetElectionPriceCalc(); err != nil {
+		log.Fatalf("cannot set election price calc: %v", err)
+	}
+	// print some basic version info about tendermint components
+	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
+		req.P2PVersion, "blockVersion", req.BlockVersion, "lastHeight",
+		lastHeight, "appHash", hex.EncodeToString(appHash))
+	log.Infow("replaying stored blocks")
+
 	return abcitypes.ResponseInfo{
 		LastBlockHeight:  int64(lastHeight),
 		LastBlockAppHash: appHash,
@@ -254,7 +258,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 
 	// add tx costs
 	for k, v := range genesisAppState.TxCost.AsMap() {
-		err = app.State.SetTxCost(k, v)
+		err = app.State.SetTxBaseCost(k, v)
 		if err != nil {
 			log.Fatalf("could not set tx cost %q to value %q from genesis file to the State", k, v)
 		}
@@ -268,6 +272,16 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	// set max election size
 	if err := app.State.SetMaxProcessSize(genesisAppState.MaxElectionSize); err != nil {
 		log.Fatal("unable to set max election size")
+	}
+
+	// set network capacity
+	if err := app.State.SetNetworkCapacity(genesisAppState.NetworkCapacity); err != nil {
+		log.Fatal("unable to set  network capacity")
+	}
+
+	// initialize election price calc
+	if err := app.State.SetElectionPriceCalc(); err != nil {
+		log.Fatalf("cannot set election price calc: %v", err)
 	}
 
 	// commit state and get hash

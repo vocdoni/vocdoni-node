@@ -190,6 +190,11 @@ func main() {
 		}
 	}
 
+	// set election price calculator
+	if err := vc.SetElectionPrice(); err != nil {
+		log.Fatal(err)
+	}
+
 	// set funded accounts if any
 	if len(config.fundedAccounts) > 0 {
 		for _, addr := range config.fundedAccounts {
@@ -215,6 +220,7 @@ func main() {
 
 	vc.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
 	vc.SetBlockSize(config.blockSize)
+
 	go vc.Start()
 	uAPI, err := vc.EnableAPI("0.0.0.0", config.port, config.path)
 	if err != nil {

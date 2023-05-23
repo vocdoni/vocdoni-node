@@ -209,12 +209,16 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))
 }
 
-// BurnTxCostIncrementNonce reduces the transaction cost from the account balance and increments nonce
-func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType models.TxType) error {
+// BurnTxCostIncrementNonce reduces the transaction cost from the account balance and increments nonce.
+// If cost is set to 0, the cost is calculated from the tx type base cost.
+func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType models.TxType, cost uint64) error {
 	// get tx cost
-	cost, err := v.TxCost(txType, false)
-	if err != nil {
-		return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
+	if cost == 0 {
+		var err error
+		cost, err = v.TxBaseCost(txType, false)
+		if err != nil {
+			return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
+		}
 	}
 	// get account
 	acc, err := v.GetAccount(accountAddress, false)

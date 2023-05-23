@@ -198,6 +198,7 @@ type ChainInfo struct {
 	VoteCount               uint64    `json:"voteCount"`
 	CircuitConfigurationTag string    `json:"cicuitConfigurationTag"`
 	MaxCensusSize           uint64    `json:"maxCensusSize"`
+	NetworkCapacity         uint64    `json:"networkCapacity"`
 }
 
 type Account struct {

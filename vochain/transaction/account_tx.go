@@ -48,7 +48,7 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if err := vstate.CheckDuplicateDelegates(tx.GetDelegates(), &txSenderAddress); err != nil {
 		return fmt.Errorf("invalid delegates: %w", err)
 	}
-	txCost, err := t.state.TxCost(models.TxType_CREATE_ACCOUNT, false)
+	txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost: %w", err)
 	}
@@ -135,7 +135,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 	if tx.GetNonce() != txSenderAccount.Nonce {
 		return fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
 	}
-	cost, err := t.state.TxCost(tx.Txtype, false)
+	cost, err := t.state.TxBaseCost(tx.Txtype, false)
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost: %w", err)
 	}
@@ -202,7 +202,7 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 		)
 	}
 	// get setAccount tx cost
-	costSetAccountInfoURI, err := t.state.TxCost(models.TxType_SET_ACCOUNT_INFO_URI, false)
+	costSetAccountInfoURI, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, false)
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost: %w", err)
 	}

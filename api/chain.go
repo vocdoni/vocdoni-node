@@ -242,6 +242,10 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
+	networkCapacity, err := a.vocapp.State.NetworkCapacity()
+	if err != nil {
+		return err
+	}
 
 	data, err := json.Marshal(&ChainInfo{
 		ID:                      a.vocapp.ChainID(),
@@ -257,6 +261,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 		GenesisTime:             a.vocapp.Genesis().GenesisTime,
 		CircuitConfigurationTag: a.vocapp.CircuitConfigurationTag(),
 		MaxCensusSize:           maxCensusSize,
+		NetworkCapacity:         networkCapacity,
 	})
 	if err != nil {
 		return err
@@ -350,7 +355,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	}
 	var err error
 	for k, v := range genesis.TxCostNameToTxTypeMap {
-		txCosts.Costs[k], err = a.vocapp.State.TxCost(v, true)
+		txCosts.Costs[k], err = a.vocapp.State.TxBaseCost(v, true)
 		if err != nil {
 			return err
 		}

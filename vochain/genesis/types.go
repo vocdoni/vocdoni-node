@@ -119,6 +119,7 @@ type GenesisAppState struct {
 	Treasurer       types.HexBytes       `json:"treasurer"`
 	TxCost          TransactionCosts     `json:"tx_cost"`
 	MaxElectionSize uint64               `json:"max_election_size"`
+	NetworkCapacity uint64               `json:"network_capacity"`
 }
 
 // AppStateValidators represents a validator in the genesis app state.

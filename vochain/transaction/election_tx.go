@@ -13,6 +13,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -73,11 +74,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx,
 			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
 	}
 
-	// check tx cost
-	cost, err := t.state.TxCost(models.TxType_NEW_PROCESS, false)
-	if err != nil {
-		return nil, ethereum.Address{}, fmt.Errorf("cannot get NewProcessTx transaction cost: %w", err)
-	}
+	// check signature
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return nil, ethereum.Address{}, fmt.Errorf("could not get account: %w", err)
@@ -85,35 +82,39 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx,
 	if addr == nil {
 		return nil, ethereum.Address{}, fmt.Errorf("cannot get account from vtx.Signature, nil result")
 	}
+
+	// get Tx cost, since it is a new process, we should use the election price calculator
+	cost := t.txElectionCostFromProcess(tx.Process)
+
 	// check balance and nonce
 	if acc.Balance < cost {
-		return nil, ethereum.Address{}, vstate.ErrNotEnoughBalance
+		return nil, ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
 	}
 	if acc.Nonce != tx.Nonce {
-		return nil, ethereum.Address{}, vstate.ErrAccountNonceInvalid
+		return nil, ethereum.Address{}, fmt.Errorf("%w: expected %d, got %d", vstate.ErrAccountNonceInvalid, acc.Nonce, tx.Nonce)
 	}
 
 	// if organization ID is not set, use the sender address
 	if tx.Process.EntityId == nil {
 		tx.Process.EntityId = addr.Bytes()
-	}
-
-	// check if process entityID matches tx sender
-	if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
-		// check for a delegate
-		entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
-		entityAccount, err := t.state.GetAccount(entityAddress, false)
-		if err != nil {
-			return nil, ethereum.Address{}, fmt.Errorf(
-				"cannot get organization account for checking if the sender is a delegate: %w", err,
-			)
-		}
-		if entityAccount == nil {
-			return nil, ethereum.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
-		}
-		if !entityAccount.IsDelegate(*addr) {
-			return nil, ethereum.Address{}, fmt.Errorf(
-				"account %s unauthorized to create a new election on this organization", addr.Hex())
+	} else {
+		// check if process entityID matches tx sender
+		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
+			// check for a delegate
+			entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
+			entityAccount, err := t.state.GetAccount(entityAddress, false)
+			if err != nil {
+				return nil, ethereum.Address{}, fmt.Errorf(
+					"cannot get organization account for checking if the sender is a delegate: %w", err,
+				)
+			}
+			if entityAccount == nil {
+				return nil, ethereum.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
+			}
+			if !entityAccount.IsDelegate(*addr) {
+				return nil, ethereum.Address{}, fmt.Errorf(
+					"account %s unauthorized to create a new election on this organization", addr.Hex())
+			}
 		}
 	}
 
@@ -156,7 +157,7 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx, forCommit bool
 	}
 	tx := vtx.Tx.GetSetProcess()
 	// get tx cost
-	cost, err := t.state.TxCost(tx.Txtype, false)
+	cost, err := t.state.TxBaseCost(tx.Txtype, false)
 	if err != nil {
 		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
 	}
@@ -367,4 +368,14 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 		}
 	}
 	return nil
+}
+
+func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) uint64 {
+	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
+		MaxCensusSize:    process.GetMaxCensusSize(),
+		ElectionDuration: process.BlockCount + process.StartBlock,
+		EncryptedVotes:   process.GetEnvelopeType().EncryptedVotes,
+		AnonymousVotes:   process.GetEnvelopeType().Anonymous,
+		MaxVoteOverwrite: process.GetVoteOptions().MaxVoteOverwrites,
+	})
 }
