@@ -398,3 +398,24 @@ func (v *State) MaxProcessSize() (uint64, error) {
 	}
 	return strconv.ParseUint(string(size), 10, 64)
 }
+
+// SetNetworkCapacity sets the total capacity (in votes per block) of the network.
+func (v *State) SetNetworkCapacity(capacity uint64) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet([]byte("networkCapacity"), []byte(strconv.FormatUint(capacity, 10)), StateTreeCfg(TreeExtra))
+}
+
+// NetworkCapacity returns the total capacity (in votes per block) of the network.
+func (v *State) NetworkCapacity() (uint64, error) {
+	v.Tx.RLock()
+	defer v.Tx.RUnlock()
+	size, err := v.Tx.DeepGet([]byte("networkCapacity"), StateTreeCfg(TreeExtra))
+	if err != nil {
+		if errors.Is(err, arbo.ErrKeyNotFound) {
+			return 0, nil
+		}
+		return 0, err
+	}
+	return strconv.ParseUint(string(size), 10, 64)
+}

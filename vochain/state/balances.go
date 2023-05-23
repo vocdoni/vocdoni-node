@@ -124,7 +124,7 @@ func (v *State) VerifyTreasurer(addr common.Address, txNonce uint32) error {
 }
 
 // SetTxCost sets the given transaction cost
-func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
+func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return fmt.Errorf("txType %v shouldn't cost anything", txType)
@@ -137,11 +137,11 @@ func (v *State) SetTxCost(txType models.TxType, cost uint64) error {
 	return v.Tx.DeepSet([]byte(key), costBytes[:], StateTreeCfg(TreeExtra))
 }
 
-// TxCost returns the cost of a given transaction
+// TxBaseCost returns the base cost of a given transaction
 // When committed is false, the operation is executed also on not yet commited
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last commited version.
-func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
+func (v *State) TxBaseCost(txType models.TxType, committed bool) (uint64, error) {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
 		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
@@ -154,11 +154,11 @@ func (v *State) TxCost(txType models.TxType, committed bool) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var cost []byte
-	if cost, err = extraTree.Get([]byte(key)); err != nil {
+	var costBytes []byte
+	if costBytes, err = extraTree.Get([]byte(key)); err != nil {
 		return 0, ErrTxCostNotFound
 	}
-	return binary.LittleEndian.Uint64(cost), nil
+	return binary.LittleEndian.Uint64(costBytes), nil
 }
 
 // FaucetNonce returns true if the key is found in the subtree

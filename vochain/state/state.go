@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -96,6 +97,8 @@ type State struct {
 	currentHeight atomic.Uint32
 	// chainID identifies the blockchain
 	chainID string
+	// electionPriceCalc is the calculator for the election price
+	ElectionPriceCalc *electionprice.Calculator
 }
 
 // NewState creates a new State
@@ -131,14 +134,16 @@ func NewState(dbType, dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
-		dataDir:   dataDir,
-		db:        database,
-		Store:     sdb,
-		Tx:        treeTxWithMutex{TreeTx: tx},
-		voteCache: voteCache,
+		dataDir:           dataDir,
+		db:                database,
+		Store:             sdb,
+		Tx:                treeTxWithMutex{TreeTx: tx},
+		voteCache:         voteCache,
+		ElectionPriceCalc: &electionprice.Calculator{Disable: true},
 	}
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
+
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }
 
@@ -222,6 +227,28 @@ func (v *State) SetChainID(chID string) {
 // ChainID gets the blockchain identifier.
 func (v *State) ChainID() string {
 	return v.chainID
+}
+
+// SetElectionPriceCalc sets the election price calculator with the current network capacity and base price.
+func (v *State) SetElectionPriceCalc() error {
+	// initialize election price calculator
+	electionBasePrice, err := v.TxBaseCost(models.TxType_NEW_PROCESS, false)
+	if err != nil {
+		if errors.Is(err, ErrTxCostNotFound) {
+			electionBasePrice = 0
+		} else {
+			return fmt.Errorf("cannot fetch election base price: %w", err)
+		}
+	}
+	v.ElectionPriceCalc = electionprice.NewElectionPriceCalculator(electionprice.DefaultElectionPriceFactors)
+	v.ElectionPriceCalc.SetBasePrice(electionBasePrice)
+	capacity, err := v.NetworkCapacity()
+	if err != nil {
+		return fmt.Errorf("cannot fetch network capacity: %w", err)
+	}
+	v.ElectionPriceCalc.SetCapacity(capacity)
+	log.Infow("election price calculator initialized", "basePrice", electionBasePrice, "capacity", capacity)
+	return nil
 }
 
 // RemoveValidator removes a tendermint validator identified by its address
@@ -491,6 +518,7 @@ func (v *State) Rollback() {
 	v.txCounter.Store(0)
 }
 
+// Close closes the vochain StateDB.
 func (v *State) Close() error {
 	v.Tx.Lock()
 	v.Tx.Discard()
