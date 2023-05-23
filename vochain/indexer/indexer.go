@@ -517,13 +517,6 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
-	if err := idx.indexTokenTransfer(tx); err != nil {
-		log.Errorw(err, "cannot index new transaction")
-	}
-}
-
-// newTokenTransfer creates a new token transfer and stores it in the database
-func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
 	queries := idx.blockTxQueries()
@@ -535,9 +528,8 @@ func (idx *Indexer) indexTokenTransfer(tx *vochaintx.TokenTransfer) error {
 		Amount:       int64(tx.Amount),
 		TransferTime: time.Now(),
 	}); err != nil {
-		return err
+		log.Errorw(err, "cannot index new transaction")
 	}
-	return nil
 }
 
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
