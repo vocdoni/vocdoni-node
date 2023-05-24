@@ -138,9 +138,7 @@ $COMPOSE_CMD up -d
 check_gw_is_up() {
 	date
 	$COMPOSE_CMD_RUN test \
-		curl -s --fail $GWHOST \
-		  -X POST \
-		  -d '{"id": "req00'$RANDOM'", "request": {"method": "genProof", "timestamp":'$(date +%s)'}}' 2>/dev/null
+		curl -s --fail $APIHOST/chain/info 2>/dev/null
 }
 
 log "### Waiting for test suite to be ready ###"
