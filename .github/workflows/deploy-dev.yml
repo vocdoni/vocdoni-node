@@ -26,7 +26,7 @@ jobs:
   call-docker-release:
     name: Docker
     needs: push-to-dev
-    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@feat/deploy-dev
+    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@master
     secrets: inherit
     with:
       image-tag: dev
