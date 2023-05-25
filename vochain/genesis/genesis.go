@@ -26,6 +26,17 @@ var Genesis = map[string]VochainGenesis{
 		CircuitsConfigTag: "dev",
 		Genesis:           &stageGenesis,
 	},
+
+	// Apex production network
+	"apex": {
+		AutoUpdateGenesis: false,
+		SeedNodes: []string{
+			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.apex.vocdoni.net:26656",
+			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.apex.vocdoni.net:26656",
+		},
+		CircuitsConfigTag: "dev",
+		Genesis:           &apexGenesis,
+	},
 }
 
 var devGenesis = GenesisDoc{
@@ -214,6 +225,117 @@ var stageGenesis = GenesisDoc{
 			NewProcess:              5,
 			SendTokens:              1,
 			SetAccountInfoURI:       1,
+			CreateAccount:           1,
+			AddDelegateForAccount:   1,
+			DelDelegateForAccount:   1,
+			CollectFaucet:           1,
+		},
+	},
+}
+
+var apexGenesis = GenesisDoc{
+	GenesisTime: time.Date(2023, time.May, 24, 9, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-apex-v1",
+	ConsensusParams: &ConsensusParams{
+		Block: BlockParams{
+			MaxBytes: 2097152,
+			MaxGas:   -1,
+		},
+		Evidence: EvidenceParams{
+			MaxAgeNumBlocks: 100000,
+			MaxAgeDuration:  10000,
+		},
+		Validator: ValidatorParams{
+			PubKeyTypes: []string{"secp256k1"},
+		},
+		Version: VersionParams{
+			AppVersion: 0,
+		},
+	},
+	AppState: GenesisAppState{
+		MaxElectionSize: 1000000,
+		NetworkCapacity: 5000,
+		Validators: []AppStateValidators{
+			{ // 0
+				Address:  types.HexStringToHexBytes("8a67aa6e63ea24a029fade79b93f39aa2f935608"),
+				PubKey:   types.HexStringToHexBytes("024e3fbcd7e1516ebbc332519a3602e39753c6dd49c46df307c1e60b976f0b29a5"),
+				Power:    10,
+				Name:     "vocdoni-validator0",
+				KeyIndex: 1,
+			},
+			{ // 1
+				Address:  types.HexStringToHexBytes("dd47c5e9db1be4f9c6fac3474b9d9aec5c00ecdd"),
+				PubKey:   types.HexStringToHexBytes("02364db3aedf05ffbf25e67e81de971f3a9965b9e1a2d066af06b634ba5c959152"),
+				Power:    10,
+				Name:     "vocdoni-validator1",
+				KeyIndex: 0,
+			},
+			{ // 2
+				Address:  types.HexStringToHexBytes("6bc0fe0ac7e7371294e3c2d39b0e1337b9757193"),
+				PubKey:   types.HexStringToHexBytes("037a2e3b3e7ae07cb75dbc73aff9c39b403e0ec58b596cf03fe99a27555285ef73"),
+				Power:    10,
+				Name:     "vocdoni-validator2",
+				KeyIndex: 0,
+			},
+			{ // 3
+				Address:  types.HexStringToHexBytes("d863a79bb3c019941de5ebfc10a136bbfbbc2982"),
+				PubKey:   types.HexStringToHexBytes("03553d1b75cdda0a49136417daee453c3a00ed75af64ec6aa20476cf227dfd946c"),
+				Power:    10,
+				Name:     "vocdoni-validator3",
+				KeyIndex: 2,
+			},
+			{ // 4
+				Address:  types.HexStringToHexBytes("d16a9fe63456ea0b3706a2855b98a3a20f10e308"),
+				PubKey:   types.HexStringToHexBytes("036e25b61605a04ef3cf5829e73a2c9db4a4b0958a8a6be0895c3df19b69e7ad45"),
+				Power:    10,
+				Name:     "vocdoni-validator4",
+				KeyIndex: 0,
+			},
+			{ // 5
+				Address:  types.HexStringToHexBytes("4ece41dd2b0f0ddd4ddef9fa83ad6d973c98a48c"),
+				PubKey:   types.HexStringToHexBytes("027b034a05be20113cdf39eff609c5265d1575c5510bf3fcc611e6da0bed6d30b4"),
+				Power:    10,
+				Name:     "vocdoni-validator5",
+				KeyIndex: 3,
+			},
+			{ // 6
+				Address:  types.HexStringToHexBytes("2b617bad95bb36805512c76a02144c778d3cda20"),
+				PubKey:   types.HexStringToHexBytes("034105acd3392dffcfe08a7a2e1c48fb4f52c7f4cdce4477474afc0ddff023ec2d"),
+				Power:    10,
+				Name:     "vocdoni-validator6",
+				KeyIndex: 0,
+			},
+			{ // 7
+				Address:  types.HexStringToHexBytes("4945fd40d29870a931561b26a30a529081ded677"),
+				PubKey:   types.HexStringToHexBytes("038276c348971ef9d8b11abaf0cdce50e6cb89bd0f87df14301ef02d46db09db6d"),
+				Power:    10,
+				Name:     "vocdoni-validtaor7",
+				KeyIndex: 0,
+			},
+			{ // 8
+				Address:  types.HexStringToHexBytes("34868fa6ef1b001b830a5a19a06c69f62f622410"),
+				PubKey:   types.HexStringToHexBytes("02a94d4a25c0281980af65d014ce72d34b0aba6e5dff362da8b34c31e8b93b26a9"),
+				Power:    10,
+				Name:     "vocdoni-validator8",
+				KeyIndex: 4,
+			},
+		},
+		Accounts: []GenesisAccount{
+			{ // faucet
+				Address: types.HexStringToHexBytes("863a75f41025f0c8878d3a100c8c16576fe8fe4f"),
+				Balance: 10000000,
+			},
+		},
+		Treasurer: types.HexStringToHexBytes("13987a54c434d33ec810eeedba4ed7a542e3df24"),
+		TxCost: TransactionCosts{
+			SetProcessStatus:        1,
+			SetProcessCensus:        5,
+			SetProcessResults:       1,
+			SetProcessQuestionIndex: 1,
+			RegisterKey:             1,
+			NewProcess:              10,
+			SendTokens:              1,
+			SetAccountInfoURI:       5,
 			CreateAccount:           1,
 			AddDelegateForAccount:   1,
 			DelDelegateForAccount:   1,
