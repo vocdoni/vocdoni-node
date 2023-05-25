@@ -190,9 +190,23 @@ wait_jobs
 if [ -n "$GOCOVERDIR" ] ; then
 	log "### Collect all coverage files in $GOCOVERDIR ###"
 	mkdir -p $GOCOVERDIR
+	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
+		find /app/run/gocoverage/
+		find /wd/$GOCOVERDIR/
+		"
 	$COMPOSE_CMD down
 	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
+		find /app/run/gocoverage/
+		find /wd/$GOCOVERDIR/
+	    ls -l /app/run/gocoverage/. /wd/$GOCOVERDIR
 		cp -rf /app/run/gocoverage/. /wd/$GOCOVERDIR
+		ls -la /app/run/gocoverage/. /wd/$GOCOVERDIR
+		whoami
+		touch /wd/whoami
+		echo -- cmd args are \
+			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/wd/$GOCOVERDIR/covdata.txt
+		find /wd/$GOCOVERDIR/
 		go tool covdata textfmt \
 			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
 			-o=/wd/$GOCOVERDIR/covdata.txt
