@@ -172,8 +172,9 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
 			return nil, err
 		}
-		privKey := hex.EncodeToString(crypto256k1.GenPrivKey().Bytes())
-		pv, err := NewPrivateValidator(privKey,
+		pk := crypto256k1.GenPrivKey()
+		privKeyHex := hex.EncodeToString(pk.Bytes())
+		pv, err := NewPrivateValidator(privKeyHex,
 			filepath.Join(nodeDir, "priv_validator_key.json"),
 			filepath.Join(nodeDir, "priv_validator_state.json"),
 		)
@@ -181,7 +182,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 		}
 		pv.Save()
-		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKey), 0o600); err != nil {
+		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKeyHex), 0o600); err != nil {
 			return nil, err
 		}
 		signer := ethereum.SignKeys{}
@@ -229,7 +230,9 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		0o600); err != nil {
 		return nil, err
 	}
-	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"), seedNodeKey.PrivKey.Bytes(), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(seedDir, "hex_seed_key"),
+		[]byte(hex.EncodeToString(seedNodeKey.PrivKey.Bytes())),
+		0o600); err != nil {
 		return nil, err
 	}
 
