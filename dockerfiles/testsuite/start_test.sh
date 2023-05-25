@@ -1,7 +1,6 @@
 #!/bin/bash
 # bash start_test.sh [testname] [testname] [...]
 #  (if no argument is passed, run all tests)
-#  legacy_cspvoting: run (rpc_client) csp vote test
 #  e2etest_plaintextelection_empty: run poll vote test, with no votes
 #  e2etest_plaintextelection: run poll vote test
 #  e2etest_encryptedelection: run encrypted vote test
@@ -45,7 +44,6 @@ log() { echo $(date --rfc-3339=s) "$@" ; }
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"legacy_cspvoting"
 	"e2etest_plaintextelection_empty"
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
@@ -72,16 +70,6 @@ tests_to_run=(
 
 # if any arg is passed, treat them as the tests to run, overriding the default list
 [ $# != 0 ] && tests_to_run=($@)
-
-legacy_cspvoting() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
-		  --logLevel=$LOGLEVEL \
-		  --operation=cspvoting \
-		  --treasurerKey=$TREASURER_KEY \
-		  --electionSize=$ELECTION_SIZE \
-		  --accountKeys=$(echo $ACCOUNT_KEYS | awk '{print $3}')
-}
 
 e2etest() {
 	op=$1
