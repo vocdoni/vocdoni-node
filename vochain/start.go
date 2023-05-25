@@ -122,25 +122,23 @@ func newTendermint(app *BaseApplication,
 	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
 		log.Fatal(err)
 	}
-	// p2p config
+
 	tconfig.LogLevel = localConfig.LogLevel
 	if tconfig.LogLevel == "none" {
 		tconfig.LogLevel = "disabled"
 	}
-	tconfig.RPC.ListenAddress = "tcp://" + localConfig.RPCListen
-	tconfig.P2P.ListenAddress = "tcp://" + localConfig.P2PListen
-	tconfig.P2P.AllowDuplicateIP = false
-	tconfig.P2P.AddrBookStrict = true
-	tconfig.P2P.FlushThrottleTimeout = 500 * time.Millisecond
-	tconfig.P2P.MaxPacketMsgPayloadSize = 10240
-	tconfig.P2P.RecvRate = 5120000
-	tconfig.P2P.DialTimeout = time.Second * 5
+
+	// p2p config
+	tconfig.P2P.MaxPacketMsgPayloadSize = 4096 // 4KB
+	tconfig.P2P.RecvRate = 20480000            // 20MB/s
+	tconfig.P2P.SendRate = 20480000            // 20MB/s
+	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
+
 	if localConfig.Dev {
 		tconfig.P2P.AllowDuplicateIP = true
 		tconfig.P2P.AddrBookStrict = false
-		tconfig.P2P.HandshakeTimeout = time.Second * 10
 	}
-	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
+
 	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
 	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
 		!localConfig.IsSeedNode && ok {
@@ -156,7 +154,6 @@ func newTendermint(app *BaseApplication,
 	if len(tconfig.P2P.PersistentPeers) > 0 {
 		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
 	}
-	tconfig.RPC.CORSAllowedOrigins = []string{"*"}
 
 	// consensus config
 	blockTime := 8
@@ -170,10 +167,6 @@ func newTendermint(app *BaseApplication,
 	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 200
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
 	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
-
-	// Enable only FastSync (until StateSync is implemented)
-	tconfig.BlockSyncMode = true
-	tconfig.StateSync.Enable = false
 
 	// if seed node
 	if localConfig.IsSeedNode {
@@ -192,13 +185,13 @@ func newTendermint(app *BaseApplication,
 	// mempool config
 	tconfig.Mempool.Version = "v0"
 	tconfig.Mempool.Size = localConfig.MempoolSize
-	tconfig.Mempool.Recheck = true
+	tconfig.Mempool.Recheck = false
 	tconfig.Mempool.KeepInvalidTxsInCache = false
 	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
 	tconfig.Mempool.Broadcast = true
-	tconfig.Mempool.MaxBatchBytes = 500 * tconfig.Mempool.MaxTxBytes // maximum 500 full-size txs
+
 	log.Debugf("mempool config: %+v", tconfig.Mempool)
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
 	// -tags=cleveldb is used. See tmdb_*.go.
@@ -260,7 +253,7 @@ func newTendermint(app *BaseApplication,
 			Prometheus:           true,
 			PrometheusListenAddr: "",
 			MaxOpenConnections:   2,
-			Namespace:            "comet",
+			Namespace:            "cometbft",
 		}
 	}
 
@@ -283,7 +276,6 @@ func newTendermint(app *BaseApplication,
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
 
-	//service, err := tmnode.DefaultNewNode(tconfig, logger) // I'M NOT SURE OF THIS,
 	service, err := tmnode.NewNode(tconfig,
 		pv,
 		nodeKey,
