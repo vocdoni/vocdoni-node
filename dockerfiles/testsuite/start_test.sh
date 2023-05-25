@@ -163,29 +163,21 @@ for test in ${tests_to_run[@]}; do
 done
 
 log "### Waiting for tests to finish ###"
+wait
 
-wait_jobs() {
-	while [ -n "$(jobs)" ]; do
-		for file in $results/*.retval ; do
-			test=$(basename $file .retval)
-			RET=$(cat $file)
-			if [ "$RET" == "0" ] ; then
-				log "### Vochain test $test finished correctly! ###"
-				rm $file
-			else
-				log "### Vochain test $test failed! (aborting all tests) ###"
-				$COMPOSE_CMD down
-				log "### Post run logs ###"
-				$COMPOSE_CMD logs --tail 1000
-				failed="$test"
-				return
-			fi
-		done
-		sleep 1
-	done
-}
-
-wait_jobs
+failed=""
+for test in ${tests_to_run[@]} ; do
+	RET=$(cat $results/$test.retval)
+	if [ "$RET" == "0" ] ; then
+		log "### Vochain test $test finished correctly! ###"
+	else
+		log "### Vochain test $test failed! ###"
+		log "### Post run logs ###"
+		$COMPOSE_CMD logs --tail 1000
+		failed="$test"
+		break
+	fi
+done
 
 if [ -n "$GOCOVERDIR" ] ; then
 	log "### Collect all coverage files in $GOCOVERDIR ###"
