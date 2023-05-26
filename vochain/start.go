@@ -253,7 +253,7 @@ func newTendermint(app *BaseApplication,
 			Prometheus:           true,
 			PrometheusListenAddr: "",
 			MaxOpenConnections:   2,
-			Namespace:            "cometbft",
+			Namespace:            "comet",
 		}
 	}
 
