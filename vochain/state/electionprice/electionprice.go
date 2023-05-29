@@ -107,41 +107,41 @@ type ElectionParameters struct {
 // the price of an election. These factors adjust the influence of different
 // aspects of the election (size, duration, encryption, anonymity, overwrite count) on the final price.
 type Factors struct {
-	k1 float64 // sizePriceFactor
-	k2 float64 // durationPriceFactor
-	k3 float64 // encryptedPriceFactor
-	k4 float64 // anonymousPriceFactor
-	k5 float64 // overwritePriceFactor
-	k6 float64 // Size scaling factor for maxCensusSize
-	k7 int     // Threshold for maxCensusSize scaling
+	K1 float64 `json:"k1"` // sizePriceFactor
+	K2 float64 `json:"k2"` // durationPriceFactor
+	K3 float64 `json:"k3"` // encryptedPriceFactor
+	K4 float64 `json:"k4"` // anonymousPriceFactor
+	K5 float64 `json:"k5"` // overwritePriceFactor
+	K6 float64 `json:"k6"` // Size scaling factor for maxCensusSize
+	K7 int     `json:"k7"` // Threshold for maxCensusSize scaling
 }
 
 // Calculator is a struct that stores the constant factors and basePrice
 // required for calculating the price of an election.
 type Calculator struct {
-	basePrice uint64     // base price for an election
-	capacity  uint64     // capacity of the blockchain
-	factors   Factors    // factors affecting the price
-	mutex     sync.Mutex // mutex for thread-safe operations
-	Disable   bool       // if true, disables the calculator and makes the Price function return 0
+	BasePrice uint64     `json:"basePrice"` // base price for an election
+	Capacity  uint64     `json:"capacity"`  // capacity of the blockchain
+	Factors   Factors    `json:"factors"`   // factors affecting the price
+	mutex     sync.Mutex `json:"-"`         // mutex for thread-safe operations
+	Disable   bool       `json:"-"`         // if true, disables the calculator and makes the Price function return 0
 }
 
 // DefaultElectionPriceFactors is the default set of constant factors used for calculating the price.
 var DefaultElectionPriceFactors = Factors{
-	k1: 0.002,
-	k2: 0.0005,
-	k3: 0.005,
-	k4: 10,
-	k5: 3,
-	k6: 0.0008,
-	k7: 200,
+	K1: 0.002,
+	K2: 0.0005,
+	K3: 0.005,
+	K4: 10,
+	K5: 3,
+	K6: 0.0008,
+	K7: 200,
 }
 
 // NewElectionPriceCalculator creates a new PriceCalculator with the given constant factors.
 // The basePrice and maxCapacity should be properly set before using the calculator.
 func NewElectionPriceCalculator(factors Factors) *Calculator {
 	return &Calculator{
-		factors: factors,
+		Factors: factors,
 	}
 }
 
@@ -171,40 +171,40 @@ func (p *Calculator) Price(params *ElectionParameters) uint64 {
 	// This uses a formula that scales based on the capacity of the blockchain
 	// The extra scaling factor for maxCensusSize is only applied if maxCensusSize >= k7
 	// This is to prevent a negative result causing an underflow error
-	sizePriceFactor := p.factors.k1 * float64(params.MaxCensusSize) *
-		(1 - (1 / float64(p.capacity)))
-	if params.MaxCensusSize >= uint64(p.factors.k7) {
-		sizePriceFactor *= 1 + p.factors.k6*(float64(params.MaxCensusSize)-float64(p.factors.k7))
+	sizePriceFactor := p.Factors.K1 * float64(params.MaxCensusSize) *
+		(1 - (1 / float64(p.Capacity)))
+	if params.MaxCensusSize >= uint64(p.Factors.K7) {
+		sizePriceFactor *= 1 + p.Factors.K6*(float64(params.MaxCensusSize)-float64(p.Factors.K7))
 	}
 	sizePrice := uint64(sizePriceFactor)
 
 	// Compute the durationPrice: the price based on the election duration
 	// This uses a formula that scales with both the duration and the maxCensusSize
-	durationPriceFactor := p.factors.k2 * float64(params.ElectionDuration) *
-		(1 + float64(params.MaxCensusSize)/float64(p.capacity))
+	durationPriceFactor := p.Factors.K2 * float64(params.ElectionDuration) *
+		(1 + float64(params.MaxCensusSize)/float64(p.Capacity))
 	durationPrice := uint64(durationPriceFactor)
 
 	// Compute the encryptedPrice: the price based on whether encryption is required
 	// If encryption is required, the price is scaled based on the maxCensusSize
 	encryptedPrice := uint64(0)
 	if params.EncryptedVotes {
-		encryptedPrice = uint64(p.factors.k3 * float64(params.MaxCensusSize))
+		encryptedPrice = uint64(p.Factors.K3 * float64(params.MaxCensusSize))
 	}
 
 	// Compute the anonymousPrice: the price based on whether the election is anonymous
 	// If the election is anonymous, a flat price is added
 	anonymousPrice := uint64(0)
 	if params.AnonymousVotes {
-		anonymousPrice = uint64(p.factors.k4)
+		anonymousPrice = uint64(p.Factors.K4)
 	}
 
 	// Compute the overwritePrice: the price based on the maximum number of vote overwrites allowed
 	// This uses a formula that scales based on the maxCensusSize and the maximum number of overwrites
-	overwritePriceFactor := p.factors.k5 * float64(params.MaxVoteOverwrite) / float64(p.capacity)
+	overwritePriceFactor := p.Factors.K5 * float64(params.MaxVoteOverwrite) / float64(p.Capacity)
 	overwritePrice := uint64(overwritePriceFactor * float64(params.MaxCensusSize))
 
 	// Sum all the prices to get the final price
-	price := p.basePrice + sizePrice + durationPrice + encryptedPrice + anonymousPrice + overwritePrice
+	price := p.BasePrice + sizePrice + durationPrice + encryptedPrice + anonymousPrice + overwritePrice
 
 	return price
 }
@@ -213,7 +213,7 @@ func (p *Calculator) Price(params *ElectionParameters) uint64 {
 func (p *Calculator) SetCapacity(capacity uint64) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	p.capacity = capacity
+	p.Capacity = capacity
 }
 
 // SetBasePrice sets the current capacity of the blockchain.
@@ -221,6 +221,6 @@ func (p *Calculator) SetCapacity(capacity uint64) {
 func (p *Calculator) SetBasePrice(basePrice uint64) {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
-	p.basePrice = basePrice
+	p.BasePrice = basePrice
 	p.Disable = basePrice == 0
 }
