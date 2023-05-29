@@ -1,24 +1,21 @@
 package types
 
 import (
-	"fmt"
 	"math/big"
 )
 
-// BigInt is a big.Int wrapper which marshals JSON to a string representation of the big number
+// BigInt is a big.Int wrapper which marshals JSON to a string representation of the big number.
+// Note that a nil pointer value marshals as the empty string.
 type BigInt big.Int
 
-func (i BigInt) MarshalText() ([]byte, error) {
-	// TODO(mvdan): we shouldn't be using String/SetString for encoding
-	return []byte((*big.Int)(&i).String()), nil
+func (i *BigInt) MarshalText() ([]byte, error) {
+	return (*big.Int)(i).MarshalText()
 }
 
 func (i *BigInt) UnmarshalText(data []byte) error {
-	i2, ok := new(big.Int).SetString(string(data), 0)
-	if !ok {
-		return fmt.Errorf("wrong format for bigInt: %q", string(data))
+	if err := (*big.Int)(i).UnmarshalText(data); err != nil {
+		panic(err)
 	}
-	*i = (BigInt)(*i2)
 	return nil
 }
 
@@ -38,15 +35,6 @@ func (i *BigInt) String() string {
 // SetBytes interprets buf as big-endian unsigned integer
 func (i *BigInt) SetBytes(buf []byte) *BigInt {
 	return (*BigInt)(i.MathBigInt().SetBytes(buf))
-}
-
-// SetString interprets the string as a big number
-func (i *BigInt) SetString(s string) (*BigInt, error) {
-	bi, ok := i.MathBigInt().SetString(s, 10)
-	if !ok {
-		return nil, fmt.Errorf("cannot set string %s", s)
-	}
-	return (*BigInt)(bi), nil
 }
 
 // Bytes returns the bytes representation of the big number

@@ -263,7 +263,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		if _, err := queries.UpdateProcessResultByID(context.TODO(), indexerdb.UpdateProcessResultByIDParams{
 			ID:         indxR.ProcessID,
 			Votes:      encodeVotes(indxR.Votes),
-			Weight:     indxR.Weight.String(),
+			Weight:     encodeBigint(indxR.Weight),
 			VoteOptsPb: encodedPb(indxR.VoteOpts),
 			EnvelopePb: encodedPb(indxR.EnvelopeType),
 		}); err != nil {
@@ -563,7 +563,7 @@ func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
 	for i := range votes {
 		r = append(r, []string{})
 		for j := range votes[i] {
-			r[i] = append(r[i], votes[i][j].String())
+			r[i] = append(r[i], encodeBigint(votes[i][j]))
 		}
 	}
 	return r

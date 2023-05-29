@@ -112,12 +112,7 @@ func decodeVotes(input string) [][]*types.BigInt {
 	for _, group := range strings.Split(input, " ") {
 		var element []*types.BigInt
 		for _, s := range strings.Split(group, ",") {
-			n := new(types.BigInt)
-			if err := n.UnmarshalText([]byte(s)); err != nil {
-				log.Error(err) // TODO(mvdan): propagate errors via a database/sql interface?
-				continue
-			}
-			element = append(element, n)
+			element = append(element, decodeBigint(s))
 		}
 		votes = append(votes, element)
 	}
@@ -146,9 +141,12 @@ func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
 }
 
 func decodeBigint(s string) *types.BigInt {
+	if s == "" {
+		return nil
+	}
 	n := new(types.BigInt)
 	if err := n.UnmarshalText([]byte(s)); err != nil {
-		log.Error(err)
+		panic(err) // should never happen
 	}
 	return n
 }
@@ -200,17 +198,13 @@ type Vote struct {
 }
 
 func VoteFromDB(dbvote *indexerdb.GetVoteRow) *Vote {
-	weightInt := new(types.BigInt)
-	if err := weightInt.UnmarshalText([]byte(dbvote.Weight)); err != nil {
-		panic(err) // should never happen
-	}
 	return &Vote{
 		Nullifier:      dbvote.Nullifier,
 		ProcessID:      dbvote.ProcessID,
 		VoterID:        dbvote.VoterID,
 		Height:         uint32(dbvote.BlockHeight),
 		TxIndex:        int32(dbvote.BlockIndex),
-		Weight:         weightInt,
+		Weight:         decodeBigint(dbvote.Weight),
 		TxHash:         dbvote.Hash,
 		CreationTime:   dbvote.CreationTime,
 		OverwriteCount: uint32(dbvote.OverwriteCount),

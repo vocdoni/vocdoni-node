@@ -57,7 +57,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          vote.VotePackage,
 		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
-		Weight:               voteRef.Weight.String(),
+		Weight:               encodeBigint(voteRef.Weight),
 		OverwriteCount:       voteRef.OverwriteCount,
 		Date:                 voteRef.CreationTime,
 		Meta: indexertypes.EnvelopeMetadata{
@@ -145,7 +145,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:             processID,
 		Votes:          encodeVotes(r.Votes),
-		Weight:         r.Weight.String(),
+		Weight:         encodeBigint(r.Weight),
 		EnvelopeHeight: int64(r.EnvelopeHeight),
 		BlockHeight:    int64(r.BlockHeight),
 	}); err != nil {
@@ -319,7 +319,7 @@ func (idx *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResu
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:             pid,
 		Votes:          encodeVotes(results.Votes),
-		Weight:         results.Weight.String(),
+		Weight:         encodeBigint(results.Weight),
 		EnvelopeHeight: int64(results.EnvelopeHeight),
 		BlockHeight:    int64(results.BlockHeight),
 	}); err != nil {
