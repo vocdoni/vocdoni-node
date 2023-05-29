@@ -62,6 +62,19 @@ func encodeVotes(votes [][]*types.BigInt) string {
 	return b.String()
 }
 
+// TODO(mvdan): encode bigints as bytes in sqlite
+
+func encodeBigint(n *types.BigInt) string {
+	if n == nil {
+		return ""
+	}
+	p, err := n.MarshalText()
+	if err != nil {
+		panic(err) // should never happen
+	}
+	return string(p)
+}
+
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	procInner, err := idx.oneQuery.GetProcess(context.TODO(), pid)
