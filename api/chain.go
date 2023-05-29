@@ -59,6 +59,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/chain/info/electionPriceFactors",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainInfoPriceFactors,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/chain/dateToBlock/{timestamp}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -280,6 +288,21 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
 	// Encode the circuit configuration to JSON
 	data, err := json.Marshal(circuitConfig)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainInfoPriceFactors
+//
+//	@Summary		Election price factors info
+//	@Description	Returns the factors and values used to calculate the election price
+//	@Success		200	{object}	election	price	factors
+//	@Router			/chain/info/electionPriceFactors [get]
+func (a *API) chainInfoPriceFactors(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// Encode the values and factors to JSON
+	data, err := json.Marshal(a.vocapp.State.ElectionPriceCalc)
 	if err != nil {
 		return err
 	}
