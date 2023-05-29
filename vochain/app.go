@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -31,10 +30,9 @@ import (
 )
 
 const (
-	// MempoolLaunchPruneIntervalBlocks is the number of blocks after which the mempool is pruned.
-	MempoolLaunchPruneIntervalBlocks = 12 // 2 minutes
-	// MempoolTxTTLBlocks is the maximum live time in blocks for a transaction before is pruned from the mempool.
-	MempoolTxTTLBlocks = 60 // 10 minutes
+	// recheckTxHeightInterval is the number of blocks after which the mempool is
+	// checked for transactions to be rechecked.
+	recheckTxHeightInterval = 12
 )
 
 var (
@@ -53,13 +51,6 @@ type BaseApplication struct {
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
 	isSynchronizing atomic.Bool
-
-	// mempoolTxRef is a map of tx hashes to the block height when they were added to the mempool.
-	mempoolTxRef map[[32]byte]uint32
-	// mempoolTxRefLock is a mutex to protect the mempoolTxRef map.
-	mempoolTxRefLock sync.Mutex
-	// mempoolTxRefToGC is a slice of tx hashes to be removed from the mempoolTxRef map on Commit().
-	mempoolTxRefToGC [][32]byte
 
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
@@ -120,7 +111,6 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		dataDir:            dbpath,
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
-		mempoolTxRef:       make(map[[32]byte]uint32),
 	}, nil
 }
 
@@ -133,30 +123,6 @@ func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitype
 			app.isSynchronizing.Store(false)
 		}
 	}
-	if app.Height()%MempoolLaunchPruneIntervalBlocks == 0 {
-		// remove all expired txs from mempool
-		count := 0
-		app.mempoolTxRefLock.Lock()
-		for txKey, height := range app.mempoolTxRef {
-			if height+MempoolTxTTLBlocks > app.Height() {
-				if app.fnMempoolPrune != nil {
-					if err := app.fnMempoolPrune(txKey); err != nil {
-						log.Warnw("mempool prune", "err", err.Error(), "tx", hex.EncodeToString(txKey[:]))
-					}
-				}
-				count++
-				delete(app.mempoolTxRef, txKey)
-			}
-		}
-		app.mempoolTxRefLock.Unlock()
-		if count > 0 {
-			log.Infow("mempool prune", "txs", count, "height", app.Height())
-		}
-	}
-
-	app.mempoolTxRefLock.Lock()
-	app.mempoolTxRefToGC = [][32]byte{}
-	app.mempoolTxRefLock.Unlock()
 	return app.fnBeginBlock(req)
 }
 
@@ -299,7 +265,9 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
 	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
-		return abcitypes.ResponseCheckTx{Code: 0}
+		if height%recheckTxHeightInterval != 0 {
+			return abcitypes.ResponseCheckTx{Code: 0}
+		}
 	}
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
@@ -313,11 +281,6 @@ func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.Resp
 		log.Errorw(err, "checkTx")
 		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}
 	}
-	// add tx to mempool reference map for recheck prunning
-	app.mempoolTxRefLock.Lock()
-	app.mempoolTxRef[tx.TxID] = height
-	app.mempoolTxRefLock.Unlock()
-
 	return abcitypes.ResponseCheckTx{
 		Code: 0,
 		Data: response.Data,
@@ -340,10 +303,6 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 		"height", app.Height(),
 		"tx", tx.Tx,
 	)
-	// add tx to mempool reference map for prunning on Commit()
-	app.mempoolTxRefLock.Lock()
-	app.mempoolTxRefToGC = append(app.mempoolTxRefToGC, tx.TxID)
-	app.mempoolTxRefLock.Unlock()
 	// check tx is correct on the current state
 	response, err := app.TransactionHandler.CheckTx(tx, true)
 	if err != nil {
@@ -383,12 +342,6 @@ func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
 	}
-	// prune pending mempool tx references
-	app.mempoolTxRefLock.Lock()
-	for _, txID := range app.mempoolTxRefToGC {
-		delete(app.mempoolTxRef, txID)
-	}
-	app.mempoolTxRefLock.Unlock()
 	if app.State.TxCounter() > 0 {
 		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
 	}
