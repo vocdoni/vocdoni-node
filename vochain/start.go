@@ -127,18 +127,11 @@ func newTendermint(app *BaseApplication,
 	if tconfig.LogLevel == "none" {
 		tconfig.LogLevel = "disabled"
 	}
-
-	// p2p config
-	tconfig.P2P.MaxPacketMsgPayloadSize = 4096 // 4KB
-	tconfig.P2P.RecvRate = 20480000            // 20MB/s
-	tconfig.P2P.SendRate = 20480000            // 20MB/s
 	tconfig.P2P.ExternalAddress = localConfig.PublicAddr
-
 	if localConfig.Dev {
 		tconfig.P2P.AllowDuplicateIP = true
 		tconfig.P2P.AddrBookStrict = false
 	}
-
 	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
 	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
 		!localConfig.IsSeedNode && ok {
@@ -185,7 +178,7 @@ func newTendermint(app *BaseApplication,
 	// mempool config
 	tconfig.Mempool.Version = "v0"
 	tconfig.Mempool.Size = localConfig.MempoolSize
-	tconfig.Mempool.Recheck = false
+	tconfig.Mempool.Recheck = true
 	tconfig.Mempool.KeepInvalidTxsInCache = false
 	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
