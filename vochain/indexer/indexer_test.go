@@ -64,22 +64,28 @@ func TestEntityList(t *testing.T) {
 func testEntityList(t *testing.T, entityCount int) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app, true)
+	baseProcess := &models.Process{
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
+		EnvelopeType:  &models.EnvelopeType{},
+		MaxCensusSize: 1000,
+	}
 	for i := 0; i < entityCount; i++ {
 		pid := util.RandomBytes(32)
 		eid := util.RandomBytes(20)
-		if err := app.State.AddProcess(&models.Process{
-			ProcessId:     pid,
-			EntityId:      eid,
-			BlockCount:    10,
-			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-			EnvelopeType:  &models.EnvelopeType{},
-			MaxCensusSize: 1000,
-		}); err != nil {
+		baseProcess.ProcessId = pid
+		baseProcess.EntityId = eid
+		if err := app.State.AddProcess(baseProcess); err != nil {
 			t.Fatal(err)
 		}
 		if i%5 == 1 {
 			app.AdvanceTestBlock()
 		}
+	}
+	baseProcess.ProcessId = util.RandomBytes(32)
+	// add 1 more process to an entity that already has one to test for duplicates
+	if err := app.State.AddProcess(baseProcess); err != nil {
+		t.Fatal(err)
 	}
 	app.AdvanceTestBlock()
 
@@ -95,7 +101,7 @@ func testEntityList(t *testing.T, entityCount int) {
 		}
 		for _, e := range list {
 			if entitiesByID[e.String()] {
-				t.Fatalf("found duplicated entity: %s", e)
+				t.Fatalf("found duplicated entity: %x", e)
 			}
 			entitiesByID[e.String()] = true
 		}
