@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"time"
 
 	tmtypes "github.com/cometbft/cometbft/types"
@@ -186,7 +187,7 @@ type BlockTransactionsInfo struct {
 }
 
 type GenericTransactionWithInfo struct {
-	TxContent types.HexBytes           `json:"tx"`
+	TxContent json.RawMessage          `json:"tx"`
 	TxInfo    indexertypes.Transaction `json:"txInfo"`
 }
 
