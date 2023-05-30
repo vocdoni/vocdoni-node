@@ -112,7 +112,7 @@ WHERE entity_id = sqlc.arg(entity_id);
 SELECT COUNT(DISTINCT entity_id) FROM processes;
 
 -- name: SearchEntities :many
-SELECT entity_id FROM processes
+SELECT DISTINCT entity_id FROM processes
 WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
 ORDER BY creation_time DESC, id ASC
 LIMIT ?

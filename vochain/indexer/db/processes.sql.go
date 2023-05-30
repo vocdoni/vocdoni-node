@@ -244,7 +244,7 @@ func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{
 }
 
 const searchEntities = `-- name: SearchEntities :many
-SELECT entity_id FROM processes
+SELECT DISTINCT entity_id FROM processes
 WHERE (? = '' OR (INSTR(LOWER(HEX(entity_id)), ?) > 0))
 ORDER BY creation_time DESC, id ASC
 LIMIT ?
