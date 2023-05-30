@@ -15,13 +15,7 @@ jobs:
       with:
         fetch-depth: 0 # the push step needs a full repo, not shallow
     - name: Push main branch to dev branch
-      uses: ad-m/github-push-action@v0.6.0
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: dev
-        # this push only works if it applies cleanly. if it fails, you need to do
-        # `git push -f origin origin/master:dev`
-        # from an account authorized to do force-push, and re-run the action
+      run: git push origin master:dev
 
   call-docker-release:
     name: Docker
