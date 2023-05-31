@@ -7,6 +7,7 @@ on:
       image-tag:
         required: true
         type: string
+  pull_request:
 
 jobs:
   job_docker_release:
@@ -32,7 +33,7 @@ jobs:
         id: vars
         shell: bash
         run: |
-          echo "IMAGE_TAG_CLEAN=$(echo ${{ inputs.image-tag }} | tr '/' '-' )" >> $GITHUB_OUTPUT
+          echo "IMAGE_TAG_CLEAN=main" >> $GITHUB_OUTPUT
           echo "GIT_HASH_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "DATE_IN_SECS=$(date +%s)" >> $GITHUB_OUTPUT
       - name: Build and Push image to Docker Hub and ghcr.io
