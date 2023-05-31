@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/hashicorp/golang-lru/v2/simplelru"
+	"github.com/hashicorp/golang-lru/v2"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
 )
@@ -20,7 +20,7 @@ func MockIPFS(t testing.TB) *Handler {
 		NilRepo:   false,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	storage.retrieveCache, err = simplelru.NewLRU[string, []byte](RetrievedFileCacheSize, nil)
+	storage.retrieveCache, err = lru.New[string, []byte](RetrievedFileCacheSize)
 	qt.Assert(t, err, qt.IsNil)
 	storage.Node = n
 	api, err := ipfsapi.NewCoreAPI(n)

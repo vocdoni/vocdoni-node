@@ -17,6 +17,7 @@ import (
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -24,7 +25,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 
-	"go.vocdoni.io/dvote/db/lru"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -63,7 +63,7 @@ type BaseApplication struct {
 	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
 	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
 
-	blockCache *lru.AtomicCache[int64, *tmtypes.Block]
+	blockCache *lru.Cache[int64, *tmtypes.Block]
 	// height of the last ended block
 	height atomic.Uint32
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
@@ -103,11 +103,15 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
+	blockCache, err := lru.New[int64, *tmtypes.Block](32)
+	if err != nil {
+		return nil, err
+	}
 	return &BaseApplication{
 		State:              state,
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
-		blockCache:         lru.NewAtomic[int64, *tmtypes.Block](32),
+		blockCache:         blockCache,
 		dataDir:            dbpath,
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
@@ -360,13 +364,12 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
 		return nil
 	}
-	return app.blockCache.GetAndUpdate(height, func(prev *tmtypes.Block) *tmtypes.Block {
-		if prev != nil {
-			// If it's already in the cache, use it as-is.
-			return prev
-		}
-		return app.fnGetBlockByHeight(height)
-	})
+	if block, ok := app.blockCache.Get(height); ok {
+		return block
+	}
+	block := app.fnGetBlockByHeight(height)
+	app.blockCache.Add(height, block)
+	return block
 }
 
 // GetBlockByHash retreies a full block indexed by its Hash

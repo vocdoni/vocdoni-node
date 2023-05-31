@@ -6,10 +6,9 @@ import (
 	"io"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2/simplelru"
+	"github.com/hashicorp/golang-lru/v2"
 	coreiface "github.com/ipfs/boxo/coreiface"
 	ipfscid "github.com/ipfs/go-cid"
 	keystore "github.com/ipfs/go-ipfs-keystore"
@@ -47,8 +46,7 @@ type Handler struct {
 	DataDir  string
 	LogLevel string
 
-	retrieveCacheMu sync.Mutex
-	retrieveCache   *simplelru.LRU[string, []byte]
+	retrieveCache *lru.Cache[string, []byte]
 
 	// cancel helps us stop extra goroutines and listeners which complement
 	// the IpfsNode above.
@@ -125,7 +123,7 @@ func (i *Handler) Init(d *types.DataStore) error {
 	i.Node = node
 	i.CoreAPI = coreAPI
 	i.DataDir = d.Datadir
-	i.retrieveCache, err = simplelru.NewLRU[string, []byte](RetrievedFileCacheSize, nil)
+	i.retrieveCache, err = lru.New[string, []byte](RetrievedFileCacheSize)
 	if err != nil {
 		return err
 	}
@@ -265,9 +263,7 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 
 	// check if we have the file in the local cache
-	i.retrieveCacheMu.Lock()
 	ccontent, _ := i.retrieveCache.Get(path)
-	i.retrieveCacheMu.Unlock()
 	if ccontent != nil {
 		log.Debugf("retrieved file %s from cache", path)
 		return ccontent, nil
@@ -321,9 +317,7 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	}
 
 	// Save file to cache for future attempts
-	i.retrieveCacheMu.Lock()
 	i.retrieveCache.Add(path, content)
-	i.retrieveCacheMu.Unlock()
 
 	log.Infow("retrieved file", "path", path, "size", fsize)
 	return content, nil
