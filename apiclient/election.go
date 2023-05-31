@@ -256,7 +256,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		return nil, err
 	}
 	if electionCreate.MetadataURL == "" {
-		return electionCreate.ElectionID, fmt.Errorf("metadata could not be published")
+		log.Warnf("metadata could not be published")
 	}
 
 	return electionCreate.ElectionID, nil

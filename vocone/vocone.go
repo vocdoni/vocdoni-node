@@ -1,6 +1,8 @@
 package vocone
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -27,6 +29,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
@@ -65,7 +68,7 @@ type Vocone struct {
 }
 
 // NewVocone returns a ready Vocone instance.
-func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) (*Vocone, error) {
 	vc := &Vocone{}
 	var err error
 	vc.dataDir = dataDir
@@ -89,16 +92,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc.setDefaultMethods()
 	vc.app.State.SetHeight(uint32(vc.height.Load()))
 
-	// Set max process size to 1M
-	if err := vc.app.State.SetMaxProcessSize(1000000); err != nil {
-		return nil, err
-	}
-
-	// Create burn account
-	if err := vc.CreateAccount(state.BurnAddress, &state.Account{}); err != nil {
-		return nil, err
-	}
-
 	// Create indexer
 	if vc.sc, err = indexer.NewIndexer(
 		filepath.Join(dataDir, "indexer"),
@@ -119,10 +112,12 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 
 	// Create the IPFS storage layer (we use the Vocdoni general service)
 	srv := service.VocdoniService{}
-	if vc.storage, err = srv.IPFS(&config.IPFSCfg{
-		ConfigPath: filepath.Join(dataDir, "ipfs"),
-	}); err != nil {
-		return nil, err
+	if !disableIPFS {
+		if vc.storage, err = srv.IPFS(&config.IPFSCfg{
+			ConfigPath: filepath.Join(dataDir, "ipfs"),
+		}); err != nil {
+			return nil, err
+		}
 	}
 
 	// Create the census database for storing census data
@@ -133,12 +128,14 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc.censusdb = censusdb.NewCensusDB(cdb)
 
 	// Create the data downloader and offchain data handler
-	offchaindatahandler.NewOffChainDataHandler(
-		vc.app,
-		downloader.NewDownloader(vc.storage),
-		vc.censusdb,
-		false,
-	)
+	if !disableIPFS {
+		offchaindatahandler.NewOffChainDataHandler(
+			vc.app,
+			downloader.NewDownloader(vc.storage),
+			vc.censusdb,
+			false,
+		)
+	}
 
 	return vc, err
 }
@@ -170,11 +167,26 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 	)
 }
 
-// Start initializes the block production. This method should be run async.
+// Start starts the Vocone node. This function is blocking.
 func (vc *Vocone) Start() {
 	vc.lastBlockTime = time.Now()
 	go vochainPrintInfo(10, vc.appInfo)
-
+	if vc.app.Height() == 0 {
+		log.Infof("initializing new blockchain")
+		genesisAppData, err := json.Marshal(&genesis.GenesisAppState{
+			MaxElectionSize: 1000000,
+			NetworkCapacity: uint64(vc.txsPerBlock),
+			TxCost:          defaultTxCosts(),
+		})
+		if err != nil {
+			panic(err)
+		}
+		vc.app.InitChain(abcitypes.RequestInitChain{
+			ChainId:       vc.app.ChainID(),
+			AppStateBytes: genesisAppData,
+			Time:          time.Now(),
+		})
+	}
 	for {
 		// Begin block
 		vc.vcMtx.Lock()
@@ -188,7 +200,7 @@ func (vc *Vocone) Start() {
 		// Commit block
 		vc.commitBlock()
 		comres := vc.app.Commit()
-		log.Debugf("commit hash for block %d: %x", bblock.Header.Height, comres.Data)
+		log.Debugw("block committed", "height", bblock.Header.Height, "hash", hex.EncodeToString(comres.Data))
 		vc.app.EndBlock(abcitypes.RequestEndBlock{Height: bblock.Header.Height})
 		vc.vcMtx.Unlock()
 
@@ -491,4 +503,21 @@ func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 // SetChainID sets the chainID for the vocone instance
 func (vc *Vocone) SetChainID(chainID string) {
 	vc.app.SetChainID(chainID)
+}
+
+func defaultTxCosts() genesis.TransactionCosts {
+	return genesis.TransactionCosts{
+		SetProcessStatus:        1,
+		SetProcessCensus:        1,
+		SetProcessResults:       1,
+		SetProcessQuestionIndex: 1,
+		RegisterKey:             1,
+		NewProcess:              10,
+		SendTokens:              1,
+		SetAccountInfoURI:       5,
+		CreateAccount:           1,
+		AddDelegateForAccount:   1,
+		DelDelegateForAccount:   1,
+		CollectFaucet:           1,
+	}
 }
