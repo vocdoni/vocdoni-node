@@ -217,9 +217,11 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	}
 
 	// set treasurer address
-	log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
-	if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
-		log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
+	if genesisAppState.Treasurer != nil {
+		log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
+		if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
+			log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
+		}
 	}
 
 	// add tx costs

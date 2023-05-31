@@ -31,22 +31,21 @@ func TestVocone(t *testing.T) {
 	err = account.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng)
-	qt.Assert(t, err, qt.IsNil)
-	t.Cleanup(func() { vc.storage.Stop() })
-
-	err = vc.SetBulkTxCosts(0, true)
+	vc, err := NewVocone(dir, &keymng, true)
 	qt.Assert(t, err, qt.IsNil)
 
 	vc.SetBlockTimeTarget(time.Millisecond * 500)
 	go vc.Start()
 	port := 13000 + util.RandomInt(0, 2000)
-	_, err = vc.EnableAPI("127.0.0.1", port, "/api")
+	_, err = vc.EnableAPI("127.0.0.1", port, "/v2")
 	qt.Assert(t, err, qt.IsNil)
 
 	time.Sleep(time.Second * 2) // TODO: find a more smart way to wait until everything is ready
 
-	u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d/api", port))
+	err = vc.SetBulkTxCosts(0, true)
+	qt.Assert(t, err, qt.IsNil)
+
+	u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d/v2", port))
 	qt.Assert(t, err, qt.IsNil)
 	token := uuid.New()
 	cli, err := apiclient.NewHTTPclient(u, &token)

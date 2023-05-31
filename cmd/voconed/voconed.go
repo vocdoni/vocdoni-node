@@ -4,9 +4,11 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -46,8 +48,8 @@ func main() {
 	flag.StringVar(&config.treasurer, "treasurer", "", "treasurer address")
 	flag.StringVar(&config.logLevel, "logLevel", "info", "log level (info, debug, warn, error)")
 	flag.StringVar(&config.chainID, "chainID", "vocone", "defines the chainID")
-	flag.IntVar(&config.port, "port", 9095, "network port for the HTTP API")
-	flag.StringVar(&config.path, "urlPath", "/api", "HTTP path for the API rest")
+	flag.IntVar(&config.port, "port", 9090, "network port for the HTTP API")
+	flag.StringVar(&config.path, "urlPath", "/v2", "HTTP path for the API rest")
 	flag.IntVar(&config.blockSeconds, "blockPeriod", int(vocone.DefaultBlockTimeTarget.Seconds()), "block time target in seconds")
 	flag.IntVar(&config.blockSize, "blockSize", vocone.DefaultTxsPerBlock, "max number of transactions per block")
 	setTxCosts := flag.Bool("setTxCosts", false, "if true, transaction costs are set to the value of txCosts flag")
@@ -168,7 +170,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	vc, err := vocone.NewVocone(config.dir, &mngKey)
+	vc, err := vocone.NewVocone(config.dir, &mngKey, config.disableIpfs)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -252,5 +254,11 @@ func main() {
 		}
 	}
 
-	select {}
+	// close if interrupt received
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	<-c
+	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
+	os.Exit(0)
+
 }
