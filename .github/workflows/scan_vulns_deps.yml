@@ -35,7 +35,7 @@ jobs:
             echo "CURRENT_ENVIRONMENT=development" >> $GITHUB_OUTPUT
             echo "SHORT_ENV_OUT=DEV" >> $GITHUB_OUTPUT
             containertag="commit-race-$githashshort"
-          elif [ "$branchname" = "master" ]; then
+          elif [ "$branchname" = "main" ]; then
             echo "CURRENT_ENVIRONMENT=production" >> $GITHUB_OUTPUT
             echo "SHORT_ENV_OUT=PROD" >> $GITHUB_OUTPUT
             containertag="commit-race-$githashshort"
@@ -81,7 +81,7 @@ jobs:
 
       - name: Push Docker image to ghcr.io (race enabled)
         uses: docker/build-push-action@v4
-        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main'
         with:
           context: .
           #push: true

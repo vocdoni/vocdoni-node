@@ -15,7 +15,7 @@ jobs:
       with:
         fetch-depth: 0 # the push step needs a full repo, not shallow
     - name: Push main branch to dev branch
-      run: git push origin master:dev
+      run: git push origin main:dev
 
   call-docker-release:
     name: Docker
