@@ -27,11 +27,12 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		return nil, fmt.Errorf("cannot get process: %w", err)
 	}
 
-	if p.VoteOptions.MaxCount == 0 || p.VoteOptions.MaxValue == 0 {
-		return nil, fmt.Errorf("maxCount and/or maxValue is zero")
+	if p.VoteOptions.MaxCount == 0 {
+		p.VoteOptions.MaxCount = MaxQuestions
 	}
-	if p.VoteOptions.MaxCount > MaxQuestions || p.VoteOptions.MaxValue > MaxOptions {
-		return nil, fmt.Errorf("maxCount and/or maxValue overflows hardcoded maximum")
+
+	if p.VoteOptions.MaxCount > MaxQuestions {
+		return nil, fmt.Errorf("maxCount overflow %d", p.VoteOptions.MaxCount)
 	}
 	results := &Results{
 		Votes:        NewEmptyVotes(int(p.VoteOptions.MaxCount), int(p.VoteOptions.MaxValue)+1),
@@ -64,7 +65,7 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 			return false
 		}
 		if err = results.AddVote(vp.Votes, new(big.Int).SetBytes(vote.Weight), &lock); err != nil {
-			log.Warnf("addVote failed: %v", err)
+			log.Debugf("addVote failed: %v", err)
 			return false
 		}
 		nvotes.Add(1)

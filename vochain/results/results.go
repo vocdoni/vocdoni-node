@@ -14,8 +14,6 @@ import (
 const (
 	// MaxQuestions is the maximum number of questions allowed in a VotePackage
 	MaxQuestions = 64
-	// MaxOptions is the maximum number of options allowed in a VotePackage question
-	MaxOptions = 768
 )
 
 // Results holds the final results and relevant process info for a vochain process
@@ -135,7 +133,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 		return fmt.Errorf("addVote: envelopeType is nil")
 	}
 	// MaxCount
-	if len(voteValues) > int(r.VoteOpts.MaxCount) || len(voteValues) > MaxOptions {
+	if len(voteValues) > int(r.VoteOpts.MaxCount) {
 		return fmt.Errorf("max count overflow %d", len(voteValues))
 	}
 
