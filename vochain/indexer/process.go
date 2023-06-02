@@ -213,9 +213,9 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("newEmptyProcess: maxCount is zero")
 	}
 
-	// Check for overflows
-	if options.MaxCount > results.MaxQuestions || options.MaxValue > results.MaxOptions {
-		return fmt.Errorf("maxCount or maxValue overflows hardcoded maximums")
+	// Check for maxCount overflow
+	if options.MaxCount > results.MaxQuestions {
+		return fmt.Errorf("maxCount overflow %d", options.MaxCount)
 	}
 
 	eid := p.EntityId

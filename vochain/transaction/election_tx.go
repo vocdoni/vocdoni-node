@@ -36,10 +36,10 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx,
 		return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
 	}
 	// check for maxCount/maxValue overflows
-	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions || tx.Process.VoteOptions.MaxValue > results.MaxOptions {
+	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions {
 		return nil, ethereum.Address{},
-			fmt.Errorf("maxCount or maxValue overflows hardcoded maximums (%d, %d). Received (%d, %d)",
-				results.MaxQuestions, results.MaxOptions, tx.Process.VoteOptions.MaxCount, tx.Process.VoteOptions.MaxValue)
+			fmt.Errorf("maxCount overflows (%d, %d)",
+				results.MaxQuestions, tx.Process.VoteOptions.MaxCount)
 	}
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
 		return nil, ethereum.Address{}, fmt.Errorf("status must be READY or PAUSED")
