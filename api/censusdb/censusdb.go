@@ -229,7 +229,7 @@ func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
 
 // getCensusRefFromDB returns the censusRef from the database.
 func (c *CensusDB) getCensusRefFromDB(censusID []byte) (*CensusRef, error) {
-	b, err := c.db.ReadTx().Get(
+	b, err := c.db.Get(
 		append(
 			[]byte(censusDBreferencePrefix),
 			censusID...,

@@ -92,9 +92,9 @@ func subWriteTx(tx db.WriteTx, path string) db.WriteTx {
 	return prefixeddb.NewPrefixedWriteTx(tx, []byte(path+"/"))
 }
 
-// subReadTx returns a db.ReadTx prefixed with `path | '/'`
-func subReadTx(tx db.ReadTx, path string) db.ReadTx {
-	return prefixeddb.NewPrefixedReadTx(tx, []byte(path+"/"))
+// subReader returns a db.ReadTx prefixed with `path | '/'`
+func subReader(tx db.Reader, path string) db.Reader {
+	return prefixeddb.NewPrefixedReader(tx, []byte(path+"/"))
 }
 
 // GetRootFn is a function type that takes a leaf value and returns the contained root.
@@ -227,8 +227,8 @@ func setVersionRoot(tx db.WriteTx, version uint32, root []byte) error {
 
 // getVersionRoot is a helper function used get the last version from the top
 // level tx.
-func getVersion(tx db.ReadTx) (uint32, error) {
-	versionLE, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(keyCurVersion)
+func getVersion(tx db.Reader) (uint32, error) {
+	versionLE, err := subReader(tx, path.Join(subKeyMeta, pathVersion)).Get(keyCurVersion)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
 	} else if err != nil {
@@ -239,8 +239,8 @@ func getVersion(tx db.ReadTx) (uint32, error) {
 
 // getVersionRoot is a helper function used get the root of version from the
 // top level tx.
-func (s *StateDB) getVersionRoot(tx db.ReadTx, version uint32) ([]byte, error) {
-	root, err := subReadTx(tx, path.Join(subKeyMeta, pathVersion)).Get(uint32ToBytes(version))
+func (s *StateDB) getVersionRoot(tx db.Reader, version uint32) ([]byte, error) {
+	root, err := subReader(tx, path.Join(subKeyMeta, pathVersion)).Get(uint32ToBytes(version))
 	if errors.Is(err, db.ErrKeyNotFound) && version == 0 {
 		return make([]byte, s.hashLen), nil
 	} else if err != nil {
@@ -251,7 +251,7 @@ func (s *StateDB) getVersionRoot(tx db.ReadTx, version uint32) ([]byte, error) {
 
 // getRoot is a helper function used to get the last version's root from the
 // top level tx.
-func (s *StateDB) getRoot(tx db.ReadTx) ([]byte, error) {
+func (s *StateDB) getRoot(tx db.Reader) ([]byte, error) {
 	version, err := getVersion(tx)
 	if err != nil {
 		return nil, err
@@ -262,26 +262,20 @@ func (s *StateDB) getRoot(tx db.ReadTx) ([]byte, error) {
 // Version returns the last commited version.  Calling Version on a fresh
 // StateDB will return 0.
 func (s *StateDB) Version() (uint32, error) {
-	tx := s.db.ReadTx()
-	defer tx.Discard()
-	return getVersion(tx)
+	return getVersion(s.db)
 }
 
 // VersionRoot returns the StateDB root corresponding to the version v.  A new
 // StateDB always has the version 0 with root == emptyHash.
 func (s *StateDB) VersionRoot(v uint32) ([]byte, error) {
-	tx := s.db.ReadTx()
-	defer tx.Discard()
-	return s.getVersionRoot(tx, v)
+	return s.getVersionRoot(s.db, v)
 }
 
 // Hash returns the cryptographic summary of the StateDB, which corresponds to
 // the root of the mainTree.  This hash cryptographically represents the entire
 // StateDB (except for the NoState databases).
 func (s *StateDB) Hash() ([]byte, error) {
-	tx := s.db.ReadTx()
-	defer tx.Discard()
-	return s.getRoot(tx)
+	return s.getRoot(s.db)
 }
 
 // BeginTx creates a new transaction for the StateDB to begin an update, with
@@ -346,7 +340,7 @@ func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
 // that take a db.WriteTx but only write conditionally, and we want to detect a
 // write attempt.
 type readOnlyWriteTx struct {
-	db.ReadTx
+	db.Reader
 }
 
 // ErrReadOnly is returned when a write operation is attempted on a db.WriteTx
@@ -373,25 +367,24 @@ func (t *readOnlyWriteTx) Apply(w db.WriteTx) error {
 }
 
 // Commit implements db.WriteTx.Commit but returns nil always.
-func (t *readOnlyWriteTx) Commit() error {
-	return nil
-}
+func (t *readOnlyWriteTx) Commit() error { return nil }
+
+// Commit implements db.WriteTx.Discard as a no-op.
+func (t *readOnlyWriteTx) Discard() {}
 
 // TreeView returns the mainTree opened at root as a TreeView for read-only.
 // If root is nil, the last version's root is used.
 func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
 	cfg := mainTreeCfg
 
-	tx := s.db.ReadTx()
-	defer tx.Discard()
 	if root == nil {
 		var err error
-		if root, err = s.getRoot(tx); err != nil {
+		if root, err = s.getRoot(s.db); err != nil {
 			return nil, err
 		}
 	}
 
-	txTree := subReadTx(tx, subKeyTree)
+	txTree := subReader(s.db, subKeyTree)
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(s.db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if errors.Is(err, ErrReadOnly) {

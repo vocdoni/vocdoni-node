@@ -38,18 +38,8 @@ func TestWriteTx(t *testing.T, database db.Database) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, v, qt.DeepEquals, []byte("b"))
 
-	// ensure that WriteTx can be passed into a function that accepts
-	// ReadTx, and that can be used
-	useReadTxFromWriteTx(t, wTx)
-
 	err = wTx.Commit()
 	qt.Assert(t, err, qt.IsNil)
-}
-
-func useReadTxFromWriteTx(t *testing.T, rTx db.ReadTx) {
-	v, err := rTx.Get([]byte("a"))
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, v, qt.DeepEquals, []byte("b"))
 }
 
 func TestIterate(t *testing.T, d db.Database) {
@@ -140,9 +130,7 @@ func TestConcurrentWriteTx(t *testing.T, database db.Database) {
 	}()
 
 	wgInc.Wait()
-	rTx := database.ReadTx()
-	defer rTx.Discard()
-	val, err := rTx.Get(key)
+	val, err := database.Get(key)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, val, qt.DeepEquals, []byte{1})
 

@@ -14,6 +14,7 @@ func TestPrefixed(t *testing.T) {
 	prefix2 := []byte("two")
 
 	db1 := NewPrefixedDatabase(database, prefix1)
+	db2 := NewPrefixedDatabase(database, prefix2)
 
 	keys1, values1 := [][]byte{[]byte("a"), []byte("b")}, [][]byte{[]byte("1"), []byte("2")}
 	keys2, values2 := [][]byte{[]byte("c"), []byte("d")}, [][]byte{[]byte("3"), []byte("4")}
@@ -40,15 +41,13 @@ func TestPrefixed(t *testing.T) {
 	})
 	qt.Assert(t, err, qt.IsNil)
 
-	// Check key-values in PrefixedReadTx "two"
-	rTx2 := NewPrefixedReadTx(database.ReadTx(), prefix2)
-	v0, err := rTx2.Get(keys2[0])
+	// Check key-values in PrefixedDatabase "two"
+	v0, err := db2.Get(keys2[0])
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, v0, qt.DeepEquals, values2[0])
-	v1, err := rTx2.Get(keys2[1])
+	v1, err := db2.Get(keys2[1])
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, v1, qt.DeepEquals, values2[1])
-	rTx2.Discard()
 
 	// Check all key-values with prefixes in parent Database
 	prefixes := [][]byte{prefix1, prefix1, prefix2, prefix2}

@@ -23,7 +23,7 @@ func TestStateSnapshot(t *testing.T) {
 	snap.SetMainRoot(mainRoot)
 
 	tree1 := newTreeForTest(t, 0)
-	root1, err := tree1.Root(tree1.DB().ReadTx())
+	root1, err := tree1.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	snap.AddTree("Tree1", "", root1)
 	err = tree1.DumpWriter(&snap)
@@ -31,7 +31,7 @@ func TestStateSnapshot(t *testing.T) {
 	snap.EndTree()
 
 	tree2 := newTreeForTest(t, 1)
-	root2, err := tree2.Root(tree2.DB().ReadTx())
+	root2, err := tree2.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	snap.AddTree("Tree2", "", root2)
 	err = tree2.DumpWriter(&snap)
@@ -39,7 +39,7 @@ func TestStateSnapshot(t *testing.T) {
 	snap.EndTree()
 
 	tree3 := newTreeForTest(t, 2)
-	root3, err := tree3.Root(tree3.DB().ReadTx())
+	root3, err := tree3.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	snap.AddTree("Tree3", "Tree1", root3)
 	err = tree3.DumpWriter(&snap)
@@ -64,7 +64,7 @@ func TestStateSnapshot(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	_, err = snap2.ReadAll()
 	qt.Assert(t, err, qt.ErrorIs, io.EOF)
-	root, err := treeImp.Root(treeImp.DB().ReadTx())
+	root, err := treeImp.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, root1, qt.DeepEquals, root)
 
@@ -76,7 +76,7 @@ func TestStateSnapshot(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	err = treeImp.ImportDump(b)
 	qt.Assert(t, err, qt.IsNil)
-	root, err = treeImp.Root(treeImp.DB().ReadTx())
+	root, err = treeImp.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, root2, qt.DeepEquals, root)
 
@@ -88,7 +88,7 @@ func TestStateSnapshot(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	err = treeImp.ImportDump(b)
 	qt.Assert(t, err, qt.IsNil)
-	root, err = treeImp.Root(treeImp.DB().ReadTx())
+	root, err = treeImp.Root(nil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, root3, qt.DeepEquals, root)
 

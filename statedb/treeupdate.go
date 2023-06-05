@@ -14,7 +14,7 @@ import (
 // Viewer with a Set method.  This is simmilar to db.WriteTx but without the
 // Commit and Discard methods.  Any db.WriteTx implements Updater.
 type Updater interface {
-	Viewer
+	db.Reader
 	Set(key, value []byte) error
 	Delete(key []byte) error
 }
@@ -361,7 +361,7 @@ func (t *TreeTx) SaveWithoutCommit() error {
 type treeUpdateView TreeUpdate
 
 // NoState implements the TreeViewer.NoState method.
-func (v *treeUpdateView) NoState() Viewer {
+func (v *treeUpdateView) NoState() db.Reader {
 	return (*TreeUpdate)(v).NoState()
 }
 

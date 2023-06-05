@@ -1,6 +1,10 @@
 package statedb
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+
+	"go.vocdoni.io/dvote/db"
+)
 
 // SetUint64 stores an uint64 in little endian under the key.
 func SetUint64(u Updater, key []byte, n uint64) error {
@@ -10,7 +14,7 @@ func SetUint64(u Updater, key []byte, n uint64) error {
 }
 
 // GetUint64 gets an uint64 from little endian under the key.
-func GetUint64(v Viewer, key []byte) (uint64, error) {
+func GetUint64(v db.Reader, key []byte) (uint64, error) {
 	value, err := v.Get(key)
 	if err != nil {
 		return 0, err
