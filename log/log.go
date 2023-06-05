@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path"
+	"runtime/debug"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -205,7 +206,7 @@ func Error(args ...interface{}) {
 
 // Fatal sends a fatal level log message
 func Fatal(args ...interface{}) {
-	log.Fatal().Msg(fmt.Sprint(args...))
+	log.Fatal().Msg(fmt.Sprint(args...) + "\n" + string(debug.Stack()))
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
 	// entire program.
@@ -243,7 +244,7 @@ func Errorf(template string, args ...interface{}) {
 
 // Fatalf sends a formatted fatal level log message
 func Fatalf(template string, args ...interface{}) {
-	Logger().Fatal().Msgf(template, args...)
+	Logger().Fatal().Msgf(template+"\n"+string(debug.Stack()), args...)
 }
 
 // Debugw sends a debug level log message with key-value pairs.
