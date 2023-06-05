@@ -242,7 +242,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		}
 		if !process.Mode.Interruptible {
 			if v.CurrentHeight() < process.BlockCount+process.StartBlock {
-				return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
+				return fmt.Errorf("process %x is not interruptible, cannot change status to %s",
 					pid, newstatus.String())
 			}
 		}

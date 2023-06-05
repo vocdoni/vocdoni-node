@@ -158,9 +158,9 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	status = models.ProcessStatus_ENDED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
 
-	// Set it to RESULTS (should work)
+	// Set it to RESULTS (should not work)
 	status = models.ProcessStatus_RESULTS
-	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 
 	// Set it to READY (should fail)
 	status = models.ProcessStatus_READY
