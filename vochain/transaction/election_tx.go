@@ -195,6 +195,10 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx, forCommit bool
 	}
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_STATUS:
+		if tx.GetStatus() == models.ProcessStatus_RESULTS {
+			// Status can only be set to RESULTS by the internal logic of the blockchain (see IST controller).
+			return ethereum.Address{}, fmt.Errorf("not authoritzed to set process status to RESULTS")
+		}
 		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:
 		return ethereum.Address(*addr), t.state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
