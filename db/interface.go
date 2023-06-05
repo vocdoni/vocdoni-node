@@ -5,10 +5,8 @@ import (
 	"io"
 )
 
-const (
-	// TypePebble defines the type of db that uses PebbleDB
-	TypePebble = "pebble"
-)
+// TypePebble defines the type of db that uses PebbleDB
+const TypePebble = "pebble"
 
 // ErrKeysNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
@@ -31,10 +29,17 @@ type Options struct {
 type Database interface {
 	io.Closer
 
-	// ReadTx creates a new read transaction.
-	ReadTx() ReadTx
+	Reader
+
 	// WriteTx creates a new write transaction.
 	WriteTx() WriteTx
+}
+
+// Reader contains the read-only database operations.
+type Reader interface {
+	// Get retrieves the value for the given key. If the key does not
+	// exist, returns the error ErrKeyNotFound
+	Get(key []byte) ([]byte, error)
 
 	// Iterate calls callback with all key-value pairs in the database whose key
 	// starts with prefix. The calls are ordered lexicographically by key.
@@ -46,19 +51,8 @@ type Database interface {
 	Iterate(prefix []byte, callback func(key, value []byte) bool) error
 }
 
-type ReadTx interface {
-	// Get retrieves the value for the given key. If the key does not
-	// exist, returns the error ErrKeyNotFound
-	Get(key []byte) ([]byte, error)
-	// Discard discards the transaction. This method can be called always,
-	// even if previously the Tx has been Commited (for the WriteTx case).
-	// So it's a good practice to `defer tx.Discard()` just after creating
-	// the tx.
-	Discard()
-}
-
 type WriteTx interface {
-	ReadTx
+	Reader
 
 	// Set adds a key-value pair. If the key already exists, its value is
 	// updated.
@@ -74,6 +68,11 @@ type WriteTx interface {
 	Apply(WriteTx) error
 	// Commit commits the transaction into the db
 	Commit() error
+	// Discard discards the transaction. This method can be called always,
+	// even if previously the Tx has been Commited (for the WriteTx case).
+	// So it's a good practice to `defer tx.Discard()` just after creating
+	// the tx.
+	Discard()
 }
 
 // UnwrapWriteTx unwraps (if possible) the WriteTx using Unwrap method

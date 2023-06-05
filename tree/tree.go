@@ -63,10 +63,9 @@ func (t *Tree) DB() db.Database {
 }
 
 // Get returns the value for a given key.
-func (t *Tree) Get(rTx db.ReadTx, key []byte) ([]byte, error) {
+func (t *Tree) Get(rTx db.Reader, key []byte) ([]byte, error) {
 	if rTx == nil {
-		rTx = t.DB().ReadTx()
-		defer rTx.Discard()
+		rTx = t.db
 	}
 	_, v, err := t.tree.GetWithTx(rTx, key)
 	if err != nil {
@@ -168,10 +167,9 @@ func (t *Tree) AddBatch(wTx db.WriteTx, keys, values [][]byte) ([]int, error) {
 
 // Iterate over all the database-encoded nodes of the tree.  When callback
 // returns true, the iteration is stopped and this function returns.
-func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) error {
+func (t *Tree) Iterate(rTx db.Reader, callback func(key, value []byte) bool) error {
 	if rTx == nil {
-		rTx = t.DB().ReadTx()
-		defer rTx.Discard()
+		rTx = t.db
 	}
 	callbackWrapper := func(currLvl int, k, v []byte) bool {
 		return callback(k, v)
@@ -185,7 +183,7 @@ func (t *Tree) Iterate(rTx db.ReadTx, callback func(key, value []byte) bool) err
 
 // IterateLeaves iterates over all leafs of the tree.  When callback returns true,
 // the iteration is stopped and this function returns.
-func (t *Tree) IterateLeaves(rTx db.ReadTx, callback func(key, value []byte) bool) error {
+func (t *Tree) IterateLeaves(rTx db.Reader, callback func(key, value []byte) bool) error {
 	return t.Iterate(rTx, func(key, value []byte) bool {
 		if value[0] != arbo.PrefixValueLeaf {
 			return false
@@ -196,19 +194,17 @@ func (t *Tree) IterateLeaves(rTx db.ReadTx, callback func(key, value []byte) boo
 }
 
 // Root returns the current root.
-func (t *Tree) Root(rTx db.ReadTx) ([]byte, error) {
+func (t *Tree) Root(rTx db.Reader) ([]byte, error) {
 	if rTx == nil {
-		rTx = t.DB().ReadTx()
-		defer rTx.Discard()
+		rTx = t.db
 	}
 	return t.tree.RootWithTx(rTx)
 }
 
 // Size returns the number of leafs under the current root
-func (t *Tree) Size(rTx db.ReadTx) (uint64, error) {
+func (t *Tree) Size(rTx db.Reader) (uint64, error) {
 	if rTx == nil {
-		rTx = t.DB().ReadTx()
-		defer rTx.Discard()
+		rTx = t.db
 	}
 	n, err := t.tree.GetNLeafsWithTx(rTx)
 	return uint64(n), err
@@ -216,10 +212,9 @@ func (t *Tree) Size(rTx db.ReadTx) (uint64, error) {
 
 // GenProof returns a byte array with the necessary data to verify that the
 // key&value are in a leaf under the current root
-func (t *Tree) GenProof(rTx db.ReadTx, key []byte) ([]byte, []byte, error) {
+func (t *Tree) GenProof(rTx db.Reader, key []byte) ([]byte, []byte, error) {
 	if rTx == nil {
-		rTx = t.DB().ReadTx()
-		defer rTx.Discard()
+		rTx = t.db
 	}
 	_, leafV, s, existence, err := t.tree.GenProofWithTx(rTx, key)
 	if err != nil {

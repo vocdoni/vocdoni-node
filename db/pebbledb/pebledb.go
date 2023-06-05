@@ -8,25 +8,16 @@ import (
 	"go.vocdoni.io/dvote/db"
 )
 
-// ReadTx implements the interface db.ReadTx
-type ReadTx struct {
-	batch *pebble.Batch
-}
-
-// check that ReadTx implements the db.ReadTx interface
-var _ db.ReadTx = (*ReadTx)(nil)
-
 // WriteTx implements the interface db.WriteTx
 type WriteTx struct {
 	batch *pebble.Batch
 }
 
-// check that WriteTx implements the db.ReadTx & db.WriteTx interfaces
+// check that WriteTx implements the db.WriteTx interface
 var _ db.WriteTx = (*WriteTx)(nil)
 
-// Get implements the db.ReadTx.Get interface method
-func (tx ReadTx) Get(k []byte) ([]byte, error) {
-	v, closer, err := tx.batch.Get(k)
+func get(reader pebble.Reader, k []byte) ([]byte, error) {
+	v, closer, err := reader.Get(k)
 	if errors.Is(err, pebble.ErrNotFound) {
 		return nil, db.ErrKeyNotFound
 	}
@@ -46,15 +37,36 @@ func (tx ReadTx) Get(k []byte) ([]byte, error) {
 	return v2, nil
 }
 
-// Discard implements the db.ReadTx.Discard interface method
-func (tx ReadTx) Discard() {
-	// Close returns an error, but here in the Discard context is ommited
-	tx.batch.Close()
+func iterate(reader pebble.Reader, prefix []byte, callback func(k, v []byte) bool) (err error) {
+	iterOptions := &pebble.IterOptions{
+		LowerBound: prefix,
+		UpperBound: keyUpperBound(prefix),
+	}
+	iter := reader.NewIter(iterOptions)
+	defer func() {
+		errC := iter.Close()
+		if err != nil {
+			return
+		}
+		err = errC
+	}()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		localKey := iter.Key()[len(prefix):]
+		if cont := callback(localKey, iter.Value()); !cont {
+			break
+		}
+	}
+	return iter.Error()
 }
 
 // Get implements the db.WriteTx.Get interface method
 func (tx WriteTx) Get(k []byte) ([]byte, error) {
-	return ReadTx(tx).Get(k)
+	return get(tx.batch, k)
+}
+
+func (tx WriteTx) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
+	return iterate(tx.batch, prefix, callback)
 }
 
 // Set implements the db.WriteTx.Set interface method
@@ -80,7 +92,8 @@ func (tx WriteTx) Commit() error {
 
 // Discard implements the db.WriteTx.Discard interface method
 func (tx WriteTx) Discard() {
-	ReadTx(tx).Discard()
+	// Close returns an error, but here in the Discard context is ommited
+	tx.batch.Close()
 }
 
 // PebbleDB implements db.Database interface
@@ -108,11 +121,9 @@ func New(opts db.Options) (*PebbleDB, error) {
 	}, nil
 }
 
-// ReadTx returns a db.ReadTx
-func (db *PebbleDB) ReadTx() db.ReadTx {
-	return ReadTx{
-		batch: db.db.NewIndexedBatch(),
-	}
+// Get implements the db.WriteTx.Get interface method
+func (db *PebbleDB) Get(k []byte) ([]byte, error) {
+	return get(db.db, k)
 }
 
 // WriteTx returns a db.WriteTx
@@ -142,24 +153,5 @@ func keyUpperBound(b []byte) []byte {
 
 // Iterate implements the db.Database.Iterate interface method
 func (db *PebbleDB) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
-	iterOptions := &pebble.IterOptions{
-		LowerBound: prefix,
-		UpperBound: keyUpperBound(prefix),
-	}
-	iter := db.db.NewIter(iterOptions)
-	defer func() {
-		errC := iter.Close()
-		if err != nil {
-			return
-		}
-		err = errC
-	}()
-
-	for iter.First(); iter.Valid(); iter.Next() {
-		localKey := iter.Key()[len(prefix):]
-		if cont := callback(localKey, iter.Value()); !cont {
-			break
-		}
-	}
-	return iter.Error()
+	return iterate(db.db, prefix, callback)
 }

@@ -888,9 +888,7 @@ func TestLoadVT(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(len(invalids), qt.Equals, 0)
 
-	rTx := tree.db.ReadTx()
-	defer rTx.Discard()
-	vt, err := tree.loadVT(rTx)
+	vt, err := tree.loadVT(tree.db)
 	c.Assert(err, qt.IsNil)
 	_, err = vt.computeHashes()
 	c.Assert(err, qt.IsNil)

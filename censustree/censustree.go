@@ -207,7 +207,7 @@ func (t *Tree) GenProof(key []byte) ([]byte, []byte, error) {
 
 // Size returns the census index (number of added leafs to the merkle tree).
 func (t *Tree) Size() (uint64, error) {
-	return t.tree.Size(t.tree.DB().ReadTx())
+	return t.tree.Size(nil)
 }
 
 // Dump wraps t.tree.Dump.
@@ -311,7 +311,7 @@ func (t *Tree) ImportDump(b []byte) error {
 	// adding the weight of its values.
 	// The weight is only updated on census that have a weight value.
 	addedWeight := big.NewInt(0)
-	if err := t.tree.IterateLeaves(t.tree.DB().ReadTx(), func(key, value []byte) bool {
+	if err := t.tree.IterateLeaves(nil, func(key, value []byte) bool {
 		// add the weight (value of the leaf)
 		addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(value))
 		return false
@@ -333,7 +333,7 @@ func (t *Tree) ImportDump(b []byte) error {
 func (t *Tree) GetCensusWeight() (*big.Int, error) {
 	t.updatesLock.RLock()
 	defer t.updatesLock.RUnlock()
-	weight, err := t.tree.DB().ReadTx().Get(censusWeightKey)
+	weight, err := t.tree.DB().Get(censusWeightKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return big.NewInt(0), nil
 	}

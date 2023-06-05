@@ -41,14 +41,14 @@ func (d *PrefixedDatabase) Close() error {
 	return d.db.Close()
 }
 
-// ReadTx returns a db.ReadTx
-func (d *PrefixedDatabase) ReadTx() db.ReadTx {
-	return NewPrefixedReadTx(d.db.ReadTx(), d.prefix)
-}
-
 // WriteTx returns a db.WriteTx
 func (d *PrefixedDatabase) WriteTx() db.WriteTx {
 	return NewPrefixedWriteTx(d.db.WriteTx(), d.prefix)
+}
+
+// Get implements the db.Database.Get interface method
+func (d *PrefixedDatabase) Get(key []byte) ([]byte, error) {
+	return d.db.Get(prefixSlice(d.prefix, key))
 }
 
 // Iterate implements the db.Database.Iterate interface method
@@ -58,34 +58,34 @@ func (d *PrefixedDatabase) Iterate(prefix []byte, callback func(key, value []byt
 	})
 }
 
-// PrefixedReadTx wraps a db.ReadTx prefixing all keys with `prefix`.
-type PrefixedReadTx struct {
+// PrefixedDatabase wraps a db.Database prefixing all keys with `prefix`.
+type PrefixedReader struct {
 	prefix []byte
-	tx     db.ReadTx
+	rd     db.Reader
 }
 
-// check that PrefixedReadTx implements the db.ReadTx interface
-var _ db.ReadTx = (*PrefixedReadTx)(nil)
+// check that PrefixedDatabase implements the db.Database interface
+var _ db.Reader = (*PrefixedReader)(nil)
 
-// NewPrefixedDatabase creates a new db.ReadTx.  If the tx is already a
-// PrefixedReadTx, instead of wrapping again, the prefixes are appended to avoid
-// unecessay layers.
-func NewPrefixedReadTx(tx db.ReadTx, prefix []byte) *PrefixedReadTx {
-	if ptx, ok := tx.(*PrefixedReadTx); ok {
-		return &PrefixedReadTx{prefixSlice(ptx.prefix, prefix), ptx.tx}
+// NewPrefixedDatabase creates a new PrefixedDatabase.  If the db is already a
+// PrefixedDatabase, instead of wrapping again, the prefixes are appended to
+// avoid unecessay layers.
+func NewPrefixedReader(rd db.Reader, prefix []byte) *PrefixedReader {
+	if pdb, ok := rd.(*PrefixedReader); ok {
+		return &PrefixedReader{prefixSlice(pdb.prefix, prefix), pdb.rd}
 	}
-	return &PrefixedReadTx{prefix, tx}
+	return &PrefixedReader{prefix, rd}
 }
 
-// Get implements the db.ReadTx.Get interface method
-func (t *PrefixedReadTx) Get(key []byte) ([]byte, error) {
-	return t.tx.Get(prefixSlice(t.prefix, key))
+func (d *PrefixedReader) Get(key []byte) ([]byte, error) {
+	return d.rd.Get(prefixSlice(d.prefix, key))
 }
 
-// Discard implements the db.ReadTx.Discard interface method.  Notice that this
-// method also discards the wrapped db.ReadTx.
-func (t *PrefixedReadTx) Discard() {
-	t.tx.Discard()
+// Iterate implements the db.Database.Iterate interface method
+func (d *PrefixedReader) Iterate(prefix []byte, callback func(key, value []byte) bool) error {
+	return d.rd.Iterate(prefixSlice(d.prefix, prefix), func(key, value []byte) bool {
+		return callback(bytes.TrimPrefix(key, d.prefix), value)
+	})
 }
 
 // PrefixedWriteTx wraps a WriteTx prefixing all keys with `prefix`.
@@ -94,8 +94,7 @@ type PrefixedWriteTx struct {
 	tx     db.WriteTx
 }
 
-// check that PrefixedWriteTx implements the db.ReadTx & db.WriteTx interfaces
-var _ db.ReadTx = (*PrefixedWriteTx)(nil)
+// check that PrefixedWriteTx implements the db.WriteTx interface
 var _ db.WriteTx = (*PrefixedWriteTx)(nil)
 
 // NewPrefixedWriteTx creates a new db.WriteTx.  If the tx is already a
@@ -113,7 +112,13 @@ func (t *PrefixedWriteTx) Get(key []byte) ([]byte, error) {
 	return t.tx.Get(prefixSlice(t.prefix, key))
 }
 
-// Discard implements the db.ReadTx.Discard interface method.  Notice that this
+func (t *PrefixedWriteTx) Iterate(prefix []byte, callback func(key, value []byte) bool) error {
+	return t.tx.Iterate(prefixSlice(t.prefix, prefix), func(key, value []byte) bool {
+		return callback(bytes.TrimPrefix(key, t.prefix), value)
+	})
+}
+
+// Discard implements the db.WriteTx.Discard interface method.  Notice that this
 // method also discards the wrapped db.WriteTx.
 func (t *PrefixedWriteTx) Discard() {
 	t.tx.Discard()

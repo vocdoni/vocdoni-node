@@ -75,7 +75,7 @@ func (a *API) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 	// generate the index from the token hash
 	index := ethereum.HashRaw(token[:])
 	// using the index, get the encrypted private key
-	privKeyEncrypted, err := a.db.ReadTx().Get(append([]byte(walletDBprefixEncryptedPrivateKey), index...))
+	privKeyEncrypted, err := a.db.Get(append([]byte(walletDBprefixEncryptedPrivateKey), index...))
 	if err != nil {
 		return nil, ErrWalletNotFound
 	}
@@ -97,7 +97,7 @@ func (a *API) walletFromToken(authToken string) (*ethereum.SignKeys, error) {
 
 func (a *API) walletCheckKeyExists(privKey []byte) error {
 	privKeyHash := ethereum.HashRaw(privKey)
-	_, err := a.db.ReadTx().Get(append([]byte(walletDBprefixPrivateKeyHash), privKeyHash...))
+	_, err := a.db.Get(append([]byte(walletDBprefixPrivateKeyHash), privKeyHash...))
 	if err == db.ErrKeyNotFound {
 		return nil
 	}

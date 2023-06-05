@@ -440,8 +440,7 @@ func (vc *Vocone) getBlock(height int64) *tmtypes.Block {
 }
 
 func (vc *Vocone) getTx(height uint32, txIndex int32) (*models.SignedTx, error) {
-	rtx := vc.blockStore.ReadTx()
-	tx, err := rtx.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
+	tx, err := vc.blockStore.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
 	if err != nil {
 		return nil, err
 	}
@@ -454,8 +453,7 @@ func (vc *Vocone) mempoolSize() int {
 }
 
 func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
-	rtx := vc.blockStore.ReadTx()
-	tx, err := rtx.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
+	tx, err := vc.blockStore.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
 	if err != nil {
 		return nil, nil, err
 	}

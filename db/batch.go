@@ -15,8 +15,7 @@ type Batch struct {
 	count   uint
 }
 
-// check that Batch implements the ReadTx & WriteTx interfaces
-var _ ReadTx = (*Batch)(nil)
+// check that Batch implements the WriteTx interface
 var _ WriteTx = (*Batch)(nil)
 
 // DefaultBatchMaxSize is the default value for maxSize used in NewBatch.
@@ -48,7 +47,11 @@ func (t *Batch) Get(key []byte) ([]byte, error) {
 	return t.tx.Get(key)
 }
 
-// Discard implements the ReadTx.Discard interface method.  Notice that this
+func (t *Batch) Iterate(prefix []byte, callback func(key, value []byte) bool) error {
+	return t.tx.Iterate(prefix, callback)
+}
+
+// Discard implements the WriteTx.Discard interface method.  Notice that this
 // method will only discard the writes of the last interal tx: if the tx
 // previously has become too big a commit will have been applied that can't be
 // discarded.

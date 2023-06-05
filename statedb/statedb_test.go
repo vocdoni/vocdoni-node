@@ -418,7 +418,7 @@ func dumpPrint(db db.Database) {
 // the tree.
 //
 //lint:ignore U1000 debug function
-func treePrint(t *tree.Tree, tx db.ReadTx, name string) {
+func treePrint(t *tree.Tree, tx db.Reader, name string) {
 	fmt.Printf("--- Tree Print (%s)---\n", name)
 	if err := t.Iterate(tx, func(key, value []byte) bool {
 		if value[0] != arbo.PrefixValueLeaf {

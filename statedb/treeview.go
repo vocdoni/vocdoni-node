@@ -10,37 +10,11 @@ import (
 	"go.vocdoni.io/dvote/tree"
 )
 
-// Viewer is an interface for a read-only key-value database.  This is similar
-// to db.ReadTx, but without the Discard method.
-type Viewer interface {
-	Get(key []byte) ([]byte, error)
-}
-
-// databaseViewer is a wrapper over db.Database that implements Viewer.  We
-// implement this viewer for db.Database to offer a Get method for easy queries
-// without having to deal with the db.ReadTx externally.
-type databaseViewer struct {
-	db db.Database
-}
-
-// Get the key from the database.  Internally uses a new read transaction.
-func (v *databaseViewer) Get(key []byte) ([]byte, error) {
-	tx := v.db.ReadTx()
-	defer tx.Discard()
-	return tx.Get(key)
-}
-
-// IterateWithPrefix iterates over all the keys that start with the given prefix.
-// The iteration stops when the callback returns false.
-func (v *databaseViewer) IterateWithPrefix(prefix []byte, callback func([]byte, []byte) bool) error {
-	return v.db.Iterate(prefix, callback)
-}
-
 // TreeViewer groups the read-only methods that can be made on a subTree.
 type TreeViewer interface {
 	// NoState returns a read-only key-value database associated with this tree
 	// that doesn't affect the cryptographic integrity of the StateDB.
-	NoState() Viewer
+	NoState() db.Reader
 	// Get returns the value at key in this tree.  `key` is the path of the leaf,
 	// and the returned value is the leaf's value.
 	Get(key []byte) ([]byte, error)
@@ -93,10 +67,8 @@ type TreeView struct {
 
 // NoState returns a read-only key-value database associated with this tree
 // that doesn't affect the cryptographic integrity of the StateDB.
-func (v *TreeView) NoState() Viewer {
-	return &databaseViewer{
-		db: subDB(v.db, subKeyNoState),
-	}
+func (v *TreeView) NoState() db.Reader {
+	return subReader(v.db, subKeyNoState)
 }
 
 // Get returns the value at key in this tree.  `key` is the path of the leaf,
@@ -166,9 +138,7 @@ func (v *TreeView) SubTree(cfg TreeConfig) (treeView TreeViewer, err error) {
 	}
 
 	db := subDB(v.db, path.Join(subKeySubTree, cfg.prefix))
-	tx := db.ReadTx()
-	defer tx.Discard()
-	txTree := subReadTx(tx, subKeyTree)
+	txTree := subReader(db, subKeyTree)
 	tree, err := tree.New(&readOnlyWriteTx{txTree},
 		tree.Options{DB: subDB(db, subKeyTree), MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if errors.Is(err, ErrReadOnly) {
