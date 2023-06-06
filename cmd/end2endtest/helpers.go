@@ -401,9 +401,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 			time.Sleep(time.Second * 5)
 
 		case nextBlock:
-			ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
-			defer cancel()
-			t.api.WaitUntilNextBlock(ctx)
+			_ = t.api.WaitUntilNextBlock()
 		}
 	}
 	return contextDeadlines, nil

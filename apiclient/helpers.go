@@ -19,9 +19,9 @@ import (
 )
 
 const (
-	TimeBetweenBlocks = 8 * time.Second
-	WaitTimeout       = 3 * TimeBetweenBlocks
-	PollInterval      = TimeBetweenBlocks / 2
+	DefaultBlockInterval = 8 * time.Second
+	WaitTimeout          = 3 * DefaultBlockInterval
+	PollInterval         = DefaultBlockInterval / 2
 )
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
@@ -65,21 +65,29 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	return tx.Hash, tx.Response, nil
 }
 
-func (c *HTTPclient) WaitUntilNBlocks(ctx context.Context, n uint32) {
+// WaitUntilNextBlock waits until next block, and returns nil
+//
+// It uses a context.WithTimeout(24s) before giving up and returning ctx.Err()
+func (c *HTTPclient) WaitUntilNextBlock() error {
+	var cancel context.CancelFunc
+	ctx, cancel := context.WithTimeout(context.Background(), WaitTimeout)
+	defer cancel()
+	return c.WaitUntilNBlocks(ctx, 1)
+}
+
+// WaitUntilNBlocks waits until N blocks are produced, and returns nil.
+//
+// If ctx.Done() is reached, returns ctx.Err() instead.
+func (c *HTTPclient) WaitUntilNBlocks(ctx context.Context, n uint32) error {
 	for {
 		info, err := c.ChainInfo()
 		if err != nil {
-			log.Error(err)
+			log.Errorw(err, "ChainInfo failed, will retry")
 			time.Sleep(PollInterval)
 			continue
 		}
-		c.WaitUntilHeight(ctx, info.Height+n)
-		return
+		return c.WaitUntilHeight(ctx, info.Height+n)
 	}
-}
-
-func (c *HTTPclient) WaitUntilNextBlock(ctx context.Context) {
-	c.WaitUntilNBlocks(ctx, 1)
 }
 
 // WaitUntilHeight waits until the given height is reached and returns nil.
@@ -89,7 +97,8 @@ func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 	for {
 		info, err := c.ChainInfo()
 		if err != nil {
-			log.Warn(err)
+			log.Errorw(err, "ChainInfo failed, will retry")
+			time.Sleep(PollInterval)
 			continue
 		}
 		if info.Height >= height {
