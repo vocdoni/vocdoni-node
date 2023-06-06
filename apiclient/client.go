@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +30,10 @@ const (
 	HTTPDELETE = "DELETE"
 
 	errCodeNot200 = "API error"
+
+	// This enables Request() to handle the situation where the server replies
+	// "mempool is full", it will wait for next block and retry sending the tx
+	DefaultRetries = 3
 )
 
 // HTTPclient is the Vocdoni API HTTP client.
@@ -40,6 +45,7 @@ type HTTPclient struct {
 	chainID string
 	circuit circuit.ZkCircuitConfig
 	zkAddr  *zk.ZkAddress
+	retries int
 }
 
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
@@ -51,9 +57,10 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		ReadBufferSize:     1 * 1024 * 1024, // 1 MiB
 	}
 	c := &HTTPclient{
-		c:     &http.Client{Transport: tr, Timeout: time.Second * 8},
-		token: bearerToken,
-		addr:  addr,
+		c:       &http.Client{Transport: tr, Timeout: time.Second * 8},
+		token:   bearerToken,
+		addr:    addr,
+		retries: DefaultRetries,
 	}
 	data, status, err := c.Request(HTTPGET, nil, "chain", "info")
 	if err != nil {
@@ -141,6 +148,10 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	return nil
 }
 
+func (c *HTTPclient) SetRetries(n int) {
+	c.retries = n
+}
+
 // Request performs a `method` type raw request to the endpoint specified in urlPath parameter.
 // Method is either GET or POST. If POST, a JSON struct should be attached.  Returns the response,
 // the status code and an error.
@@ -164,17 +175,26 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 	}
 
 	log.Debugw("http request", "type", method, "path", u.Path, "body", jsonBody)
-	resp, err := c.c.Do(&http.Request{
-		Method: method,
-		URL:    u,
-		Header: headers,
-		Body: func() io.ReadCloser {
-			if jsonBody == nil {
-				return nil
-			}
-			return io.NopCloser(bytes.NewBuffer(body))
-		}(),
-	})
+	var resp *http.Response
+	for i := 1; i <= c.retries; i++ {
+		resp, err = c.c.Do(&http.Request{
+			Method: method,
+			URL:    u,
+			Header: headers,
+			Body: func() io.ReadCloser {
+				if jsonBody == nil {
+					return nil
+				}
+				return io.NopCloser(bytes.NewBuffer(body))
+			}(),
+		})
+		if resp != nil && resp.StatusCode == apirest.HTTPstatusServiceUnavailable { // mempool is full
+			log.Warnf("mempool is full, will wait and retry (%d/%d)", i, c.retries)
+			c.WaitUntilNextBlock(context.TODO())
+			continue
+		}
+		break
+	}
 	if err != nil {
 		return nil, 0, err
 	}
