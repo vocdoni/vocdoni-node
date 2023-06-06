@@ -58,9 +58,12 @@ func (idx *Indexer) AddEventListener(l EventListener) {
 type Indexer struct {
 	App *vochain.BaseApplication
 
-	// votePool is the list of votes that should be live counted, grouped by processId
-	// TODO: try using blockTx directly, after some more refactors
-	votePool map[string][]*state.Vote
+	// votePool is the set of votes that should be live counted,
+	// first grouped by processId, then keyed by nullifier.
+	// Only keeping one vote per nullifier is important for "overwrite" votes,
+	// so that we only count the last one in the live results.
+	// TODO: try using blockTx directly, after some more refactors?
+	votePool map[string]map[string]*state.Vote
 
 	// lockPool is the lock for all *Pool and blockTx operations
 	// TODO: rename to blockMu
@@ -327,7 +330,7 @@ func (idx *Indexer) Commit(height uint32) error {
 	overwritedVotes := 0
 	startTime := time.Now()
 
-	for pidStr, votes := range idx.votePool {
+	for pidStr, votesByNullifier := range idx.votePool {
 		pid := []byte(pidStr)
 		// Get the process information
 		proc, err := idx.ProcessInfo(pid)
@@ -349,33 +352,31 @@ func (idx *Indexer) Commit(height uint32) error {
 			EnvelopeType: proc.Envelope,
 		}
 		// substractedResults is used to substract votes that are overwritten
-		substratedResults := &results.Results{
+		substractedResults := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
 		}
-		for _, v := range votes {
+		// The order here isn't deterministic, but we assume that to be OK.
+		for _, v := range votesByNullifier {
+			// If overwrite is 1 or more, we need to update the vote (remove the previous
+			// one and add the new) to results.
+			// We fetch the previous vote from the state by setting committed=true.
+			// Note that if there wasn't a previous vote in the committed state,
+			// then it wasn't counted in the results yet, so don't add it to substractedResults.
+			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
-				// if overwrite is 1 or more, we need to update the vote (remove the previous
-				// one and add the new) to results.
-				// We fetch the previous vote from the state by setting committed=false
-				previousVote, err := idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
-				if err != nil {
-					log.Errorw(err, "previous vote cannot be fetch")
-					continue
-				}
-				previousOverwrites := uint32(0)
-				if previousVote.OverwriteCount != nil {
-					previousOverwrites = *previousVote.OverwriteCount
-				}
+				previousVote, _ = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
+			}
+			if previousVote != nil {
 				log.Debugw("vote overwrite, previous vote",
 					"overwrites", v.Overwrites,
 					"package", string(previousVote.VotePackage))
 				// ensure that overwriteCounter has increased
-				if v.Overwrites <= previousOverwrites {
+				if v.Overwrites <= previousVote.GetOverwriteCount() {
 					log.Errorw(fmt.Errorf(
 						"state stored overwrite count is equal or smaller than current vote overwrite count (%d <= %d)",
-						v.Overwrites, previousOverwrites),
+						v.Overwrites, previousVote.GetOverwriteCount()),
 						"check vote overwrite failed")
 					continue
 				}
@@ -383,7 +384,7 @@ func (idx *Indexer) Commit(height uint32) error {
 				if err := idx.addLiveVote(process,
 					previousVote.VotePackage,
 					new(big.Int).SetBytes(previousVote.Weight),
-					substratedResults); err != nil {
+					substractedResults); err != nil {
 					log.Errorw(err, "vote cannot be added to substracted results")
 					continue
 				}
@@ -401,7 +402,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes(pid, addedResults, substratedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(pid, addedResults, substractedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
@@ -418,7 +419,7 @@ func (idx *Indexer) Commit(height uint32) error {
 func (idx *Indexer) Rollback() {
 	idx.lockPool.Lock()
 	defer idx.lockPool.Unlock()
-	idx.votePool = make(map[string][]*state.Vote)
+	idx.votePool = make(map[string]map[string]*state.Vote)
 	if idx.blockTx != nil {
 		if err := idx.blockTx.Rollback(); err != nil {
 			log.Errorw(err, "could not rollback tx")
@@ -445,7 +446,18 @@ func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txI
 // but can be any kind of id expressed as bytes.
 func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(vote.ProcessID) {
-		idx.votePool[string(vote.ProcessID)] = append(idx.votePool[string(vote.ProcessID)], vote)
+		// Since []byte in Go isn't comparable, but we can convert any bytes to string.
+		pid := string(vote.ProcessID)
+		nullifier := string(vote.Nullifier)
+		if idx.votePool[pid] == nil {
+			idx.votePool[pid] = make(map[string]*state.Vote)
+		}
+		prevVote := idx.votePool[pid][nullifier]
+		if prevVote != nil && vote.Overwrites < prevVote.Overwrites {
+			log.Warnw("OnVote called with a lower overwrite value than before",
+				"previous", prevVote.Overwrites, "latest", vote.Overwrites)
+		}
+		idx.votePool[pid][nullifier] = vote
 	}
 
 	idx.lockPool.Lock()
