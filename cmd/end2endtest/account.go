@@ -215,9 +215,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	// after a tx is mined in a block, the indexer takes some time to update the balances
 	// (i.e. seconds, if there are votes to be indexed)
 	// give it one more block time
-	ctx, cancel = context.WithTimeout(context.Background(), apiclient.WaitTimeout)
-	defer cancel()
-	api.WaitUntilNextBlock(ctx)
+	_ = api.WaitUntilNextBlock()
 
 	// now check the resulting state
 	err = checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
@@ -271,9 +269,7 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		api.WaitUntilNextBlock(ctx)
+		_ = api.WaitUntilNextBlock()
 	}
 	return nil, fmt.Errorf("cannot create account %s after %d retries", api.MyAddress(), retries)
 }
@@ -301,9 +297,7 @@ func ensureAccountMetadataEquals(api *apiclient.HTTPclient,
 			}
 		}
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-		defer cancel()
-		api.WaitUntilNextBlock(ctx)
+		_ = api.WaitUntilNextBlock()
 	}
 	return nil, fmt.Errorf("cannot set account %s metadata after %d retries", api.MyAddress(), retries)
 }

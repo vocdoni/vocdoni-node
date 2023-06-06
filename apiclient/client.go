@@ -2,7 +2,6 @@ package apiclient
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -190,7 +189,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		})
 		if resp != nil && resp.StatusCode == apirest.HTTPstatusServiceUnavailable { // mempool is full
 			log.Warnf("mempool is full, will wait and retry (%d/%d)", i, c.retries)
-			c.WaitUntilNextBlock(context.TODO())
+			_ = c.WaitUntilNextBlock()
 			continue
 		}
 		break
