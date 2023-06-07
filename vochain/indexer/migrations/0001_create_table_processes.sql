@@ -10,7 +10,7 @@ CREATE TABLE processes (
   final_results           BOOLEAN NOT NULL,
   results_votes           TEXT NOT NULL,
   results_weight          TEXT NOT NULL, -- TODO: store as math/big.Int.Bytes?
-  results_envelope_height INTEGER NOT NULL,
+  results_envelope_height INTEGER NOT NULL, -- TODO: unused; remove
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,

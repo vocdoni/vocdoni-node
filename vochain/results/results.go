@@ -21,7 +21,7 @@ type Results struct {
 	ProcessID      types.HexBytes             `json:"processId"`
 	Votes          [][]*types.BigInt          `json:"votes"`
 	Weight         *types.BigInt              `json:"weight"`
-	EnvelopeHeight uint64                     `json:"envelopeHeight"`
+	EnvelopeHeight uint64                     `json:"envelopeHeight"` // TODO(mvdan): remove; unused once rpcapi is removed
 	EnvelopeType   *models.EnvelopeType       `json:"envelopeType"`
 	VoteOpts       *models.ProcessVoteOptions `json:"voteOptions"`
 	Signatures     []types.HexBytes           `json:"signatures"`

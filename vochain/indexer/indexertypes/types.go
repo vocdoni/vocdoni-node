@@ -121,12 +121,11 @@ func decodeVotes(input string) [][]*types.BigInt {
 
 func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
 	results := &results.Results{
-		ProcessID:      dbproc.ID,
-		Votes:          decodeVotes(dbproc.ResultsVotes),
-		Weight:         decodeBigint(dbproc.ResultsWeight),
-		EnvelopeHeight: uint64(dbproc.ResultsEnvelopeHeight),
-		Final:          dbproc.FinalResults,
-		BlockHeight:    uint32(dbproc.ResultsBlockHeight),
+		ProcessID:   dbproc.ID,
+		Votes:       decodeVotes(dbproc.ResultsVotes),
+		Weight:      decodeBigint(dbproc.ResultsWeight),
+		Final:       dbproc.FinalResults,
+		BlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
 	results.EnvelopeType = new(models.EnvelopeType)
 	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {

@@ -107,7 +107,7 @@ func (r *RPCAPI) getEnvelopeHeight(request *api.APIrequest) (*api.APIresponse, e
 	if len(request.ProcessID) != types.ProcessIDsize && len(request.ProcessID) != 0 {
 		return nil, fmt.Errorf("cannot get envelope height: (malformed processId)")
 	}
-	votes, err := r.indexer.GetEnvelopeHeight(request.ProcessID)
+	votes, err := r.indexer.CountVotes(request.ProcessID)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get envelope height: %w", err)
 	}
@@ -180,7 +180,7 @@ func (r *RPCAPI) getProcessSummary(request *api.APIrequest) (*api.APIresponse, e
 	}
 
 	// Get total number of votes (including invalid/null)
-	eh, err := r.indexer.GetEnvelopeHeight(request.ProcessID)
+	eh, err := r.indexer.CountVotes(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
 		return &response, nil
@@ -347,7 +347,7 @@ func (r *RPCAPI) getResults(request *api.APIrequest) (*api.APIresponse, error) {
 	h := uint32(vr.EnvelopeHeight)
 	response.Height = &h
 	// Get total number of votes (including invalid/null)
-	eh, err := r.indexer.GetEnvelopeHeight(request.ProcessID)
+	eh, err := r.indexer.CountVotes(request.ProcessID)
 	if err != nil {
 		response.Message = fmt.Sprintf("cannot get envelope height: %v", err)
 		return &response, nil

@@ -24,7 +24,7 @@ func (r *RPCAPI) getStats(request *api.APIrequest) (*api.APIresponse, error) {
 	}
 	stats.BlockTimeStamp = int32(block.Header.Time.Unix())
 	stats.EntityCount = int64(r.indexer.EntityCount())
-	if stats.EnvelopeCount, err = r.indexer.GetEnvelopeHeight([]byte{}); err != nil {
+	if stats.EnvelopeCount, err = r.indexer.CountVotes([]byte{}); err != nil {
 		return nil, fmt.Errorf("could not count vote envelopes: %w", err)
 	}
 	stats.ProcessCount = int64(r.indexer.ProcessCount([]byte{}))
