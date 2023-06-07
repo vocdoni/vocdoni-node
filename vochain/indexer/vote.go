@@ -116,20 +116,14 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 
 }
 
-// GetEnvelopeHeight returns the number of envelopes for a processId.
+// CountVotes returns the number of envelopes for a processId.
 // If processId is empty, returns the total number of envelopes.
-func (idx *Indexer) GetEnvelopeHeight(processID []byte) (uint64, error) {
+func (idx *Indexer) CountVotes(processID []byte) (uint64, error) {
 	if len(processID) == 0 {
-		height, err := idx.oneQuery.GetTotalProcessEnvelopeHeight(context.TODO())
-		if err != nil {
-			return 0, err
-		}
-		if height == nil {
-			return 0, nil
-		}
-		return uint64(height.(int64)), nil
+		height, err := idx.oneQuery.CountVotes(context.TODO())
+		return uint64(height), err
 	}
-	height, err := idx.oneQuery.GetProcessEnvelopeHeight(context.TODO(), processID)
+	height, err := idx.oneQuery.CountVotesByProcessID(context.TODO(), processID)
 	return uint64(height), err
 }
 
@@ -143,11 +137,10 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	// Get the results
 	r := results.ProtoToResults(process.Results)
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
-		ID:             processID,
-		Votes:          encodeVotes(r.Votes),
-		Weight:         encodeBigint(r.Weight),
-		EnvelopeHeight: int64(r.EnvelopeHeight),
-		BlockHeight:    int64(r.BlockHeight),
+		ID:          processID,
+		Votes:       encodeVotes(r.Votes),
+		Weight:      encodeBigint(r.Weight),
+		BlockHeight: int64(r.BlockHeight),
 	}); err != nil {
 		return err
 	}
@@ -162,12 +155,12 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
+	// TODO: the api package only uses results.Votes; can we simplify this?
 	sqlProcInner, err := idx.oneQuery.GetProcess(context.TODO(), processID)
 	if err != nil {
 		return nil, err
 	}
 	sqlResults := indexertypes.ResultsFromDB(&sqlProcInner)
-
 	return sqlResults, nil
 }
 
@@ -317,11 +310,10 @@ func (idx *Indexer) commitVotesUnsafe(pid []byte, partialResults, partialSubResu
 	}
 
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
-		ID:             pid,
-		Votes:          encodeVotes(results.Votes),
-		Weight:         encodeBigint(results.Weight),
-		EnvelopeHeight: int64(results.EnvelopeHeight),
-		BlockHeight:    int64(results.BlockHeight),
+		ID:          pid,
+		Votes:       encodeVotes(results.Votes),
+		Weight:      encodeBigint(results.Weight),
+		BlockHeight: int64(results.BlockHeight),
 	}); err != nil {
 		return err
 	}

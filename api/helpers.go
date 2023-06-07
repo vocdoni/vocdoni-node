@@ -26,7 +26,7 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 		if err != nil {
 			return nil, ErrCantFetchElection.WithErr(err)
 		}
-		count, err := a.indexer.GetEnvelopeHeight(pid)
+		count, err := a.indexer.CountVotes(pid)
 		if err != nil {
 			return nil, ErrCantFetchEnvelopeHeight.WithErr(err)
 		}

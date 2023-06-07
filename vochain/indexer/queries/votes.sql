@@ -15,6 +15,13 @@ LEFT JOIN transactions
 WHERE nullifier = ?
 LIMIT 1;
 
+-- name: CountVotes :one
+SELECT COUNT(*) FROM votes;
+
+-- name: CountVotesByProcessID :one
+SELECT COUNT(*) FROM votes
+WHERE process_id = ?;
+
 -- name: SearchVotes :many
 SELECT votes.*, transactions.hash FROM votes
 LEFT JOIN transactions

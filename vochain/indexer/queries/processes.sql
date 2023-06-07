@@ -71,19 +71,10 @@ SELECT status FROM processes
 WHERE id = ?
 LIMIT 1;
 
--- name: GetProcessEnvelopeHeight :one
-SELECT results_envelope_height FROM processes
-WHERE id = ?
-LIMIT 1;
-
--- name: GetTotalProcessEnvelopeHeight :one
-SELECT SUM(results_envelope_height) FROM processes;
-
 -- name: UpdateProcessResults :execresult
 UPDATE processes
 SET results_votes = sqlc.arg(votes),
 	results_weight = sqlc.arg(weight),
-	results_envelope_height = sqlc.arg(envelope_height),
 	results_block_height = sqlc.arg(block_height)
 WHERE id = sqlc.arg(id) AND final_results = FALSE;
 
@@ -92,7 +83,6 @@ UPDATE processes
 SET have_results = TRUE, final_results = TRUE,
 	results_votes = sqlc.arg(votes),
 	results_weight = sqlc.arg(weight),
-	results_envelope_height = sqlc.arg(envelope_height),
 	results_block_height = sqlc.arg(block_height)
 WHERE id = sqlc.arg(id);
 

@@ -178,19 +178,6 @@ func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const getProcessEnvelopeHeight = `-- name: GetProcessEnvelopeHeight :one
-SELECT results_envelope_height FROM processes
-WHERE id = ?
-LIMIT 1
-`
-
-func (q *Queries) GetProcessEnvelopeHeight(ctx context.Context, id types.ProcessID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getProcessEnvelopeHeight, id)
-	var results_envelope_height int64
-	err := row.Scan(&results_envelope_height)
-	return results_envelope_height, err
-}
-
 const getProcessIDsByFinalResults = `-- name: GetProcessIDsByFinalResults :many
 SELECT id FROM processes
 WHERE final_results = ?
@@ -230,17 +217,6 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 	var status int64
 	err := row.Scan(&status)
 	return status, err
-}
-
-const getTotalProcessEnvelopeHeight = `-- name: GetTotalProcessEnvelopeHeight :one
-SELECT SUM(results_envelope_height) FROM processes
-`
-
-func (q *Queries) GetTotalProcessEnvelopeHeight(ctx context.Context) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getTotalProcessEnvelopeHeight)
-	var sum interface{}
-	err := row.Scan(&sum)
-	return sum, err
 }
 
 const searchEntities = `-- name: SearchEntities :many
@@ -370,24 +346,21 @@ UPDATE processes
 SET have_results = TRUE, final_results = TRUE,
 	results_votes = ?,
 	results_weight = ?,
-	results_envelope_height = ?,
 	results_block_height = ?
 WHERE id = ?
 `
 
 type SetProcessResultsReadyParams struct {
-	Votes          string
-	Weight         string
-	EnvelopeHeight int64
-	BlockHeight    int64
-	ID             types.ProcessID
+	Votes       string
+	Weight      string
+	BlockHeight int64
+	ID          types.ProcessID
 }
 
 func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResultsReadyParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, setProcessResultsReady,
 		arg.Votes,
 		arg.Weight,
-		arg.EnvelopeHeight,
 		arg.BlockHeight,
 		arg.ID,
 	)
@@ -466,24 +439,21 @@ const updateProcessResults = `-- name: UpdateProcessResults :execresult
 UPDATE processes
 SET results_votes = ?,
 	results_weight = ?,
-	results_envelope_height = ?,
 	results_block_height = ?
 WHERE id = ? AND final_results = FALSE
 `
 
 type UpdateProcessResultsParams struct {
-	Votes          string
-	Weight         string
-	EnvelopeHeight int64
-	BlockHeight    int64
-	ID             types.ProcessID
+	Votes       string
+	Weight      string
+	BlockHeight int64
+	ID          types.ProcessID
 }
 
 func (q *Queries) UpdateProcessResults(ctx context.Context, arg UpdateProcessResultsParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateProcessResults,
 		arg.Votes,
 		arg.Weight,
-		arg.EnvelopeHeight,
 		arg.BlockHeight,
 		arg.ID,
 	)

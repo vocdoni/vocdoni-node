@@ -1025,15 +1025,30 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	// Start the indexer again
 	idx, err = newTestIndexerNoCleanup(dataDir, app, true)
 	qt.Assert(t, err, qt.IsNil)
+
+	// The results should not be up to date.
 	results, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(0))
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"0", "0"},
+		{"0", "0"},
+		{"0", "0"},
+		{"0", "0"},
+		{"0", "0"},
+	})
 
-	// Run the AfterSyncBootstrap, which should update the results
+	// Run the AfterSyncBootstrap, which should update the results.
 	idx.AfterSyncBootstrap()
+
 	results, err = idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, results.EnvelopeHeight, qt.Equals, uint64(10))
+	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+		{"0", "10"},
+		{"0", "10"},
+		{"0", "10"},
+		{"0", "0"},
+		{"0", "0"},
+	})
 }
 
 func TestCountVotes(t *testing.T) {
@@ -1077,12 +1092,12 @@ func TestCountVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID
-	height, err := idx.GetEnvelopeHeight(pid)
+	height, err := idx.CountVotes(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 
 	// Test global envelope height (number of votes)
-	height, err = idx.GetEnvelopeHeight([]byte{})
+	height, err = idx.CountVotes([]byte{})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 
@@ -1186,7 +1201,7 @@ func TestOverwriteVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// check envelope height for this PID
-	height, err := idx.GetEnvelopeHeight(pid)
+	height, err := idx.CountVotes(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(1))
 
