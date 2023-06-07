@@ -117,16 +117,9 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 		return nil, err
 	}
 
-	resp, err := a.vocapp.SendTx(txData)
+	resp, err := a.sendTx(txData)
 	if err != nil {
 		return nil, err
-	}
-
-	if resp == nil {
-		return nil, ErrVochainEmptyReply
-	}
-	if resp.Code != 0 {
-		return nil, ErrVochainReturnedErrorCode.Withf("(%d) %s", resp.Code, string(resp.Data))
 	}
 
 	return &Transaction{

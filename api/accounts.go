@@ -185,15 +185,9 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 
 	// send the transaction to the blockchain
-	res, err := a.vocapp.SendTx(req.TxPayload)
+	res, err := a.sendTx(req.TxPayload)
 	if err != nil {
-		return ErrVochainSendTxFailed.WithErr(err)
-	}
-	if res == nil {
-		return ErrVochainEmptyReply
-	}
-	if res.Code != 0 {
-		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
+		return err
 	}
 
 	// prepare the reply

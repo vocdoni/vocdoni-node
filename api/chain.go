@@ -345,22 +345,16 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
-	res, err := a.vocapp.SendTx(req.Payload)
+	res, err := a.sendTx(req.Payload)
 	if err != nil {
-		return ErrVochainSendTxFailed.WithErr(err)
+		return err
 	}
-	if res == nil {
-		return ErrVochainEmptyReply
-	}
-	if res.Code != 0 {
-		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
-	}
-	var data []byte
-	if data, err = json.Marshal(Transaction{
+	data, err := json.Marshal(Transaction{
 		Response: res.Data.Bytes(),
 		Code:     &res.Code,
 		Hash:     res.Hash.Bytes(),
-	}); err != nil {
+	})
+	if err != nil {
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)

@@ -64,18 +64,13 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 
 	// send the transaction to the mempool
-	res, err := a.vocapp.SendTx(req.TxPayload)
+	res, err := a.sendTx(req.TxPayload)
 	if err != nil {
 		return err
 	}
-	if res == nil {
-		return ErrVochainEmptyReply
-	}
-	if res.Code != 0 {
-		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
-	}
-	var data []byte
-	if data, err = json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()}); err != nil {
+
+	data, err := json.Marshal(Vote{VoteID: res.Data.Bytes(), TxHash: res.Hash.Bytes()})
+	if err != nil {
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
