@@ -3,11 +3,14 @@ package api
 import (
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt" // required for evm encoding
 	"math/big"
 	"reflect"
 	"strings"
 
+	cmtpool "github.com/cometbft/cometbft/mempool"
+	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
@@ -41,6 +44,22 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 		})
 	}
 	return processes, nil
+}
+
+// sendTx wraps a.vocapp.SendTx(). If an error is returned, it's wrapped into an apirest.APIerror
+func (a *API) sendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	resp, err := a.vocapp.SendTx(tx)
+	switch {
+	case errors.As(err, &cmtpool.ErrMempoolIsFull{}):
+		return nil, ErrVochainOverloaded.WithErr(err)
+	case err != nil:
+		return nil, ErrVochainSendTxFailed.WithErr(err)
+	case resp == nil:
+		return nil, ErrVochainEmptyReply
+	case resp.Code != 0:
+		return nil, ErrVochainReturnedErrorCode.Withf("(%d) %s", resp.Code, string(resp.Data))
+	}
+	return resp, nil
 }
 
 func protoFormat(tx []byte) string {

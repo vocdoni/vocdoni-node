@@ -30,11 +30,12 @@ const (
 
 // HTTPstatus* equal http.Status*, simple sugar to avoid importing http everywhere
 const (
-	HTTPstatusOK          = http.StatusOK
-	HTTPstatusNoContent   = http.StatusNoContent
-	HTTPstatusBadRequest  = http.StatusBadRequest
-	HTTPstatusInternalErr = http.StatusInternalServerError
-	HTTPstatusNotFound    = http.StatusNotFound
+	HTTPstatusOK                 = http.StatusOK
+	HTTPstatusNoContent          = http.StatusNoContent
+	HTTPstatusBadRequest         = http.StatusBadRequest
+	HTTPstatusInternalErr        = http.StatusInternalServerError
+	HTTPstatusNotFound           = http.StatusNotFound
+	HTTPstatusServiceUnavailable = http.StatusServiceUnavailable
 )
 
 // API is a namespace handler for the httpRouter with Bearer authorization

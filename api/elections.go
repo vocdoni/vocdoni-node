@@ -481,15 +481,9 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	// send the transaction
-	res, err := a.vocapp.SendTx(req.TxPayload)
+	res, err := a.sendTx(req.TxPayload)
 	if err != nil {
-		return ErrVochainSendTxFailed.WithErr(err)
-	}
-	if res == nil {
-		return ErrVochainEmptyReply
-	}
-	if res.Code != 0 {
-		return ErrVochainReturnedErrorCode.Withf("(%d) %s", res.Code, string(res.Data))
+		return err
 	}
 
 	resp := &ElectionCreate{
