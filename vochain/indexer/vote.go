@@ -49,6 +49,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 	if err != nil {
 		return nil, err
 	}
+	// TODO: do not fetch from the state
 	vote, err := idx.App.State.Vote(voteRef.ProcessID, nullifier, true)
 	if err != nil {
 		return nil, ErrVoteNotFound
@@ -203,7 +204,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (idx *Indexer) addLiveVote(process *models.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
+func (idx *Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
 	var vote *state.VotePackage
 	if isOpenProcess(process) {

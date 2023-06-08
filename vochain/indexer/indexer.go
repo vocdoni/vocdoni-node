@@ -246,12 +246,12 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		// Since we cannot be sure if there are votes missing, we need to
 		// perform the full computation.
 		log.Debugf("recovering live process %x", p)
-		process, err := idx.App.State.Process(p, false)
+		process, err := idx.ProcessInfo(p)
 		if err != nil {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
-		options := process.VoteOptions
+		options := process.VoteOpts
 
 		indxR := &results.Results{
 			ProcessID: p,
@@ -259,7 +259,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			Votes:        results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
-			EnvelopeType: process.EnvelopeType,
+			EnvelopeType: process.Envelope,
 			Signatures:   []types.HexBytes{},
 		}
 
@@ -278,7 +278,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		results := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
-			EnvelopeType: process.EnvelopeType,
+			EnvelopeType: process.Envelope,
 		}
 		// Get the votes from the state
 		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
@@ -333,15 +333,10 @@ func (idx *Indexer) Commit(height uint32) error {
 	for pidStr, votesByNullifier := range idx.votePool {
 		pid := []byte(pidStr)
 		// Get the process information
+		// TODO: reuse blockTx
 		proc, err := idx.ProcessInfo(pid)
 		if err != nil {
 			log.Warnf("cannot get process %x", pid)
-			continue
-		}
-		// TODO: remove this state fetch
-		process, err := idx.App.State.Process(pid, false)
-		if err != nil {
-			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
 
@@ -364,6 +359,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			// We fetch the previous vote from the state by setting committed=true.
 			// Note that if there wasn't a previous vote in the committed state,
 			// then it wasn't counted in the results yet, so don't add it to substractedResults.
+			// TODO: can we get previousVote via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
 				previousVote, _ = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
@@ -381,10 +377,8 @@ func (idx *Indexer) Commit(height uint32) error {
 					continue
 				}
 				// add the live vote to substracted results
-				if err := idx.addLiveVote(process,
-					previousVote.VotePackage,
-					new(big.Int).SetBytes(previousVote.Weight),
-					substractedResults); err != nil {
+				if err := idx.addLiveVote(proc, previousVote.VotePackage,
+					new(big.Int).SetBytes(previousVote.Weight), substractedResults); err != nil {
 					log.Errorw(err, "vote cannot be added to substracted results")
 					continue
 				}
@@ -393,15 +387,13 @@ func (idx *Indexer) Commit(height uint32) error {
 				newVotes++
 			}
 			// add the new vote to results
-			if err := idx.addLiveVote(process,
-				v.VotePackage,
-				v.Weight,
-				addedResults); err != nil {
+			if err := idx.addLiveVote(proc, v.VotePackage, v.Weight, addedResults); err != nil {
 				log.Errorw(err, "vote cannot be added to results")
 				continue
 			}
 		}
 		// Commit votes (store to disk)
+		// TODO: reuse blockTx
 		if err := idx.commitVotes(pid, addedResults, substractedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
@@ -493,6 +485,7 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
+	// TODO: can we get KeyIndex from ProcessInfo? perhaps len(PublicKeys), or adding a new sqlite column?
 	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot fetch process %s from state: (%s)", pid, err)

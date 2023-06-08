@@ -194,8 +194,8 @@ func (idx *Indexer) EntityCount() uint64 {
 }
 
 // Return whether a process must have live results or not
-func isOpenProcess(process *models.Process) bool {
-	return !process.EnvelopeType.EncryptedVotes
+func isOpenProcess(process *indexertypes.Process) bool {
+	return !process.Envelope.EncryptedVotes
 }
 
 // newEmptyProcess creates a new empty process and stores it into the database.
@@ -223,7 +223,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
 
 	compResultsHeight := uint32(0)
-	if isOpenProcess(p) {
+	if !p.EnvelopeType.EncryptedVotes { // like isOpenProcess, but on the state type
 		compResultsHeight = p.BlockCount + p.StartBlock + 1
 	}
 
