@@ -288,7 +288,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			return false
 		})
 		// Store the results on the persistent database
-		if err := idx.commitVotesUnsafe(p, results, nil, idx.App.Height()); err != nil {
+		if err := idx.commitVotesUnsafe(queries, p, results, nil, idx.App.Height()); err != nil {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
@@ -320,11 +320,6 @@ func (idx *Indexer) Commit(height uint32) error {
 	}
 	maps.Clear(idx.blockUpdateProcs)
 
-	if err := idx.blockTx.Commit(); err != nil {
-		log.Errorw(err, "could not commit tx")
-	}
-	idx.blockTx = nil
-
 	// Add votes collected by onVote (live results)
 	newVotes := 0
 	overwritedVotes := 0
@@ -332,13 +327,13 @@ func (idx *Indexer) Commit(height uint32) error {
 
 	for pidStr, votesByNullifier := range idx.votePool {
 		pid := []byte(pidStr)
-		// Get the process information
-		// TODO: reuse blockTx
-		proc, err := idx.ProcessInfo(pid)
+		// Get the process information while reusing blockTx
+		procInner, err := queries.GetProcess(ctx, pid)
 		if err != nil {
 			log.Warnf("cannot get process %x", pid)
 			continue
 		}
+		proc := indexertypes.ProcessFromDB(&procInner)
 
 		// results is used to accumulate the new votes for a process
 		addedResults := &results.Results{
@@ -393,11 +388,16 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		// TODO: reuse blockTx
-		if err := idx.commitVotes(pid, addedResults, substractedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(queries, pid, addedResults, substractedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
+
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
+
 	if newVotes+overwritedVotes > 0 {
 		log.Infow("add live votes to results",
 			"block", height, "newVotes", newVotes, "overwritedVotes",
