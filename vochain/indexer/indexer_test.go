@@ -18,7 +18,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -707,7 +706,7 @@ func TestLiveResults(t *testing.T) {
 			r),
 			qt.IsNil)
 	}
-	qt.Assert(t, idx.commitVotes(indexerdb.New(idx.sqlDB), pid, r, nil, 1), qt.IsNil)
+	qt.Assert(t, idx.commitVotes(idx.readWriteQueries, pid, r, nil, 1), qt.IsNil)
 
 	if !isOpenProcess(process) {
 		t.Fatal("isOpenProcess returned false")
@@ -838,7 +837,7 @@ var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
 	if err := idx.addLiveVote(proc, vp, weight, r); err != nil {
 		return err
 	}
-	return idx.commitVotes(indexerdb.New(idx.sqlDB), pid, r, nil, 1)
+	return idx.commitVotes(idx.readWriteQueries, pid, r, nil, 1)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {

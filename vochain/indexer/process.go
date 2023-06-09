@@ -77,7 +77,7 @@ func encodeBigint(n *types.BigInt) string {
 
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
-	procInner, err := idx.oneQuery.GetProcess(context.TODO(), pid)
+	procInner, err := idx.readOnlyQuery.GetProcess(context.TODO(), pid)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrProcessNotFound
@@ -116,7 +116,7 @@ func (idx *Indexer) ProcessList(entityID []byte,
 		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
 	}
 
-	procs, err := idx.oneQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
+	procs, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
 		EntityID:        entityID,
 		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
 		Namespace:       int64(namespace),
@@ -137,7 +137,7 @@ func (idx *Indexer) ProcessList(entityID []byte,
 // If entityID is zero-value, returns the total number of processes of all entities.
 func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
 	if len(entityID) == 0 {
-		count, err := idx.oneQuery.GetProcessCount(context.TODO())
+		count, err := idx.readOnlyQuery.GetProcessCount(context.TODO())
 		if err != nil {
 			log.Errorf("could not get the process count: %v", err)
 			return 0
@@ -158,7 +158,7 @@ func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
 func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
 	// TODO: EntityList callers in the api package want the process count as well;
 	// work it out here so that the api package doesn't cause N sql queries.
-	entityIDs, err := idx.oneQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
+	entityIDs, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: searchTerm,
 		Offset:         int32(from),
 		Limit:          int32(max),
@@ -176,7 +176,7 @@ func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexByte
 
 // EntityProcessCount returns the number of processes that an entity holds
 func (idx *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
-	count, err := idx.oneQuery.GetEntityProcessCount(context.TODO(), entityId)
+	count, err := idx.readOnlyQuery.GetEntityProcessCount(context.TODO(), entityId)
 	if err != nil {
 		return 0, err
 	}
@@ -185,7 +185,7 @@ func (idx *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
 
 // EntityCount return the number of entities indexed by the indexer
 func (idx *Indexer) EntityCount() uint64 {
-	count, err := idx.oneQuery.GetEntityCount(context.TODO())
+	count, err := idx.readOnlyQuery.GetEntityCount(context.TODO())
 	if err != nil {
 		log.Errorf("could not get the entity count: %v", err)
 		return 0
