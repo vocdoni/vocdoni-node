@@ -20,13 +20,13 @@ var (
 
 // TransactionCount returns the number of transactions indexed
 func (idx *Indexer) TransactionCount() (uint64, error) {
-	count, err := idx.oneQuery.CountTransactions(context.TODO())
+	count, err := idx.readOnlyQuery.CountTransactions(context.TODO())
 	return uint64(count), err
 }
 
 // GetTransaction fetches the txReference for the given tx height
 func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error) {
-	sqlTxRef, err := idx.oneQuery.GetTransaction(context.TODO(), int64(id))
+	sqlTxRef, err := idx.readOnlyQuery.GetTransaction(context.TODO(), int64(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
@@ -38,7 +38,7 @@ func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error)
 
 // GetTxReferenceByBlockHeightAndBlockIndex fetches the txReference for the given tx height and block tx index
 func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
-	sqlTxRef, err := idx.oneQuery.GetTxReferenceByBlockHeightAndBlockIndex(context.TODO(), indexerdb.GetTxReferenceByBlockHeightAndBlockIndexParams{
+	sqlTxRef, err := idx.readOnlyQuery.GetTxReferenceByBlockHeightAndBlockIndex(context.TODO(), indexerdb.GetTxReferenceByBlockHeightAndBlockIndexParams{
 		BlockHeight: blockHeight,
 		BlockIndex:  blockIndex,
 	})
@@ -53,7 +53,7 @@ func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockI
 
 // GetTxHashReference fetches the txReference for the given tx hash
 func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Transaction, error) {
-	sqlTxRef, err := idx.oneQuery.GetTransactionByHash(context.TODO(), hash)
+	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHash(context.TODO(), hash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
@@ -66,7 +66,7 @@ func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Trans
 // GetLastTransactions fetches a number of the latest indexed transactions.
 // The first one returned is the newest, so they are in descending order.
 func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Transaction, error) {
-	sqlTxRefs, err := idx.oneQuery.GetLastTransactions(context.TODO(), indexerdb.GetLastTransactionsParams{
+	sqlTxRefs, err := idx.readOnlyQuery.GetLastTransactions(context.TODO(), indexerdb.GetLastTransactionsParams{
 		Limit:  limit,
 		Offset: offset,
 	})

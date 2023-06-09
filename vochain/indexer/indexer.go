@@ -69,7 +69,13 @@ type Indexer struct {
 	// TODO: rename to blockMu
 	lockPool sync.Mutex
 
-	oneQuery *indexerdb.Queries
+	readOnlyDB  *sql.DB
+	readWriteDB *sql.DB
+
+	readOnlyQuery *indexerdb.Queries
+
+	// TODO: consider folding into blockTx
+	readWriteQueries *indexerdb.Queries
 
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
@@ -86,7 +92,7 @@ type Indexer struct {
 
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
-	sqlDB          *sql.DB
+
 	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
 	// being executed.
 	recoveryBootLock sync.RWMutex
@@ -99,8 +105,8 @@ type Indexer struct {
 }
 
 // NewIndexer returns an instance of the Indexer
-// using the local storage database of dbPath and integrated into the state vochain instance
-func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
+// using the local storage database in dataDir and integrated into the state vochain instance
+func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
 	idx := &Indexer{
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
@@ -117,7 +123,7 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 
 	log.Infow("indexer initialization",
 		"took", time.Since(startTime),
-		"dataDir", dbPath,
+		"dataDir", dataDir,
 		"liveResults", countLiveResults,
 		"transactions", countMap[indexertypes.CountStoreTransactions],
 		"envelopes", countMap[indexertypes.CountStoreEnvelopes],
@@ -125,32 +131,45 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 		"entities", countMap[indexertypes.CountStoreEntities],
 	)
 
-	sqlPath := dbPath + "-sqlite"
-	// s.sqlDB, err = sql.Open("sqlite", sqlPath) // modernc
-	idx.sqlDB, err = sql.Open("sqlite3", sqlPath) // mattn
+	// sqlite doesn't support multiple concurrent writers.
+	// For that reason, readWriteDB is limited to one open connection.
+	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
+	// we use WAL to allow multiple concurrent readers at the same time.
+	dbPath := dataDir + "-sqlite" // TODO: filepath.Join(dataDir, "db.sqlite")
+	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", dbPath))
 	if err != nil {
 		return nil, err
 	}
-	// sqlite doesn't support multiple concurrent writers.
-	// Since we execute queries from many goroutines, allowing multiple open
-	// connections may lead to concurrent writes, resulting in confusing
-	// "database is locked" errors. See TestIndexerConcurrentDB.
-	// While here, also set other reasonable maximum values.
-	idx.sqlDB.SetMaxOpenConns(1)
-	idx.sqlDB.SetMaxIdleConns(2)
-	idx.sqlDB.SetConnMaxIdleTime(5 * time.Minute)
-	idx.sqlDB.SetConnMaxLifetime(time.Hour)
+
+	// Increasing these numbers can allow for more queries to run concurrently,
+	// but it also increases the memory used by sqlite and our connection pool.
+	// Most read-only queries we run are quick enough, so a small number seems OK.
+	idx.readOnlyDB.SetMaxOpenConns(10)
+	idx.readOnlyDB.SetMaxIdleConns(20)
+	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
+	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
+
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
+	if err != nil {
+		return nil, err
+	}
+
+	idx.readWriteDB.SetMaxOpenConns(1)
+	idx.readWriteDB.SetMaxIdleConns(2)
+	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
+	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
 	}
 	// goose.SetLogger(log.Logger()) // TODO: interfaces aren't compatible
 	goose.SetBaseFS(embedMigrations)
-	if err := goose.Up(idx.sqlDB, "migrations"); err != nil {
+	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return nil, fmt.Errorf("goose up: %w", err)
 	}
 
-	idx.oneQuery = indexerdb.New(idx.sqlDB)
+	idx.readOnlyQuery = indexerdb.New(idx.readOnlyDB)
+	idx.readWriteQueries = indexerdb.New(idx.readWriteDB)
 
 	// Subscribe to events
 	idx.App.State.AddEventListener(idx)
@@ -159,7 +178,10 @@ func NewIndexer(dbPath string, app *vochain.BaseApplication, countLiveResults bo
 }
 
 func (idx *Indexer) Close() error {
-	if err := idx.sqlDB.Close(); err != nil {
+	if err := idx.readOnlyDB.Close(); err != nil {
+		return err
+	}
+	if err := idx.readWriteDB.Close(); err != nil {
 		return err
 	}
 	return nil
@@ -171,7 +193,7 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 		panic("Indexer.blockTxQueries was called without locking Indexer.lockPool")
 	}
 	if idx.blockTx == nil {
-		tx, err := idx.sqlDB.Begin()
+		tx, err := idx.readWriteDB.Begin()
 		if err != nil {
 			panic(err) // shouldn't happen, use an error return if it ever does
 		}
@@ -230,7 +252,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
 
-	queries := idx.oneQuery // TODO: use a tx
+	queries := idx.readWriteQueries // TODO: use a tx
 
 	prcIDs, err := queries.GetProcessIDsByFinalResults(context.TODO(), false)
 	if err != nil {
@@ -540,7 +562,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
 // from the database, ordered by timestamp and paginated by maxItems and offset
 func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.oneQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
+	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
 		FromAccount: from,
 		Limit:       maxItems,
 		Offset:      offset,

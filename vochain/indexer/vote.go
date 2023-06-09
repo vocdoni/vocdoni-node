@@ -30,7 +30,7 @@ var ErrVoteNotFound = fmt.Errorf("vote not found")
 // GetEnvelopeReference gets the reference for an AddVote transaction.
 // This reference can then be used to fetch the vote transaction directly from the BlockStore.
 func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote, error) {
-	sqlTxRefInner, err := idx.oneQuery.GetVote(context.TODO(), nullifier)
+	sqlTxRefInner, err := idx.readOnlyQuery.GetVote(context.TODO(), nullifier)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrVoteNotFound
@@ -88,7 +88,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
-	txRefs, err := idx.oneQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
+	txRefs, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
 		ProcessID:       processId,
 		NullifierSubstr: searchTerm,
 		Limit:           int32(max),
@@ -121,10 +121,10 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 // If processId is empty, returns the total number of envelopes.
 func (idx *Indexer) CountVotes(processID []byte) (uint64, error) {
 	if len(processID) == 0 {
-		height, err := idx.oneQuery.CountVotes(context.TODO())
+		height, err := idx.readOnlyQuery.CountVotes(context.TODO())
 		return uint64(height), err
 	}
-	height, err := idx.oneQuery.CountVotesByProcessID(context.TODO(), processID)
+	height, err := idx.readOnlyQuery.CountVotesByProcessID(context.TODO(), processID)
 	return uint64(height), err
 }
 
@@ -157,7 +157,7 @@ func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
 	// TODO: the api package only uses results.Votes; can we simplify this?
-	sqlProcInner, err := idx.oneQuery.GetProcess(context.TODO(), processID)
+	sqlProcInner, err := idx.readOnlyQuery.GetProcess(context.TODO(), processID)
 	if err != nil {
 		return nil, err
 	}
