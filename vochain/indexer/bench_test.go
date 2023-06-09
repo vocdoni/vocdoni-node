@@ -3,6 +3,7 @@ package indexer
 import (
 	"fmt"
 	"math/big"
+	"sync"
 	"testing"
 	"time"
 
@@ -46,47 +47,76 @@ func BenchmarkIndexVotes(b *testing.B) {
 
 	b.ReportAllocs()
 	b.ResetTimer()
+
+	var lastVotes []*state.Vote
+	var lastTxs []*vochaintx.Tx
+
 	for i := 0; i < b.N; i++ {
-		// Index a number of votes, then run a couple of queries.
+		// Index $numInserts votes, and then do $numFetches across $concurrentReaders.
+		// The read-only queries are done on the previous iteration, to ensure they are indexed.
 		height := uint32(500 + i)
 		const numInserts = 100
-		const numFetches = 20
-		var oneVote *state.Vote
-		var oneTx *vochaintx.Tx
-		for j := 0; j < numInserts; j++ {
-			txBlockIndex := int32(j)
+		const numFetches = 50
+		const concurrentReaders = 5
+		var curVotes []*state.Vote
+		var curTxs []*vochaintx.Tx
 
-			vote := &state.Vote{
-				Height:      height,
-				ProcessID:   pid,
-				Nullifier:   rnd.RandomBytes(32),
-				VotePackage: vp,
-				Weight:      new(big.Int).SetUint64(1 + uint64(rnd.RandomIntn(9999))),
-			}
-			idx.OnVote(vote, txBlockIndex)
+		var wg sync.WaitGroup
 
-			tx := &vochaintx.Tx{
-				TxID:        rnd.Random32(),
-				TxModelType: "vote",
+		wg.Add(1)
+		go func() {
+			for j := 0; j < numInserts; j++ {
+				txBlockIndex := int32(j)
+
+				vote := &state.Vote{
+					Height:      height,
+					ProcessID:   pid,
+					Nullifier:   rnd.RandomBytes(32),
+					VotePackage: vp,
+					Weight:      new(big.Int).SetUint64(1 + uint64(rnd.RandomIntn(9999))),
+				}
+				idx.OnVote(vote, txBlockIndex)
+				curVotes = append(curVotes, vote)
+
+				tx := &vochaintx.Tx{
+					TxID:        rnd.Random32(),
+					TxModelType: "vote",
+				}
+				idx.OnNewTx(tx, height, txBlockIndex)
+				curTxs = append(curTxs, tx)
 			}
-			idx.OnNewTx(tx, height, txBlockIndex)
-			if j == numInserts/2 {
-				oneVote = vote
-				oneTx = tx
+			app.AdvanceTestBlock()
+			wg.Done()
+		}()
+
+		for reader := 0; reader < concurrentReaders; reader++ {
+			if i == 0 {
+				// lastVotes and lastTxs are empty at the beginning; nothing to fetch
+				continue
 			}
+			wg.Add(1)
+			go func() {
+				numFetches := numFetches / concurrentReaders
+				for j := 0; j < numFetches; j++ {
+					vote := lastVotes[j%len(lastVotes)]
+					tx := lastTxs[j%len(lastTxs)]
+
+					voteRef, err := idx.GetEnvelopeReference(vote.Nullifier)
+					qt.Assert(b, err, qt.IsNil)
+					qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(vote.Weight), qt.Equals, 0)
+					qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, tx.TxID[:])
+
+					txRef, err := idx.GetTxHashReference(tx.TxID[:])
+					qt.Assert(b, err, qt.IsNil)
+					qt.Assert(b, txRef.BlockHeight, qt.Equals, vote.Height)
+				}
+				wg.Done()
+			}()
 		}
-		app.AdvanceTestBlock()
+		wg.Wait()
 
-		for j := 0; j < numFetches; j++ {
-			voteRef, err := idx.GetEnvelopeReference(oneVote.Nullifier)
-			qt.Assert(b, err, qt.IsNil)
-			qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(oneVote.Weight), qt.Equals, 0)
-			qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, oneTx.TxID[:])
-
-			txRef, err := idx.GetTxHashReference(oneTx.TxID[:])
-			qt.Assert(b, err, qt.IsNil)
-			qt.Assert(b, txRef.BlockHeight, qt.Equals, oneVote.Height)
-		}
+		lastVotes = curVotes
+		lastTxs = curTxs
 	}
 }
 
