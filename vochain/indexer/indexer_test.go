@@ -6,7 +6,6 @@ import (
 	"io"
 	stdlog "log"
 	"math/big"
-	"sync"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -1351,46 +1350,4 @@ func TestTxIndexer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
 	qt.Assert(t, txs[0].Index, qt.Equals, uint64(95))
-}
-
-// Test that we can do concurrent reads and writes to sqlite without running
-// into "database is locked" errors.
-func TestIndexerConcurrentDB(t *testing.T) {
-	t.Skip("TODO: rewrite without direct calls to unexported methods")
-	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
-
-	pid := util.RandomBytes(32)
-	if err := app.State.AddProcess(&models.Process{
-		ProcessId:     pid,
-		EntityId:      util.RandomBytes(20),
-		BlockCount:    10,
-		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
-		EnvelopeType:  &models.EnvelopeType{},
-		MaxCensusSize: 1000,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	app.AdvanceTestBlock()
-	// if err := idx.setResultsHeight(pid, 123); err != nil {
-	// 	t.Error(err)
-	// }
-
-	const concurrency = 300
-	var wg sync.WaitGroup
-
-	wg.Add(concurrency)
-	for i := 0; i < concurrency; i++ {
-		i := i
-		go func() {
-			defer wg.Done()
-			// if err := idx.setResultsHeight(pid, 123); err != nil {
-			// 	t.Errorf("iteration %d: %v", i, err)
-			// }
-			if _, err := idx.ProcessInfo(pid); err != nil {
-				t.Errorf("iteration %d: %v", i, err)
-			}
-		}()
-	}
-	wg.Wait()
 }
