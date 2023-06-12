@@ -451,7 +451,7 @@ func (t *e2eElection) sendVote(v voteInfo, apiClientMtx *sync.Mutex) (int, error
 // ballotVotes from a default list of 10 vote values that exceed the max value, max total cost and is not unique will
 func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
 	votes := make([][]int, 0, nvotes)
-	var resultsCh1, resultsCh2 []*types.BigInt
+	var resultsField1, resultsField2 []*types.BigInt
 
 	// initial 10 votes to be sent by the ballot test
 	var v = [][]int{
@@ -459,34 +459,32 @@ func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
 		{1, 6}, {0, 8}, {6, 5}, {2, 7}, {6, 4},
 	}
 
-	switch {
 	// less than 10 votes
-	case nvotes < 10:
-		// default results on choice 1 for less than 10 votes
-		resultsCh1 = votesToBigInt([]uint64{0, 0, 0, 0, 0, 0, 0})
-		// default results on choice 2 for less than 10 votes
-		resultsCh2 = votesToBigInt([]uint64{0, 0, 0, 0, 0, 0, 0})
-
-	// greater o equal than 10 votes
-	default:
+	if nvotes < 10 {
+		// default results with zero values on field 1 for less than 10 votes
+		resultsField1 = votesToBigInt(make([]uint64, b.maxValue+1)...)
+		// default results with zero values on field 2 for less than 10 votes
+		resultsField2 = votesToBigInt(make([]uint64, b.maxValue+1)...)
+	} else {
+		// greater o equal than 10 votes
 		for i := 0; i < nvotes/10; i++ {
 			votes = append(votes, v...)
 		}
-		// default results on choice 1 for 10 votes
-		resultsCh1 = votesToBigInt([]uint64{0, 10, 20, 0, 0, 0, 10})
-		// default results on choice 2 for 10 votes
-		resultsCh2 = votesToBigInt([]uint64{10, 0, 0, 10, 10, 0, 10})
+		// default results on field 1 for 10 votes
+		resultsField1 = votesToBigInt(0, 10, 20, 0, 0, 0, 10)
+		// default results on field 2 for 10 votes
+		resultsField2 = votesToBigInt(10, 0, 0, 10, 10, 0, 10)
 
 		// nvotes split 10, for example for 44 nvotes, nvoteDid10 will be 4
 		// and that number will be multiplied by each default result to obtain the results for 40 votes
 		nvotesDiv10 := new(types.BigInt).SetUint64(uint64(nvotes / 10))
 
 		for i := 0; i <= int(b.maxValue); i++ {
-			newvalCh1 := new(types.BigInt).Mul(resultsCh1[i], nvotesDiv10)
-			newvalCh2 := new(types.BigInt).Mul(resultsCh2[i], nvotesDiv10)
+			newvalField1 := new(types.BigInt).Mul(resultsField1[i], nvotesDiv10)
+			newvalField2 := new(types.BigInt).Mul(resultsField2[i], nvotesDiv10)
 
-			resultsCh1[i] = newvalCh1
-			resultsCh2[i] = newvalCh2
+			resultsField1[i] = newvalField1
+			resultsField2[i] = newvalField2
 		}
 	}
 
@@ -502,16 +500,16 @@ func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
 			isUniqueValues := v[i][0] != v[i][1]
 
 			if isValidTotalCost && isValidValues && isUniqueValues {
-				newvalCh1 := new(types.BigInt).Add(resultsCh1[v[i][0]], new(types.BigInt).SetUint64(10))
-				newvalCh2 := new(types.BigInt).Add(resultsCh2[v[i][1]], new(types.BigInt).SetUint64(10))
+				newvalField1 := new(types.BigInt).Add(resultsField1[v[i][0]], new(types.BigInt).SetUint64(10))
+				newvalField2 := new(types.BigInt).Add(resultsField2[v[i][1]], new(types.BigInt).SetUint64(10))
 
-				resultsCh1[v[i][0]] = newvalCh1
-				resultsCh2[v[i][1]] = newvalCh2
+				resultsField1[v[i][0]] = newvalField1
+				resultsField2[v[i][1]] = newvalField2
 			}
 		}
 	}
 
-	expectedResults := [][]*types.BigInt{resultsCh1, resultsCh2}
+	expectedResults := [][]*types.BigInt{resultsField1, resultsField2}
 
 	log.Debug("vote values generated", votes)
 	log.Debug("results expected", expectedResults)
@@ -545,7 +543,7 @@ func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([
 	return key, nil
 }
 
-func matchResults(results [][]*types.BigInt, expectedResults [][]*types.BigInt) bool {
+func matchResults(results, expectedResults [][]*types.BigInt) bool {
 	// iterate over each question to check if the results match with the expected results
 	for i := 0; i < len(results); i++ {
 		for q := range results[i] {
@@ -557,7 +555,7 @@ func matchResults(results [][]*types.BigInt, expectedResults [][]*types.BigInt) 
 	return true
 }
 
-func votesToBigInt(votes []uint64) []*types.BigInt {
+func votesToBigInt(votes ...uint64) []*types.BigInt {
 	vBigInt := make([]*types.BigInt, len(votes))
 	for i, v := range votes {
 		vBigInt[i] = new(types.BigInt).SetUint64(v)
