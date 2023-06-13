@@ -45,12 +45,8 @@ WHERE (sqlc.arg(entity_id_len) = 0 OR entity_id = sqlc.arg(entity_id))
 	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
 ORDER BY creation_time DESC, id ASC
--- TODO(mvdan): use sqlc.arg once limit/offset support it:
--- https://github.com/kyleconroy/sqlc/issues/1025
--- LIMIT sqlc.arg(limit)
--- OFFSET sqlc.arg(offset)
-LIMIT ?
-OFFSET ?
+LIMIT sqlc.arg(limit)
+OFFSET sqlc.arg(offset)
 ;
 
 -- name: UpdateProcessFromState :execresult
@@ -105,8 +101,8 @@ SELECT COUNT(DISTINCT entity_id) FROM processes;
 SELECT DISTINCT entity_id FROM processes
 WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
 ORDER BY creation_time DESC, id ASC
-LIMIT ?
-OFFSET ?
+LIMIT sqlc.arg(limit)
+OFFSET sqlc.arg(offset)
 ;
 
 -- name: GetProcessIDsByFinalResults :many

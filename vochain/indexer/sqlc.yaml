@@ -2,7 +2,7 @@ version: 2
 sql:
 - schema: "migrations"
   queries: "queries"
-  engine: "mysql" # TODO: sqlite
+  engine: "sqlite"
   gen:
     go:
       package: "indexerdb"

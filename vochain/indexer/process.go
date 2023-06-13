@@ -123,8 +123,8 @@ func (idx *Indexer) ProcessList(entityID []byte,
 		Status:          int64(statusnum),
 		SourceNetworkID: int64(srcNetworkId),
 		IDSubstr:        searchTerm,
-		Offset:          int32(from),
-		Limit:           int32(max),
+		Offset:          int64(from),
+		Limit:           int64(max),
 		WithResults:     withResults,
 	})
 	if err != nil {
@@ -160,8 +160,8 @@ func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexByte
 	// work it out here so that the api package doesn't cause N sql queries.
 	entityIDs, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: searchTerm,
-		Offset:         int32(from),
-		Limit:          int32(max),
+		Offset:         int64(from),
+		Limit:          int64(max),
 	})
 	if err != nil {
 		log.Errorf("error listing entities: %v", err)
