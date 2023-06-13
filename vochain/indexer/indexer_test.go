@@ -681,37 +681,17 @@ func TestLiveResults(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 
-	process, err := idx.ProcessInfo(pid)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Add 100 votes
 	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
-
 	qt.Assert(t, err, qt.IsNil)
-	r := &results.Results{
-		Votes:        results.NewEmptyVotes(3, 100),
-		Weight:       new(types.BigInt).SetUint64(0),
-		VoteOpts:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
-		EnvelopeType: &models.EnvelopeType{},
-	}
-	idx.addProcessToLiveResults(pid)
-	for i := 0; i < 100; i++ {
-		qt.Assert(t, idx.addLiveVote(
-			process,
-			vp,
-			new(big.Int).SetUint64(1),
-			r),
-			qt.IsNil)
-	}
-	qt.Assert(t, idx.commitVotes(idx.readWriteQueries, pid, r, nil, 1), qt.IsNil)
 
-	if !isOpenProcess(process) {
-		t.Fatal("isOpenProcess returned false")
+	for i := 0; i < 100; i++ {
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
 	}
 
 	// Test results
+	app.AdvanceTestBlock()
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 
