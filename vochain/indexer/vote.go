@@ -91,8 +91,8 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 	txRefs, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
 		ProcessID:       processId,
 		NullifierSubstr: searchTerm,
-		Limit:           int32(max),
-		Offset:          int32(from),
+		Limit:           int64(max),
+		Offset:          int64(from),
 	})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

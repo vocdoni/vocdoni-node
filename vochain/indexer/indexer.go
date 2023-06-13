@@ -30,7 +30,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.17.2 generate
+//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@734e06ede7e68dc76e53f41727285abe5301dc69 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -564,8 +564,8 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
 	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
 		FromAccount: from,
-		Limit:       maxItems,
-		Offset:      offset,
+		Limit:       int64(maxItems),
+		Offset:      int64(offset),
 	})
 	if err != nil {
 		return nil, err

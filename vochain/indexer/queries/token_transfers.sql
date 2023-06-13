@@ -14,11 +14,8 @@ LIMIT 1;
 
 -- name: GetTokenTransfersByFromAccount :many
 SELECT * FROM token_transfers
--- the column and parameter; see sqlc.yaml
 WHERE from_account = sqlc.arg(from_account)
 ORDER BY transfer_time DESC
--- TODO(jordipainan): use sqlc.arg once limit/offset support it:
--- https://github.com/kyleconroy/sqlc/issues/1025
-LIMIT ?
-OFFSET ?
+LIMIT sqlc.arg(limit)
+OFFSET sqlc.arg(offset)
 ;

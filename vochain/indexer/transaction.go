@@ -67,8 +67,8 @@ func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Trans
 // The first one returned is the newest, so they are in descending order.
 func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Transaction, error) {
 	sqlTxRefs, err := idx.readOnlyQuery.GetLastTransactions(context.TODO(), indexerdb.GetLastTransactionsParams{
-		Limit:  limit,
-		Offset: offset,
+		Limit:  int64(limit),
+		Offset: int64(offset),
 	})
 	if err != nil || len(sqlTxRefs) == 0 {
 		if errors.Is(err, sql.ErrNoRows) || len(sqlTxRefs) == 0 {
