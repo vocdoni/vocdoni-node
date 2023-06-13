@@ -248,13 +248,18 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		time.Sleep(time.Second * 1)
 	}
 	log.Infof("running indexer after-sync bootstrap")
+
 	// Block the new votes addition until the recovery finishes.
+	// TODO: perhaps redundant with lockPool now?
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
 
-	queries := idx.readWriteQueries // TODO: use a tx
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	queries := idx.blockTxQueries()
+	ctx := context.TODO()
 
-	prcIDs, err := queries.GetProcessIDsByFinalResults(context.TODO(), false)
+	prcIDs, err := queries.GetProcessIDsByFinalResults(ctx, false)
 	if err != nil {
 		log.Error(err)
 	}
@@ -285,7 +290,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 			Signatures:   []types.HexBytes{},
 		}
 
-		if _, err := queries.UpdateProcessResultByID(context.TODO(), indexerdb.UpdateProcessResultByIDParams{
+		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
 			ID:         indxR.ProcessID,
 			Votes:      encodeVotes(indxR.Votes),
 			Weight:     encodeBigint(indxR.Weight),
@@ -317,6 +322,13 @@ func (idx *Indexer) AfterSyncBootstrap() {
 		// Add process to live results so new votes will be added
 		idx.addProcessToLiveResults(p)
 	}
+
+	// don't wait until the next Commit call to commit blockTx
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
+
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
 
