@@ -151,9 +151,7 @@ func (t *E2EOverwriteElection) Run() error {
 	}
 
 	// should count the first overwrite
-	expectedResults := [][]*types.BigInt{
-		votesToBigInt([]uint64{uint64(c.nvotes-2) * 10, 20, 0}),
-	}
+	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-2)*10, 20, 0)}
 
 	// only the first overwrite should be valid in the results and must math with the expected results
 	if !matchResults(elres.Results, expectedResults) {

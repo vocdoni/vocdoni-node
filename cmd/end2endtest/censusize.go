@@ -156,9 +156,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	}
 
 	// should not count the last vote
-	expectedResults := [][]*types.BigInt{
-		votesToBigInt([]uint64{uint64(c.nvotes-1) * 10, 0, 0}),
-	}
+	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-1)*10, 0, 0)}
 
 	if !matchResults(elres.Results, expectedResults) {
 		return fmt.Errorf("election result must match, expected Results: %s but got Results: %v", expectedResults, elres.Results)
