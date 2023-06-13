@@ -34,10 +34,7 @@ LIMIT 1;
 
 -- name: SearchProcesses :many
 SELECT id FROM processes
--- TODO(mvdan): when sqlc's parser is better, and does not get confused with
--- string types, use:
--- WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
-WHERE (sqlc.arg(entity_id_len) = 0 OR entity_id = sqlc.arg(entity_id))
+WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
 	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
 	AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
