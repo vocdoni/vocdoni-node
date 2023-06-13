@@ -52,11 +52,7 @@ func encodeVotes(votes [][]*types.BigInt) string {
 			if j > 0 {
 				b.WriteByte(',')
 			}
-			text, err := n.MarshalText()
-			if err != nil {
-				panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
-			}
-			b.Write(text)
+			b.WriteString(encodeBigint(n))
 		}
 	}
 	return b.String()

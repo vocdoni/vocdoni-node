@@ -238,25 +238,19 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 		t := time.Now()
 		creationTime = &t
 	}
-	weightStr := []byte("1")
+	weightStr := "1"
 	if vote.Weight != nil {
-		var err error
-		weightStr, err = vote.Weight.MarshalText()
-		if err != nil {
-			panic(err) // should never happen
-		}
+		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
 	}
 	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
 		Nullifier:      vote.Nullifier,
 		ProcessID:      vote.ProcessID,
 		BlockHeight:    int64(vote.Height),
 		BlockIndex:     int64(txIndex),
-		Weight:         string(weightStr),
+		Weight:         weightStr,
 		OverwriteCount: int64(vote.Overwrites),
-		// VoterID has a NOT NULL constraint, so we need to provide
-		// a zero value for it since nil is not allowed
-		VoterID:      nonNullBytes(vote.VoterID),
-		CreationTime: *creationTime,
+		VoterID:        nonNullBytes(vote.VoterID),
+		CreationTime:   *creationTime,
 	}); err != nil {
 		return err
 	}
