@@ -788,35 +788,18 @@ func TestAddVote(t *testing.T) {
 	qt.Assert(t, err, qt.ErrorMatches, "values are not unique")
 }
 
-var vote = func(v []int, idx *Indexer, pid []byte, weight *big.Int) error {
-	vp, err := state.NewVotePackage(v).Encode()
-	if err != nil {
-		return err
+var addVote = func(t *testing.T, app *vochain.BaseApplication, pid []byte, votes []int, weight *big.Int) {
+	t.Helper()
+	vp, err := state.NewVotePackage(votes).Encode()
+	qt.Assert(t, err, qt.IsNil)
+	v := &state.Vote{
+		ProcessID:   pid,
+		VotePackage: vp,
+		Nullifier:   util.RandomBytes(32),
+		Weight:      weight,
 	}
-	max := 0
-	for _, i := range v {
-		if i > max {
-			max = i
-		}
-	}
-	proc, err := idx.ProcessInfo(pid)
-	if err != nil {
-		return err
-	}
-	r := &results.Results{
-		ProcessID: pid,
-		Votes: results.NewEmptyVotes(
-			int(proc.VoteOpts.MaxCount), int(proc.VoteOpts.MaxValue)+1),
-		Weight:       new(types.BigInt).SetUint64(0),
-		Signatures:   []types.HexBytes{},
-		VoteOpts:     proc.VoteOpts,
-		EnvelopeType: proc.Envelope,
-	}
-	idx.addProcessToLiveResults(pid)
-	if err := idx.addLiveVote(proc, vp, weight, r); err != nil {
-		return err
-	}
-	return idx.commitVotes(idx.readWriteQueries, pid, r, nil, 1)
+	err = app.State.AddVote(v)
+	qt.Assert(t, err, qt.IsNil)
 }
 
 func TestBallotProtocolRateProduct(t *testing.T) {
@@ -842,13 +825,14 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Rate a product, expected result: [ [1,0,1,0,2], [0,0,2,0,2] ]
-	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{4, 2}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 4}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 4}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 5}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{0, 0, 0}, idx, pid, nil), qt.ErrorMatches, ".*")
+	addVote(t, app, pid, []int{4, 2}, nil)
+	addVote(t, app, pid, []int{4, 2}, nil)
+	addVote(t, app, pid, []int{2, 4}, nil)
+	addVote(t, app, pid, []int{0, 4}, nil)
+	addVote(t, app, pid, []int{0, 5}, nil)    // error: overflow
+	addVote(t, app, pid, []int{0, 0, 0}, nil) // error: too many votes
 
+	app.AdvanceTestBlock()
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
@@ -889,16 +873,15 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	//  weight: 20000000000, 100000^2 + 112345^2 // wrong
 
 	// Good
-	qt.Assert(t, vote([]int{10, 28}, idx, pid, new(big.Int).SetUint64(1000)), qt.IsNil)
-	qt.Assert(t, vote([]int{5, 5}, idx, pid, new(big.Int).SetUint64(50)), qt.IsNil)
-	qt.Assert(t, vote([]int{100000, 100000}, idx, pid, new(big.Int).SetUint64(20000000000)), qt.IsNil)
-	qt.Assert(t, vote([]int{1, 0}, idx, pid, new(big.Int).SetUint64(1)), qt.IsNil)
-	// Wrong
-	qt.Assert(t, vote([]int{5, 2}, idx, pid, new(big.Int).SetUint64(25)),
-		qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{100000, 112345}, idx, pid, new(big.Int).SetUint64(20000000000)),
-		qt.ErrorMatches, ".*overflow.*")
+	addVote(t, app, pid, []int{10, 28}, new(big.Int).SetUint64(1000))
+	addVote(t, app, pid, []int{5, 5}, new(big.Int).SetUint64(50))
+	addVote(t, app, pid, []int{100000, 100000}, new(big.Int).SetUint64(20000000000))
+	addVote(t, app, pid, []int{1, 0}, new(big.Int).SetUint64(1))
+	// Wrong; overflows
+	addVote(t, app, pid, []int{5, 2}, new(big.Int).SetUint64(25))
+	addVote(t, app, pid, []int{100000, 112345}, new(big.Int).SetUint64(20000000000))
 
+	app.AdvanceTestBlock()
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
@@ -937,12 +920,13 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	// Multichoice (choose 3 ouf of 5):
 	// - Vote Envelope: `[1,1,1,0,0]` `[0,1,1,1,0]` `[1,1,0,0,0]`
 	// - Results: `[ [1, 2], [0, 3], [1, 2], [2, 1], [3, 0] ]`
-	qt.Assert(t, vote([]int{1, 1, 1, 0, 0}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{0, 1, 1, 1, 0}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{1, 1, 0, 0, 0}, idx, pid, nil), qt.IsNil)
-	qt.Assert(t, vote([]int{2, 1, 0, 0, 0}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
-	qt.Assert(t, vote([]int{1, 1, 1, 1, 0}, idx, pid, nil), qt.ErrorMatches, ".*overflow.*")
+	addVote(t, app, pid, []int{1, 1, 1, 0, 0}, nil)
+	addVote(t, app, pid, []int{0, 1, 1, 1, 0}, nil)
+	addVote(t, app, pid, []int{1, 1, 0, 0, 0}, nil)
+	addVote(t, app, pid, []int{2, 1, 0, 0, 0}, nil)
+	addVote(t, app, pid, []int{1, 1, 1, 1, 0}, nil)
 
+	app.AdvanceTestBlock()
 	result, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	votes := GetFriendlyResults(result.Votes)
@@ -1147,6 +1131,7 @@ func TestOverwriteVotes(t *testing.T) {
 	qt.Assert(t, stateVote.OverwriteCount, qt.IsNil)
 
 	// Check the results actually changed
+	app.AdvanceTestBlock()
 	results, err := idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
