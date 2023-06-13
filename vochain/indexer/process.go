@@ -117,8 +117,7 @@ func (idx *Indexer) ProcessList(entityID []byte,
 	}
 
 	procs, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
-		EntityID:        entityID,
-		EntityIDLen:     len(entityID), // see the TODO in queries/process.sql
+		EntityID:        nonNullBytes(entityID), // so that LENGTH never returns NULL
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
 		SourceNetworkID: int64(srcNetworkId),

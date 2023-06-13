@@ -260,21 +260,20 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 
 const searchProcesses = `-- name: SearchProcesses :many
 SELECT id FROM processes
-WHERE (?1 = 0 OR entity_id = ?2)
-	AND (?3 = 0 OR namespace = ?3)
-	AND (?4 = 0 OR status = ?4)
-	AND (?5 = 0 OR source_network_id = ?5)
+WHERE (LENGTH(?1) = 0 OR entity_id = ?1)
+	AND (?2 = 0 OR namespace = ?2)
+	AND (?3 = 0 OR status = ?3)
+	AND (?4 = 0 OR source_network_id = ?4)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
-	AND (?6 = '' OR (INSTR(LOWER(HEX(id)), ?6) > 0))
-	AND (?7 = FALSE OR have_results)
+	AND (?5 = '' OR (INSTR(LOWER(HEX(id)), ?5) > 0))
+	AND (?6 = FALSE OR have_results)
 ORDER BY creation_time DESC, id ASC
-LIMIT ?9
-OFFSET ?8
+LIMIT ?8
+OFFSET ?7
 `
 
 type SearchProcessesParams struct {
-	EntityIDLen     interface{}
-	EntityID        types.EntityID
+	EntityID        interface{}
 	Namespace       interface{}
 	Status          interface{}
 	SourceNetworkID interface{}
@@ -284,12 +283,8 @@ type SearchProcessesParams struct {
 	Limit           int64
 }
 
-// TODO(mvdan): when sqlc's parser is better, and does not get confused with
-// string types, use:
-// WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
 func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
 	rows, err := q.db.QueryContext(ctx, searchProcesses,
-		arg.EntityIDLen,
 		arg.EntityID,
 		arg.Namespace,
 		arg.Status,
