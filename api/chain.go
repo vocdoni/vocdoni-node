@@ -99,7 +99,7 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/chain/transactions/reference/height/{height}/page/{page}",
+		"/chain/blocks/{height}/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTxByHeightHandler,
@@ -521,7 +521,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Description	Given a block returns the list of transactions for that block
 //	@Success		200	{object}	TransactionList
 //
-//	@Router			/chain/transactions/reference/height/{height}/page/{page} [get]
+//	@Router			/chain/blocks/{height}/transactions/page/{page} [get]
 func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
