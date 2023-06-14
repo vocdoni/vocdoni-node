@@ -20,6 +20,6 @@ func (vs *VocdoniService) VochainIndexer() error {
 		return err
 	}
 	// launch the indexer after sync routine (executed when the blockchain is ready)
-	go vs.Indexer.AfterSyncBootstrap()
+	go vs.Indexer.AfterSyncBootstrap(false)
 	return nil
 }

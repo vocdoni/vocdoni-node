@@ -216,7 +216,7 @@ func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
 // still open (live) and updates all temporary data (current voting weight and live results
 // if unecrypted). This method might be called on a goroutine after initializing the Indexer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
-func (idx *Indexer) AfterSyncBootstrap() {
+func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	// if no live results, we don't need the bootstraping
 	if idx.ignoreLiveResults {
 		return
@@ -227,7 +227,7 @@ func (idx *Indexer) AfterSyncBootstrap() {
 	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
 	// the Wait loop would pass.
 	syncSignals := 5
-	for {
+	for !inTest {
 		// Add some grace time to avoid false positive on IsSynchronizing()
 		if !idx.App.IsSynchronizing() {
 			syncSignals--
