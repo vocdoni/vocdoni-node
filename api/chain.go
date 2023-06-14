@@ -99,7 +99,7 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/chain/transactions/reference/height/{height}",
+		"/chain/transactions/reference/height/{height}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTxByHeightHandler,
@@ -521,7 +521,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Description	Given a block returns the list of transactions for that block
 //	@Success		200	{object}	TransactionList
 //
-//	@Router			/chain/transactions/reference/height/{height} [get]
+//	@Router			/chain/transactions/reference/height/{height}/page/{page} [get]
 func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
@@ -534,9 +534,22 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	blockTxs := &BlockTransactionsInfo{
 		BlockNumber:       height,
 		TransactionsCount: uint32(len(block.Txs)),
-		Transactions:      make([]TransactionMetadata, len(block.Txs)),
+		Transactions:      make([]TransactionMetadata, 0),
 	}
-	for i := range block.Txs {
+
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber.WithErr(err)
+		}
+	}
+	page = page * MaxPageSize
+	count := 0
+	for i := page; i < len(block.Txs); i++ {
+		if count >= MaxPageSize {
+			break
+		}
 		signedTx := new(models.SignedTx)
 		tx := new(models.Tx)
 		var err error
@@ -557,9 +570,10 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 		blockTxs.Transactions = append(blockTxs.Transactions, TransactionMetadata{
 			Type:   txType,
 			Index:  int32(i),
-			Height: uint32(txRef.Index),
+			Number: uint32(txRef.Index),
 			Hash:   block.Txs[i].Hash(),
 		})
+		count++
 	}
 	data, err := json.Marshal(blockTxs)
 	if err != nil {
