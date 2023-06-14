@@ -74,9 +74,6 @@ type Indexer struct {
 
 	readOnlyQuery *indexerdb.Queries
 
-	// TODO: consider folding into blockTx
-	readWriteQueries *indexerdb.Queries
-
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
 	blockTx      *sql.Tx
@@ -169,7 +166,6 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	}
 
 	idx.readOnlyQuery = indexerdb.New(idx.readOnlyDB)
-	idx.readWriteQueries = indexerdb.New(idx.readWriteDB)
 
 	// Subscribe to events
 	idx.App.State.AddEventListener(idx)
