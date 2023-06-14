@@ -34,7 +34,6 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResult
 	if err != nil {
 		tb.Fatal(err)
 	}
-	idx.skipTargetHeightSleeps = true
 	tb.Cleanup(func() {
 		if err := idx.Close(); err != nil {
 			tb.Error(err)
@@ -48,7 +47,6 @@ func newTestIndexerNoCleanup(dataDir string, app *vochain.BaseApplication, count
 	if err != nil {
 		return nil, err
 	}
-	idx.skipTargetHeightSleeps = true
 	return idx, nil
 }
 
