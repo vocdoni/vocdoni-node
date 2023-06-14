@@ -75,6 +75,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
+		"/chain/blockToDate/{height}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainEstimateDateHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
 		"/chain/transactions/cost",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -327,6 +335,28 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 	data, err := json.Marshal(struct {
 		Height uint32 `json:"height"`
 	}{Height: height},
+	)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainEstimateDateHandler
+//
+//	@Summary		Estimate timestamp for block
+//	@Description	Returns the estimated timestamp for the block height provided
+//	@Success		200	{object}	object
+//	@Router			/chain/blockToDate/{height} [get]
+func (a *API) chainEstimateDateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	if err != nil {
+		return err
+	}
+	timestamp := a.vocinfo.HeightTime(height)
+	data, err := json.Marshal(struct {
+		Date time.Time `json:"date"`
+	}{Date: timestamp},
 	)
 	if err != nil {
 		return err
