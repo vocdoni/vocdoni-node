@@ -255,6 +255,10 @@ func (k *KeyKeeper) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)
 	// do nothing
 }
 
+func (k *KeyKeeper) OnBeginBlock(state.BeginBlock) {
+	// do nothing
+}
+
 // OnProcessStatusChange will publish the private
 // keys of the ended process, if required
 func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {

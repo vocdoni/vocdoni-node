@@ -175,6 +175,7 @@ type Listener struct {
 
 func (l *Listener) OnVote(vote *Vote, txIndex int32)                                             {}
 func (l *Listener) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)                  {}
+func (l *Listener) OnBeginBlock(BeginBlock)                                                      {}
 func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
 func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
 func (l *Listener) OnCancel(pid []byte, txIndex int32)                                           {}
