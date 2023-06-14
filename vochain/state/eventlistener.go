@@ -1,6 +1,8 @@
 package state
 
 import (
+	"time"
+
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -30,6 +32,7 @@ type EventListener interface {
 	OnSetAccount(addr []byte, account *Account)
 	OnTransferTokens(tx *vochaintx.TokenTransfer)
 	Commit(height uint32) (err error)
+	OnBeginBlock(BeginBlock)
 	Rollback()
 }
 
@@ -42,4 +45,16 @@ func (v *State) AddEventListener(l EventListener) {
 // CleanEventListeners removes all event listeners.
 func (v *State) CleanEventListeners() {
 	v.eventListeners = nil
+}
+
+type BeginBlock struct {
+	Height   int64
+	Time     time.Time
+	DataHash []byte
+}
+
+func (v *State) OnBeginBlock(bb BeginBlock) {
+	for _, l := range v.eventListeners {
+		l.OnBeginBlock(bb)
+	}
 }

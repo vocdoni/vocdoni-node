@@ -11,6 +11,12 @@ import (
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
+type Block struct {
+	Height   int64
+	Time     time.Time
+	DataHash []byte
+}
+
 type Process struct {
 	ID                    types.ProcessID
 	EntityID              types.EntityID

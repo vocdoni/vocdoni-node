@@ -12,6 +12,7 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -126,6 +127,11 @@ func (app *BaseApplication) fnBeginBlockDefault(
 	height := uint32(req.Header.GetHeight())
 	app.State.SetHeight(height)
 	go app.State.CachePurge(height)
+	app.State.OnBeginBlock(state.BeginBlock{
+		Height:   req.Header.Height,
+		Time:     req.Header.Time,
+		DataHash: req.Header.DataHash,
+	})
 
 	return abcitypes.ResponseBeginBlock{}
 }
