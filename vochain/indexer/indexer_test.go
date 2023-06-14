@@ -42,14 +42,6 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResult
 	return idx
 }
 
-func newTestIndexerNoCleanup(dataDir string, app *vochain.BaseApplication, countLiveResults bool) (*Indexer, error) {
-	idx, err := NewIndexer(dataDir, app, true)
-	if err != nil {
-		return nil, err
-	}
-	return idx, nil
-}
-
 func TestEntityList(t *testing.T) {
 	for _, count := range []int{2, 100, 155} {
 		t.Run(fmt.Sprintf("count=%03d", count), func(t *testing.T) {
@@ -937,13 +929,11 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 func TestAfterSyncBootStrap(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	dataDir := t.TempDir()
-	idx, err := newTestIndexerNoCleanup(dataDir, app, true)
-	qt.Assert(t, err, qt.IsNil)
+	idx := newTestIndexer(t, app, true)
 	pid := util.RandomBytes(32)
 	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
 
-	err = app.State.AddProcess(&models.Process{
+	err := app.State.AddProcess(&models.Process{
 		ProcessId:     pid,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Status:        models.ProcessStatus_READY,
@@ -963,8 +953,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, proc.FinalResults, qt.IsFalse)
 
-	// Stop the indexer
-	qt.Assert(t, idx.Close(), qt.IsNil)
+	// Stop the indexer from getting the state events.
 	app.State.CleanEventListeners()
 
 	// Add 10 votes to the election
@@ -979,10 +968,6 @@ func TestAfterSyncBootStrap(t *testing.T) {
 
 	// Save the current state with the 10 new votes
 	app.State.Save()
-
-	// Start the indexer again
-	idx, err = newTestIndexerNoCleanup(dataDir, app, true)
-	qt.Assert(t, err, qt.IsNil)
 
 	// The results should not be up to date.
 	results, err := idx.GetResults(pid)
