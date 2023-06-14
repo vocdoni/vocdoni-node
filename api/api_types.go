@@ -174,10 +174,10 @@ type TransactionReference struct {
 }
 
 type TransactionMetadata struct {
-	Type   string         `json:"type"`
-	Height uint32         `json:"height"`
-	Index  int32          `json:"index"`
-	Hash   types.HexBytes `json:"hash"`
+	Type   string         `json:"transactionType"`
+	Number uint32         `json:"transactionNumber"`
+	Index  int32          `json:"transactionIndex"`
+	Hash   types.HexBytes `json:"transactionHash"`
 }
 
 type BlockTransactionsInfo struct {
