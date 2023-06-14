@@ -996,7 +996,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	})
 
 	// Run the AfterSyncBootstrap, which should update the results.
-	idx.AfterSyncBootstrap()
+	idx.AfterSyncBootstrap(true)
 
 	results, err = idx.GetResults(pid)
 	qt.Assert(t, err, qt.IsNil)

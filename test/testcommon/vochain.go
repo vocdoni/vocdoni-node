@@ -225,7 +225,7 @@ func NewMockIndexer(tb testing.TB, vnode *vochain.BaseApplication) *indexer.Inde
 	if err != nil {
 		tb.Fatal(err)
 	}
-	sc.AfterSyncBootstrap()
+	sc.AfterSyncBootstrap(true)
 	return sc
 }
 
