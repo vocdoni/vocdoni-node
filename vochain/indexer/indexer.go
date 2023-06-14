@@ -95,10 +95,6 @@ type Indexer struct {
 	recoveryBootLock sync.RWMutex
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
-
-	// In the tests, the extra 5s sleeps can make CI really slow at times, to
-	// the point that it times out. Skip that in the tests.
-	skipTargetHeightSleeps bool
 }
 
 // NewIndexer returns an instance of the Indexer
