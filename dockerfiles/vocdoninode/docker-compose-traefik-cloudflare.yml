@@ -27,7 +27,7 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
 
   dvotenode:
-    image: "ghcr.io/vocdoni/go-dvote:${VOCDONI_NODE_TAG:-dev}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${VOCDONI_NODE_TAG:-main}"
     env_file: env
     volumes:
       - "run:/app/run"
