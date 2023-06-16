@@ -18,7 +18,7 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	go build -trimpath -o=/bin -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
 
-FROM debian:11.6-slim as base
+FROM debian:bookworm-slim as base
 WORKDIR /app
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
