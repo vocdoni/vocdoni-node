@@ -7,22 +7,25 @@ ARG BUILDARGS
 # Build all the binaries at once, so that the final targets don't require having
 # Go installed to build each of them.
 WORKDIR /src
-COPY . .
 ENV CGO_ENABLED=1
 RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
+	--mount=type=bind,source=go.sum,target=go.sum \
+	--mount=type=bind,source=go.mod,target=go.mod \
+	go mod download -x
+RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
-	go build -trimpath -o=. -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
+	--mount=type=bind,target=. \
+	go build -trimpath -o=/bin -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
 	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
 
-FROM node:lts-bullseye-slim AS test
+FROM debian:11.6-slim as base
+WORKDIR /app
 
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-WORKDIR /app
-COPY --from=builder /src/vochaintest ./
-COPY --from=builder /src/end2endtest ./
 
 # Support for go-rapidsnark witness calculator (https://github.com/iden3/go-rapidsnark/tree/main/witness)
-COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
+COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so \
+                    /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
 # Support for go-rapidsnark prover (https://github.com/iden3/go-rapidsnark/tree/main/prover)
 RUN apt-get update && \
 	apt-get install -y libc6-dev libomp-dev openmpi-common libgomp1 curl && \
@@ -30,20 +33,10 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-FROM debian:11.6-slim
+FROM base as test
+COPY --from=builder /bin/vochaintest /bin/end2endtest /app/
 
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-WORKDIR /app
-COPY --from=builder /src/node ./
-COPY --from=builder /src/voconed ./
-
-# Support for go-rapidsnark witness calculator (https://github.com/iden3/go-rapidsnark/tree/main/witness)
-COPY --from=builder /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so /go/pkg/mod/github.com/wasmerio/wasmer-go@v1.0.4/wasmer/packaged/lib/linux-amd64/libwasmer.so
-# Support for go-rapidsnark prover (https://github.com/iden3/go-rapidsnark/tree/main/prover)
-RUN apt-get update && \
-	apt-get install -y libc6-dev libomp-dev openmpi-common libgomp1 && \
-	apt-get autoremove -y && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+FROM base
+COPY --from=builder /bin/node /bin/voconed /app/
 
 ENTRYPOINT ["/app/node"]
