@@ -178,9 +178,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"height", height)
 
 		// Verify the proof
-		valid, weight, err := VerifyProof(process, voteEnvelope.Proof,
-			process.CensusOrigin, process.CensusRoot, process.ProcessId,
-			vote.VoterID)
+		valid, weight, err := VerifyProof(process, voteEnvelope.Proof, vote.VoterID)
 		if err != nil {
 			return nil, err
 		}

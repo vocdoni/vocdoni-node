@@ -37,15 +37,19 @@ type VerifyProofFunc func(process *models.Process, proof *models.Proof,
 
 // VerifyProof is a wrapper over all VerifyProofFunc(s) available which uses the process.CensusOrigin
 // to execute the correct verification function.
-func VerifyProof(process *models.Process, proof *models.Proof,
-	censusOrigin models.CensusOrigin,
-	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
+func VerifyProof(process *models.Process, proof *models.Proof, vID state.VoterID) (bool, *big.Int, error) {
+	if proof == nil {
+		return false, nil, fmt.Errorf("proof is nil")
+	}
+	if process == nil {
+		return false, nil, fmt.Errorf("process is nil")
+	}
 	log.Debugw("verify proof",
-		"censusOrigin", censusOrigin,
-		"electionID", fmt.Sprintf("%x", processID),
+		"censusOrigin", process.CensusOrigin,
+		"electionID", fmt.Sprintf("%x", process.ProcessId),
 		"voterID", fmt.Sprintf("%x", vID),
 		"address", fmt.Sprintf("%x", vID.Address()),
-		"censusRoot", fmt.Sprintf("%x", censusRoot),
+		"censusRoot", fmt.Sprintf("%x", process.CensusRoot),
 	)
 	// check census origin and compute vote digest identifier
 	var verifyProof VerifyProofFunc
@@ -144,8 +148,8 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 	key := vID.Address()
 
 	p := proof.GetCa()
-	if p == nil {
-		return false, nil, fmt.Errorf("invalid CA proof")
+	if p == nil || p.Bundle == nil {
+		return false, nil, fmt.Errorf("CSP proof or bundle are nil")
 	}
 	if !bytes.Equal(p.Bundle.Address, key) {
 		return false, nil, fmt.Errorf(
@@ -186,7 +190,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 			}
 		}
 		if !bytes.Equal(bundlePub, censusRoot) {
-			return false, nil, fmt.Errorf("csp bundle signature does not match")
+			return false, nil, fmt.Errorf("CSP bundle signature does not match")
 		}
 	case models.ProofCA_ECDSA_BLIND, models.ProofCA_ECDSA_BLIND_PIDSALTED:
 		// Blind CSP check
@@ -219,7 +223,7 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 				processID, rootPub.Bytes(), cspbundleDec.ProcessId, cspbundleDec.Address, signature.Bytes())
 		}
 	default:
-		return false, nil, fmt.Errorf("csp proof %s type not supported", p.Type.String())
+		return false, nil, fmt.Errorf("CSP proof %s type not supported", p.Type.String())
 	}
 	return true, bigOne, nil
 }

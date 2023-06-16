@@ -260,12 +260,7 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.Tx, forCommit boo
 	voterID := vstate.NewVoterID(vstate.VoterIDTypeECDSA, pubKey)
 	var valid bool
 	var weight *big.Int
-	valid, weight, err = VerifyProof(process, tx.Proof,
-		process.CensusOrigin,
-		process.CensusRoot,
-		process.ProcessId,
-		voterID,
-	)
+	valid, weight, err = VerifyProof(process, tx.Proof, voterID)
 	if err != nil {
 		return fmt.Errorf("proof not valid: %w", err)
 	}
