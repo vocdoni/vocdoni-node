@@ -10,9 +10,9 @@ import (
 
 	"github.com/hashicorp/golang-lru/v2"
 	coreiface "github.com/ipfs/boxo/coreiface"
+	"github.com/ipfs/boxo/files"
 	ipfscid "github.com/ipfs/go-cid"
 	keystore "github.com/ipfs/go-ipfs-keystore"
-	files "github.com/ipfs/go-libipfs/files"
 	ipfslog "github.com/ipfs/go-log/v2"
 
 	"github.com/ipfs/boxo/coreiface/options"
