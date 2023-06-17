@@ -773,6 +773,7 @@ github.com/ipfs/go-ipfs-exchange-interface v0.2.0/go.mod h1:z6+RhJuDQbqKguVyslSO
 github.com/ipfs/go-ipfs-exchange-offline v0.3.0 h1:c/Dg8GDPzixGd0MC8Jh6mjOwU57uYokgWRFidfvEkuA=
 github.com/ipfs/go-ipfs-exchange-offline v0.3.0/go.mod h1:MOdJ9DChbb5u37M1IcbrRB02e++Z7521fMxqCNRrz9s=
 github.com/ipfs/go-ipfs-files v0.3.0 h1:fallckyc5PYjuMEitPNrjRfpwl7YFt69heCOUhsbGxQ=
+github.com/ipfs/go-ipfs-files v0.3.0/go.mod h1:xAUtYMwB+iu/dtf6+muHNSFQCJG2dSiStR2P6sn9tIM=
 github.com/ipfs/go-ipfs-keystore v0.1.0 h1:gfuQUO/cyGZgZIHE6OrJas4OnwuxXCqJG7tI0lrB5Qc=
 github.com/ipfs/go-ipfs-keystore v0.1.0/go.mod h1:LvLw7Qhnb0RlMOfCzK6OmyWxICip6lQ06CCmdbee75U=
 github.com/ipfs/go-ipfs-posinfo v0.0.1 h1:Esoxj+1JgSjX0+ylc0hUmJCOv6V2vFoZiETLR6OtpRs=
@@ -794,7 +795,6 @@ github.com/ipfs/go-ipld-git v0.1.1/go.mod h1:+VyMqF5lMcJh4rwEppV0e6g4nCCHXThLYYD
 github.com/ipfs/go-ipld-legacy v0.1.1 h1:BvD8PEuqwBHLTKqlGFTHSwrwFOMkVESEvwIYwR2cdcc=
 github.com/ipfs/go-ipld-legacy v0.1.1/go.mod h1:8AyKFCjgRPsQFf15ZQgDB8Din4DML/fOmKZkkFkrIEg=
 github.com/ipfs/go-libipfs v0.7.0 h1:Mi54WJTODaOL2/ZSm5loi3SwI3jI2OuFWUrQIkJ5cpM=
-github.com/ipfs/go-libipfs v0.7.0/go.mod h1:KsIf/03CqhICzyRGyGo68tooiBE2iFbI/rXW7FhAYr0=
 github.com/ipfs/go-log v0.0.1/go.mod h1:kL1d2/hzSpI0thNYjiKfjanbVNU+IIGA/WnNESY9leM=
 github.com/ipfs/go-log v1.0.3/go.mod h1:OsLySYkwIbiSUR/yBTdv1qPtcE4FW3WPWk/ewz9Ru+A=
 github.com/ipfs/go-log v1.0.5 h1:2dOuUCB1Z7uoczMWgAyDck5JLb72zHzrMnGnCNNbvY8=
@@ -818,7 +818,6 @@ github.com/ipfs/kubo v0.20.0 h1:bnURAj3pBcz4Mu5Z3OrWNvXl22/Y2xGKIJcStc9jGOA=
 github.com/ipfs/kubo v0.20.0/go.mod h1:f9gTqR5sgz4VoAm6ZJsaFu7SivVZPRrOHtrDdI9Brow=
 github.com/ipld/edelweiss v0.2.0 h1:KfAZBP8eeJtrLxLhi7r3N0cBCo7JmwSRhOJp3WSpNjk=
 github.com/ipld/edelweiss v0.2.0/go.mod h1:FJAzJRCep4iI8FOFlRriN9n0b7OuX3T/S9++NpBDmA4=
-github.com/ipld/go-car v0.5.0 h1:kcCEa3CvYMs0iE5BzD5sV7O2EwMiCIp3uF8tA6APQT8=
 github.com/ipld/go-car/v2 v2.9.1-0.20230325062757-fff0e4397a3d h1:22g+x1tgWSXK34i25qjs+afr7basaneEkHaglBshd2g=
 github.com/ipld/go-codec-dagpb v1.6.0 h1:9nYazfyu9B1p3NAgfVdpRco3Fs2nFC72DqVsMj6rOcc=
 github.com/ipld/go-codec-dagpb v1.6.0/go.mod h1:ANzFhfP2uMJxRBr8CE+WQWs5UsNa0pYtmKZ+agnUw9s=
