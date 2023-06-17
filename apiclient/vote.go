@@ -168,7 +168,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		}
 	}
 	// send the vote to the API and handle the response
-	resp, code, err := c.Request("POST", voteAPI, "votes")
+	resp, code, err := c.Request(HTTPPOST, voteAPI, "votes")
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +184,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 
 // Verify verifies a vote. The voteID is the nullifier of the vote.
 func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
-	resp, code, err := c.Request("GET", nil, "votes", "verify", electionID.String(), voteID.String())
+	resp, code, err := c.Request(HTTPGET, nil, "votes", "verify", electionID.String(), voteID.String())
 	if err != nil {
 		return false, err
 	}

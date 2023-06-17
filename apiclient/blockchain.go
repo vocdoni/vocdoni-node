@@ -23,7 +23,7 @@ func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	chainInfo := &api.ChainInfo{}
@@ -40,7 +40,7 @@ func (c *HTTPclient) TransactionsCost() (map[string]uint64, error) {
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	txscost := &api.Transaction{
@@ -72,7 +72,7 @@ func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.Transacti
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, ErrTransactionDoesNotExist
 	}
 	txRef := &api.TransactionReference{}
@@ -95,7 +95,7 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, ErrTransactionDoesNotExist
 	}
 	tx := &models.Tx{}
@@ -118,7 +118,7 @@ func (c *HTTPclient) OrganizationsBySearchTermPaginated(
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	orgs := new(struct {
