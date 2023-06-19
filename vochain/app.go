@@ -510,7 +510,7 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 		t := time.Unix(app.TimestampStartBlock(), 0)
 		return &t
 	}
-	blk := app.fnGetBlockByHeight(height)
+	blk := app.GetBlockByHeight(height)
 	if blk == nil {
 		return nil
 	}
