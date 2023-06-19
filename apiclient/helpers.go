@@ -12,6 +12,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
@@ -29,7 +30,7 @@ func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	var h struct {
@@ -56,7 +57,7 @@ func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte
 	if err != nil {
 		return nil, nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	if err := json.Unmarshal(resp, tx); err != nil {
@@ -282,7 +283,7 @@ func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetP
 	if err != nil {
 		return nil, err
 	}
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("faucet request failed: %s", resp.Status)
 	}
 	data, err := io.ReadAll(resp.Body)

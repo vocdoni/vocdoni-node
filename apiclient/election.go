@@ -21,11 +21,11 @@ func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) 
 	if electionID == nil {
 		return nil, fmt.Errorf("passed electionID is nil")
 	}
-	resp, code, err := c.Request("GET", nil, "elections", electionID.String())
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String())
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	election := &api.Election{}
@@ -73,7 +73,7 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	electionCreate := &api.ElectionCreate{
 		TxPayload: stx,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "elections")
+	resp, code, err := c.Request(HTTPPOST, electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +247,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		TxPayload: stx,
 		Metadata:  metadataBytes,
 	}
-	resp, code, err := c.Request("POST", electionCreate, "elections")
+	resp, code, err := c.Request(HTTPPOST, electionCreate, "elections")
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	}
 
 	// send the transaction
-	resp, code, err := c.Request("POST", &api.Transaction{Payload: stx}, "chain", "transactions")
+	resp, code, err := c.Request(HTTPPOST, &api.Transaction{Payload: stx}, "chain", "transactions")
 	if err != nil {
 		return nil, err
 	}
@@ -333,7 +333,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 
 // ElectionVoteCount returns the number of registered votes for a given election.
 func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error) {
-	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "votes", "count")
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "votes", "count")
 	if err != nil {
 		return 0, err
 	}
@@ -352,11 +352,11 @@ func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error
 
 // ElectionResults returns the election results given its ID.
 func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionResults, error) {
-	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "scrutiny")
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "scrutiny")
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionResults := &api.ElectionResults{}
@@ -382,7 +382,7 @@ func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, elec
 		WithResults:    withResults,
 		Status:         status.String(),
 	}
-	resp, code, err := c.Request("POST", body, "elections", "filter", "page", strconv.Itoa(page))
+	resp, code, err := c.Request(HTTPPOST, body, "elections", "filter", "page", strconv.Itoa(page))
 	if err != nil {
 		return nil, err
 	}
@@ -399,11 +399,11 @@ func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, elec
 // ElectionKeys fetches the encryption keys for an election.
 // Note that only elections that are SecretUntilTheEnd will return keys
 func (c *HTTPclient) ElectionKeys(electionID types.HexBytes) (*api.ElectionKeys, error) {
-	resp, code, err := c.Request("GET", nil, "elections", electionID.String(), "keys")
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "keys")
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	electionKeys := &api.ElectionKeys{}
@@ -439,11 +439,11 @@ func (c *HTTPclient) ElectionPrice(election *api.ElectionDescription) (uint64, e
 		AnonymousVotes:   election.ElectionType.Anonymous,
 		MaxVoteOverwrite: uint32(election.VoteType.MaxVoteOverwrites),
 	}
-	resp, code, err := c.Request("POST", params, "elections", "price")
+	resp, code, err := c.Request(HTTPPOST, params, "elections", "price")
 	if err != nil {
 		return 0, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	price := struct {

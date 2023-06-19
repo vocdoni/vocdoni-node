@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -30,14 +31,14 @@ type CensusProof struct {
 // csp (api.CensusTypeCSP).
 func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 	// create a new census
-	resp, code, err := c.Request("POST", nil, "censuses", censusType)
+	resp, code, err := c.Request(HTTPPOST, nil, "censuses", censusType)
 	if err != nil {
 		return nil, err
 	}
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
@@ -50,11 +51,11 @@ func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 // CensusAddParticipants adds one or several participants to an existing census.
 // The Key can be either the public key or address of the voter.
 func (c *HTTPclient) CensusAddParticipants(censusID types.HexBytes, participants *api.CensusParticipants) error {
-	resp, code, err := c.Request("POST", &participants, "censuses", censusID.String(), "participants")
+	resp, code, err := c.Request(HTTPPOST, &participants, "censuses", censusID.String(), "participants")
 	if err != nil {
 		return err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	return nil
@@ -62,11 +63,11 @@ func (c *HTTPclient) CensusAddParticipants(censusID types.HexBytes, participants
 
 // CensusSize returns the number of participants in a census.
 func (c *HTTPclient) CensusSize(censusID types.HexBytes) (uint64, error) {
-	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "size")
+	resp, code, err := c.Request(HTTPGET, nil, "censuses", censusID.String(), "size")
 	if err != nil {
 		return 0, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
@@ -79,11 +80,11 @@ func (c *HTTPclient) CensusSize(censusID types.HexBytes) (uint64, error) {
 // CensusPublish publishes a census to the distributed data storage and returns its root hash
 // and storage URI.
 func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, string, error) {
-	resp, code, err := c.Request("POST", nil, "censuses", censusID.String(), "publish")
+	resp, code, err := c.Request(HTTPPOST, nil, "censuses", censusID.String(), "publish")
 	if err != nil {
 		return nil, "", err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}
@@ -95,11 +96,11 @@ func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, str
 
 // CensusGenProof generates a proof for a voter in a census. The voterKey is the public key or address of the voter.
 func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusProof, error) {
-	resp, code, err := c.Request("GET", nil, "censuses", censusID.String(), "proof", voterKey.String())
+	resp, code, err := c.Request(HTTPGET, nil, "censuses", censusID.String(), "proof", voterKey.String())
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	censusData := &api.Census{}

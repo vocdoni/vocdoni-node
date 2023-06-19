@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/data/ipfs"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	indexertypes "go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -32,7 +33,7 @@ func (c *HTTPclient) Treasurer() (*api.Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	acc := &api.Account{}
@@ -56,7 +57,7 @@ func (c *HTTPclient) Account(address string) (*api.Account, error) {
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	acc := &api.Account{}
@@ -138,7 +139,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	acc := &api.AccountSet{}
@@ -199,7 +200,7 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	accv := &api.AccountSet{}
@@ -217,7 +218,7 @@ func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*i
 	if err != nil {
 		return nil, err
 	}
-	if code != 200 {
+	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	var transfers []*indexertypes.TokenTransferMeta
