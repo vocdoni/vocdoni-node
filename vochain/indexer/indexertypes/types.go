@@ -192,7 +192,7 @@ type Vote struct {
 	Weight         *types.BigInt
 	TxIndex        int32
 	TxHash         types.HexBytes
-	CreationTime   time.Time
+	BlockTime      time.Time
 	OverwriteCount uint32
 }
 
@@ -204,8 +204,8 @@ func VoteFromDB(dbvote *indexerdb.GetVoteRow) *Vote {
 		Height:         uint32(dbvote.BlockHeight),
 		TxIndex:        int32(dbvote.BlockIndex),
 		Weight:         decodeBigint(dbvote.Weight),
-		TxHash:         dbvote.Hash,
-		CreationTime:   dbvote.CreationTime,
+		TxHash:         dbvote.TxHash,
+		BlockTime:      dbvote.CreationTime,
 		OverwriteCount: uint32(dbvote.OverwriteCount),
 	}
 }

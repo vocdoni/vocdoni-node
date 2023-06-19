@@ -5,7 +5,7 @@ CREATE TABLE votes (
   block_height    INTEGER NOT NULL,
   block_index     INTEGER NOT NULL,
   weight          TEXT NOT NULL, -- a bigint in Go, so we store via MarshalText
-  creation_time   DATETIME NOT NULL,
+  creation_time   DATETIME NOT NULL, -- TODO: unused, remove
   voter_id        BLOB NOT NULL,
   overwrite_count INTEGER NOT NULL,
 
