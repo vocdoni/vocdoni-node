@@ -43,7 +43,7 @@ REPLACE INTO votes (
 	weight, voter_id, overwrite_count, creation_time
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?, ?
+	?, ?, ?, datetime(123, 'unixepoch')
 )
 `
 
@@ -55,7 +55,6 @@ type CreateVoteParams struct {
 	Weight         string
 	VoterID        state.VoterID
 	OverwriteCount int64
-	CreationTime   time.Time
 }
 
 func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Result, error) {
@@ -67,15 +66,16 @@ func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Res
 		arg.Weight,
 		arg.VoterID,
 		arg.OverwriteCount,
-		arg.CreationTime,
 	)
 }
 
 const getVote = `-- name: GetVote :one
-SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.creation_time, v.voter_id, v.overwrite_count, t.hash FROM votes AS v
+SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.creation_time, v.voter_id, v.overwrite_count, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
 LEFT JOIN transactions AS t
 	ON v.block_height = t.block_height
 	AND v.block_index = t.block_index
+LEFT JOIN blocks AS b
+	ON v.block_height = b.height
 WHERE v.nullifier = ?
 LIMIT 1
 `
@@ -89,7 +89,8 @@ type GetVoteRow struct {
 	CreationTime   time.Time
 	VoterID        state.VoterID
 	OverwriteCount int64
-	Hash           types.Hash
+	TxHash         types.Hash
+	BlockTime      time.Time
 }
 
 func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVoteRow, error) {
@@ -104,7 +105,8 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 		&i.CreationTime,
 		&i.VoterID,
 		&i.OverwriteCount,
-		&i.Hash,
+		&i.TxHash,
+		&i.BlockTime,
 	)
 	return i, err
 }

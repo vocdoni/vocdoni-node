@@ -4,14 +4,16 @@ REPLACE INTO votes (
 	weight, voter_id, overwrite_count, creation_time
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?, ?
+	?, ?, ?, datetime(123, 'unixepoch')
 );
 
 -- name: GetVote :one
-SELECT v.*, t.hash FROM votes AS v
+SELECT v.*, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
 LEFT JOIN transactions AS t
 	ON v.block_height = t.block_height
 	AND v.block_index = t.block_index
+LEFT JOIN blocks AS b
+	ON v.block_height = b.height
 WHERE v.nullifier = ?
 LIMIT 1;
 

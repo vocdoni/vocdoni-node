@@ -242,7 +242,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		VoteOptsPb:        encodedPb(p.VoteOptions),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
-		CreationTime:      currentBlockTime,
+		CreationTime:      currentBlockTime, // TODO: remove with sql LEFT JOIN on blocks
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),

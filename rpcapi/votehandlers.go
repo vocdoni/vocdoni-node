@@ -82,7 +82,7 @@ func (r *RPCAPI) getEnvelopeStatus(request *api.APIrequest) (*api.APIresponse, e
 	}
 	response.Registered = types.True
 	response.Height = &vr.Height
-	response.BlockTimestamp = int32(vr.CreationTime.Unix())
+	response.BlockTimestamp = int32(vr.BlockTime.Unix())
 	response.ProcessID = vr.ProcessID
 	return &response, nil
 }

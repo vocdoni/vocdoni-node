@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
 
@@ -60,7 +59,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
 		Weight:               encodeBigint(voteRef.Weight),
 		OverwriteCount:       voteRef.OverwriteCount,
-		Date:                 voteRef.CreationTime,
+		Date:                 voteRef.BlockTime,
 		Meta: indexertypes.EnvelopeMetadata{
 			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
@@ -233,11 +232,6 @@ func (idx *Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byt
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
 func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
-	creationTime := idx.App.TimestampFromBlock(int64(vote.Height))
-	if creationTime == nil {
-		t := time.Now()
-		creationTime = &t
-	}
 	weightStr := "1"
 	if vote.Weight != nil {
 		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
@@ -250,7 +244,6 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 		Weight:         weightStr,
 		OverwriteCount: int64(vote.Overwrites),
 		VoterID:        nonNullBytes(vote.VoterID),
-		CreationTime:   *creationTime,
 	}); err != nil {
 		return err
 	}
