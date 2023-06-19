@@ -57,7 +57,7 @@ func BenchmarkIndexer(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Index $numInserts votes, and then do $numFetches across $concurrentReaders.
 		// The read-only queries are done on the previous iteration, to ensure they are indexed.
-		height := uint32(500 + i)
+		height := app.Height()
 		const numInserts = 100
 		const numFetches = 50
 		const concurrentReaders = 5
