@@ -18,7 +18,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-func BenchmarkIndexVotes(b *testing.B) {
+func BenchmarkIndexer(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
 	idx := newTestIndexer(b, app, true)
@@ -50,6 +50,9 @@ func BenchmarkIndexVotes(b *testing.B) {
 
 	var lastVotes []*state.Vote
 	var lastTxs []*vochaintx.Tx
+
+	// Note that we use qt's Check in the goroutines below,
+	// since b.Fatal can only be called from the main goroutine.
 
 	for i := 0; i < b.N; i++ {
 		// Index $numInserts votes, and then do $numFetches across $concurrentReaders.
@@ -102,13 +105,17 @@ func BenchmarkIndexVotes(b *testing.B) {
 					tx := lastTxs[j%len(lastTxs)]
 
 					voteRef, err := idx.GetEnvelopeReference(vote.Nullifier)
-					qt.Assert(b, err, qt.IsNil)
-					qt.Assert(b, voteRef.Weight.MathBigInt().Cmp(vote.Weight), qt.Equals, 0)
-					qt.Assert(b, []byte(voteRef.TxHash), qt.DeepEquals, tx.TxID[:])
+					qt.Check(b, err, qt.IsNil)
+					if err == nil {
+						qt.Check(b, voteRef.Weight.MathBigInt().Cmp(vote.Weight), qt.Equals, 0)
+						qt.Check(b, []byte(voteRef.TxHash), qt.DeepEquals, tx.TxID[:])
+					}
 
 					txRef, err := idx.GetTxHashReference(tx.TxID[:])
-					qt.Assert(b, err, qt.IsNil)
-					qt.Assert(b, txRef.BlockHeight, qt.Equals, vote.Height)
+					qt.Check(b, err, qt.IsNil)
+					if err == nil {
+						qt.Check(b, txRef.BlockHeight, qt.Equals, vote.Height)
+					}
 				}
 				wg.Done()
 			}()
