@@ -13,6 +13,10 @@ import (
 // Error codes in the 4001-4999 range are the user's fault,
 // and error codes 5001-5999 are the server's fault, mimicking HTTP.
 //
+// NEVER change any of the current error codes, only append new errors after the current last 4XXX or 5XXX
+// If you notice there's a gap (say, error code 4010, 4011 and 4013 exist, 4012 is missing) DON'T fill in the gap,
+// that code was used in the past for some error (not anymore) and shouldn't be reused.
+//
 // Do note that HTTPstatus 204 No Content implies the response body will be empty,
 // so the Code and Message will actually be discarded, never sent to the client
 var (
@@ -55,16 +59,16 @@ var (
 	ErrParamRootInvalid                 = apirest.APIerror{Code: 4036, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (root) invalid")}
 	ErrParamNetworkInvalid              = apirest.APIerror{Code: 4037, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid network")}
 	ErrParamToInvalid                   = apirest.APIerror{Code: 4038, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid address")}
-	ErrMissingParameter                 = apirest.APIerror{Code: 4039, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("one or more parameters are missing")}
-	ErrParticipantKeyMissing            = apirest.APIerror{Code: 4040, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("missing participant key")}
-	ErrIndexedCensusCantUseWeight       = apirest.APIerror{Code: 4041, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("indexed census cannot use weight")}
-	ErrWalletNotFound                   = apirest.APIerror{Code: 4042, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("wallet not found")}
-	ErrWalletPrivKeyAlreadyExists       = apirest.APIerror{Code: 4043, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("wallet private key already exists")}
-	ErrElectionEndDateInThePast         = apirest.APIerror{Code: 4044, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date cannot be in the past")}
-	ErrElectionEndDateBeforeStart       = apirest.APIerror{Code: 4045, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date must be after start date")}
-	ErrElectionNotFound                 = apirest.APIerror{Code: 4046, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("election not found")}
-	ErrCensusNotFound                   = apirest.APIerror{Code: 4047, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("census not found")}
-	ErrNoElectionKeys                   = apirest.APIerror{Code: 4048, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("no election keys available")}
+	ErrParticipantKeyMissing            = apirest.APIerror{Code: 4039, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("missing participant key")}
+	ErrIndexedCensusCantUseWeight       = apirest.APIerror{Code: 4040, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("indexed census cannot use weight")}
+	ErrWalletNotFound                   = apirest.APIerror{Code: 4041, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("wallet not found")}
+	ErrWalletPrivKeyAlreadyExists       = apirest.APIerror{Code: 4042, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("wallet private key already exists")}
+	ErrElectionEndDateInThePast         = apirest.APIerror{Code: 4043, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date cannot be in the past")}
+	ErrElectionEndDateBeforeStart       = apirest.APIerror{Code: 4044, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date must be after start date")}
+	ErrElectionNotFound                 = apirest.APIerror{Code: 4045, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("election not found")}
+	ErrCensusNotFound                   = apirest.APIerror{Code: 4046, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("census not found")}
+	ErrNoElectionKeys                   = apirest.APIerror{Code: 4047, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("no election keys available")}
+	ErrMissingParameter                 = apirest.APIerror{Code: 4048, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("one or more parameters are missing")}
 	ErrKeyNotFoundInCensus              = apirest.APIerror{Code: 4049, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("key not found in census")}
 	ErrInvalidStatus                    = apirest.APIerror{Code: 4050, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid status")}
 	ErrInvalidCensusKeyLength           = apirest.APIerror{Code: 4051, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid census key length")}
