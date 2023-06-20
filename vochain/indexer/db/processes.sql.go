@@ -222,8 +222,9 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 }
 
 const searchEntities = `-- name: SearchEntities :many
-SELECT DISTINCT entity_id FROM processes
+SELECT entity_id, COUNT(id) FROM processes
 WHERE (?1 = '' OR (INSTR(LOWER(HEX(entity_id)), ?1) > 0))
+GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC
 LIMIT ?3
 OFFSET ?2
@@ -235,19 +236,24 @@ type SearchEntitiesParams struct {
 	Limit          int64
 }
 
-func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]types.EntityID, error) {
+type SearchEntitiesRow struct {
+	EntityID types.EntityID
+	Count    int64
+}
+
+func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
 	rows, err := q.db.QueryContext(ctx, searchEntities, arg.EntityIDSubstr, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []types.EntityID
+	var items []SearchEntitiesRow
 	for rows.Next() {
-		var entity_id types.EntityID
-		if err := rows.Scan(&entity_id); err != nil {
+		var i SearchEntitiesRow
+		if err := rows.Scan(&i.EntityID, &i.Count); err != nil {
 			return nil, err
 		}
-		items = append(items, entity_id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

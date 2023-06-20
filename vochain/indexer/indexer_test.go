@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -14,7 +15,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -71,8 +71,9 @@ func testEntityList(t *testing.T, entityCount int) {
 			app.AdvanceTestBlock()
 		}
 	}
-	baseProcess.ProcessId = util.RandomBytes(32)
 	// add 1 more process to an entity that already has one to test for duplicates
+	twoProcessesEntity := baseProcess.EntityId
+	baseProcess.ProcessId = util.RandomBytes(32)
 	if err := app.State.AddProcess(baseProcess); err != nil {
 		t.Fatal(err)
 	}
@@ -89,10 +90,15 @@ func testEntityList(t *testing.T, entityCount int) {
 			break
 		}
 		for _, e := range list {
-			if entitiesByID[e.String()] {
-				t.Fatalf("found duplicated entity: %x", e)
+			if entitiesByID[string(e.EntityID)] {
+				t.Fatalf("found duplicated entity: %x", e.EntityID)
 			}
-			entitiesByID[e.String()] = true
+			entitiesByID[string(e.EntityID)] = true
+			if bytes.Equal(e.EntityID, twoProcessesEntity) {
+				qt.Assert(t, e.Count, qt.Equals, int64(2))
+			} else {
+				qt.Assert(t, e.Count, qt.Equals, int64(1))
+			}
 		}
 		last += 10
 	}
@@ -171,9 +177,8 @@ func TestEntitySearch(t *testing.T) {
 		}
 	}
 	app.AdvanceTestBlock()
-	var list []types.HexBytes
 	// Exact entity search
-	list = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	list := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
 	if len(list) < 1 {
 		t.Fatalf("expected 1 entity, got %d", len(list))
 	}

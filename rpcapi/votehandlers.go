@@ -364,8 +364,10 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 	if request.ListSize > MaxListSize || request.ListSize <= 0 {
 		request.ListSize = MaxListSize
 	}
-	eids := r.indexer.EntityList(request.ListSize, request.From, request.SearchTerm)
-	response.EntityIDs = eids
+	entities := r.indexer.EntityList(request.ListSize, request.From, request.SearchTerm)
+	for _, e := range entities {
+		response.EntityIDs = append(response.EntityIDs, e.EntityID)
+	}
 	return &response, nil
 }
 

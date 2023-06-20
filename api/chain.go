@@ -201,10 +201,10 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	organizations := []*OrganizationList{}
 
 	list := a.indexer.EntityList(MaxPageSize, page, "")
-	for _, orgID := range list {
+	for _, org := range list {
 		organizations = append(organizations, &OrganizationList{
-			OrganizationID: orgID,
-			ElectionCount:  a.indexer.ProcessCount(orgID),
+			OrganizationID: org.EntityID,
+			ElectionCount:  uint64(org.Count),
 		})
 	}
 
@@ -587,6 +587,7 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 			tx.ProtoReflect().WhichOneof(
 				tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
 
+		// TODO: can we avoid indexer Get calls in a loop?
 		txRef, err := a.indexer.GetTxHashReference(block.Txs[i].Hash())
 		if err != nil {
 			return ErrTransactionNotFound
@@ -727,10 +728,10 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 		return ErrOrgNotFound
 	}
 
-	for _, orgID := range matchingOrganizationIds {
+	for _, org := range matchingOrganizationIds {
 		organizations = append(organizations, &OrganizationList{
-			OrganizationID: orgID,
-			ElectionCount:  a.indexer.ProcessCount(orgID),
+			OrganizationID: org.EntityID,
+			ElectionCount:  uint64(org.Count),
 		})
 	}
 
