@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -154,7 +155,7 @@ func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.
 	return election, nil
 }
 
-func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool) map[string]*apiclient.CensusProof {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) map[string]*apiclient.CensusProof {
 	type voterProof struct {
 		proof   *apiclient.CensusProof
 		address string
@@ -191,10 +192,17 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 				voterKey = t.api.MyZkAddress().Bytes()
 			}
 
-			pr, err := t.api.CensusGenProof(root, voterKey)
-			if isAnonymousVoting {
-				apiClientMtx.Unlock()
+			var pr *apiclient.CensusProof
+			var err error
+			if csp != nil {
+				pr, err = cspGenProof(t.election.ElectionID, voterKey, csp)
+			} else {
+				pr, err = t.api.CensusGenProof(root, voterKey)
+				if isAnonymousVoting {
+					apiClientMtx.Unlock()
+				}
 			}
+
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -221,17 +229,16 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 	}
 
 	wg.Wait()
-	time.Sleep(time.Second) // wait a grace time for the last proof to be added
 	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(t.voterAccounts))
 	stopProofs <- true
 
 	return proofs
 }
 
-func (t *e2eElection) setupCensus(censusType string) (types.HexBytes, error) {
+func (t *e2eElection) setupAccount() error {
 	// Set the account in the API client, so we can sign transactions
 	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
-		return nil, err
+		return err
 	}
 
 	// If the account does not exist, create a new one
@@ -240,11 +247,14 @@ func (t *e2eElection) setupCensus(censusType string) (types.HexBytes, error) {
 	if err != nil {
 		acc, err = t.createAccount(t.api.MyAddress().Hex())
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
+	return nil
+}
 
+func (t *e2eElection) setupCensus(censusType string) (types.HexBytes, error) {
 	// Create a new census
 	censusID, err := t.api.NewCensus(censusType)
 	if err != nil {
@@ -269,6 +279,10 @@ func (t *e2eElection) setupCensus(censusType string) (types.HexBytes, error) {
 }
 
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
+	if err := t.setupAccount(); err != nil {
+		return err
+	}
+
 	censusID, err := t.setupCensus(ed.Census.Type)
 	if err != nil {
 		return err
@@ -310,34 +324,52 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 		return err
 	}
 	t.election = election
-	t.proofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous)
+	t.proofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
 
 	return nil
 }
 
 func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
-	var censusURI string
-	// default census type
-	censusType := vapi.CensusTypeWeighted
-
-	censusID, err := t.setupCensus(censusType)
-	if err != nil {
+	// Set the account in the API client, so we can sign transactions
+	if err := t.setupAccount(); err != nil {
 		return err
 	}
 
-	// Publish the census
-	prc.CensusRoot, censusURI, err = t.api.CensusPublish(censusID)
-	if err != nil {
-		return err
-	}
-	log.Infof("census published with root %x", prc.CensusRoot)
+	csp := &ethereum.SignKeys{}
 
-	prc.EntityId = t.api.MyAddress().Bytes()
-	prc.CensusURI = &censusURI
+	switch prc.CensusOrigin {
+	case models.CensusOrigin_OFF_CHAIN_CA:
+		t.voterAccounts = ethereum.NewSignKeysBatch(t.config.nvotes)
 
-	// Check census size (of the published census)
-	if !t.isCensusSizeValid(prc.CensusRoot) {
-		return err
+		if err := csp.Generate(); err != nil {
+			return err
+		}
+		censusRoot := csp.PublicKey()
+		prc.CensusRoot = censusRoot
+
+	default:
+		censusType := vapi.CensusTypeWeighted
+		censusID, err := t.setupCensus(censusType)
+		if err != nil {
+			return err
+		}
+
+		// Publish the census
+		var censusURI string
+		prc.CensusRoot, censusURI, err = t.api.CensusPublish(censusID)
+		if err != nil {
+			return err
+		}
+
+		log.Infof("census published with root %x", prc.CensusRoot)
+
+		prc.CensusURI = &censusURI
+		csp = nil
+
+		// Check census size (of the published census)
+		if !t.isCensusSizeValid(prc.CensusRoot) {
+			return err
+		}
 	}
 
 	electionID, err := t.api.NewElectionRaw(prc)
@@ -353,7 +385,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 	t.election = election
 	prc.ProcessId = t.election.ElectionID
 
-	t.proofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous)
+	t.proofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
 
 	return nil
 }
@@ -570,4 +602,32 @@ func votesToBigInt(votes ...uint64) []*types.BigInt {
 		vBigInt[i] = new(types.BigInt).SetUint64(v)
 	}
 	return vBigInt
+}
+
+func cspGenProof(pid, voterKey []byte, csp *ethereum.SignKeys) (*apiclient.CensusProof, error) {
+	bundle := &models.CAbundle{
+		ProcessId: pid,
+		Address:   voterKey,
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	if err != nil {
+		return nil, err
+	}
+
+	signature, err := csp.SignEthereum(bundleBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	caProof := &models.ProofCA{
+		Bundle:    bundle,
+		Type:      models.ProofCA_ECDSA,
+		Signature: signature,
+	}
+	caProofBytes, err := proto.Marshal(caProof)
+	if err != nil {
+		return nil, err
+	}
+
+	return &apiclient.CensusProof{Proof: caProofBytes}, nil
 }

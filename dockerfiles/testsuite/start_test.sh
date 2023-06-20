@@ -10,6 +10,7 @@
 #  e2etest_censusizelection: run max census size test
 #  e2etest_ballotelection: run ballot test
 #  e2etest_lifecyclelection: run lifecycle test
+#  e2etest_cspelection: run csp test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
@@ -55,6 +56,7 @@ tests_to_run=(
 	"e2etest_ballotelection"
 	"e2etest_tokentxs"
 	"e2etest_lifecyclelection"
+	"e2etest_cspelection"
 )
 
 # print help
@@ -122,6 +124,10 @@ e2etest_ballotelection() {
 
 e2etest_lifecyclelection() {
   e2etest lifecyclelection
+}
+
+e2etest_cspelection() {
+  e2etest cspelection
 }
 
 ### end tests definition
