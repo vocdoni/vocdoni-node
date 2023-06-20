@@ -150,10 +150,10 @@ func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
 // EntityList returns the list of entities indexed by the indexer
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
-func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexBytes {
+func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.SearchEntitiesRow {
 	// TODO: EntityList callers in the api package want the process count as well;
 	// work it out here so that the api package doesn't cause N sql queries.
-	entityIDs, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
+	rows, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: searchTerm,
 		Offset:         int64(from),
 		Limit:          int64(max),
@@ -162,11 +162,7 @@ func (idx *Indexer) EntityList(max, from int, searchTerm string) []types.HexByte
 		log.Errorf("error listing entities: %v", err)
 		return nil
 	}
-	hexIDs := make([]types.HexBytes, len(entityIDs))
-	for i, id := range entityIDs {
-		hexIDs[i] = id
-	}
-	return hexIDs
+	return rows
 }
 
 // EntityProcessCount returns the number of processes that an entity holds
