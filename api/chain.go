@@ -333,7 +333,7 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 		return err
 	}
 	data, err := json.Marshal(struct {
-		Height uint32 `json:"height"`
+		Height uint64 `json:"height"`
 	}{Height: height},
 	)
 	if err != nil {
