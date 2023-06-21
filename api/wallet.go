@@ -309,7 +309,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	// Set startBlock and endBlock
-	var startBlock uint32
+	var startBlock uint64
 	// if start date is empty, do not attempt to parse it. Set startBlock to 0, starting the
 	// election immediately. Otherwise, ensure the startBlock is in the future
 	if !description.StartDate.IsZero() {
@@ -336,7 +336,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if startBlock == 0 {
 		// If startBlock is set to 0 (process starts asap), set the blockcount to the desired
 		// end block, minus the expected start block of the process
-		blockCount = blockCount - uint32(a.vocinfo.Height()) + 3
+		blockCount = blockCount - uint64(a.vocinfo.Height()) + 3
 	}
 
 	// Set the envelope and process models
@@ -421,8 +421,8 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// Build the process transaction
 	process := &models.Process{
 		EntityId:     wallet.Address().Bytes(),
-		StartBlock:   startBlock,
-		BlockCount:   blockCount,
+		StartBlock:   uint32(startBlock),
+		BlockCount:   uint32(blockCount),
 		CensusRoot:   root,
 		CensusURI:    &description.Census.URL,
 		Status:       models.ProcessStatus_READY,
