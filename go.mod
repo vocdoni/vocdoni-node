@@ -13,7 +13,7 @@ require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
-	github.com/cockroachdb/pebble v0.0.0-20230309163202-51422ae2d449
+	github.com/cockroachdb/pebble v0.0.0-20230620232302-06034ff014e0
 	github.com/cometbft/cometbft v0.37.1
 	github.com/cometbft/cometbft-db v0.8.0
 	github.com/ethereum/go-ethereum v1.11.6
@@ -50,7 +50,7 @@ require (
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.1
 	github.com/pressly/goose/v3 v3.10.0
-	github.com/prometheus/client_golang v1.14.0
+	github.com/prometheus/client_golang v1.16.0
 	github.com/rs/zerolog v1.28.0
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/pflag v1.0.5
@@ -58,7 +58,7 @@ require (
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.vocdoni.io/proto v1.14.5-0.20230426091403-1c1475660dc8
-	golang.org/x/crypto v0.9.0
+	golang.org/x/crypto v0.10.0
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
 	golang.org/x/net v0.10.0
 	google.golang.org/protobuf v1.30.0
@@ -87,6 +87,7 @@ require (
 	github.com/cockroachdb/errors v1.9.1 // indirect
 	github.com/cockroachdb/logtags v0.0.0-20230118201751-21c54148d20b // indirect
 	github.com/cockroachdb/redact v1.1.3 // indirect
+	github.com/cockroachdb/tokenbucket v0.0.0-20230613231145-182959a1fad6 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cosmos/gogoproto v1.4.1 // indirect
@@ -239,9 +240,9 @@ require (
 	github.com/petermattis/goid v0.0.0-20221018141743-354ef7f2fd21 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/polydawn/refmt v0.89.0 // indirect
-	github.com/prometheus/client_model v0.3.0 // indirect
-	github.com/prometheus/common v0.42.0 // indirect
-	github.com/prometheus/procfs v0.9.0 // indirect
+	github.com/prometheus/client_model v0.4.0 // indirect
+	github.com/prometheus/common v0.44.0 // indirect
+	github.com/prometheus/procfs v0.11.0 // indirect
 	github.com/prometheus/statsd_exporter v0.22.8 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
@@ -251,7 +252,7 @@ require (
 	github.com/raulk/go-watchdog v1.3.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
-	github.com/rogpeppe/go-internal v1.9.0 // indirect
+	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/samber/lo v1.36.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
@@ -294,10 +295,10 @@ require (
 	go.uber.org/zap v1.24.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.10.0 // indirect
-	golang.org/x/oauth2 v0.5.0 // indirect
-	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.8.0 // indirect
-	golang.org/x/text v0.9.0 // indirect
+	golang.org/x/oauth2 v0.8.0 // indirect
+	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/sys v0.9.0 // indirect
+	golang.org/x/text v0.10.0 // indirect
 	golang.org/x/tools v0.7.0 // indirect
 	golang.org/x/xerrors v0.0.0-20220907171357-04be3eba64a2 // indirect
 	gonum.org/v1/gonum v0.11.0 // indirect
