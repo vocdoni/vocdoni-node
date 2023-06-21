@@ -71,20 +71,22 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		nvotes.Add(1)
 		return false
 	})
-	if err == nil {
-		log.Infow("computed results",
-			"process", fmt.Sprintf("%x", electionID),
-			"votes", nvotes.Load(),
-			"results", results.String(),
-			"elapsed", time.Since(startTime).String(),
-		)
-	}
 	if errors.Is(err, statedb.ErrEmptyTree) {
 		// no votes, return empty results
 		return results, nil
 	}
+	if err != nil {
+		return nil, fmt.Errorf("IterateVotes failed: %w", err)
+	}
+
+	log.Infow("computed results",
+		"process", fmt.Sprintf("%x", electionID),
+		"votes", nvotes.Load(),
+		"results", results.String(),
+		"elapsed", time.Since(startTime).String(),
+	)
 	results.EnvelopeHeight = nvotes.Load()
-	return results, err
+	return results, nil
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
