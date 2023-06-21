@@ -14,7 +14,7 @@ require (
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
 	github.com/cockroachdb/pebble v0.0.0-20230620232302-06034ff014e0
-	github.com/cometbft/cometbft v0.37.1
+	github.com/cometbft/cometbft v0.37.2
 	github.com/cometbft/cometbft-db v0.8.0
 	github.com/ethereum/go-ethereum v1.11.6
 	github.com/fatih/color v1.15.0
@@ -60,7 +60,7 @@ require (
 	go.vocdoni.io/proto v1.14.5-0.20230426091403-1c1475660dc8
 	golang.org/x/crypto v0.10.0
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
-	golang.org/x/net v0.10.0
+	golang.org/x/net v0.11.0
 	google.golang.org/protobuf v1.30.0
 )
 
