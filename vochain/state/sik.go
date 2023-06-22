@@ -21,7 +21,7 @@ func (v *State) SetSIK(addr common.Address, sik []byte) error {
 // not registered, it returns an error. If it is, it will encode the hysteresis
 // height and set it as SIK value to invalidate it and prevent it to being
 // updated before that height.
-func (v *State) DelSIK(addr common.Address) error {
+func (v *State) DelSIK(addr common.Address, hysteresisHeight uint32) error {
 	return nil
 }
 
