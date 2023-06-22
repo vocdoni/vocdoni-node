@@ -11,11 +11,17 @@ import (
 // Error() returns a human-readable description of the error.
 //
 // Error codes in the 4001-4999 range are the user's fault,
-// and error codes 5001-5999 are the server's fault, mimicking HTTP.
+// and they return HTTP Status 400 or 404 (or even 204), whatever is most appropriate.
 //
+// Error codes 5001-5999 are the server's fault
+// and they return HTTP Status 500 or 503, or something else if appropriate.
+//
+// The initial list of errors were more or less grouped by topic, but the list grows with time in a random fashion.
 // NEVER change any of the current error codes, only append new errors after the current last 4XXX or 5XXX
 // If you notice there's a gap (say, error code 4010, 4011 and 4013 exist, 4012 is missing) DON'T fill in the gap,
 // that code was used in the past for some error (not anymore) and shouldn't be reused.
+// There's no correlation between Code and HTTP Status,
+// for example the fact that Code 4045 returns HTTP Status 404 Not Found is just a coincidence
 //
 // Do note that HTTPstatus 204 No Content implies the response body will be empty,
 // so the Code and Message will actually be discarded, never sent to the client
