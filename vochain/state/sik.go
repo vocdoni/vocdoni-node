@@ -30,8 +30,8 @@ const hysteresisLen = 32
 //   - If the hysteresis height is reached, it updates the value of the sik with
 //     the provided one.
 func (v *State) SetSIK(address common.Address, newSik []byte) error {
-	// check if exists a registered sik for the provided address, query for a
-	// commited tree version
+	// check if exists a registered sik for the provided address, query also for
+	// no commited tree version
 	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// if not exists create it
@@ -67,8 +67,24 @@ func (v *State) SetSIK(address common.Address, newSik []byte) error {
 // height and set it as SIK value to invalidate it and prevent it to being
 // updated before that height. The hysteresisHeight must be greater than the
 // curren chain height.
-func (v *State) DelSIK(addr common.Address, hysteresisHeight uint32) error {
-	return nil
+func (v *State) DelSIK(address common.Address, hysteresisHeight uint32) error {
+	// if the sik does not exists or something fails querying return the error
+	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	if err != nil {
+		return err
+	}
+	// if the stored sik is already invalidated return an error
+	if !validSIK(sik) {
+		return ErrSIKAlreadyInvalid
+	}
+	// if the provided hysteresis height is lower or equal to the current height
+	// return an error
+	if hysteresisHeight <= v.CurrentHeight() {
+		return ErrInvalidHysteresis
+	}
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(address.Bytes(), encodeHysteresis(hysteresisHeight), StateTreeCfg(TreeSIK))
 }
 
 // encodeHysteresis funtion returns the encoded value of the height hysteresis

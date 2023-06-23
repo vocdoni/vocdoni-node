@@ -38,6 +38,35 @@ func TestSetSIK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 }
 
+func Test_DelSIK(t *testing.T) {
+	c := qt.New(t)
+	// create a tree for testing
+	dir := t.TempDir()
+	s, err := NewState(db.TypePebble, dir)
+	qt.Assert(t, err, qt.IsNil)
+	// create a valid leaf
+	address := common.HexToAddress("0xF3668000B66c61aAa08aBC559a8C78Ae7E007C2e")
+	sik, _ := hex.DecodeString("3a7806f4e0b5bda625d465abf5639ba42ac9b91bafea3b800a4a")
+	// try to delete it when it not exists yet
+	c.Assert(s.DelSIK(address, 5), qt.IsNotNil)
+	// mock a height greater than the hysteresis provided
+	s.SetHeight(10)
+	c.Assert(s.DelSIK(address, 5), qt.IsNotNil)
+	// add an invalid sik (with hysteresis value)
+	s.Tx.Lock()
+	err = s.Tx.DeepAdd(address.Bytes(), encodeHysteresis(10), StateTreeCfg(TreeSIK))
+	s.Tx.Unlock()
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.DelSIK(address, 5), qt.IsNotNil)
+	// mock a valid sik and try a success deletion
+	s.SetHeight(2)
+	s.Tx.Lock()
+	err = s.Tx.DeepSet(address.Bytes(), sik, StateTreeCfg(TreeSIK))
+	s.Tx.Unlock()
+	c.Assert(err, qt.IsNil)
+	c.Assert(s.DelSIK(address, 5), qt.IsNil)
+}
+
 func Test_hysteresis(t *testing.T) {
 	c := qt.New(t)
 	height := uint32(3498223)

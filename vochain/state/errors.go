@@ -13,5 +13,7 @@ var (
 	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
 	ErrInvalidURILength     = fmt.Errorf("invalid URI length")
 	ErrRegisteredValidSIK   = fmt.Errorf("address already has a valid sik")
+	ErrSIKAlreadyInvalid    = fmt.Errorf("sik is already invalidated")
 	ErrHysteresisNotReached = fmt.Errorf("hysteresis height not reached")
+	ErrInvalidHysteresis    = fmt.Errorf("hysteresis must be greater than the curren height")
 )
