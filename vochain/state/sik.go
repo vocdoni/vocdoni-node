@@ -49,7 +49,7 @@ func (v *State) SetSIK(address common.Address, newSik []byte) error {
 		return ErrRegisteredValidSIK
 	}
 	// check if the hysteresis height is reached
-	hysteresis := decodeHysteresis(sik)
+	hysteresis := decodeHeigh(sik)
 	if hysteresis > v.CurrentHeight() {
 		return ErrHysteresisNotReached
 	}
@@ -63,11 +63,10 @@ func (v *State) SetSIK(address common.Address, newSik []byte) error {
 }
 
 // DelSIK function removes the registered SIK for the address provided. If it is
-// not registered, it returns an error. If it is, it will encode the hysteresis
-// height and set it as SIK value to invalidate it and prevent it to being
-// updated before that height. The hysteresisHeight must be greater than the
-// curren chain height.
-func (v *State) DelSIK(address common.Address, hysteresisHeight uint32) error {
+// not registered, it returns an error. If it is, it will encode the current
+// height and set it as the SIK value to invalidate it and prevent it from being
+// updated until all processes created before that height have finished.
+func (v *State) DelSIK(address common.Address) error {
 	// if the sik does not exists or something fails querying return the error
 	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
 	if err != nil {
@@ -77,22 +76,17 @@ func (v *State) DelSIK(address common.Address, hysteresisHeight uint32) error {
 	if !validSIK(sik) {
 		return ErrSIKAlreadyInvalid
 	}
-	// if the provided hysteresis height is lower or equal to the current height
-	// return an error
-	if hysteresisHeight <= v.CurrentHeight() {
-		return ErrInvalidHysteresis
-	}
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(address.Bytes(), encodeHysteresis(hysteresisHeight), StateTreeCfg(TreeSIK))
+	return v.Tx.DeepSet(address.Bytes(), encodeHeight(v.CurrentHeight()), StateTreeCfg(TreeSIK))
 }
 
-// encodeHysteresis funtion returns the encoded value of the height hysteresis
+// encodeHeight funtion returns the encoded value of the height hysteresis
 // provided ready to use in the SIK subTree as leaf value.
 // It will have 32 bytes:
 //   - The initial 28 bytes must be zero.
 //   - The remaining 4 bytes must contain the height encoded in LittleEndian
-func encodeHysteresis(height uint32) []byte {
+func encodeHeight(height uint32) []byte {
 	bHeight := big.NewInt(int64(height)).Bytes()
 	// fill with zeros until reach the encoded height length
 	for len(bHeight) < encodedHeightLen {
@@ -107,9 +101,9 @@ func encodeHysteresis(height uint32) []byte {
 	return hysteresis
 }
 
-// decodeHysteresis funtion returns the decoded height uint32 from the leaf
+// decodeHeigh funtion returns the decoded height uint32 from the leaf
 // value that contains the encoded hysteresis height.
-func decodeHysteresis(leafValue []byte) uint32 {
+func decodeHeigh(leafValue []byte) uint32 {
 	bHeight := []byte{}
 	for i := hysteresisLen - 1; len(bHeight) < encodedHeightLen; i-- {
 		bHeight = append(bHeight, leafValue[i])
