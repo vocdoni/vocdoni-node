@@ -12,4 +12,6 @@ var (
 	ErrAccountBalanceZero   = fmt.Errorf("zero balance account not valid")
 	ErrAccountAlreadyExists = fmt.Errorf("account already exists")
 	ErrInvalidURILength     = fmt.Errorf("invalid URI length")
+	ErrRegisteredValidSIK   = fmt.Errorf("address already has a valid sik")
+	ErrHysteresisNotReached = fmt.Errorf("hysteresis height not reached")
 )

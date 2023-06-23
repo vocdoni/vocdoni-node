@@ -1,9 +1,13 @@
 package state
 
 import (
+	"encoding/hex"
+	"errors"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // encodedHeightLen constant is the number of bytes of the encoded hysteresis
@@ -25,8 +29,37 @@ const hysteresisLen = 32
 //   - If the hysteresis height is not reached yet, it returns an error.
 //   - If the hysteresis height is reached, it updates the value of the sik with
 //     the provided one.
-func (v *State) SetSIK(addr common.Address, sik []byte) error {
-	return nil
+func (v *State) SetSIK(address common.Address, newSik []byte) error {
+	// check if exists a registered sik for the provided address, query for a
+	// commited tree version
+	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		// if not exists create it
+		log.Debugw("setSIK (create)",
+			"address", address.String(),
+			"sik", hex.EncodeToString(sik))
+		v.Tx.Lock()
+		defer v.Tx.Unlock()
+		return v.Tx.DeepAdd(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
+	} else if err != nil {
+		return err
+	}
+	// check if is a valid sik
+	if validSIK(sik) {
+		return ErrRegisteredValidSIK
+	}
+	// check if the hysteresis height is reached
+	hysteresis := decodeHysteresis(sik)
+	if hysteresis > v.CurrentHeight() {
+		return ErrHysteresisNotReached
+	}
+	log.Debugw("setSIK (update)",
+		"address", address.String(),
+		"sik", hex.EncodeToString(newSik))
+	// if the hysteresis is reached update the sik for the address
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	return v.Tx.DeepSet(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
 }
 
 // DelSIK function removes the registered SIK for the address provided. If it is
@@ -45,11 +78,15 @@ func (v *State) DelSIK(addr common.Address, hysteresisHeight uint32) error {
 //   - The remaining 4 bytes must contain the height encoded in LittleEndian
 func encodeHysteresis(height uint32) []byte {
 	bHeight := big.NewInt(int64(height)).Bytes()
-	hysteresis := make([]byte, hysteresisLen)
-	// copy the height bytes swapping endianness in the last bytes of the empty
-	// hysteresis result
-	for i, b := hysteresisLen-1, 0; i >= hysteresisLen-len(bHeight); i, b = i-1, b+1 {
-		hysteresis[i] = bHeight[b]
+	// fill with zeros until reach the encoded height length
+	for len(bHeight) < encodedHeightLen {
+		bHeight = append([]byte{0}, bHeight...)
+	}
+	// create the hysteresis with the rigth number of zeros
+	hysteresis := make([]byte, hysteresisLen-encodedHeightLen)
+	// copy the height bytes swapping endianness in the last bytes
+	for i := encodedHeightLen - 1; i >= 0; i-- {
+		hysteresis = append(hysteresis, bHeight[i])
 	}
 	return hysteresis
 }
@@ -58,8 +95,18 @@ func encodeHysteresis(height uint32) []byte {
 // value that contains the encoded hysteresis height.
 func decodeHysteresis(leafValue []byte) uint32 {
 	bHeight := []byte{}
-	for i := hysteresisLen - 1; i >= hysteresisLen-encodedHeightLen; i-- {
+	for i := hysteresisLen - 1; len(bHeight) < encodedHeightLen; i-- {
 		bHeight = append(bHeight, leafValue[i])
 	}
 	return uint32(new(big.Int).SetBytes(bHeight).Int64())
+}
+
+// validSIK function returns if the provided SIK is a valid one or invalid.
+func validSIK(sik []byte) bool {
+	for i := 0; i < len(sik)-encodedHeightLen; i++ {
+		if sik[i] != 0 {
+			return true
+		}
+	}
+	return false
 }

@@ -210,6 +210,14 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	if _, err := update.SubTree(treeCfg); err != nil {
 		return nil, err
 	}
+	treeCfg = StateTreeCfg(TreeSIK)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(treeCfg); err != nil {
+		return nil, err
+	}
 
 	return sdb, update.Commit(0)
 }
