@@ -63,7 +63,7 @@ type Process struct {
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 }
 
-func ProcessFromDB(dbproc *indexerdb.Process) *Process {
+func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
 		EntityID:          nonEmptyBytes(dbproc.EntityID),
@@ -81,7 +81,7 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		Namespace:         uint32(dbproc.Namespace),
 		PrivateKeys:       nonEmptySplit(dbproc.PrivateKeys, ","),
 		PublicKeys:        nonEmptySplit(dbproc.PublicKeys, ","),
-		CreationTime:      dbproc.CreationTime,
+		CreationTime:      dbproc.BlockTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
 	}
@@ -119,7 +119,7 @@ func decodeVotes(input string) [][]*types.BigInt {
 	return votes
 }
 
-func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
+func ResultsFromDB(dbproc *indexerdb.GetProcessRow) *results.Results {
 	results := &results.Results{
 		ProcessID:   dbproc.ID,
 		Votes:       decodeVotes(dbproc.ResultsVotes),

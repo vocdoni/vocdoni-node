@@ -8,6 +8,7 @@ import (
 	stdlog "log"
 	"math/big"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/pressly/goose/v3"
@@ -34,6 +35,14 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResult
 	if err != nil {
 		tb.Fatal(err)
 	}
+	// TODO: TestBaseApplication calls BeginBlock with height 0,
+	// before NewIndexer is called and has subscribed to events.
+	// We should fix up the constructors so that the indexer starts listening earlier.
+	// Until then, make sure the indexer always has the first (zero) block.
+	idx.OnBeginBlock(state.BeginBlock{
+		Time:   time.Now(),
+		Height: 0,
+	})
 	tb.Cleanup(func() {
 		if err := idx.Close(); err != nil {
 			tb.Error(err)
@@ -943,7 +952,6 @@ func TestAfterSyncBootStrap(t *testing.T) {
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Status:        models.ProcessStatus_READY,
 		Mode:          &models.ProcessMode{AutoStart: true},
-		StartBlock:    1,
 		BlockCount:    10,
 		MaxCensusSize: 1000,
 		VoteOptions: &models.ProcessVoteOptions{
@@ -952,7 +960,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 		},
 	})
 	qt.Assert(t, err, qt.IsNil)
-	app.AdvanceTestBlock() // block 1
+	app.AdvanceTestBlock()
 
 	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)

@@ -97,8 +97,10 @@ func (app *BaseApplication) SetTestingMethods() {
 		app.fnBeginBlockDefault(req)
 		return abcitypes.ResponseBeginBlock{}
 	})
-	app.State.SetHeight(0)
-	app.endBlockTimestamp.Store(time.Now().Unix())
+	app.BeginBlock(abcitypes.RequestBeginBlock{Header: tmprototypes.Header{
+		Time:   time.Now(),
+		Height: 0,
+	}})
 }
 
 // AdvanceTestBlock commits the current state, ends the current block and starts a new one.

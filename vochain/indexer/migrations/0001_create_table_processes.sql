@@ -33,7 +33,7 @@ CREATE TABLE processes (
   public_keys  TEXT NOT NULL, -- comma-separated list of hex keys
 
   question_index      INTEGER NOT NULL,
-  creation_time       DATETIME NOT NULL,
+  creation_time       DATETIME NOT NULL, -- TODO: unused; remove
   source_block_height INTEGER NOT NULL,
   source_network_id   INTEGER NOT NULL
 );

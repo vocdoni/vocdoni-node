@@ -35,7 +35,7 @@ INSERT INTO processes (
 	?, ?, ?,
 	?, ?, ?,
 	?, ?,
-	?, ?,
+	?, datetime(123, 'unixepoch'),
 	?, ?,
 
 	?, '0', 0,
@@ -65,7 +65,6 @@ type CreateProcessParams struct {
 	PrivateKeys       string
 	PublicKeys        string
 	QuestionIndex     int64
-	CreationTime      time.Time
 	SourceBlockHeight int64
 	SourceNetworkID   int64
 	ResultsVotes      string
@@ -94,7 +93,6 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.PrivateKeys,
 		arg.PublicKeys,
 		arg.QuestionIndex,
-		arg.CreationTime,
 		arg.SourceBlockHeight,
 		arg.SourceNetworkID,
 		arg.ResultsVotes,
@@ -125,14 +123,49 @@ func (q *Queries) GetEntityProcessCount(ctx context.Context, entityID types.Enti
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_block, end_block, results_height, have_results, final_results, results_votes, results_weight, results_envelope_height, results_block_height, census_root, rolling_census_root, rolling_census_size, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope_pb, mode_pb, vote_opts_pb, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+SELECT p.id, p.entity_id, p.start_block, p.end_block, p.results_height, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_envelope_height, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope_pb, p.mode_pb, p.vote_opts_pb, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, b.time AS block_time FROM processes AS p
+LEFT JOIN blocks AS b
+	ON p.start_block = b.height
 WHERE id = ?
 LIMIT 1
 `
 
-func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, error) {
+type GetProcessRow struct {
+	ID                    types.ProcessID
+	EntityID              types.EntityID
+	StartBlock            int64
+	EndBlock              int64
+	ResultsHeight         int64
+	HaveResults           bool
+	FinalResults          bool
+	ResultsVotes          string
+	ResultsWeight         string
+	ResultsEnvelopeHeight int64
+	ResultsBlockHeight    int64
+	CensusRoot            types.CensusRoot
+	RollingCensusRoot     types.CensusRoot
+	RollingCensusSize     int64
+	MaxCensusSize         int64
+	CensusUri             string
+	Metadata              string
+	CensusOrigin          int64
+	Status                int64
+	Namespace             int64
+	EnvelopePb            types.EncodedProtoBuf
+	ModePb                types.EncodedProtoBuf
+	VoteOptsPb            types.EncodedProtoBuf
+	PrivateKeys           string
+	PublicKeys            string
+	QuestionIndex         int64
+	CreationTime          time.Time
+	SourceBlockHeight     int64
+	SourceNetworkID       int64
+	BlockTime             time.Time
+}
+
+func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProcessRow, error) {
 	row := q.db.QueryRowContext(ctx, getProcess, id)
-	var i Process
+	var i GetProcessRow
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
@@ -163,6 +196,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.CreationTime,
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
+		&i.BlockTime,
 	)
 	return i, err
 }
@@ -225,7 +259,7 @@ const searchEntities = `-- name: SearchEntities :many
 SELECT entity_id, COUNT(id) FROM processes
 WHERE (?1 = '' OR (INSTR(LOWER(HEX(entity_id)), ?1) > 0))
 GROUP BY entity_id
-ORDER BY creation_time DESC, id ASC
+ORDER BY start_block DESC, id ASC
 LIMIT ?3
 OFFSET ?2
 `
@@ -273,7 +307,7 @@ WHERE (LENGTH(?1) = 0 OR entity_id = ?1)
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (?5 = '' OR (INSTR(LOWER(HEX(id)), ?5) > 0))
 	AND (?6 = FALSE OR have_results)
-ORDER BY creation_time DESC, id ASC
+ORDER BY start_block DESC, id ASC
 LIMIT ?8
 OFFSET ?7
 `

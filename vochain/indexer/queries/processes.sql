@@ -20,7 +20,7 @@ INSERT INTO processes (
 	?, ?, ?,
 	?, ?, ?,
 	?, ?,
-	?, ?,
+	?, datetime(123, 'unixepoch'),
 	?, ?,
 
 	?, '0', 0,
@@ -28,7 +28,9 @@ INSERT INTO processes (
 );
 
 -- name: GetProcess :one
-SELECT * FROM processes
+SELECT p.*, b.time AS block_time FROM processes AS p
+LEFT JOIN blocks AS b
+	ON p.start_block = b.height
 WHERE id = ?
 LIMIT 1;
 
@@ -41,7 +43,7 @@ WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
 	-- TODO(mvdan): consider keeping an id_hex column for faster searches
 	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
 	AND (sqlc.arg(with_results) = FALSE OR have_results)
-ORDER BY creation_time DESC, id ASC
+ORDER BY start_block DESC, id ASC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset)
 ;
@@ -98,7 +100,7 @@ SELECT COUNT(DISTINCT entity_id) FROM processes;
 SELECT entity_id, COUNT(id) FROM processes
 WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
 GROUP BY entity_id
-ORDER BY creation_time DESC, id ASC
+ORDER BY start_block DESC, id ASC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset)
 ;

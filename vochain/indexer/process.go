@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -209,10 +208,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		return fmt.Errorf("maxCount overflow %d", options.MaxCount)
 	}
 
-	eid := p.EntityId
-	// Get the block time from the Header
-	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
-
 	compResultsHeight := uint32(0)
 	if !p.EnvelopeType.EncryptedVotes { // like isOpenProcess, but on the state type
 		compResultsHeight = p.BlockCount + p.StartBlock + 1
@@ -221,7 +216,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	// Create and store process in the indexer database
 	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
-		EntityID:          nonNullBytes(eid),
+		EntityID:          nonNullBytes(p.EntityId),
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		HaveResults:       compResultsHeight > 0,
@@ -238,7 +233,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		VoteOptsPb:        encodedPb(p.VoteOptions),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
-		CreationTime:      currentBlockTime, // TODO: remove with sql LEFT JOIN on blocks
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),

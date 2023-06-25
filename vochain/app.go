@@ -492,6 +492,8 @@ func (app *BaseApplication) Height() uint32 {
 	return app.height.Load()
 }
 
+// TODO(mvdan): both of these methods are unused now, and perhaps TimestampFromBlock too
+
 // Timestamp returns the last block end timestamp
 func (app *BaseApplication) Timestamp() int64 {
 	return app.endBlockTimestamp.Load()
