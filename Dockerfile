@@ -16,7 +16,7 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
 	--mount=type=bind,target=. \
 	go build -trimpath -o=/bin -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
-	./cmd/node ./cmd/vochaintest ./cmd/voconed ./cmd/end2endtest
+	./cmd/node ./cmd/voconed ./cmd/end2endtest
 
 FROM debian:bookworm-slim as base
 WORKDIR /app
@@ -34,7 +34,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 FROM base as test
-COPY --from=builder /bin/vochaintest /bin/end2endtest /app/
+COPY --from=builder /bin/end2endtest /app/
 
 FROM base
 COPY --from=builder /bin/node /bin/voconed /app/

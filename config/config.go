@@ -42,8 +42,6 @@ type Config struct {
 	}
 	// EnableAPI enables the HTTP API REST service
 	EnableAPI bool
-	// EnableRPC enables the HTTP RPC service
-	EnableRPC bool
 	// EnableFaucet enables the faucet API service for the given amounts
 	EnableFaucetWithAmount uint64
 }
@@ -103,8 +101,6 @@ type VochainCfg struct {
 	LogLevel string
 	// LogOutput logging output
 	LogOutput string
-	// RPCListen address for the RPC server tendermint listens on
-	RPCListen string
 	// P2PListen address to listen for incoming P2P connections
 	P2PListen string
 	// PublicAddr IP address to expose, guessed by the program (your public IP address) if not set

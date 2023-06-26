@@ -52,7 +52,6 @@ require (
 	github.com/pressly/goose/v3 v3.10.0
 	github.com/prometheus/client_golang v1.16.0
 	github.com/rs/zerolog v1.28.0
-	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.15.0
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
@@ -256,6 +255,7 @@ require (
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/samber/lo v1.36.0 // indirect
 	github.com/sasha-s/go-deadlock v0.3.1 // indirect
+	github.com/shirou/gopsutil v3.21.11+incompatible // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/afero v1.9.3 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
