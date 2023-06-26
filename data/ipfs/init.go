@@ -16,11 +16,13 @@ import (
 	"github.com/ipfs/kubo/config"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
+	"github.com/ipfs/kubo/core/node/libp2p"
 	"github.com/ipfs/kubo/plugin/loader"
 	"github.com/ipfs/kubo/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/ipfs/kubo/repo/fsrepo/migrations"
 	"github.com/ipfs/kubo/repo/fsrepo/migrations/ipfsfetcher"
+	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
 
@@ -85,6 +87,10 @@ func startNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 		Repo:      r,
 		Online:    true,
 		Permanent: true,
+		Routing: func(args libp2p.RoutingOptionArgs) (routing.Routing, error) {
+			args.OptimisticProvide = true
+			return libp2p.DHTOption(args)
+		},
 	}
 
 	// We use node.Cancel to stop it instead.
