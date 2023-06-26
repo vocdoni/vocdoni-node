@@ -96,15 +96,13 @@ func newConfig() (*config.Config, config.Error) {
 	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
-	// api & rpc
+	// api
 	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0",
 		"API endpoint listen address")
 	globalCfg.ListenPort = *flag.IntP("listenPort", "p", 9090,
 		"API endpoint http port")
 	globalCfg.EnableAPI = *flag.Bool("enableAPI", true,
 		"enable HTTP API endpoints")
-	globalCfg.EnableRPC = *flag.Bool("enableRPC", false,
-		"enable legacy JSON-RPC endpoint (deprecated)")
 	globalCfg.TLS.Domain = *flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
 	globalCfg.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
@@ -121,8 +119,6 @@ func newConfig() (*config.Config, config.Error) {
 		"p2p host and port to listent for the voting chain")
 	globalCfg.Vochain.PublicAddr = *flag.String("vochainPublicAddr", "",
 		"external address:port to announce to other peers (automatically guessed if empty)")
-	globalCfg.Vochain.RPCListen = *flag.String("vochainRPCListen", "127.0.0.1:26657",
-		"rpc host and port to listen to for the voting chain")
 	globalCfg.Vochain.Genesis = *flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
 	globalCfg.Vochain.LogLevel = *flag.String("vochainLogLevel", "disabled",
@@ -161,6 +157,13 @@ func newConfig() (*config.Config, config.Error) {
 	// parse flags
 	flag.CommandLine.SortFlags = false
 	flag.CommandLine.SetNormalizeFunc(deprecatedFlagsFunc)
+	flag.Bool("enableRPC", false, "deprecated")
+	_ = flag.CommandLine.MarkDeprecated("enableRPC",
+		"JSON-RPC endpoint support was deprecated and removed, this flag is ignored")
+	flag.String("vochainRPCListen", "", "deprecated")
+	_ = flag.CommandLine.MarkDeprecated("vochainRPCListen",
+		"JSON-RPC endpoint support was deprecated and removed, this flag is ignored")
+
 	flag.Parse()
 
 	// setting up viper
@@ -195,7 +198,6 @@ func newConfig() (*config.Config, config.Error) {
 	viper.BindPFlag("signingKey", flag.Lookup("signingKey"))
 
 	viper.BindPFlag("enableAPI", flag.Lookup("enableAPI"))
-	viper.BindPFlag("enableRPC", flag.Lookup("enableRPC"))
 	viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount"))
 	viper.Set("TLS.DirCert", globalCfg.DataDir+"/tls")
 	viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain"))
@@ -210,7 +212,6 @@ func newConfig() (*config.Config, config.Error) {
 	viper.Set("vochain.Dev", globalCfg.Dev)
 	viper.BindPFlag("vochain.P2PListen", flag.Lookup("vochainP2PListen"))
 	viper.BindPFlag("vochain.PublicAddr", flag.Lookup("vochainPublicAddr"))
-	viper.BindPFlag("vochain.RPCListen", flag.Lookup("vochainRPCListen"))
 	viper.BindPFlag("vochain.LogLevel", flag.Lookup("vochainLogLevel"))
 	viper.BindPFlag("vochain.Peers", flag.Lookup("vochainPeers"))
 	viper.BindPFlag("vochain.Seeds", flag.Lookup("vochainSeeds"))
@@ -528,14 +529,6 @@ func main() {
 	// Gateway API and RPC
 	//
 	if globalCfg.Mode == types.ModeGateway {
-		// JSON-RPC service
-		if globalCfg.EnableRPC {
-			log.Info("enabling JSON-RPC")
-			if _, err = srv.LegacyRPC(); err != nil {
-				log.Fatal(err)
-			}
-		}
-
 		// HTTP API REST service
 		if globalCfg.EnableAPI {
 			log.Info("enabling API")
