@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"os"
 	"time"
@@ -117,7 +116,7 @@ func (t *E2EBallotElection) Run() error {
 		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		return err
 	}
 

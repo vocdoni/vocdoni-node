@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"os"
 	"time"
 
@@ -102,7 +101,7 @@ func (t *E2EEncryptedElection) Run() error {
 		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		return err
 	}
 
@@ -113,9 +112,9 @@ func (t *E2EEncryptedElection) Run() error {
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancel()
-	election, err := api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	election, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
 		return err
 	}

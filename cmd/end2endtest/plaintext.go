@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"os"
 	"time"
 
@@ -94,42 +93,26 @@ func (t *E2EPlaintextElection) Run() error {
 		c.nvotes, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
 
 	// Set the account back to the organization account
-	if err := api.SetAccount(hex.EncodeToString(c.accountKeys[0].PrivateKey())); err != nil {
+	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
 		return err
 	}
 
 	// End the election by setting the status to ENDED
 	log.Infof("ending election...")
-	hash, err := api.SetElectionStatus(t.election.ElectionID, "ENDED")
-	if err != nil {
+	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
 		return err
 	}
-
-	// Check the election status is actually ENDED
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
-		log.Fatalf("gave up waiting for tx %x to be mined: %s", hash, err)
-	}
-
-	t.election, err = api.Election(t.election.ElectionID)
-	if err != nil {
-		return err
-	}
-	if t.election.Status != "ENDED" {
-		log.Fatal("election status is not ENDED")
-	}
-	log.Infof("election %s status is ENDED", t.election.ElectionID.String())
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel = context.WithTimeout(context.Background(), time.Second*300)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*100)
 	defer cancel()
-	t.election, err = api.WaitUntilElectionStatus(ctx, t.election.ElectionID, "RESULTS")
+	election, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
 	if err != nil {
 		return err
 	}
+
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
-	log.Infof("election results: %v", t.election.Results)
+	log.Infof("election results: %v", election.Results)
 
 	return nil
 }
