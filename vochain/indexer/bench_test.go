@@ -104,11 +104,11 @@ func BenchmarkIndexer(b *testing.B) {
 					vote := lastVotes[j%len(lastVotes)]
 					tx := lastTxs[j%len(lastTxs)]
 
-					voteRef, err := idx.GetEnvelopeReference(vote.Nullifier)
+					voteRef, err := idx.GetEnvelope(vote.Nullifier)
 					qt.Check(b, err, qt.IsNil)
 					if err == nil {
-						qt.Check(b, voteRef.Weight.MathBigInt().Cmp(vote.Weight), qt.Equals, 0)
-						qt.Check(b, []byte(voteRef.TxHash), qt.DeepEquals, tx.TxID[:])
+						qt.Check(b, voteRef.Meta.Nullifier, qt.DeepEquals, vote.Nullifier)
+						qt.Check(b, []byte(voteRef.Meta.TxHash), qt.DeepEquals, tx.TxID[:])
 					}
 
 					txRef, err := idx.GetTxHashReference(tx.TxID[:])

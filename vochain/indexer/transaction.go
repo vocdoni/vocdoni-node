@@ -13,10 +13,8 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 )
 
-var (
-	// ErrTransactionNotFound is returned if the transaction is not found.
-	ErrTransactionNotFound = fmt.Errorf("transaction not found")
-)
+// ErrTransactionNotFound is returned if the transaction is not found.
+var ErrTransactionNotFound = fmt.Errorf("transaction not found")
 
 // TransactionCount returns the number of transactions indexed
 func (idx *Indexer) TransactionCount() (uint64, error) {

@@ -256,6 +256,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
 	// check process exists and return 404 if not
+	// TODO: use the indexer to count votes
 	if _, err := getElection(electionID, a.vocapp.State); err != nil {
 		return err
 	}
@@ -288,6 +289,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
+	// TODO: sqlite also has public and private keys, consider using it instead
 	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
 		return err
@@ -334,6 +336,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
 	}
+	// TODO: remove the getElection call?
 	if _, err := getElection(electionID, a.vocapp.State); err != nil {
 		return err
 	}

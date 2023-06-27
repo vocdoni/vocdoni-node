@@ -145,6 +145,7 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if len(voteID) != types.ProcessIDsize {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
+	// TODO: use the indexer to verify that a vote exists?
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
 		return ErrVoteNotFound
 	}

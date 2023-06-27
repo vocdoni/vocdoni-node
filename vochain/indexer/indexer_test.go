@@ -1049,9 +1049,9 @@ func TestCountVotes(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
 
-	ref, err := idx.GetEnvelopeReference(nullifier)
+	ref, err := idx.GetEnvelope(nullifier)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, ref.Height, qt.CmpEquals(), blockHeight)
+	qt.Assert(t, ref.Meta.Height, qt.CmpEquals(), blockHeight)
 
 	// Note that txIndex is 0, because the votes are added directly to the sate,
 	// while the txCounter only increments on DeliverTx() execution.
@@ -1155,7 +1155,7 @@ func TestOverwriteVotes(t *testing.T) {
 	qt.Assert(t, height, qt.CmpEquals(), uint64(1))
 
 	// check overwrite count is correct
-	ref, err := idx.GetEnvelopeReference(nullifier)
+	ref, err := idx.GetEnvelope(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.OverwriteCount, qt.CmpEquals(), uint32(1))
 
