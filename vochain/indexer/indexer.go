@@ -106,29 +106,14 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 
 		blockUpdateProcs: make(map[string]bool),
 	}
-
-	startTime := time.Now()
-
-	countMap, err := idx.retrieveCounts()
-	if err != nil {
-		return nil, fmt.Errorf("could not create indexer: %v", err)
-	}
-
-	log.Infow("indexer initialization",
-		"took", time.Since(startTime),
-		"dataDir", dataDir,
-		"liveResults", countLiveResults,
-		"transactions", countMap[indexertypes.CountStoreTransactions],
-		"envelopes", countMap[indexertypes.CountStoreEnvelopes],
-		"processes", countMap[indexertypes.CountStoreProcesses],
-		"entities", countMap[indexertypes.CountStoreEntities],
-	)
+	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", countLiveResults)
 
 	// sqlite doesn't support multiple concurrent writers.
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
 	dbPath := dataDir + "-sqlite" // TODO: filepath.Join(dataDir, "db.sqlite")
+	var err error
 	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", dbPath))
 	if err != nil {
 		return nil, err
@@ -193,22 +178,6 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 		idx.blockQueries = indexerdb.New(idx.blockTx)
 	}
 	return idx.blockQueries
-}
-
-// retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
-// If no CountStore model is stored for the type, it counts all db entries of that type.
-func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
-	txCountStore := new(indexertypes.CountStore)
-	envelopeCountStore := new(indexertypes.CountStore)
-	processCountStore := new(indexertypes.CountStore)
-	entityCountStore := new(indexertypes.CountStore)
-	// TODO(mvdan): implement on sqlite if needed
-	return map[uint8]uint64{
-		indexertypes.CountStoreTransactions: txCountStore.Count,
-		indexertypes.CountStoreEnvelopes:    envelopeCountStore.Count,
-		indexertypes.CountStoreProcesses:    processCountStore.Count,
-		indexertypes.CountStoreEntities:     entityCountStore.Count,
-	}, nil
 }
 
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
@@ -279,7 +248,6 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.Envelope,
-			Signatures:   []types.HexBytes{},
 		}
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
