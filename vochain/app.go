@@ -368,6 +368,16 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 		return block
 	}
 	block := app.fnGetBlockByHeight(height)
+	// Don't add nil entries to the block cache.
+	// If a block is fetched before it's available, we don't want to cache the failure,
+	// as otherwise we might keep returning a nil block even after the blockstore has it.
+	// This means that we only cache blockstore hits, but that seems okay.
+	//
+	// TODO: we could cache blockstore misses as long as we remove a block's cache entry
+	// when a block appears in the chain.
+	if block == nil {
+		return nil
+	}
 	app.blockCache.Add(height, block)
 	return block
 }
