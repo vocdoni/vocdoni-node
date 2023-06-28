@@ -251,11 +251,7 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 				continue
 			}
 		}
-		results, err := pa.indexer.GetResults(p)
-		if err != nil {
-			return err
-		}
-
+		results := procInfo.Results()
 		if err := pa.storage.AddProcess(&Process{
 			ProcessInfo: procInfo,
 			Results:     results,

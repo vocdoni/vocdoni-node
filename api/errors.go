@@ -89,7 +89,7 @@ var (
 	ErrMarshalingServerJSONFailed       = apirest.APIerror{Code: 5006, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("marshaling (server-side) JSON failed")}
 	ErrCantFetchElectionList            = apirest.APIerror{Code: 5007, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch election list")}
 	ErrCantFetchElection                = apirest.APIerror{Code: 5008, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch election")}
-	ErrCantFetchElectionResults         = apirest.APIerror{Code: 5009, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch election results")}
+	ErrCantFetchElectionResults         = apirest.APIerror{Code: 5009, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch election results")} // unused as of 2023-06-28
 	ErrCantFetchTokenTransfers          = apirest.APIerror{Code: 5010, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch token transfers")}
 	ErrCantFetchEnvelopeHeight          = apirest.APIerror{Code: 5011, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch envelope height")}
 	ErrCantFetchEnvelope                = apirest.APIerror{Code: 5012, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch vote envelope")}

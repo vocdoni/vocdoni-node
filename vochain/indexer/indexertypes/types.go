@@ -41,29 +41,47 @@ type Process struct {
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
+
+	ResultsVotes       [][]*types.BigInt `json:"-"`
+	ResultsWeight      *types.BigInt     `json:"-"`
+	ResultsBlockHeight uint32            `json:"-"`
+}
+
+func (p *Process) Results() *results.Results {
+	return &results.Results{
+		ProcessID:    p.ID,
+		Votes:        p.ResultsVotes,
+		Weight:       p.ResultsWeight,
+		EnvelopeType: p.Envelope,
+		VoteOpts:     p.VoteOpts,
+		BlockHeight:  p.ResultsBlockHeight,
+	}
 }
 
 func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
-		ID:                dbproc.ID,
-		EntityID:          nonEmptyBytes(dbproc.EntityID),
-		StartBlock:        uint32(dbproc.StartBlock),
-		EndBlock:          uint32(dbproc.EndBlock),
-		HaveResults:       dbproc.HaveResults,
-		FinalResults:      dbproc.FinalResults,
-		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
-		RollingCensusRoot: nonEmptyBytes(dbproc.RollingCensusRoot),
-		RollingCensusSize: uint64(dbproc.RollingCensusSize),
-		MaxCensusSize:     uint64(dbproc.MaxCensusSize),
-		CensusURI:         dbproc.CensusUri,
-		CensusOrigin:      int32(dbproc.CensusOrigin),
-		Status:            int32(dbproc.Status),
-		Namespace:         uint32(dbproc.Namespace),
-		PrivateKeys:       nonEmptySplit(dbproc.PrivateKeys, ","),
-		PublicKeys:        nonEmptySplit(dbproc.PublicKeys, ","),
-		CreationTime:      dbproc.CreationTime,
-		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
-		Metadata:          dbproc.Metadata,
+		ID:                 dbproc.ID,
+		EntityID:           nonEmptyBytes(dbproc.EntityID),
+		StartBlock:         uint32(dbproc.StartBlock),
+		EndBlock:           uint32(dbproc.EndBlock),
+		HaveResults:        dbproc.HaveResults,
+		FinalResults:       dbproc.FinalResults,
+		CensusRoot:         nonEmptyBytes(dbproc.CensusRoot),
+		RollingCensusRoot:  nonEmptyBytes(dbproc.RollingCensusRoot),
+		RollingCensusSize:  uint64(dbproc.RollingCensusSize),
+		MaxCensusSize:      uint64(dbproc.MaxCensusSize),
+		CensusURI:          dbproc.CensusUri,
+		CensusOrigin:       int32(dbproc.CensusOrigin),
+		Status:             int32(dbproc.Status),
+		Namespace:          uint32(dbproc.Namespace),
+		PrivateKeys:        nonEmptySplit(dbproc.PrivateKeys, ","),
+		PublicKeys:         nonEmptySplit(dbproc.PublicKeys, ","),
+		CreationTime:       dbproc.CreationTime,
+		SourceBlockHeight:  uint64(dbproc.SourceBlockHeight),
+		Metadata:           dbproc.Metadata,
+		ResultsVotes:       decodeVotes(dbproc.ResultsVotes),
+		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
+		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
 
 	if _, ok := models.SourceNetworkId_name[int32(dbproc.SourceNetworkID)]; !ok {
@@ -97,25 +115,6 @@ func decodeVotes(input string) [][]*types.BigInt {
 		votes = append(votes, element)
 	}
 	return votes
-}
-
-func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
-	results := &results.Results{
-		ProcessID:   dbproc.ID,
-		Votes:       decodeVotes(dbproc.ResultsVotes),
-		Weight:      decodeBigint(dbproc.ResultsWeight),
-		BlockHeight: uint32(dbproc.ResultsBlockHeight),
-	}
-	results.EnvelopeType = new(models.EnvelopeType)
-	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {
-		log.Error(err)
-		return nil
-	}
-	results.VoteOpts = new(models.ProcessVoteOptions)
-	if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
-		log.Error(err)
-	}
-	return results
 }
 
 func decodeBigint(s string) *types.BigInt {
