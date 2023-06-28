@@ -623,18 +623,18 @@ func TestResults(t *testing.T) {
 	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
 
 	// Test results
-	result, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	log.Infof("results: %s", GetFriendlyResults(result.Votes))
+	log.Infof("results: %s", GetFriendlyResults(proc.ResultsVotes))
 	v0 := big.NewInt(0)
 	v30 := big.NewInt(30)
 	var value *big.Int
-	for q := range result.Votes {
-		for qi := range result.Votes[q] {
+	for q := range proc.ResultsVotes {
+		for qi := range proc.ResultsVotes[q] {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].MathBigInt()
+			value = proc.ResultsVotes[q][qi].MathBigInt()
 			if qi != 1 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -643,7 +643,7 @@ func TestResults(t *testing.T) {
 			}
 		}
 	}
-	for _, q := range GetFriendlyResults(result.Votes) {
+	for _, q := range GetFriendlyResults(proc.ResultsVotes) {
 		for qi, v1 := range q {
 			if qi > 3 {
 				t.Fatalf("found more questions that expected")
@@ -687,18 +687,18 @@ func TestLiveResults(t *testing.T) {
 
 	// Test results
 	app.AdvanceTestBlock()
-	result, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
 
 	v0 := big.NewInt(0)
 	v100 := big.NewInt(100)
 	var value *big.Int
-	for q := range result.Votes {
-		for qi := range result.Votes[q] {
+	for q := range proc.ResultsVotes {
+		for qi := range proc.ResultsVotes[q] {
 			if qi > 100 {
 				t.Fatalf("found more questions that expected")
 			}
-			value = result.Votes[q][qi].MathBigInt()
+			value = proc.ResultsVotes[q][qi].MathBigInt()
 			if qi == 0 && value.Cmp(v0) != 0 {
 				t.Fatalf("result is not correct, %d is not 0 as expected", value.Uint64())
 			}
@@ -735,7 +735,8 @@ func TestAddVote(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 
-	pr, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
+	pr := proc.Results()
 	qt.Assert(t, err, qt.IsNil)
 	// Should be fine
 	err = pr.AddVote([]int{1, 2, 3}, nil, nil)
@@ -828,9 +829,9 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	addVote(t, app, pid, []int{0, 0, 0}, nil) // error: too many votes
 
 	app.AdvanceTestBlock()
-	result, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := GetFriendlyResults(result.Votes)
+	votes := GetFriendlyResults(proc.ResultsVotes)
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "0", "2", "0", "2"})
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "0", "1", "0", "2"})
 }
@@ -877,9 +878,9 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	addVote(t, app, pid, []int{100000, 112345}, new(big.Int).SetUint64(20000000000))
 
 	app.AdvanceTestBlock()
-	result, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := GetFriendlyResults(result.Votes)
+	votes := GetFriendlyResults(proc.ResultsVotes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"100016"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"100033"})
 }
@@ -922,9 +923,9 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 	addVote(t, app, pid, []int{1, 1, 1, 1, 0}, nil)
 
 	app.AdvanceTestBlock()
-	result, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	votes := GetFriendlyResults(result.Votes)
+	votes := GetFriendlyResults(proc.ResultsVotes)
 	qt.Assert(t, votes[0], qt.DeepEquals, []string{"1", "2"})
 	qt.Assert(t, votes[1], qt.DeepEquals, []string{"0", "3"})
 	qt.Assert(t, votes[2], qt.DeepEquals, []string{"1", "2"})
@@ -975,9 +976,9 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	app.State.Save()
 
 	// The results should not be up to date.
-	results, err := idx.GetResults(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "0"},
 		{"0", "0"},
 		{"0", "0"},
@@ -988,9 +989,9 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	// Run the AfterSyncBootstrap, which should update the results.
 	idx.AfterSyncBootstrap(true)
 
-	results, err = idx.GetResults(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "10"},
 		{"0", "10"},
 		{"0", "10"},
@@ -1120,9 +1121,9 @@ func TestOverwriteVotes(t *testing.T) {
 
 	// Check the results actually changed
 	app.AdvanceTestBlock()
-	results, err := idx.GetResults(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "1", "0"},
 		{"0", "1", "0"},
 		{"0", "1", "0"},
@@ -1165,9 +1166,9 @@ func TestOverwriteVotes(t *testing.T) {
 	qt.Assert(t, envelope.VotePackage, qt.DeepEquals, vp)
 
 	// check the results are correct (only the second vote should be counted)
-	results, err = idx.GetResults(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "0", "1"},
 		{"0", "0", "1"},
 		{"0", "0", "1"},
@@ -1204,9 +1205,9 @@ func TestOverwriteVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// check the results again
-	results, err = idx.GetResults(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "0", "2"},
 		{"0", "0", "2"},
 		{"0", "0", "2"},
@@ -1234,16 +1235,16 @@ func TestOverwriteVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// check the results again
-	results, err = idx.GetResults(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, GetFriendlyResults(results.Votes), qt.DeepEquals, [][]string{
+	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"1", "0", "1"},
 		{"1", "0", "1"},
 		{"1", "0", "1"},
 	})
 
 	// check the weight is correct (should be 2 because of the overwrite)
-	qt.Assert(t, results.Weight.MathBigInt().Int64(), qt.Equals, int64(2))
+	qt.Assert(t, proc.ResultsWeight.MathBigInt().Int64(), qt.Equals, int64(2))
 }
 
 func TestTxIndexer(t *testing.T) {

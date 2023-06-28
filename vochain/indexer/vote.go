@@ -138,17 +138,6 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	return nil
 }
 
-// GetResults returns the current result for a processId
-func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
-	// TODO: fold into ProcessInfo, now that the results are not in a separate table.
-	sqlProcInner, err := idx.readOnlyQuery.GetProcess(context.TODO(), processID)
-	if err != nil {
-		return nil, err
-	}
-	sqlResults := indexertypes.ResultsFromDB(&sqlProcInner)
-	return sqlResults, nil
-}
-
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
 // If the state.VotePackage is encrypted the list of keys to decrypt it should be provided.
 // The order of the Keys must be as it was encrypted.
@@ -258,11 +247,11 @@ func (idx *Indexer) commitVotes(queries *indexerdb.Queries, pid []byte, partialR
 func (idx *Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	sqlProcInner, err := queries.GetProcess(context.TODO(), pid)
+	procInner, err := queries.GetProcess(context.TODO(), pid)
 	if err != nil {
 		return err
 	}
-	results := indexertypes.ResultsFromDB(&sqlProcInner)
+	results := indexertypes.ProcessFromDB(&procInner).Results()
 	if partialSubResults != nil {
 		if err := results.Sub(partialSubResults); err != nil {
 			return err
