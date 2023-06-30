@@ -131,7 +131,7 @@ func NewTree(cfg Config) (*Tree, error) {
 }
 
 // NewTreeWithTx returns a new Tree using the given db.WriteTx, which will not
-// be ccommited inside this method, if there is a Tree still in the given
+// be committed inside this method, if there is a Tree still in the given
 // database, it will load it.
 func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
 	// if thresholdNLeafs is set to 0, use the DefaultThresholdNLeafs
@@ -575,7 +575,7 @@ func keyPathFromKey(maxLevels int, k []byte) ([]byte, error) {
 			len(k), maxLevels, maxKeyLen, len(k)*8, len(k))
 	}
 	keyPath := make([]byte, maxKeyLen)
-	copy(keyPath[:], k)
+	copy(keyPath, k)
 	return keyPath, nil
 }
 
@@ -770,7 +770,7 @@ func (t *Tree) newLeafValue(k, v []byte) ([]byte, []byte, error) {
 
 // newLeafValue takes a key & value from a leaf, and computes the leaf hash,
 // which is used as the leaf key. And the value is the concatenation of the
-// inputed key & value. The output of this function is used as key-value to
+// inputted key & value. The output of this function is used as key-value to
 // store the leaf in the DB.
 // [     1 byte   |     1 byte    | N bytes | M bytes ]
 // [ type of node | length of key |   key   |  value  ]
@@ -1104,7 +1104,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 	}
 
 	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8))))
-	copy(keyPath[:], k)
+	copy(keyPath, k)
 
 	key, _, err := newLeafValue(hashFunc, k, v)
 	if err != nil {
@@ -1125,7 +1125,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 			}
 		}
 	}
-	if bytes.Equal(key[:], root) {
+	if bytes.Equal(key, root) {
 		return true, nil
 	}
 	return false, nil

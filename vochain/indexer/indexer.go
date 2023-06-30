@@ -518,7 +518,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	}
 }
 
-// NOT USED but required for implementing the vochain.EventListener interface
+// OnSetAccount NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {

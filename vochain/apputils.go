@@ -39,7 +39,7 @@ func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval
 			return nil, fmt.Errorf("cannot decode private key: (%s)", err)
 		}
 		privKey = make([]byte, crypto256k1.PrivKeySize)
-		if n := copy(privKey[:], keyBytes[:]); n != crypto256k1.PrivKeySize {
+		if n := copy(privKey[:], keyBytes); n != crypto256k1.PrivKeySize {
 			return nil, fmt.Errorf("incorrect private key length (got %d, need %d)", n, crypto25519.PrivateKeySize)
 		}
 		pv.Key.Address = privKey.PubKey().Address()

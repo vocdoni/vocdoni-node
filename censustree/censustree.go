@@ -41,15 +41,15 @@ type Options struct {
 	CensusType models.Census_Type
 }
 
-// By default, the maximum number of levels will be 160, which allows to add
+// DefaultMaxLevels is by default, the maximum number of levels will be 160, which allows to add
 // up to 2^160 leaves to the tree, with keys with up to 20 bytes. However the
-// number of levels could be setted up during the tree initialization which
+// number of levels could be set up during the tree initialization which
 // allows to support uses cases with specific restrictions such as the
 // zkweighted census, which needs to optimize some artifacts size that depends
 // of the number of levels of the tree.
 const DefaultMaxLevels = 160
 
-// The maximum length of a census tree key is defined by the number of levels of
+// DefaultMaxKeyLen is the maximum length of a census tree key is defined by the number of levels of
 // the census tree. It is the number of bytes that can fit into 'n' bits, where
 // 'n' is the number of levels of the census tree.
 const DefaultMaxKeyLen = DefaultMaxLevels / 8

@@ -278,8 +278,11 @@ func (r *HTTProuter) generateTLScert(host string, port int) (*http.Server, *auto
 	}
 	r.TLSconfig.GetCertificate = m.GetCertificate
 	serverConfig := &http.Server{
-		Addr:      net.JoinHostPort(host, fmt.Sprintf("%d", port)),
-		TLSConfig: r.TLSconfig,
+		Addr:              net.JoinHostPort(host, fmt.Sprintf("%d", port)),
+		TLSConfig:         r.TLSconfig,
+		ReadTimeout:       10 * time.Second,
+		IdleTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 3 * time.Second,
 	}
 	serverConfig.TLSConfig.NextProtos = append(serverConfig.TLSConfig.NextProtos, acme.ALPNProto)
 
