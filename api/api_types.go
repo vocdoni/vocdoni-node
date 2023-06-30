@@ -109,19 +109,19 @@ type Key struct {
 }
 
 type Vote struct {
-	TxPayload            []byte         `json:"txPayload,omitempty"`
-	TxHash               types.HexBytes `json:"txHash,omitempty"`
-	VoteID               types.HexBytes `json:"voteID,omitempty"`
-	EncryptionKeyIndexes []uint32       `json:"encryptionKeys,omitempty"`
-	VotePackage          string         `json:"package,omitempty"`
-	VoteWeight           string         `json:"weight,omitempty"`
-	VoteNumber           *uint32        `json:"number,omitempty"`
-	ElectionID           types.HexBytes `json:"electionID,omitempty"`
-	VoterID              types.HexBytes `json:"voterID,omitempty"`
-	BlockHeight          uint32         `json:"blockHeight,omitempty"`
-	TransactionIndex     *int32         `json:"transactionIndex,omitempty"`
-	OverwriteCount       *uint32        `json:"overwriteCount,omitempty"`
-	Date                 *time.Time     `json:"date,omitempty"`
+	TxPayload            []byte          `json:"txPayload,omitempty"`
+	TxHash               types.HexBytes  `json:"txHash,omitempty"`
+	VoteID               types.HexBytes  `json:"voteID,omitempty"`
+	EncryptionKeyIndexes []uint32        `json:"encryptionKeys,omitempty"`
+	VotePackage          json.RawMessage `json:"package,omitempty"`
+	VoteWeight           string          `json:"weight,omitempty"`
+	VoteNumber           *uint32         `json:"number,omitempty"`
+	ElectionID           types.HexBytes  `json:"electionID,omitempty"`
+	VoterID              types.HexBytes  `json:"voterID,omitempty"`
+	BlockHeight          uint32          `json:"blockHeight,omitempty"`
+	TransactionIndex     *int32          `json:"transactionIndex,omitempty"`
+	OverwriteCount       *uint32         `json:"overwriteCount,omitempty"`
+	Date                 *time.Time      `json:"date,omitempty"`
 }
 
 type CensusTypeDescription struct {
