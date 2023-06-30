@@ -114,7 +114,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it.
 	if json.Valid(voteData.VotePackage) {
-		vote.VotePackage = string(voteData.VotePackage)
+		vote.VotePackage = voteData.VotePackage
 	}
 
 	var data []byte
