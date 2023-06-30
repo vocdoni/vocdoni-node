@@ -23,7 +23,7 @@ func New(groupKey string, ipfsHandler *ipfs.Handler) *IPFSConnect {
 		IPFS: ipfsHandler,
 	}
 	keyHash := ethereum.HashRaw([]byte(groupKey))
-	copy(is.GroupKey[:], keyHash[:])
+	copy(is.GroupKey[:], keyHash)
 	return is
 }
 

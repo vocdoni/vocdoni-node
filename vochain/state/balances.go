@@ -55,9 +55,9 @@ func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 }
 
 // Treasurer returns the address and the Treasurer nonce
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (v *State) Treasurer(committed bool) (*models.Treasurer, error) {
 	if !committed {
 		v.Tx.RLock()
@@ -123,7 +123,7 @@ func (v *State) VerifyTreasurer(addr common.Address, txNonce uint32) error {
 	return nil
 }
 
-// SetTxCost sets the given transaction cost
+// SetTxBaseCost sets the given transaction cost
 func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {
@@ -133,14 +133,14 @@ func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {
 	defer v.Tx.Unlock()
 	log.Debugf("setting tx cost %d for tx %s", cost, txType.String())
 	costBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(costBytes[:], cost)
-	return v.Tx.DeepSet([]byte(key), costBytes[:], StateTreeCfg(TreeExtra))
+	binary.LittleEndian.PutUint64(costBytes, cost)
+	return v.Tx.DeepSet([]byte(key), costBytes, StateTreeCfg(TreeExtra))
 }
 
 // TxBaseCost returns the base cost of a given transaction
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (v *State) TxBaseCost(txType models.TxType, committed bool) (uint64, error) {
 	key, ok := TxTypeCostToStateKey[txType]
 	if !ok {

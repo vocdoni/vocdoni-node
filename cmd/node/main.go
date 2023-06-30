@@ -375,7 +375,7 @@ func main() {
 	if globalCfg.Dev || globalCfg.PprofPort > 0 {
 		go func() {
 			if globalCfg.PprofPort == 0 {
-				globalCfg.PprofPort = int((time.Now().Unix() % 100)) + 61000
+				globalCfg.PprofPort = int(time.Now().Unix()%100) + 61000
 			}
 			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", globalCfg.PprofPort))
 			if err != nil {
@@ -496,7 +496,8 @@ func main() {
 		// create the key for the validator used to sign transactions
 		signer := ethereum.SignKeys{}
 		if err := signer.AddHexKey(globalCfg.Vochain.MinerKey); err != nil {
-			log.Fatal(err)
+			log.Errorf("add hex key failed %v", err)
+			return
 		}
 		validator, err := srv.App.State.Validator(signer.Address(), true)
 		if err != nil {

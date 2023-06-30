@@ -533,7 +533,7 @@ func TestSplitInBuckets(t *testing.T) {
 		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
 		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
 		keyPath := make([]byte, 32)
-		copy(keyPath[:], k)
+		copy(keyPath, k)
 		kvs[i].pos = i
 		kvs[i].keyPath = k
 		kvs[i].k = k
@@ -1108,7 +1108,7 @@ func testUpFromSubRootsWithEmpties(c *qt.C, preSubRoots [][]byte, indexEmpties [
 	tree1, tree2 := initTestUpFromSubRoots(c)
 
 	testPreSubRoots := make([][]byte, len(preSubRoots))
-	copy(testPreSubRoots[:], preSubRoots[:])
+	copy(testPreSubRoots, preSubRoots)
 	for i := 0; i < len(indexEmpties); i++ {
 		testPreSubRoots[indexEmpties[i]] = tree1.emptyHash
 	}

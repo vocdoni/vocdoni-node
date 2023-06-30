@@ -6,7 +6,6 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// ________________________ TRANSACTION COSTS __________________________
 // TransactionCosts describes how much each operation should cost
 type TransactionCosts struct {
 	SetProcessStatus        uint32 `json:"Tx_SetProcessStatus"`

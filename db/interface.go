@@ -8,7 +8,7 @@ import (
 // TypePebble defines the type of db that uses PebbleDB
 const TypePebble = "pebble"
 
-// ErrKeysNotFound is used to indicate that a key does not exist in the db.
+// ErrKeyNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
 
 // ErrTxnTooBig is used to indicate that a WriteTx is too big and can't include

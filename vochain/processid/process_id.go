@@ -75,7 +75,7 @@ func (p *ProcessID) Unmarshal(pid []byte) error {
 	p.chainID = fmt.Sprintf("%x", pid[:4])
 
 	baddr := make([]byte, 20)
-	copy(baddr[:], pid[6:26])
+	copy(baddr, pid[6:26])
 	p.organizationAddr = common.BytesToAddress(baddr)
 
 	p.censusOrigin = uint8(binary.BigEndian.Uint16(append([]byte{0x00}, pid[26:27]...)))

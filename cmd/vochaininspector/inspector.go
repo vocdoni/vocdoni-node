@@ -46,7 +46,7 @@ func main() {
 	flag.StringVar(&action, "action", "sync", `action to execute: 
 	sync = synchronize the blockchain
 	block = print a block from the blockstore
-	blockList = list blocks and numfer of transactions
+	blockList = list blocks and number of transactions
 	listProcess = list voting processes from the state at specific height
 	listVotes = list votes from the state at specific height
 	listBlockVotes = list existing votes from a block (with nullifier)
@@ -61,7 +61,7 @@ func main() {
 	switch action {
 	case "listProcess":
 		if blockHeight == 0 {
-			log.Fatal("listProcess requires a heigh value")
+			log.Fatal("listProcess requires a height value")
 		}
 		path := filepath.Join(dataDir, "data", "vcstate")
 		log.Infof("opening state database path %s", path)
@@ -69,7 +69,7 @@ func main() {
 
 	case "listVotes":
 		if blockHeight == 0 {
-			log.Fatal("listVotes requires a heigh value")
+			log.Fatal("listVotes requires a height value")
 		}
 		path := filepath.Join(dataDir, "data", "vcstate")
 		log.Infof("opening state database path %s", path)
@@ -77,13 +77,13 @@ func main() {
 
 	case "listBlockVotes":
 		if blockHeight == 0 {
-			log.Fatal("listBlockVotes requires a heigh value")
+			log.Fatal("listBlockVotes requires a height value")
 		}
 		listBlockVotes(int64(blockHeight), dataDir)
 
 	case "stateGraph":
 		if blockHeight == 0 {
-			log.Fatal("stateGraph requires a heigh value")
+			log.Fatal("stateGraph requires a height value")
 		}
 		path := filepath.Join(dataDir, "data", "vcstate")
 		graphVizMainTree(int64(blockHeight), path)
@@ -115,7 +115,8 @@ func main() {
 		vnode.Node.Stop()
 		height, err := vnode.State.LastHeight()
 		if err != nil {
-			log.Fatal(err)
+			log.Error(err)
+			return
 		}
 		log.Infof("last height is %d", height)
 		for i := uint32(1); i <= height; i++ {
@@ -213,7 +214,7 @@ func openStateAtHeight(height int64, stateDir string) *statedb.TreeView {
 	}
 	log.Infof("Last height found on state is %d", lastHeight)
 	if height > int64(lastHeight) {
-		log.Fatal("Height cannot be greather than lastHeight")
+		log.Fatal("Height cannot be greater than lastHeight")
 	}
 	root, err := sdb.VersionRoot(uint32(height))
 	if err != nil {
