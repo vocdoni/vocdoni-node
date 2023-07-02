@@ -348,7 +348,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			// We fetch the previous vote from the state by setting committed=true.
 			// Note that if there wasn't a previous vote in the committed state,
 			// then it wasn't counted in the results yet, so don't add it to substractedResults.
-			// TODO: can we get previousVote via blockTx?
+			// TODO: can we get previousVote from sqlite via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
 				previousVote, _ = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)

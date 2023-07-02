@@ -67,12 +67,14 @@ type Transaction struct {
 }
 
 type Vote struct {
-	Nullifier      types.Nullifier
-	ProcessID      types.ProcessID
-	BlockHeight    int64
-	BlockIndex     int64
-	Weight         string
-	CreationTime   time.Time
-	VoterID        state.VoterID
-	OverwriteCount int64
+	Nullifier            types.Nullifier
+	ProcessID            types.ProcessID
+	BlockHeight          int64
+	BlockIndex           int64
+	Weight               string
+	CreationTime         time.Time
+	VoterID              state.VoterID
+	OverwriteCount       int64
+	EncryptionKeyIndexes string
+	Package              string
 }

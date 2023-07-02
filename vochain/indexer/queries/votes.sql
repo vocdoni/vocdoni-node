@@ -1,10 +1,12 @@
 -- name: CreateVote :execresult
 REPLACE INTO votes (
 	nullifier, process_id, block_height, block_index,
-	weight, voter_id, overwrite_count, creation_time
+	weight, voter_id, overwrite_count, creation_time,
+	encryption_key_indexes, package
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?, datetime(123, 'unixepoch')
+	?, ?, ?, datetime(123, 'unixepoch'),
+	?, ?
 );
 
 -- name: GetVote :one

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -33,15 +34,9 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		return nil, err
 	}
 
-	// TODO: do not fetch from the state
-	vote, err := idx.App.State.Vote(voteRef.ProcessID, nullifier, true)
-	if err != nil {
-		return nil, ErrVoteNotFound
-	}
-
 	envelopePackage := &indexertypes.EnvelopePackage{
-		VotePackage:          vote.VotePackage,
-		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
+		VotePackage:          []byte(voteRef.Package),
+		EncryptionKeyIndexes: decodeArrayJSON[uint32](voteRef.EncryptionKeyIndexes),
 		Weight:               voteRef.Weight,
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime,
@@ -204,17 +199,36 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
 	}
 	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
-		Nullifier:      vote.Nullifier,
-		ProcessID:      vote.ProcessID,
-		BlockHeight:    int64(vote.Height),
-		BlockIndex:     int64(txIndex),
-		Weight:         weightStr,
-		OverwriteCount: int64(vote.Overwrites),
-		VoterID:        nonNullBytes(vote.VoterID),
+		Nullifier:            vote.Nullifier,
+		ProcessID:            vote.ProcessID,
+		BlockHeight:          int64(vote.Height),
+		BlockIndex:           int64(txIndex),
+		Weight:               weightStr,
+		OverwriteCount:       int64(vote.Overwrites),
+		VoterID:              nonNullBytes(vote.VoterID),
+		EncryptionKeyIndexes: encodeArrayJSON(vote.EncryptionKeyIndexes),
+		Package:              string(vote.VotePackage),
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func encodeArrayJSON[T any](v []T) string {
+	p, err := json.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return string(p)
+}
+
+func decodeArrayJSON[T any](s string) []T {
+	var v []T
+	err := json.Unmarshal([]byte(s), &v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return v
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
