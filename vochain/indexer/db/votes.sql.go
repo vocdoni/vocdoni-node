@@ -40,11 +40,11 @@ func (q *Queries) CountVotesByProcessID(ctx context.Context, processID types.Pro
 const createVote = `-- name: CreateVote :execresult
 REPLACE INTO votes (
 	nullifier, process_id, block_height, block_index,
-	weight, voter_id, overwrite_count, creation_time,
+	weight, voter_id, overwrite_count,
 	encryption_key_indexes, package
 ) VALUES (
 	?, ?, ?, ?,
-	?, ?, ?, datetime(123, 'unixepoch'),
+	?, ?, ?,
 	?, ?
 )
 `
@@ -76,7 +76,7 @@ func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Res
 }
 
 const getVote = `-- name: GetVote :one
-SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.creation_time, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
+SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
 LEFT JOIN transactions AS t
 	ON v.block_height = t.block_height
 	AND v.block_index = t.block_index
@@ -92,7 +92,6 @@ type GetVoteRow struct {
 	BlockHeight          int64
 	BlockIndex           int64
 	Weight               string
-	CreationTime         time.Time
 	VoterID              state.VoterID
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
@@ -110,7 +109,6 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 		&i.BlockHeight,
 		&i.BlockIndex,
 		&i.Weight,
-		&i.CreationTime,
 		&i.VoterID,
 		&i.OverwriteCount,
 		&i.EncryptionKeyIndexes,
@@ -122,7 +120,7 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 }
 
 const searchVotes = `-- name: SearchVotes :many
-SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.creation_time, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash FROM votes AS v
+SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash FROM votes AS v
 LEFT JOIN transactions AS t
 	ON  v.block_height = t.block_height
 	AND v.block_index  = t.block_index
@@ -146,7 +144,6 @@ type SearchVotesRow struct {
 	BlockHeight          int64
 	BlockIndex           int64
 	Weight               string
-	CreationTime         time.Time
 	VoterID              state.VoterID
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
@@ -174,7 +171,6 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.BlockHeight,
 			&i.BlockIndex,
 			&i.Weight,
-			&i.CreationTime,
 			&i.VoterID,
 			&i.OverwriteCount,
 			&i.EncryptionKeyIndexes,
