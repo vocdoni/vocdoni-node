@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -108,17 +110,31 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	}
 	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", countLiveResults)
 
+	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
+	// Create the parent directory as well if it doesn't exist.
+	if err := os.MkdirAll(dataDir, 0o777); err != nil {
+		return nil, err
+	}
+	dbPath := filepath.Join(dataDir, "db.sqlite")
+	var err error
+
 	// sqlite doesn't support multiple concurrent writers.
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
-	dbPath := dataDir + "-sqlite" // TODO: filepath.Join(dataDir, "db.sqlite")
-	var err error
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
+	if err != nil {
+		return nil, err
+	}
+	idx.readWriteDB.SetMaxOpenConns(1)
+	idx.readWriteDB.SetMaxIdleConns(2)
+	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
+	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
+
 	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", dbPath))
 	if err != nil {
 		return nil, err
 	}
-
 	// Increasing these numbers can allow for more queries to run concurrently,
 	// but it also increases the memory used by sqlite and our connection pool.
 	// Most read-only queries we run are quick enough, so a small number seems OK.
@@ -126,16 +142,6 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	idx.readOnlyDB.SetMaxIdleConns(20)
 	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
 	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
-
-	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
-	if err != nil {
-		return nil, err
-	}
-
-	idx.readWriteDB.SetMaxOpenConns(1)
-	idx.readWriteDB.SetMaxIdleConns(2)
-	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
-	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
