@@ -22,9 +22,22 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type testElection struct {
+	server     testcommon.APIserver
+	election   api.ElectionCreate
+	censusData *api.Census
+	stx        models.SignedTx
+	voterKey   ethereum.SignKeys
+}
+
 func TestAPIcensusAndVote(t *testing.T) {
-	server := testcommon.APIserver{}
-	server.Start(t,
+	te := testElection{}
+	te.CreateCensusAndElection(t, 10)
+}
+
+func (te *testElection) CreateCensusAndElection(t testing.TB, nvotes int) {
+	te.server = testcommon.APIserver{}
+	te.server.Start(t,
 		api.ChainHandler,
 		api.CensusHandler,
 		api.VoteHandler,
@@ -33,22 +46,22 @@ func TestAPIcensusAndVote(t *testing.T) {
 		api.WalletHandler,
 	)
 	// Block 1
-	server.VochainAPP.AdvanceTestBlock()
+	te.server.VochainAPP.AdvanceTestBlock()
 
 	token1 := uuid.New()
-	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+	c := testutil.NewTestHTTPclient(t, te.server.ListenAddr, &token1)
 
 	// create a new census
 	resp, code := c.Request("POST", nil, "censuses", "weighted")
 	qt.Assert(t, code, qt.Equals, 200)
-	censusData := &api.Census{}
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	id1 := censusData.CensusID.String()
+	te.censusData = &api.Census{}
+	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
+	id1 := te.censusData.CensusID.String()
 
 	// add a bunch of keys and values (weights)
 	rnd := testutil.NewRandom(1)
 	cparts := api.CensusParticipants{}
-	for i := 1; i < 10; i++ {
+	for i := 1; i < nvotes; i++ {
 		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
 			Key:    rnd.RandomBytes(20),
 			Weight: (*types.BigInt)(big.NewInt(int64(1))),
@@ -58,25 +71,24 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// add the key we'll use for cast votes
-	voterKey := ethereum.SignKeys{}
-	qt.Assert(t, voterKey.Generate(), qt.IsNil)
+	qt.Assert(t, te.voterKey.Generate(), qt.IsNil)
 
 	_, code = c.Request("POST", &api.CensusParticipants{Participants: []api.CensusParticipant{{
-		Key:    voterKey.Address().Bytes(),
+		Key:    te.voterKey.Address().Bytes(),
 		Weight: (*types.BigInt)(big.NewInt(1)),
 	}}}, "censuses", id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
 	resp, code = c.Request("POST", nil, "censuses", id1, "publish")
 	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
-	root := censusData.CensusID
+	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
+	qt.Assert(t, te.censusData.CensusID, qt.IsNotNil)
+	root := te.censusData.CensusID
 
-	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", voterKey.Address().Bytes()))
+	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", te.voterKey.Address().Bytes()))
 	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
+	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
+	qt.Assert(t, te.censusData.Weight.String(), qt.Equals, "1")
 
 	metadataBytes, err := json.Marshal(
 		&api.ElectionMetadata{
@@ -110,10 +122,10 @@ func TestAPIcensusAndVote(t *testing.T) {
 	}
 	txb, err := proto.Marshal(&tx)
 	qt.Assert(t, err, qt.IsNil)
-	signedTxb, err := server.Account.SignVocdoniTx(txb, server.VochainAPP.ChainID())
+	signedTxb, err := te.server.Account.SignVocdoniTx(txb, te.server.VochainAPP.ChainID())
 	qt.Assert(t, err, qt.IsNil)
-	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
-	stxb, err := proto.Marshal(&stx)
+	te.stx = models.SignedTx{Tx: txb, Signature: signedTxb}
+	stxb, err := proto.Marshal(&te.stx)
 	qt.Assert(t, err, qt.IsNil)
 
 	election := api.ElectionCreate{
@@ -126,9 +138,11 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Block 2
-	server.VochainAPP.AdvanceTestBlock()
+	te.server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
+}
 
+func (te *testElection) Vote(t testing.TB, c *testutil.TestHTTPclient, nvotes int) {
 	// Send a vote
 	votePackage := &state.VotePackage{
 		Votes: []int{1},
@@ -138,37 +152,37 @@ func TestAPIcensusAndVote(t *testing.T) {
 
 	vote := &models.VoteEnvelope{
 		Nonce:       util.RandomBytes(16),
-		ProcessId:   election.ElectionID,
+		ProcessId:   te.election.ElectionID,
 		VotePackage: votePackageBytes,
 	}
 	vote.Proof = &models.Proof{
 		Payload: &models.Proof_Arbo{
 			Arbo: &models.ProofArbo{
 				Type:       models.ProofArbo_BLAKE2B,
-				Siblings:   censusData.Proof,
-				LeafWeight: censusData.Value,
+				Siblings:   te.censusData.Proof,
+				LeafWeight: te.censusData.Value,
 			},
 		},
 	}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	te.stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
 	qt.Assert(t, err, qt.IsNil)
-	stx.Signature, err = voterKey.SignVocdoniTx(stx.Tx, server.VochainAPP.ChainID())
+	te.stx.Signature, err = te.voterKey.SignVocdoniTx(te.stx.Tx, te.server.VochainAPP.ChainID())
 	qt.Assert(t, err, qt.IsNil)
-	stxb, err = proto.Marshal(&stx)
+	stxb, err := proto.Marshal(&te.stx)
 	qt.Assert(t, err, qt.IsNil)
 
 	v := &api.Vote{TxPayload: stxb}
-	resp, code = c.Request("POST", v, "votes")
+	resp, code := c.Request("POST", v, "votes")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &v)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Block 3
-	server.VochainAPP.AdvanceTestBlock()
+	te.server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 3)
 
 	// Verify the vote
-	_, code = c.Request("GET", nil, "votes", "verify", election.ElectionID.String(), v.VoteID.String())
+	_, code = c.Request("GET", nil, "votes", "verify", te.election.ElectionID.String(), v.VoteID.String())
 	qt.Assert(t, code, qt.Equals, 200)
 
 	// Get the vote and check the data
