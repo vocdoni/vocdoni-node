@@ -171,7 +171,7 @@ func (v *State) RegisterStartBlock(pid []byte, startBlock uint32) error {
 	if err != nil {
 		return err
 	}
-	newStartBlock := []byte{}
+	newStartBlock := make([]byte, 32)
 	binary.LittleEndian.PutUint32(newStartBlock, startBlock)
 	return processesTree.NoState().Set(pid, newStartBlock)
 }

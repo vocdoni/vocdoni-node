@@ -2,7 +2,6 @@ package state
 
 import (
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -23,18 +22,18 @@ func TestSetSIK(t *testing.T) {
 	// try to overwrite a valid sik with another
 	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrRegisteredValidSIK)
 	// mock invalid leaf value with a hysteresis height
-	leafValue := encodeHeight(10)
 	s.Tx.Lock()
-	err = s.Tx.DeepSet(address.Bytes(), leafValue, StateTreeCfg(TreeSIK))
+	err = s.Tx.DeepSet(address.Bytes(), encodeHeight(10), StateTreeCfg(TreeSIK))
 	s.Tx.Unlock()
 	c.Assert(err, qt.IsNil)
-	// try to update the sik without reach hysteresis
-	s.SetHeight(5)
-	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrHysteresisNotReached)
+	// try to update the sik when the threshold is not reached
+	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrSIKNotUpdateable)
+	s.Tx.Lock()
+	err = s.Tx.DeepSet(address.Bytes(), encodeHeight(100), StateTreeCfg(TreeSIK))
+	s.Tx.Unlock()
+	c.Assert(err, qt.IsNil)
 	// increase the current height to reach hysteresis and try to update again
-	s.SetHeight(10)
 	err = s.SetSIK(address, sik)
-	fmt.Println(err)
 	c.Assert(err, qt.IsNil)
 }
 
@@ -66,28 +65,27 @@ func Test_DelSIK(t *testing.T) {
 	c.Assert(s.DelSIK(address), qt.IsNil)
 }
 
-func Test_hysteresis(t *testing.T) {
+func Test_heightEncoding(t *testing.T) {
 	c := qt.New(t)
 	height := uint32(3498223)
 	encoded := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 239, 96, 53, 0}
 	c.Assert(encodeHeight(height), qt.ContentEquals, encoded)
-	c.Assert(decodeHeigh(encodeHeight(height)), qt.Equals, height)
+	c.Assert(decodeHeight(encodeHeight(height)), qt.Equals, height)
 
 	height = uint32(0)
-	encoded = make([]byte, hysteresisLen)
+	encoded = make([]byte, sikLeafValueLen)
 	c.Assert(encodeHeight(height), qt.ContentEquals, encoded)
-	c.Assert(decodeHeigh(encodeHeight(height)), qt.Equals, height)
+	c.Assert(decodeHeight(encodeHeight(height)), qt.Equals, height)
 
 	height = uint32(4294967294)
 	encoded = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 254, 255, 255, 255}
 	c.Assert(encodeHeight(height), qt.ContentEquals, encoded)
-	c.Assert(decodeHeigh(encodeHeight(height)), qt.Equals, height)
+	c.Assert(decodeHeight(encodeHeight(height)), qt.Equals, height)
 
 	height = uint32(16777472)
 	encoded = []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
 	c.Assert(encodeHeight(height), qt.ContentEquals, encoded)
-	c.Assert(decodeHeigh(encodeHeight(height)), qt.Equals, height)
-
+	c.Assert(decodeHeight(encodeHeight(height)), qt.Equals, height)
 }
 
 func Test_validSIK(t *testing.T) {
