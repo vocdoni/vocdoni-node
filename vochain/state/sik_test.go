@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/util"
 )
 
 func TestSetSIK(t *testing.T) {
@@ -21,18 +22,26 @@ func TestSetSIK(t *testing.T) {
 	c.Assert(s.SetSIK(address, sik), qt.IsNil)
 	// try to overwrite a valid sik with another
 	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrRegisteredValidSIK)
-	// mock invalid leaf value with a hysteresis height
+	// mock invalid leaf value with small encoded height
 	s.Tx.Lock()
 	err = s.Tx.DeepSet(address.Bytes(), encodeHeight(10), StateTreeCfg(TreeSIK))
 	s.Tx.Unlock()
 	c.Assert(err, qt.IsNil)
 	// try to update the sik when the threshold is not reached
 	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrSIKNotUpdateable)
+	// retry to update the sik increasing the state height and registering new
+	// startBlock
+	s.SetHeight(50)
+	err = s.RegisterStartBlock(common.BytesToAddress(util.RandomBytes(32)).Bytes(), 40)
+	c.Assert(err, qt.IsNil)
+	// try to update the sik when the threshold is not reached
+	c.Assert(s.SetSIK(address, sik), qt.ErrorIs, ErrSIKNotUpdateable)
+	// mock a valid encoded height as sik value
 	s.Tx.Lock()
 	err = s.Tx.DeepSet(address.Bytes(), encodeHeight(100), StateTreeCfg(TreeSIK))
 	s.Tx.Unlock()
 	c.Assert(err, qt.IsNil)
-	// increase the current height to reach hysteresis and try to update again
+	// try to update the sik when the threshold is reached
 	err = s.SetSIK(address, sik)
 	c.Assert(err, qt.IsNil)
 }

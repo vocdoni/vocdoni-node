@@ -199,8 +199,9 @@ func (v *State) MinOnGoingStartBlock(committed bool) (uint32, error) {
 	}
 	minStartBlock := v.CurrentHeight()
 	startBlocksSubTree := processesTree.NoState()
-	if err := startBlocksSubTree.Iterate(startBlocksSubTreePrefix, func(key, value []byte) bool {
-		if startBlock := binary.LittleEndian.Uint32(value); startBlock < minStartBlock {
+	if err := startBlocksSubTree.Iterate([]byte{}, func(key, value []byte) bool {
+		startBlock := binary.LittleEndian.Uint32(value)
+		if startBlock < minStartBlock {
 			minStartBlock = startBlock
 		}
 		return true
