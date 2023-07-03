@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"strconv"
@@ -19,6 +20,8 @@ var (
 	emptyCensusRoot                = make([]byte, StateChildTreeCfg(ChildTreeCensus).HashFunc().Len())
 	emptyPreRegisterNullifiersRoot = make([]byte, StateChildTreeCfg(ChildTreePreRegisterNullifiers).HashFunc().Len())
 )
+
+var startBlocksSubTreePrefix = []byte("sb")
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
@@ -161,6 +164,52 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 	return count, nil
 }
 
+func (v *State) RegisterStartBlock(pid []byte, startBlock uint32) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	processesTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return err
+	}
+	newStartBlock := []byte{}
+	binary.LittleEndian.PutUint32(newStartBlock, startBlock)
+	return processesTree.NoState().Set(pid, newStartBlock)
+}
+
+func (v *State) DeleteStartBlock(pid []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	processesTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return err
+	}
+	return processesTree.NoState().Delete(pid)
+}
+
+// MinOnGoingStartBlock returns the minimun start block of the current on going
+// processes from the no-state db associated to the process sub tree.
+func (v *State) MinOnGoingStartBlock(committed bool) (uint32, error) {
+	if !committed {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return 0, err
+	}
+	minStartBlock := v.CurrentHeight()
+	startBlocksSubTree := processesTree.NoState()
+	if err := startBlocksSubTree.Iterate(startBlocksSubTreePrefix, func(key, value []byte) bool {
+		if startBlock := binary.LittleEndian.Uint32(value); startBlock < minStartBlock {
+			minStartBlock = startBlock
+		}
+		return true
+	}); err != nil {
+		return 0, err
+	}
+	return minStartBlock, nil
+}
+
 // ListProcessIDs returns the full list of process identifiers (pid).
 func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	if !committed {
@@ -211,9 +260,28 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
+	// update the process
 	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return updateProcess(&v.Tx, p, pid)
+	if err := updateProcess(&v.Tx, p, pid); err != nil {
+		return err
+	}
+	v.Tx.Unlock()
+	// try to update startBlocks database
+	switch p.Status {
+	case models.ProcessStatus_READY:
+		if err := v.RegisterStartBlock(p.ProcessId, p.StartBlock); err != nil {
+			return err
+		}
+	case models.ProcessStatus_PAUSED:
+		if err := v.RegisterStartBlock(p.ProcessId, v.CurrentHeight()); err != nil {
+			return err
+		}
+	case models.ProcessStatus_ENDED:
+		if err := v.DeleteStartBlock(p.ProcessId); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // SetProcessStatus changes the process status to the one provided.
