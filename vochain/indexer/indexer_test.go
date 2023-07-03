@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -1304,4 +1305,56 @@ func TestTxIndexer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
 	qt.Assert(t, txs[0].Index, qt.Equals, uint64(95))
+}
+
+func TestCensusUpdate(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+
+	originalCensusRoot := util.RandomBytes(32)
+	originalCensusURI := new(string)
+	*originalCensusURI = "ipfs://1234"
+	pid := util.RandomBytes(32)
+
+	if err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+		Mode:          &models.ProcessMode{AutoStart: true, DynamicCensus: true},
+		MaxCensusSize: 1000,
+		CensusRoot:    originalCensusRoot,
+		CensusURI:     originalCensusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	app.AdvanceTestBlock()
+
+	// get created process
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	// check the census root is correct
+	qt.Assert(t, proc.CensusRoot, qt.DeepEquals, types.HexBytes(originalCensusRoot))
+	// check the census uri is correct
+	qt.Assert(t, proc.CensusURI, qt.DeepEquals, *originalCensusURI)
+
+	// send SET_PROCESS_CENSUS_UPDATE
+	newCensusRoot := util.RandomBytes(32)
+	newCensusURI := new(string)
+	*newCensusURI = "ipfs://5678"
+	if err := app.State.SetProcessCensus(pid, newCensusRoot, *newCensusURI, true); err != nil {
+		t.Fatal(err)
+	}
+
+	// advance block
+	app.AdvanceTestBlock()
+	// get process again
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	// check the census root is correct
+	qt.Assert(t, proc.CensusRoot, qt.DeepEquals, types.HexBytes(newCensusRoot))
+	// check the census uri is correct
+	qt.Assert(t, proc.CensusURI, qt.DeepEquals, *newCensusURI)
 }
