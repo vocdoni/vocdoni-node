@@ -537,6 +537,14 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	}
 }
 
+// OnCensusUpdate adds the process to blockUpdateProcs in order to update the census.
+// This function call is triggered by the SET_PROCESS_CENSUS tx.
+func (idx *Indexer) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.blockUpdateProcs[string(pid)] = true
+}
+
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
 // from the database, ordered by timestamp and paginated by maxItems and offset
 func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {

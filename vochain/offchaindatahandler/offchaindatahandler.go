@@ -168,3 +168,4 @@ func (d *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.Pr
 func (d *OffChainDataHandler) OnTransferTokens(tx *vochaintx.TokenTransfer) {}
 func (d *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
 }
+func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
