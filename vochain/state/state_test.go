@@ -183,6 +183,7 @@ func (l *Listener) OnProcessKeys(pid []byte, encryptionPub string, txIndex int32
 func (l *Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)                {}
 func (l *Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) {
 }
+func (l *Listener) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
 func (l *Listener) OnSetAccount(addr []byte, account *Account) {
 }
 func (l *Listener) OnTransferTokens(tx *vochaintx.TokenTransfer) {

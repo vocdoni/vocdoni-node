@@ -278,6 +278,8 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
+func (k *KeyKeeper) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
+
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
 func (k *KeyKeeper) generateKeys(pid []byte) (*processKeys, error) {

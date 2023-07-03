@@ -31,6 +31,7 @@ type EventListener interface {
 	OnProcessesStart(pids [][]byte)
 	OnSetAccount(addr []byte, account *Account)
 	OnTransferTokens(tx *vochaintx.TokenTransfer)
+	OnCensusUpdate(pid, censusRoot []byte, censusURI string)
 	Commit(height uint32) (err error)
 	OnBeginBlock(BeginBlock)
 	Rollback()
