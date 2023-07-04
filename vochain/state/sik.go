@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"math/big"
@@ -92,6 +93,78 @@ func (v *State) DelSIK(address common.Address) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	return v.Tx.DeepSet(address.Bytes(), encodeHeight(v.CurrentHeight()), StateTreeCfg(TreeSIK))
+}
+
+// UpdateSIKRoots keep on track the last valid SIK Merkle Tree roots to support
+// voting to already registered users when an election is on going and new users
+// are registered. When a new sikRoot is generated, the sikRoot’s from an older
+// block than the current block minus the hysteresis blocks will be deleted:
+//   - If exists a sikRoot for the minimun hysteresis block number
+//     (currentBlock - hysteresis), just remove all the roots with a lower block
+//     number.
+//   - If it does not exist, remove all roots with a lower block number except
+//     for the next lower sikRoot. It is becouse it still being validate for a
+//     period.
+func (v *State) UpdateSIKRoots() error {
+	// get sik roots key-value database associated to the siks tree
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return err
+	}
+	sikRoots := siksTree.NoState()
+	// calculate the current minimun block to purge useless sik roots
+	minBlock := v.CurrentHeight() - SIKROOT_HYSTERESIS_BLOCKS
+	if minBlock != 0 {
+		toPurge := [][]byte{}
+		minBlockKey := make([]byte, 32)
+		binary.LittleEndian.PutUint32(minBlockKey, minBlock)
+		if _, err := sikRoots.Get(minBlockKey); err == nil {
+			// if exists a sikRoot for the minimun block number just remove all
+			// the roots with a lower block number
+			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+				if binary.LittleEndian.Uint32(key) < minBlock {
+					toPurge = append(toPurge, key)
+				}
+				return true
+			})
+		} else {
+			// If not, remove all roots with a lower block number except for
+			// the next lower sikRoot
+			nearestLowerBlock := uint32(0)
+			// iterate once to get the nearest lower block to the calculated
+			// min block
+			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+				blockNumber := binary.LittleEndian.Uint32(key)
+				if nearestLowerBlock < blockNumber && blockNumber < minBlock {
+					nearestLowerBlock = blockNumber
+				}
+				return true
+			})
+			// iterate again to get the sikRoots block numbers to delete
+			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+				if binary.LittleEndian.Uint32(key) < nearestLowerBlock {
+					toPurge = append(toPurge, key)
+				}
+				return true
+			})
+		}
+		// delete the selected sikRoots by its block numbers
+		for _, blockNumber := range toPurge {
+			if err := sikRoots.Delete(blockNumber); err != nil {
+				return err
+			}
+		}
+	}
+	// add the new sikRoot
+	hash, err := siksTree.Root()
+	if err != nil {
+		return err
+	}
+	blockKey := make([]byte, 32)
+	binary.LittleEndian.PutUint32(blockKey, v.CurrentHeight())
+	return sikRoots.Set(blockKey, hash)
 }
 
 // encodeHeight funtion returns the encoded value of the encoded height

@@ -21,8 +21,6 @@ var (
 	emptyPreRegisterNullifiersRoot = make([]byte, StateChildTreeCfg(ChildTreePreRegisterNullifiers).HashFunc().Len())
 )
 
-var startBlocksSubTreePrefix = []byte("sb")
-
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
 func (v *State) AddProcess(p *models.Process) error {
