@@ -45,8 +45,12 @@ func (v *State) SetSIK(address common.Address, newSik []byte) error {
 			"address", address.String(),
 			"sik", hex.EncodeToString(sik))
 		v.Tx.Lock()
-		defer v.Tx.Unlock()
-		return v.Tx.DeepAdd(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
+		err = v.Tx.DeepAdd(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
+		v.Tx.Unlock()
+		if err != nil {
+			return err
+		}
+		return v.UpdateSIKRoots()
 	}
 	if err != nil {
 		return err
@@ -72,8 +76,12 @@ func (v *State) SetSIK(address common.Address, newSik []byte) error {
 		"sik", hex.EncodeToString(newSik))
 	// if the hysteresis is reached update the sik for the address
 	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
+	err = v.Tx.DeepSet(address.Bytes(), newSik, StateTreeCfg(TreeSIK))
+	v.Tx.Unlock()
+	if err != nil {
+		return err
+	}
+	return v.UpdateSIKRoots()
 }
 
 // DelSIK function removes the registered SIK for the address provided. If it is
@@ -91,8 +99,27 @@ func (v *State) DelSIK(address common.Address) error {
 		return ErrSIKAlreadyInvalid
 	}
 	v.Tx.Lock()
+	err = v.Tx.DeepSet(address.Bytes(), encodeHeight(v.CurrentHeight()), StateTreeCfg(TreeSIK))
+	v.Tx.Unlock()
+	if err != nil {
+		return err
+	}
+	return v.UpdateSIKRoots()
+}
+
+func (v *State) ValidSIKRoots() ([][]byte, error) {
+	v.Tx.Lock()
 	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(address.Bytes(), encodeHeight(v.CurrentHeight()), StateTreeCfg(TreeSIK))
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return nil, err
+	}
+	validRoots := [][]byte{}
+	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
+		validRoots = append(validRoots, root)
+		return true
+	})
+	return validRoots, nil
 }
 
 // UpdateSIKRoots keep on track the last valid SIK Merkle Tree roots to support
@@ -113,17 +140,18 @@ func (v *State) UpdateSIKRoots() error {
 	if err != nil {
 		return err
 	}
-	sikRoots := siksTree.NoState()
+	sikRootsDB := siksTree.NoState()
 	// calculate the current minimun block to purge useless sik roots
-	minBlock := v.CurrentHeight() - SIKROOT_HYSTERESIS_BLOCKS
-	if minBlock != 0 {
+	currentBlock := v.CurrentHeight()
+	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
 		toPurge := [][]byte{}
+		minBlock := currentBlock - SIKROOT_HYSTERESIS_BLOCKS
 		minBlockKey := make([]byte, 32)
 		binary.LittleEndian.PutUint32(minBlockKey, minBlock)
-		if _, err := sikRoots.Get(minBlockKey); err == nil {
+		if _, err := sikRootsDB.Get(minBlockKey); err == nil {
 			// if exists a sikRoot for the minimun block number just remove all
 			// the roots with a lower block number
-			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
 				if binary.LittleEndian.Uint32(key) < minBlock {
 					toPurge = append(toPurge, key)
 				}
@@ -135,7 +163,7 @@ func (v *State) UpdateSIKRoots() error {
 			nearestLowerBlock := uint32(0)
 			// iterate once to get the nearest lower block to the calculated
 			// min block
-			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
 				blockNumber := binary.LittleEndian.Uint32(key)
 				if nearestLowerBlock < blockNumber && blockNumber < minBlock {
 					nearestLowerBlock = blockNumber
@@ -143,7 +171,7 @@ func (v *State) UpdateSIKRoots() error {
 				return true
 			})
 			// iterate again to get the sikRoots block numbers to delete
-			sikRoots.Iterate([]byte{}, func(key, value []byte) bool {
+			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
 				if binary.LittleEndian.Uint32(key) < nearestLowerBlock {
 					toPurge = append(toPurge, key)
 				}
@@ -152,7 +180,7 @@ func (v *State) UpdateSIKRoots() error {
 		}
 		// delete the selected sikRoots by its block numbers
 		for _, blockNumber := range toPurge {
-			if err := sikRoots.Delete(blockNumber); err != nil {
+			if err := sikRootsDB.Delete(blockNumber); err != nil {
 				return err
 			}
 		}
@@ -163,8 +191,8 @@ func (v *State) UpdateSIKRoots() error {
 		return err
 	}
 	blockKey := make([]byte, 32)
-	binary.LittleEndian.PutUint32(blockKey, v.CurrentHeight())
-	return sikRoots.Set(blockKey, hash)
+	binary.LittleEndian.PutUint32(blockKey, currentBlock)
+	return sikRootsDB.Set(blockKey, hash)
 }
 
 // encodeHeight funtion returns the encoded value of the encoded height
