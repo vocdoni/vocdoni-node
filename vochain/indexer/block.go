@@ -9,8 +9,8 @@ import (
 )
 
 func (idx *Indexer) OnBeginBlock(bb state.BeginBlock) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateBlock(context.TODO(), indexerdb.CreateBlockParams{
 		Height:   bb.Height,

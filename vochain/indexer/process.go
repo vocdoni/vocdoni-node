@@ -245,8 +245,8 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateProcess(context.TODO(), procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
