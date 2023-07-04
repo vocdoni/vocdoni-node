@@ -82,8 +82,8 @@ func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Tr
 }
 
 func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTransaction(context.TODO(), indexerdb.CreateTransactionParams{
 		Hash:        tx.TxID[:],
