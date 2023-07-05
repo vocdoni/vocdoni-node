@@ -7,8 +7,8 @@ CREATE TABLE processes (
 
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
-  results_votes           TEXT NOT NULL,
-  results_weight          TEXT NOT NULL, -- TODO: store as math/big.Int.Bytes?
+  results_votes           TEXT NOT NULL, -- bigint matrix like "a,b,c x,y,z ..."
+  results_weight          TEXT NOT NULL, -- bigint
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,
