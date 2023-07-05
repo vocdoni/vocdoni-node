@@ -96,9 +96,9 @@ func testEntityList(t *testing.T, entityCount int) {
 			}
 			entitiesByID[string(e.EntityID)] = true
 			if bytes.Equal(e.EntityID, twoProcessesEntity) {
-				qt.Assert(t, e.Count, qt.Equals, int64(2))
+				qt.Assert(t, e.ProcessCount, qt.Equals, int64(2))
 			} else {
-				qt.Assert(t, e.Count, qt.Equals, int64(1))
+				qt.Assert(t, e.ProcessCount, qt.Equals, int64(1))
 			}
 		}
 		last += 10

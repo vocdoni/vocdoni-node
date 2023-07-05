@@ -93,7 +93,7 @@ WHERE entity_id = sqlc.arg(entity_id);
 SELECT COUNT(DISTINCT entity_id) FROM processes;
 
 -- name: SearchEntities :many
-SELECT entity_id, COUNT(id) FROM processes
+SELECT entity_id, COUNT(id) AS process_count FROM processes
 WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
 GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC

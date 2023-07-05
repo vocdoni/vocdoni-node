@@ -218,7 +218,7 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 }
 
 const searchEntities = `-- name: SearchEntities :many
-SELECT entity_id, COUNT(id) FROM processes
+SELECT entity_id, COUNT(id) AS process_count FROM processes
 WHERE (?1 = '' OR (INSTR(LOWER(HEX(entity_id)), ?1) > 0))
 GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC
@@ -233,8 +233,8 @@ type SearchEntitiesParams struct {
 }
 
 type SearchEntitiesRow struct {
-	EntityID types.EntityID
-	Count    int64
+	EntityID     types.EntityID
+	ProcessCount int64
 }
 
 func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
@@ -246,7 +246,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 	var items []SearchEntitiesRow
 	for rows.Next() {
 		var i SearchEntitiesRow
-		if err := rows.Scan(&i.EntityID, &i.Count); err != nil {
+		if err := rows.Scan(&i.EntityID, &i.ProcessCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

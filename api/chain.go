@@ -204,7 +204,7 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	for _, org := range list {
 		organizations = append(organizations, &OrganizationList{
 			OrganizationID: org.EntityID,
-			ElectionCount:  uint64(org.Count),
+			ElectionCount:  uint64(org.ProcessCount),
 		})
 	}
 
@@ -731,7 +731,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 	for _, org := range matchingOrganizationIds {
 		organizations = append(organizations, &OrganizationList{
 			OrganizationID: org.EntityID,
-			ElectionCount:  uint64(org.Count),
+			ElectionCount:  uint64(org.ProcessCount),
 		})
 	}
 
