@@ -16,10 +16,12 @@ import (
 const SIKROOT_HYSTERESIS_BLOCKS = 32
 
 const (
-	// encodedHeightLen constant is the number of bytes of the encoded hysteresis
-	// that contains the hysteresis height value, starting from the last byte
+	// encodedHeightLen constant is the number of bytes of the encoded
+	// hysteresis that contains the hysteresis height value, starting from the
+	// last byte
 	encodedHeightLen = 4
-	// sikLeafValueLen constant contains the number of bytes that a leaf value has
+	// sikLeafValueLen constant contains the number of bytes that a leaf value
+	// has
 	sikLeafValueLen = 32
 )
 

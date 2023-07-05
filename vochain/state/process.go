@@ -162,6 +162,9 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 	return count, nil
 }
 
+// RegisterStartBlock function creates a new record on the key-value database
+// associated to the processes subtree for the process ID and the startBlock
+// number provided.
 func (v *State) RegisterStartBlock(pid []byte, startBlock uint32) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
@@ -174,6 +177,8 @@ func (v *State) RegisterStartBlock(pid []byte, startBlock uint32) error {
 	return processesTree.NoState().Set(pid, newStartBlock)
 }
 
+// DeleteStartBlock function deletes the record on the key-value database
+// associated to the processes subtree for the process ID provided.
 func (v *State) DeleteStartBlock(pid []byte) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
@@ -184,9 +189,9 @@ func (v *State) DeleteStartBlock(pid []byte) error {
 	return processesTree.NoState().Delete(pid)
 }
 
-// MinOnGoingStartBlock returns the minimun start block of the current on going
+// MinReadyProcessStartBlock returns the minimun start block of the current on going
 // processes from the no-state db associated to the process sub tree.
-func (v *State) MinOnGoingStartBlock(committed bool) (uint32, error) {
+func (v *State) MinReadyProcessStartBlock(committed bool) (uint32, error) {
 	if !committed {
 		v.Tx.RLock()
 		defer v.Tx.RUnlock()
@@ -196,8 +201,8 @@ func (v *State) MinOnGoingStartBlock(committed bool) (uint32, error) {
 		return 0, err
 	}
 	minStartBlock := v.CurrentHeight()
-	startBlocksSubTree := processesTree.NoState()
-	if err := startBlocksSubTree.Iterate([]byte{}, func(key, value []byte) bool {
+	startBlocksSB := processesTree.NoState()
+	if err := startBlocksSB.Iterate([]byte{}, func(key, value []byte) bool {
 		startBlock := binary.LittleEndian.Uint32(value)
 		if startBlock < minStartBlock {
 			minStartBlock = startBlock
