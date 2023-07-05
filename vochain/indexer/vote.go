@@ -41,6 +41,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime,
 		Meta: indexertypes.EnvelopeMetadata{
+			VoterID:   voteRef.VoterID.Address(),
 			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
 			TxIndex:   int32(voteRef.BlockIndex),
