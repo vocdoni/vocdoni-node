@@ -225,9 +225,10 @@ func TestCensusProof(t *testing.T) {
 		&models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
-					Type:       models.ProofArbo_BLAKE2B,
-					Siblings:   censusData.Proof,
-					LeafWeight: censusData.Value,
+					Type:            models.ProofArbo_BLAKE2B,
+					Siblings:        censusData.Proof,
+					AvalaibleWeight: censusData.Value,
+					VoteWeight:      censusData.Value,
 				},
 			},
 		},
