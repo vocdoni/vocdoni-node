@@ -227,7 +227,7 @@ func TestCensusProof(t *testing.T) {
 				Arbo: &models.ProofArbo{
 					Type:            models.ProofArbo_BLAKE2B,
 					Siblings:        censusData.Proof,
-					AvalaibleWeight: censusData.Value,
+					AvailableWeight: censusData.Value,
 					VoteWeight:      censusData.Value,
 				},
 			},

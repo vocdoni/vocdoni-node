@@ -115,16 +115,16 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		if len(leafKey) > censustree.DefaultMaxKeyLen {
 			leafKey = leafKey[:censustree.DefaultMaxKeyLen]
 		}
-		valid, err := tree.VerifyProof(hashFunc, leafKey, p.AvalaibleWeight, p.Siblings, censusRoot)
+		valid, err := tree.VerifyProof(hashFunc, leafKey, p.AvailableWeight, p.Siblings, censusRoot)
 		if !valid || err != nil {
 			return false, nil, err
 		}
 		// Legacy: support p.LeafWeight == nil, assume then value=1
-		if p.AvalaibleWeight == nil {
+		if p.AvailableWeight == nil {
 			return true, bigOne, nil
 		}
 
-		factoryWeight := arbo.BytesToBigInt(p.AvalaibleWeight)
+		factoryWeight := arbo.BytesToBigInt(p.AvailableWeight)
 		if p.VoteWeight == nil {
 			return true, factoryWeight, nil
 		}

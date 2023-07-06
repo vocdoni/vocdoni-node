@@ -141,7 +141,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 				Arbo: &models.ProofArbo{
 					Type:            models.ProofArbo_BLAKE2B,
 					Siblings:        v.ProofMkTree.Proof,
-					AvalaibleWeight: v.ProofMkTree.LeafValue,
+					AvailableWeight: v.ProofMkTree.LeafValue,
 					KeyType:         v.ProofMkTree.KeyType,
 					VoteWeight:      voteWeight,
 				},
