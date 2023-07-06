@@ -154,7 +154,7 @@ done
 log "### Test suite ready ###"
 
 # create temp dir
-results="/tmp/.vochaintest$RANDOM"
+results="/tmp/.vocdoni-test$RANDOM"
 mkdir -p $results
 
 for test in ${tests_to_run[@]}; do

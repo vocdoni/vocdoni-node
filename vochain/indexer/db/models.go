@@ -18,35 +18,33 @@ type Block struct {
 }
 
 type Process struct {
-	ID                    types.ProcessID
-	EntityID              types.EntityID
-	StartBlock            int64
-	EndBlock              int64
-	ResultsHeight         int64
-	HaveResults           bool
-	FinalResults          bool
-	ResultsVotes          string
-	ResultsWeight         string
-	ResultsEnvelopeHeight int64
-	ResultsBlockHeight    int64
-	CensusRoot            types.CensusRoot
-	RollingCensusRoot     types.CensusRoot
-	RollingCensusSize     int64
-	MaxCensusSize         int64
-	CensusUri             string
-	Metadata              string
-	CensusOrigin          int64
-	Status                int64
-	Namespace             int64
-	EnvelopePb            types.EncodedProtoBuf
-	ModePb                types.EncodedProtoBuf
-	VoteOptsPb            types.EncodedProtoBuf
-	PrivateKeys           string
-	PublicKeys            string
-	QuestionIndex         int64
-	CreationTime          time.Time
-	SourceBlockHeight     int64
-	SourceNetworkID       int64
+	ID                 types.ProcessID
+	EntityID           types.EntityID
+	StartBlock         int64
+	EndBlock           int64
+	HaveResults        bool
+	FinalResults       bool
+	ResultsVotes       string
+	ResultsWeight      string
+	ResultsBlockHeight int64
+	CensusRoot         types.CensusRoot
+	RollingCensusRoot  types.CensusRoot
+	RollingCensusSize  int64
+	MaxCensusSize      int64
+	CensusUri          string
+	Metadata           string
+	CensusOrigin       int64
+	Status             int64
+	Namespace          int64
+	EnvelopePb         types.EncodedProtoBuf
+	ModePb             types.EncodedProtoBuf
+	VoteOptsPb         types.EncodedProtoBuf
+	PrivateKeys        string
+	PublicKeys         string
+	QuestionIndex      int64
+	CreationTime       time.Time
+	SourceBlockHeight  int64
+	SourceNetworkID    int64
 }
 
 type TokenTransfer struct {
@@ -67,12 +65,13 @@ type Transaction struct {
 }
 
 type Vote struct {
-	Nullifier      types.Nullifier
-	ProcessID      types.ProcessID
-	BlockHeight    int64
-	BlockIndex     int64
-	Weight         string
-	CreationTime   time.Time
-	VoterID        state.VoterID
-	OverwriteCount int64
+	Nullifier            types.Nullifier
+	ProcessID            types.ProcessID
+	BlockHeight          int64
+	BlockIndex           int64
+	Weight               string
+	VoterID              state.VoterID
+	OverwriteCount       int64
+	EncryptionKeyIndexes string
+	Package              string
 }

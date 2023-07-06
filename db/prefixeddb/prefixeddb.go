@@ -27,7 +27,7 @@ func prefixSlice(prefix, v []byte) []byte {
 
 // NewPrefixedDatabase creates a new PrefixedDatabase.  If the db is already a
 // PrefixedDatabase, instead of wrapping again, the prefixes are appended to
-// avoid unecessay layers.
+// avoid unnecessary layers.
 func NewPrefixedDatabase(db db.Database, prefix []byte) *PrefixedDatabase {
 	if pdb, ok := db.(*PrefixedDatabase); ok {
 		return &PrefixedDatabase{prefixSlice(pdb.prefix, prefix), pdb.db}
@@ -58,7 +58,7 @@ func (d *PrefixedDatabase) Iterate(prefix []byte, callback func(key, value []byt
 	})
 }
 
-// PrefixedDatabase wraps a db.Database prefixing all keys with `prefix`.
+// PrefixedReader wraps a Reader tx prefixing all keys with `prefix`.
 type PrefixedReader struct {
 	prefix []byte
 	rd     db.Reader
@@ -67,9 +67,9 @@ type PrefixedReader struct {
 // check that PrefixedDatabase implements the db.Database interface
 var _ db.Reader = (*PrefixedReader)(nil)
 
-// NewPrefixedDatabase creates a new PrefixedDatabase.  If the db is already a
-// PrefixedDatabase, instead of wrapping again, the prefixes are appended to
-// avoid unecessay layers.
+// NewPrefixedReader creates a new PrefixedReader.  If the rd is already a
+// PrefixedReader, instead of wrapping again, the prefixes are appended to
+// avoid unnecessary layers.
 func NewPrefixedReader(rd db.Reader, prefix []byte) *PrefixedReader {
 	if pdb, ok := rd.(*PrefixedReader); ok {
 		return &PrefixedReader{prefixSlice(pdb.prefix, prefix), pdb.rd}

@@ -2,8 +2,6 @@ package indexertypes
 
 import (
 	"encoding/json"
-	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
@@ -11,27 +9,9 @@ import (
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
-
-const (
-	// CountStoreEntities is the key for the entity count db reference
-	CountStoreEntities = uint8(iota)
-	// CountStoreProcesses is the key for the process count db reference
-	CountStoreProcesses
-	// CountStoreEnvelopes is the key for the envelope count db reference
-	CountStoreEnvelopes
-	// CountStoreTransactions is the key for the transaction count db reference
-	CountStoreTransactions
-)
-
-// CountStore holds the count of envelopes, processes, entities, or transactions
-type CountStore struct {
-	Type  uint8
-	Count uint64
-}
 
 // Process represents an election process handled by the Vochain.
 // The indexer Process data type is different from the vochain state data type
@@ -61,29 +41,47 @@ type Process struct {
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
+
+	ResultsVotes       [][]*types.BigInt `json:"-"`
+	ResultsWeight      *types.BigInt     `json:"-"`
+	ResultsBlockHeight uint32            `json:"-"`
+}
+
+func (p *Process) Results() *results.Results {
+	return &results.Results{
+		ProcessID:    p.ID,
+		Votes:        p.ResultsVotes,
+		Weight:       p.ResultsWeight,
+		EnvelopeType: p.Envelope,
+		VoteOpts:     p.VoteOpts,
+		BlockHeight:  p.ResultsBlockHeight,
+	}
 }
 
 func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
-		ID:                dbproc.ID,
-		EntityID:          nonEmptyBytes(dbproc.EntityID),
-		StartBlock:        uint32(dbproc.StartBlock),
-		EndBlock:          uint32(dbproc.EndBlock),
-		HaveResults:       dbproc.HaveResults,
-		FinalResults:      dbproc.FinalResults,
-		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
-		RollingCensusRoot: nonEmptyBytes(dbproc.RollingCensusRoot),
-		RollingCensusSize: uint64(dbproc.RollingCensusSize),
-		MaxCensusSize:     uint64(dbproc.MaxCensusSize),
-		CensusURI:         dbproc.CensusUri,
-		CensusOrigin:      int32(dbproc.CensusOrigin),
-		Status:            int32(dbproc.Status),
-		Namespace:         uint32(dbproc.Namespace),
-		PrivateKeys:       nonEmptySplit(dbproc.PrivateKeys, ","),
-		PublicKeys:        nonEmptySplit(dbproc.PublicKeys, ","),
-		CreationTime:      dbproc.CreationTime,
-		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
-		Metadata:          dbproc.Metadata,
+		ID:                 dbproc.ID,
+		EntityID:           nonEmptyBytes(dbproc.EntityID),
+		StartBlock:         uint32(dbproc.StartBlock),
+		EndBlock:           uint32(dbproc.EndBlock),
+		HaveResults:        dbproc.HaveResults,
+		FinalResults:       dbproc.FinalResults,
+		CensusRoot:         nonEmptyBytes(dbproc.CensusRoot),
+		RollingCensusRoot:  nonEmptyBytes(dbproc.RollingCensusRoot),
+		RollingCensusSize:  uint64(dbproc.RollingCensusSize),
+		MaxCensusSize:      uint64(dbproc.MaxCensusSize),
+		CensusURI:          dbproc.CensusUri,
+		CensusOrigin:       int32(dbproc.CensusOrigin),
+		Status:             int32(dbproc.Status),
+		Namespace:          uint32(dbproc.Namespace),
+		PrivateKeys:        nonEmptySplit(dbproc.PrivateKeys, ","),
+		PublicKeys:         nonEmptySplit(dbproc.PublicKeys, ","),
+		CreationTime:       dbproc.CreationTime,
+		SourceBlockHeight:  uint64(dbproc.SourceBlockHeight),
+		Metadata:           dbproc.Metadata,
+		ResultsVotes:       decodeVotes(dbproc.ResultsVotes),
+		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
+		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
 
 	if _, ok := models.SourceNetworkId_name[int32(dbproc.SourceNetworkID)]; !ok {
@@ -119,26 +117,6 @@ func decodeVotes(input string) [][]*types.BigInt {
 	return votes
 }
 
-func ResultsFromDB(dbproc *indexerdb.Process) *results.Results {
-	results := &results.Results{
-		ProcessID:   dbproc.ID,
-		Votes:       decodeVotes(dbproc.ResultsVotes),
-		Weight:      decodeBigint(dbproc.ResultsWeight),
-		Final:       dbproc.FinalResults,
-		BlockHeight: uint32(dbproc.ResultsBlockHeight),
-	}
-	results.EnvelopeType = new(models.EnvelopeType)
-	if err := proto.Unmarshal(dbproc.EnvelopePb, results.EnvelopeType); err != nil {
-		log.Error(err)
-		return nil
-	}
-	results.VoteOpts = new(models.ProcessVoteOptions)
-	if err := proto.Unmarshal(dbproc.VoteOptsPb, results.VoteOpts); err != nil {
-		log.Error(err)
-	}
-	return results
-}
-
 func decodeBigint(s string) *types.BigInt {
 	if s == "" {
 		return nil
@@ -170,46 +148,6 @@ func (p Process) String() string {
 	return string(b)
 }
 
-// Entity holds the db reference for an entity
-type Entity struct {
-	ID           types.HexBytes
-	ProcessCount uint32
-	CreationTime time.Time
-}
-
-// VotePackage represents the payload of a vote (usually base64 encoded)
-type VotePackage struct {
-	Nonce string `json:"nonce,omitempty"`
-	Votes []int  `json:"votes"`
-}
-
-// Vote holds the db reference for a single vote
-type Vote struct {
-	Nullifier      types.HexBytes
-	ProcessID      types.HexBytes
-	VoterID        state.VoterID
-	Height         uint32
-	Weight         *types.BigInt
-	TxIndex        int32
-	TxHash         types.HexBytes
-	BlockTime      time.Time
-	OverwriteCount uint32
-}
-
-func VoteFromDB(dbvote *indexerdb.GetVoteRow) *Vote {
-	return &Vote{
-		Nullifier:      dbvote.Nullifier,
-		ProcessID:      dbvote.ProcessID,
-		VoterID:        dbvote.VoterID,
-		Height:         uint32(dbvote.BlockHeight),
-		TxIndex:        int32(dbvote.BlockIndex),
-		Weight:         decodeBigint(dbvote.Weight),
-		TxHash:         dbvote.TxHash,
-		BlockTime:      dbvote.CreationTime,
-		OverwriteCount: uint32(dbvote.OverwriteCount),
-	}
-}
-
 // EnvelopeMetadata contains vote information for the EnvelopeList api
 type EnvelopeMetadata struct {
 	ProcessId types.HexBytes `json:"processId"`
@@ -226,7 +164,7 @@ type EnvelopePackage struct {
 	Meta                 EnvelopeMetadata `json:"meta"`
 	Nonce                types.HexBytes   `json:"nonce"`
 	Signature            types.HexBytes   `json:"signature"`
-	VotePackage          []byte           `json:"votePackage"`
+	VotePackage          []byte           `json:"votePackage"` // plaintext or encrypted JSON
 	Weight               string           `json:"weight"`
 	OverwriteCount       uint32           `json:"overwriteCount"`
 	Date                 time.Time        `json:"date"`
@@ -269,46 +207,6 @@ func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
 	}
 }
 
-// BlockMetadata contains the metadata for a single tendermint block
-type BlockMetadata struct {
-	Height          uint32         `json:"height,omitempty"`
-	Timestamp       time.Time      `json:"timestamp"`
-	Hash            types.HexBytes `json:"hash,omitempty"`
-	NumTxs          uint64         `json:"numTxs"`
-	LastBlockHash   types.HexBytes `json:"lastBlockHash"`
-	ProposerAddress types.HexBytes `json:"proposerAddress"`
-}
-
-// String prints the BlockMetadata in a human-readable format
-func (b *BlockMetadata) String() string {
-	v := reflect.ValueOf(b)
-	t := v.Type()
-	var builder strings.Builder
-	builder.WriteString("{")
-	for i := 0; i < t.NumField(); i++ {
-		fv := v.Field(i)
-		if fv.IsZero() {
-			// omit zero values
-			continue
-		}
-		if builder.Len() > 1 {
-			builder.WriteString(" ")
-		}
-		ft := t.Field(i)
-		builder.WriteString(ft.Name)
-		builder.WriteString(":")
-		if ft.Type.Kind() == reflect.Slice && ft.Type.Elem().Kind() == reflect.Uint8 {
-			// print []byte as hexadecimal
-			fmt.Fprintf(&builder, "%x", fv.Bytes())
-		} else {
-			fv = reflect.Indirect(fv) // print *T as T
-			fmt.Fprintf(&builder, "%v", fv.Interface())
-		}
-	}
-	builder.WriteString("}")
-	return builder.String()
-}
-
 // TokenTransferMeta contains the information of a token transfer and some extra useful information.
 // The types are compatible with the SQL defined schema.
 type TokenTransferMeta struct {
@@ -318,13 +216,4 @@ type TokenTransferMeta struct {
 	TxHash    types.Hash      `json:"txHash"`
 	Timestamp time.Time       `json:"timestamp"`
 	To        types.AccountID `json:"to"`
-}
-
-// ________________________ CALLBACKS DATA STRUCTS ________________________
-
-// IndexerOnProcessData holds the required data for callbacks when
-// a new process is added into the vochain.
-type IndexerOnProcessData struct {
-	EntityID  []byte
-	ProcessID []byte
 }

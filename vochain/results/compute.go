@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -38,13 +37,11 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		Votes:        NewEmptyVotes(int(p.VoteOptions.MaxCount), int(p.VoteOptions.MaxValue)+1),
 		ProcessID:    electionID,
 		Weight:       new(types.BigInt).SetUint64(0),
-		Final:        true,
 		VoteOpts:     p.VoteOptions,
 		EnvelopeType: p.EnvelopeType,
 		BlockHeight:  st.CurrentHeight(),
 	}
 
-	var nvotes atomic.Uint64
 	lock := sync.Mutex{}
 	startTime := time.Now()
 	err = st.IterateVotes(electionID, true, func(vote *models.StateDBVote) bool {
@@ -68,23 +65,22 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 			log.Debugf("addVote failed: %v", err)
 			return false
 		}
-		nvotes.Add(1)
 		return false
 	})
-	if err == nil {
-		log.Infow("computed results",
-			"process", fmt.Sprintf("%x", electionID),
-			"votes", nvotes.Load(),
-			"results", results.String(),
-			"elapsed", time.Since(startTime).String(),
-		)
-	}
 	if errors.Is(err, statedb.ErrEmptyTree) {
 		// no votes, return empty results
 		return results, nil
 	}
-	results.EnvelopeHeight = nvotes.Load()
-	return results, err
+	if err != nil {
+		return nil, fmt.Errorf("IterateVotes failed: %w", err)
+	}
+
+	log.Infow("computed results",
+		"process", fmt.Sprintf("%x", electionID),
+		"results", results.String(),
+		"elapsed", time.Since(startTime).String(),
+	)
+	return results, nil
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.

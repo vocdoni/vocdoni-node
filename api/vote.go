@@ -112,9 +112,9 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		Date:                 &voteData.Date,
 	}
 
-	// check if votePackage is not encrypted and if so, return it
-	if _, err := json.Marshal(voteData.VotePackage); err == nil {
-		vote.VotePackage = string(voteData.VotePackage)
+	// If VotePackage is valid JSON, it's not encrypted, so we can include it.
+	if json.Valid(voteData.VotePackage) {
+		vote.VotePackage = voteData.VotePackage
 	}
 
 	var data []byte
@@ -145,6 +145,7 @@ func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if len(voteID) != types.ProcessIDsize {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
+	// TODO: use the indexer to verify that a vote exists?
 	if ok, err := a.vocapp.State.VoteExists(electionID, voteID, true); !ok || err != nil {
 		return ErrVoteNotFound
 	}

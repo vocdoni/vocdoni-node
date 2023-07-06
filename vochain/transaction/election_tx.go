@@ -97,24 +97,23 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx,
 	// if organization ID is not set, use the sender address
 	if tx.Process.EntityId == nil {
 		tx.Process.EntityId = addr.Bytes()
-	} else {
-		// check if process entityID matches tx sender
-		if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) {
-			// check for a delegate
-			entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
-			entityAccount, err := t.state.GetAccount(entityAddress, false)
-			if err != nil {
-				return nil, ethereum.Address{}, fmt.Errorf(
-					"cannot get organization account for checking if the sender is a delegate: %w", err,
-				)
-			}
-			if entityAccount == nil {
-				return nil, ethereum.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
-			}
-			if !entityAccount.IsDelegate(*addr) {
-				return nil, ethereum.Address{}, fmt.Errorf(
-					"account %s unauthorized to create a new election on this organization", addr.Hex())
-			}
+
+	} else if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) { // check if process entityID matches tx sender
+
+		// check for a delegate
+		entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
+		entityAccount, err := t.state.GetAccount(entityAddress, false)
+		if err != nil {
+			return nil, ethereum.Address{}, fmt.Errorf(
+				"cannot get organization account for checking if the sender is a delegate: %w", err,
+			)
+		}
+		if entityAccount == nil {
+			return nil, ethereum.Address{}, fmt.Errorf("organization account %s does not exists", addr.Hex())
+		}
+		if !entityAccount.IsDelegate(*addr) {
+			return nil, ethereum.Address{}, fmt.Errorf(
+				"account %s unauthorized to create a new election on this organization", addr.Hex())
 		}
 	}
 

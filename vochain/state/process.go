@@ -448,6 +448,9 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
+		for _, l := range v.eventListeners {
+			l.OnCensusUpdate(process.ProcessId, process.CensusRoot, censusURI)
+		}
 	}
 
 	return nil

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -19,17 +20,13 @@ import (
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
-// ErrNoResultsYet is an error returned to indicate the process exist but
-// it does not have yet reuslts.
-var ErrNoResultsYet = fmt.Errorf("no results yet")
-
 // ErrVoteNotFound is returned if the vote is not found in the indexer database.
 var ErrVoteNotFound = fmt.Errorf("vote not found")
 
-// GetEnvelopeReference gets the reference for an AddVote transaction.
-// This reference can then be used to fetch the vote transaction directly from the BlockStore.
-func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote, error) {
-	sqlTxRefInner, err := idx.readOnlyQuery.GetVote(context.TODO(), nullifier)
+// GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
+// Returns the envelope and the signature (if any).
+func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
+	voteRef, err := idx.readOnlyQuery.GetVote(context.TODO(), nullifier)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrVoteNotFound
@@ -37,34 +34,18 @@ func (idx *Indexer) GetEnvelopeReference(nullifier []byte) (*indexertypes.Vote, 
 		return nil, err
 	}
 
-	sqlTxRef := indexertypes.VoteFromDB(&sqlTxRefInner)
-	return sqlTxRef, nil
-}
-
-// GetEnvelope retrieves an Envelope from the Blockchain block store identified by its nullifier.
-// Returns the envelope and the signature (if any).
-func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage, error) {
-	voteRef, err := idx.GetEnvelopeReference(nullifier)
-	if err != nil {
-		return nil, err
-	}
-	// TODO: do not fetch from the state
-	vote, err := idx.App.State.Vote(voteRef.ProcessID, nullifier, true)
-	if err != nil {
-		return nil, ErrVoteNotFound
-	}
-
 	envelopePackage := &indexertypes.EnvelopePackage{
-		VotePackage:          vote.VotePackage,
-		EncryptionKeyIndexes: vote.EncryptionKeyIndexes,
-		Weight:               encodeBigint(voteRef.Weight),
-		OverwriteCount:       voteRef.OverwriteCount,
+		VotePackage:          []byte(voteRef.Package),
+		EncryptionKeyIndexes: decodeArrayJSON[uint32](voteRef.EncryptionKeyIndexes),
+		Weight:               voteRef.Weight,
+		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime,
 		Meta: indexertypes.EnvelopeMetadata{
+			VoterID:   voteRef.VoterID.Address(),
 			ProcessId: voteRef.ProcessID,
 			Nullifier: nullifier,
-			TxIndex:   voteRef.TxIndex,
-			Height:    voteRef.Height,
+			TxIndex:   int32(voteRef.BlockIndex),
+			Height:    uint32(voteRef.BlockHeight),
 			TxHash:    voteRef.TxHash,
 		},
 	}
@@ -123,6 +104,8 @@ func (idx *Indexer) CountVotes(processID []byte) (uint64, error) {
 		height, err := idx.readOnlyQuery.CountVotes(context.TODO())
 		return uint64(height), err
 	}
+	// TODO: the api package calls CountVotes with pid after ProcessInfo often.
+	// Consider doing it as part of ProcessInfo.
 	height, err := idx.readOnlyQuery.CountVotesByProcessID(context.TODO(), processID)
 	return uint64(height), err
 }
@@ -149,25 +132,6 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	idx.delProcessFromLiveResults(processID)
 
 	return nil
-}
-
-// GetResults returns the current result for a processId
-func (idx *Indexer) GetResults(processID []byte) (*results.Results, error) {
-	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
-	// does not matter much in the end
-	// TODO: the api package only uses results.Votes; can we simplify this?
-	sqlProcInner, err := idx.readOnlyQuery.GetProcess(context.TODO(), processID)
-	if err != nil {
-		return nil, err
-	}
-	sqlResults := indexertypes.ResultsFromDB(&sqlProcInner)
-	return sqlResults, nil
-}
-
-// GetResultsWeight returns the current weight of cast votes for a processId.
-func (idx *Indexer) GetResultsWeight(processID []byte) (*big.Int, error) {
-	// TODO(mvdan): implement on sqlite if needed
-	return nil, nil
 }
 
 // unmarshalVote decodes the base64 payload to a VotePackage struct type.
@@ -223,7 +187,6 @@ func (idx *Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byt
 	} else {
 		// If encrypted, just add the weight
 		results.Weight.Add(results.Weight, (*types.BigInt)(weight))
-		results.EnvelopeHeight++
 	}
 	return nil
 }
@@ -237,17 +200,36 @@ func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries
 		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
 	}
 	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
-		Nullifier:      vote.Nullifier,
-		ProcessID:      vote.ProcessID,
-		BlockHeight:    int64(vote.Height),
-		BlockIndex:     int64(txIndex),
-		Weight:         weightStr,
-		OverwriteCount: int64(vote.Overwrites),
-		VoterID:        nonNullBytes(vote.VoterID),
+		Nullifier:            vote.Nullifier,
+		ProcessID:            vote.ProcessID,
+		BlockHeight:          int64(vote.Height),
+		BlockIndex:           int64(txIndex),
+		Weight:               weightStr,
+		OverwriteCount:       int64(vote.Overwrites),
+		VoterID:              nonNullBytes(vote.VoterID),
+		EncryptionKeyIndexes: encodeArrayJSON(vote.EncryptionKeyIndexes),
+		Package:              string(vote.VotePackage),
 	}); err != nil {
 		return err
 	}
 	return nil
+}
+
+func encodeArrayJSON[T any](v []T) string {
+	p, err := json.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return string(p)
+}
+
+func decodeArrayJSON[T any](s string) []T {
+	var v []T
+	err := json.Unmarshal([]byte(s), &v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return v
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
@@ -280,11 +262,11 @@ func (idx *Indexer) commitVotes(queries *indexerdb.Queries, pid []byte, partialR
 func (idx *Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
-	sqlProcInner, err := queries.GetProcess(context.TODO(), pid)
+	procInner, err := queries.GetProcess(context.TODO(), pid)
 	if err != nil {
 		return err
 	}
-	results := indexertypes.ResultsFromDB(&sqlProcInner)
+	results := indexertypes.ProcessFromDB(&procInner).Results()
 	if partialSubResults != nil {
 		if err := results.Sub(partialSubResults); err != nil {
 			return err

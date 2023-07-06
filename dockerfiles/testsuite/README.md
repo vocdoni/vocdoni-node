@@ -5,7 +5,7 @@ To run the tests:
 ```
 docker-compose build
 docker-compose up -d
-go run ../../cmd/vochaintest/vochaintest.go --oracleKey $(. env.oracle0key; echo $DVOTE_ETHCONFIG_SIGNINGKEY) --electionSize=1000
+go run ../../cmd/end2endtest/
 ```
 
 there's also a bash script, which prefers to be run with `NOTTY=1`
@@ -28,33 +28,30 @@ it also specifies which nodes are trusted oracles.
 the seed node will serve to bootstrap the network: it'll just wait for incoming connections from other nodes, and provide them a list of peers which they can connect to.
 the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 4 miners online, they can reach consensus and start producing blocks.
 
-when the network is up and running, the tool `vochaintest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (something only the oracles are entitled to do), `vochaintest` needs to know the private key of the oracle (passed in `--oracleKey`), in order to sign the transaction.
+when the network is up and running, the tool `end2endtest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (a transaction that costs a certain amount of tokens), `end2endtest` uses a faucet offered by the testsuite (passed in `--faucet`) to fund the accounts.
 
 ## Developing
-### Connecting to docker-compose network to run vochaintest locally
-Gateway is exposed on `localhost:9090`.
-```
-$ cd dockerfiles/testsuite && docker-compose up
-vochaintest --oracleKey=... --treasurerKey=... --gwHost=http://localhost:9090/dvote --operation=tokentransactions
-```
-The oracle and treasurer keys are in the `env.oracle0key` and `env.treasurerkey` files.
-
-
 ### Adding integration tests
 When adding a new integration test to `start_test.sh`, please name the container after your test, including the RANDOMID to allow concurrent test runs in CI servers. Example:
 ```
-merkle_vote_plaintext() {
-	merkle_vote poll-vote
+e2etest_plaintextelection() {
+	e2etest plaintextelection --votes=100
 }
 ...
-merkle_vote() {
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${1}_${RANDOMID} test timeout 300 \
-		./vochaintest --gwHost $GWHOST \
+e2etest() {
+	op=$1
+	shift
+	args=$@
+	id="${op}_$(echo $args | md5sum | awk '{print $1}')"
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 300 \
+		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
-    ...
+		  --operation=$op \
+		  --parallel=$CONCURRENT_CONNECTIONS \
+ 		  $args
 }
 ```
-`${FUNCNAME[0]}` is the name of the current bash function, and `$1` is the argument passed to it. The container's name will be `merkle_vote-poll-vote`.
+`${FUNCNAME[0]}` is the name of the current bash function, and `$@` are the arguments passed to it. The container's name will be `plaintextelection-bb448c37657a78f302a6fd283671c83a`.
 
 ### Debugging failures
 When tests fail, the logs is too polluted with output from miners to be useful. By passing `CLEAN=0` as an envvar, the docker containers are not deleted after the script finishes and you can inspect their logs with `docker logs <container name>`

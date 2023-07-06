@@ -521,7 +521,8 @@ func (v *State) Rollback() {
 	v.Tx.Discard()
 	var err error
 	if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
-		log.Fatalf("cannot begin statedb tx: %s", err)
+		log.Errorf("cannot begin statedb tx: %s", err)
+		return
 	}
 	v.txCounter.Store(0)
 }

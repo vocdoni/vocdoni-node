@@ -1,7 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block,
-	results_height, have_results, final_results,
+	have_results, final_results,
 	census_root, rolling_census_root, rolling_census_size,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
@@ -10,11 +10,10 @@ INSERT INTO processes (
 	question_index, creation_time,
 	source_block_height, source_network_id,
 
-	results_votes, results_weight, results_envelope_height,
-	results_block_height
+	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?,
-	0, ?, ?,
+	?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -23,8 +22,7 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 
-	?, '0', 0,
-	0
+	?, '0', 0
 );
 
 -- name: GetProcess :one

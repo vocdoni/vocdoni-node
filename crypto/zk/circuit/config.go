@@ -46,7 +46,7 @@ func (config ZkCircuitConfig) KeySize() int {
 	return config.Levels / 8
 }
 
-// CircuitsConfiguration stores the relation between the different vochain nets
+// CircuitsConfigurations stores the relation between the different vochain nets
 // and the associated circuit configuration. Any circuit configuration must have
 // the remote and local location of the circuits artifacts and their metadata
 // such as artifacts hash or the number of parameters.

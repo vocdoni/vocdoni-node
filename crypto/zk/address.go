@@ -80,7 +80,7 @@ func AddressFromBytes(seed []byte) (*ZkAddress, error) {
 		return nil, fmt.Errorf("the seed provided does not have 32 bytes at least")
 	}
 	jubjubKey := babyjub.PrivateKey{}
-	if _, err := hex.Decode(jubjubKey[:], seed[:]); err != nil {
+	if _, err := hex.Decode(jubjubKey[:], seed); err != nil {
 		return nil, fmt.Errorf("error generating babyjub key: %w", err)
 	}
 	pubKey, err := poseidon.Hash([]*big.Int{

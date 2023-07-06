@@ -18,15 +18,12 @@ const (
 
 // Results holds the final results and relevant process info for a vochain process
 type Results struct {
-	ProcessID      types.HexBytes             `json:"processId"`
-	Votes          [][]*types.BigInt          `json:"votes"`
-	Weight         *types.BigInt              `json:"weight"`
-	EnvelopeHeight uint64                     `json:"envelopeHeight"` // TODO(mvdan): remove; unused once rpcapi is removed
-	EnvelopeType   *models.EnvelopeType       `json:"envelopeType"`
-	VoteOpts       *models.ProcessVoteOptions `json:"voteOptions"`
-	Signatures     []types.HexBytes           `json:"signatures"`
-	Final          bool                       `json:"final"`
-	BlockHeight    uint32                     `json:"blockHeight"`
+	ProcessID    types.HexBytes             `json:"processId"`
+	Votes        [][]*types.BigInt          `json:"votes"`
+	Weight       *types.BigInt              `json:"weight"`
+	EnvelopeType *models.EnvelopeType       `json:"envelopeType"`
+	VoteOpts     *models.ProcessVoteOptions `json:"voteOptions"`
+	BlockHeight  uint32                     `json:"blockHeight"`
 }
 
 // String formats the results in a human-readable string
@@ -66,7 +63,6 @@ func (r *Results) Add(new *Results) error {
 	if new.BlockHeight > r.BlockHeight {
 		r.BlockHeight = new.BlockHeight
 	}
-	r.EnvelopeHeight += new.EnvelopeHeight
 	// Update votes only if present
 	if len(new.Votes) == 0 {
 		return nil
@@ -93,7 +89,6 @@ func (r *Results) Add(new *Results) error {
 // Sub subtracts the total weight and votes from the given Results to the containing Results.
 func (r *Results) Sub(new *Results) error {
 	r.Weight.Sub(r.Weight, new.Weight)
-	r.EnvelopeHeight -= new.EnvelopeHeight
 	// Update votes only if present
 	if len(new.Votes) == 0 {
 		return nil
@@ -191,8 +186,6 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	if len(r.Votes) == 0 {
 		r.Votes = NewEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
 	}
-	// Increase EnvelopeHeight by the number of votes added
-	r.EnvelopeHeight++
 
 	// If MaxValue is zero, consider discrete value couting. So for each questoin, the value
 	// is aggregated. The weight is multiplied for the value if costFromWeight=False.

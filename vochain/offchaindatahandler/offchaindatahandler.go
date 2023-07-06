@@ -1,6 +1,7 @@
 package offchaindatahandler
 
 import (
+	"encoding/hex"
 	"sync"
 
 	"go.vocdoni.io/dvote/api/censusdb"
@@ -92,31 +93,51 @@ func (d *OffChainDataHandler) Commit(height uint32) error {
 // OnProcess is triggered when a new election is created. It checks if the election contains offchain data
 // that needs to be imported and enqueues it for being handled by Commit.
 func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
-	censusRoot = util.TrimHex(censusRoot)
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if !d.importOnlyNew {
-		p, err := d.vochain.State.Process(pid, false)
-		if err != nil || p == nil {
-			log.Errorw(err, "could get process from state")
-			return
-		}
-		// enqueue for import election metadata information
-		if m := p.GetMetadata(); m != "" {
-			d.queue = append(d.queue, importItem{
-				uri:      m,
-				itemType: itemTypeElectionMetadata,
-			})
-		}
-		// enqueue for download external census if needs to be imported
-		if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
-			d.queue = append(d.queue, importItem{
-				censusRoot: censusRoot,
-				uri:        censusURI,
-				itemType:   itemTypeExternalCensus,
-			})
-		}
+	if d.importOnlyNew && d.isFastSync {
+		return
 	}
+	p, err := d.vochain.State.Process(pid, false)
+	if err != nil || p == nil {
+		log.Errorw(err, "onProcess: could get process from state")
+		return
+	}
+	// enqueue for import election metadata information
+	if m := p.GetMetadata(); m != "" {
+		d.queue = append(d.queue, importItem{
+			uri:      m,
+			itemType: itemTypeElectionMetadata,
+		})
+	}
+	// enqueue for download external census if needs to be imported
+	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+		d.queue = append(d.queue, importItem{
+			censusRoot: util.TrimHex(censusRoot),
+			uri:        censusURI,
+			itemType:   itemTypeExternalCensus,
+		})
+	}
+}
+
+// OnCensusUpdate is triggered when the census is updated during an election.
+func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
+	if d.importOnlyNew && d.isFastSync {
+		return
+	}
+	p, err := d.vochain.State.Process(pid, false)
+	if err != nil || p == nil {
+		log.Errorw(err, "onCensusUpdate: could get process from state")
+		return
+	}
+	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+		d.queue = append(d.queue, importItem{
+			censusRoot: hex.EncodeToString(censusRoot),
+			uri:        censusURI,
+			itemType:   itemTypeExternalCensus,
+		})
+	}
+
 }
 
 // OnProcessesStart is triggered when a process starts. It checks if the process contains a rolling census.
@@ -124,13 +145,12 @@ func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 	for _, pid := range pids {
 		process, err := d.vochain.State.Process(pid, false)
 		if err != nil {
-			log.Errorf("could find process with pid %x: %v", pid, err)
+			log.Errorf("onProcessStart: could find process with pid %x: %v", pid, err)
 			continue
 		}
 		// enqueue for import rolling census (zkSnarks voting with preregister enabled)
 		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
 			d.queueLock.Lock()
-			log.Infof("adding rolling census for process %x to queue", pid)
 			d.queue = append(d.queue, importItem{
 				itemType: itemTypeRollingCensus,
 				pid:      pid,
@@ -144,15 +164,16 @@ func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 func (d *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if !d.importOnlyNew {
-		// enqueue for import account metadata information
-		if m := account.GetInfoURI(); m != "" {
-			log.Debugf("adding account info metadata %s to queue", m)
-			d.queue = append(d.queue, importItem{
-				uri:      m,
-				itemType: itemTypeAccountMetadata,
-			})
-		}
+	if d.importOnlyNew && d.isFastSync {
+		return
+	}
+	// enqueue for import account metadata information
+	if m := account.GetInfoURI(); m != "" {
+		log.Debugf("adding account info metadata %s to queue", m)
+		d.queue = append(d.queue, importItem{
+			uri:      m,
+			itemType: itemTypeAccountMetadata,
+		})
 	}
 }
 

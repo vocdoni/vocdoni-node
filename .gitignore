@@ -4,7 +4,6 @@
 /node
 /voconed
 /vochaininspector
-/vochaintest
 *.exe
 *.exe~
 *.dll

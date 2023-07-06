@@ -195,7 +195,6 @@ func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.
 	cfg.LogLevel = "error"
 	cfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
 	cfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
-	cfg.RPCListen = fmt.Sprintf("0.0.0.0:%d", 27000+rand.Intn(1000))
 	cfg.NoWaitSync = true
 	cfg.MempoolSize = 20000
 	cfg.MinerTargetBlockTimeSeconds = 3

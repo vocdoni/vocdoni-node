@@ -158,8 +158,7 @@ func UpdateRouterTags(fset *token.FileSet, parsedFile *ast.File, fmap map[string
 	cmap := ast.NewCommentMap(fset, parsedFile, parsedFile.Comments)
 
 	ast.Inspect(parsedFile, func(n ast.Node) bool {
-		switch x := n.(type) {
-		case *ast.FuncDecl:
+		if x, ok := n.(*ast.FuncDecl); ok {
 			if pms, found := fmap[x.Name.Name]; found {
 				list := []*ast.Comment{}
 				for _, line := range cmap[x][0].List {
@@ -195,8 +194,7 @@ func InitComments(fset *token.FileSet, parsedFile *ast.File, fmap map[string][]P
 	cmap := ast.NewCommentMap(fset, parsedFile, parsedFile.Comments)
 
 	ast.Inspect(parsedFile, func(n ast.Node) bool {
-		switch x := n.(type) {
-		case *ast.FuncDecl:
+		if x, ok := n.(*ast.FuncDecl); ok {
 			if _, found := fmap[x.Name.Name]; found {
 				list := []*ast.Comment{}
 				list = append(list, &ast.Comment{

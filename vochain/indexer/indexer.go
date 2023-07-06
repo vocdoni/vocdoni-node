@@ -7,6 +7,8 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
 	"sort"
 	"sync"
 	"time"
@@ -106,34 +108,33 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 
 		blockUpdateProcs: make(map[string]bool),
 	}
+	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", countLiveResults)
 
-	startTime := time.Now()
-
-	countMap, err := idx.retrieveCounts()
-	if err != nil {
-		return nil, fmt.Errorf("could not create indexer: %v", err)
+	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
+	// Create the parent directory as well if it doesn't exist.
+	if err := os.MkdirAll(dataDir, 0o777); err != nil {
+		return nil, err
 	}
-
-	log.Infow("indexer initialization",
-		"took", time.Since(startTime),
-		"dataDir", dataDir,
-		"liveResults", countLiveResults,
-		"transactions", countMap[indexertypes.CountStoreTransactions],
-		"envelopes", countMap[indexertypes.CountStoreEnvelopes],
-		"processes", countMap[indexertypes.CountStoreProcesses],
-		"entities", countMap[indexertypes.CountStoreEntities],
-	)
+	dbPath := filepath.Join(dataDir, "db.sqlite")
+	var err error
 
 	// sqlite doesn't support multiple concurrent writers.
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
-	dbPath := dataDir + "-sqlite" // TODO: filepath.Join(dataDir, "db.sqlite")
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
+	if err != nil {
+		return nil, err
+	}
+	idx.readWriteDB.SetMaxOpenConns(1)
+	idx.readWriteDB.SetMaxIdleConns(2)
+	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
+	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
+
 	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", dbPath))
 	if err != nil {
 		return nil, err
 	}
-
 	// Increasing these numbers can allow for more queries to run concurrently,
 	// but it also increases the memory used by sqlite and our connection pool.
 	// Most read-only queries we run are quick enough, so a small number seems OK.
@@ -141,16 +142,6 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	idx.readOnlyDB.SetMaxIdleConns(20)
 	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
 	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
-
-	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
-	if err != nil {
-		return nil, err
-	}
-
-	idx.readWriteDB.SetMaxOpenConns(1)
-	idx.readWriteDB.SetMaxIdleConns(2)
-	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
-	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
@@ -193,22 +184,6 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 		idx.blockQueries = indexerdb.New(idx.blockTx)
 	}
 	return idx.blockQueries
-}
-
-// retrieveCounts returns a count for txs, envelopes, processes, and entities, in that order.
-// If no CountStore model is stored for the type, it counts all db entries of that type.
-func (idx *Indexer) retrieveCounts() (map[uint8]uint64, error) {
-	txCountStore := new(indexertypes.CountStore)
-	envelopeCountStore := new(indexertypes.CountStore)
-	processCountStore := new(indexertypes.CountStore)
-	entityCountStore := new(indexertypes.CountStore)
-	// TODO(mvdan): implement on sqlite if needed
-	return map[uint8]uint64{
-		indexertypes.CountStoreTransactions: txCountStore.Count,
-		indexertypes.CountStoreEnvelopes:    envelopeCountStore.Count,
-		indexertypes.CountStoreProcesses:    processCountStore.Count,
-		indexertypes.CountStoreEntities:     entityCountStore.Count,
-	}, nil
 }
 
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
@@ -279,7 +254,6 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.Envelope,
-			Signatures:   []types.HexBytes{},
 		}
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
@@ -380,7 +354,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			// We fetch the previous vote from the state by setting committed=true.
 			// Note that if there wasn't a previous vote in the committed state,
 			// then it wasn't counted in the results yet, so don't add it to substractedResults.
-			// TODO: can we get previousVote via blockTx?
+			// TODO: can we get previousVote from sqlite via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
 				previousVote, _ = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
@@ -544,7 +518,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	}
 }
 
-// NOT USED but required for implementing the vochain.EventListener interface
+// OnSetAccount NOT USED but required for implementing the vochain.EventListener interface
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
@@ -561,6 +535,14 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	}); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
+}
+
+// OnCensusUpdate adds the process to blockUpdateProcs in order to update the census.
+// This function call is triggered by the SET_PROCESS_CENSUS tx.
+func (idx *Indexer) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
+	idx.lockPool.Lock()
+	defer idx.lockPool.Unlock()
+	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // GetTokenTransfersByFromAccount returns all the token transfers made from a given account
