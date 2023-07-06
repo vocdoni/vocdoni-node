@@ -434,6 +434,24 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return response, nil
 		}
 
+	case *models.Tx_SetSik:
+		err := t.SetSikTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
+		}
+
+		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
+		if newSik := vtx.Tx.GetSetSik().GetSik(); newSik != nil {
+			if err := t.state.SetSIK(address, newSik); err != nil {
+				return nil, fmt.Errorf("setSikTx: %w", err)
+			}
+			return response, nil
+		}
+		if err := t.state.InvalidateSIK(address); err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
+		}
+		return response, nil
+
 	default:
 		return nil, fmt.Errorf("invalid transaction type")
 	}

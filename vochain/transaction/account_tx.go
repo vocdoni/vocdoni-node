@@ -239,3 +239,30 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	}
 	return nil
 }
+
+// SetSikTxCheck checks if a set sik tx is valid
+func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
+	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
+		return ErrNilTx
+	}
+	tx := vtx.Tx.GetSetSik()
+	if tx == nil {
+		return fmt.Errorf("invalid transaction")
+	}
+
+	bAddress := tx.GetAddress()
+	if bAddress == nil {
+		return fmt.Errorf("invalid address")
+	}
+
+	txAddress := common.BytesToAddress(bAddress)
+	if txAddress == (common.Address{}) {
+		return fmt.Errorf("invalid address")
+	}
+
+	if _, err := t.state.GetAccount(txAddress, false); err != nil {
+		return fmt.Errorf("cannot get tx account: %w", err)
+	}
+
+	return nil
+}
