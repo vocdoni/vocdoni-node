@@ -49,17 +49,21 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 		// The connection was closed, so don't try to write to it.
 		return fmt.Errorf("connection is closed")
 	}
-	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
 	h.Writer.Header().Set("Content-Type", "application/json")
+
+	if httpStatusCode == http.StatusNoContent {
+		// For 204 status, don't set Content-Length, don't try to write a body.
+		h.Writer.WriteHeader(httpStatusCode)
+		log.Debugf("response: (%d)", httpStatusCode)
+		_, err := h.Writer.Write([]byte(""))
+		return err
+	}
+
+	// Content length will be message length plus newline character
+	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
 	h.Writer.WriteHeader(httpStatusCode)
 
 	log.Debugf("response: (%d) %s", httpStatusCode, msg)
-
-	if httpStatusCode == http.StatusNoContent {
-		// don't try to h.Writer.Write(msg) since that would fail with
-		// "request method or response status code does not allow body"
-		return nil
-	}
 
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
