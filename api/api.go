@@ -1,6 +1,9 @@
 package api
 
-//go:generate go run go.vocdoni.io/dvote/api/autoswag
+////// Disabled autoswag due to https://github.com/swaggo/swag/issues/1267
+////// TODO: re-enable when a fixed swaggo/swag is released
+////// and remove the workaround done by @selankon on docs/models/models.go
+////go:generate go run go.vocdoni.io/dvote/api/autoswag
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.8.10 fmt
 
 import (
