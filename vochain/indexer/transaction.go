@@ -29,7 +29,7 @@ func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
 		}
-		return nil, fmt.Errorf("tx wiht id %d not found: %v", id, err)
+		return nil, fmt.Errorf("tx with id %d not found: %v", id, err)
 	}
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }

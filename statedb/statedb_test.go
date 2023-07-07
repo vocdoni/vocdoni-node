@@ -118,7 +118,7 @@ func TestStateDB(t *testing.T) {
 	// Insert a new key-value
 	qt.Assert(t, mainTree.Add(keys[2], vals[2]), qt.IsNil)
 
-	// Uncommited changes are not available in the View
+	// Uncommitted changes are not available in the View
 	{
 		mainTreeView, err := sdb.TreeView(nil)
 		qt.Assert(t, err, qt.IsNil)

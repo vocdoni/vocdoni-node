@@ -95,9 +95,9 @@ func (v *Vote) DeepCopy() *Vote {
 }
 
 // CountTotalVotes return the global vote count.
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) CountTotalVotes(committed bool) (uint64, error) {
 	if !committed {
 		s.Tx.RLock()
@@ -201,7 +201,7 @@ func (s *State) voteID(pid, nullifier []byte) ([]byte, error) {
 		return nil, fmt.Errorf("wrong processID size %d", len(pid))
 	}
 	// The vote nullifier generated during anonymous voting with zksnarks could
-	// have 31 or 32 bytes of lenght. Now, here only check that the nullifier is
+	// have 31 or 32 bytes of length. Now, here only check that the nullifier is
 	// not empty and then, if it is wrong, the verification will be fail.
 	// TODO: (lucas) Set a minimun and maximum length for the nullifier and
 	// check it.
@@ -216,9 +216,9 @@ func (s *State) voteID(pid, nullifier []byte) ([]byte, error) {
 
 // Vote returns the stored vote if exists. Returns ErrProcessNotFound if the
 // process does not exist, ErrVoteNotFound if the vote does not exist.
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.StateDBVote, error) {
 	vid, err := s.voteID(processID, nullifier)
 	if err != nil {
@@ -279,9 +279,9 @@ func (s *State) IterateVotes(processID []byte, committed bool, callback func(vot
 }
 
 // VoteExists returns true if the envelope identified with voteID exists
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) VoteExists(processID, nullifier []byte, committed bool) (bool, error) {
 	_, err := s.Vote(processID, nullifier, committed)
 	if errors.Is(err, ErrProcessNotFound) {
@@ -295,9 +295,9 @@ func (s *State) VoteExists(processID, nullifier []byte, committed bool) (bool, e
 }
 
 // iterateVotes iterates fn over state tree entries with the processID prefix.
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) iterateVotes(processID []byte,
 	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool) error {
 	if !committed {
@@ -328,9 +328,9 @@ func (s *State) iterateVotes(processID []byte,
 }
 
 // CountVotes returns the number of votes registered for a given process id
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) CountVotes(processID []byte, committed bool) (uint64, error) {
 	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
 		StateTreeCfg(TreeProcess),
@@ -350,9 +350,9 @@ func (s *State) CountVotes(processID []byte, committed bool) (uint64, error) {
 }
 
 // EnvelopeList returns a list of registered envelopes nullifiers given a processId
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (s *State) EnvelopeList(processID []byte, from, listSize int,
 	committed bool) (nullifiers [][]byte) {
 	idx := 0

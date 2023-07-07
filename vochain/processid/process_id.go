@@ -69,7 +69,7 @@ func (p *ProcessID) UnmarshalBinary(data []byte) error {
 // Unmarshal decodes a 32 byte payload into the process ID fields
 func (p *ProcessID) Unmarshal(pid []byte) error {
 	if len(pid) != 32 {
-		return fmt.Errorf("processID lenght not correct")
+		return fmt.Errorf("processID length not correct")
 	}
 
 	p.chainID = fmt.Sprintf("%x", pid[:4])

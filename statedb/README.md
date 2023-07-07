@@ -64,7 +64,7 @@ subTrees: the mainTree.
 
 The StateDB is updated via transactions. When starting a new transaction
 (`TreeTx`), you will also get a pointer to the mainTree (via a `TreeUpdate`
-type). When commiting a transaction you must specify the version for the
+type). When committing a transaction you must specify the version for the
 update.
 
 ```go
