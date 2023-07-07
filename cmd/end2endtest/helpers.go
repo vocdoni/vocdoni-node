@@ -73,7 +73,7 @@ func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
 	}
 
 	log.Infof("creating Vocdoni account %s", address)
-	hash, err := t.api.AccountBootstrap(faucetPkg, accountMetadata)
+	hash, err := t.api.AccountBootstrap(faucetPkg, accountMetadata, nil)
 	if err != nil {
 		return nil, err
 	}

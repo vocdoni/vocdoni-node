@@ -223,6 +223,7 @@ type AccountSet struct {
 	Metadata    []byte         `json:"metadata,omitempty"`
 	TxHash      types.HexBytes `json:"txHash"`
 	MetadataURL string         `json:"metadataURL"`
+	SIK         []byte         `json:"sik,omitempty"`
 }
 
 type Census struct {

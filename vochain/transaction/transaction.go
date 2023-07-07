@@ -233,6 +233,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
+				if sik := tx.GetSik(); sik != nil {
+					if err := t.state.SetSIK(txSenderAddress, sik); err != nil {
+						return nil, fmt.Errorf("setAccountTx: setSik %w", err)
+					}
+				}
 				if tx.FaucetPackage != nil {
 					faucetIssuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
 					if err != nil {

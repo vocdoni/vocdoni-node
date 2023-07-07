@@ -95,7 +95,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 
 // AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
 // to pay for the costs of the transaction if the blockchain requires it.  Returns the transaction hash.
-func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata) (types.HexBytes, error) {
+func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata, sik []byte) (types.HexBytes, error) {
 	var err error
 	var metadataBytes []byte
 	var metadataURI string
@@ -105,6 +105,16 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
 		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+	}
+
+	if sik == nil {
+		sikSign, err := c.account.SignEthereum([]byte(DefaultSIKContent))
+		if err != nil {
+			return nil, fmt.Errorf("could not create the signature for the sik: %w", err)
+		}
+		if sik, err = c.GenerateSik(sikSign, nil); err != nil {
+			return nil, fmt.Errorf("could not generate the sik: %w", err)
+		}
 	}
 
 	// Build the transaction
@@ -117,6 +127,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPkg,
 				InfoURI:       &metadataURI,
+				Sik:           sik,
 			},
 		}})
 	if err != nil {

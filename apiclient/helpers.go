@@ -5,21 +5,25 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
+	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
+	DefaultSIKContent    = "vocdoni"
 	DefaultBlockInterval = 8 * time.Second
 	WaitTimeout          = 3 * DefaultBlockInterval
 	PollInterval         = DefaultBlockInterval / 2
@@ -314,5 +318,28 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 		Payload:   fpackage.FaucetPayload,
 		Signature: fpackage.Signature,
 	}, nil
+}
 
+// GenerateSik function generates the Secret Identity Key for the current client
+// account with the signature and the secret provided following the definition:
+//
+//	SIK = Hash(address, signature, secret*)
+//
+// The secret is optional.
+func (c *HTTPclient) GenerateSik(sign, secret []byte) ([]byte, error) {
+	if sign == nil {
+		return nil, fmt.Errorf("signature not provided")
+	}
+	seed := []*big.Int{
+		c.MyAddress().Big(),
+		arbo.BytesToBigInt(sign),
+	}
+	if secret != nil {
+		seed = append(seed, arbo.BytesToBigInt(secret))
+	}
+	hash, err := poseidon.Hash(seed)
+	if err != nil {
+		return nil, err
+	}
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
 }

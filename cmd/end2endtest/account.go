@@ -260,7 +260,7 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 			return acct, nil
 		}
 
-		_, err = api.AccountBootstrap(faucetPkg, nil)
+		_, err = api.AccountBootstrap(faucetPkg, nil, nil)
 		if err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, nevermind, job done.
