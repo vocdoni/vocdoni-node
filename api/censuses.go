@@ -720,7 +720,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	// Get the leaf siblings from arbo based on the key received and include
 	// them into the response, only if it is zkweighted.
 	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
-		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
+		response.CensusSiblings, err = ref.Tree().GetCircomSiblings(leafKey)
 		if err != nil {
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
@@ -732,7 +732,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		response.Weight = (*types.BigInt)(weight)
 	}
 	// get sik merkle tree proof
-	response.SikRoot, response.SikProof, err = a.vocapp.GenSikProof(common.BytesToAddress(key))
+	response.SikRoot, response.SikProof, response.SikSiblings, err = a.vocapp.GenSikCircomProof(common.BytesToAddress(key))
 	if err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}

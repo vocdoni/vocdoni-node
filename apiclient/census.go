@@ -110,7 +110,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 	cp := CensusProof{
 		Proof:     censusData.CensusProof,
 		LeafValue: censusData.Value,
-		Siblings:  censusData.Siblings,
+		Siblings:  censusData.CensusSiblings,
 	}
 	if censusData.Weight != nil {
 		cp.LeafWeight = censusData.Weight.MathBigInt()
