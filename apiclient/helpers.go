@@ -2,6 +2,7 @@ package apiclient
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -323,9 +324,9 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 // GenerateSik function generates the Secret Identity Key for the current client
 // account with the signature and the secret provided following the definition:
 //
-//	SIK = Hash(address, signature, secret*)
+//	SIK = poseidon(address, signature, secret*)
 //
-// The secret is optional.
+// *The secret is optional.
 func (c *HTTPclient) GenerateSik(sign, secret []byte) ([]byte, error) {
 	if sign == nil {
 		return nil, fmt.Errorf("signature not provided")
@@ -342,4 +343,25 @@ func (c *HTTPclient) GenerateSik(sign, secret []byte) ([]byte, error) {
 		return nil, err
 	}
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
+}
+
+// Nullifier returns snark friendly nullifier based on the provided signature,
+// the user secret and electionId. The nullifier is calculated following its
+// definition:
+//
+//	nullifier = poseidon(signature, secret*, sha256(electionId))
+//
+// *The secret is optional.
+func (c *HTTPclient) CalcNullifier(sign, secret, electionId []byte) (*big.Int, error) {
+	// Encode the electionId -> sha256(electionId)
+	hashedElectionId := sha256.Sum256(electionId)
+	intElectionId := []*big.Int{
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[:16])),
+		new(big.Int).SetBytes(arbo.SwapEndianness(hashedElectionId[16:])),
+	}
+	seed := []*big.Int{arbo.BytesToBigInt(sign)}
+	if secret != nil {
+		seed = append(seed, arbo.BytesToBigInt(secret))
+	}
+	return poseidon.Hash(append(seed, intElectionId...))
 }
