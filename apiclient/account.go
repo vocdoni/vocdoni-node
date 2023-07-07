@@ -238,3 +238,95 @@ func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*i
 	}
 	return transfers, nil
 }
+
+// SetSik function allows to update the Secret Identity Key for the current
+// HTTPClient account. To do that, the function requires a secret user input.
+func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
+	signature, err := c.account.SignEthereum([]byte(DefaultSIKContent))
+	if err != nil {
+		return nil, fmt.Errorf("could not create the signature for the sik: %w", err)
+	}
+	sik, err := c.GenerateSik(signature, nil)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate the sik: %w", err)
+	}
+	// Build the transaction
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetSik{
+			SetSik: &models.SikTx{
+				Txtype:  models.TxType_SET_ACCOUNT_SIK,
+				Address: c.account.Address().Bytes(),
+				Sik:     sik,
+			},
+		}})
+	if err != nil {
+		return nil, err
+	}
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPOST, &api.SikSet{
+		TxPayload: stxb,
+	}, "accounts", "sik")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.SikSet{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+	return accv.TxHash, nil
+}
+
+// DelSik function allows to delete the Secret Identity Key for the current
+// HTTPClient account if it already has a valid one.
+func (c *HTTPclient) DelSik() (types.HexBytes, error) {
+	// Build the transaction
+	var err error
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_DelSik{
+			DelSik: &models.SikTx{
+				Txtype:  models.TxType_DEL_ACCOUNT_SIK,
+				Address: c.account.Address().Bytes(),
+			},
+		}})
+	if err != nil {
+		return nil, err
+	}
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPDELETE, &api.SikSet{
+		TxPayload: stxb,
+	}, "accounts", "sik")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.SikSet{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+	return accv.TxHash, nil
+}
