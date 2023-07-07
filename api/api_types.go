@@ -233,7 +233,8 @@ type SikSet struct {
 type Census struct {
 	CensusID    types.HexBytes `json:"censusID,omitempty"`
 	Type        string         `json:"type,omitempty"`
-	Root        types.HexBytes `json:"root,omitempty"`
+	CensusRoot  types.HexBytes `json:"censusRoot,omitempty"`
+	SikRoot     types.HexBytes `json:"sikRoot,omitempty"`
 	Weight      *types.BigInt  `json:"weight,omitempty"`
 	Key         types.HexBytes `json:"key,omitempty"`
 	CensusProof types.HexBytes `json:"censusProof,omitempty"`

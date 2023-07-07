@@ -87,8 +87,8 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	resp, code = cl.Request("GET", nil, censusID, "root")
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(b, censusData.Root, qt.IsNotNil)
-	root := censusData.Root
+	qt.Assert(b, censusData.CensusRoot, qt.IsNotNil)
+	root := censusData.CensusRoot
 
 	resp, code = cl.Request("GET", nil, censusID, "size")
 	qt.Assert(b, code, qt.Equals, 200)
@@ -101,7 +101,7 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(b, censusData.Weight.String(), qt.Equals, "1")
 
-	censusData.Root = root
+	censusData.CensusRoot = root
 	genProofZk(b, electionID, zkAddr, censusData)
 }
 
@@ -110,7 +110,7 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 	// the leaf siblings and value (weight)
 
 	log.Infow("zk census data received, starting to generate the proof inputs...",
-		"censusRoot", censusData.Root, "electionId", fmt.Sprintf("%x", electionID))
+		"censusRoot", censusData.CensusRoot, "electionId", fmt.Sprintf("%x", electionID))
 
 	// Get vote weight
 	weight := new(big.Int).SetInt64(1)
@@ -118,7 +118,7 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 		weight = censusData.Weight.MathBigInt()
 	}
 	// Generate circuit inputs
-	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.Root, electionID, weight, weight, censusData.Siblings)
+	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.CensusRoot, electionID, weight, weight, censusData.Siblings)
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)
@@ -127,7 +127,7 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 	nullifier, ok := new(big.Int).SetString(rawInputs.Nullifier, 10)
 	qt.Assert(b, ok, qt.IsTrue)
 
-	log.Infow("proof inputs generated", "censusRoot", censusData.Root.String(),
+	log.Infow("proof inputs generated", "censusRoot", censusData.CensusRoot.String(),
 		"nullifier", nullifier.String())
 
 	// Get artifacts of the current circuit

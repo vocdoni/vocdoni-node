@@ -312,7 +312,7 @@ func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 	var data []byte
 	if data, err = json.Marshal(Census{
-		Root: root,
+		CensusRoot: root,
 	}); err != nil {
 		return err
 	}
@@ -677,7 +677,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		response.Weight = (*types.BigInt)(weight)
 	}
 	// get sik merkle tree proof
-	_, response.SikProof, err = a.vocapp.GenSikProof(common.BytesToAddress(key))
+	response.SikRoot, response.SikProof, err = a.vocapp.GenSikProof(common.BytesToAddress(key))
 	if err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
@@ -731,7 +731,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		}
 	}
 
-	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.Root)
+	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.CensusRoot)
 	if err != nil {
 		return ErrCensusProofVerificationFailed.WithErr(err)
 	}
