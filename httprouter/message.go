@@ -11,7 +11,7 @@ import (
 
 // Message is a wrapper for messages for a RouterNamespace implementation.
 // Data is set by the namespace and can be of any type (implementation details
-// should be check). In order to send a reply, Context.Send() should be called.
+// should be checked). In order to send a reply, Context.Send() should be called.
 type Message struct {
 	Data      interface{}
 	TimeStamp time.Time

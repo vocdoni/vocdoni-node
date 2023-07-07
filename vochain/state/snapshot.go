@@ -221,7 +221,12 @@ func (s *StateSnapshot) Save() error {
 	if err != nil {
 		return err
 	}
-	defer finalFile.Close()
+
+	defer func() {
+		if err := finalFile.Close(); err != nil {
+			log.Warnf("error closing the file %v", err)
+		}
+	}()
 
 	// build the header
 	var buf bytes.Buffer
@@ -233,8 +238,7 @@ func (s *StateSnapshot) Save() error {
 	// write the size of the header in the first 32 bytes
 	headerSize := make([]byte, snapshotHeaderLenSize)
 	binary.LittleEndian.PutUint32(headerSize, uint32(buf.Len()))
-	_, err = finalFile.Write(headerSize)
-	if err != nil {
+	if _, err := finalFile.Write(headerSize); err != nil {
 		return err
 	}
 
