@@ -269,7 +269,7 @@ func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) error {
 
 // SetSikTxCheck checks if a set sik tx is valid
 func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
-	if err := t.SetSikTxCheck(vtx); err != nil {
+	if err := t.DelSikTxCheck(vtx); err != nil {
 		return err
 	}
 	bAddress := vtx.Tx.GetSetSik().GetSik()
