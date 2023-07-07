@@ -446,6 +446,17 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
+		// check if the address already has invalidated sik to ensure that it is
+		// not updated after reach the correct height to avoid double voting
+		if currentSik, err := t.state.SIKByAddress(address); err == nil {
+			maxEndBlock, err := t.state.MaxReadyProcessEndBlock(false)
+			if err != nil {
+				return nil, fmt.Errorf("setSikTx: %w", err)
+			}
+			if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
+				return nil, fmt.Errorf("setSikTx: the sik could not be changed yet")
+			}
+		}
 		newSik := vtx.Tx.GetSetSik().GetSik()
 		if err := t.state.SetSIK(address, newSik); err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
@@ -458,17 +469,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
 		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
-		currentSik, err := t.state.SIKByAddress(address)
-		if err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
-		}
-		maxEndBlock, err := t.state.MaxReadyProcessEndBlock(false)
-		if err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
-		}
-		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
-			return nil, fmt.Errorf("setSikTx: the sik could not be changed yet")
-		}
 		if err := t.state.InvalidateSIK(address); err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
