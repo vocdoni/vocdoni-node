@@ -17,7 +17,7 @@ import (
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -530,4 +530,13 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 // MempoolSize returns the size of the transaction mempool
 func (app *BaseApplication) MempoolSize() int {
 	return app.fnMempoolSize()
+}
+
+// GenSikProof function returns the merkle tree proof for the provided address
+func (app *BaseApplication) GenSikProof(address ethcommon.Address) ([]byte, []byte, error) {
+	sikTree, err := app.State.Tx.DeepSubTree(vstate.StateTreeCfg(vstate.TreeSIK))
+	if err != nil {
+		return nil, nil, err
+	}
+	return sikTree.GenProof(address.Bytes())
 }

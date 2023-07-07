@@ -112,9 +112,9 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, keyWeight.String())
 
 	proof := &Census{
-		Key:   key,
-		Proof: censusData.Proof,
-		Value: censusData.Value,
+		Key:         key,
+		CensusProof: censusData.CensusProof,
+		Value:       censusData.Value,
 	}
 	resp, code = c.Request("POST", proof, id2, "verify")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
@@ -226,7 +226,7 @@ func TestCensusProof(t *testing.T) {
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
 					Type:            models.ProofArbo_BLAKE2B,
-					Siblings:        censusData.Proof,
+					Siblings:        censusData.CensusProof,
 					AvailableWeight: censusData.Value,
 					VoteWeight:      censusData.Value,
 				},

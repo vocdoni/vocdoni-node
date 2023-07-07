@@ -145,7 +145,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 		Payload: &models.Proof_Arbo{
 			Arbo: &models.ProofArbo{
 				Type:            models.ProofArbo_BLAKE2B,
-				Siblings:        censusData.Proof,
+				Siblings:        censusData.CensusProof,
 				AvailableWeight: censusData.Value,
 				VoteWeight:      censusData.Value,
 			},

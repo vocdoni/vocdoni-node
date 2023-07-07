@@ -231,17 +231,18 @@ type SikSet struct {
 }
 
 type Census struct {
-	CensusID types.HexBytes `json:"censusID,omitempty"`
-	Type     string         `json:"type,omitempty"`
-	Root     types.HexBytes `json:"root,omitempty"`
-	Weight   *types.BigInt  `json:"weight,omitempty"`
-	Key      types.HexBytes `json:"key,omitempty"`
-	Proof    types.HexBytes `json:"proof,omitempty"`
-	Value    types.HexBytes `json:"value,omitempty"`
-	Size     uint64         `json:"size,omitempty"`
-	Valid    bool           `json:"valid,omitempty"`
-	URI      string         `json:"uri,omitempty"`
-	Siblings []string       `json:"siblings,omitempty"`
+	CensusID    types.HexBytes `json:"censusID,omitempty"`
+	Type        string         `json:"type,omitempty"`
+	Root        types.HexBytes `json:"root,omitempty"`
+	Weight      *types.BigInt  `json:"weight,omitempty"`
+	Key         types.HexBytes `json:"key,omitempty"`
+	CensusProof types.HexBytes `json:"censusProof,omitempty"`
+	SikProof    types.HexBytes `json:"sikProof,omitempty"`
+	Value       types.HexBytes `json:"value,omitempty"`
+	Size        uint64         `json:"size,omitempty"`
+	Valid       bool           `json:"valid,omitempty"`
+	URI         string         `json:"uri,omitempty"`
+	Siblings    []string       `json:"siblings,omitempty"`
 }
 
 type File struct {

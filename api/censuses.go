@@ -8,6 +8,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
@@ -656,9 +657,9 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return ErrKeyNotFoundInCensus.With(hex.EncodeToString(leafKey))
 	}
 	response := Census{
-		Proof: siblings,
-		Value: leafV,
-		Type:  censusType,
+		CensusProof: siblings,
+		Value:       leafV,
+		Type:        censusType,
 	}
 
 	// Get the leaf siblings from arbo based on the key received and include
@@ -675,12 +676,16 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		weight := ref.Tree().BytesToBigInt(leafV)
 		response.Weight = (*types.BigInt)(weight)
 	}
+	// get sik merkle tree proof
+	_, response.SikProof, err = a.vocapp.GenSikProof(common.BytesToAddress(key))
+	if err != nil {
+		return ErrCantGetCircomSiblings.WithErr(err)
+	}
 
 	var data []byte
 	if data, err = json.Marshal(&response); err != nil {
 		return err
 	}
-
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
@@ -700,7 +705,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err := json.Unmarshal(msg.Data, &cdata); err != nil {
 		return err
 	}
-	if cdata.Key == nil || cdata.Proof == nil {
+	if cdata.Key == nil || cdata.CensusProof == nil {
 		return ErrParamKeyOrProofMissing
 	}
 
@@ -726,7 +731,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		}
 	}
 
-	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
+	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.Root)
 	if err != nil {
 		return ErrCensusProofVerificationFailed.WithErr(err)
 	}

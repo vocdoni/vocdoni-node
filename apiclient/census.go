@@ -108,7 +108,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	cp := CensusProof{
-		Proof:     censusData.Proof,
+		Proof:     censusData.CensusProof,
 		LeafValue: censusData.Value,
 		Siblings:  censusData.Siblings,
 	}
