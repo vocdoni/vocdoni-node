@@ -38,7 +38,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		Mode:          &models.ProcessMode{},
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
 		Status:        models.ProcessStatus_READY,
-		CensusRoot:    make([]byte, 32), // emtpy hash
+		CensusRoot:    make([]byte, 32), // empty hash
 		StartBlock:    0,
 		BlockCount:    3,
 		MaxCensusSize: 100,

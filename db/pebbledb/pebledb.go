@@ -92,7 +92,7 @@ func (tx WriteTx) Commit() error {
 
 // Discard implements the db.WriteTx.Discard interface method
 func (tx WriteTx) Discard() {
-	// Close returns an error, but here in the Discard context is ommited
+	// Close returns an error, but here in the Discard context is omitted
 	tx.batch.Close()
 }
 

@@ -368,7 +368,7 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 
 // ElectionFilterPaginated returns a list of elections filtered by the given parameters.
 // POST /elections/filter/page/<page>
-// Retuns a list of elections filtered by the given parameters.
+// Returns a list of elections filtered by the given parameters.
 func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, electionID types.HexBytes,
 	status models.ProcessStatus, withResults bool, page int) (*[]api.ElectionSummary, error) {
 	body := struct {

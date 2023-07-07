@@ -307,7 +307,7 @@ func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.Tx, forCommit boo
 	}
 
 	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:
-	// A. We can skip the proof verification when forCommiting
+	// A. We can skip the proof verification when forcommitting
 	// B. We can detect invalid key registration (due to no more weight
 	//    available) at mempool tx insertion
 

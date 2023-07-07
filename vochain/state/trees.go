@@ -34,7 +34,7 @@ const (
 )
 
 var (
-	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unkown")
+	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unknown")
 )
 
 // treeTxWithMutex is a wrapper over TreeTx with a mutex for convenient
@@ -57,9 +57,9 @@ func (v *State) setMainTreeView(treeView *statedb.TreeView) {
 }
 
 // mainTreeViewer returns the mainTree as a treeViewer.
-// When committed is false, the mainTree returned is the not yet commited one
+// When committed is false, the mainTree returned is the not yet committed one
 // from the currently open StateDB transaction.
-// When committed is true, the mainTree returned is the last commited version.
+// When committed is true, the mainTree returned is the last committed version.
 func (v *State) mainTreeViewer(committed bool) statedb.TreeViewer {
 	if committed {
 		return v.MainTreeView()

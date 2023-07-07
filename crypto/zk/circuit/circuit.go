@@ -236,7 +236,7 @@ func storeFile(content []byte, dstPath string) error {
 		return fmt.Errorf("error creating the artifact file: %w", err)
 	}
 	if _, err := fd.Write(content); err != nil {
-		return fmt.Errorf("error writting the artifact file: %w", err)
+		return fmt.Errorf("error writing the artifact file: %w", err)
 	}
 	return nil
 }

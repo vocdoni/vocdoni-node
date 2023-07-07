@@ -28,7 +28,7 @@ type ZkAddress struct {
 	PubKey *big.Int
 	// addr contains the public key big.Int reduced to 20 bytes
 	// (defaultZkAddrLen). It is a private attribute because the correct formats
-	// are calulated throw other struct methods such as ZkAddress.String() or
+	// are calculated throw other struct methods such as ZkAddress.String() or
 	// ZkAddress.Bytes().
 	addr *big.Int
 }

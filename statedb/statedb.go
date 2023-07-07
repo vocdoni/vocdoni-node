@@ -2,7 +2,7 @@
 Package statedb contains the implementation of StateDB, a database backed
 structure that holds the state of the blockchain indexed by version (each
 version corresponding to the state at each block).  The StateDB holds a dynamic
-hierarcy of linked merkle trees starting with the mainTree on top, with the
+hierarchy of linked merkle trees starting with the mainTree on top, with the
 property that the keys and values of all merkle trees can be cryptographically
 represented by a single hash, the StateDB.Hash (which corresponds to the
 mainTree.Root).
@@ -109,7 +109,7 @@ type TreeParams struct {
 	// HashFunc is the hash function used in the merkle tree
 	HashFunc arbo.HashFunction
 	// KindID is a unique identifier that specifies what kind of tree this
-	// is.  Diferent kind of trees under the same parent tree must have
+	// is.  Different kind of trees under the same parent tree must have
 	// different KindIDs, as this parameter is used to build a disjoint
 	// database prefix for each subTree under the same parent tree.
 	KindID string
@@ -259,7 +259,7 @@ func (s *StateDB) getRoot(tx db.Reader) ([]byte, error) {
 	return s.getVersionRoot(tx, version)
 }
 
-// Version returns the last commited version.  Calling Version on a fresh
+// Version returns the last committed version.  Calling Version on a fresh
 // StateDB will return 0.
 func (s *StateDB) Version() (uint32, error) {
 	return getVersion(s.db)

@@ -339,8 +339,8 @@ func (idx *Indexer) Commit(height uint32) error {
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
 		}
-		// substractedResults is used to substract votes that are overwritten
-		substractedResults := &results.Results{
+		// subtractedResults is used to subtract votes that are overwritten
+		subtractedResults := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
@@ -351,7 +351,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			// one and add the new) to results.
 			// We fetch the previous vote from the state by setting committed=true.
 			// Note that if there wasn't a previous vote in the committed state,
-			// then it wasn't counted in the results yet, so don't add it to substractedResults.
+			// then it wasn't counted in the results yet, so don't add it to subtractedResults.
 			// TODO: can we get previousVote from sqlite via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
@@ -369,10 +369,10 @@ func (idx *Indexer) Commit(height uint32) error {
 						"check vote overwrite failed")
 					continue
 				}
-				// add the live vote to substracted results
+				// add the live vote to subtracted results
 				if err := idx.addLiveVote(proc, previousVote.VotePackage,
-					new(big.Int).SetBytes(previousVote.Weight), substractedResults); err != nil {
-					log.Errorw(err, "vote cannot be added to substracted results")
+					new(big.Int).SetBytes(previousVote.Weight), subtractedResults); err != nil {
+					log.Errorw(err, "vote cannot be added to subtracted results")
 					continue
 				}
 				overwritedVotes++
@@ -386,7 +386,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes(queries, pid, addedResults, substractedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(queries, pid, addedResults, subtractedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}

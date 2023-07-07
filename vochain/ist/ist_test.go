@@ -77,7 +77,7 @@ func TestISTCschedule(t *testing.T) {
 	// start block 3
 	testAdvanceBlock(t, s, istc, false)
 
-	// start block 4, results should be commited
+	// start block 4, results should be committed
 	testAdvanceBlock(t, s, istc, false)
 
 	// Wait for results
@@ -171,5 +171,5 @@ func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller, syncFlag b
 	_, err = s.Save()
 	qt.Assert(t, err, qt.IsNil)
 	s.SetHeight(height + 1)
-	log.Infof("commited block %d", height)
+	log.Infof("committed block %d", height)
 }

@@ -31,7 +31,7 @@ const (
 // HTTProuter is a thread-safe multiplexer http(s) router using go-chi and autocert with a set of
 // preconfigured options. The router abstracts the HTTP layer and uses a custom Message type that
 // allows create handlers in a comfortable manner.
-// Allows multiple diferent kind of data processors by using the RouterNamespace interface. Each processor
+// Allows multiple different kind of data processors by using the RouterNamespace interface. Each processor
 // is identified by a unique namespace string which must be specified when adding handlers.
 // Handlers can be Public, Private and Administrator. The proper checks must be implemented by the
 // RouterNamespace implementation.
