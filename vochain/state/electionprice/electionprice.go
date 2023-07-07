@@ -107,23 +107,23 @@ type ElectionParameters struct {
 // the price of an election. These factors adjust the influence of different
 // aspects of the election (size, duration, encryption, anonymity, overwrite count) on the final price.
 type Factors struct {
-	K1 float64 `json:"k1"` // sizePriceFactor
-	K2 float64 `json:"k2"` // durationPriceFactor
-	K3 float64 `json:"k3"` // encryptedPriceFactor
-	K4 float64 `json:"k4"` // anonymousPriceFactor
-	K5 float64 `json:"k5"` // overwritePriceFactor
-	K6 float64 `json:"k6"` // Size scaling factor for maxCensusSize
-	K7 int     `json:"k7"` // Threshold for maxCensusSize scaling
+	K1 float64 `json:"k1" example:"0.002"`  // sizePriceFactor
+	K2 float64 `json:"k2" example:"0.0005"` // durationPriceFactor
+	K3 float64 `json:"k3" example:"0.005"`  // encryptedPriceFactor
+	K4 float64 `json:"k4" example:"10"`     // anonymousPriceFactor
+	K5 float64 `json:"k5" example:"3"`      // overwritePriceFactor
+	K6 float64 `json:"k6" example:"0.0008"` // Size scaling factor for maxCensusSize
+	K7 int     `json:"k7" example:"200"`    // Threshold for maxCensusSize scaling
 }
 
 // Calculator is a struct that stores the constant factors and basePrice
 // required for calculating the price of an election.
 type Calculator struct {
-	BasePrice uint64     `json:"basePrice"` // base price for an election
-	Capacity  uint64     `json:"capacity"`  // capacity of the blockchain
-	Factors   Factors    `json:"factors"`   // factors affecting the price
-	mutex     sync.Mutex `json:"-"`         // mutex for thread-safe operations
-	Disable   bool       `json:"-"`         // if true, disables the calculator and makes the Price function return 0
+	BasePrice uint64     `json:"basePrice" example:"5"`   // base price for an election
+	Capacity  uint64     `json:"capacity" example:"2000"` // capacity of the blockchain
+	Factors   Factors    `json:"factors"`                 // factors affecting the price
+	mutex     sync.Mutex `json:"-"`                       // mutex for thread-safe operations
+	Disable   bool       `json:"-"`                       // if true, disables the calculator and makes the Price function return 0
 }
 
 // DefaultElectionPriceFactors is the default set of constant factors used for calculating the price.

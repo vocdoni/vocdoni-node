@@ -1,6 +1,9 @@
 package api
 
-//go:generate go run go.vocdoni.io/dvote/api/autoswag
+////// Disabled autoswag due to https://github.com/swaggo/swag/issues/1267
+////// TODO: re-enable when a fixed swaggo/swag is released
+////// and remove the workaround done by @selankon on docs/models/models.go
+////go:generate go run go.vocdoni.io/dvote/api/autoswag
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.8.10 fmt
 
 import (
@@ -18,6 +21,27 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
+
+//	@title			Vocdoni API
+//	@version		2.0.0
+//	@description	Vocdoni API is a REST API
+//	@description.markdown
+
+//	@tag.name			Chain
+//	@tag.description	Everything about internal Vochain information (transactions, organizations, blocks, stats...)
+//	@tag.name			Accounts
+//	@tag.description	Related to account metadata (additional account information like balance, storage URI, process count...)
+//	@tag.name			Elections
+//	@tag.description	Create, manage and get information about elections
+//	@tag.name			Censuses
+//	@tag.description	Manage census: create, add, get, verify...
+//	@tag.name			Votes
+//	@tag.description	Submit, get, and verify votes
+//	@tag.name			Wallet
+//	@tag.description	Operations for the wallets managed backend side
+
+//	@BasePath					https://api-dev.vocdoni.net/v2/
+//	@securityDefinitions.basic	BasicAuth
 
 // MaxPageSize defines the maximum number of results returned by the paginated endpoints
 const MaxPageSize = 10

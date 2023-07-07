@@ -117,9 +117,13 @@ func (a *API) enableElectionHandlers() error {
 
 // electionFullListHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	object
+//	@Summary		List elections
+//	@Description	Get a list of elections summaries.
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page "
+//	@Success		200		{object}	ElectionSummary
 //	@Router			/elections/page/{page} [get]
 func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
@@ -168,9 +172,13 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 
 // electionHandler
 //
-//	@Summary		Get election information
-//	@Description	Get election information
-//	@Success		200	{object}	Election
+//	@Summary		Election information
+//	@Description	Get full election information
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionID	path		string	true	"Election id"
+//	@Success		200			{object}	Election
 //	@Router			/elections/{electionID} [get]
 func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -242,9 +250,13 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 
 // electionVotesCountHandler
 //
-//	@Summary		Get vote count
+//	@Summary		Count election votes
 //	@Description	Get the number of votes for an election
-//	@Success		200	{object}	object
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionID	path		string	true	"Election id"
+//	@Success		200			{object}	object{count=number}
 //	@Router			/elections/{electionID}/votes/count [get]
 func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -278,7 +290,11 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 //
 //	@Summary		List encryption keys
 //	@Description	Returns the list of public/private encryption keys
-//	@Success		200	{object}	ElectionKeys
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionID	path		string	true	"Election id"
+//	@Success		200			{object}	ElectionKeys
 //	@Router			/elections/{electionID}/keys [get]
 func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -325,7 +341,12 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //
 //	@Summary		List election votes
 //	@Description	Returns the list of voteIDs for an election (paginated)
-//	@Success		200	{object}	object
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionID	path		string	true	"Election id"
+//	@Param			page		path		number	true	"Page "
+//	@Success		200			{object}	Vote
 //	@Router			/elections/{electionID}/votes/page/{page} [get]
 func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -373,10 +394,14 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 // electionScrutinyHandler
 //
-//	@Summary		Election results
-//	@Description	Returns the consensus results of an election
-//	@Success		200	{object}	ElectionResults
-//	@Router			/elections/{electionID}/scrutiny [get]
+//	@Summary				Election results
+//	@Description.markdown	electionScrutinyHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					electionID	path		string	true	"Election id"
+//	@Success				200			{object}	ElectionResults
+//	@Router					/elections/{electionID}/scrutiny [get]
 func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
@@ -425,10 +450,14 @@ func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 
 // electionCreateHandler
 //
-//	@Summary		Create election
-//	@Description	Creates a new election
-//	@Success		200	{object}	ElectionCreate
-//	@Router			/elections [post]
+//	@Summary				Create election
+//	@Description.markdown	electionCreateHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					transaction	body		models.SignedTx	true	"Uses `txPayload` protobuf signed transaction, and the `metadata` base64-encoded JSON object"
+//	@Success				200			{object}	ElectionCreate	"It return txId, electionId and the metadataURL for the newly created election. If metadataURL is returned empty, means that there is some issue with the storage provider.""
+//	@Router					/elections [post]
 func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &ElectionCreate{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -522,7 +551,11 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //
 //	@Summary		Compute IPFS CIDv1 of file
 //	@Description	Helper endpoint to get the IPFS CIDv1 hash of a file
-//	@Success		200	{object}	File
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			transaction	body		object{payload=string}	true	"File bytes base64 encoded"
+//	@Success		200			{object}	File
 //	@Router			/files/cid [post]
 func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(msg.Data) > MaxOffchainFileSize {
@@ -550,7 +583,11 @@ func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 //	@Summary		Compute election price
 //	@Description	Helper endpoint to get the election price.
-//	@Success		200	{object}	Price
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			transaction	body		electionprice.ElectionParameters	true	"5 election parameters that are required for calculating the price"
+//	@Success		200			{object}	object{price=number}
 //	@Router			/elections/price [post]
 func (a *API) electionPriceHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &electionprice.ElectionParameters{}
@@ -586,11 +623,15 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 
 // electionFilterPaginatedHandler
 //
-//	@Summary		Election list (filtered, paginated)
-//	@Description	Returns a paginated list of elections filtered by partial organizationID, partial processID,
-//					process status and with results available or not.
-//	@Success		200	{object}	object
-//	@Router			/elections/filter/page/{page} [post]
+//	@Summary				List elections (filtered)
+//	@Description.markdown	electionFilterPaginatedHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					page		path		number			true	"Page to paginate"
+//	@Param					transaction	body		ElectionFilter	true	"Filtered by partial organizationID, partial processID, process status and with results available or not"
+//	@Success				200			{object}	ElectionSummary
+//	@Router					/elections/filter/page/{page} [post]
 func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body
 	body := &ElectionFilter{}

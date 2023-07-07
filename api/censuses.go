@@ -145,10 +145,15 @@ func (a *API) enableCensusHandlers() error {
 
 // censusCreateHandler
 //
-//	@Summary		Create a new census
-//	@Description	Create a new census
-//	@Success		200	{object}	Census
-//	@Router			/censuses/{type} [post]
+//	@Summary				Create a new census
+//	@Description.markdown	censusCreateHandler
+//	@Tags					Censuses
+//	@Accept					json
+//	@Produce				json
+//	@Security				BasicAuth
+//	@Param					type	path		string	true	"Census type"	Enums(weighted,zkweighted,csp)
+//	@Success				200		{object}	object{censusId=string}
+//	@Router					/censuses/{type} [post]
 func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -177,10 +182,16 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 // censusAddHandler
 //
-//	@Summary		Add participants to census
-//	@Description	Adds one or multiple key/weights to the census
-//	@Success		200	"(empty body)"
-//	@Router			/censuses/{censusID}/participants [post]
+//	@Summary				Add participants to census
+//	@Description.markdown	censusAddHandler
+//	@Tags					Censuses
+//	@Accept					json
+//	@Produce				json
+//	@Security				BasicAuth
+//	@Param					censusID	path	string				true	"Census id"
+//	@Param					transaction	body	CensusParticipants	true	"PublicKey - weight array "
+//	@Success				200			"(empty body)"
+//	@Router					/censuses/{censusID}/participants [post]
 func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -260,9 +271,13 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 // censusTypeHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
+//	@Summary		Get type of census
+//	@Description	Get the type of a census
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path		string					true	"Census id"
+//	@Success		200			{object}	object{census=string}	"Census type "weighted", "zkweighted", "csp"
 //	@Router			/censuses/{censusID}/type [get]
 func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
@@ -290,9 +305,13 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 // censusRootHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
+//	@Summary		Census Merkle Root
+//	@Description	Get census [Merkle Tree root](https://docs.vocdoni.io/architecture/census/off-chain-tree.html) hash, used to identify the census at specific snapshot.\n\n- Bearer token not required
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path		string				true	"Census id"
+//	@Success		200			{object}	object{root=string}	"Merkle root of the census"
 //	@Router			/censuses/{censusID}/root [get]
 func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
@@ -322,9 +341,14 @@ func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 // censusDumpHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	censusdb.CensusDump
+//	@Summary		Export census
+//	@Description	Export census to JSON format. Requires Bearer token
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Param			censusID	path		string	true	"Census id"
+//	@Success		200			{object}	censusdb.CensusDump
 //	@Router			/censuses/{censusID}/export [get]
 func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
@@ -364,9 +388,14 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 // censusImportHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	"(empty body)"
+//	@Summary		Import census
+//	@Description	Import census from JSON previously exported using [`/censuses/{censusId}/export`](census-export). Requires Bearer token
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Security		BasicAuth
+//	@Param			censusID	path	string	true	"Census id"
+//	@Success		200			"(empty body)"
 //	@Router			/censuses/{censusID}/import [post]
 func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
@@ -415,9 +444,13 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 // censusWeightHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
+//	@Summary		Census total weight
+//	@Description	It sums all weights added to the census. Weight is a stringified bigInt
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path		string					true	"Census id"
+//	@Success		200			{object}	object{weight=string}	"Sum of weight son a stringfied big int format"
 //	@Router			/censuses/{censusID}/weight [get]
 func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
@@ -447,9 +480,13 @@ func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 // censusSizeHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
+//	@Summary		Census size
+//	@Description	Total number of keys added to the census. Size as integer
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path		string				true	"Census id"
+//	@Success		200			{object}	object{size=string}	"Size as integer"
 //	@Router			/censuses/{censusID}/size [get]
 func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
@@ -479,9 +516,16 @@ func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 // censusDeleteHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	"(empty body)"
+//	@Summary		Delete census
+//	@Description	Delete unpublished census (not on the storage yet). See [publish census](census-publish)\n
+//	@Description	- Requires Bearer token
+//	@Description	- Deletes a census from the server storage
+//	@Description	- Published census cannot be deleted
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path	string	true	"Census id"
+//	@Success		200			"(empty body)"
 //	@Router			/censuses/{censusID} [delete]
 func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
@@ -507,11 +551,16 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 // censusPublishHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
-//	@Router			/censuses/{censusID}/publish [post]
-//	@Router			/censuses/{censusID}/publish/{root} [post]
+//	@Summary				Publish census
+//	@Description.markdown	censusPublishHandler
+//	@Tags					Censuses
+//	@Accept					json
+//	@Produce				json
+//	@Security				BasicAuth
+//	@Success				200			{object}	object{census=object{censusID=string,uri=string}}	"It return published censusID and the ipfs uri where its uploaded"
+//	@Param					censusID	path		string												true	"Census id"
+//	@Router					/censuses/{censusID}/publish [post]
+//	/censuses/{censusID}/publish/{root} [post] Endpoint docs generated on docs/models/model.go
 func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -615,10 +664,16 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 // censusProofHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
-//	@Router			/censuses/{censusID}/proof/{key} [get]
+//	@Summary				Prove key to census
+//	@Description.markdown	censusProofHandler
+//	@Tags					Censuses
+//	@Accept					json
+//	@Produce				json
+//	@Security				BasicAuth
+//	@Param					censusID	path		string											true	"Census id"
+//	@Param					key			path		string											true	"Key to proof"
+//	@Success				200			{object}	object{weight=number,proof=string,value=string}	"where proof is Merkle tree siblings and value is Merkle tree leaf value"
+//	@Router					/censuses/{censusID}/proof/{key} [get]
 func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
@@ -691,9 +746,13 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 
 // censusVerifyHandler
 //
-//	@Summary		TODO
-//	@Description	TODO
-//	@Success		200	{object}	Census
+//	@Summary		Verify merkle proof
+//	@Description	Verify that a previously obtained Merkle proof for a key, acquired via [/censuses/{censusId}/proof/{publicKey}](prove-key-to-census) is still correct.
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Param			censusID	path		string	true	"Census id"
+//	@Success		200			{object}	object{valid=bool}
 //	@Router			/censuses/{censusID}/verify [post]
 func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))

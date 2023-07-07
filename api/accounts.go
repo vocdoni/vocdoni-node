@@ -106,8 +106,13 @@ func (a *API) enableAccountHandlers() error {
 // accountHandler
 //
 //	@Summary		Get account
-//	@Description	Get account information
-//	@Success		200	{object}	Account
+//	@Description	Get account information by its address or public key. The `infoURI` parameter contain where account metadata is uploaded (like avatar, name...). It return also an already parsed "metadata" object from this infoUri.
+//	@Description	The `meta` object inside the `metadata` property is left to the user to add random information about the account.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			address	path		string	true	"Account address"
+//	@Success		200		{object}	Account
 //	@Router			/accounts/{address} [get]
 func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
@@ -150,10 +155,14 @@ func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 
 // accountSetHandler
 //
-//	@Summary		Set account
-//	@Description	Set account information
-//	@Success		200	{object}	AccountSet
-//	@Router			/accounts [post]
+//	@Summary				Set account
+//	@Description.markdown	accountSetHandler
+//	@Tags					Accounts
+//	@Accept					json
+//	@Produce				json
+//	@Param					transaction	body		object{txPayload=string,metadata=string}	true	"Transaction payload and metadata object encoded using base64 "
+//	@Success				200			{object}	AccountSet
+//	@Router					/accounts [post]
 func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &AccountSet{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
@@ -238,8 +247,11 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 // treasurerHandler
 //
 //	@Summary		Get treasurer address
-//	@Description	Get treasurer address
-//	@Success		200	{object}	object
+//	@Description	Get treasurer address. The treasurer is a new authority entity identified by its Ethereum address and is the only one that can Mint new tokens.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{address=string}
 //	@Router			/accounts/treasurer [get]
 func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	acc, err := a.vocapp.State.Treasurer(true)
@@ -261,11 +273,16 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 
 // electionListHandler
 //
-//	@Summary		Elections list
+//	@Summary		List organization elections
 //	@Description	List the elections of an organization
-//	@Success		200	{object}	Organization
-//	@Router			/accounts/{organizationID}/elections/status/{status}/page/{page} [get]
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			organizationID	path		string	true	"Specific organizationID"
+//	@Param			page			path		number	true	"Define de page number"
+//	@Success		200				{object}	object{elections=[]ElectionSummary}
 //	@Router			/accounts/{organizationID}/elections/page/{page} [get]
+//	/accounts/{organizationID}/elections/status/{status}/page/{page} [post] Endpoint docs generated on docs/models/model.go
 func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
@@ -332,9 +349,13 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 
 // electionCountHandler
 //
-//	@Summary		Elections count
+//	@Summary		Count organization elections
 //	@Description	Returns the number of elections for an organization
-//	@Success		200	{object}	object
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			organizationID	path		string	true	"Specific organizationID"
+//	@Success		200				{object}	object{count=number}
 //	@Router			/accounts/{organizationID}/elections/count [get]
 func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
@@ -361,9 +382,14 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 // tokenTransfersHandler
 //
-//	@Summary		Token transfers list
-//	@Description	Returns the token transfers for an organization
-//	@Success		200	{object}	object
+//	@Summary		List account transfers
+//	@Description	Returns the token transfers for an account. A transfer is a token transference from one account to other (excepting the burn address).
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			accountID	path		string	true	"Specific accountID"
+//	@Param			page		path		string	true	"Paginator page"
+//	@Success		200			{object}	object{transfers=[]indexertypes.TokenTransferMeta}
 //	@Router			/accounts/{accountID}/transfers/page/{page} [get]
 func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))

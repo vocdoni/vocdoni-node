@@ -58,8 +58,6 @@ func encodeVotes(votes [][]*types.BigInt) string {
 	return b.String()
 }
 
-// TODO(mvdan): encode bigints as bytes in sqlite
-
 func encodeBigint(n *types.BigInt) string {
 	if n == nil {
 		return ""
@@ -151,8 +149,6 @@ func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
 // searchTerm is optional, if declared as zero-value
 // will be ignored. Searches against the ID field.
 func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.SearchEntitiesRow {
-	// TODO: EntityList callers in the api package want the process count as well;
-	// work it out here so that the api package doesn't cause N sql queries.
 	rows, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: searchTerm,
 		Offset:         int64(from),
@@ -238,15 +234,15 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		VoteOptsPb:        encodedPb(p.VoteOptions),
 		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
 		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
-		CreationTime:      currentBlockTime, // TODO: remove with sql LEFT JOIN on blocks
+		CreationTime:      currentBlockTime,
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
 		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateProcess(context.TODO(), procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)

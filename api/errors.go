@@ -33,7 +33,7 @@ var (
 	ErrAccountAlreadyExists             = apirest.APIerror{Code: 4004, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("account already exists")}
 	ErrTreasurerNotFound                = apirest.APIerror{Code: 4005, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("treasurer account not found")}
 	ErrOrgNotFound                      = apirest.APIerror{Code: 4006, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("organization not found")}
-	ErrTransactionNotFound              = apirest.APIerror{Code: 4007, HTTPstatus: apirest.HTTPstatusNoContent, Err: fmt.Errorf("transaction hash not found")}
+	ErrTransactionNotFound              = apirest.APIerror{Code: 4007, HTTPstatus: apirest.HTTPstatusNoContent, Err: fmt.Errorf("transaction not found")}
 	ErrBlockNotFound                    = apirest.APIerror{Code: 4008, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("block not found")}
 	ErrMetadataProvidedButNoURI         = apirest.APIerror{Code: 4009, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("metadata provided but no metadata URI found in transaction")}
 	ErrMetadataURINotMatchContent       = apirest.APIerror{Code: 4010, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("metadata URI does not match metadata content")}

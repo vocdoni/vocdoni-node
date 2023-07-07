@@ -1,0 +1,16 @@
+target:
+  oneOf:
+    - $ref: "#/components/schemas/models.Tx_Vote"
+    - $ref: "#/components/schemas/models.Tx_Admin"
+    - $ref: "#/components/schemas/models.Tx_SetProcess"
+    - $ref: "#/components/schemas/models.Tx_RegisterKey"
+    - $ref: "#/components/schemas/models.Tx_MintTokens"
+    - $ref: "#/components/schemas/models.Tx_SendTokens"
+    - $ref: "#/components/schemas/models.Tx_SetTransactionCosts"
+    - $ref: "#/components/schemas/models.Tx_SetAccount"
+    - $ref: "#/components/schemas/models.Tx_CollectFaucet"
+    - $ref: "#/components/schemas/models.Tx_SetKeykeeper"
+
+
+
+

@@ -67,20 +67,18 @@ type Indexer struct {
 	// TODO: try using blockTx directly, after some more refactors?
 	votePool map[string]map[string]*state.Vote
 
-	// lockPool is the lock for all *Pool and blockTx operations
-	// TODO: rename to blockMu
-	lockPool sync.Mutex
-
 	readOnlyDB  *sql.DB
 	readWriteDB *sql.DB
 
 	readOnlyQuery *indexerdb.Queries
 
+	// blockMu protects blockTx, blockQueries, and blockUpdateProcs.
+	blockMu sync.Mutex
 	// blockTx is an in-progress SQL transaction which is committed or rolled
 	// back along with the current block.
-	blockTx      *sql.Tx
+	blockTx *sql.Tx
+	// blockQueries wraps blockTx.
 	blockQueries *indexerdb.Queries
-
 	// blockUpdateProcs is the list of process IDs that require sync with the state database.
 	// The key is a types.ProcessID as a string, so that it can be used as a map key.
 	blockUpdateProcs map[string]bool
@@ -172,7 +170,7 @@ func (idx *Indexer) Close() error {
 
 // blockTxQueries assumes that lockPool is locked.
 func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
-	if idx.lockPool.TryLock() {
+	if idx.blockMu.TryLock() {
 		panic("Indexer.blockTxQueries was called without locking Indexer.lockPool")
 	}
 	if idx.blockTx == nil {
@@ -221,8 +219,8 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	idx.recoveryBootLock.Lock()
 	defer idx.recoveryBootLock.Unlock()
 
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()
 
@@ -300,8 +298,8 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (idx *Indexer) Commit(height uint32) error {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 
 	// Update existing processes
 	updateProcs := maps.Keys(idx.blockUpdateProcs)
@@ -409,8 +407,8 @@ func (idx *Indexer) Commit(height uint32) error {
 
 // Rollback removes the non committed pending operations
 func (idx *Indexer) Rollback() {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.votePool = make(map[string]map[string]*state.Vote)
 	if idx.blockTx != nil {
 		if err := idx.blockTx.Rollback(); err != nil {
@@ -452,8 +450,8 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 		idx.votePool[pid][nullifier] = vote
 	}
 
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
 		log.Errorw(err, "could not index vote")
@@ -462,23 +460,23 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 
 // OnCancel indexer stores the processID and entityID
 func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessKeys does nothing
 func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessStatusChange adds the process to blockUpdateProcs and, if ended, the resultsPool
 func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
 	txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
@@ -495,24 +493,24 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 		log.Errorf("keyindex is nil")
 		return
 	}
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessResults verifies the results for a process and appends it to blockUpdateProcs
 func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
 	txIndex int32) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessesStart adds the processes to blockUpdateProcs.
 // This is required to update potential changes when a process is started, such as the rolling census.
 func (idx *Indexer) OnProcessesStart(pids [][]byte) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	for _, pid := range pids {
 		idx.blockUpdateProcs[string(pid)] = true
 	}
@@ -522,8 +520,8 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTokenTransfer(context.TODO(), indexerdb.CreateTokenTransferParams{
 		TxHash:       tx.TxHash,
@@ -540,8 +538,8 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 // OnCensusUpdate adds the process to blockUpdateProcs in order to update the census.
 // This function call is triggered by the SET_PROCESS_CENSUS tx.
 func (idx *Indexer) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
-	idx.lockPool.Lock()
-	defer idx.lockPool.Unlock()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
