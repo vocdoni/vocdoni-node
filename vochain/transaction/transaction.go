@@ -441,12 +441,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
-		if newSik := vtx.Tx.GetSetSik().GetSik(); newSik != nil {
-			if err := t.state.SetSIK(address, newSik); err != nil {
-				return nil, fmt.Errorf("setSikTx: %w", err)
-			}
-			return response, nil
+		newSik := vtx.Tx.GetSetSik().GetSik()
+		if err := t.state.SetSIK(address, newSik); err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
+		return response, nil
+
+	case *models.Tx_DelSik:
+		err := t.DelSikTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
+		}
+		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
 		currentSik, err := t.state.SIKByAddress(address)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)

@@ -240,8 +240,8 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	return nil
 }
 
-// SetSikTxCheck checks if a set sik tx is valid
-func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
+// DelSikTxCheck checks if a delete sik tx is valid
+func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) error {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
@@ -264,5 +264,17 @@ func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
 		return fmt.Errorf("cannot get tx account: %w", err)
 	}
 
+	return nil
+}
+
+// SetSikTxCheck checks if a set sik tx is valid
+func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
+	if err := t.SetSikTxCheck(vtx); err != nil {
+		return err
+	}
+	bAddress := vtx.Tx.GetSetSik().GetSik()
+	if bAddress == nil {
+		return fmt.Errorf("invalid sik value")
+	}
 	return nil
 }
