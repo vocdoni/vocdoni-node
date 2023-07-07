@@ -447,6 +447,17 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 			return response, nil
 		}
+		currentSik, err := t.state.SIKByAddress(address)
+		if err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
+		}
+		maxEndBlock, err := t.state.MaxReadyProcessEndBlock(false)
+		if err != nil {
+			return nil, fmt.Errorf("setSikTx: %w", err)
+		}
+		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
+			return nil, fmt.Errorf("setSikTx: the sik could not be changed yet")
+		}
 		if err := t.state.InvalidateSIK(address); err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}

@@ -214,6 +214,40 @@ func (v *State) MinReadyProcessStartBlock(committed bool) (uint32, error) {
 	return minStartBlock, nil
 }
 
+// MaxReadyProcessEndBlock returns the maximun end block of the current on going
+// processes from the no-state db associated to the process sub tree.
+func (v *State) MaxReadyProcessEndBlock(committed bool) (uint32, error) {
+	if !committed {
+		v.Tx.RLock()
+		defer v.Tx.RUnlock()
+	}
+	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return 0, err
+	}
+	maxEndBlock := v.CurrentHeight()
+	startBlocksSB := processesTree.NoState()
+	if err := startBlocksSB.Iterate([]byte{}, func(pid, _ []byte) bool {
+		processBytes, err := processesTree.DeepGet(pid)
+		if err != nil {
+			return false
+		}
+		var process models.StateDBProcess
+		err = proto.Unmarshal(processBytes, &process)
+		if err != nil {
+			return false
+		}
+		endBlock := process.GetProcess().StartBlock + process.GetProcess().BlockCount
+		if endBlock > maxEndBlock {
+			maxEndBlock = endBlock
+		}
+		return true
+	}); err != nil {
+		return 0, err
+	}
+	return maxEndBlock, nil
+}
+
 // ListProcessIDs returns the full list of process identifiers (pid).
 func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	if !committed {
