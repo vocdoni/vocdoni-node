@@ -292,6 +292,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	idx.blockQueries = nil
 
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
@@ -395,6 +396,7 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	idx.blockQueries = nil
 
 	if newVotes+overwritedVotes > 0 {
 		log.Infow("add live votes to results",
@@ -415,6 +417,7 @@ func (idx *Indexer) Rollback() {
 			log.Errorw(err, "could not rollback tx")
 		}
 		idx.blockTx = nil
+		idx.blockQueries = nil
 	}
 	maps.Clear(idx.blockUpdateProcs)
 }
