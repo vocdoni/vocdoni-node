@@ -80,7 +80,7 @@ func testEntityList(t *testing.T, entityCount int) {
 	}
 	app.AdvanceTestBlock()
 
-	qt.Assert(t, idx.EntityCount(), qt.Equals, uint64(entityCount))
+	qt.Assert(t, idx.CountTotalEntities(), qt.Equals, uint64(entityCount))
 
 	entitiesByID := make(map[string]bool)
 	last := 0
@@ -270,10 +270,10 @@ func testProcessList(t *testing.T, procsCount int) {
 	_, err := idx.ProcessList(nil, 0, 64, "", 0, 0, "", false)
 	qt.Assert(t, err, qt.IsNil)
 
-	qt.Assert(t, idx.ProcessCount(eidOneProcess), qt.Equals, uint64(1))
-	qt.Assert(t, idx.ProcessCount(eidProcsCount), qt.Equals, uint64(procsCount))
-	qt.Assert(t, idx.ProcessCount(nil), qt.Equals, uint64(10+procsCount))
-	qt.Assert(t, idx.ProcessCount([]byte("not an entity id that exists")), qt.Equals, uint64(0))
+	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
+	qt.Assert(t, idx.CountEntityProcesses(eidOneProcess), qt.Equals, uint64(1))
+	qt.Assert(t, idx.CountEntityProcesses(eidProcsCount), qt.Equals, uint64(procsCount))
+	qt.Assert(t, idx.CountEntityProcesses([]byte("not an entity id that exists")), qt.Equals, uint64(0))
 }
 
 func TestProcessSearch(t *testing.T) {
@@ -1267,7 +1267,7 @@ func TestTxIndexer(t *testing.T) {
 	}
 	qt.Assert(t, idx.Commit(0), qt.IsNil)
 
-	count, err := idx.TransactionCount()
+	count, err := idx.CountTotalTransactions()
 	qt.Assert(t, err, qt.IsNil)
 	const totalTxs = totalBlocks * txsPerBlock
 	qt.Assert(t, count, qt.Equals, uint64(totalTxs))

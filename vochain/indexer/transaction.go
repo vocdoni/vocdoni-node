@@ -16,8 +16,8 @@ import (
 // ErrTransactionNotFound is returned if the transaction is not found.
 var ErrTransactionNotFound = fmt.Errorf("transaction not found")
 
-// TransactionCount returns the number of transactions indexed
-func (idx *Indexer) TransactionCount() (uint64, error) {
+// CountTotalTransactions returns the number of transactions indexed
+func (idx *Indexer) CountTotalTransactions() (uint64, error) {
 	count, err := idx.readOnlyQuery.CountTransactions(context.TODO())
 	return uint64(count), err
 }
