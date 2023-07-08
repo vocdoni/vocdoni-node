@@ -262,7 +262,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	voteCount, err := a.indexer.CountVotes(nil)
+	voteCount, err := a.indexer.CountTotalVotes()
 	if err != nil {
 		return err
 	}

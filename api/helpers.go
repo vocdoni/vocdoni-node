@@ -29,10 +29,6 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 		if err != nil {
 			return nil, ErrCantFetchElection.WithErr(err)
 		}
-		count, err := a.indexer.CountVotes(pid)
-		if err != nil {
-			return nil, ErrCantFetchEnvelopeHeight.WithErr(err)
-		}
 		processes = append(processes, &ElectionSummary{
 			ElectionID:     procInfo.ID,
 			OrganizationID: procInfo.EntityID,
@@ -40,7 +36,7 @@ func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
 			StartDate:      procInfo.CreationTime,
 			EndDate:        a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
 			FinalResults:   procInfo.FinalResults,
-			VoteCount:      count,
+			VoteCount:      procInfo.VoteCount,
 		})
 	}
 	return processes, nil

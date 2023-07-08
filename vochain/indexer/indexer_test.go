@@ -1042,14 +1042,14 @@ func TestCountVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Test envelope height for this PID
-	height, err := idx.CountVotes(pid)
+	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
+	qt.Assert(t, proc.VoteCount, qt.CmpEquals(), uint64(101))
 
-	// Test global envelope height (number of votes)
-	height, err = idx.CountVotes([]byte{})
+	// Test global envelope total (number of votes)
+	total, err := idx.CountTotalVotes()
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), uint64(101))
+	qt.Assert(t, total, qt.CmpEquals(), uint64(101))
 
 	ref, err := idx.GetEnvelope(nullifier)
 	qt.Assert(t, err, qt.IsNil)
@@ -1152,9 +1152,9 @@ func TestOverwriteVotes(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// check envelope height for this PID
-	height, err := idx.CountVotes(pid)
+	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, height, qt.CmpEquals(), uint64(1))
+	qt.Assert(t, proc.VoteCount, qt.CmpEquals(), uint64(1))
 
 	// check overwrite count is correct
 	ref, err := idx.GetEnvelope(nullifier)
@@ -1167,7 +1167,6 @@ func TestOverwriteVotes(t *testing.T) {
 	qt.Assert(t, envelope.VotePackage, qt.DeepEquals, vp)
 
 	// check the results are correct (only the second vote should be counted)
-	proc, err = idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, GetFriendlyResults(proc.ResultsVotes), qt.DeepEquals, [][]string{
 		{"0", "0", "1"},
