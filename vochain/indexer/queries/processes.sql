@@ -26,8 +26,11 @@ INSERT INTO processes (
 );
 
 -- name: GetProcess :one
-SELECT * FROM processes
-WHERE id = ?
+SELECT p.*, COUNT(v.nullifier) AS vote_count FROM processes AS p
+LEFT JOIN votes AS v
+	ON p.id = v.process_id
+WHERE p.id = ?
+GROUP BY p.id
 LIMIT 1;
 
 -- name: SearchProcesses :many

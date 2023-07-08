@@ -145,10 +145,6 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
-		count, err := a.indexer.CountVotes(eid)
-		if err != nil {
-			return ErrCantFetchEnvelopeHeight.WithErr(err)
-		}
 		list = append(list, ElectionSummary{
 			ElectionID:     eid,
 			OrganizationID: e.EntityID,
@@ -156,7 +152,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
 			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
 			FinalResults:   e.FinalResults,
-			VoteCount:      count,
+			VoteCount:      e.VoteCount,
 		})
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
@@ -192,10 +188,6 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 		}
 		return ErrCantFetchElection.Withf("(%x): %v", electionID, err)
 	}
-	count, err := a.indexer.CountVotes(electionID)
-	if err != nil {
-		return ErrCantFetchEnvelopeHeight.WithErr(err)
-	}
 
 	election := Election{
 		ElectionSummary: ElectionSummary{
@@ -205,7 +197,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
 			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults:   proc.FinalResults,
-			VoteCount:      count,
+			VoteCount:      proc.VoteCount,
 		},
 		MetadataURL:  proc.Metadata,
 		CreationTime: proc.CreationTime,
@@ -680,10 +672,6 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		if err != nil {
 			return ErrCantFetchElection.WithErr(err)
 		}
-		count, err := a.indexer.CountVotes(eid)
-		if err != nil {
-			return ErrCantFetchEnvelopeHeight.WithErr(err)
-		}
 		list = append(list, ElectionSummary{
 			OrganizationID: e.EntityID,
 			ElectionID:     eid,
@@ -691,7 +679,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
 			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
 			FinalResults:   e.FinalResults,
-			VoteCount:      count,
+			VoteCount:      e.VoteCount,
 		})
 	}
 	data, err := json.Marshal(struct {

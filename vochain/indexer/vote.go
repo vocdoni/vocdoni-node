@@ -97,16 +97,9 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 
 }
 
-// CountVotes returns the number of envelopes for a processId.
-// If processId is empty, returns the total number of envelopes.
-func (idx *Indexer) CountVotes(processID []byte) (uint64, error) {
-	if len(processID) == 0 {
-		height, err := idx.readOnlyQuery.CountVotes(context.TODO())
-		return uint64(height), err
-	}
-	// TODO: the api package calls CountVotes with pid after ProcessInfo often.
-	// Consider doing it as part of ProcessInfo.
-	height, err := idx.readOnlyQuery.CountVotesByProcessID(context.TODO(), processID)
+// CountVotes returns the total number of envelopes.
+func (idx *Indexer) CountTotalVotes() (uint64, error) {
+	height, err := idx.readOnlyQuery.CountVotes(context.TODO())
 	return uint64(height), err
 }
 

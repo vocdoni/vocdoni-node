@@ -42,6 +42,8 @@ type Process struct {
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 
+	VoteCount uint64 `json:"-"` // via LEFT JOIN
+
 	ResultsVotes       [][]*types.BigInt `json:"-"`
 	ResultsWeight      *types.BigInt     `json:"-"`
 	ResultsBlockHeight uint32            `json:"-"`
@@ -58,7 +60,7 @@ func (p *Process) Results() *results.Results {
 	}
 }
 
-func ProcessFromDB(dbproc *indexerdb.Process) *Process {
+func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	proc := &Process{
 		ID:                 dbproc.ID,
 		EntityID:           nonEmptyBytes(dbproc.EntityID),
@@ -79,6 +81,7 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		CreationTime:       dbproc.CreationTime,
 		SourceBlockHeight:  uint64(dbproc.SourceBlockHeight),
 		Metadata:           dbproc.Metadata,
+		VoteCount:          uint64(dbproc.VoteCount),
 		ResultsVotes:       decodeVotes(dbproc.ResultsVotes),
 		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
 		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
