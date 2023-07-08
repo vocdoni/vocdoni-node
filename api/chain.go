@@ -234,7 +234,7 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Success		200	{object}	object{count=int}	"Number of registered organizations"
 //	@Router			/chain/organizations/count [get]
 func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	count := a.indexer.EntityCount()
+	count := a.indexer.CountTotalEntities()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
 	if err != nil {
@@ -254,7 +254,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 //	@Success				200	{object}	api.ChainInfo
 //	@Router					/chain/info [get]
 func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	transactionCount, err := a.indexer.TransactionCount()
+	transactionCount, err := a.indexer.CountTotalTransactions()
 	if err != nil {
 		return err
 	}
@@ -262,6 +262,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
+	// TODO: merge the "count total" methods for entities/processes/votes in the indexer
 	voteCount, err := a.indexer.CountTotalVotes()
 	if err != nil {
 		return err
@@ -278,8 +279,8 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	data, err := json.Marshal(&ChainInfo{
 		ID:                      a.vocapp.ChainID(),
 		BlockTime:               *a.vocinfo.BlockTimes(),
-		ElectionCount:           a.indexer.ProcessCount(nil),
-		OrganizationCount:       a.indexer.EntityCount(),
+		ElectionCount:           a.indexer.CountTotalProcesses(),
+		OrganizationCount:       a.indexer.CountTotalEntities(),
 		Height:                  a.vocapp.Height(),
 		Syncing:                 a.vocapp.IsSynchronizing(),
 		TransactionCount:        transactionCount,
@@ -829,7 +830,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 //	@Success		200	{object}	object{count=number}
 //	@Router			/chain/transactions/count [get]
 func (a *API) chainTxCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	count, err := a.indexer.TransactionCount()
+	count, err := a.indexer.CountTotalTransactions()
 	if err != nil {
 		return err
 	}
