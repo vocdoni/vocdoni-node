@@ -37,6 +37,8 @@ type TreeViewer interface {
 	// GenProof generates a proof of existence of the given key for this tree.  The
 	// returned values are the leaf value and the proof itself.
 	GenProof(key []byte) ([]byte, []byte, error)
+	// GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
+	GetCircomSiblings(key []byte) ([]string, error)
 	// SubTree is used to open the subTree (singleton and non-singleton) as a
 	// TreeView.
 	SubTree(c TreeConfig) (TreeViewer, error)
@@ -110,6 +112,11 @@ func (v *TreeView) Size() (uint64, error) {
 // returned values are the leaf value and the proof itself.
 func (v *TreeView) GenProof(key []byte) ([]byte, []byte, error) {
 	return v.tree.GenProof(nil, key)
+}
+
+// GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
+func (t *TreeView) GetCircomSiblings(key []byte) ([]string, error) {
+	return t.tree.GetCircomSiblings(key)
 }
 
 // Dump exports all the tree leafs.

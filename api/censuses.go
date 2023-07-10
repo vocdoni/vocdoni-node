@@ -8,7 +8,6 @@ import (
 	"errors"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
@@ -18,6 +17,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -731,12 +731,24 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		weight := ref.Tree().BytesToBigInt(leafV)
 		response.Weight = (*types.BigInt)(weight)
 	}
-	// get sik merkle tree proof
-	response.SikRoot, response.SikProof, response.SikSiblings, err = a.vocapp.GenSikCircomProof(common.BytesToAddress(key))
+	sikTree, err := a.vocapp.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
 	if err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
-
+	// get merkle root
+	if response.SikRoot, err = sikTree.Root(); err != nil {
+		return ErrCantGetCircomSiblings.WithErr(err)
+	}
+	// get sik merkle tree proof
+	_, response.SikProof, err = sikTree.GenProof(leafKey)
+	if err != nil {
+		return ErrCantGetCircomSiblings.WithErr(err)
+	}
+	// get sik merkle tree circom siblings
+	if response.SikSiblings, err = sikTree.AsTreeView().GetCircomSiblings(leafKey); err != nil {
+		return ErrCantGetCircomSiblings.WithErr(err)
+	}
+	// encode response
 	var data []byte
 	if data, err = json.Marshal(&response); err != nil {
 		return err

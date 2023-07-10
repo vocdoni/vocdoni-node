@@ -272,21 +272,21 @@ func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, code, err := c.Request(HTTPPOST, &api.SikSet{
-		TxPayload: stxb,
-	}, "accounts", "sik")
+	resp, code, err := c.Request(HTTPPOST, &api.Transaction{
+		Payload: stxb,
+	}, "chain", "transaction")
 	if err != nil {
 		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	accv := &api.SikSet{}
+	accv := &api.Transaction{}
 	err = json.Unmarshal(resp, accv)
 	if err != nil {
 		return nil, err
 	}
-	return accv.TxHash, nil
+	return accv.Hash, nil
 }
 
 // DelSik function allows to delete the Secret Identity Key for the current
@@ -314,8 +314,8 @@ func (c *HTTPclient) DelSik() (types.HexBytes, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp, code, err := c.Request(HTTPDELETE, &api.SikSet{
-		TxPayload: stxb,
+	resp, code, err := c.Request(HTTPDELETE, &api.Transaction{
+		Payload: stxb,
 	}, "accounts", "sik")
 	if err != nil {
 		return nil, err
@@ -323,10 +323,10 @@ func (c *HTTPclient) DelSik() (types.HexBytes, error) {
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	accv := &api.SikSet{}
+	accv := &api.Transaction{}
 	err = json.Unmarshal(resp, accv)
 	if err != nil {
 		return nil, err
 	}
-	return accv.TxHash, nil
+	return accv.Hash, nil
 }

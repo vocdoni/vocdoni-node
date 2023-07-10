@@ -228,11 +228,6 @@ type AccountSet struct {
 	MetadataURL string         `json:"metadataURL" swaggertype:"string"`
 }
 
-type SikSet struct {
-	TxPayload []byte         `json:"txPayload,omitempty"`
-	TxHash    types.HexBytes `json:"txHash"`
-}
-
 type Census struct {
 	CensusID       types.HexBytes `json:"censusID,omitempty"`
 	Type           string         `json:"type,omitempty"`

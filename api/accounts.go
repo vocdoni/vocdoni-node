@@ -82,24 +82,6 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 
-	if err := a.endpoint.RegisterMethod(
-		"/accounts/sik",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.setSikHandler,
-	); err != nil {
-		return err
-	}
-
-	if err := a.endpoint.RegisterMethod(
-		"/accounts/sik",
-		"DELETE",
-		apirest.MethodAccessTypePublic,
-		a.setSikHandler,
-	); err != nil {
-		return err
-	}
-
 	return nil
 }
 
@@ -422,33 +404,6 @@ func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// setSikHandler
-//
-//	@Summary		Updates the Secret Identity Key of an Address
-//	@Description	Updates the Secret Identity Key of an Address
-//	@Success		200	{object}	SikSet
-//	@Router			/accounts/sik [post]
-func (a *API) setSikHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	req := &SikSet{}
-	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return err
-	}
-	// send the transaction to the blockchain
-	res, err := a.sendTx(req.TxPayload)
-	if err != nil {
-		return err
-	}
-	// prepare the reply
-	resp := &SikSet{
-		TxHash: res.Hash.Bytes(),
-	}
-	var data []byte
-	if data, err = json.Marshal(resp); err != nil {
-		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math/big"
 	"path/filepath"
 	"sync/atomic"
 	"time"
@@ -19,9 +18,7 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
-	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -533,38 +530,4 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 // MempoolSize returns the size of the transaction mempool
 func (app *BaseApplication) MempoolSize() int {
 	return app.fnMempoolSize()
-}
-
-// GenSikCircomProof function returns the merkle tree proof for the provided
-// address ready to be verified on circom (encoding the siblings properly). It
-// returns the root, the packaged siblings and the encoded siblings for circom.
-func (app *BaseApplication) GenSikCircomProof(address ethcommon.Address) ([]byte, []byte, []string, error) {
-	sikTree, err := app.State.Tx.DeepSubTree(vstate.StateTreeCfg(vstate.TreeSIK))
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	// get merkle root
-	root, err := sikTree.Root()
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	// get packaged siblings and unpack them
-	_, pSiblings, err := sikTree.GenProof(address.Bytes())
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	uSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, pSiblings)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	// encode as circom expects
-	siblings := make([]string, censustree.DefaultMaxLevels)
-	for i := 0; i < len(siblings); i++ {
-		sibling := big.NewInt(0)
-		if i < len(uSiblings) {
-			sibling = arbo.BytesToBigInt(uSiblings[i])
-		}
-		siblings = append(siblings, sibling.String())
-	}
-	return root, pSiblings, siblings, nil
 }
