@@ -631,3 +631,53 @@ func cspGenProof(pid, voterKey []byte, csp *ethereum.SignKeys) (*apiclient.Censu
 
 	return &apiclient.CensusProof{Proof: caProofBytes}, nil
 }
+
+func (t *e2eElection) verifyVoteCount(nvotesExpected int) error {
+	startTime := time.Now()
+
+	// Wait for all the votes to be verified
+	for {
+		count, err := t.api.ElectionVoteCount(t.election.ElectionID)
+		if err != nil {
+			log.Warn(err)
+		}
+		if count == uint32(nvotesExpected) {
+			break
+		}
+
+		if err := t.api.WaitUntilNextBlock(); err != nil {
+			return fmt.Errorf("timeout waiting for next block")
+		}
+
+		log.Infof("verified %d/%d votes", count, nvotesExpected)
+		if time.Since(startTime) > t.config.timeout {
+			log.Fatalf("timeout waiting for votes to be registered")
+		}
+	}
+
+	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
+		t.config.nvotes, time.Since(startTime), int(float64(nvotesExpected)/time.Since(startTime).Seconds()))
+
+	return nil
+}
+
+func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error) {
+	// Set the account back to the organization account
+	api := t.api.Clone(t.config.accountPrivKeys[0])
+
+	// End the election by setting the status to ENDED
+	log.Infof("ending election...")
+	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
+		return nil, fmt.Errorf("cannot set election status to ENDED %w", err)
+	}
+
+	// Wait for the election to be in RESULTS state
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout*3)
+	defer cancel()
+
+	results, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
+	if err != nil {
+		return nil, fmt.Errorf("error waiting for election publish final results %w", err)
+	}
+	return results, nil
+}

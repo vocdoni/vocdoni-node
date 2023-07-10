@@ -91,7 +91,7 @@ func main() {
 		"faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
 	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "",
 		"(optional) token passed as Bearer when fetching faucetURL")
-	flag.DurationVar(&c.timeout, "timeout", 5*time.Minute, "timeout duration")
+	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout, "timeout duration of each step")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
