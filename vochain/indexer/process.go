@@ -152,17 +152,6 @@ func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.Sea
 	return rows
 }
 
-// CountEntityProcesses returns the number of processes that an entity holds
-// TODO: only used by the tests, and EntityList does it too; remove?
-func (idx *Indexer) CountEntityProcesses(entityId []byte) uint64 {
-	count, err := idx.readOnlyQuery.GetEntityProcessCount(context.TODO(), entityId)
-	if err != nil {
-		log.Errorf("error getting entity: %v", err)
-		return 0
-	}
-	return uint64(count)
-}
-
 // CountTotalEntities return the total number of entities indexed by the indexer
 func (idx *Indexer) CountTotalEntities() uint64 {
 	count, err := idx.readOnlyQuery.GetEntityCount(context.TODO())

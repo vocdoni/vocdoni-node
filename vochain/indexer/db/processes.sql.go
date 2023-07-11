@@ -110,18 +110,6 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const getEntityProcessCount = `-- name: GetEntityProcessCount :one
-SELECT COUNT(*) FROM processes
-WHERE entity_id = ?1
-`
-
-func (q *Queries) GetEntityProcessCount(ctx context.Context, entityID types.EntityID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getEntityProcessCount, entityID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const getProcess = `-- name: GetProcess :one
 SELECT p.id, p.entity_id, p.start_block, p.end_block, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope_pb, p.mode_pb, p.vote_opts_pb, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
 LEFT JOIN votes AS v

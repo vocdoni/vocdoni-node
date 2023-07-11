@@ -88,10 +88,6 @@ WHERE id = sqlc.arg(id);
 -- name: GetProcessCount :one
 SELECT COUNT(*) FROM processes;
 
--- name: GetEntityProcessCount :one
-SELECT COUNT(*) FROM processes
-WHERE entity_id = sqlc.arg(entity_id);
-
 -- name: GetEntityCount :one
 SELECT COUNT(DISTINCT entity_id) FROM processes;
 
