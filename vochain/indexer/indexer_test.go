@@ -271,9 +271,16 @@ func testProcessList(t *testing.T, procsCount int) {
 	qt.Assert(t, err, qt.IsNil)
 
 	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
-	qt.Assert(t, idx.CountEntityProcesses(eidOneProcess), qt.Equals, uint64(1))
-	qt.Assert(t, idx.CountEntityProcesses(eidProcsCount), qt.Equals, uint64(procsCount))
-	qt.Assert(t, idx.CountEntityProcesses([]byte("not an entity id that exists")), qt.Equals, uint64(0))
+	countEntityProcs := func(eid []byte) int64 {
+		list := idx.EntityList(1, 0, fmt.Sprintf("%x", eid))
+		if len(list) == 0 {
+			return -1
+		}
+		return list[0].ProcessCount
+	}
+	qt.Assert(t, countEntityProcs(eidOneProcess), qt.Equals, int64(1))
+	qt.Assert(t, countEntityProcs(eidProcsCount), qt.Equals, int64(procsCount))
+	qt.Assert(t, countEntityProcs([]byte("not an entity id that exists")), qt.Equals, int64(-1))
 }
 
 func TestProcessSearch(t *testing.T) {
