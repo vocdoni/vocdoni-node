@@ -144,7 +144,7 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
 	}
-	// goose.SetLogger(log.Logger()) // TODO: interfaces aren't compatible
+	goose.SetLogger(log.GooseLogger())
 	goose.SetBaseFS(embedMigrations)
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return nil, fmt.Errorf("goose up: %w", err)
