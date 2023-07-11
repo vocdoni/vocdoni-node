@@ -39,7 +39,8 @@ type voter struct {
 }
 
 func TestAPIcensusAndVote(t *testing.T) {
-	te := NewTestElection(t, 10)
+	te := NewTestElection(t)
+	te.GenerateVoters(t, 10)
 	te.CreateCensusAndElection(t)
 	// Block 2
 	te.server.VochainAPP.AdvanceTestBlock()
@@ -53,7 +54,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	te.VerifyVotes(t)
 }
 
-func NewTestElection(t testing.TB, nvotes int) *testElection {
+func NewTestElection(t testing.TB) *testElection {
 	te := &testElection{}
 
 	// Server
@@ -72,15 +73,16 @@ func NewTestElection(t testing.TB, nvotes int) *testElection {
 	// Client
 	token1 := uuid.New()
 	te.c = testutil.NewTestHTTPclient(t, te.server.ListenAddr, &token1)
+	return te
+}
 
+func (te *testElection) GenerateVoters(t testing.TB, nvotes int) {
 	// Voters
 	for i := 0; i < nvotes; i++ {
 		k := ethereum.NewSignKeys()
 		qt.Assert(t, k.Generate(), qt.IsNil)
 		te.voters = append(te.voters, voter{key: k})
 	}
-
-	return te
 }
 
 func (te *testElection) CreateCensusAndElection(t testing.TB) {
@@ -99,7 +101,8 @@ func (te *testElection) CreateCensusAndElection(t testing.TB) {
 			Weight: (*types.BigInt)(big.NewInt(1)),
 		})
 	}
-	_, code = te.c.Request("POST", &cparts, "censuses", id1, "participants")
+	resp, code = te.c.Request("POST", &cparts, "censuses", id1, "participants")
+	t.Logf("%s", resp)
 	qt.Assert(t, code, qt.Equals, 200)
 
 	resp, code = te.c.Request("POST", nil, "censuses", id1, "publish")
