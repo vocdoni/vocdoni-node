@@ -679,11 +679,10 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
-	key, err := censusKeyParse(ctx.URLParam("key"))
+	address, err := censusKeyParse(ctx.URLParam("key"))
 	if err != nil {
 		return err
 	}
-
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
@@ -700,21 +699,17 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	// ZkAddress which follows a specific transformation process that must be
 	// implemented into the circom circuit also, and it is already hashed.
 	// Otherwhise, hash the key before get the proof.
-	leafKey := key
+	leafKey := address
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
-		leafKey, err = ref.Tree().Hash(key)
+		leafKey, err = ref.Tree().Hash(address)
 		if err != nil {
 			return err
 		}
 	}
-	leafV, siblings, err := ref.Tree().GenProof(leafKey)
+	response := Census{Type: censusType}
+	response.Value, response.CensusProof, err = ref.Tree().GenProof(leafKey)
 	if err != nil {
 		return ErrKeyNotFoundInCensus.With(hex.EncodeToString(leafKey))
-	}
-	response := Census{
-		CensusProof: siblings,
-		Value:       leafV,
-		Type:        censusType,
 	}
 
 	// Get the leaf siblings from arbo based on the key received and include
@@ -724,29 +719,29 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		if err != nil {
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
+
+		sikTree, err := a.vocapp.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
+		if err != nil {
+			return ErrCantGetCircomSiblings.WithErr(err)
+		}
+		// get merkle root
+		if response.SikRoot, err = sikTree.Root(); err != nil {
+			return ErrCantGetCircomSiblings.WithErr(err)
+		}
+		// get sik merkle tree proof
+		if _, response.SikProof, err = sikTree.GenProof(address); err != nil {
+			return ErrCantGetCircomSiblings.WithErr(err)
+		}
+		// get sik merkle tree circom siblings
+		if response.SikSiblings, err = sikTree.AsTreeView().GetCircomSiblings(address); err != nil {
+			return ErrCantGetCircomSiblings.WithErr(err)
+		}
 	}
-	if len(leafV) > 0 {
+	if len(response.Value) > 0 {
 		// return the string representation of the census value (weight)
 		// to make the client know his voting power for the census
-		weight := ref.Tree().BytesToBigInt(leafV)
+		weight := ref.Tree().BytesToBigInt(response.Value)
 		response.Weight = (*types.BigInt)(weight)
-	}
-	sikTree, err := a.vocapp.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
-	if err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
-	}
-	// get merkle root
-	if response.SikRoot, err = sikTree.Root(); err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
-	}
-	// get sik merkle tree proof
-	_, response.SikProof, err = sikTree.GenProof(leafKey)
-	if err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
-	}
-	// get sik merkle tree circom siblings
-	if response.SikSiblings, err = sikTree.AsTreeView().GetCircomSiblings(leafKey); err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
 	}
 	// encode response
 	var data []byte

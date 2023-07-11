@@ -20,6 +20,19 @@ const (
 	publicSigLen = 7
 )
 
+var modulus, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
+
+func BigToFF(iv *big.Int) *big.Int {
+	z := big.NewInt(0)
+	if c := iv.Cmp(modulus); c == 0 {
+		return z
+	} else if c != 1 && iv.Cmp(z) != -1 {
+		return iv
+	}
+	return z.Mod(iv, modulus)
+
+}
+
 // ProtobufZKProofToProverProof parses the provided protobuf ready proof struct
 // into a prover ready proof struct.
 func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error) {

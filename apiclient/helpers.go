@@ -15,6 +15,7 @@ import (
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree/arbo"
@@ -332,8 +333,8 @@ func (c *HTTPclient) GenerateSik(sign, secret []byte) ([]byte, error) {
 		return nil, fmt.Errorf("signature not provided")
 	}
 	seed := []*big.Int{
-		c.MyAddress().Big(),
-		arbo.BytesToBigInt(sign),
+		zk.BigToFF(c.MyAddress().Big()),
+		zk.BigToFF(new(big.Int).SetBytes(sign)),
 	}
 	if secret != nil {
 		seed = append(seed, arbo.BytesToBigInt(secret))
