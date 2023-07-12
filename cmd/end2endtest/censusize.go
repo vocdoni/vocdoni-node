@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -57,7 +56,6 @@ func (t *E2EMaxCensusSizeElection) Teardown() error {
 
 func (t *E2EMaxCensusSizeElection) Run() error {
 	c := t.config
-	api := t.api
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
@@ -99,41 +97,12 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		}
 	}
 
-	//  the last vote was not success and it not counts
-	log.Infof("waiting for all the votes to be registered...")
-	for {
-		count, err := api.ElectionVoteCount(t.election.ElectionID)
-		if err != nil {
-			log.Warn(err)
-		}
-		if count == uint32(c.nvotes-1) {
-			break
-		}
-		time.Sleep(time.Second * 5)
-		log.Infof("verified %d/%d votes", count, c.nvotes)
-		if time.Since(startTime) > c.timeout {
-			log.Fatalf("timeout waiting for votes to be registered")
-		}
-	}
-
-	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		c.nvotes-1, time.Since(startTime), int(float64(c.nvotes)/time.Since(startTime).Seconds()))
-
-	// Set the account back to the organization account
-	if err := api.SetAccount(c.accountPrivKeys[0]); err != nil {
+	// one vote is not valid
+	if err := t.verifyVoteCount(t.config.nvotes - 1); err != nil {
 		return err
 	}
 
-	// End the election by setting the status to ENDED
-	log.Infof("ending election...")
-	if _, err := api.SetElectionStatus(t.election.ElectionID, "ENDED"); err != nil {
-		return err
-	}
-
-	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*100)
-	defer cancel()
-	elres, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
+	elres, err := t.endElectionAndFetchResults()
 	if err != nil {
 		return err
 	}
