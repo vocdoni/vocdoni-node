@@ -110,7 +110,7 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 
 	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
 	// Create the parent directory as well if it doesn't exist.
-	if err := os.MkdirAll(dataDir, 0o777); err != nil {
+	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
 	dbPath := filepath.Join(dataDir, "db.sqlite")

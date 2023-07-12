@@ -17,7 +17,6 @@ import (
 
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
-
 	urlapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
@@ -238,7 +237,7 @@ func newConfig() (*config.Config, config.Error) {
 		cfgError = config.Error{
 			Message: fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
 		}
-		// creting config folder if not exists
+		// creating config folder if not exists
 		err = os.MkdirAll(globalCfg.DataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
@@ -385,7 +384,6 @@ func main() {
 			log.Error(http.Serve(ln, nil))
 		}()
 	}
-
 	log.Infow("starting vocdoni node", "version", internal.Version, "mode", globalCfg.Mode)
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled!")

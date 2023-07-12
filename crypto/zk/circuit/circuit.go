@@ -211,7 +211,13 @@ func downloadFile(ctx context.Context, fileUrl string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Warnf("error closing body response %v", err)
+		}
+	}()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error on download file %s: http status: %d", fileUrl, res.StatusCode)
 	}
