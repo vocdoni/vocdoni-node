@@ -206,10 +206,13 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 // the signature of the DefaultSignatureSIKContent and the user secret (if it
 // is provided) following the definition:
 //
-//	SIK = poseidon(address, signature, secret*)
+//	SIK = poseidon(address, signature, secret)
 //
-// *The secret is optional.
-func (k *SignKeys) Sik(secret []byte) ([]byte, error) {
+// The secret could be nil.
+func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
+	if secret == nil {
+		return nil, fmt.Errorf("no secret provided")
+	}
 	sign, err := k.SignEthereum([]byte(DefaultSignatureSIKContent))
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
@@ -217,15 +220,17 @@ func (k *SignKeys) Sik(secret []byte) ([]byte, error) {
 	seed := []*big.Int{
 		zk.BigToFF(k.Address().Big()),
 		zk.BigToFF(new(big.Int).SetBytes(sign)),
-	}
-	if secret != nil {
-		seed = append(seed, arbo.BytesToBigInt(secret))
+		arbo.BytesToBigInt(secret),
 	}
 	hash, err := poseidon.Hash(seed)
 	if err != nil {
 		return nil, err
 	}
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
+}
+
+func (k *SignKeys) Sik() ([]byte, error) {
+	return k.CustomSik([]byte{})
 }
 
 func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {

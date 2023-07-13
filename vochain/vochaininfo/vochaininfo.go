@@ -19,7 +19,7 @@ type VochainInfo struct {
 	height int64
 	// NOTE(Edu): After the integration of the arbo-based StateDB, there's
 	// no single voteTree, but we can still count total number of votes.  A
-	// more appropiate name for this variable would be voteCount
+	// more appropriate name for this variable would be voteCount
 	voteTreeSize    uint64
 	processTreeSize uint64
 	mempoolSize     int

@@ -26,8 +26,11 @@ INSERT INTO processes (
 );
 
 -- name: GetProcess :one
-SELECT * FROM processes
-WHERE id = ?
+SELECT p.*, COUNT(v.nullifier) AS vote_count FROM processes AS p
+LEFT JOIN votes AS v
+	ON p.id = v.process_id
+WHERE p.id = ?
+GROUP BY p.id
 LIMIT 1;
 
 -- name: SearchProcesses :many
@@ -84,10 +87,6 @@ WHERE id = sqlc.arg(id);
 
 -- name: GetProcessCount :one
 SELECT COUNT(*) FROM processes;
-
--- name: GetEntityProcessCount :one
-SELECT COUNT(*) FROM processes
-WHERE entity_id = sqlc.arg(entity_id);
 
 -- name: GetEntityCount :one
 SELECT COUNT(DISTINCT entity_id) FROM processes;

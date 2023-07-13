@@ -16,8 +16,8 @@ import (
 // ErrTransactionNotFound is returned if the transaction is not found.
 var ErrTransactionNotFound = fmt.Errorf("transaction not found")
 
-// TransactionCount returns the number of transactions indexed
-func (idx *Indexer) TransactionCount() (uint64, error) {
+// CountTotalTransactions returns the number of transactions indexed
+func (idx *Indexer) CountTotalTransactions() (uint64, error) {
 	count, err := idx.readOnlyQuery.CountTransactions(context.TODO())
 	return uint64(count), err
 }
@@ -29,7 +29,7 @@ func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrTransactionNotFound
 		}
-		return nil, fmt.Errorf("tx wiht id %d not found: %v", id, err)
+		return nil, fmt.Errorf("tx with id %d not found: %v", id, err)
 	}
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }

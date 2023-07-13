@@ -211,7 +211,13 @@ func downloadFile(ctx context.Context, fileUrl string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			log.Warnf("error closing body response %v", err)
+		}
+	}()
+
 	if res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("error on download file %s: http status: %d", fileUrl, res.StatusCode)
 	}
@@ -236,7 +242,7 @@ func storeFile(content []byte, dstPath string) error {
 		return fmt.Errorf("error creating the artifact file: %w", err)
 	}
 	if _, err := fd.Write(content); err != nil {
-		return fmt.Errorf("error writting the artifact file: %w", err)
+		return fmt.Errorf("error writing the artifact file: %w", err)
 	}
 	return nil
 }

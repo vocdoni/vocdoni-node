@@ -11,7 +11,7 @@ import (
 )
 
 // Updater is an interface for a read-write key-value database.  It extends
-// Viewer with a Set method.  This is simmilar to db.WriteTx but without the
+// Viewer with a Set method.  This is similar to db.WriteTx but without the
 // Commit and Discard methods.  Any db.WriteTx implements Updater.
 type Updater interface {
 	db.Reader
@@ -27,7 +27,7 @@ type treeWithTx struct {
 
 // TreeUpdate is an opened tree that can be updated.  All updates are stored in
 // an internal transaction (shared with all the opened subTrees) and will only
-// be commited with the TreeTx.Commit function is called.  The TreeUpdate is
+// be committed with the TreeTx.Commit function is called.  The TreeUpdate is
 // not safe for concurrent use.
 type TreeUpdate struct {
 	// tx is db.WriteTx where all the changes done to this TreeUpdate will
@@ -319,8 +319,8 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 // state.  Parameter version sets the version used to index this update
 // (identified by the mainTree root).  The specified version will be stored as
 // the last version of the StateDB.  In general, Commits should use sequential
-// version numbers, but overwritting an existing version can be useful in some
-// cases (for example, overwritting version 0 to setup a genesis state).
+// version numbers, but overwriting an existing version can be useful in some
+// cases (for example, overwriting version 0 to setup a genesis state).
 func (t *TreeTx) Commit(version uint32) error {
 	root, err := propagateRoot(&t.TreeUpdate)
 	if err != nil {
@@ -351,7 +351,7 @@ func (t *TreeTx) Discard() {
 }
 
 // SaveWithoutCommit saves the changes made from the TreeTx without committing a new state.
-// This is useful for testing purposes and for commiting only nostate changes.
+// This is useful for testing purposes and for committing only nostate changes.
 func (t *TreeTx) SaveWithoutCommit() error {
 	return t.tx.Commit()
 }

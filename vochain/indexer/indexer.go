@@ -32,7 +32,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@734e06ede7e68dc76e53f41727285abe5301dc69 generate
+//go:generate go run github.com/kyleconroy/sqlc/cmd/sqlc@v1.19.0 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -110,7 +110,7 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 
 	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
 	// Create the parent directory as well if it doesn't exist.
-	if err := os.MkdirAll(dataDir, 0o777); err != nil {
+	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
 	dbPath := filepath.Join(dataDir, "db.sqlite")
@@ -144,7 +144,7 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return nil, err
 	}
-	// goose.SetLogger(log.Logger()) // TODO: interfaces aren't compatible
+	goose.SetLogger(log.GooseLogger())
 	goose.SetBaseFS(embedMigrations)
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return nil, fmt.Errorf("goose up: %w", err)
@@ -292,6 +292,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	idx.blockQueries = nil
 
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
@@ -339,8 +340,8 @@ func (idx *Indexer) Commit(height uint32) error {
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
 		}
-		// substractedResults is used to substract votes that are overwritten
-		substractedResults := &results.Results{
+		// subtractedResults is used to subtract votes that are overwritten
+		subtractedResults := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     proc.VoteOpts,
 			EnvelopeType: proc.Envelope,
@@ -351,7 +352,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			// one and add the new) to results.
 			// We fetch the previous vote from the state by setting committed=true.
 			// Note that if there wasn't a previous vote in the committed state,
-			// then it wasn't counted in the results yet, so don't add it to substractedResults.
+			// then it wasn't counted in the results yet, so don't add it to subtractedResults.
 			// TODO: can we get previousVote from sqlite via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
@@ -369,10 +370,10 @@ func (idx *Indexer) Commit(height uint32) error {
 						"check vote overwrite failed")
 					continue
 				}
-				// add the live vote to substracted results
+				// add the live vote to subtracted results
 				if err := idx.addLiveVote(proc, previousVote.VotePackage,
-					new(big.Int).SetBytes(previousVote.Weight), substractedResults); err != nil {
-					log.Errorw(err, "vote cannot be added to substracted results")
+					new(big.Int).SetBytes(previousVote.Weight), subtractedResults); err != nil {
+					log.Errorw(err, "vote cannot be added to subtracted results")
 					continue
 				}
 				overwritedVotes++
@@ -386,7 +387,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes(queries, pid, addedResults, substractedResults, idx.App.Height()); err != nil {
+		if err := idx.commitVotes(queries, pid, addedResults, subtractedResults, idx.App.Height()); err != nil {
 			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
 		}
 	}
@@ -395,6 +396,7 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	idx.blockQueries = nil
 
 	if newVotes+overwritedVotes > 0 {
 		log.Infow("add live votes to results",
@@ -415,6 +417,7 @@ func (idx *Indexer) Rollback() {
 			log.Errorw(err, "could not rollback tx")
 		}
 		idx.blockTx = nil
+		idx.blockQueries = nil
 	}
 	maps.Clear(idx.blockUpdateProcs)
 }

@@ -126,20 +126,11 @@ func (idx *Indexer) ProcessList(entityID []byte,
 	return procs, nil
 }
 
-// ProcessCount returns the number of processes of a given entityID indexed.
-// If entityID is zero-value, returns the total number of processes of all entities.
-func (idx *Indexer) ProcessCount(entityID []byte) uint64 {
-	if len(entityID) == 0 {
-		count, err := idx.readOnlyQuery.GetProcessCount(context.TODO())
-		if err != nil {
-			log.Errorf("could not get the process count: %v", err)
-			return 0
-		}
-		return uint64(count)
-	}
-	count, err := idx.EntityProcessCount(entityID)
+// CountTotalProcesses returns the total number of processes indexed.
+func (idx *Indexer) CountTotalProcesses() uint64 {
+	count, err := idx.readOnlyQuery.GetProcessCount(context.TODO())
 	if err != nil {
-		log.Errorf("processCount: cannot fetch entity process count: %v", err)
+		log.Errorf("could not get the process count: %v", err)
 		return 0
 	}
 	return uint64(count)
@@ -161,17 +152,8 @@ func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.Sea
 	return rows
 }
 
-// EntityProcessCount returns the number of processes that an entity holds
-func (idx *Indexer) EntityProcessCount(entityId []byte) (uint32, error) {
-	count, err := idx.readOnlyQuery.GetEntityProcessCount(context.TODO(), entityId)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(count), nil
-}
-
-// EntityCount return the number of entities indexed by the indexer
-func (idx *Indexer) EntityCount() uint64 {
+// CountTotalEntities return the total number of entities indexed by the indexer
+func (idx *Indexer) CountTotalEntities() uint64 {
 	count, err := idx.readOnlyQuery.GetEntityCount(context.TODO())
 	if err != nil {
 		log.Errorf("could not get the entity count: %v", err)

@@ -69,7 +69,7 @@ type WriteTx interface {
 	// Commit commits the transaction into the db
 	Commit() error
 	// Discard discards the transaction. This method can be called always,
-	// even if previously the Tx has been Commited (for the WriteTx case).
+	// even if previously the Tx has been committed (for the WriteTx case).
 	// So it's a good practice to `defer tx.Discard()` just after creating
 	// the tx.
 	Discard()

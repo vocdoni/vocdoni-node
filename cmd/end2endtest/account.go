@@ -44,19 +44,18 @@ func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 
 	// create alice signer
 	t.alice = ethereum.NewSignKeys()
-	err := t.alice.Generate()
-	if err != nil {
-		return err
+	if err := t.alice.Generate(); err != nil {
+		return fmt.Errorf("error in alice.Generate: %w", err)
 	}
 
 	// create bob signer
 	t.bob = ethereum.NewSignKeys()
-	err = t.bob.Generate()
-	if err != nil {
-		return err
+	if err := t.bob.Generate(); err != nil {
+		return fmt.Errorf("error in bob.Generate: %w", err)
 	}
 
 	// get faucet package for alice
+	var err error
 	t.aliceFP, err = faucetPackage(t.config.faucet, t.config.faucetAuthToken, t.alice.Address().Hex())
 	if err != nil {
 		return err
@@ -64,12 +63,12 @@ func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 
 	// check transaction cost
 	if err := testGetTxCost(t.api); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error in testGetTxCost: %w", err)
 	}
 
 	// check create and set account
 	if err := testCreateAndSetAccount(t.api, t.aliceFP, t.alice, t.bob); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error in testCreateAndSetAccount: %w", err)
 	}
 
 	return nil
@@ -83,7 +82,7 @@ func (t *E2ETokenTxs) Teardown() error {
 func (t *E2ETokenTxs) Run() error {
 	// check send tokens
 	if err := testSendTokens(t.api, t.alice, t.bob); err != nil {
-		log.Fatal(err)
+		return fmt.Errorf("error in testSendTokens: %w", err)
 	}
 
 	return nil
@@ -110,7 +109,7 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	// create account with faucet package
 	aliceAcc, err := ensureAccountExists(api.Clone(hex.EncodeToString(alice.PrivateKey())), fp)
 	if err != nil {
-		return err
+		return fmt.Errorf("error in ensureAccountExists(alice) %w", err)
 	}
 	if aliceAcc == nil {
 		return state.ErrAccountNotExist
@@ -118,21 +117,20 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	log.Infow("account successfully created", "account", aliceAcc)
 
 	// now try set own account info
-	_, err = ensureAccountMetadataEquals(api.Clone(hex.EncodeToString(alice.PrivateKey())),
-		&apipkg.AccountMetadata{Version: "12345"})
-	if err != nil {
+	if _, err := ensureAccountMetadataEquals(api.Clone(hex.EncodeToString(alice.PrivateKey())),
+		&apipkg.AccountMetadata{Version: "12345"}); err != nil {
 		return err
 	}
 
 	// create account for bob with faucet package from alice
 	afp, err := vochain.GenerateFaucetPackage(alice, bob.Address(), aliceAcc.Balance/2)
 	if err != nil {
-		return fmt.Errorf("cannot generate faucet package %v", err)
+		return fmt.Errorf("error in GenerateFaucetPackage %v", err)
 	}
 
 	bobAcc, err := ensureAccountExists(api.Clone(hex.EncodeToString(bob.PrivateKey())), afp)
 	if err != nil {
-		return err
+		return fmt.Errorf("error in ensureAccountExists(bob) %w", err)
 	}
 
 	// check balance added from payload
@@ -218,14 +216,12 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	_ = api.WaitUntilNextBlock()
 
 	// now check the resulting state
-	err = checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
-		(aliceAcc.Balance - amountAtoB - txCost + amountBtoA))
-	if err != nil {
+	if err := checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
+		aliceAcc.Balance-amountAtoB-txCost+amountBtoA); err != nil {
 		return err
 	}
-	err = checkAccountNonceAndBalance(bob, bobAcc.Nonce+1,
-		(bobAcc.Balance - amountBtoA - txCost + amountAtoB))
-	if err != nil {
+	if err := checkAccountNonceAndBalance(bob, bobAcc.Nonce+1,
+		bobAcc.Balance-amountBtoA-txCost+amountAtoB); err != nil {
 		return err
 	}
 
@@ -260,8 +256,7 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 			return acct, nil
 		}
 
-		_, err = api.AccountBootstrap(faucetPkg, nil, nil)
-		if err != nil {
+		if _, err = api.AccountBootstrap(faucetPkg, nil, nil); err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, nevermind, job done.
 			} else {
@@ -286,8 +281,7 @@ func ensureAccountMetadataEquals(api *apiclient.HTTPclient,
 			return acct, nil
 		}
 
-		_, err = api.AccountSetMetadata(metadata)
-		if err != nil {
+		if _, err := api.AccountSetMetadata(metadata); err != nil {
 			if strings.Contains(err.Error(), "tx already exists in cache") {
 				// don't worry then, someone else created it in a race, or still pending, nevermind
 			} else if strings.Contains(err.Error(), "invalid URI, must be different") {

@@ -78,7 +78,7 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, vapp *vochain.
 			acc = ethereum.NewSignKeys()
 		}
 		qt.Assert(b, acc.Generate(), qt.IsNil)
-		sik, err := acc.Sik(nil)
+		sik, err := acc.Sik()
 		qt.Assert(b, err, qt.IsNil)
 		qt.Assert(b, vapp.State.SetAddressSIK(acc.Address(), sik), qt.IsNil)
 

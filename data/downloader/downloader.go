@@ -163,7 +163,7 @@ func (d *Downloader) importQueueDaemon(ctx context.Context) {
 	}
 }
 
-// queueAddDelta adds or substracts a delta to the queue size.
+// queueAddDelta adds or subtracts a delta to the queue size.
 func (d *Downloader) queueAddDelta(i int32) {
 	d.queueSize.Add(i)
 	if i > 0 {

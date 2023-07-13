@@ -278,7 +278,7 @@ func TestCensusZk(t *testing.T) {
 		c.Assert(err, qt.IsNil)
 		keys = append(keys, acc.Address().Bytes())
 		// generate sik and create the vochain account for this voter with it
-		sik, err := acc.Sik(nil)
+		sik, err := acc.Sik()
 		c.Assert(err, qt.IsNil)
 		c.Assert(testApi.vocapp.State.SetAddressSIK(acc.Address(), sik), qt.IsNil)
 	}

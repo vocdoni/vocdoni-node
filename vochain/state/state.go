@@ -287,9 +287,9 @@ func (v *State) RemoveValidator(address []byte) error {
 }
 
 // Validators returns a list of the chain validators
-// When committed is false, the operation is executed also on not yet commited
+// When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last commited version.
+// When committed is true, the operation is executed on the last committed version.
 func (v *State) Validators(committed bool) (map[string]*models.Validator, error) {
 	if !committed {
 		v.Tx.RLock()
@@ -547,7 +547,7 @@ func (v *State) Close() error {
 	return v.db.Close()
 }
 
-// LastHeight returns the last commited height (block count).  We match the
+// LastHeight returns the last committed height (block count).  We match the
 // StateDB Version with the height via the Commits done in Save.
 func (v *State) LastHeight() (uint32, error) {
 	return v.Store.Version()
