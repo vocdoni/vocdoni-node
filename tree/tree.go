@@ -289,17 +289,4 @@ func (t *Tree) PrintGraphviz() error {
 	return t.tree.PrintGraphviz(nil)
 }
 
-// GetCircomSiblings function get the circom ready proof from Arbo for the key
-// provided as argument, get the correctly encoded censusSiblings from it and
-// returns them as strings using the correct way to encode-decode them.
-func (t *Tree) GetCircomSiblings(k []byte) ([]string, error) {
-	proof, err := t.tree.GenerateCircomVerifierProof(k)
-	if err != nil {
-		return nil, err
-	}
-	siblings := []string{}
-	for _, bSibling := range proof.Siblings {
-		siblings = append(siblings, arbo.BytesToBigInt(bSibling).String())
-	}
-	return siblings, nil
-}
+

@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/censusdb"
-	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/data/ipfs"
@@ -65,19 +65,28 @@ func BenchmarkZkCensus(b *testing.B) {
 	b.ResetTimer()
 
 	b.Run("census", func(b *testing.B) {
-		zkCensusBenchmark(b, c, censusID, electionID)
+		zkCensusBenchmark(b, c, vocapp, censusID, electionID)
 	})
 }
 
-func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID string, electionID []byte) {
-	zkAddr, err := zk.NewRandAddress()
-	qt.Assert(b, err, qt.IsNil)
-
+func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, vapp *vochain.BaseApplication, censusID string, electionID []byte) {
 	cparts := api.CensusParticipants{}
-	cparts.Participants = append(cparts.Participants, api.CensusParticipant{
-		Key:    zkAddr.Bytes(),
-		Weight: (*types.BigInt)(big.NewInt(1)),
-	})
+	admin := ethereum.NewSignKeys()
+	for i := 0; i < 10; i++ {
+		acc := admin
+		if i != 0 {
+			acc = ethereum.NewSignKeys()
+		}
+		qt.Assert(b, acc.Generate(), qt.IsNil)
+		sik, err := acc.Sik(nil)
+		qt.Assert(b, err, qt.IsNil)
+		qt.Assert(b, vapp.State.SetAddressSIK(acc.Address(), sik), qt.IsNil)
+
+		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
+			Key:    acc.Address().Bytes(),
+			Weight: (*types.BigInt)(big.NewInt(1)),
+		})
+	}
 
 	_, code := cl.Request("POST", &cparts, censusID, "participants")
 	qt.Assert(b, code, qt.Equals, 200)
@@ -96,19 +105,18 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, censusID strin
 	b.Logf("root: %x | size: %d", root, censusData.Size)
 
 	// generate a proof
-	resp, code = cl.Request("GET", nil, censusID, "proof", zkAddr.String())
+	resp, code = cl.Request("GET", nil, censusID, "proof", admin.AddressString())
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(b, censusData.Weight.String(), qt.Equals, "1")
 
 	censusData.CensusRoot = root
-	genProofZk(b, electionID, zkAddr, censusData)
+	genProofZk(b, electionID, admin, censusData)
 }
 
-func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusData *api.Census) {
+func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData *api.Census) {
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
-
 	log.Infow("zk census data received, starting to generate the proof inputs...",
 		"censusRoot", censusData.CensusRoot, "electionId", fmt.Sprintf("%x", electionID))
 
@@ -118,7 +126,9 @@ func genProofZk(b *testing.B, electionID []byte, zkAddr *zk.ZkAddress, censusDat
 		weight = censusData.Weight.MathBigInt()
 	}
 	// Generate circuit inputs
-	rawInputs, err := circuit.GenerateCircuitInput(zkAddr, censusData.CensusRoot, electionID, weight, weight, censusData.CensusSiblings)
+	rawInputs, err := circuit.GenerateCircuitInput(acc, nil, electionID,
+		censusData.CensusRoot, censusData.SikRoot, censusData.CensusSiblings,
+		censusData.SikSiblings, weight, censusData.Weight.MathBigInt())
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)

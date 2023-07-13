@@ -2,7 +2,6 @@ package state
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"strconv"
@@ -162,92 +161,6 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 	return count, nil
 }
 
-// RegisterStartBlock function creates a new record on the key-value database
-// associated to the processes subtree for the process ID and the startBlock
-// number provided.
-func (v *State) RegisterStartBlock(pid []byte, startBlock uint32) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	processesTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
-	if err != nil {
-		return err
-	}
-	newStartBlock := make([]byte, 32)
-	binary.LittleEndian.PutUint32(newStartBlock, startBlock)
-	return processesTree.NoState().Set(pid, newStartBlock)
-}
-
-// DeleteStartBlock function deletes the record on the key-value database
-// associated to the processes subtree for the process ID provided.
-func (v *State) DeleteStartBlock(pid []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	processesTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
-	if err != nil {
-		return err
-	}
-	return processesTree.NoState().Delete(pid)
-}
-
-// MinReadyProcessStartBlock returns the minimun start block of the current on going
-// processes from the no-state db associated to the process sub tree.
-func (v *State) MinReadyProcessStartBlock(committed bool) (uint32, error) {
-	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
-	}
-	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
-	if err != nil {
-		return 0, err
-	}
-	minStartBlock := v.CurrentHeight()
-	startBlocksSB := processesTree.NoState()
-	if err := startBlocksSB.Iterate([]byte{}, func(key, value []byte) bool {
-		startBlock := binary.LittleEndian.Uint32(value)
-		if startBlock < minStartBlock {
-			minStartBlock = startBlock
-		}
-		return true
-	}); err != nil {
-		return 0, err
-	}
-	return minStartBlock, nil
-}
-
-// MaxReadyProcessEndBlock returns the maximun end block of the current on going
-// processes from the no-state db associated to the process sub tree.
-func (v *State) MaxReadyProcessEndBlock(committed bool) (uint32, error) {
-	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
-	}
-	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
-	if err != nil {
-		return 0, err
-	}
-	maxEndBlock := v.CurrentHeight()
-	startBlocksSB := processesTree.NoState()
-	if err := startBlocksSB.Iterate([]byte{}, func(pid, _ []byte) bool {
-		processBytes, err := processesTree.DeepGet(pid)
-		if err != nil {
-			return false
-		}
-		var process models.StateDBProcess
-		err = proto.Unmarshal(processBytes, &process)
-		if err != nil {
-			return false
-		}
-		endBlock := process.GetProcess().StartBlock + process.GetProcess().BlockCount
-		if endBlock > maxEndBlock {
-			maxEndBlock = endBlock
-		}
-		return true
-	}); err != nil {
-		return 0, err
-	}
-	return maxEndBlock, nil
-}
-
 // ListProcessIDs returns the full list of process identifiers (pid).
 func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	if !committed {
@@ -307,15 +220,15 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	// try to update startBlocks database
 	switch p.Status {
 	case models.ProcessStatus_READY:
-		if err := v.RegisterStartBlock(p.ProcessId, p.StartBlock); err != nil {
+		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, p.StartBlock); err != nil {
 			return err
 		}
 	case models.ProcessStatus_PAUSED:
-		if err := v.RegisterStartBlock(p.ProcessId, v.CurrentHeight()); err != nil {
+		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, v.CurrentHeight()); err != nil {
 			return err
 		}
 	case models.ProcessStatus_ENDED:
-		if err := v.DeleteStartBlock(p.ProcessId); err != nil {
+		if err := v.ProcessBlockRegistry.DeleteStartBlock(p.ProcessId); err != nil {
 			return err
 		}
 	}

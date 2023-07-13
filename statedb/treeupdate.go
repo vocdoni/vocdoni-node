@@ -93,12 +93,6 @@ func (u *TreeUpdate) GenProof(key []byte) ([]byte, []byte, error) {
 	return u.tree.GenProof(u.tree.tx, key)
 }
 
-// GetCircomSiblings generates a proof of existence of the given key for this tree.  The
-// returned values are the leaf value and the proof itself.
-func (u *TreeUpdate) GetCircomSiblings(key []byte) ([]string, error) {
-	return u.tree.GetCircomSiblings(key)
-}
-
 // Dump exports all the tree leafs.
 // Unimplemented because arbo.Tree.Dump doesn't take db.ReadTx as input.
 func (u *TreeUpdate) Dump(w io.Writer) error {
@@ -405,11 +399,6 @@ func (v *treeUpdateView) Size() (uint64, error) { return (*TreeUpdate)(v).Size()
 // GenProof implements the TreeViewer.GenProof method.
 func (v *treeUpdateView) GenProof(key []byte) ([]byte, []byte, error) {
 	return (*TreeUpdate)(v).GenProof(key)
-}
-
-// GetCircomSiblings implements the TreeViewer.GetCircomSiblings method.
-func (v *treeUpdateView) GetCircomSiblings(key []byte) ([]string, error) {
-	return (*TreeUpdate)(v).GetCircomSiblings(key)
 }
 
 // Dump exports all the tree leafs.

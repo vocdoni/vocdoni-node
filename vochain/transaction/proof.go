@@ -124,16 +124,16 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 			return true, bigOne, nil
 		}
 
-		factoryWeight := arbo.BytesToBigInt(p.AvailableWeight)
+		availableWeight := arbo.BytesToBigInt(p.AvailableWeight)
 		if p.VoteWeight == nil {
-			return true, factoryWeight, nil
+			return true, availableWeight, nil
 		}
 
-		votingWeight := new(big.Int).SetBytes(p.VoteWeight)
-		if votingWeight.Cmp(factoryWeight) == 1 {
+		voteWeight := new(big.Int).SetBytes(p.VoteWeight)
+		if voteWeight.Cmp(availableWeight) == 1 {
 			return false, nil, fmt.Errorf("assigned weight exceeded")
 		}
-		return true, votingWeight, nil
+		return true, voteWeight, nil
 	default:
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)

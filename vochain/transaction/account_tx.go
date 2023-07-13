@@ -241,40 +241,40 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 }
 
 // DelSikTxCheck checks if a delete sik tx is valid
-func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) error {
+func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
-		return ErrNilTx
+		return common.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetSetSik()
 	if tx == nil {
-		return fmt.Errorf("invalid transaction")
+		return common.Address{}, fmt.Errorf("invalid transaction")
 	}
 
-	bAddress := tx.GetAddress()
-	if bAddress == nil {
-		return fmt.Errorf("invalid address")
+	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
-
-	txAddress := common.BytesToAddress(bAddress)
-	if txAddress == (common.Address{}) {
-		return fmt.Errorf("invalid address")
+	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
-		return fmt.Errorf("cannot get tx account: %w", err)
+		return common.Address{}, fmt.Errorf("cannot get tx account: %w", err)
 	}
 
-	return nil
+	return txAddress, nil
 }
 
 // SetSikTxCheck checks if a set sik tx is valid
-func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) error {
-	if err := t.DelSikTxCheck(vtx); err != nil {
-		return err
+func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, error) {
+	addr, err := t.DelSikTxCheck(vtx)
+	if err != nil {
+		return common.Address{}, err
 	}
-	bAddress := vtx.Tx.GetSetSik().GetSik()
-	if bAddress == nil {
-		return fmt.Errorf("invalid sik value")
+	sik := vtx.Tx.GetSetSik().GetSik()
+	if sik == nil {
+		return common.Address{}, fmt.Errorf("invalid sik value")
 	}
-	return nil
+	return addr, nil
 }

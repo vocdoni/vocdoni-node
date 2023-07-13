@@ -29,13 +29,13 @@ const (
 // value of a user
 type SIK []byte
 
-// SIKByAddress function return the current SIK value associated to the provided
+// SIKFromAddress function return the current SIK value associated to the provided
 // address.
-func (v *State) SIKByAddress(address common.Address) (SIK, error) {
+func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
 	return v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
 }
 
-// SetSIK function creates or update the SIK of the provided address in the
+// SetAddressSIK function creates or update the SIK of the provided address in the
 // state. It covers the following cases:
 //   - It checks if already exists a valid SIK for the provided address and if
 //     so it returns an error.
@@ -43,7 +43,7 @@ func (v *State) SIKByAddress(address common.Address) (SIK, error) {
 //     value provided.
 //   - If it exists but it is not valid, overwrite the stored value with the
 //     provided one.
-func (v *State) SetSIK(address common.Address, newSik SIK) error {
+func (v *State) SetAddressSIK(address common.Address, newSik SIK) error {
 	// check if exists a registered sik for the provided address, query also for
 	// no commited tree version
 	rawSik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
@@ -103,56 +103,6 @@ func (v *State) InvalidateSIK(address common.Address) error {
 		return err
 	}
 	return v.UpdateSIKRoots()
-}
-
-// InvalidateAt funtion sets the current SIK value to the encoded value of the
-// height provided, ready to use in the SIK subTree as leaf value to invalidate
-// it. The encoded value will have 32 bytes:
-//   - The initial 28 bytes must be zero.
-//   - The remaining 4 bytes must contain the height encoded in LittleEndian
-func (s SIK) InvalidateAt(height uint32) SIK {
-	bHeight := big.NewInt(int64(height)).Bytes()
-	// fill with zeros until reach the encoded height length
-	for len(bHeight) < encodedHeightLen {
-		bHeight = append([]byte{0}, bHeight...)
-	}
-	// create the encodedHeight with the right number of zeros
-	s = make([]byte, sikLeafValueLen-encodedHeightLen)
-	// copy the height bytes swapping endianness in the last bytes
-	for i := encodedHeightLen - 1; i >= 0; i-- {
-		s = append(s, bHeight[i])
-	}
-	return s
-}
-
-// DecodeInvalidatedHeight funtion returns the decoded height uint32 from the
-// leaf value that contains an invalidated SIK.
-func (s SIK) DecodeInvalidatedHeight() uint32 {
-	bHeight := []byte{}
-	for i := sikLeafValueLen - 1; len(bHeight) < encodedHeightLen; i-- {
-		bHeight = append(bHeight, s[i])
-	}
-	return uint32(new(big.Int).SetBytes(bHeight).Int64())
-}
-
-// Valid function returns if the current SIK is a valid one or not.
-func (s SIK) Valid() bool {
-	for i := 0; i < len(s)-encodedHeightLen; i++ {
-		if s[i] != 0 {
-			return true
-		}
-	}
-	return false
-}
-
-// String function return the human readable version of the current SIK, if it
-// is a valid one, return the SIK value as hex. If it is already invalidated,
-// return the decoded height.
-func (s SIK) String() string {
-	if s.Valid() {
-		return hex.EncodeToString(s)
-	}
-	return fmt.Sprint(s.DecodeInvalidatedHeight())
 }
 
 // ValidSIKRoots return the list of current valid roots from the SIK's merkle
@@ -244,4 +194,54 @@ func (v *State) UpdateSIKRoots() error {
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
 	return sikRootsDB.Set(blockKey, hash)
+}
+
+// InvalidateAt funtion sets the current SIK value to the encoded value of the
+// height provided, ready to use in the SIK subTree as leaf value to invalidate
+// it. The encoded value will have 32 bytes:
+//   - The initial 28 bytes must be zero.
+//   - The remaining 4 bytes must contain the height encoded in LittleEndian
+func (s SIK) InvalidateAt(height uint32) SIK {
+	bHeight := big.NewInt(int64(height)).Bytes()
+	// fill with zeros until reach the encoded height length
+	for len(bHeight) < encodedHeightLen {
+		bHeight = append([]byte{0}, bHeight...)
+	}
+	// create the encodedHeight with the right number of zeros
+	s = make([]byte, sikLeafValueLen-encodedHeightLen)
+	// copy the height bytes swapping endianness in the last bytes
+	for i := encodedHeightLen - 1; i >= 0; i-- {
+		s = append(s, bHeight[i])
+	}
+	return s
+}
+
+// DecodeInvalidatedHeight funtion returns the decoded height uint32 from the
+// leaf value that contains an invalidated SIK.
+func (s SIK) DecodeInvalidatedHeight() uint32 {
+	bHeight := []byte{}
+	for i := sikLeafValueLen - 1; len(bHeight) < encodedHeightLen; i-- {
+		bHeight = append(bHeight, s[i])
+	}
+	return uint32(new(big.Int).SetBytes(bHeight).Int64())
+}
+
+// Valid function returns if the current SIK is a valid one or not.
+func (s SIK) Valid() bool {
+	for i := 0; i < len(s)-encodedHeightLen; i++ {
+		if s[i] != 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// String function return the human readable version of the current SIK, if it
+// is a valid one, return the SIK value as hex. If it is already invalidated,
+// return the decoded height.
+func (s SIK) String() string {
+	if s.Valid() {
+		return hex.EncodeToString(s)
+	}
+	return fmt.Sprint(s.DecodeInvalidatedHeight())
 }

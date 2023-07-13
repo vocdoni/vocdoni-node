@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -715,7 +716,11 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	// Get the leaf siblings from arbo based on the key received and include
 	// them into the response, only if it is zkweighted.
 	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
-		response.CensusSiblings, err = ref.Tree().GetCircomSiblings(leafKey)
+		_, censusProof, err := ref.Tree().GenProof(leafKey)
+		if err != nil {
+			return ErrCantGetCircomSiblings.WithErr(err)
+		}
+		response.CensusSiblings, err = zk.ProofToCircomSiblings(censusProof)
 		if err != nil {
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
@@ -733,7 +738,7 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
 		// get sik merkle tree circom siblings
-		if response.SikSiblings, err = sikTree.AsTreeView().GetCircomSiblings(address); err != nil {
+		if response.SikSiblings, err = zk.ProofToCircomSiblings(response.SikProof); err != nil {
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
 	}

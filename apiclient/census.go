@@ -24,6 +24,12 @@ type CensusProof struct {
 	KeyType models.ProofArbo_KeyType
 	// Siblings contains the decoded siblings keys
 	Siblings []string
+	// SikRoot contains the current and valid sik merkle tree root hash
+	SikRoot types.HexBytes
+	// SikProof contains encoded and packed sik siblings as a sik proof
+	SikProof types.HexBytes
+	// SikSiblings contains the decoded sik siblings keys
+	SikSiblings []string
 }
 
 // NewCensus creates a new census and returns its ID. The censusType can be
@@ -111,6 +117,10 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		Proof:     censusData.CensusProof,
 		LeafValue: censusData.Value,
 		Siblings:  censusData.CensusSiblings,
+		// sik stuff
+		SikRoot:     censusData.SikRoot,
+		SikProof:    censusData.SikProof,
+		SikSiblings: censusData.SikSiblings,
 	}
 	if censusData.Weight != nil {
 		cp.LeafWeight = censusData.Weight.MathBigInt()

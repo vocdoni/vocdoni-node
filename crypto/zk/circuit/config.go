@@ -53,14 +53,14 @@ func (config ZkCircuitConfig) KeySize() int {
 var CircuitsConfigurations = map[string]ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
-			"zk-franchise-proof-circuit/master",
+			"zk-franchise-proof-circuit/feature/new-circuit",
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
-		ProvingKeyHash:          hexToBytes("0x48596c390d24a173c796b0dae68f3c08db034171917ca1b2f253ce9476a35945"),
+		ProvingKeyHash:          hexToBytes("0xa42bf48a706aa24a78e364f769d9576c3ee7b453fefacafdcee4e1335ff5365f"),
 		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0x411c78a012d6d163e02704d9ce33b6d84e84ee67f62179f53158ffabd88da44a"),
+		VerificationKeyHash:     hexToBytes("0x24c4c4f6ca2a48c41e95d324c48b4428d4794d7e6fbeb9c840221ad797bcae56"),
 		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0xcc1af3eb9462788840284e83dd777d5b43782d9a7ca89ce8d88709237a2e18e9"),
+		WasmHash:                hexToBytes("0x0fe608036ef46ca58395c86b6b31b3c54edd79f331d003b7769c999ace38abfc"),
 		WasmFilename:            "circuit.wasm",
 	},
 }

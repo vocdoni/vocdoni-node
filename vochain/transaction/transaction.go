@@ -234,7 +234,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
 				if sik := tx.GetSik(); sik != nil {
-					if err := t.state.SetSIK(txSenderAddress, sik); err != nil {
+					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
 						return nil, fmt.Errorf("setAccountTx: setSik %w", err)
 					}
 				}
@@ -440,16 +440,14 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_SetSik:
-		err := t.SetSikTxCheck(vtx)
+		addr, err := t.SetSikTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-
-		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
 		// check if the address already has invalidated sik to ensure that it is
 		// not updated after reach the correct height to avoid double voting
-		if currentSik, err := t.state.SIKByAddress(address); err == nil {
-			maxEndBlock, err := t.state.MaxReadyProcessEndBlock(false)
+		if currentSik, err := t.state.SIKFromAddress(addr); err == nil {
+			maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
 			if err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
 			}
@@ -458,17 +456,16 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 		}
 		newSik := vtx.Tx.GetSetSik().GetSik()
-		if err := t.state.SetSIK(address, newSik); err != nil {
+		if err := t.state.SetAddressSIK(addr, newSik); err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
 		return response, nil
 
 	case *models.Tx_DelSik:
-		err := t.DelSikTxCheck(vtx)
+		address, err := t.DelSikTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-		address := common.BytesToAddress(vtx.Tx.GetSetSik().GetAddress())
 		if err := t.state.InvalidateSIK(address); err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}

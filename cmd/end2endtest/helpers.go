@@ -15,7 +15,6 @@ import (
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -180,17 +179,6 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 		log.Infof("generating %d voting proofs", len(accounts))
 		for _, acc := range accounts {
 			voterKey := acc.Address().Bytes()
-
-			if isAnonymousVoting {
-				apiClientMtx.Lock()
-				privKey := acc.PrivateKey()
-				if err := t.api.SetAccount(privKey.String()); err != nil {
-					apiClientMtx.Unlock()
-					log.Fatal(err)
-					return
-				}
-				voterKey = t.api.MyZkAddress().Bytes()
-			}
 
 			var pr *apiclient.CensusProof
 			var err error
@@ -568,20 +556,9 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 	}
 }
 
+// TODO: remove this function
 func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
-	var key []byte
-
-	switch censusType {
-	case vapi.CensusTypeWeighted:
-		key = voterAccount.Address().Bytes()
-	case vapi.CensusTypeZKWeighted:
-		zkAddr, err := zk.AddressFromSignKeys(voterAccount)
-		if err != nil {
-			return nil, err
-		}
-		key = zkAddr.Bytes()
-	}
-	return key, nil
+	return voterAccount.Address().Bytes(), nil
 }
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {

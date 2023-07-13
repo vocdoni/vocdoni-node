@@ -98,7 +98,8 @@ type State struct {
 	// chainID identifies the blockchain
 	chainID string
 	// electionPriceCalc is the calculator for the election price
-	ElectionPriceCalc *electionprice.Calculator
+	ElectionPriceCalc    *electionprice.Calculator
+	ProcessBlockRegistry *ProcessBlockRegistry
 }
 
 // NewState creates a new State
@@ -143,6 +144,16 @@ func NewState(dbType, dataDir string) (*State, error) {
 	}
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
+
+	processesTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	if err != nil {
+		return nil, err
+	}
+	s.ProcessBlockRegistry = &ProcessBlockRegistry{
+		treeRW:   processesTree.NoState(),
+		treeRead: processesTree.AsTreeView(),
+		treeLock: &s.Tx,
+	}
 
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }

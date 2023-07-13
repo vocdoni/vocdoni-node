@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// Default length of each proof parameters
 const (
 	proofALen    = 3
 	proofBLen    = 6
@@ -20,18 +21,10 @@ const (
 	publicSigLen = 7
 )
 
-var modulus, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
-
-func BigToFF(iv *big.Int) *big.Int {
-	z := big.NewInt(0)
-	if c := iv.Cmp(modulus); c == 0 {
-		return z
-	} else if c != 1 && iv.Cmp(z) != -1 {
-		return iv
-	}
-	return z.Mod(iv, modulus)
-
-}
+// bn254BaseField contains the Base Field of the twisted Edwards curve, whose
+// base field os the scalar field on the curve BN254. It helps to represent
+// a scalar number into the field.
+var bn254BaseField, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 
 // ProtobufZKProofToProverProof parses the provided protobuf ready proof struct
 // into a prover ready proof struct.
@@ -95,20 +88,15 @@ func ProverProofToProtobufZKProof(p *prover.Proof,
 // codification into a slice of string arbo compatible.
 func zkProofPublicInputs(electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) []string {
 	pubInputs := []string{}
-
 	// 1. [2]processId
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[:16]).String())
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[16:]).String())
-
 	// 2. censusRoot
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
-
 	// 3. nullifier
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(nullifier).String())
-
 	// 4. weight
 	pubInputs = append(pubInputs, weight.String())
-
 	// 5. [2]voteHash
 	voteHash := sha256.Sum256(weight.Bytes())
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[:16]).String())
@@ -127,14 +115,46 @@ func LittleEndianToNBytes(num *big.Int, n int) *big.Int {
 	return new(big.Int).SetBytes(numBytes[m:])
 }
 
-// BytesToArboStr calculates the sha256 hash (32 bytes) of the slice of bytes
-// provided. Then, splits the hash into a two parts of 16 bytes, swap the
-// endianess of that parts, encodes they into a two big.Ints and return both as
-// strings into a []string.
-func BytesToArboStr(input []byte) []string {
-	hash := sha256.Sum256(input)
-	return []string{
-		new(big.Int).SetBytes(arbo.SwapEndianness(hash[:16])).String(),
-		new(big.Int).SetBytes(arbo.SwapEndianness(hash[16:])).String(),
+// BigToFF function returns the finite field representation of the big.Int
+// provided. It uses Euclidean Modulus and the BN254 curve scalar field to
+// represent the provided number.
+func BigToFF(iv *big.Int) *big.Int {
+	z := big.NewInt(0)
+	if c := iv.Cmp(bn254BaseField); c == 0 {
+		return z
+	} else if c != 1 && iv.Cmp(z) != -1 {
+		return iv
 	}
+	return z.Mod(iv, bn254BaseField)
+}
+
+// BytesToArbo calculates the sha256 hash (32 bytes) of the slice of bytes
+// provided. Then, splits the hash into a two parts of 16 bytes, swap the
+// endianess of that parts and encodes they into a two big.Int's.
+func BytesToArbo(input []byte) []*big.Int {
+	hash := sha256.Sum256(input)
+	return []*big.Int{
+		new(big.Int).SetBytes(arbo.SwapEndianness(hash[:16])),
+		new(big.Int).SetBytes(arbo.SwapEndianness(hash[16:])),
+	}
+}
+
+// BytesToArboStr function wraps BytesToArbo to return the input as []string.
+func BytesToArboStr(input []byte) []string {
+	arboBytes := BytesToArbo(input)
+	return []string{arboBytes[0].String(), arboBytes[1].String()}
+}
+
+// ProofToCircomSiblings function decodes the provided proof (or packaged
+// siblings) and and encodes any contained siblings for use in a Circom circuit.
+func ProofToCircomSiblings(proof []byte) ([]string, error) {
+	rawSiblings, err := arbo.UnpackSiblings(arbo.HashFunctionPoseidon, proof)
+	if err != nil {
+		return nil, err
+	}
+	siblings := []string{}
+	for _, bSibling := range rawSiblings {
+		siblings = append(siblings, arbo.BytesToBigInt(bSibling).String())
+	}
+	return siblings, nil
 }

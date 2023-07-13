@@ -84,11 +84,11 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if v.VoteWeight == nil {
 			v.VoteWeight = v.ProofMkTree.LeafWeight
 		}
-
 		// generate circuit inputs with the election, census and voter
 		// information and encode it into a json
-		rawInputs, err := circuit.GenerateCircuitInput(c.zkAddr, election.Census.CensusRoot, election.ElectionID,
-			v.ProofMkTree.LeafWeight, v.VoteWeight, v.ProofMkTree.Siblings)
+		rawInputs, err := circuit.GenerateCircuitInput(c.account, nil, election.ElectionID, 
+			election.Census.CensusRoot, v.ProofMkTree.SikRoot, v.ProofMkTree.Siblings, 
+			v.ProofMkTree.SikSiblings, v.VoteWeight, v.ProofMkTree.LeafWeight)
 		if err != nil {
 			return nil, err
 		}

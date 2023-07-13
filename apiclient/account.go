@@ -108,11 +108,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	}
 
 	if sik == nil {
-		sikSign, err := c.account.SignEthereum([]byte(DefaultSIKContent))
-		if err != nil {
-			return nil, fmt.Errorf("could not create the signature for the sik: %w", err)
-		}
-		if sik, err = c.GenerateSik(sikSign, nil); err != nil {
+		if sik, err = c.account.Sik(nil); err != nil {
 			return nil, fmt.Errorf("could not generate the sik: %w", err)
 		}
 	}
@@ -242,11 +238,7 @@ func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*i
 // SetSik function allows to update the Secret Identity Key for the current
 // HTTPClient account. To do that, the function requires a secret user input.
 func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
-	signature, err := c.account.SignEthereum([]byte(DefaultSIKContent))
-	if err != nil {
-		return nil, fmt.Errorf("could not create the signature for the sik: %w", err)
-	}
-	sik, err := c.GenerateSik(signature, nil)
+	sik, err := c.account.Sik(secret)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate the sik: %w", err)
 	}
