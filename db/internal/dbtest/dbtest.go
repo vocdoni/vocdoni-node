@@ -179,21 +179,3 @@ func TestWriteTxApplyPrefixed(t *testing.T, d, dbWithPrefix db.Database) {
 	err = wTx.Apply(wTxWithPrefix)
 	qt.Assert(t, err, qt.IsNil)
 }
-
-func TestWriteTxApplyBatch(t *testing.T, d db.Database) {
-	batch := db.NewBatch(d)
-	defer batch.Discard()
-	wTx := d.WriteTx()
-	defer wTx.Discard()
-
-	qt.Assert(t, batch.Set([]byte("a"), []byte("a")), qt.IsNil)
-	qt.Assert(t, wTx.Set([]byte("b"), []byte("b")), qt.IsNil)
-
-	// try to put the contents from the normal wTx into the batch
-	err := batch.Apply(wTx)
-	qt.Assert(t, err, qt.IsNil)
-
-	// try to put the contents from batch into the normal wTx
-	err = wTx.Apply(batch)
-	qt.Assert(t, err, qt.IsNil)
-}

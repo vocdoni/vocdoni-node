@@ -13,9 +13,6 @@ import (
 // The process is concurrency safe, meaning that there cannot be two sequences
 // happening in parallel.
 //
-// If Commit() returns ErrHaltVochain, the error is considered a consensus
-// failure and the blockchain will halt.
-//
 // If OncProcessResults() returns an error, the results transaction won't be included
 // in the blockchain. This event relays on the event handlers to decide if results are
 // valid or not since the Vochain State do not validate results.

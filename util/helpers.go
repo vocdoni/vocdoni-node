@@ -39,16 +39,3 @@ func RandomInt(min, max int) int {
 	}
 	return int(num.Int64()) + min
 }
-
-func SplitBytes(buf []byte, lim int) [][]byte {
-	var chunk []byte
-	chunks := make([][]byte, 0, len(buf)/lim+1)
-	for len(buf) >= lim {
-		chunk, buf = buf[:lim], buf[lim:]
-		chunks = append(chunks, chunk)
-	}
-	if len(buf) > 0 {
-		chunks = append(chunks, buf)
-	}
-	return chunks
-}

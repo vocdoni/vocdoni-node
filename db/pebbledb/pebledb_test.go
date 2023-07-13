@@ -40,13 +40,6 @@ func TestWriteTxApplyPrefixed(t *testing.T) {
 	dbtest.TestWriteTxApplyPrefixed(t, database, dbWithPrefix)
 }
 
-func TestWriteTxApplyBatch(t *testing.T) {
-	database, err := New(db.Options{Path: t.TempDir()})
-	qt.Assert(t, err, qt.IsNil)
-
-	dbtest.TestWriteTxApplyBatch(t, database)
-}
-
 // NOTE: This test fails.  pebble.Batch doesn't detect conflicts.  Moreover,
 // reads from a pebble.Batch return the last version from the Database, even if
 // the update was made after the pebble.Batch was created.  Basically it's not
