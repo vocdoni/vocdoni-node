@@ -32,34 +32,27 @@ type APIserver struct {
 }
 
 // Start starts a basic URL API server for testing
-func (d *APIserver) Start(t testing.TB, apis ...string) {
-	// create the account signer
-	d.Account = ethereum.NewSignKeys()
-	if err := d.Account.Generate(); err != nil {
-		t.Fatal(err)
-	}
-
+func (d *APIserver) Start(t testing.TB, datadir string, apis ...string) {
 	// create the IPFS storage
 	d.Storage = &data.DataMockTest{}
-	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
-
+	err := d.Storage.Init(&types.DataStore{Datadir: datadir})
+	qt.Assert(t, err, qt.IsNil)
+	t.Log(datadir)
 	// creeate the API router
 	router := httprouter.HTTProuter{}
-	router.Init("127.0.0.1", 0)
+	err = router.Init("127.0.0.1", 0)
+	qt.Assert(t, err, qt.IsNil)
+
 	addr, err := url.Parse("http://" + router.Address().String() + "/")
 	qt.Assert(t, err, qt.IsNil)
 	d.ListenAddr = addr
 	t.Logf("address: %s", addr.String())
-	api, err := api.NewAPI(&router, "/", t.TempDir())
+
+	api, err := api.NewAPI(&router, "/", datadir)
 	qt.Assert(t, err, qt.IsNil)
 
 	// create vochain application
 	d.VochainAPP = vochain.TestBaseApplication(t)
-
-	// create and add balance for the pre-created Account
-	err = d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 100000)
-	qt.Assert(t, err, qt.IsNil)
-	d.VochainAPP.Commit()
 
 	// create vochain info (we do not start since it is not required)
 	d.VochainInfo = vochaininfo.NewVochainInfo(d.VochainAPP)
@@ -68,7 +61,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	d.Indexer = NewMockIndexer(t, d.VochainAPP)
 
 	// create census database
-	db, err := metadb.New(db.TypePebble, t.TempDir())
+	db, err := metadb.New(db.TypePebble, datadir)
 	qt.Assert(t, err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
@@ -78,4 +71,20 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	// enable the required handlers
 	err = api.EnableHandlers(apis...)
 	qt.Assert(t, err, qt.IsNil)
+
+	d.AccountInit(t)
+}
+
+func (d *APIserver) AccountInit(t testing.TB) {
+	// create the account signer
+	d.Account = ethereum.NewSignKeys()
+	if err := d.Account.Generate(); err != nil {
+		t.Fatal(err)
+	}
+
+	// create and add balance for the pre-created Account
+	err := d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 100000)
+	qt.Assert(t, err, qt.IsNil)
+	d.VochainAPP.Commit()
+
 }

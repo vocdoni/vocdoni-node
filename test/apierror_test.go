@@ -15,7 +15,7 @@ import (
 
 func TestAPIerror(t *testing.T) {
 	server := testcommon.APIserver{}
-	server.Start(t,
+	server.Start(t, t.TempDir(),
 		api.ChainHandler,
 		api.CensusHandler,
 		api.VoteHandler,

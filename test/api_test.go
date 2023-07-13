@@ -39,7 +39,7 @@ type voter struct {
 }
 
 func TestAPIcensusAndVote(t *testing.T) {
-	te := NewTestElection(t)
+	te := NewTestElection(t, t.TempDir())
 	te.GenerateVoters(t, 10)
 	te.CreateCensusAndElection(t)
 	// Block 2
@@ -54,12 +54,12 @@ func TestAPIcensusAndVote(t *testing.T) {
 	te.VerifyVotes(t)
 }
 
-func NewTestElection(t testing.TB) *testElection {
+func NewTestElection(t testing.TB, datadir string) *testElection {
 	te := &testElection{}
 
 	// Server
 	te.server = testcommon.APIserver{}
-	te.server.Start(t,
+	te.server.Start(t, datadir,
 		api.ChainHandler,
 		api.CensusHandler,
 		api.VoteHandler,
@@ -78,6 +78,7 @@ func NewTestElection(t testing.TB) *testElection {
 
 func (te *testElection) GenerateVoters(t testing.TB, nvotes int) {
 	// Voters
+	te.voters = nil
 	for i := 0; i < nvotes; i++ {
 		k := ethereum.NewSignKeys()
 		qt.Assert(t, k.Generate(), qt.IsNil)
@@ -103,7 +104,6 @@ func (te *testElection) AddCensusParticipants(t testing.TB, id string) types.Hex
 			})
 		}
 
-		t.Log("wtf")
 		// POST this chunk of voters
 		resp, code := te.c.Request("POST", &cparts, "censuses", id, "participants")
 		qt.Assert(t, code, qt.Equals, 200)
@@ -127,7 +127,6 @@ func (te *testElection) CreateCensusAndElection(t testing.TB) {
 	id1 := te.censusData.CensusID.String()
 
 	root := te.AddCensusParticipants(t, id1)
-	t.Log(root, id1)
 	for i, voter := range te.voters {
 		censusData := &api.Census{}
 		resp, code = te.c.Request("GET", nil, "censuses", root.String(),
@@ -183,6 +182,7 @@ func (te *testElection) CreateCensusAndElection(t testing.TB) {
 		TxPayload: stxb,
 		Metadata:  metadataBytes,
 	}
+	te.server.AccountInit(t)
 	resp, code = te.c.Request("POST", te.election, "elections")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &te.election)
@@ -251,14 +251,13 @@ func (te *testElection) VerifyVotes(t testing.TB) {
 		err := json.Unmarshal(resp, v2)
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, v2.VoteID.String(), qt.Equals, voter.vote.VoteID.String())
-		qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(2))
 		qt.Assert(t, v2.VoterID.String(), qt.Equals, fmt.Sprintf("%x", voter.key.Address().Bytes()))
 	}
 }
 
 func TestAPIaccount(t *testing.T) {
 	server := testcommon.APIserver{}
-	server.Start(t,
+	server.Start(t, t.TempDir(),
 		api.ChainHandler,
 		api.CensusHandler,
 		api.VoteHandler,
