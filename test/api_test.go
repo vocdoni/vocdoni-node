@@ -85,6 +85,39 @@ func (te *testElection) GenerateVoters(t testing.TB, nvotes int) {
 	}
 }
 
+func (te *testElection) AddCensusParticipants(t testing.TB, id string) types.HexBytes {
+	// add a bunch of keys and values (weights) in batches of api.MaxCensusAddBatchSize
+	for i := 0; i < len(te.voters); i += api.MaxCensusAddBatchSize {
+		// Get the next chunk of voters
+		end := i + api.MaxCensusAddBatchSize
+		if end > len(te.voters) {
+			end = len(te.voters)
+		}
+
+		// Add the voters in the chunk to the cparts struct
+		cparts := api.CensusParticipants{}
+		for _, voter := range te.voters[i:end] {
+			cparts.Participants = append(cparts.Participants, api.CensusParticipant{
+				Key:    voter.key.Address().Bytes(),
+				Weight: (*types.BigInt)(big.NewInt(1)),
+			})
+		}
+
+		t.Log("wtf")
+		// POST this chunk of voters
+		resp, code := te.c.Request("POST", &cparts, "censuses", id, "participants")
+		qt.Assert(t, code, qt.Equals, 200)
+		qt.Assert(t, resp, qt.IsNotNil)
+	}
+
+	resp, code := te.c.Request("POST", nil, "censuses", id, "publish")
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
+	qt.Assert(t, te.censusData.CensusID, qt.IsNotNil)
+	root := te.censusData.CensusID
+	return root
+}
+
 func (te *testElection) CreateCensusAndElection(t testing.TB) {
 	// create a new census
 	resp, code := te.c.Request("POST", nil, "censuses", "weighted")
@@ -93,24 +126,8 @@ func (te *testElection) CreateCensusAndElection(t testing.TB) {
 	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
 	id1 := te.censusData.CensusID.String()
 
-	// add a bunch of keys and values (weights)
-	cparts := api.CensusParticipants{}
-	for _, voter := range te.voters {
-		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
-			Key:    voter.key.Address().Bytes(),
-			Weight: (*types.BigInt)(big.NewInt(1)),
-		})
-	}
-	resp, code = te.c.Request("POST", &cparts, "censuses", id1, "participants")
-	t.Logf("%s", resp)
-	qt.Assert(t, code, qt.Equals, 200)
-
-	resp, code = te.c.Request("POST", nil, "censuses", id1, "publish")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, te.censusData), qt.IsNil)
-	qt.Assert(t, te.censusData.CensusID, qt.IsNotNil)
-	root := te.censusData.CensusID
-
+	root := te.AddCensusParticipants(t, id1)
+	t.Log(root, id1)
 	for i, voter := range te.voters {
 		censusData := &api.Census{}
 		resp, code = te.c.Request("GET", nil, "censuses", root.String(),
