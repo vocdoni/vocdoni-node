@@ -14,11 +14,9 @@ import (
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
 	tmcfg "github.com/cometbft/cometbft/config"
-	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/proxy"
 
-	tmjson "github.com/cometbft/cometbft/libs/json"
 	tmlog "github.com/cometbft/cometbft/libs/log"
 	tmos "github.com/cometbft/cometbft/libs/os"
 	"github.com/cometbft/cometbft/libs/service"
@@ -284,26 +282,4 @@ func newTendermint(app *BaseApplication,
 	}
 
 	return service, nil
-}
-
-// AminoKeys is a helper function that transforms a standard EDDSA key into
-// Tendermint like amino format useful for creating genesis files.
-func AminoKeys(key crypto256k1.PrivKey) (private, public []byte, err error) {
-	aminoKey, err := tmjson.Marshal(key)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	aminoPubKey, err := tmjson.Marshal(key.PubKey())
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return aminoKey, aminoPubKey, nil
-}
-
-// AminoPubKey is a helper function that transforms a standard EDDSA pubkey into
-// Tendermint like amino format useful for creating genesis files.
-func AminoPubKey(pubkey []byte) ([]byte, error) {
-	return tmjson.Marshal(pubkey)
 }

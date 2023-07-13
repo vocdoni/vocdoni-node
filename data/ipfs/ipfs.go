@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	coreiface "github.com/ipfs/boxo/coreiface"
 	"github.com/ipfs/boxo/files"
 	ipfscid "github.com/ipfs/go-cid"

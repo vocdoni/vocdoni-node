@@ -148,12 +148,6 @@ func (vi *VochainInfo) HeightTime(height int64) time.Time {
 	return time.Now().Add(time.Duration(diffHeight*t) * time.Millisecond)
 }
 
-// Sync returns true if the Vochain is considered up-to-date
-// Disclaimer: this method is not 100% accurated. Use it just for non-critical operations
-func (vi *VochainInfo) Sync() bool {
-	return !vi.vnode.IsSynchronizing()
-}
-
 // TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
 // ProcessTree: total number of created voting processes in the blockchain
 // VoteTree: total number of votes registered in the blockchain
