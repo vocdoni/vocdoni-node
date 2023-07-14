@@ -184,14 +184,14 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
 		for _, acc := range accounts {
-			voterKey := acc.Address().Bytes()
-
 			var pr *apiclient.CensusProof
 			var err error
 			if csp != nil {
-				pr, err = cspGenProof(t.election.ElectionID, voterKey, csp)
+				pr, err = cspGenProof(t.election.ElectionID, acc.Address().Bytes(), csp)
 			} else {
-				pr, err = t.api.CensusGenProof(root, voterKey)
+				voterPrivKey := acc.PrivateKey()
+				voterApi := t.api.Clone(voterPrivKey.String())
+				pr, err = voterApi.CensusGenProof(root, acc.Address().Bytes())
 			}
 
 			if err != nil {
@@ -535,7 +535,7 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 					case strings.Contains(err.Error(), "mempool is full"):
 						log.Warn(err)
 						// wait and retry
-						_ = t.api.WaitUntilNextBlock()
+						_ = voterApi.WaitUntilNextBlock()
 					case strings.Contains(err.Error(), "already exists") ||
 						strings.Contains(err.Error(), "overwrite count reached"):
 						// don't retry

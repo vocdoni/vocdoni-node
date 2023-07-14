@@ -105,7 +105,7 @@ func (p *Proof) Nullifier() (*big.Int, error) {
 		return nil, ErrPublicSignalFormat
 	}
 	// Get the nullifier from the fourth public signal of the proof
-	strNullifier := p.PubSignals[3]
+	strNullifier := p.PubSignals[2]
 	// Parse it into a big.Int
 	nullifier, ok := new(big.Int).SetString(strNullifier, 10)
 	if !ok {

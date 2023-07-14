@@ -342,7 +342,7 @@ func TestCensusZk(t *testing.T) {
 		},
 		state.NewVoterID(state.VoterIDTypeECDSA, accounts[0].PublicKey()),
 	)
-	
+
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
 	qt.Assert(t, newWeight.Uint64(), qt.Equals, uint64(1))

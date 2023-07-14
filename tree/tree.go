@@ -288,5 +288,3 @@ func (t *Tree) ImportDump(b []byte) error {
 func (t *Tree) PrintGraphviz() error {
 	return t.tree.PrintGraphviz(nil)
 }
-
-
