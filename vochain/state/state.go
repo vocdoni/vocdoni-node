@@ -65,13 +65,6 @@ var CensusOrigins = map[models.CensusOrigin]CensusProperties{
 		NeedsURI: true, AllowCensusUpdate: true},
 }
 
-type ErrHaltVochain struct {
-	reason error
-}
-
-func (e ErrHaltVochain) Error() string { return fmt.Sprintf("halting vochain: %v", e.reason) }
-func (e ErrHaltVochain) Unwrap() error { return e.reason }
-
 // State represents the state of the vochain application
 type State struct {
 	// data directory for storing files
@@ -500,9 +493,6 @@ func (v *State) Save() ([]byte, error) {
 	// Notify listeners about the commit state
 	for _, l := range v.eventListeners {
 		if err := l.Commit(height); err != nil {
-			if _, fatal := err.(ErrHaltVochain); fatal {
-				return nil, err
-			}
 			log.Warnf("event callback error on commit: %v", err)
 		}
 	}
