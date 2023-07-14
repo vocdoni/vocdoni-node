@@ -11,6 +11,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/util"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data/ipfs"
@@ -271,11 +272,12 @@ func TestCensusZk(t *testing.T) {
 	id1 := censusData.CensusID.String()
 
 	// add a bunch of keys and values (weights)
+	accounts := []*ethereum.SignKeys{}
 	keys := [][]byte{}
 	for i := 1; i < 11; i++ {
 		acc := ethereum.NewSignKeys()
 		c.Assert(acc.Generate(), qt.IsNil)
-		c.Assert(err, qt.IsNil)
+		accounts = append(accounts, acc)
 		keys = append(keys, acc.Address().Bytes())
 		// generate sik and create the vochain account for this voter with it
 		sik, err := acc.Sik()
@@ -315,8 +317,33 @@ func TestCensusZk(t *testing.T) {
 	root := censusData.CensusID.String()
 
 	// generate a proof
-	resp, code = httpClient.Request("GET", nil, root, "proof", fmt.Sprintf("%x", keys[0]))
+	resp, code = httpClient.Request("GET", nil, root, "proof", accounts[0].AddressString())
 	c.Assert(code, qt.Equals, 200)
 	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
 	c.Assert(censusData.Weight.String(), qt.Equals, "1")
+
+	// verify the proof
+	electionID := util.RandomBytes(32)
+	valid, newWeight, err := transaction.VerifyProof(
+		&models.Process{
+			ProcessId:    electionID,
+			CensusRoot:   censusData.CensusID,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		},
+		&models.Proof{
+			Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:            models.ProofArbo_POSEIDON,
+					Siblings:        censusData.CensusProof,
+					AvailableWeight: censusData.Value,
+					VoteWeight:      censusData.Value,
+				},
+			},
+		},
+		state.NewVoterID(state.VoterIDTypeECDSA, accounts[0].PublicKey()),
+	)
+	
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, valid, qt.IsTrue)
+	qt.Assert(t, newWeight.Uint64(), qt.Equals, uint64(1))
 }

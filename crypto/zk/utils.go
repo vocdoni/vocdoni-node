@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
@@ -18,7 +19,7 @@ const (
 	proofBLen    = 6
 	proofBEncLen = 3
 	proofCLen    = 3
-	publicSigLen = 7
+	publicSigLen = 8
 )
 
 // bn254BaseField contains the Base Field of the twisted Edwards curve, whose
@@ -152,9 +153,13 @@ func ProofToCircomSiblings(proof []byte) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	siblings := []string{}
-	for _, bSibling := range rawSiblings {
-		siblings = append(siblings, arbo.BytesToBigInt(bSibling).String())
+	siblings := make([]string, censustree.DefaultMaxLevels+1)
+	for i := 0; i < len(siblings); i++ {
+		if i < len(rawSiblings) {
+			siblings[i] = arbo.BytesToBigInt(rawSiblings[i]).String()
+		} else {
+			siblings[i] = "0"
+		}
 	}
 	return siblings, nil
 }

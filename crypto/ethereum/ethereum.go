@@ -218,9 +218,9 @@ func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
 	seed := []*big.Int{
-		zk.BigToFF(k.Address().Big()),
+		arbo.BytesToBigInt(k.Address().Bytes()),
+		zk.BigToFF(new(big.Int).SetBytes(secret)),
 		zk.BigToFF(new(big.Int).SetBytes(sign)),
-		arbo.BytesToBigInt(secret),
 	}
 	hash, err := poseidon.Hash(seed)
 	if err != nil {
@@ -240,10 +240,12 @@ func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
 	// get the representation of the signature on the finite field and repeat
-	// the same with the secret if it is provided
+	// the same with the secret if it is provided, if not add a zero
 	seed := []*big.Int{zk.BigToFF(new(big.Int).SetBytes(sign))}
 	if secret != nil {
 		seed = append(seed, zk.BigToFF(new(big.Int).SetBytes(secret)))
+	} else {
+		seed = append(seed, big.NewInt(0))
 	}
 	// encode the election id for circom and include it into the nullifier
 	encElectionId := zk.BytesToArbo(electionId)

@@ -102,20 +102,17 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 			return false, nil, fmt.Errorf("voterID is nil")
 		}
 		// check if the proof key is for an address (default) or a pubKey
+		var err error
 		key := vID.Address()
-
-		hashedKey, err := hashFunc.Hash(key)
-		if err != nil {
-			return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
+		if p.Type != models.ProofArbo_POSEIDON {
+			if key, err = hashFunc.Hash(key); err != nil {
+				return false, nil, fmt.Errorf("cannot hash proof key: %w", err)
+			}
+			if len(key) > censustree.DefaultMaxKeyLen {
+				key = key[:censustree.DefaultMaxKeyLen]
+			}
 		}
-		// If the provided key is longer than the defined maximum length
-		// truncate it.
-		// TODO: return an error if the other key lengths are deprecated
-		leafKey := hashedKey
-		if len(leafKey) > censustree.DefaultMaxKeyLen {
-			leafKey = leafKey[:censustree.DefaultMaxKeyLen]
-		}
-		valid, err := tree.VerifyProof(hashFunc, leafKey, p.AvailableWeight, p.Siblings, censusRoot)
+		valid, err := tree.VerifyProof(hashFunc, key, p.AvailableWeight, p.Siblings, censusRoot)
 		if !valid || err != nil {
 			return false, nil, err
 		}
@@ -129,7 +126,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 			return true, availableWeight, nil
 		}
 
-		voteWeight := new(big.Int).SetBytes(p.VoteWeight)
+		voteWeight := arbo.BytesToBigInt(p.VoteWeight)
 		if voteWeight.Cmp(availableWeight) == 1 {
 			return false, nil, fmt.Errorf("assigned weight exceeded")
 		}

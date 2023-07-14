@@ -100,13 +100,13 @@ func TestProverProofToProtobufZKProof(t *testing.T) {
 			},
 			C: []string{"0", "1", "2"},
 		},
-		PubSignals: []string{"0", "1", "2", "3", "4", "5", "6"},
+		PubSignals: []string{"0", "1", "2", "3", "4", "5", "6", "7"},
 	}
 	expected = &models.ProofZkSNARK{
 		A:            []string{"0", "1", "2"},
 		B:            []string{"0", "1", "2", "3", "4", "5"},
 		C:            []string{"0", "1", "2"},
-		PublicInputs: []string{"0", "1", "2", "3", "4", "5", "6"},
+		PublicInputs: []string{"0", "1", "2", "3", "4", "5", "6", "7"},
 	}
 	result, err = ProverProofToProtobufZKProof(input, mockData, mockData, mockData, new(big.Int).SetInt64(1))
 	c.Assert(err, qt.IsNil)

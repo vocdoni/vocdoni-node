@@ -54,12 +54,12 @@ type Proof struct {
 func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	data := ProofData{}
 	if err := json.Unmarshal(proofData, &data); err != nil {
-		return nil, ErrEncodingProof
+		return nil, fmt.Errorf("%w: %w", ErrEncodingProof, err)
 	}
 
 	signals := []string{}
 	if err := json.Unmarshal(pubSignals, &signals); err != nil {
-		return nil, ErrEncodingProof
+		return nil, fmt.Errorf("%w: %w", ErrEncodingProof, err)
 	}
 	return &Proof{Data: data, PubSignals: signals}, nil
 }
@@ -69,12 +69,12 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 func (p *Proof) Bytes() ([]byte, []byte, error) {
 	proofData, err := json.Marshal(p.Data)
 	if err != nil {
-		return nil, nil, ErrDecodingProof
+		return nil, nil, fmt.Errorf("%w: %w", ErrDecodingProof, err)
 	}
 
 	pubSignals, err := json.Marshal(p.PubSignals)
 	if err != nil {
-		return nil, nil, ErrDecodingProof
+		return nil, nil, fmt.Errorf("%w: %w", ErrDecodingProof, err)
 	}
 
 	return proofData, pubSignals, nil
@@ -123,7 +123,8 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// catch the panic and return an error instead.
 	defer func() {
 		if p := recover(); p != nil {
-			panicErr = ErrParsingWitness
+			err, _ := p.(error)
+			panicErr = fmt.Errorf("%w: %w", ErrParsingWitness, err)
 		}
 	}()
 
@@ -132,20 +133,20 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// witness calculation.
 	inputs, err := witness.ParseInputs(inputsBytes)
 	if err != nil {
-		return nil, ErrParsingWitness
+		return nil, fmt.Errorf("%w: %w", ErrParsingWitness, err)
 	}
 
 	// Instances a go-rapidsnark/witness calculator with the provided wasm
 	// []byte
 	calculator, err := witness.NewCircom2WitnessCalculator(wasmBytes, true)
 	if err != nil {
-		return nil, ErrInitWitnessCalc
+		return nil, fmt.Errorf("%w: %w", ErrInitWitnessCalc, err)
 	}
 
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
-		return nil, ErrWitnessCalc
+		return nil, fmt.Errorf("%w: %w", ErrWitnessCalc, err)
 	}
 
 	return wtns, nil
@@ -168,7 +169,7 @@ func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// proving zkey provided.
 	strProofData, strPubSignals, err := prover.Groth16ProverRaw(zKey, wtns)
 	if err != nil {
-		return nil, ErrProofGen
+		return nil, fmt.Errorf("%w: %w", ErrProofGen, err)
 	}
 
 	// Parse the components generated into a prover.Proof struct

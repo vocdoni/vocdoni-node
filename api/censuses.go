@@ -712,6 +712,9 @@ func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return ErrKeyNotFoundInCensus.With(hex.EncodeToString(leafKey))
 	}
+	if response.CensusRoot, err = ref.Tree().Root(); err != nil {
+		return ErrCensusRootIsNil.WithErr(err)
+	}
 
 	// Get the leaf siblings from arbo based on the key received and include
 	// them into the response, only if it is zkweighted.

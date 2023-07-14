@@ -1,6 +1,7 @@
 package circuit
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
@@ -18,7 +19,7 @@ type CircuitInputs struct {
 	Nullifier       string   `json:"nullifier"`
 	AvailableWeight string   `json:"availableWeight"`
 	VoteHash        []string `json:"voteHash"`
-	SikRoot         string   `json:"sikRoot"`
+	SikRoot         string   `json:"cikRoot"`
 	CensusRoot      string   `json:"censusRoot"`
 
 	// Private inputs
@@ -28,7 +29,13 @@ type CircuitInputs struct {
 
 	VoteWeight     string   `json:"voteWeight"`
 	CensusSiblings []string `json:"censusSiblings"`
-	SikSiblings    []string `json:"sikSiblings"`
+	SikSiblings    []string `json:"cikSiblings"`
+}
+
+func (ci *CircuitInputs) String() string {
+	bstr, _ := json.Marshal(ci)
+	// bstr, _ := json.MarshalIndent(ci, "", "\t")
+	return string(bstr)
 }
 
 // GenerateCircuitInput receives the required parameters to encode them
