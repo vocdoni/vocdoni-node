@@ -64,8 +64,8 @@ func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainVoteCache)
 }
 
-// getMetrics updates the metrics values to the current state
-func (vi *VochainInfo) getMetrics() {
+// setMetrics updates the metrics values to the current state
+func (vi *VochainInfo) setMetrics() {
 	VochainHeight.Set(float64(vi.Height()))
 	VochainMempool.Set(float64(vi.MempoolSize()))
 	p, v, vxm := vi.TreeSizes()
@@ -83,7 +83,7 @@ func (vi *VochainInfo) CollectMetrics(ma *metrics.Agent) {
 		vi.registerMetrics(ma)
 		for {
 			time.Sleep(ma.RefreshInterval)
-			vi.getMetrics()
+			vi.setMetrics()
 		}
 	}
 }

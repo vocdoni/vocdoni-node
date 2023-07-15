@@ -111,7 +111,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_NewProcess:
-		p, txSender, err := t.NewProcessTxCheck(vtx, forCommit)
+		p, txSender, err := t.NewProcessTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("newProcessTx: %w", err)
 		}
@@ -143,7 +143,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_SetProcess:
-		txSender, err := t.SetProcessTxCheck(vtx, forCommit)
+		txSender, err := t.SetProcessTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setProcessTx: %w", err)
 		}

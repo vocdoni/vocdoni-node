@@ -38,8 +38,8 @@ func (i *Handler) registerMetrics(ma *metrics.Agent) {
 	ma.Register(FilePins)
 }
 
-// GetMetrics to be called as a loop and grab metrics
-func (i *Handler) getMetrics(ctx context.Context) error {
+// setMetrics to be called as a loop and grab metrics
+func (i *Handler) setMetrics(ctx context.Context) error {
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
 		return err
@@ -67,7 +67,7 @@ func (i *Handler) CollectMetrics(ctx context.Context, ma *metrics.Agent) error {
 		for {
 			time.Sleep(ma.RefreshInterval)
 			tctx, cancel := context.WithTimeout(ctx, time.Minute)
-			err := i.getMetrics(tctx)
+			err := i.setMetrics(tctx)
 			cancel()
 			if err != nil {
 				return err
