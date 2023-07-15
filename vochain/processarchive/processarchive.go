@@ -21,10 +21,10 @@ import (
 type ProcessArchive struct {
 	indexer    *indexer.Indexer
 	ipfs       *ipfs.Handler
-	storage    *jsonStorage
-	publish    chan (bool)
+	storage    *JsonStorage
+	publish    chan bool
 	lastUpdate time.Time
-	close      chan (bool)
+	close      chan bool
 }
 
 type Process struct {
@@ -43,24 +43,24 @@ type IndexProcess struct {
 	ProcessID types.HexBytes `json:"processId"`
 }
 
-type jsonStorage struct {
+type JsonStorage struct {
 	datadir string
 	lock    sync.RWMutex
 	index   *Index
 }
 
 // NewJsonStorage opens a new jsonStorage file at the location provided by datadir
-func NewJsonStorage(datadir string) (*jsonStorage, error) {
+func NewJsonStorage(datadir string) (*JsonStorage, error) {
 	err := os.MkdirAll(datadir, 0o750)
 	if err != nil {
 		return nil, err
 	}
 	i, err := BuildIndex(datadir)
-	return &jsonStorage{datadir: datadir, index: i}, err
+	return &JsonStorage{datadir: datadir, index: i}, err
 }
 
 // AddProcess adds an entire process to js
-func (js *jsonStorage) AddProcess(p *Process) error {
+func (js *JsonStorage) AddProcess(p *Process) error {
 	if p == nil || p.ProcessInfo == nil || len(p.ProcessInfo.ID) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
@@ -94,7 +94,7 @@ func (js *jsonStorage) AddProcess(p *Process) error {
 }
 
 // GetProcess retrieves a process from the js storage
-func (js *jsonStorage) GetProcess(pid []byte) (*Process, error) {
+func (js *JsonStorage) GetProcess(pid []byte) (*Process, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("process not valid")
 	}
@@ -109,7 +109,7 @@ func (js *jsonStorage) GetProcess(pid []byte) (*Process, error) {
 }
 
 // ProcessExist returns true if a process already existin in the storage
-func (js *jsonStorage) ProcessExist(pid []byte) (bool, error) {
+func (js *JsonStorage) ProcessExist(pid []byte) (bool, error) {
 	js.lock.Lock()
 	defer js.lock.Unlock()
 	if _, err := os.Stat(filepath.Join(js.datadir, fmt.Sprintf("%x", pid))); err != nil {
@@ -173,8 +173,8 @@ func NewProcessArchive(s *indexer.Indexer, ipfs *ipfs.Handler,
 		indexer: s,
 		ipfs:    ipfs,
 		storage: js,
-		publish: make(chan (bool), 1),
-		close:   make(chan (bool), 1), // TO-DO: use a context
+		publish: make(chan bool, 1),
+		close:   make(chan bool, 1), // TO-DO: use a context
 	}
 
 	// Perform an initial scan to add previous processes

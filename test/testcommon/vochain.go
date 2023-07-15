@@ -2,25 +2,17 @@ package testcommon
 
 import (
 	"encoding/base64"
-	"fmt"
-	"math/rand"
-	"path"
-	"strconv"
-	"testing"
-	"time"
-
 	secp "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/privval"
-	tmtypes "github.com/cometbft/cometbft/types"
 	"google.golang.org/protobuf/proto"
+	"math/rand"
+	"strconv"
+	"testing"
 
-	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
@@ -156,68 +148,6 @@ func NewVochainStateWithProcess(tb testing.TB) *state.State {
 	return s
 }
 
-func NewMockVochainNode(tb testing.TB, cfg *config.VochainCfg, mngKey *ethereum.SignKeys) *vochain.BaseApplication {
-	// start vochain node
-	// create config
-	cfg.DataDir = tb.TempDir()
-	// create genesis file
-	tmConsensusParams := tmtypes.DefaultConsensusParams()
-	// TO-DO: use cometbft/cometbft/types instead of custom (copied) types
-	consensusParams := &genesis.ConsensusParams{
-		Block:     genesis.BlockParams{MaxBytes: 100000, MaxGas: 100},
-		Evidence:  genesis.EvidenceParams{MaxAgeNumBlocks: 1, MaxAgeDuration: 1},
-		Validator: genesis.ValidatorParams(tmConsensusParams.Validator),
-	}
-	validator := privval.NewFilePV(
-		secp.GenPrivKey(),
-		path.Join(cfg.DataDir, "config", "priv_validator_key.json"),
-		path.Join(cfg.DataDir, "data", "priv_validator_state.json"),
-	)
-
-	accounts := []string{mngKey.AddressString()}
-	defaultAccountsBalance := int(1000000)
-	treasurer := mngKey.AddressString()
-	genBytes, err := vochain.NewGenesis(
-		cfg,
-		strconv.Itoa(rand.Int()),
-		consensusParams,
-		[]privval.FilePV{*validator},
-		accounts,
-		defaultAccountsBalance,
-		treasurer,
-		new(genesis.TransactionCosts), // set all costs to zero
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
-
-	// creating node
-	cfg.LogLevel = "error"
-	cfg.P2PListen = fmt.Sprintf("0.0.0.0:%d", 29000+rand.Intn(1000))
-	cfg.PublicAddr = fmt.Sprintf("0.0.0.0:%d", 28000+rand.Intn(1000))
-	cfg.NoWaitSync = true
-	cfg.MempoolSize = 20000
-	cfg.MinerTargetBlockTimeSeconds = 3
-	cfg.DBType = "pebble"
-
-	// run node
-	cfg.MinerKey = fmt.Sprintf("%x", validator.Key.PrivKey)
-	vnode := vochain.NewVochain(cfg, genBytes)
-	tb.Cleanup(func() {
-		if err := vnode.Service.Stop(); err != nil {
-			tb.Error(err)
-		}
-		ch := vnode.Service.Quit()
-		select {
-		case <-ch:
-		case <-time.After(5 * time.Second):
-			tb.Error("timeout waiting for node to stop")
-		}
-	})
-	vnode.SetTestingMethods()
-	return vnode
-}
-
 func NewMockIndexer(tb testing.TB, vnode *vochain.BaseApplication) *indexer.Indexer {
 	tb.Log("starting vochain indexer")
 	sc, err := indexer.NewIndexer(tb.TempDir(), vnode, true)
@@ -226,16 +156,4 @@ func NewMockIndexer(tb testing.TB, vnode *vochain.BaseApplication) *indexer.Inde
 	}
 	sc.AfterSyncBootstrap(true)
 	return sc
-}
-
-// CreateEthRandomKeysBatch creates a set of eth random signing keys
-func CreateEthRandomKeysBatch(tb testing.TB, n int) []*ethereum.SignKeys {
-	s := make([]*ethereum.SignKeys, n)
-	for i := 0; i < n; i++ {
-		s[i] = ethereum.NewSignKeys()
-		if err := s[i].Generate(); err != nil {
-			tb.Fatal(err)
-		}
-	}
-	return s
 }
