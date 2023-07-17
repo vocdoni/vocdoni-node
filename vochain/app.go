@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,10 +18,12 @@ import (
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
+	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -38,6 +41,8 @@ const (
 var (
 	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
 	ErrTransactionNotFound = fmt.Errorf("transaction not found")
+	// Ensure that BaseApplication implements abcitypes.Application.
+	_ abcitypes.Application = (*BaseApplication)(nil)
 )
 
 // BaseApplication reflects the ABCI application implementation.
@@ -60,10 +65,7 @@ type BaseApplication struct {
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
-	fnBeginBlock       func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock
-	fnEndBlock         func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock
-
-	blockCache *lru.Cache[int64, *tmtypes.Block]
+	blockCache         *lru.Cache[int64, *tmtypes.Block]
 	// height of the last ended block
 	height atomic.Uint32
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
@@ -75,10 +77,18 @@ type BaseApplication struct {
 	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
+
+	// testMockBlockStore is used for testing purposes only
+	testMockBlockStore *testutil.MockBlockStore
 }
 
-// Ensure that BaseApplication implements abcitypes.Application.
-var _ abcitypes.Application = (*BaseApplication)(nil)
+// DeliverTxResponse is the response returned by DeliverTx after executing the transaction.
+type DeliverTxResponse struct {
+	Code uint32
+	Log  string
+	Info string
+	Data []byte
+}
 
 // NewBaseApplication creates a new BaseApplication given a name and a DB backend.
 // Node still needs to be initialized with SetNode.
@@ -118,23 +128,6 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
-// BeginBlock is called at the beginning of every block.
-func (app *BaseApplication) BeginBlock(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	if app.isSynchronizingFn != nil {
-		if app.isSynchronizingFn() {
-			app.isSynchronizing.Store(true)
-		} else {
-			app.isSynchronizing.Store(false)
-		}
-	}
-	return app.fnBeginBlock(req)
-}
-
-// EndBlock is called at the end of every block.
-func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	return app.fnEndBlock(req)
-}
-
 // Info Return information about the application state.
 // Used to sync Tendermint with the application during a handshake that happens on startup.
 // The returned AppVersion will be included in the Header of every block.
@@ -142,51 +135,51 @@ func (app *BaseApplication) EndBlock(req abcitypes.RequestEndBlock) abcitypes.Re
 // ensuring that Commit is never called twice for the same block height.
 //
 // We use this method to initialize some state variables.
-func (app *BaseApplication) Info(req abcitypes.RequestInfo) abcitypes.ResponseInfo {
+func (app *BaseApplication) Info(ctx context.Context,
+	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
-		log.Fatalf("cannot get State.LastHeight: %v", err)
+		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
 	appHash, err := app.State.Store.Hash()
 	if err != nil {
-		log.Fatalf("cannot get Store.Hash: %v", err)
+		return nil, fmt.Errorf("cannot get Store.Hash: %w", err)
 	}
 	if err := app.State.SetElectionPriceCalc(); err != nil {
-		log.Fatalf("cannot set election price calc: %v", err)
+		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
 	// print some basic version info about tendermint components
 	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
 		req.P2PVersion, "blockVersion", req.BlockVersion, "lastHeight",
 		lastHeight, "appHash", hex.EncodeToString(appHash))
-	log.Infow("replaying stored blocks")
 
-	return abcitypes.ResponseInfo{
+	return &abcitypes.ResponseInfo{
 		LastBlockHeight:  int64(lastHeight),
 		LastBlockAppHash: appHash,
-	}
+	}, nil
 }
 
 // InitChain called once upon genesis
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
-func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.ResponseInitChain {
+func (app *BaseApplication) InitChain(ctx context.Context,
+	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState genesis.GenesisAppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
-		fmt.Printf("%s\n", req.AppStateBytes)
-		log.Fatalf("cannot unmarshal app state bytes: %v", err)
+		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
 	}
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
 		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
 			if err != vstate.ErrAccountAlreadyExists {
-				log.Fatalf("cannot create acount %x %v", addr, err)
+				return nil, fmt.Errorf("cannot create acount %x: %w", addr, err)
 			}
 			if err := app.State.InitChainMintBalance(addr, acc.Balance); err != nil {
-				log.Fatal(err)
+				return nil, fmt.Errorf("cannot initialize chain minintg balance: %w", err)
 			}
 		}
 		log.Infow("created account", "addr", addr.Hex(), "tokens", acc.Balance)
@@ -210,7 +203,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 			KeyIndex: uint32(genesisAppState.Validators[i].KeyIndex),
 		}
 		if err = app.State.AddValidator(v); err != nil {
-			log.Fatal(err)
+			return nil, fmt.Errorf("cannot add validator %s: %w", log.FormatProto(v), err)
 		}
 		tendermintValidators = append(tendermintValidators,
 			abcitypes.UpdateValidator(
@@ -224,7 +217,7 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	if genesisAppState.Treasurer != nil {
 		log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
 		if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
-			log.Fatalf("could not set State.Treasurer from genesis file: %s", err)
+			return nil, fmt.Errorf("could not set State.Treasurer from genesis file: %w", err)
 		}
 	}
 
@@ -232,76 +225,130 @@ func (app *BaseApplication) InitChain(req abcitypes.RequestInitChain) abcitypes.
 	for k, v := range genesisAppState.TxCost.AsMap() {
 		err = app.State.SetTxBaseCost(k, v)
 		if err != nil {
-			log.Fatalf("could not set tx cost %q to value %q from genesis file to the State", k, v)
+			return nil, fmt.Errorf("could not set tx cost %q to value %q from genesis file to the State", k, v)
 		}
 	}
 
 	// create burn account
 	if err := app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}); err != nil {
-		log.Fatal("unable to set burn address")
+		return nil, fmt.Errorf("unable to set burn address")
 	}
 
 	// set max election size
 	if err := app.State.SetMaxProcessSize(genesisAppState.MaxElectionSize); err != nil {
-		log.Fatal("unable to set max election size")
+		return nil, fmt.Errorf("unable to set max election size")
 	}
 
 	// set network capacity
 	if err := app.State.SetNetworkCapacity(genesisAppState.NetworkCapacity); err != nil {
-		log.Fatal("unable to set  network capacity")
+		return nil, fmt.Errorf("unable to set  network capacity")
 	}
 
 	// initialize election price calc
 	if err := app.State.SetElectionPriceCalc(); err != nil {
-		log.Fatalf("cannot set election price calc: %v", err)
+		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
 
 	// commit state and get hash
 	hash, err := app.State.Save()
 	if err != nil {
-		log.Fatalf("cannot save state: %s", err)
+		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-	return abcitypes.ResponseInitChain{
+	return &abcitypes.ResponseInitChain{
 		Validators: tendermintValidators,
 		AppHash:    hash,
-	}
+	}, nil
 }
 
 // CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(req abcitypes.RequestCheckTx) abcitypes.ResponseCheckTx {
+func (app *BaseApplication) CheckTx(ctx context.Context,
+	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		if height%recheckTxHeightInterval != 0 {
-			return abcitypes.ResponseCheckTx{Code: 0}
+			return &abcitypes.ResponseCheckTx{Code: 0}, nil
 		}
 	}
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}
+		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
 	}
 	response, err := app.TransactionHandler.CheckTx(tx, false)
 	if err != nil {
 		if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
-			return abcitypes.ResponseCheckTx{Code: 0}
+			return &abcitypes.ResponseCheckTx{Code: 0}, nil
 		}
 		log.Errorw(err, "checkTx")
-		return abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}
+		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}, err
 	}
-	return abcitypes.ResponseCheckTx{
+	return &abcitypes.ResponseCheckTx{
 		Code: 0,
 		Data: response.Data,
 		Info: fmt.Sprintf("%x", response.TxHash),
 		Log:  response.Log,
-	}
+	}, nil
 }
 
-// DeliverTx unmarshals req.Tx and adds it to the State if it is valid
-func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.ResponseDeliverTx {
+// FinalizeBlock It delivers a decided block to the Application. The Application must execute
+// the transactions in the block deterministically and update its state accordingly.
+// Cryptographic commitments to the block and transaction results, returned via the corresponding
+// parameters in ResponseFinalizeBlock, are included in the header of the next block.
+// CometBFT calls it when a new block is decided.
+func (app *BaseApplication) FinalizeBlock(ctx context.Context,
+	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
+	app.beginBlock(req.GetTime(), uint32(req.GetHeight()))
+	for _, tx := range req.Txs {
+		resp := app.deliverTx(tx)
+		if resp.Code != 0 {
+			log.Warnw("deliverTx failed",
+				"code", resp.Code,
+				"data", string(resp.Data),
+				"info", resp.Info,
+				"log", resp.Log)
+		}
+	}
+	// execute internal state transition commit
+	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
+		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
+	}
+	app.endBlock(req.GetTime(), uint32(req.GetHeight()))
+	return &abcitypes.ResponseFinalizeBlock{
+		AppHash: app.State.WorkingHash(),
+	}, nil
+}
+
+// Commit saves the current vochain state and returns a commit hash
+func (app *BaseApplication) Commit(ctx context.Context, req *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+	// save state
+	_, err := app.State.Save()
+	if err != nil {
+		return nil, fmt.Errorf("cannot save state: %w", err)
+	}
+	// perform state snapshot (DISABLED)
+	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
+		startTime := time.Now()
+		log.Infof("performing a state snapshot on block %d", app.Height())
+		if _, err := app.State.Snapshot(); err != nil {
+			return nil, fmt.Errorf("cannot make state snapshot: %w", err)
+		}
+		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
+		log.Debugf("%+v", app.State.ListSnapshots())
+	}
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
+	return &abcitypes.ResponseCommit{
+		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
+	}, nil
+}
+
+// deliverTx unmarshals req.Tx and adds it to the State if it is valid
+func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 	// Increase Tx counter on return since the index 0 is valid
 	defer app.State.TxCounterAdd()
 	tx := new(vochaintx.Tx)
-	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
+	if err := tx.Unmarshal(rawTx, app.ChainID()); err != nil {
+		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
 	}
 	log.Debugw("deliver tx",
 		"hash", fmt.Sprintf("%x", tx.TxID),
@@ -313,13 +360,13 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	response, err := app.TransactionHandler.CheckTx(tx, true)
 	if err != nil {
 		log.Errorw(err, "rejected tx")
-		return abcitypes.ResponseDeliverTx{Code: 1, Data: []byte(err.Error())}
+		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
 	}
 	// call event listeners
 	for _, e := range app.State.EventListeners() {
 		e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
 	}
-	return abcitypes.ResponseDeliverTx{
+	return &DeliverTxResponse{
 		Code: 0,
 		Data: response.Data,
 		Info: fmt.Sprintf("%x", response.TxHash),
@@ -327,33 +374,30 @@ func (app *BaseApplication) DeliverTx(req abcitypes.RequestDeliverTx) abcitypes.
 	}
 }
 
-// Commit saves the current vochain state and returns a commit hash
-func (app *BaseApplication) Commit() abcitypes.ResponseCommit {
-	// execute internal state transition commit
-	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
-		log.Fatalf("cannot execute ISTC commit: %v", err)
-	}
-	// save state
-	data, err := app.State.Save()
-	if err != nil {
-		log.Fatalf("cannot save state: %v", err)
-	}
-	// perform state snapshot (DISABLED)
-	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
-		startTime := time.Now()
-		log.Infof("performing a state snapshot on block %d", app.Height())
-		if _, err := app.State.Snapshot(); err != nil {
-			log.Fatalf("cannot make state snapshot: %v", err)
+// beginBlock is called at the beginning of every block.
+func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
+	if app.isSynchronizingFn != nil {
+		if app.isSynchronizingFn() {
+			app.isSynchronizing.Store(true)
+		} else {
+			app.isSynchronizing.Store(false)
 		}
-		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
-		log.Debugf("%+v", app.State.ListSnapshots())
 	}
-	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
-	}
-	return abcitypes.ResponseCommit{
-		Data: data,
-	}
+	app.State.Rollback()
+	app.startBlockTimestamp.Store(t.Unix())
+	app.State.SetHeight(height)
+	app.height.Store(height)
+	go app.State.CachePurge(height)
+	app.State.OnBeginBlock(state.BeginBlock{
+		Height: int64(height),
+		Time:   t,
+		// TODO: remove data hash from this event call
+	})
+}
+
+// endBlock is called at the end of every block.
+func (app *BaseApplication) endBlock(t time.Time, height uint32) {
+	app.endBlockTimestamp.Store(t.Unix())
 }
 
 // GetBlockByHeight retrieves a full block indexed by its height.
@@ -411,42 +455,92 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 }
 
 // Query does nothing
-func (app *BaseApplication) Query(req abcitypes.RequestQuery) abcitypes.ResponseQuery {
-	return abcitypes.ResponseQuery{}
+func (app *BaseApplication) Query(ctx context.Context,
+	req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+	return &abcitypes.ResponseQuery{}, nil
 }
 
-// PrepareProposal does nothing
-func (app *BaseApplication) PrepareProposal(req abcitypes.RequestPrepareProposal) abcitypes.ResponsePrepareProposal {
-	return abcitypes.ResponsePrepareProposal{
-		Txs: req.GetTxs(),
+// PrepareProposal allows the block proposer to perform application-dependent work in a block before
+// proposing it. This enables, for instance, batch optimizations to a block, which has been empirically
+// demonstrated to be a key component for improved performance. Method PrepareProposal is called every
+// time CometBFT is about to broadcast a Proposal message and validValue is nil. CometBFT gathers
+// outstanding transactions from the mempool, generates a block header, and uses them to create a block
+// to propose. Then, it calls RequestPrepareProposal with the newly created proposal, called raw proposal.
+// The Application can make changes to the raw proposal, such as modifying the set of transactions or the
+// order in which they appear, and returns the (potentially) modified proposal, called prepared proposal in
+// the ResponsePrepareProposal call. The logic modifying the raw proposal MAY be non-deterministic.
+func (app *BaseApplication) PrepareProposal(ctx context.Context,
+	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
+	validTxs := [][]byte{}
+	for _, tx := range req.GetTxs() {
+		resp, err := app.CheckTx(ctx, &abcitypes.RequestCheckTx{
+			Tx: tx, Type: abcitypes.CheckTxType_New})
+		if err != nil || resp.Code != 0 {
+			log.Warnw("discard invalid tx on prepare proposal",
+				"err", err,
+				"code", resp.Code,
+				"data", string(resp.Data),
+				"info", resp.Info,
+				"log", resp.Log)
+			continue
+		}
+		validTxs = append(validTxs, tx)
 	}
+
+	return &abcitypes.ResponsePrepareProposal{
+		Txs: validTxs,
+	}, nil
 }
 
-// ProcessProposal does nothing
-func (app *BaseApplication) ProcessProposal(req abcitypes.RequestProcessProposal) abcitypes.ResponseProcessProposal {
-	return abcitypes.ResponseProcessProposal{
+// ProcessProposal allows a validator to perform application-dependent work in a proposed block. This enables
+// features such as immediate block execution, and allows the Application to reject invalid blocks.
+// CometBFT calls it when it receives a proposal and validValue is nil. The Application cannot modify the
+// proposal at this point but can reject it if invalid. If that is the case, the consensus algorithm will
+// prevote nil on the proposal, which has strong liveness implications for CometBFT. As a general rule, the
+// Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
+// is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
+// proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
+func (app *BaseApplication) ProcessProposal(ctx context.Context,
+	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
-	}
+	}, nil
 }
 
-func (app *BaseApplication) ApplySnapshotChunk(
-	req abcitypes.RequestApplySnapshotChunk) abcitypes.ResponseApplySnapshotChunk {
-	return abcitypes.ResponseApplySnapshotChunk{}
+// ListSnapshots returns a list of available snapshots.
+func (app *BaseApplication) ListSnapshots(context.Context,
+	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
+	return &abcitypes.ResponseListSnapshots{}, nil
 }
 
-func (app *BaseApplication) ListSnapshots(
-	req abcitypes.RequestListSnapshots) abcitypes.ResponseListSnapshots {
-	return abcitypes.ResponseListSnapshots{}
+// OfferSnapshot returns the response to a snapshot offer.
+func (app *BaseApplication) OfferSnapshot(context.Context,
+	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
+	return &abcitypes.ResponseOfferSnapshot{}, nil
 }
 
-func (app *BaseApplication) LoadSnapshotChunk(
-	req abcitypes.RequestLoadSnapshotChunk) abcitypes.ResponseLoadSnapshotChunk {
-	return abcitypes.ResponseLoadSnapshotChunk{}
+// LoadSnapshotChunk returns the response to a snapshot chunk loading request.
+func (app *BaseApplication) LoadSnapshotChunk(context.Context,
+	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
+	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
 }
 
-func (app *BaseApplication) OfferSnapshot(
-	req abcitypes.RequestOfferSnapshot) abcitypes.ResponseOfferSnapshot {
-	return abcitypes.ResponseOfferSnapshot{}
+// ApplySnapshotChunk returns the response to a snapshot chunk applying request.
+func (app *BaseApplication) ApplySnapshotChunk(context.Context,
+	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
+	return &abcitypes.ResponseApplySnapshotChunk{}, nil
+}
+
+// ExtendVote creates application specific vote extension
+func (app *BaseApplication) ExtendVote(context.Context,
+	*abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
+	return &abcitypes.ResponseExtendVote{}, nil
+}
+
+// VerifyVoteExtension verifies application's vote extension data
+func (app *BaseApplication) VerifyVoteExtension(context.Context,
+	*abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
+	return &abcitypes.ResponseVerifyVoteExtension{}, nil
 }
 
 // ChainID returns the Node ChainID
@@ -455,9 +549,9 @@ func (app *BaseApplication) ChainID() string {
 }
 
 // SetChainID sets the app and state chainID
-func (app *BaseApplication) SetChainID(chainId string) {
-	app.chainID = chainId
-	app.State.SetChainID(chainId)
+func (app *BaseApplication) SetChainID(chainID string) {
+	app.chainID = chainID
+	app.State.SetChainID(chainID)
 }
 
 // Genesis returns the tendermint genesis information
@@ -485,9 +579,6 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
-	if app.Service == nil {
-		return true
-	}
 	return app.Service.(*node.Node).ConsensusReactor().WaitSync()
 }
 

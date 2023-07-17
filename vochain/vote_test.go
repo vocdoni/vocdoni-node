@@ -107,22 +107,20 @@ func TestVoteOverwrite(t *testing.T) {
 	qt.Check(t, err, qt.IsNil)
 	app.AdvanceTestBlock()
 
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
+	cktx := new(abcitypes.RequestCheckTx)
+	var cktxresp *abcitypes.ResponseCheckTx
 
 	// send 9 votes, should be fine
 	for i := 1; i < 10; i++ {
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 0, 1}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		cktxresp = app.CheckTx(cktx)
+		cktxresp, _ = app.CheckTx(nil, cktx)
 		qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
-		detx.Tx, err = proto.Marshal(stx)
+		txb, err := proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		detxresp = app.DeliverTx(detx)
+		detxresp := app.deliverTx(txb)
 		qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
 		app.AdvanceTestBlock()
@@ -133,12 +131,12 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(nil, cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
-	detx.Tx, err = proto.Marshal(stx)
+	txb, err := proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	detxresp = app.DeliverTx(detx)
+	detxresp := app.deliverTx(txb)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
 	app.AdvanceTestBlock()
@@ -148,12 +146,12 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(nil, cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
-	detx.Tx, err = proto.Marshal(stx)
+	txb, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	detxresp = app.DeliverTx(detx)
+	detxresp = app.deliverTx(txb)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
 	app.AdvanceTestBlock()
@@ -163,12 +161,12 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(nil, cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
-	detx.Tx, err = proto.Marshal(stx)
+	txb, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	detxresp = app.DeliverTx(detx)
+	detxresp = app.deliverTx(txb)
 	qt.Check(t, detxresp.Code, qt.Equals, uint32(0))
 
 	app.AdvanceTestBlock()
@@ -177,7 +175,7 @@ func TestVoteOverwrite(t *testing.T) {
 	stx = testBuildSignedVote(t, pid, keys[0], proofs[0], []int{3, 1, 1}, app.ChainID())
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(nil, cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(1))
 
 	vote, err := app.State.Vote(pid, detxresp.Data, false)
@@ -224,18 +222,17 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// define a function to send a vote
 	vote := func(i int) uint32 {
-		var cktx abcitypes.RequestCheckTx
-		var detx abcitypes.RequestDeliverTx
+		cktx := new(abcitypes.RequestCheckTx)
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		cktxresp := app.CheckTx(cktx)
+		cktxresp, _ := app.CheckTx(nil, cktx)
 		if cktxresp.Code != 0 {
 			return cktxresp.Code
 		}
-		detx.Tx, err = proto.Marshal(stx)
+		txb, err := proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		detxresp := app.DeliverTx(detx)
+		detxresp := app.deliverTx(txb)
 		return detxresp.Code
 	}
 

@@ -3,6 +3,7 @@ package vochain
 // go test -benchmem -run=^$ -bench=. -cpu=10
 
 import (
+	"context"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -112,11 +113,8 @@ func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
 }
 
 func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.SignedTx) {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
+	var cktx *abcitypes.RequestCheckTx
+	var cktxresp *abcitypes.ResponseCheckTx
 
 	var err error
 	var txBytes []byte
@@ -126,20 +124,25 @@ func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.SignedTx)
 			b.Fatal(err)
 		}
 		cktx.Tx = txBytes
-		cktxresp = app.CheckTx(cktx)
+		cktxresp, _ = app.CheckTx(context.Background(), cktx)
 		if cktxresp.Code != 0 {
 			b.Fatalf(fmt.Sprintf("checkTX failed: %s", cktxresp.Data))
 		} else {
-			detx.Tx = txBytes
-			detxresp = app.DeliverTx(detx)
+			detxresp := app.deliverTx(txBytes)
 			if detxresp.Code != 0 {
 				b.Fatalf(fmt.Sprintf("deliverTX failed: %s", detxresp.Data))
 			}
 		}
 		i++
 		if i%100 == 0 {
-			app.Commit()
+			_, err = app.Commit(nil, nil)
+			if err != nil {
+				b.Fatal(err)
+			}
 		}
 	}
-	app.Commit()
+	_, err = app.Commit(nil, nil)
+	if err != nil {
+		b.Fatal(err)
+	}
 }

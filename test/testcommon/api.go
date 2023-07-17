@@ -59,7 +59,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	// create and add balance for the pre-created Account
 	err = d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 100000)
 	qt.Assert(t, err, qt.IsNil)
-	d.VochainAPP.Commit()
+	d.VochainAPP.Commit(nil, nil)
 
 	// create vochain info (we do not start since it is not required)
 	d.VochainInfo = vochaininfo.NewVochainInfo(d.VochainAPP)

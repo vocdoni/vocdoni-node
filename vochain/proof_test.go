@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -46,10 +47,7 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
+	cktx := new(abcitypes.RequestCheckTx)
 
 	// send the votes (but not the last one), should be ok
 	for i, s := range keys {
@@ -57,16 +55,17 @@ func TestMerkleTreeProof(t *testing.T) {
 
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Assert(t, err, qt.IsNil)
-		cktxresp = app.CheckTx(cktx)
+		cktxresp, _ := app.CheckTx(context.Background(), cktx)
 		qt.Assert(t, cktxresp.Code, qt.Equals, uint32(0))
 
-		detx.Tx, err = proto.Marshal(stx)
+		txb, err := proto.Marshal(stx)
 		qt.Assert(t, err, qt.IsNil)
-		detxresp = app.DeliverTx(detx)
+		detxresp := app.deliverTx(txb)
 		qt.Assert(t, detxresp.Code, qt.Equals, uint32(0))
 
 		if i%5 == 0 {
-			app.Commit()
+			_, err = app.Commit(nil, nil)
+			qt.Assert(t, err, qt.IsNil)
 			app.AdvanceTestBlock()
 		}
 	}
@@ -102,7 +101,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Assert(t, err, qt.IsNil)
 
-		cktxresp = app.CheckTx(cktx)
+		cktxresp, _ := app.CheckTx(context.Background(), cktx)
 		if i == 0 && cktxresp.Code != 0 {
 			t.Fatalf("checkTx returned err on first valid vote: %s", cktxresp.Data)
 		}
@@ -110,10 +109,10 @@ func TestMerkleTreeProof(t *testing.T) {
 			t.Fatalf("checkTx returned 0 for vote %d, an error was expected", i)
 		}
 
-		detx.Tx, err = proto.Marshal(stx)
+		txb, err := proto.Marshal(stx)
 		qt.Assert(t, err, qt.IsNil)
 
-		detxresp = app.DeliverTx(detx)
+		detxresp := app.deliverTx(txb)
 		if i == 0 && detxresp.Code != 0 {
 			t.Fatalf("devlierTx returned err on first valid vote: %s", detxresp.Data)
 		}
@@ -197,10 +196,8 @@ func TestCSPproof(t *testing.T) {
 
 func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
+	cktx := new(abcitypes.RequestCheckTx)
+	var cktxresp *abcitypes.ResponseCheckTx
 	var stx models.SignedTx
 	var err error
 
@@ -224,7 +221,7 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 	cktx.Tx, err = proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
 			t.Fatalf(fmt.Sprintf("checkTx failed: %s", cktxresp.Data))
@@ -234,9 +231,9 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 			t.Fatalf("checkTx success, but expected result is fail")
 		}
 	}
-	detx.Tx, err = proto.Marshal(&stx)
+	txb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
-	detxresp = app.DeliverTx(detx)
+	detxresp := app.deliverTx(txb)
 	if detxresp.Code != 0 {
 		if expectedResult {
 			t.Fatalf(fmt.Sprintf("deliverTx failed: %s", detxresp.Data))
@@ -246,5 +243,6 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 			t.Fatalf("deliverTx success, but expected result is fail")
 		}
 	}
-	app.Commit()
+	_, err = app.Commit(nil, nil)
+	qt.Assert(t, err, qt.IsNil)
 }
