@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/hashicorp/golang-lru/v2"
+	lru "github.com/hashicorp/golang-lru/v2"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
 )
