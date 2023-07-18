@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
@@ -115,7 +116,7 @@ func TestVoteOverwrite(t *testing.T) {
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 0, 1}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		cktxresp, _ = app.CheckTx(nil, cktx)
+		cktxresp, _ = app.CheckTx(context.TODO(), cktx)
 		qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
 		txb, err := proto.Marshal(stx)
@@ -131,7 +132,7 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp, _ = app.CheckTx(nil, cktx)
+	cktxresp, _ = app.CheckTx(context.TODO(), cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
 	txb, err := proto.Marshal(stx)
@@ -146,7 +147,7 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp, _ = app.CheckTx(nil, cktx)
+	cktxresp, _ = app.CheckTx(context.TODO(), cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
 	txb, err = proto.Marshal(stx)
@@ -161,7 +162,7 @@ func TestVoteOverwrite(t *testing.T) {
 
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp, _ = app.CheckTx(nil, cktx)
+	cktxresp, _ = app.CheckTx(context.TODO(), cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(0))
 
 	txb, err = proto.Marshal(stx)
@@ -175,7 +176,7 @@ func TestVoteOverwrite(t *testing.T) {
 	stx = testBuildSignedVote(t, pid, keys[0], proofs[0], []int{3, 1, 1}, app.ChainID())
 	cktx.Tx, err = proto.Marshal(stx)
 	qt.Check(t, err, qt.IsNil)
-	cktxresp, _ = app.CheckTx(nil, cktx)
+	cktxresp, _ = app.CheckTx(context.TODO(), cktx)
 	qt.Check(t, cktxresp.Code, qt.Equals, uint32(1))
 
 	vote, err := app.State.Vote(pid, detxresp.Data, false)
@@ -226,7 +227,7 @@ func TestMaxCensusSize(t *testing.T) {
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
-		cktxresp, _ := app.CheckTx(nil, cktx)
+		cktxresp, _ := app.CheckTx(context.TODO(), cktx)
 		if cktxresp.Code != 0 {
 			return cktxresp.Code
 		}

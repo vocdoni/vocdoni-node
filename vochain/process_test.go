@@ -417,7 +417,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
 
 	}
-	_, err := app.Commit(nil, nil)
+	_, err := app.Commit(context.TODO(), nil)
 	qt.Assert(t, err, qt.IsNil)
 	return app, keys
 }
@@ -444,7 +444,7 @@ func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.
 		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
 	}
 	// commit()
-	_, err = app.Commit(nil, nil)
+	_, err = app.Commit(context.TODO(), nil)
 	return err
 }
 

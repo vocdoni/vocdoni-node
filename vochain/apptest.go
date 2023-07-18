@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -28,7 +29,7 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 	if err != nil {
 		tb.Fatal(err)
 	}
-	_, err = app.InitChain(nil, &abcitypes.RequestInitChain{
+	_, err = app.InitChain(context.TODO(), &abcitypes.RequestInitChain{
 		Time:          time.Now(),
 		ChainId:       "test",
 		Validators:    []abcitypes.ValidatorUpdate{},
@@ -96,7 +97,7 @@ func (app *BaseApplication) SetTestingMethods() {
 // AdvanceTestBlock commits the current state, ends the current block and starts a new one.
 // Advances the block height and timestamp.
 func (app *BaseApplication) AdvanceTestBlock() {
-	_, err := app.Commit(nil, nil)
+	_, err := app.Commit(context.TODO(), nil)
 	if err != nil {
 		panic(err)
 	}

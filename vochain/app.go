@@ -23,7 +23,6 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
-	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -395,7 +394,7 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.State.SetHeight(height)
 	app.height.Store(height)
 	go app.State.CachePurge(height)
-	app.State.OnBeginBlock(state.BeginBlock{
+	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
 		Time:   t,
 		// TODO: remove data hash from this event call

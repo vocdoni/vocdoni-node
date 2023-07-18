@@ -135,13 +135,13 @@ func benchCheckTx(b *testing.B, app *BaseApplication, voters []*models.SignedTx)
 		}
 		i++
 		if i%100 == 0 {
-			_, err = app.Commit(nil, nil)
+			_, err = app.Commit(context.TODO(), nil)
 			if err != nil {
 				b.Fatal(err)
 			}
 		}
 	}
-	_, err = app.Commit(nil, nil)
+	_, err = app.Commit(context.TODO(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
