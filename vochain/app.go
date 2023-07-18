@@ -297,7 +297,8 @@ func (app *BaseApplication) CheckTx(ctx context.Context,
 func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	app.beginBlock(req.GetTime(), uint32(req.GetHeight()))
-	for _, tx := range req.Txs {
+	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
+	for i, tx := range req.Txs {
 		resp := app.deliverTx(tx)
 		if resp.Code != 0 {
 			log.Warnw("deliverTx failed",
@@ -306,6 +307,11 @@ func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 				"info", resp.Info,
 				"log", resp.Log)
 		}
+		txResults[i] = &abcitypes.ExecTxResult{
+			Code: resp.Code,
+			Data: resp.Data,
+			Log:  resp.Log,
+		}
 	}
 	// execute internal state transition commit
 	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
@@ -313,7 +319,8 @@ func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 	}
 	app.endBlock(req.GetTime(), uint32(req.GetHeight()))
 	return &abcitypes.ResponseFinalizeBlock{
-		AppHash: app.State.WorkingHash(),
+		AppHash:   app.State.WorkingHash(),
+		TxResults: txResults, // TODO: check if we can remove this
 	}, nil
 }
 
