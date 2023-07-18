@@ -34,7 +34,6 @@ type CircuitInputs struct {
 
 func (ci *CircuitInputs) String() string {
 	bstr, _ := json.Marshal(ci)
-	// bstr, _ := json.MarshalIndent(ci, "", "\t")
 	return string(bstr)
 }
 

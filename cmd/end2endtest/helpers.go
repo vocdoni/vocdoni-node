@@ -541,6 +541,9 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 						// don't retry
 						delete(queue, i)
 						errs[i] = err
+					case strings.Contains(err.Error(), "expired sik root"):
+						delete(queue, i)
+						errs[i] = err
 					default:
 						// any other error, print it and wait a bit
 						log.Warn(err)
@@ -644,7 +647,7 @@ func (t *e2eElection) verifyVoteCount(nvotesExpected int) error {
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		t.config.nvotes, time.Since(startTime), int(float64(nvotesExpected)/time.Since(startTime).Seconds()))
+		nvotesExpected, time.Since(startTime), int(float64(nvotesExpected)/time.Since(startTime).Seconds()))
 
 	return nil
 }
