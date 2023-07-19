@@ -3,20 +3,19 @@ issues:
         exclude-use-default: false
 linters:
         enable:
-        - gosec
         - misspell
         - gofumpt
-        - lll
         - staticcheck
-        - structcheck
-        - varcheck
         - unused
         - typecheck
         - ineffassign
         - errcheck
         - gosimple
         - goconst
+        - zerologlint
+        - sqlclosecheck
+        - bodyclose
+        - dupl
+        - revive
 
 linters-settings:
-        lll:
-                line-length: 100

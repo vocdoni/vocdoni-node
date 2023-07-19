@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -416,37 +417,35 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
 
 	}
-	app.Commit()
+	_, err := app.Commit(context.TODO(), nil)
+	qt.Assert(t, err, qt.IsNil)
 	return app, keys
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
+	cktx := new(abcitypes.RequestCheckTx)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)
 	if err != nil {
 		return fmt.Errorf("mashaling failed: %w", err)
 	}
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
 	// deliverTx()
-	detx.Tx, err = proto.Marshal(stx)
+	tx, err := proto.Marshal(stx)
 	if err != nil {
 		return fmt.Errorf("mashaling failed: %w", err)
 	}
-	detxresp = app.DeliverTx(detx)
+	detxresp := app.deliverTx(tx)
 	if detxresp.Code != 0 {
 		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
 	}
 	// commit()
-	app.Commit()
-	return nil
+	_, err = app.Commit(context.TODO(), nil)
+	return err
 }
 
 func TestGlobalMaxProcessSize(t *testing.T) {

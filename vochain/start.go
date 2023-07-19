@@ -174,7 +174,6 @@ func newTendermint(app *BaseApplication,
 	// disable transaction indexer (we don't use it)
 	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: "null"}
 	// mempool config
-	tconfig.Mempool.Version = "v0"
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = true
 	tconfig.Mempool.KeepInvalidTxsInCache = false
@@ -266,13 +265,12 @@ func newTendermint(app *BaseApplication,
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
-
 	service, err := tmnode.NewNode(tconfig,
 		pv,
 		nodeKey,
 		proxy.NewLocalClientCreator(app),
 		tmnode.DefaultGenesisDocProviderFunc(tconfig),
-		tmnode.DefaultDBProvider,
+		tmcfg.DefaultDBProvider,
 		tmnode.DefaultMetricsProvider(tconfig.Instrumentation),
 		logger,
 	)

@@ -546,6 +546,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		}
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
+
 	ref, err := a.indexer.GetTxReferenceByBlockHeightAndBlockIndex(height, index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {

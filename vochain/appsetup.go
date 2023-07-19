@@ -3,16 +3,13 @@ package vochain
 import (
 	"context"
 	"fmt"
-	"time"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/node"
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -40,7 +37,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
 func (app *BaseApplication) SetDefaultMethods() {
-	log.Infof("setting default Tendermint methods for blockchain interaction")
 	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
 		resblock, err := app.Node.BlockByHash(context.Background(), hash)
 		if err != nil {
@@ -66,8 +62,6 @@ func (app *BaseApplication) SetDefaultMethods() {
 		return app.Service.(*node.Node).Mempool().Size()
 	})
 	app.SetFnMempoolPrune(app.fnMempoolRemoveTxTendermint)
-	app.SetFnBeginBlock(app.fnBeginBlockDefault)
-	app.SetFnEndBlock(app.fnEndBlockDefault)
 	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
 		result, err := app.Node.BroadcastTxSync(context.Background(), tx)
 		log.Debugw("broadcast tx",
@@ -96,11 +90,11 @@ func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*mode
 	if block == nil {
 		return nil, ErrTransactionNotFound
 	}
-	if int32(len(block.Txs)) <= txIndex {
+	if int32(len(block.Data.Txs)) <= txIndex {
 		return nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
-	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
+	return tx, proto.Unmarshal(block.Data.Txs[txIndex], tx)
 }
 
 func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
@@ -113,39 +107,6 @@ func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*
 	}
 	tx := &models.SignedTx{}
 	return tx, block.Txs[txIndex].Hash(), proto.Unmarshal(block.Txs[txIndex], tx)
-}
-
-// fnBeginBlockDefault signals the beginning of a new block. Called prior to any DeliverTxs.
-// The header contains the height, timestamp, and more - it exactly matches the
-// Tendermint block header.
-// The LastCommitInfo and ByzantineValidators can be used to determine rewards and
-// punishments for the validators.
-func (app *BaseApplication) fnBeginBlockDefault(
-	req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock {
-	app.State.Rollback()
-	app.startBlockTimestamp.Store(req.Header.GetTime().Unix())
-	height := uint32(req.Header.GetHeight())
-	app.State.SetHeight(height)
-	go app.State.CachePurge(height)
-	app.State.OnBeginBlock(state.BeginBlock{
-		Height:   req.Header.Height,
-		Time:     req.Header.Time,
-		DataHash: req.Header.DataHash,
-	})
-
-	return abcitypes.ResponseBeginBlock{}
-}
-
-// fnEndBlockDefault updates the app height and timestamp at the end of the current block
-func (app *BaseApplication) fnEndBlockDefault(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock {
-	app.endBlock(req.Height, time.Now())
-	return abcitypes.ResponseEndBlock{}
-}
-
-func (app *BaseApplication) endBlock(height int64, timestamp time.Time) abcitypes.ResponseEndBlock {
-	app.height.Store(uint32(height))
-	app.endBlockTimestamp.Store(timestamp.Unix())
-	return abcitypes.ResponseEndBlock{}
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by hash
@@ -186,16 +147,6 @@ func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
 // SetFnMempoolPrune sets the mempool prune method for a transaction.
 func (app *BaseApplication) SetFnMempoolPrune(fn func([32]byte) error) {
 	app.fnMempoolPrune = fn
-}
-
-// SetFnBeginBlock sets the begin block method.
-func (app *BaseApplication) SetFnBeginBlock(fn func(req abcitypes.RequestBeginBlock) abcitypes.ResponseBeginBlock) {
-	app.fnBeginBlock = fn
-}
-
-// SetFnEndBlock sets the end block method.
-func (app *BaseApplication) SetFnEndBlock(fn func(req abcitypes.RequestEndBlock) abcitypes.ResponseEndBlock) {
-	app.fnEndBlock = fn
 }
 
 // fnMempoolRemoveTxTendermint removes a transaction (identifier by its vochain.TxKey() hash)

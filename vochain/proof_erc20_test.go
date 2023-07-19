@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -64,12 +65,8 @@ func TestEthProof(t *testing.T) {
 
 func testEthSendVotes(t *testing.T, s testStorageProof,
 	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
-	var cktx abcitypes.RequestCheckTx
-	var detx abcitypes.RequestDeliverTx
-
-	var cktxresp abcitypes.ResponseCheckTx
-	var detxresp abcitypes.ResponseDeliverTx
-
+	cktx := new(abcitypes.RequestCheckTx)
+	var cktxresp *abcitypes.ResponseCheckTx
 	var stx models.SignedTx
 
 	t.Logf("voting %x", s.StorageProof.Key)
@@ -116,7 +113,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 	if cktx.Tx, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
-	cktxresp = app.CheckTx(cktx)
+	cktxresp, _ = app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
 			t.Fatalf(fmt.Sprintf("checkTx failed: %s", cktxresp.Data))
@@ -126,10 +123,12 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 			t.Fatalf("checkTx success, but expected result is fail")
 		}
 	}
-	if detx.Tx, err = proto.Marshal(&stx); err != nil {
+
+	var txb []byte
+	if txb, err = proto.Marshal(&stx); err != nil {
 		t.Fatal(err)
 	}
-	detxresp = app.DeliverTx(detx)
+	detxresp := app.deliverTx(txb)
 	if detxresp.Code != 0 {
 		if expectedResult {
 			t.Fatalf(fmt.Sprintf("deliverTx failed: %s", detxresp.Data))
@@ -139,7 +138,10 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 			t.Fatalf("deliverTx success, but expected result is fail")
 		}
 	}
-	app.Commit()
+	_, err = app.Commit(context.TODO(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 }
 
 var testSmartContractHolders = []string{

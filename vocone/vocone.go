@@ -1,6 +1,7 @@
 package vocone
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -13,7 +14,6 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/cometbft/cometbft/crypto/tmhash"
-	tmprototypes "github.com/cometbft/cometbft/proto/tendermint/types"
 	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -181,27 +181,41 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			panic(err)
 		}
-		vc.app.InitChain(abcitypes.RequestInitChain{
+		if _, err = vc.app.InitChain(context.Background(), &abcitypes.RequestInitChain{
 			ChainId:       vc.app.ChainID(),
 			AppStateBytes: genesisAppData,
 			Time:          time.Now(),
-		})
+		}); err != nil {
+			panic(err)
+		}
 	}
 	for {
 		// Begin block
 		vc.vcMtx.Lock()
-		bblock := abcitypes.RequestBeginBlock{
-			Header: tmprototypes.Header{
+		startTime := time.Now()
+		height := vc.height.Load()
+		// Create and execute block
+		resp, err := vc.app.FinalizeBlock(
+			context.Background(),
+			&abcitypes.RequestFinalizeBlock{
+				Txs:    vc.prepareBlock(),
+				Height: height,
 				Time:   time.Now(),
-				Height: vc.height.Load(),
 			},
+		)
+		if err != nil {
+			log.Error(err, "finalize block error")
 		}
-		vc.app.BeginBlock(bblock)
-		// Commit block
-		vc.commitBlock()
-		comres := vc.app.Commit()
-		log.Debugw("block committed", "height", bblock.Header.Height, "hash", hex.EncodeToString(comres.Data))
-		vc.app.EndBlock(abcitypes.RequestEndBlock{Height: bblock.Header.Height})
+		// Commit block to persistent state
+		_, err = vc.app.Commit(context.Background(), &abcitypes.RequestCommit{})
+		if err != nil {
+			log.Error(err, "commit error")
+		}
+		log.Debugw("block committed",
+			"height", height,
+			"hash", hex.EncodeToString(resp.GetAppHash()),
+			"took", time.Since(startTime),
+		)
 		vc.vcMtx.Unlock()
 
 		// Waiting time
@@ -369,7 +383,10 @@ func (vc *Vocone) setDefaultMethods() {
 }
 
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
-	resp := vc.app.CheckTx(abcitypes.RequestCheckTx{Tx: tx})
+	resp, err := vc.app.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+	if err != nil {
+		return nil, err
+	}
 	if resp.Code == 0 {
 		select {
 		case vc.mempool <- tx:
@@ -389,36 +406,42 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 	}, nil
 }
 
-func (vc *Vocone) commitBlock() {
+// prepareBlock prepares a block with transactions from the mempool and returns the list of transactions.
+func (vc *Vocone) prepareBlock() [][]byte {
 	blockStoreTx := vc.blockStore.WriteTx()
 	defer blockStoreTx.Discard()
-	var txCount int
+	var transactions [][]byte
 txLoop:
-	for txCount = 0; txCount < vc.txsPerBlock; {
+	for txCount := 0; txCount < vc.txsPerBlock; {
 		var tx []byte
 		select {
 		case tx = <-vc.mempool:
 		default: // mempool is empty
 			break txLoop
 		}
-		resp := vc.app.DeliverTx(abcitypes.RequestDeliverTx{Tx: tx})
+		// ensure all txs are still valid valid
+		resp, err := vc.app.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+		if err != nil {
+			log.Errorw(err, "error on check tx")
+			continue
+		}
 		if resp.Code == 0 {
-			blockStoreTx.Set(
+			if err := blockStoreTx.Set(
 				[]byte(fmt.Sprintf("%d_%d", vc.height.Load(), txCount)),
 				tx,
-			)
-			txCount++
-			log.Debugf("deliver tx succeed %s", resp.Info)
+			); err != nil {
+				log.Errorw(err, "error on store tx")
+				continue
+			}
+			transactions = append(transactions, tx)
 		} else {
-			log.Warnf("deliver tx failed: %s", resp.Data)
+			log.Warnw("check tx failed", "code", resp.Code, "data", string(resp.Data))
 		}
 	}
-	if txCount > 0 {
-		log.Infof("stored %d transactions on block %d", txCount, vc.height.Load())
-		if err := blockStoreTx.Commit(); err != nil {
-			log.Errorf("cannot commit to blockstore: %v", err)
-		}
+	if len(transactions) > 0 {
+		log.Infow("stored transactions on block", "count", len(transactions), "height", vc.height.Load())
 	}
+	return transactions
 }
 
 // TO-DO: improve this function
