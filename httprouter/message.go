@@ -55,8 +55,7 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 		// For 204 status, don't set Content-Length, don't try to write a body.
 		h.Writer.WriteHeader(httpStatusCode)
 		log.Debugf("response: (%d)", httpStatusCode)
-		_, err := h.Writer.Write([]byte(""))
-		return err
+		return nil
 	}
 
 	// Content length will be message length plus newline character
