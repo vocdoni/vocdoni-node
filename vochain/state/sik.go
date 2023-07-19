@@ -115,14 +115,14 @@ func (v *State) InvalidateSIK(address common.Address) error {
 // ValidSIKRoots returns the list of current valid roots from the SIK's merkle
 // tree. It reads the roots from the key-value database associated to the SIK's
 // subtree.
-func (v *State) ValidSIKRoots() ([]SIK, error) {
+func (v *State) ValidSIKRoots() ([][]byte, error) {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, err
 	}
-	validRoots := []SIK{}
+	validRoots := [][]byte{}
 	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
 		validRoots = append(validRoots, root)
 		return true

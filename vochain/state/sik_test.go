@@ -74,9 +74,9 @@ func Test_sikRoots(t *testing.T) {
 	validSIKs, err := s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 1)
-	processTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
+	sikTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	c.Assert(err, qt.IsNil)
-	firstRoot, err := processTree.Root()
+	firstRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
 	c.Assert(firstRoot, qt.ContentEquals, validSIKs[0])
 	// increase the height and include a new sik
@@ -88,11 +88,11 @@ func Test_sikRoots(t *testing.T) {
 	validSIKs, err = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 2)
-	secondRoot, err := processTree.Root()
+	secondRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
 	c.Assert(firstRoot, qt.ContentEquals, validSIKs[0])
 	c.Assert(secondRoot, qt.ContentEquals, validSIKs[1])
-	// increase the height and include a new sik that will delete the first one
+	// increase the height and include a new sik that will delete the rest of sikroots
 	address3 := common.HexToAddress("0x2dd603151d817f829b03412f7378e1179b5b2b1c")
 	sik3, _ := hex.DecodeString("7ccbc0da9e8d7e469ba60cd898a5b881c99a960c1e69990a3196")
 	s.SetHeight(66)
@@ -100,11 +100,10 @@ func Test_sikRoots(t *testing.T) {
 	// check the results
 	validSIKs, err = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
-	c.Assert(len(validSIKs), qt.Equals, 2)
-	thirdRoot, err := processTree.Root()
+	c.Assert(len(validSIKs), qt.Equals, 1)
+	thirdRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
-	c.Assert(secondRoot, qt.ContentEquals, validSIKs[0])
-	c.Assert(thirdRoot, qt.ContentEquals, validSIKs[1])
+	c.Assert(thirdRoot, qt.ContentEquals, validSIKs[0])
 }
 
 func Test_heightEncoding(t *testing.T) {

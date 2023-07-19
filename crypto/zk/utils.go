@@ -13,11 +13,28 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// The proof structure is the following:
+// 	{
+// 		A: [3]bigint,
+// 		B: [3][2]bigint,
+// 		C: [3]bigint,
+// 		PublicSignals: [8]bigint{
+//			0: electionId[0],
+// 			1: electionId[1],
+// 			2: nullifier,
+// 			3: availableWeight,
+// 			4: voteHash[0],
+// 			5: voteHash[1],
+// 			6: sikRoot,
+// 			7: censusRoot
+//		}
+// 	}
+
 // Default length of each proof parameters
 const (
 	proofALen    = 3
-	proofBLen    = 6
-	proofBEncLen = 3
+	proofBLen    = 6 // flatted
+	proofBEncLen = 3 // matrix
 	proofCLen    = 3
 	publicSigLen = 8
 )
@@ -54,8 +71,8 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 // required to calculate that parameter. If the provided proof does not contains
 // a defined public signals and any of the rest of the parameters is nil, the
 // resulting struct will not contains any defined PublicInputs value.
-func ProverProofToProtobufZKProof(p *prover.Proof,
-	electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) (*models.ProofZkSNARK, error) {
+func ProverProofToProtobufZKProof(p *prover.Proof, electionId, sikRoot,
+	censusRoot, nullifier types.HexBytes, availableWeight *big.Int) (*models.ProofZkSNARK, error) {
 	if len(p.Data.A) != proofALen || len(p.Data.B) != proofBEncLen || len(p.Data.C) != proofCLen {
 		return nil, fmt.Errorf("wrong ZkSnark prover proof format")
 	}
@@ -77,31 +94,35 @@ func ProverProofToProtobufZKProof(p *prover.Proof,
 	// if not, check if the rest of the arguments are provided and try to
 	// generate the correct public signals
 	if p.PubSignals == nil {
-		if electionId == nil || censusRoot == nil || nullifier == nil || weight == nil {
+		if electionId == nil || sikRoot == nil || censusRoot == nil || nullifier == nil || availableWeight == nil {
 			return nil, fmt.Errorf("no enought arguments to generate the calc signals")
 		}
-		proof.PublicInputs = zkProofPublicInputs(electionId, censusRoot, nullifier, weight)
+		proof.PublicInputs = zkProofPublicInputs(electionId, sikRoot, censusRoot, nullifier, availableWeight)
 	}
 	return proof, nil
 }
 
 // zkProofPublicInputs encodes the provided parameters in the correct order and
 // codification into a slice of string arbo compatible.
-func zkProofPublicInputs(electionId, censusRoot, nullifier types.HexBytes, weight *big.Int) []string {
+func zkProofPublicInputs(electionId, sikRoot, censusRoot, nullifier types.HexBytes, availableWeight *big.Int) []string {
 	pubInputs := []string{}
-	// 1. [2]processId
+	// 0. electionId[0]
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[:16]).String())
+	// 1. electionId[1]
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[16:]).String())
-	// 2. censusRoot
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
-	// 3. nullifier
+	// 2. nullifier
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(nullifier).String())
-	// 4. weight
-	pubInputs = append(pubInputs, weight.String())
-	// 5. [2]voteHash
-	voteHash := sha256.Sum256(weight.Bytes())
+	// 3. availableWeight
+	pubInputs = append(pubInputs, availableWeight.String())
+	voteHash := sha256.Sum256(availableWeight.Bytes())
+	// 4. voteHash[0]
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[:16]).String())
+	// 5. voteHash[1]
 	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[16:]).String())
+	// 6. sikRoot
+	pubInputs = append(pubInputs, arbo.BytesToBigInt(sikRoot).String())
+	// 7. censusRoot
+	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
 
 	return pubInputs
 }

@@ -219,6 +219,8 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + ipfs.CalculateCIDv1json(metaData)
+	sik, err := signer.Sik()
+	qt.Assert(t, err, qt.IsNil)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -226,6 +228,7 @@ func TestAPIaccount(t *testing.T) {
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
+			Sik:           sik,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)

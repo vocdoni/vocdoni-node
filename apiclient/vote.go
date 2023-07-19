@@ -108,7 +108,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			return nil, err
 		}
 		// encode the proof into a protobuf
-		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil)
+		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil, nil)
 		if err != nil {
 			return nil, err
 		}

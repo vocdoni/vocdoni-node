@@ -488,11 +488,17 @@ func testSetAccountTx(t *testing.T,
 	create bool) error {
 	var err error
 
+	sik, err := signer.Sik()
+	if err != nil {
+		return err
+	}
+
 	tx := &models.SetAccountTx{
 		Nonce:         &nonce,
 		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
 		Account:       account.Bytes(),
 		FaucetPackage: faucetPkg,
+		Sik:           sik,
 	}
 	if create {
 		tx.Txtype = models.TxType_CREATE_ACCOUNT
