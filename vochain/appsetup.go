@@ -37,7 +37,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
 func (app *BaseApplication) SetDefaultMethods() {
-	log.Infof("setting default Tendermint methods for blockchain interaction")
 	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
 		resblock, err := app.Node.BlockByHash(context.Background(), hash)
 		if err != nil {
@@ -91,11 +90,11 @@ func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*mode
 	if block == nil {
 		return nil, ErrTransactionNotFound
 	}
-	if int32(len(block.Txs)) <= txIndex {
+	if int32(len(block.Data.Txs)) <= txIndex {
 		return nil, ErrTransactionNotFound
 	}
 	tx := &models.SignedTx{}
-	return tx, proto.Unmarshal(block.Txs[txIndex], tx)
+	return tx, proto.Unmarshal(block.Data.Txs[txIndex], tx)
 }
 
 func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {

@@ -65,8 +65,6 @@ type BaseApplication struct {
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
 	blockCache         *lru.Cache[int64, *tmtypes.Block]
-	// height of the last ended block
-	height atomic.Uint32
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
@@ -140,6 +138,7 @@ func (app *BaseApplication) Info(ctx context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
+	app.State.SetHeight(lastHeight)
 	appHash, err := app.State.Store.Hash()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get Store.Hash: %w", err)
@@ -262,9 +261,8 @@ func (app *BaseApplication) InitChain(ctx context.Context,
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(ctx context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
-	height := app.Height()
 	if req.Type == abcitypes.CheckTxType_Recheck {
-		if height%recheckTxHeightInterval != 0 {
+		if app.Height()%recheckTxHeightInterval != 0 {
 			return &abcitypes.ResponseCheckTx{Code: 0}, nil
 		}
 	}
@@ -295,7 +293,8 @@ func (app *BaseApplication) CheckTx(ctx context.Context,
 // CometBFT calls it when a new block is decided.
 func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
-	app.beginBlock(req.GetTime(), uint32(req.GetHeight()))
+	height := uint32(req.GetHeight())
+	app.beginBlock(req.GetTime(), height)
 	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
 	for i, tx := range req.Txs {
 		resp := app.deliverTx(tx)
@@ -313,10 +312,10 @@ func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 		}
 	}
 	// execute internal state transition commit
-	if err := app.Istc.Commit(app.Height(), app.IsSynchronizing()); err != nil {
+	if err := app.Istc.Commit(height, app.IsSynchronizing()); err != nil {
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
-	app.endBlock(req.GetTime(), uint32(req.GetHeight()))
+	app.endBlock(req.GetTime(), height)
 	return &abcitypes.ResponseFinalizeBlock{
 		AppHash:   app.State.WorkingHash(),
 		TxResults: txResults, // TODO: check if we can remove this
@@ -370,7 +369,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 	}
 	// call event listeners
 	for _, e := range app.State.EventListeners() {
-		e.OnNewTx(tx, app.Height()+1, app.State.TxCounter())
+		e.OnNewTx(tx, app.Height(), app.State.TxCounter())
 	}
 	return &DeliverTxResponse{
 		Code: 0,
@@ -392,7 +391,6 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.State.Rollback()
 	app.startBlockTimestamp.Store(t.Unix())
 	app.State.SetHeight(height)
-	app.height.Store(height)
 	go app.State.CachePurge(height)
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
@@ -477,10 +475,13 @@ func (app *BaseApplication) Query(ctx context.Context,
 // the ResponsePrepareProposal call. The logic modifying the raw proposal MAY be non-deterministic.
 func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
+	// TODO: Prepare Proposal should check the validity of the transactions for the next block.
+	// Currently they are executed by CheckTx, but it does not allow height to be passed in.
 	validTxs := [][]byte{}
 	for _, tx := range req.GetTxs() {
 		resp, err := app.CheckTx(ctx, &abcitypes.RequestCheckTx{
-			Tx: tx, Type: abcitypes.CheckTxType_New})
+			Tx: tx, Type: abcitypes.CheckTxType_New,
+		})
 		if err != nil || resp.Code != 0 {
 			log.Warnw("discard invalid tx on prepare proposal",
 				"err", err,
@@ -594,9 +595,9 @@ func (app *BaseApplication) IsSynchronizing() bool {
 	return app.isSynchronizing.Load()
 }
 
-// Height returns the current blockchain height
+// Height returns the current blockchain height, including the latest (under construction) block.
 func (app *BaseApplication) Height() uint32 {
-	return app.height.Load()
+	return app.State.CurrentHeight()
 }
 
 // Timestamp returns the last block end timestamp
