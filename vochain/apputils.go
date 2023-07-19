@@ -7,10 +7,8 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
-	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -20,11 +18,9 @@ import (
 
 	crypto25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
-	tmjson "github.com/cometbft/cometbft/libs/json"
 	tmp2p "github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/privval"
 	tmtypes "github.com/cometbft/cometbft/types"
-	tmtime "github.com/cometbft/cometbft/types/time"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -65,65 +61,6 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmp2p.NodeKey, error) {
 	}
 	// Write nodeKey to disk
 	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
-}
-
-// NewGenesis creates a new genesis and return its bytes
-func NewGenesis(cfg *config.VochainCfg, chainID string, consensusParams *genesis.ConsensusParams,
-	validators []privval.FilePV, accounts []string, initAccountsBalance int,
-	treasurer string, txCosts *genesis.TransactionCosts) ([]byte, error) {
-	// default consensus params
-	appState := genesis.GenesisAppState{}
-	appState.Validators = make([]genesis.AppStateValidators, len(validators))
-	for idx, val := range validators {
-		pubk, err := val.GetPubKey()
-		if err != nil {
-			return nil, err
-		}
-		signer := ethereum.SignKeys{}
-		if err := signer.AddHexKey(hex.EncodeToString(val.Key.PrivKey.Bytes())); err != nil {
-			return nil, err
-		}
-		appState.Validators[idx] = genesis.AppStateValidators{
-			Address: signer.Address().Bytes(),
-			PubKey:  pubk.Bytes(),
-			Power:   10,
-			Name:    strconv.Itoa(util.RandomInt(1, 10000)),
-		}
-	}
-	for _, acc := range accounts {
-		accAddressBytes, err := hex.DecodeString(util.TrimHex(acc))
-		if err != nil {
-			return nil, err
-		}
-		appState.Accounts = append(appState.Accounts, genesis.GenesisAccount{
-			Address: accAddressBytes,
-			Balance: uint64(initAccountsBalance),
-		})
-	}
-
-	if txCosts != nil {
-		appState.TxCost = *txCosts
-	}
-	tb, err := hex.DecodeString(util.TrimHex(treasurer))
-	if err != nil {
-		return nil, err
-	}
-	appState.Treasurer = tb
-	genDoc := genesis.GenesisDoc{
-		ChainID:         chainID,
-		GenesisTime:     tmtime.Now(),
-		ConsensusParams: consensusParams,
-		AppState:        appState,
-	}
-
-	// Note that the genesis doc bytes are later consumed by tendermint,
-	// which expects amino-flavored json. We can't use encoding/json.
-	genBytes, err := tmjson.Marshal(genDoc)
-	if err != nil {
-		return nil, err
-	}
-
-	return genBytes, nil
 }
 
 // GenerateFaucetPackage generates a faucet package.

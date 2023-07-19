@@ -1,6 +1,7 @@
 package processid
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -49,11 +50,13 @@ func (p *ProcessID) Marshal() []byte {
 	envType := make([]byte, 2)
 	binary.BigEndian.PutUint16(envType, uint16(p.envType))
 
-	var id []byte
-	id = append(chainID[:6], p.organizationAddr.Bytes()[:20]...)
-	id = append(id, proofType[1:]...)
-	id = append(id, envType[1:]...)
-	return append(id, nonce[:4]...)
+	var id bytes.Buffer
+	id.Write(chainID[:6])
+	id.Write(p.organizationAddr.Bytes()[:20])
+	id.Write(proofType[1:])
+	id.Write(envType[1:])
+	id.Write(nonce[:4])
+	return id.Bytes()
 }
 
 // MarshalBinary implements the BinaryMarshaler interface

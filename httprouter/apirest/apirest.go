@@ -99,29 +99,33 @@ func (e APIerror) Send(ctx *httprouter.HTTPContext) error {
 }
 
 // Withf returns a copy of APIerror with the Sprintf formatted string appended at the end of e.Err
-// Original e.Err is wrapped inside, so you can still match with errors.Is()
 func (e APIerror) Withf(format string, args ...interface{}) APIerror {
-	e.Err = fmt.Errorf("%w: %v", e.Err, fmt.Sprintf(format, args...))
-	return e
+	return APIerror{
+		Err:        fmt.Errorf("%w: %v", e.Err, fmt.Sprintf(format, args...)),
+		Code:       e.Code,
+		HTTPstatus: e.HTTPstatus,
+	}
 }
 
 // With returns a copy of APIerror with the string appended at the end of e.Err
-// Original e.Err is wrapped inside, so you can still match with errors.Is()
 func (e APIerror) With(s string) APIerror {
-	e.Err = fmt.Errorf("%w: %v", e.Err, s)
-	return e
+	return APIerror{
+		Err:        fmt.Errorf("%w: %v", e.Err, s),
+		Code:       e.Code,
+		HTTPstatus: e.HTTPstatus,
+	}
 }
 
 // WithErr returns a copy of APIerror with err.Error() appended at the end of e.Err
-// Original e.Err is wrapped inside, so you can still match with errors.Is()
-//
-// TODO: wrap both errors instead, as soon as we get Go 1.20
 func (e APIerror) WithErr(err error) APIerror {
-	e.Err = fmt.Errorf("%w: %v", e.Err, err.Error())
-	return e
+	return APIerror{
+		Err:        fmt.Errorf("%w: %v", e.Err, err.Error()),
+		Code:       e.Code,
+		HTTPstatus: e.HTTPstatus,
+	}
 }
 
-// NewAPI returns a API initialized type
+// NewAPI returns an API initialized type
 func NewAPI(router *httprouter.HTTProuter, baseRoute string) (*API, error) {
 	if router == nil {
 		panic("httprouter is nil")

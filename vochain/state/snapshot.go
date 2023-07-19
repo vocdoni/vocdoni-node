@@ -387,14 +387,14 @@ func (v *State) installSnapshot(height uint32) error {
 }
 */
 
-type diskSnapshotInfo struct {
+type DiskSnapshotInfo struct {
 	ModTime time.Time
 	Height  uint32
 	Size    int64
 }
 
 // ListSnapshots returns the list of the current state snapshots stored in disk.
-func (v *State) ListSnapshots() []diskSnapshotInfo {
+func (v *State) ListSnapshots() []DiskSnapshotInfo {
 	files, err := os.ReadDir(filepath.Join(
 		v.dataDir,
 		storageDirectory,
@@ -402,7 +402,7 @@ func (v *State) ListSnapshots() []diskSnapshotInfo {
 	if err != nil {
 		log.Fatal(err)
 	}
-	var list []diskSnapshotInfo
+	var list []DiskSnapshotInfo
 	for _, file := range files {
 		if !file.IsDir() {
 			height, err := strconv.Atoi(file.Name())
@@ -415,7 +415,7 @@ func (v *State) ListSnapshots() []diskSnapshotInfo {
 				log.Errorw(err, "could not list snapshot file")
 				continue
 			}
-			list = append(list, diskSnapshotInfo{
+			list = append(list, DiskSnapshotInfo{
 				Size:    fileInfo.Size(),
 				ModTime: fileInfo.ModTime(),
 				Height:  uint32(height),
