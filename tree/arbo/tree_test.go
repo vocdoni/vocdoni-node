@@ -890,36 +890,3 @@ func TestKeyLenBiggerThan32(t *testing.T) {
 		randomBytes(bLen))
 	c.Assert(err, qt.IsNil)
 }
-
-func BenchmarkAdd(b *testing.B) {
-	bLen := 32 // for both Poseidon & Sha256
-	// prepare inputs
-	var ks, vs [][]byte
-	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		ks = append(ks, k)
-		vs = append(vs, v)
-	}
-
-	b.Run("Poseidon", func(b *testing.B) {
-		benchmarkAdd(b, HashFunctionPoseidon, ks, vs)
-	})
-	b.Run("Sha256", func(b *testing.B) {
-		benchmarkAdd(b, HashFunctionSha256, ks, vs)
-	})
-}
-
-func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
-	c := qt.New(b)
-	database := metadb.NewTest(c)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 140,
-		HashFunction: hashFunc})
-	c.Assert(err, qt.IsNil)
-
-	for i := 0; i < len(ks); i++ {
-		if err := tree.Add(ks[i], vs[i]); err != nil {
-			b.Fatal(err)
-		}
-	}
-}
