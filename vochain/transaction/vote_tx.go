@@ -172,7 +172,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 
 		// Get valid verification key and verify the proof parsed
 		if err := proof.Verify(t.ZkCircuit.VerificationKey); err != nil {
-			return nil, fmt.Errorf("zkSNARK proof verification failed")
+			return nil, fmt.Errorf("zkSNARK proof verification failed: %w", err)
 		}
 
 	} else { // Signature based voting

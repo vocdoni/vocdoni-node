@@ -29,9 +29,9 @@ const (
 	PubKeyLengthBytesUncompressed = 65
 	// SigningPrefix is the prefix added when hashing
 	SigningPrefix = "\u0019Ethereum Signed Message:\n"
-	// DefaultSignatureSIKContent conatains the default seed to sing during
+	// DefaultSikPayload conatains the default seed to sing during
 	// SIK generation
-	DefaultSignatureSIKContent = "Vocdoni Sik Seed"
+	DefaultSikPayload = "vocdoni-sik-payload"
 )
 
 // SignKeys represents an ECDSA pair of keys for signing.
@@ -203,7 +203,7 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 }
 
 // Sik method generates the Secret Identity Key for the current SignKeys with
-// the signature of the DefaultSignatureSIKContent and the user secret (if it
+// the signature of the DefaultSikPayload and the user secret (if it
 // is provided) following the definition:
 //
 //	SIK = poseidon(address, signature, secret)
@@ -213,7 +213,7 @@ func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
 	if secret == nil {
 		return nil, fmt.Errorf("no secret provided")
 	}
-	sign, err := k.SignEthereum([]byte(DefaultSignatureSIKContent))
+	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
@@ -235,7 +235,7 @@ func (k *SignKeys) Sik() ([]byte, error) {
 
 func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {
 	// sign the default Secret Identity Key seed
-	sign, err := k.SignEthereum([]byte(DefaultSignatureSIKContent))
+	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}

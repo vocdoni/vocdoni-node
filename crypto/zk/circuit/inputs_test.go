@@ -38,7 +38,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	hexTestRoot, err := hex.DecodeString(testRoot)
 	c.Assert(err, qt.IsNil)
 	// mock user signature
-	signature, err := acc.SignEthereum([]byte(ethereum.DefaultSignatureSIKContent))
+	signature, err := acc.SignEthereum([]byte(ethereum.DefaultSikPayload))
 	c.Assert(err, qt.IsNil)
 	// mock expected circuit inputs
 	expected := &CircuitInputs{
