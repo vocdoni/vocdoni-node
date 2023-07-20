@@ -547,7 +547,7 @@ func (v *State) CurrentHeight() uint32 {
 	return v.currentHeight.Load()
 }
 
-// SetHeight sets the height for the current block.
+// SetHeight sets the height for the current (not committed) block.
 func (v *State) SetHeight(height uint32) {
 	v.currentHeight.Store(height)
 }
