@@ -19,7 +19,7 @@ type CircuitInputs struct {
 	Nullifier       string   `json:"nullifier"`
 	AvailableWeight string   `json:"availableWeight"`
 	VoteHash        []string `json:"voteHash"`
-	SikRoot         string   `json:"cikRoot"`
+	SikRoot         string   `json:"sikRoot"`
 	CensusRoot      string   `json:"censusRoot"`
 
 	// Private inputs
@@ -29,7 +29,7 @@ type CircuitInputs struct {
 
 	VoteWeight     string   `json:"voteWeight"`
 	CensusSiblings []string `json:"censusSiblings"`
-	SikSiblings    []string `json:"cikSiblings"`
+	SikSiblings    []string `json:"sikSiblings"`
 }
 
 func (ci *CircuitInputs) String() string {

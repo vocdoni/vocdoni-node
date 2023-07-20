@@ -56,11 +56,11 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 			"zk-franchise-proof-circuit/feature/new-circuit",
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
-		ProvingKeyHash:          hexToBytes("0xa42bf48a706aa24a78e364f769d9576c3ee7b453fefacafdcee4e1335ff5365f"),
+		ProvingKeyHash:          hexToBytes("0xb4487df5f2cb2834f2bf3680dd92516df5ace950fe7379730dc000e6a06fb7db"),
 		ProvingKeyFilename:      "proving_key.zkey",
-		VerificationKeyHash:     hexToBytes("0x24c4c4f6ca2a48c41e95d324c48b4428d4794d7e6fbeb9c840221ad797bcae56"),
+		VerificationKeyHash:     hexToBytes("0x16d2b61bccc06197e04c2dc9a1055998ccdbd34fa0f286b195ddca04e087daa0"),
 		VerificationKeyFilename: "verification_key.json",
-		WasmHash:                hexToBytes("0x0fe608036ef46ca58395c86b6b31b3c54edd79f331d003b7769c999ace38abfc"),
+		WasmHash:                hexToBytes("0x5502eae8c658adbdc609cd7da68fa14847bb2bc0665d4cdb4f988a33c7619518"),
 		WasmFilename:            "circuit.wasm",
 	},
 }
