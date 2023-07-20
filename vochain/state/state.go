@@ -143,11 +143,10 @@ func NewState(dbType, dataDir string) (*State, error) {
 		return nil, err
 	}
 	s.ProcessBlockRegistry = &ProcessBlockRegistry{
-		treeRW:   processesTree.NoState(),
-		treeRead: processesTree.AsTreeView(),
-		treeLock: &s.Tx,
+		startBlocksDB: processesTree.NoState(),
+		dbLock:        &s.Tx,
+		mainTree:      s.mainTreeViewer(false),
 	}
-
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }
 

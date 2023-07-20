@@ -178,6 +178,14 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/sikroots",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainSikRootsHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -838,6 +846,38 @@ func (a *API) chainTxCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		struct {
 			Count uint64 `json:"count"`
 		}{Count: count},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainSikRootsHandler
+//
+//	@Summary		List of valid SIK roots
+//	@Description	Returns the list of currently valid roots of the merkle tree where the vochain account SIK's are stored.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	uint64
+//	@Success		200	{object}	object{sikroots=[]string}
+//	@Router			/chain/transactions/count [get]
+func (a *API) chainSikRootsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	validSikRoots, err := a.vocapp.State.ValidSIKRoots()
+	if err != nil {
+		return err
+	}
+
+	sikRoots := []types.HexBytes{}
+	for _, root := range validSikRoots {
+		sikRoots = append(sikRoots, root)
+	}
+	data, err := json.Marshal(
+		struct {
+			SikRoots []types.HexBytes `json:"sikroots"`
+		}{SikRoots: sikRoots},
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
