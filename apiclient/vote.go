@@ -41,7 +41,7 @@ type VoteData struct {
 	VoteWeight *big.Int
 
 	ProofMkTree  *CensusProof
-	ProofSikTree *SikProof
+	ProofSikTree *CensusProof
 	ProofCSP     types.HexBytes
 	Keys         []api.Key
 

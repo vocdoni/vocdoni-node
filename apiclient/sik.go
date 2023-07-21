@@ -6,17 +6,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/types"
 )
-
-type SikProof struct {
-	// Proof contains encoded and packed siblings as a census proof
-	Proof types.HexBytes
-	// Root contains the sik merkle tree roor
-	Root types.HexBytes
-	// Siblings contains the decoded siblings keys
-	Siblings []string
-}
 
 type SikRoots []string
 
@@ -40,7 +30,7 @@ func (c *HTTPclient) ValidSikRoots() (SikRoots, error) {
 }
 
 // SikGenProof generates a proof for the voter address in the sik merkle tree.
-func (c *HTTPclient) SikGenProof() (*SikProof, error) {
+func (c *HTTPclient) SikGenProof() (*CensusProof, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "sik", "proof", c.account.AddressString())
 	if err != nil {
 		return nil, err
@@ -48,14 +38,15 @@ func (c *HTTPclient) SikGenProof() (*SikProof, error) {
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	sikProof := &api.SikProof{}
-	if err := json.Unmarshal(resp, sikProof); err != nil {
+	sikData := &api.Census{}
+	if err := json.Unmarshal(resp, sikData); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
-	sp := SikProof{
-		Proof:    sikProof.Proof,
-		Root:     sikProof.Root,
-		Siblings: sikProof.Siblings,
+	cp := CensusProof{
+		Root:      sikData.CensusRoot,
+		Proof:     sikData.CensusProof,
+		LeafValue: sikData.Value,
+		Siblings:  sikData.CensusSiblings,
 	}
-	return &sp, nil
+	return &cp, nil
 }

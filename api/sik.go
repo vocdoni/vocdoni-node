@@ -88,17 +88,17 @@ func (a *API) sikProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
-	response := SikProof{}
+	response := Census{}
 	// get merkle root
-	if response.Root, err = sikTree.Root(); err != nil {
+	if response.CensusRoot, err = sikTree.Root(); err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
 	// get sik merkle tree proof
-	if _, response.Proof, err = sikTree.GenProof(address); err != nil {
+	if response.Value, response.CensusProof, err = sikTree.GenProof(address); err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
 	// get sik merkle tree circom siblings
-	if response.Siblings, err = zk.ProofToCircomSiblings(response.Proof); err != nil {
+	if response.CensusSiblings, err = zk.ProofToCircomSiblings(response.CensusProof); err != nil {
 		return ErrCantGetCircomSiblings.WithErr(err)
 	}
 	// encode and send the sikproof

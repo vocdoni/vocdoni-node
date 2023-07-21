@@ -13,6 +13,8 @@ import (
 
 // CensusProof represents proof for a voter in a census
 type CensusProof struct {
+	// Root contains census tree root
+	Root types.HexBytes
 	// Proof contains encoded and packed siblings as a census proof
 	Proof types.HexBytes
 	// LeafValue contains the associated value on the census tree
@@ -108,6 +110,7 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
 	cp := CensusProof{
+		Root:      censusData.CensusRoot,
 		Proof:     censusData.CensusProof,
 		LeafValue: censusData.Value,
 		Siblings:  censusData.CensusSiblings,

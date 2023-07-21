@@ -161,14 +161,14 @@ func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.
 	return election, nil
 }
 
-func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) (map[string]*apiclient.CensusProof, map[string]*apiclient.SikProof) {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) (map[string]*apiclient.CensusProof, map[string]*apiclient.CensusProof) {
 	type voterProof struct {
 		proof    *apiclient.CensusProof
-		sikproof *apiclient.SikProof
+		sikproof *apiclient.CensusProof
 		address  string
 	}
 	proofs := make(map[string]*apiclient.CensusProof, t.config.nvotes)
-	sikProofs := make(map[string]*apiclient.SikProof, t.config.nvotes)
+	sikProofs := make(map[string]*apiclient.CensusProof, t.config.nvotes)
 	proofCh := make(chan *voterProof)
 	stopProofs := make(chan bool)
 	go func() {

@@ -115,7 +115,7 @@ func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *voch
 	censusData.CensusRoot = root
 
 	// generate a sik proof
-	sikData := &api.SikProof{}
+	sikData := &api.Census{}
 	resp, code = sc.Request("GET", nil, "proof", admin.AddressString())
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, sikData), qt.IsNil)
@@ -124,7 +124,7 @@ func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *voch
 
 }
 
-func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData *api.Census, sikData *api.SikProof) {
+func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData, sikData *api.Census) {
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
 	log.Infow("zk census data received, starting to generate the proof inputs...",
@@ -137,8 +137,8 @@ func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusD
 	}
 	// Generate circuit inputs
 	rawInputs, err := circuit.GenerateCircuitInput(acc, nil, electionID,
-		censusData.CensusRoot, sikData.Root, censusData.CensusSiblings,
-		sikData.Siblings, weight, censusData.Weight.MathBigInt())
+		censusData.CensusRoot, sikData.CensusRoot, censusData.CensusSiblings,
+		sikData.CensusSiblings, weight, censusData.Weight.MathBigInt())
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)
