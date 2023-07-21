@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"log"
 
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -25,16 +26,16 @@ type ZkCircuitConfig struct {
 	// current circuit configuration artifacts has
 	Levels int `json:"levels"`
 	// ProvingKeyHash contains the expected hash for the file filenameZKey
-	ProvingKeyHash []byte `json:"zKeyHash"`
+	ProvingKeyHash types.HexBytes `json:"zKeyHash"`
 	// FilenameProvingKey defines the name of the file of the circom ProvingKey
 	ProvingKeyFilename string `json:"zKeyFilename"` // proving_key.zkey
 	// VerificationKeyHash contains the expected hash for the file filenameVK
-	VerificationKeyHash []byte `json:"vKeyHash"`
+	VerificationKeyHash types.HexBytes `json:"vKeyHash"`
 	// FilenameVerificationKey defines the name of the file of the circom
 	// VerificationKey
 	VerificationKeyFilename string `json:"vKeyFilename"` // verification_key.json
 	// WasmHash contains the expected hash for the file filenameWasm
-	WasmHash []byte `json:"wasmHash"`
+	WasmHash types.HexBytes `json:"wasmHash"`
 	// FilenameWasm defines the name of the file of the circuit wasm compiled
 	// version
 	WasmFilename string `json:"wasmFilename"` // circuit.wasm
