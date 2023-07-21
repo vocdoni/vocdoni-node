@@ -161,12 +161,14 @@ func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.
 	return election, nil
 }
 
-func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) map[string]*apiclient.CensusProof {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) (map[string]*apiclient.CensusProof, map[string]*apiclient.SikProof) {
 	type voterProof struct {
-		proof   *apiclient.CensusProof
-		address string
+		proof    *apiclient.CensusProof
+		sikproof *apiclient.SikProof
+		address  string
 	}
 	proofs := make(map[string]*apiclient.CensusProof, t.config.nvotes)
+	sikProofs := make(map[string]*apiclient.SikProof, t.config.nvotes)
 	proofCh := make(chan *voterProof)
 	stopProofs := make(chan bool)
 	go func() {
@@ -174,6 +176,7 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 			select {
 			case p := <-proofCh:
 				proofs[p.address] = p.proof
+				sikProofs[p.address] = p.sikproof
 			case <-stopProofs:
 				return
 			}
@@ -184,27 +187,30 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
 		for _, acc := range accounts {
-			var pr *apiclient.CensusProof
+			voterProof := &voterProof{address: acc.Address().Hex()}
+
 			var err error
 			if csp != nil {
-				pr, err = cspGenProof(t.election.ElectionID, acc.Address().Bytes(), csp)
+				voterProof.proof, err = cspGenProof(t.election.ElectionID, acc.Address().Bytes(), csp)
 			} else {
 				voterPrivKey := acc.PrivateKey()
 				voterApi := t.api.Clone(voterPrivKey.String())
-				pr, err = voterApi.CensusGenProof(root, acc.Address().Bytes())
+				voterProof.proof, err = voterApi.CensusGenProof(root, acc.Address().Bytes())
+				if err != nil {
+					log.Fatal(err)
+				}
+				if isAnonymousVoting {
+					voterProof.sikproof, err = voterApi.SikGenProof()
+				}
 			}
-
 			if err != nil {
 				log.Fatal(err)
 			}
 
 			if !isAnonymousVoting {
-				pr.KeyType = models.ProofArbo_ADDRESS
+				voterProof.proof.KeyType = models.ProofArbo_ADDRESS
 			}
-			proofCh <- &voterProof{
-				proof:   pr,
-				address: acc.Address().Hex(),
-			}
+			proofCh <- voterProof
 		}
 	}
 
@@ -223,7 +229,7 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(t.voterAccounts))
 	stopProofs <- true
 
-	return proofs
+	return proofs, sikProofs
 }
 
 func (t *e2eElection) setupAccount() error {
@@ -321,7 +327,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 		return err
 	}
 	t.election = election
-	t.proofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
+	t.proofs, t.sikproofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
 
 	return nil
 }
@@ -382,7 +388,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 	t.election = election
 	prc.ProcessId = t.election.ElectionID
 
-	t.proofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
+	t.proofs, t.sikproofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
 
 	return nil
 }

@@ -34,8 +34,6 @@ func BenchmarkZkCensus(b *testing.B) {
 	b.ReportAllocs()
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
-	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
-	qt.Assert(b, err, qt.IsNil)
 
 	vocApi, err := api.NewAPI(&router, "/", b.TempDir())
 	qt.Assert(b, err, qt.IsNil)
@@ -46,16 +44,21 @@ func BenchmarkZkCensus(b *testing.B) {
 	censusDB := censusdb.NewCensusDB(db)
 
 	storage := ipfs.MockIPFS(b)
-
 	vocapp := vochain.TestBaseApplication(b)
 	vocApi.Attach(vocapp, nil, nil, storage, censusDB)
-	qt.Assert(b, vocApi.EnableHandlers(api.CensusHandler), qt.IsNil)
+	qt.Assert(b, vocApi.EnableHandlers(api.CensusHandler, api.SikHandler), qt.IsNil)
 
-	token1 := uuid.New()
-	c := testutil.NewTestHTTPclient(b, addr, &token1)
+	censusUrl, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
+	qt.Assert(b, err, qt.IsNil)
+	token := uuid.New()
+	censusClient := testutil.NewTestHTTPclient(b, censusUrl, &token)
+
+	sikUrl, err := url.Parse("http://" + path.Join(router.Address().String(), "sik"))
+	qt.Assert(b, err, qt.IsNil)
+	sikClient := testutil.NewTestHTTPclient(b, sikUrl, &token)
 
 	// create a new zk census
-	resp, code := c.Request("POST", nil, api.CensusTypeZKWeighted)
+	resp, code := censusClient.Request("POST", nil, api.CensusTypeZKWeighted)
 	qt.Assert(b, code, qt.Equals, 200)
 	censusData := &api.Census{}
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
@@ -65,11 +68,11 @@ func BenchmarkZkCensus(b *testing.B) {
 	b.ResetTimer()
 
 	b.Run("census", func(b *testing.B) {
-		zkCensusBenchmark(b, c, vocapp, censusID, electionID)
+		zkCensusBenchmark(b, censusClient, sikClient, vocapp, censusID, electionID, router.Address().String())
 	})
 }
 
-func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, vapp *vochain.BaseApplication, censusID string, electionID []byte) {
+func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *vochain.BaseApplication, censusID string, electionID []byte, baseUrl string) {
 	cparts := api.CensusParticipants{}
 	admin := ethereum.NewSignKeys()
 	for i := 0; i < 10; i++ {
@@ -88,33 +91,40 @@ func zkCensusBenchmark(b *testing.B, cl *testutil.TestHTTPclient, vapp *vochain.
 		})
 	}
 
-	_, code := cl.Request("POST", &cparts, censusID, "participants")
+	_, code := cc.Request("POST", &cparts, censusID, "participants")
 	qt.Assert(b, code, qt.Equals, 200)
 
 	var resp []byte
 	censusData := &api.Census{}
-	resp, code = cl.Request("GET", nil, censusID, "root")
+	resp, code = cc.Request("GET", nil, censusID, "root")
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(b, censusData.CensusRoot, qt.IsNotNil)
 	root := censusData.CensusRoot
 
-	resp, code = cl.Request("GET", nil, censusID, "size")
+	resp, code = cc.Request("GET", nil, censusID, "size")
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	b.Logf("root: %x | size: %d", root, censusData.Size)
 
 	// generate a proof
-	resp, code = cl.Request("GET", nil, censusID, "proof", admin.AddressString())
+	resp, code = cc.Request("GET", nil, censusID, "proof", admin.AddressString())
 	qt.Assert(b, code, qt.Equals, 200)
 	qt.Assert(b, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(b, censusData.Weight.String(), qt.Equals, "1")
-
 	censusData.CensusRoot = root
-	genProofZk(b, electionID, admin, censusData)
+
+	// generate a sik proof
+	sikData := &api.SikProof{}
+	resp, code = sc.Request("GET", nil, "proof", admin.AddressString())
+	qt.Assert(b, code, qt.Equals, 200)
+	qt.Assert(b, json.Unmarshal(resp, sikData), qt.IsNil)
+
+	genProofZk(b, electionID, admin, censusData, sikData)
+
 }
 
-func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData *api.Census) {
+func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData *api.Census, sikData *api.SikProof) {
 	// Get merkle proof associated to the voter key provided, that will contains
 	// the leaf siblings and value (weight)
 	log.Infow("zk census data received, starting to generate the proof inputs...",
@@ -127,8 +137,8 @@ func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusD
 	}
 	// Generate circuit inputs
 	rawInputs, err := circuit.GenerateCircuitInput(acc, nil, electionID,
-		censusData.CensusRoot, censusData.SikRoot, censusData.CensusSiblings,
-		censusData.SikSiblings, weight, censusData.Weight.MathBigInt())
+		censusData.CensusRoot, sikData.Root, censusData.CensusSiblings,
+		sikData.Siblings, weight, censusData.Weight.MathBigInt())
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)

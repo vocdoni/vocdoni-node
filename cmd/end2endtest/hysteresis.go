@@ -61,6 +61,7 @@ func (t *E2EHysteresis) Run() error {
 		votes = append(votes, &apiclient.VoteData{
 			ElectionID:   t.election.ElectionID,
 			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			ProofSikTree: t.sikproofs[acct.Address().Hex()],
 			Choices:      []int{i % 2},
 			VoterAccount: acct,
 		})
@@ -77,39 +78,30 @@ func (t *E2EHysteresis) Run() error {
 		return err
 	}
 
-	log.Info("wating to reach hysteresis to create new account and force to delete old sikroots")
-	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
-	defer cancel()
-	if err := t.api.WaitUntilNBlocks(ctx, state.SIKROOT_HYSTERESIS_BLOCKS); err != nil {
+	forceUpdateSikRoots := func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
+		defer cancel()
+		if err := t.api.WaitUntilNBlocks(ctx, state.SIKROOT_HYSTERESIS_BLOCKS); err != nil {
+			return err
+		}
+		testAccount := ethereum.NewSignKeys()
+		if err := testAccount.Generate(); err != nil {
+			return err
+		}
+		testAccountPrivKey := testAccount.PrivateKey()
+		if _, _, err := t.createAccount(testAccountPrivKey.String()); err != nil {
+			return err
+		}
+		return nil
+	}
+	log.Info("watting to reach hysteresis to create new account and force to delete the last old sik root")
+	if err := forceUpdateSikRoots(); err != nil {
 		return err
 	}
-
-	log.Info("create first account to force to update sik roots")
-	testAccount := ethereum.NewSignKeys()
-	if err := testAccount.Generate(); err != nil {
+	log.Info("watting again to reach hysteresis to create new account and force to delete the last root")
+	if err := forceUpdateSikRoots(); err != nil {
 		return err
 	}
-	testAccountPrivKey := testAccount.PrivateKey()
-	if _, _, err := t.createAccount(testAccountPrivKey.String()); err != nil {
-		return err
-	}
-	log.Info("wating to reach hysteresis to create new account and force to delete the last old sik root")
-	ctx, cancel = context.WithTimeout(context.Background(), t.config.timeout)
-	defer cancel()
-	if err := t.api.WaitUntilNBlocks(ctx, state.SIKROOT_HYSTERESIS_BLOCKS); err != nil {
-		return err
-	}
-
-	log.Info("create second account to force to update sik roots")
-	testAccount = ethereum.NewSignKeys()
-	if err := testAccount.Generate(); err != nil {
-		return err
-	}
-	testAccountPrivKey = testAccount.PrivateKey()
-	if _, _, err := t.createAccount(testAccountPrivKey.String()); err != nil {
-		return err
-	}
-
 	invalidVotes := len(votes) - validVotes
 	log.Infow("enqueuing invalid votes", "n", invalidVotes, "election", t.election.ElectionID)
 	errors := t.sendVotes(votes[validVotes:])

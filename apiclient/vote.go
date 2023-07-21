@@ -40,9 +40,10 @@ type VoteData struct {
 	ElectionID types.HexBytes
 	VoteWeight *big.Int
 
-	ProofMkTree *CensusProof
-	ProofCSP    types.HexBytes
-	Keys        []api.Key
+	ProofMkTree  *CensusProof
+	ProofSikTree *SikProof
+	ProofCSP     types.HexBytes
+	Keys         []api.Key
 
 	// if VoterAccount is set, it will be used to sign the vote
 	// instead of the keys found in HTTPclient.account
@@ -87,8 +88,8 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		// generate circuit inputs with the election, census and voter
 		// information and encode it into a json
 		rawInputs, err := circuit.GenerateCircuitInput(c.account, nil, election.ElectionID,
-			election.Census.CensusRoot, v.ProofMkTree.SikRoot, v.ProofMkTree.Siblings,
-			v.ProofMkTree.SikSiblings, v.VoteWeight, v.ProofMkTree.LeafWeight)
+			election.Census.CensusRoot, v.ProofSikTree.Root, v.ProofMkTree.Siblings,
+			v.ProofSikTree.Siblings, v.VoteWeight, v.ProofMkTree.LeafWeight)
 		if err != nil {
 			return nil, err
 		}

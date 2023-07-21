@@ -41,6 +41,7 @@ type e2eElection struct {
 	election      *vapi.Election
 	voterAccounts []*ethereum.SignKeys
 	proofs        map[string]*apiclient.CensusProof
+	sikproofs     map[string]*apiclient.SikProof
 }
 
 type operation struct {

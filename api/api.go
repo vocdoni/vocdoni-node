@@ -147,6 +147,11 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			if a.censusdb == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
+		case SikHandler:
+			a.enableSikHandlers()
+			if a.censusdb == nil {
+				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
+			}
 
 		default:
 			return fmt.Errorf("%w: %s", ErrHandlerUnknown, h)

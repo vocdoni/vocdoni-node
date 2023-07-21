@@ -58,7 +58,7 @@ func (v *State) SetAddressSIK(address common.Address, newSik SIK) error {
 		// if not exists create it
 		log.Debugw("setSIK (create)",
 			"address", address.String(),
-			"sik", SIK(newSik).String())
+			"sik", newSik.String())
 		v.Tx.Lock()
 		err = siksTree.Add(address.Bytes(), newSik)
 		v.Tx.Unlock()
