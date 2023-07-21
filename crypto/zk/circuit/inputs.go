@@ -61,11 +61,10 @@ func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
 	if password != nil {
 		ffPassword = zk.BigToFF(new(big.Int).SetBytes(password))
 	}
-	signature, err := account.SignEthereum([]byte(ethereum.DefaultSikPayload))
+	signature, err := account.SignVocdoniSik()
 	if err != nil {
 		return nil, err
 	}
-
 	return &CircuitInputs{
 		ElectionId:      zk.BytesToArboStr(electionId),
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),

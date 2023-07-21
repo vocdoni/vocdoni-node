@@ -188,6 +188,18 @@ func (k *SignKeys) SignVocdoniMsg(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
+// SignVocdoniSik signs the default vocdoni sik payload. It envolves the
+// SignEthereum method, using the DefaultSikPayload and discarding the last
+// byte of the signature (used for recovery), different that the same byte of a
+// signature generated with javascript.
+func (k *SignKeys) SignVocdoniSik() ([]byte, error) {
+	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
+	if err != nil {
+		return nil, err
+	}
+	return sign[:SignatureLength-1], nil
+}
+
 // VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Address, error) {
 	recoveredAddr, err := AddrFromSignature(message, signature)
@@ -213,7 +225,7 @@ func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
 	if secret == nil {
 		return nil, fmt.Errorf("no secret provided")
 	}
-	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
+	sign, err := k.SignVocdoniSik()
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
@@ -235,7 +247,7 @@ func (k *SignKeys) Sik() ([]byte, error) {
 
 func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {
 	// sign the default Secret Identity Key seed
-	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
+	sign, err := k.SignVocdoniSik()
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
