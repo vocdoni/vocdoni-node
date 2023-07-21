@@ -4,6 +4,7 @@ CREATE TABLE processes (
   entity_id    BLOB NOT NULL,
   start_block  INTEGER NOT NULL,
   end_block    INTEGER NOT NULL,
+  block_count  INTEGER NOT NULL,
 
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
