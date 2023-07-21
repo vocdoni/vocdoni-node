@@ -153,6 +153,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
 			FinalResults:   e.FinalResults,
 			VoteCount:      e.VoteCount,
+			ManuallyEnded:  e.EndBlock < e.StartBlock+e.BlockCount,
 		})
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
@@ -198,6 +199,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
 			FinalResults:   proc.FinalResults,
 			VoteCount:      proc.VoteCount,
+			ManuallyEnded:  proc.EndBlock < proc.StartBlock+proc.BlockCount,
 		},
 		MetadataURL:  proc.Metadata,
 		CreationTime: proc.CreationTime,
@@ -680,6 +682,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
 			FinalResults:   e.FinalResults,
 			VoteCount:      e.VoteCount,
+			ManuallyEnded:  e.EndBlock < e.StartBlock+e.BlockCount,
 		})
 	}
 	data, err := json.Marshal(struct {

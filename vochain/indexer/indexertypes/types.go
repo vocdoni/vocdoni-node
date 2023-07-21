@@ -21,6 +21,7 @@ type Process struct {
 	EntityID          types.HexBytes             `json:"entityId"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
+	BlockCount        uint32                     `json:"blockCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
@@ -66,6 +67,7 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		EntityID:           nonEmptyBytes(dbproc.EntityID),
 		StartBlock:         uint32(dbproc.StartBlock),
 		EndBlock:           uint32(dbproc.EndBlock),
+		BlockCount:         uint32(dbproc.BlockCount),
 		HaveResults:        dbproc.HaveResults,
 		FinalResults:       dbproc.FinalResults,
 		CensusRoot:         nonEmptyBytes(dbproc.CensusRoot),

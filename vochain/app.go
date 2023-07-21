@@ -586,6 +586,9 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
+	if app.Service == nil {
+		return true
+	}
 	return app.Service.(*node.Node).ConsensusReactor().WaitSync()
 }
 
