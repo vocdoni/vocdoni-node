@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors" // required for evm encoding
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -145,16 +145,7 @@ func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		if err != nil {
 			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
-		list = append(list, ElectionSummary{
-			ElectionID:     eid,
-			OrganizationID: e.EntityID,
-			Status:         models.ProcessStatus_name[e.Status],
-			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults:   e.FinalResults,
-			VoteCount:      e.VoteCount,
-			ManuallyEnded:  e.EndBlock < e.StartBlock+e.BlockCount,
-		})
+		list = append(list, a.electionSummary(e))
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
@@ -191,21 +182,12 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 	}
 
 	election := Election{
-		ElectionSummary: ElectionSummary{
-			ElectionID:     electionID,
-			OrganizationID: proc.EntityID,
-			Status:         strings.ToLower(models.ProcessStatus_name[proc.Status]),
-			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
-			FinalResults:   proc.FinalResults,
-			VoteCount:      proc.VoteCount,
-			ManuallyEnded:  proc.EndBlock < proc.StartBlock+proc.BlockCount,
-		},
-		MetadataURL:  proc.Metadata,
-		CreationTime: proc.CreationTime,
-		VoteMode:     VoteMode{EnvelopeType: proc.Envelope},
-		ElectionMode: ElectionMode{ProcessMode: proc.Mode},
-		TallyMode:    TallyMode{ProcessVoteOptions: proc.VoteOpts},
+		ElectionSummary: a.electionSummary(proc),
+		MetadataURL:     proc.Metadata,
+		CreationTime:    proc.CreationTime,
+		VoteMode:        VoteMode{EnvelopeType: proc.Envelope},
+		ElectionMode:    ElectionMode{ProcessMode: proc.Mode},
+		TallyMode:       TallyMode{ProcessVoteOptions: proc.VoteOpts},
 		Census: &ElectionCensus{
 			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
 			CensusRoot:             proc.CensusRoot,
@@ -674,16 +656,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		if err != nil {
 			return ErrCantFetchElection.WithErr(err)
 		}
-		list = append(list, ElectionSummary{
-			OrganizationID: e.EntityID,
-			ElectionID:     eid,
-			Status:         models.ProcessStatus_name[e.Status],
-			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults:   e.FinalResults,
-			VoteCount:      e.VoteCount,
-			ManuallyEnded:  e.EndBlock < e.StartBlock+e.BlockCount,
-		})
+		list = append(list, a.electionSummary(e))
 	}
 	data, err := json.Marshal(struct {
 		Elections []ElectionSummary `json:"elections"`

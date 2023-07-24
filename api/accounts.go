@@ -316,9 +316,14 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrParamStatusMissing
 	}
 
-	elections, err := a.electionSummaryList(pids...)
-	if err != nil {
-		return err
+	elections := []*ElectionSummary{}
+	for _, pid := range pids {
+		procInfo, err := a.indexer.ProcessInfo(pid)
+		if err != nil {
+			return ErrCantFetchElection.WithErr(err)
+		}
+		summary := a.electionSummary(procInfo)
+		elections = append(elections, &summary)
 	}
 	data, err := json.Marshal(&Organization{
 		Elections: elections,
