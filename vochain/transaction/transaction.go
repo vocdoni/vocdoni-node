@@ -9,7 +9,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/ist"
-	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -198,7 +197,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		tx := vtx.Tx.GetSetAccount()
 
 		var err error
-		var sik state.SIK
+		var sik vstate.SIK
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
 			if sik, err = t.CreateAccountTxCheck(vtx); err != nil {

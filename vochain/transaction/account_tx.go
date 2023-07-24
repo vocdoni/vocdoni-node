@@ -8,7 +8,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -16,7 +15,7 @@ import (
 )
 
 // CreateAccountTxCheck checks if an account creation tx is valid
-func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) (state.SIK, error) {
+func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) (vstate.SIK, error) {
 	if vtx == nil || vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
 		return nil, ErrNilTx
 	}
@@ -264,12 +263,11 @@ func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, e
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
 		return common.Address{}, fmt.Errorf("cannot get tx account: %w", err)
 	}
-
 	return txAddress, nil
 }
 
 // SetSikTxCheck checks if a set sik tx is valid
-func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, state.SIK, error) {
+func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
 	addr, err := t.DelSikTxCheck(vtx)
 	if err != nil {
 		return common.Address{}, nil, err
