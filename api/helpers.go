@@ -4,10 +4,9 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt" // required for evm encoding
+	"fmt"
 	"math/big"
 	"reflect"
-	"strings"
 
 	cmtpool "github.com/cometbft/cometbft/mempool"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -15,31 +14,23 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
-func (a *API) electionSummaryList(pids ...[]byte) ([]*ElectionSummary, error) {
-	processes := []*ElectionSummary{}
-	for _, pid := range pids {
-		// TODO(mvdan): We construct ElectionSummaries in many places, deduplicate.
-		// TODO(mvdan): ProcessInfo could give us the results envelope height as well.
-		procInfo, err := a.indexer.ProcessInfo(pid)
-		if err != nil {
-			return nil, ErrCantFetchElection.WithErr(err)
-		}
-		processes = append(processes, &ElectionSummary{
-			ElectionID:     procInfo.ID,
-			OrganizationID: procInfo.EntityID,
-			Status:         strings.ToLower(models.ProcessStatus_name[procInfo.Status]),
-			StartDate:      procInfo.CreationTime,
-			EndDate:        a.vocinfo.HeightTime(int64(procInfo.EndBlock)),
-			FinalResults:   procInfo.FinalResults,
-			VoteCount:      procInfo.VoteCount,
-		})
+func (a *API) electionSummary(pi *indexertypes.Process) ElectionSummary {
+	return ElectionSummary{
+		ElectionID:     pi.ID,
+		OrganizationID: pi.EntityID,
+		Status:         models.ProcessStatus_name[pi.Status],
+		StartDate:      a.vocinfo.HeightTime(int64(pi.StartBlock)),
+		EndDate:        a.vocinfo.HeightTime(int64(pi.EndBlock)),
+		FinalResults:   pi.FinalResults,
+		VoteCount:      pi.VoteCount,
+		ManuallyEnded:  pi.EndBlock < pi.StartBlock+pi.BlockCount,
 	}
-	return processes, nil
 }
 
 // sendTx wraps a.vocapp.SendTx(). If an error is returned, it's wrapped into an apirest.APIerror
