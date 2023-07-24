@@ -9,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/ist"
+	"go.vocdoni.io/dvote/vochain/state"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -195,22 +196,22 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
+
+		var err error
+		var sik state.SIK
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
-			err := t.CreateAccountTxCheck(vtx)
-			if err != nil {
+			if sik, err = t.CreateAccountTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("createAccountTx: %w", err)
 			}
 
 		case models.TxType_SET_ACCOUNT_INFO_URI:
-			err := t.SetAccountInfoTxCheck(vtx)
-			if err != nil {
+			if err := t.SetAccountInfoTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountInfoTx: %w", err)
 			}
 
 		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-			err := t.SetAccountDelegateTxCheck(vtx)
-			if err != nil {
+			if err := t.SetAccountDelegateTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
 			}
 
@@ -233,12 +234,12 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
-				sik := tx.GetSik()
-				if sik == nil {
-					return nil, fmt.Errorf("setAccountTx: no sik provided")
-				}
-				if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
-					return nil, fmt.Errorf("setAccountTx: setSik %w", err)
+				// if the CreateAccountTxCheck returns a valid sik, try to
+				// persist it in the state.
+				if sik != nil {
+					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
+						return nil, fmt.Errorf("setAccountTx: setSik %w", err)
+					}
 				}
 				if tx.FaucetPackage != nil {
 					faucetIssuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
@@ -442,24 +443,14 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_SetSik:
-		addr, err := t.SetSikTxCheck(vtx)
+		addr, newSik, err := t.SetSikTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-		// check if the address already has invalidated sik to ensure that it is
-		// not updated after reach the correct height to avoid double voting
-		if currentSik, err := t.state.SIKFromAddress(addr); err == nil {
-			maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
-			if err != nil {
+		if forCommit {
+			if err := t.state.SetAddressSIK(addr, newSik); err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
 			}
-			if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
-				return nil, fmt.Errorf("setSikTx: the sik could not be changed yet")
-			}
-		}
-		newSik := vtx.Tx.GetSetSik().GetSik()
-		if err := t.state.SetAddressSIK(addr, newSik); err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
 		return response, nil
 
@@ -468,8 +459,10 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-		if err := t.state.InvalidateSIK(address); err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
+		if forCommit {
+			if err := t.state.InvalidateSIK(address); err != nil {
+				return nil, fmt.Errorf("setSikTx: %w", err)
+			}
 		}
 		return response, nil
 
