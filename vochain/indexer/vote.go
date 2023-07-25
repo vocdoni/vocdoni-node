@@ -252,7 +252,7 @@ func (idx *Indexer) commitVotes(queries *indexerdb.Queries, pid []byte, partialR
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (idx *Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
+func (idx *Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, _ uint32) error {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
 	procInner, err := queries.GetProcess(context.TODO(), pid)

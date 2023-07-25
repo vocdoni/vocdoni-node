@@ -37,7 +37,7 @@ import (
 var createVochainGenesisFile = ""
 
 // deprecatedFlagsFunc makes deprecated flags work the same as the new flags, but prints a warning
-func deprecatedFlagsFunc(f *flag.FlagSet, name string) flag.NormalizedName {
+func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 	oldName := name
 	switch name {
 	case "ipfsSyncKey":

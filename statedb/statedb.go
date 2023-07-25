@@ -352,17 +352,17 @@ var ErrReadOnly = errors.New("read only")
 var ErrEmptyTree = errors.New("empty tree")
 
 // Set implements db.WriteTx.Set but returns error always.
-func (t *readOnlyWriteTx) Set(key []byte, value []byte) error {
+func (t *readOnlyWriteTx) Set(_ []byte, _ []byte) error {
 	return ErrReadOnly
 }
 
 // Set implements db.WriteTx.Delete but returns error always.
-func (t *readOnlyWriteTx) Delete(key []byte) error {
+func (t *readOnlyWriteTx) Delete(_ []byte) error {
 	return ErrReadOnly
 }
 
 // Apply implements db.WriteTx.Apply but returns error always.
-func (t *readOnlyWriteTx) Apply(w db.WriteTx) error {
+func (t *readOnlyWriteTx) Apply(_ db.WriteTx) error {
 	return ErrReadOnly
 }
 

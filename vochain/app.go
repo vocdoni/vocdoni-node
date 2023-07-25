@@ -132,7 +132,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 // ensuring that Commit is never called twice for the same block height.
 //
 // We use this method to initialize some state variables.
-func (app *BaseApplication) Info(ctx context.Context,
+func (app *BaseApplication) Info(_ context.Context,
 	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
@@ -160,7 +160,7 @@ func (app *BaseApplication) Info(ctx context.Context,
 // InitChain called once upon genesis
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
-func (app *BaseApplication) InitChain(ctx context.Context,
+func (app *BaseApplication) InitChain(_ context.Context,
 	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
@@ -259,7 +259,7 @@ func (app *BaseApplication) InitChain(ctx context.Context,
 }
 
 // CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(ctx context.Context,
+func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		if app.Height()%recheckTxHeightInterval != 0 {
@@ -291,7 +291,7 @@ func (app *BaseApplication) CheckTx(ctx context.Context,
 // Cryptographic commitments to the block and transaction results, returned via the corresponding
 // parameters in ResponseFinalizeBlock, are included in the header of the next block.
 // CometBFT calls it when a new block is decided.
-func (app *BaseApplication) FinalizeBlock(ctx context.Context,
+func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	height := uint32(req.GetHeight())
 	app.beginBlock(req.GetTime(), height)
@@ -323,7 +323,7 @@ func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 }
 
 // Commit saves the current vochain state and returns a commit hash
-func (app *BaseApplication) Commit(ctx context.Context, req *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
 	// save state
 	_, err := app.State.Save()
 	if err != nil {
@@ -400,7 +400,7 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 }
 
 // endBlock is called at the end of every block.
-func (app *BaseApplication) endBlock(t time.Time, height uint32) {
+func (app *BaseApplication) endBlock(t time.Time, _ uint32) {
 	app.endBlockTimestamp.Store(t.Unix())
 }
 
@@ -459,8 +459,8 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 }
 
 // Query does nothing
-func (app *BaseApplication) Query(ctx context.Context,
-	req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+func (app *BaseApplication) Query(_ context.Context,
+	_ *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	return &abcitypes.ResponseQuery{}, nil
 }
 
@@ -507,8 +507,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
-func (app *BaseApplication) ProcessProposal(ctx context.Context,
-	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+func (app *BaseApplication) ProcessProposal(_ context.Context,
+	_ *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
 	}, nil

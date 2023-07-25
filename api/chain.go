@@ -192,7 +192,7 @@ func (a *API) enableChainHandlers() error {
 //	@Param					page	path		int	true	"Page number"
 //	@Success				200		{object}	api.organizationListHandler.response
 //	@Router					/chain/organizations/page/{page} [get]
-func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	var err error
 	page := 0
 	if ctx.URLParam("page") != "" {
@@ -233,7 +233,7 @@ func (a *API) organizationListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Produce		json
 //	@Success		200	{object}	object{count=int}	"Number of registered organizations"
 //	@Router			/chain/organizations/count [get]
-func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.CountTotalEntities()
 	organization := &Organization{Count: &count}
 	data, err := json.Marshal(organization)
@@ -253,7 +253,7 @@ func (a *API) organizationCountHandler(msg *apirest.APIdata, ctx *httprouter.HTT
 //	@Produce				json
 //	@Success				200	{object}	api.ChainInfo
 //	@Router					/chain/info [get]
-func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	transactionCount, err := a.indexer.CountTotalTransactions()
 	if err != nil {
 		return err
@@ -307,7 +307,7 @@ func (a *API) chainInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Produce		json
 //	@Success		200	{object}	circuit.ZkCircuitConfig
 //	@Router			/chain/info/circuit [get]
-func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainCircuitInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// Get current circuit tag
 	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
 	// Encode the circuit configuration to JSON
@@ -327,7 +327,7 @@ func (a *API) chainCircuitInfoHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Produce				json
 //	@Success				200	{object}	electionprice.Calculator
 //	@Router					/chain/info/electionPriceFactors [get]
-func (a *API) chainInfoPriceFactors(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainInfoPriceFactors(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// Encode the values and factors to JSON
 	data, err := json.Marshal(a.vocapp.State.ElectionPriceCalc)
 	if err != nil {
@@ -346,7 +346,7 @@ func (a *API) chainInfoPriceFactors(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Param			timestamp	path		string					true	"Timestamp on unix format"
 //	@Success		200			{object}	object{height=number}	"Estimated block height"
 //	@Router			/chain/dateToBlock/{timestamp} [get]
-func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainEstimateHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	timestamp, err := strconv.ParseInt(ctx.URLParam("timestamp"), 10, 64)
 	if err != nil {
 		return err
@@ -375,7 +375,7 @@ func (a *API) chainEstimateHeightHandler(msg *apirest.APIdata, ctx *httprouter.H
 //	@Param			height	path		number	true	"Block height"
 //	@Success		200		{object}	object{date=string}
 //	@Router			/chain/blockToDate/{height} [get]
-func (a *API) chainEstimateDateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainEstimateDateHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -430,7 +430,7 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Produce		json
 //	@Success		200	{object}	genesis.TransactionCosts
 //	@Router			/chain/transactions/cost [get]
-func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxCostHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCosts := &Transaction{
 		Costs: make(map[string]uint64),
 	}
@@ -458,7 +458,7 @@ func (a *API) chainTxCostHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Param			page	path		int									true	"Page number"
 //	@Success		200		{object}	api.chainTxListPaginated.response	"It return a list of transactions references"
 //	@Router			/chain/transactions/page/{page} [get]
-func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxListPaginated(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
 	if ctx.URLParam("page") != "" {
 		var err error
@@ -498,7 +498,7 @@ func (a *API) chainTxListPaginated(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Success				200		{object}	indexertypes.Transaction
 //	@Success				204		"See [errors](vocdoni-api#errors) section"
 //	@Router					/chain/transactions/reference/{hash} [get]
-func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxbyHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
@@ -530,7 +530,7 @@ func (a *API) chainTxbyHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Success		200		{object}	GenericTransactionWithInfo
 //	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/{height}/{index} [get]
-func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -576,7 +576,7 @@ func (a *API) chainTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //	@Success		200		{object}	indexertypes.Transaction
 //	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/reference/index/{index} [get]
-func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
 	if err != nil {
 		return err
@@ -606,7 +606,7 @@ func (a *API) chainTxByIndexHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Param			page	path		number	true	"Page to paginate"
 //	@Success		200		{object}	[]TransactionMetadata
 //	@Router			/chain/blocks/{height}/transactions/page/{page} [get]
-func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxByHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -676,7 +676,7 @@ func (a *API) chainTxByHeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 //	@Produce		json
 //	@Success		200	{object}	ValidatorList
 //	@Router			/chain/validators [get]
-func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	stateValidators, err := a.vocapp.State.Validators(true)
 	if err != nil {
 		return err
@@ -707,7 +707,7 @@ func (a *API) chainValidatorsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 //	@Param			height	path		int	true	"Block height"
 //	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/{height} [get]
-func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
@@ -742,7 +742,7 @@ func (a *API) chainBlockHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Param			hash	path		string	true	"Block hash"
 //	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/hash/{hash} [get]
-func (a *API) chainBlockByHashHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
@@ -830,7 +830,7 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{count=number}
 //	@Router			/chain/transactions/count [get]
-func (a *API) chainTxCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count, err := a.indexer.CountTotalTransactions()
 	if err != nil {
 		return err

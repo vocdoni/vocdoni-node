@@ -278,7 +278,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Param			censusID	path		string					true	"Census id"
 //	@Success		200			{object}	object{census=string}	"Census type "weighted", "zkweighted", "csp"
 //	@Router			/censuses/{censusID}/type [get]
-func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -312,7 +312,7 @@ func (a *API) censusTypeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Param			censusID	path		string				true	"Census id"
 //	@Success		200			{object}	object{root=string}	"Merkle root of the census"
 //	@Router			/censuses/{censusID}/root [get]
-func (a *API) censusRootHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusRootHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -451,7 +451,7 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Param			censusID	path		string					true	"Census id"
 //	@Success		200			{object}	object{weight=string}	"Sum of weight son a stringfied big int format"
 //	@Router			/censuses/{censusID}/weight [get]
-func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusWeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -487,7 +487,7 @@ func (a *API) censusWeightHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Param			censusID	path		string				true	"Census id"
 //	@Success		200			{object}	object{size=string}	"Size as integer"
 //	@Router			/censuses/{censusID}/size [get]
-func (a *API) censusSizeHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusSizeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err
@@ -673,7 +673,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Param					key			path		string											true	"Key to proof"
 //	@Success				200			{object}	object{weight=number,proof=string,value=string}	"where proof is Merkle tree siblings and value is Merkle tree leaf value"
 //	@Router					/censuses/{censusID}/proof/{key} [get]
-func (a *API) censusProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam("censusID"))
 	if err != nil {
 		return err

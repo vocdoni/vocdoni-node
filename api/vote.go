@@ -90,7 +90,7 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Param					voteID	path		string	true	"Nullifier of the vote"
 //	@Success				200		{object}	Vote
 //	@Router					/votes/{voteID} [get]
-func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)
@@ -144,7 +144,7 @@ func (a *API) getVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //	@Success		200			"(empty body)"
 //	@Failure		404			{object}	apirest.APIerror
 //	@Router			/votes/verify/{electionID}/{voteID} [get]
-func (a *API) verifyVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) verifyVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)

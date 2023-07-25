@@ -422,8 +422,8 @@ func (idx *Indexer) Rollback() {
 	maps.Clear(idx.blockUpdateProcs)
 }
 
-// OnProcess indexer stores the processID and entityID
-func (idx *Indexer) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32) {
+// OnProcess indexer stores the processID
+func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
@@ -462,22 +462,22 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 }
 
 // OnCancel indexer stores the processID and entityID
-func (idx *Indexer) OnCancel(pid []byte, txIndex int32) {
+func (idx *Indexer) OnCancel(pid []byte, _ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessKeys does nothing
-func (idx *Indexer) OnProcessKeys(pid []byte, pub string, txIndex int32) {
+func (idx *Indexer) OnProcessKeys(pid []byte, _ string, _ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
 // OnProcessStatusChange adds the process to blockUpdateProcs and, if ended, the resultsPool
-func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatus,
-	txIndex int32) {
+func (idx *Indexer) OnProcessStatusChange(pid []byte, _ models.ProcessStatus,
+	_ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
@@ -485,7 +485,7 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
-func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
+func (idx *Indexer) OnRevealKeys(pid []byte, _ string, _ int32) {
 	// TODO: can we get KeyIndex from ProcessInfo? perhaps len(PublicKeys), or adding a new sqlite column?
 	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
@@ -502,8 +502,8 @@ func (idx *Indexer) OnRevealKeys(pid []byte, priv string, txIndex int32) {
 }
 
 // OnProcessResults verifies the results for a process and appends it to blockUpdateProcs
-func (idx *Indexer) OnProcessResults(pid []byte, presults *models.ProcessResult,
-	txIndex int32) {
+func (idx *Indexer) OnProcessResults(pid []byte, _ *models.ProcessResult,
+	_ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
@@ -520,7 +520,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 }
 
 // OnSetAccount NOT USED but required for implementing the vochain.EventListener interface
-func (idx *Indexer) OnSetAccount(addr []byte, account *state.Account) {}
+func (idx *Indexer) OnSetAccount(_ []byte, _ *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	idx.blockMu.Lock()
@@ -540,7 +540,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 
 // OnCensusUpdate adds the process to blockUpdateProcs in order to update the census.
 // This function call is triggered by the SET_PROCESS_CENSUS tx.
-func (idx *Indexer) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
+func (idx *Indexer) OnCensusUpdate(pid, _ []byte, _ string) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true

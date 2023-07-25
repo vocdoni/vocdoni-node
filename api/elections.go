@@ -125,7 +125,7 @@ func (a *API) enableElectionHandlers() error {
 //	@Param			page	path		number	true	"Page "
 //	@Success		200		{object}	ElectionSummary
 //	@Router			/elections/page/{page} [get]
-func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
 	if ctx.URLParam("page") != "" {
 		var err error
@@ -177,7 +177,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	Election
 //	@Router			/elections/{electionID} [get]
-func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -252,7 +252,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	object{count=number}
 //	@Router			/elections/{electionID}/votes/count [get]
-func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -290,7 +290,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	ElectionKeys
 //	@Router			/elections/{electionID}/keys [get]
-func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -342,7 +342,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Param			page		path		number	true	"Page "
 //	@Success		200			{object}	Vote
 //	@Router			/elections/{electionID}/votes/page/{page} [get]
-func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -396,7 +396,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Param					electionID	path		string	true	"Election id"
 //	@Success				200			{object}	ElectionResults
 //	@Router					/elections/{electionID}/scrutiny [get]
-func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionScrutinyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)

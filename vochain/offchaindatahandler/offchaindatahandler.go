@@ -92,7 +92,7 @@ func (d *OffChainDataHandler) Commit(height uint32) error {
 
 // OnProcess is triggered when a new election is created. It checks if the election contains offchain data
 // that needs to be imported and enqueues it for being handled by Commit.
-func (d *OffChainDataHandler) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
+func (d *OffChainDataHandler) OnProcess(pid, _ []byte, censusRoot, censusURI string, _ int32) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
 	if d.importOnlyNew && d.isFastSync {
@@ -178,14 +178,12 @@ func (d *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) 
 }
 
 // NOT USED but required for implementing the vochain.EventListener interface
-func (d *OffChainDataHandler) OnCancel(pid []byte, txindex int32)                          {}
-func (d *OffChainDataHandler) OnVote(v *state.Vote, txindex int32)                         {}
-func (d *OffChainDataHandler) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {}
-func (d *OffChainDataHandler) OnBeginBlock(state.BeginBlock)                               {}
-func (d *OffChainDataHandler) OnProcessKeys(pid []byte, pub string, txindex int32)         {}
-func (d *OffChainDataHandler) OnRevealKeys(pid []byte, priv string, txindex int32)         {}
-func (d *OffChainDataHandler) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
-}
-func (d *OffChainDataHandler) OnTransferTokens(tx *vochaintx.TokenTransfer) {}
-func (d *OffChainDataHandler) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {
-}
+func (d *OffChainDataHandler) OnCancel(_ []byte, _ int32)                                      {}
+func (d *OffChainDataHandler) OnVote(_ *state.Vote, _ int32)                                   {}
+func (d *OffChainDataHandler) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32)                      {}
+func (d *OffChainDataHandler) OnBeginBlock(state.BeginBlock)                                   {}
+func (d *OffChainDataHandler) OnProcessKeys(_ []byte, _ string, _ int32)                       {}
+func (d *OffChainDataHandler) OnRevealKeys(_ []byte, _ string, _ int32)                        {}
+func (d *OffChainDataHandler) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32) {}
+func (d *OffChainDataHandler) OnTransferTokens(_ *vochaintx.TokenTransfer)                     {}
+func (d *OffChainDataHandler) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32)     {}

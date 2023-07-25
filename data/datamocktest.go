@@ -22,14 +22,14 @@ type DataMockTest struct {
 	rnd     testutil.Random
 }
 
-func (d *DataMockTest) Init(ds *types.DataStore) error {
+func (d *DataMockTest) Init(_ *types.DataStore) error {
 	d.files = make(map[string]string)
 	d.prefix = "ipfs://"
 	d.rnd = testutil.NewRandom(0)
 	return nil
 }
 
-func (d *DataMockTest) Publish(ctx context.Context, o []byte) (string, error) {
+func (d *DataMockTest) Publish(_ context.Context, o []byte) (string, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
 	cid := ipfs.CalculateCIDv1json(o)
@@ -37,7 +37,7 @@ func (d *DataMockTest) Publish(ctx context.Context, o []byte) (string, error) {
 	return d.prefix + cid, nil
 }
 
-func (d *DataMockTest) Retrieve(ctx context.Context, id string, maxSize int64) ([]byte, error) {
+func (d *DataMockTest) Retrieve(_ context.Context, id string, _ int64) ([]byte, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
 	if data, ok := d.files[id]; ok {
@@ -50,7 +50,7 @@ func (d *DataMockTest) Retrieve(ctx context.Context, id string, maxSize int64) (
 	return d.rnd.RandomBytes(256), nil
 }
 
-func (d *DataMockTest) Pin(ctx context.Context, path string) error {
+func (d *DataMockTest) Pin(_ context.Context, path string) error {
 	d.filesMu.Lock()
 	defer d.filesMu.Unlock()
 	if _, ok := d.files[path]; ok {
@@ -61,7 +61,7 @@ func (d *DataMockTest) Pin(ctx context.Context, path string) error {
 	return nil
 }
 
-func (d *DataMockTest) Unpin(ctx context.Context, path string) error {
+func (d *DataMockTest) Unpin(_ context.Context, path string) error {
 	d.filesMu.Lock()
 	defer d.filesMu.Unlock()
 	if _, ok := d.files[path]; !ok {
@@ -71,7 +71,7 @@ func (d *DataMockTest) Unpin(ctx context.Context, path string) error {
 	return nil
 }
 
-func (d *DataMockTest) ListPins(ctx context.Context) (map[string]string, error) {
+func (d *DataMockTest) ListPins(_ context.Context) (map[string]string, error) {
 	d.filesMu.RLock()
 	defer d.filesMu.RUnlock()
 	return maps.Clone(d.files), nil
@@ -81,11 +81,11 @@ func (d *DataMockTest) URIprefix() string {
 	return d.prefix
 }
 
-func (d *DataMockTest) Stats(ctx context.Context) map[string]interface{} {
+func (d *DataMockTest) Stats(_ context.Context) map[string]interface{} {
 	return nil
 }
 
-func (d *DataMockTest) CollectMetrics(ctx context.Context, ma *metrics.Agent) error {
+func (d *DataMockTest) CollectMetrics(_ context.Context, _ *metrics.Agent) error {
 	return nil
 }
 
