@@ -173,25 +173,25 @@ type Listener struct {
 	processStart [][][]byte
 }
 
-func (*Listener) OnVote(vote *Vote, txIndex int32)                                             {}
-func (*Listener) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)                  {}
-func (*Listener) OnBeginBlock(BeginBlock)                                                      {}
-func (*Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
-func (*Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
-func (*Listener) OnCancel(pid []byte, txIndex int32)                                           {}
-func (*Listener) OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)                {}
-func (*Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)                {}
-func (*Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) {
+func (*Listener) OnVote(_ *Vote, _ int32)                                         {}
+func (*Listener) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32)                      {}
+func (*Listener) OnBeginBlock(BeginBlock)                                         {}
+func (*Listener) OnProcess(_, _ []byte, _, _ string, _ int32)                     {}
+func (*Listener) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32) {}
+func (*Listener) OnCancel(_ []byte, _ int32)                                      {}
+func (*Listener) OnProcessKeys(_ []byte, _ string, _ int32)                       {}
+func (*Listener) OnRevealKeys(_ []byte, _ string, _ int32)                        {}
+func (*Listener) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32) {
 }
-func (*Listener) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
-func (*Listener) OnSetAccount(addr []byte, account *Account) {
+func (*Listener) OnCensusUpdate(_, _ []byte, _ string) {}
+func (*Listener) OnSetAccount(_ []byte, _ *Account) {
 }
-func (*Listener) OnTransferTokens(tx *vochaintx.TokenTransfer) {
+func (*Listener) OnTransferTokens(_ *vochaintx.TokenTransfer) {
 }
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }
-func (*Listener) Commit(height uint32) (err error) {
+func (*Listener) Commit(_ uint32) (err error) {
 	return nil
 }
 func (*Listener) Rollback() {}

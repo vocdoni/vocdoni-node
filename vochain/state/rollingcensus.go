@@ -29,7 +29,7 @@ var keyCensusLen = []byte("len")
 
 // AddToRollingCensus adds a new key to an existing rolling census.
 // NOTE: weight value is not used.
-func (v *State) AddToRollingCensus(pid []byte, key []byte, weight *big.Int) error {
+func (v *State) AddToRollingCensus(pid []byte, key []byte, _ *big.Int) error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	process, err := getProcess(v.mainTreeViewer(false), pid)
@@ -93,7 +93,7 @@ func (v *State) GetRollingCensusSize(pid []byte, committed bool) (uint64, error)
 
 // PurgeRollingCensus removes a rolling census from the permanent store
 // If the census does not exist, it does nothing.
-func (*State) PurgeRollingCensus(pid []byte) error {
+func (*State) PurgeRollingCensus(_ []byte) error {
 	return fmt.Errorf("TODO")
 }
 
