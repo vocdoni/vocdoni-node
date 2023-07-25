@@ -38,7 +38,7 @@ func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeZKWeighted}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
 	log.Debugf("election details: %+v", *t.election)
@@ -51,29 +51,35 @@ func (*E2EAnonElection) Teardown() error {
 }
 
 func (t *E2EAnonElection) Run() error {
-	// Send the votes (parallelized)
-	startTime := time.Now()
+	var vcount int
 
-	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	startTime := time.Now()
 	votes := []*apiclient.VoteData{}
-	for i, acct := range t.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.AddressString()],
-			ProofSIKTree: t.sikproofs[acct.AddressString()],
-			Choices:      []int{i % 2},
-			VoterAccount: acct,
-			VoteWeight:   big.NewInt(defaultWeight / 2),
-		})
-	}
+
+	log.Infow("enqueuing votes", "n", t.config.nvotes, "election", t.election.ElectionID)
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				ProofSIKTree: acctp.proofSIK,
+				Choices:      []int{vcount % 2},
+				VoterAccount: acctp.account,
+				VoteWeight:   big.NewInt(defaultWeight / 2),
+			})
+			vcount += 1
+		}
+		return true
+	})
+
 	errs := t.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}
 
 	log.Infow("votes submitted successfully",
-		"n", len(t.voterAccounts), "time", time.Since(startTime),
-		"vps", int(float64(len(t.voterAccounts))/time.Since(startTime).Seconds()))
+		"n", t.config.nvotes, "time", time.Since(startTime),
+		"vps", int(float64(t.config.nvotes)/time.Since(startTime).Seconds()))
 
 	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
 		return err

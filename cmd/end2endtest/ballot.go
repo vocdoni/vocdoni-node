@@ -218,27 +218,33 @@ func (t *E2EBallotApproval) Run() error {
 }
 
 func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*types.BigInt) error {
+	var vcount int
 	nvotes := e.config.nvotes
 	startTime := time.Now()
 
-	log.Infow("enqueuing votes", "n", len(e.voterAccounts), "election", e.election.ElectionID)
+	log.Infow("enqueuing votes", "n", e.config.nvotes, "election", e.election.ElectionID)
 	votes := []*apiclient.VoteData{}
-	for i, acct := range e.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   e.election.ElectionID,
-			ProofMkTree:  e.proofs[acct.Address().Hex()],
-			Choices:      choices[i],
-			VoterAccount: acct,
-		})
-	}
+
+	e.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   e.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				Choices:      choices[vcount],
+				VoterAccount: acctp.account,
+			})
+			vcount += 1
+		}
+		return true
+	})
 	errs := e.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}
 
 	log.Infow("votes submitted successfully",
-		"n", len(e.voterAccounts), "time", time.Since(startTime),
-		"vps", int(float64(len(e.voterAccounts))/time.Since(startTime).Seconds()))
+		"n", e.config.nvotes, "time", time.Since(startTime),
+		"vps", float64(e.config.nvotes)/time.Since(startTime).Seconds())
 
 	if err := e.verifyVoteCount(nvotes); err != nil {
 		return fmt.Errorf("error in verifyVoteCount: %s", err)

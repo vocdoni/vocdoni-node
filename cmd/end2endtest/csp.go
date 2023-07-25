@@ -52,16 +52,20 @@ func (t *E2ECSPElection) Run() error {
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	log.Infow("enqueuing votes", "n", t.config.nvotes, "election", t.election.ElectionID)
 	votes := []*apiclient.VoteData{}
-	for _, acct := range t.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofCSP:     t.proofs[acct.Address().Hex()].Proof,
-			Choices:      []int{0},
-			VoterAccount: acct,
-		})
-	}
+
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofCSP:     acctp.proof.Proof,
+				Choices:      []int{0},
+				VoterAccount: acctp.account,
+			})
+		}
+		return true
+	})
 	errs := t.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)

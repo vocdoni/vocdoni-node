@@ -46,23 +46,8 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		ed.d.ElectionType.DynamicCensus = ed.dynamicCensus
 		ed.d.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-		// create a census with 2 voterAccounts less than the nvotes passed, that will allow to create another
-		// census with the missing nvotes
-		censusRoot, censusURI, err := t.elections[i].setupCensus(vapi.CensusTypeWeighted, t.elections[i].config.nvotes-2, false)
-		if err != nil {
-			return err
-		}
-
-		// add the censusRoot and censusURI to the election description
-		ed.d.Census = vapi.CensusTypeDescription{
-			Type:     vapi.CensusTypeWeighted,
-			RootHash: censusRoot,
-			URL:      censusURI,
-			Size:     uint64(t.elections[1].config.nvotes),
-		}
-
 		// set up the election with the custom census created
-		if err := t.elections[i].setupElection(ed.d); err != nil {
+		if err := t.elections[i].setupElection(ed.d, t.elections[i].config.nvotes-1); err != nil {
 			return err
 		}
 		log.Debugf("election detail: %+v", *t.elections[i].election)
@@ -82,16 +67,19 @@ func (t *E2EDynamicensusElection) Run() error {
 
 	setupNewCensusAndVote := func(election e2eElection) (types.HexBytes, apiclient.VoteData, error) {
 		api := election.api
-		nvotes := election.config.nvotes
 
-		censusRoot2, censusURI2, err := election.setupCensus(vapi.CensusTypeWeighted, 2, false)
+		censusID, vAccts, err := election.setupCensus(vapi.CensusTypeWeighted, 1, false)
+		if err != nil {
+			return nil, apiclient.VoteData{}, err
+		}
+
+		censusRoot2, censusURI2, err := election.publishCheckCensus(censusID, 1)
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}
 		log.Infof("root : %x URI: %s  err: %s", censusRoot2, censusURI2, err)
 
-		voterKey := election.voterAccounts[nvotes-1].Address().Bytes()
-		proof, err := api.CensusGenProof(censusRoot2, voterKey)
+		proof, err := api.CensusGenProof(censusRoot2, vAccts[0].Address().Bytes())
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}
@@ -99,7 +87,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		v := apiclient.VoteData{
 			ElectionID:   election.election.ElectionID,
 			ProofMkTree:  proof,
-			VoterAccount: election.voterAccounts[nvotes-1],
+			VoterAccount: vAccts[0],
 			Choices:      []int{1},
 		}
 		if _, err := api.Vote(&v); err != nil {
@@ -123,26 +111,28 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		// Send the votes (parallelized)
 		startTime := time.Now()
-
-		log.Infof("enqueuing %d votes", len(t.elections[0].voterAccounts[1:]))
 		votes := []*apiclient.VoteData{}
-		for _, acct := range t.elections[0].voterAccounts[1:] {
-			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   electionID,
-				ProofMkTree:  t.elections[0].proofs[acct.Address().Hex()],
-				Choices:      []int{0},
-				VoterAccount: acct,
-			})
-		}
-		errs := t.elections[0].sendVotes(votes)
+
+		t.elections[0].voters.Range(func(key, value any) bool {
+			if acctp, ok := value.(acctProof); ok {
+				votes = append(votes, &apiclient.VoteData{
+					ElectionID:   t.elections[0].election.ElectionID,
+					ProofMkTree:  acctp.proof,
+					Choices:      []int{0},
+					VoterAccount: acctp.account,
+				})
+			}
+			return true
+		})
+		errs := t.elections[0].sendVotes(votes[1:])
 		if len(errs) > 0 {
 			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
 			return
 		}
 
 		log.Infow("votes submitted successfully",
-			"n", len(t.elections[0].voterAccounts[1:]), "time", time.Since(startTime),
-			"vps", int(float64(len(t.elections[0].voterAccounts[1:]))/time.Since(startTime).Seconds()))
+			"n", len(votes[1:]), "time", time.Since(startTime),
+			"vps", int(float64(len(votes[1:]))/time.Since(startTime).Seconds()))
 
 		var (
 			censusRoot2 types.HexBytes
@@ -191,13 +181,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		}
 
 		// try again to vote after the census update with the missing vote from the first census created
-		v = apiclient.VoteData{
-			ElectionID:   electionID,
-			ProofMkTree:  t.elections[0].proofs[t.elections[0].voterAccounts[0].Address().Hex()],
-			VoterAccount: t.elections[0].voterAccounts[0],
-			Choices:      []int{0},
-		}
-		if _, err := api.Vote(&v); err != nil {
+		if _, err := api.Vote(votes[0]); err != nil {
 			// check if the error is not the expected
 			if !strings.Contains(err.Error(), "merkle proof verification failed") {
 				errCh <- fmt.Errorf("unexpected error when voting with the first census %s", err)
@@ -206,7 +190,7 @@ func (t *E2EDynamicensusElection) Run() error {
 			log.Debugw("error expected when try to vote,", "error:", err)
 		}
 
-		if err := t.elections[0].verifyVoteCount(nvotes - 2); err != nil {
+		if err := t.elections[0].verifyVoteCount(nvotes - 1); err != nil {
 			errCh <- fmt.Errorf("error in verifyVoteCount: %s", err)
 			return
 		}
@@ -217,7 +201,7 @@ func (t *E2EDynamicensusElection) Run() error {
 			return
 		}
 
-		expectedResults := [][]*types.BigInt{votesToBigInt(uint64(nvotes-3)*10, 10, 0)}
+		expectedResults := [][]*types.BigInt{votesToBigInt(uint64(nvotes-2)*10, 10, 0)}
 
 		if !matchResults(elres.Results, expectedResults) {
 			errCh <- fmt.Errorf("election result must match, expected Results: %s but got Results: %v", expectedResults, elres.Results)
@@ -246,25 +230,30 @@ func (t *E2EDynamicensusElection) Run() error {
 		// Send the votes (parallelized)
 		startTime := time.Now()
 
-		log.Infof("enqueuing %d votes", len(t.elections[1].voterAccounts[1:]))
+		log.Infof("enqueuing %d votes", t.elections[1].config.nvotes-1)
 		votes := []*apiclient.VoteData{}
-		for _, acct := range t.elections[1].voterAccounts[1:] {
-			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   electionID,
-				ProofMkTree:  t.elections[1].proofs[acct.Address().Hex()],
-				Choices:      []int{0},
-				VoterAccount: acct,
-			})
-		}
-		errs := t.elections[1].sendVotes(votes)
+
+		t.elections[1].voters.Range(func(key, value any) bool {
+			if acctp, ok := value.(acctProof); ok {
+				votes = append(votes, &apiclient.VoteData{
+					ElectionID:   electionID,
+					ProofMkTree:  acctp.proof,
+					Choices:      []int{0},
+					VoterAccount: acctp.account,
+				})
+			}
+			return true
+		})
+
+		errs := t.elections[1].sendVotes(votes[1:])
 		if len(errs) > 0 {
 			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
 			return
 		}
 
 		log.Infow("votes submitted successfully",
-			"n", len(t.elections[1].voterAccounts[1:]), "time", time.Since(startTime),
-			"vps", int(float64(len(t.elections[1].voterAccounts[1:]))/time.Since(startTime).Seconds()))
+			"n", len(votes[1:]), "time", time.Since(startTime),
+			"vps", int(float64(len(votes[1:]))/time.Since(startTime).Seconds()))
 
 		var censusRoot2 types.HexBytes
 		var err error
