@@ -13,6 +13,11 @@ import (
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
+// SIKROOT_HYSTERESIS_BLOCKS constant defines the number of blocks that the
+// vochain will consider a sikRoot valid. In this way, any new sikRoot will be
+// valid for at least for this number of blocks. If the gap between the last
+// two valid roots is greater than the value of this constant, the oldest will
+// be valid until a new sikroot is calculated.
 // TODO: Move the definition to the right place
 const SIKROOT_HYSTERESIS_BLOCKS = 32
 
