@@ -49,7 +49,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 	return nil
 }
 
-func (t *E2EMaxCensusSizeElection) Teardown() error {
+func (*E2EMaxCensusSizeElection) Teardown() error {
 	// nothing to do here
 	return nil
 }

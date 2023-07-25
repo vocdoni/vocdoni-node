@@ -144,7 +144,7 @@ func (i *Handler) SetMultiAddress(addr string) (err error) {
 }
 
 // URIprefix returns the URI prefix which identifies the protocol
-func (i *Handler) URIprefix() string {
+func (*Handler) URIprefix() string {
 	return "ipfs://"
 }
 

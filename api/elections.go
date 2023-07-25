@@ -551,7 +551,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Param			transaction	body		object{payload=string}	true	"File bytes base64 encoded"
 //	@Success		200			{object}	File
 //	@Router			/files/cid [post]
-func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (*API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(msg.Data) > MaxOffchainFileSize {
 		return ErrFileSizeTooBig.Withf("%d vs %d bytes", len(msg.Data), MaxOffchainFileSize)
 	}

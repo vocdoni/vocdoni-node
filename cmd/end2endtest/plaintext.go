@@ -43,7 +43,7 @@ func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, c *config) error
 	return nil
 }
 
-func (t *E2EPlaintextElection) Teardown() error {
+func (*E2EPlaintextElection) Teardown() error {
 	// nothing to do here
 	return nil
 }

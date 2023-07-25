@@ -127,7 +127,7 @@ func (t *Tree) Hash(data []byte) ([]byte, error) {
 }
 
 // BytesToBigInt unmarshals a slice of bytes into a bigInt following the censusTree encoding rules
-func (t *Tree) BytesToBigInt(data []byte) *big.Int {
+func (*Tree) BytesToBigInt(data []byte) *big.Int {
 	return arbo.BytesToBigInt(data)
 }
 

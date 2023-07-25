@@ -81,14 +81,14 @@ func (d *DataMockTest) URIprefix() string {
 	return d.prefix
 }
 
-func (d *DataMockTest) Stats(_ context.Context) map[string]interface{} {
+func (*DataMockTest) Stats(_ context.Context) map[string]interface{} {
 	return nil
 }
 
-func (d *DataMockTest) CollectMetrics(_ context.Context, _ *metrics.Agent) error {
+func (*DataMockTest) CollectMetrics(_ context.Context, _ *metrics.Agent) error {
 	return nil
 }
 
-func (d *DataMockTest) Stop() error {
+func (*DataMockTest) Stop() error {
 	return nil
 }

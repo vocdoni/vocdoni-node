@@ -46,7 +46,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 	return nil
 }
 
-func (t *E2EOverwriteElection) Teardown() error {
+func (*E2EOverwriteElection) Teardown() error {
 	// nothing to do here
 	return nil
 }

@@ -246,16 +246,16 @@ func (k *KeyKeeper) Commit(height uint32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(_ *state.Vote, _ int32) {
+func (*KeyKeeper) OnVote(_ *state.Vote, _ int32) {
 	// do nothing
 }
 
 // OnNewTx is not used by the KeyKeeper
-func (k *KeyKeeper) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32) {
+func (*KeyKeeper) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnBeginBlock(state.BeginBlock) {
+func (*KeyKeeper) OnBeginBlock(state.BeginBlock) {
 	// do nothing
 }
 
@@ -278,7 +278,7 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
-func (k *KeyKeeper) OnCensusUpdate(_, _ []byte, _ string) {}
+func (*KeyKeeper) OnCensusUpdate(_, _ []byte, _ string) {}
 
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
@@ -492,19 +492,19 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 }
 
 // OnProcessKeys does nothing
-func (k *KeyKeeper) OnProcessKeys(_ []byte, _ string, _ int32) {}
+func (*KeyKeeper) OnProcessKeys(_ []byte, _ string, _ int32) {}
 
 // OnRevealKeys does nothing
-func (k *KeyKeeper) OnRevealKeys(_ []byte, _ string, _ int32) {}
+func (*KeyKeeper) OnRevealKeys(_ []byte, _ string, _ int32) {}
 
 // OnProcessResults does nothing
-func (k *KeyKeeper) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32) {}
+func (*KeyKeeper) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32) {}
 
 // OnProcessesStart does nothing
-func (k *KeyKeeper) OnProcessesStart(_ [][]byte) {}
+func (*KeyKeeper) OnProcessesStart(_ [][]byte) {}
 
 // OnSetAccount does nothing
-func (k *KeyKeeper) OnSetAccount(_ []byte, _ *state.Account) {}
+func (*KeyKeeper) OnSetAccount(_ []byte, _ *state.Account) {}
 
 // OnTransferTokens does nothing
-func (k *KeyKeeper) OnTransferTokens(_ *vochaintx.TokenTransfer) {}
+func (*KeyKeeper) OnTransferTokens(_ *vochaintx.TokenTransfer) {}

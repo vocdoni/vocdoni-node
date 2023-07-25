@@ -54,7 +54,7 @@ func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	return nil
 }
 
-func (t *E2ECSPElection) Teardown() error {
+func (*E2ECSPElection) Teardown() error {
 	// nothing to do here
 	return nil
 }
