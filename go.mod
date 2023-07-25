@@ -56,7 +56,7 @@ require (
 	github.com/spf13/viper v1.15.0
 	github.com/vocdoni/go-snark v0.0.0-20210709152824-f6e4c27d7319
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
-	go.vocdoni.io/proto v1.14.5-0.20230707085040-f040f02c5dcd
+	go.vocdoni.io/proto v1.14.5-0.20230725133216-ada74211d058
 	golang.org/x/crypto v0.11.0
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
 	golang.org/x/net v0.12.0

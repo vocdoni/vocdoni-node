@@ -253,9 +253,8 @@ func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetSik{
 			SetSik: &models.SikTx{
-				Txtype:  models.TxType_SET_ACCOUNT_SIK,
-				Address: c.account.Address().Bytes(),
-				Sik:     sik,
+				Txtype: models.TxType_SET_ACCOUNT_SIK,
+				Sik:    sik,
 			},
 		}})
 	if err != nil {
@@ -296,8 +295,7 @@ func (c *HTTPclient) DelSik() (types.HexBytes, error) {
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_DelSik{
 			DelSik: &models.SikTx{
-				Txtype:  models.TxType_DEL_ACCOUNT_SIK,
-				Address: c.account.Address().Bytes(),
+				Txtype: models.TxType_DEL_ACCOUNT_SIK,
 			},
 		}})
 	if err != nil {
