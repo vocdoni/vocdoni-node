@@ -442,25 +442,52 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_SetSik:
-		addr, newSik, err := t.SetSikTxCheck(vtx)
+		txAddress, newSik, err := t.SetSikTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
+		if err := t.state.BurnTxCostIncrementNonce(
+			txAddress,
+			models.TxType_SET_ACCOUNT_SIK,
+			0,
+		); err != nil {
+			return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+		}
 		if forCommit {
-			if err := t.state.SetAddressSIK(addr, newSik); err != nil {
+			if err := t.state.SetAddressSIK(txAddress, newSik); err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
 			}
 		}
 		return response, nil
 
 	case *models.Tx_DelSik:
-		address, err := t.DelSikTxCheck(vtx)
+		txAddress, err := t.DelSikTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
+		if err := t.state.BurnTxCostIncrementNonce(
+			txAddress,
+			models.TxType_DEL_ACCOUNT_SIK,
+			0,
+		); err != nil {
+			return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+		}
+
 		if forCommit {
-			if err := t.state.InvalidateSIK(address); err != nil {
+			if err := t.state.InvalidateSIK(txAddress); err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
+			}
+		}
+		return response, nil
+
+	case *models.Tx_RegisterSik:
+		txAddress, sik, err := t.RegisterSikTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("registerSikTx: %w", err)
+		}
+		if forCommit {
+			if err := t.state.SetAddressSIK(txAddress, sik); err != nil {
+				return nil, fmt.Errorf("registerSikTx: %w", err)
 			}
 		}
 		return response, nil

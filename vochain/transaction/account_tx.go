@@ -246,7 +246,7 @@ func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, e
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, ErrNilTx
 	}
-	tx := vtx.Tx.GetSetSik()
+	tx := vtx.Tx.GetDelSik()
 	if tx == nil {
 		return common.Address{}, fmt.Errorf("invalid transaction")
 	}
@@ -268,24 +268,105 @@ func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, e
 
 // SetSikTxCheck checks if a set sik tx is valid
 func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
-	addr, err := t.DelSikTxCheck(vtx)
-	if err != nil {
-		return common.Address{}, nil, err
+	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
+		return common.Address{}, nil, ErrNilTx
 	}
+	tx := vtx.Tx.GetSetSik()
+	if tx == nil {
+		return common.Address{}, nil, fmt.Errorf("invalid transaction")
+	}
+	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+	}
+	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+
+	if _, err := t.state.GetAccount(txAddress, false); err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot get tx account: %w", err)
+	}
+
 	newSik := vtx.Tx.GetSetSik().GetSik()
 	if newSik == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
 	}
 	// check if the address already has invalidated sik to ensure that it is
 	// not updated after reach the correct height to avoid double voting
-	if currentSik, err := t.state.SIKFromAddress(addr); err == nil {
+	if currentSik, err := t.state.SIKFromAddress(txAddress); err == nil {
 		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
 		if err != nil {
-			return addr, nil, err
+			return common.Address{}, nil, err
 		}
 		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
-			return addr, nil, fmt.Errorf("the sik could not be changed yet")
+			return txAddress, nil, fmt.Errorf("the sik could not be changed yet")
 		}
 	}
-	return addr, newSik, nil
+	return txAddress, newSik, nil
+}
+
+// RegisterSikTxCheck checks if the provided RegisterSikTx is valid ensuring
+// that the proof included on it is valid for the address of the transaction
+// signer.
+func (t *TransactionHandler) RegisterSikTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
+	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
+		return common.Address{}, nil, ErrNilTx
+	}
+	tx := vtx.Tx.GetRegisterSik()
+	if tx == nil {
+		return common.Address{}, nil, fmt.Errorf("invalid transaction")
+	}
+	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+	}
+	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	if _, err := t.state.GetAccount(txAddress, false); err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot get the account for the tx address: %w", err)
+	}
+	newSik := tx.GetSik()
+	if newSik == nil {
+		return common.Address{}, nil, fmt.Errorf("no sik value provided")
+	}
+	// check if the address already has invalidated sik to ensure that it is
+	// not updated after reach the correct height to avoid double voting
+	if currentSik, err := t.state.SIKFromAddress(txAddress); err == nil {
+		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
+		if err != nil {
+			return common.Address{}, nil, err
+		}
+		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
+			return common.Address{}, nil, fmt.Errorf("the sik could not be changed yet")
+		}
+	}
+	// check if the address already has a valid sik
+	if _, err := t.state.SIKFromAddress(txAddress); err == nil {
+		return txAddress, nil, fmt.Errorf("this address already has a valid sik")
+	}
+	// get census proof and election information provided
+	censusProof := tx.GetCensusProof()
+	if censusProof == nil {
+		return common.Address{}, nil, fmt.Errorf("no proof provided")
+	}
+	electionId := tx.GetElectionId()
+	if electionId == nil {
+		return common.Address{}, nil, fmt.Errorf("no proof provided")
+	}
+	election, err := t.state.Process(electionId, false)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("error getting the election info: %w", err)
+	}
+	// verify the proof for the transaction signer address
+	valid, _, err := VerifyProof(election, censusProof, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("error verifying the proof: %w", err)
+	}
+	if !valid {
+		return common.Address{}, nil, fmt.Errorf("proof not valid")
+	}
+	return txAddress, newSik, nil
 }
