@@ -106,7 +106,7 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 
 }
 
-func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes, nvoterKeys int) error {
+func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, nvoterKeys int) error {
 	participants := &vapi.CensusParticipants{}
 
 	voterAccounts := t.voterAccounts
@@ -203,14 +203,14 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 				voterApi := t.api.Clone(voterPrivKey.String())
 				voterProof.proof, err = voterApi.CensusGenProof(root, acc.Address().Bytes())
 				if err != nil {
-					log.Fatal(err)
+					log.Warn(err)
 				}
 				if isAnonymousVoting {
 					voterProof.sikproof, err = voterApi.SikGenProof()
 				}
 			}
 			if err != nil {
-				log.Fatal(err)
+				log.Warn(err)
 			}
 
 			if !isAnonymousVoting {
@@ -276,7 +276,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes,
 	}
 
 	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(censusType, censusID, nAcct); err != nil {
+	if err := t.addParticipantsCensus(censusID, nAcct); err != nil {
 		return nil, "", err
 	}
 
