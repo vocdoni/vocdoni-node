@@ -520,7 +520,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 }
 
 // OnSetAccount NOT USED but required for implementing the vochain.EventListener interface
-func (idx *Indexer) OnSetAccount(_ []byte, _ *state.Account) {}
+func (*Indexer) OnSetAccount(_ []byte, _ *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	idx.blockMu.Lock()

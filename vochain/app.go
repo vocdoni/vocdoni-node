@@ -459,7 +459,7 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 }
 
 // Query does nothing
-func (app *BaseApplication) Query(_ context.Context,
+func (*BaseApplication) Query(_ context.Context,
 	_ *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	return &abcitypes.ResponseQuery{}, nil
 }
@@ -507,7 +507,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
-func (app *BaseApplication) ProcessProposal(_ context.Context,
+func (*BaseApplication) ProcessProposal(_ context.Context,
 	_ *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
@@ -515,37 +515,37 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 }
 
 // ListSnapshots returns a list of available snapshots.
-func (app *BaseApplication) ListSnapshots(context.Context,
+func (*BaseApplication) ListSnapshots(context.Context,
 	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
 	return &abcitypes.ResponseListSnapshots{}, nil
 }
 
 // OfferSnapshot returns the response to a snapshot offer.
-func (app *BaseApplication) OfferSnapshot(context.Context,
+func (*BaseApplication) OfferSnapshot(context.Context,
 	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
 	return &abcitypes.ResponseOfferSnapshot{}, nil
 }
 
 // LoadSnapshotChunk returns the response to a snapshot chunk loading request.
-func (app *BaseApplication) LoadSnapshotChunk(context.Context,
+func (*BaseApplication) LoadSnapshotChunk(context.Context,
 	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
 	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
 }
 
 // ApplySnapshotChunk returns the response to a snapshot chunk applying request.
-func (app *BaseApplication) ApplySnapshotChunk(context.Context,
+func (*BaseApplication) ApplySnapshotChunk(context.Context,
 	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
 	return &abcitypes.ResponseApplySnapshotChunk{}, nil
 }
 
 // ExtendVote creates application specific vote extension
-func (app *BaseApplication) ExtendVote(context.Context,
+func (*BaseApplication) ExtendVote(context.Context,
 	*abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
 	return &abcitypes.ResponseExtendVote{}, nil
 }
 
 // VerifyVoteExtension verifies application's vote extension data
-func (app *BaseApplication) VerifyVoteExtension(context.Context,
+func (*BaseApplication) VerifyVoteExtension(context.Context,
 	*abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
 	return &abcitypes.ResponseVerifyVoteExtension{}, nil
 }

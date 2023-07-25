@@ -42,7 +42,7 @@ func (v VoterID) VoterIDTypeToString() string {
 }
 
 // Nil returns the default value for VoterID which is a non-nil slice
-func (v VoterID) Nil() []byte {
+func (VoterID) Nil() []byte {
 	return []byte{}
 }
 

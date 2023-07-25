@@ -173,28 +173,28 @@ type Listener struct {
 	processStart [][][]byte
 }
 
-func (l *Listener) OnVote(vote *Vote, txIndex int32)                                             {}
-func (l *Listener) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)                  {}
-func (l *Listener) OnBeginBlock(BeginBlock)                                                      {}
-func (l *Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
-func (l *Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
-func (l *Listener) OnCancel(pid []byte, txIndex int32)                                           {}
-func (l *Listener) OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)                {}
-func (l *Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)                {}
-func (l *Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) {
+func (*Listener) OnVote(vote *Vote, txIndex int32)                                             {}
+func (*Listener) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)                  {}
+func (*Listener) OnBeginBlock(BeginBlock)                                                      {}
+func (*Listener) OnProcess(pid, eid []byte, censusRoot, censusURI string, txIndex int32)       {}
+func (*Listener) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32) {}
+func (*Listener) OnCancel(pid []byte, txIndex int32)                                           {}
+func (*Listener) OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)                {}
+func (*Listener) OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)                {}
+func (*Listener) OnProcessResults(pid []byte, results *models.ProcessResult, txIndex int32) {
 }
-func (l *Listener) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
-func (l *Listener) OnSetAccount(addr []byte, account *Account) {
+func (*Listener) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
+func (*Listener) OnSetAccount(addr []byte, account *Account) {
 }
-func (l *Listener) OnTransferTokens(tx *vochaintx.TokenTransfer) {
+func (*Listener) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 }
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }
-func (l *Listener) Commit(height uint32) (err error) {
+func (*Listener) Commit(height uint32) (err error) {
 	return nil
 }
-func (l *Listener) Rollback() {}
+func (*Listener) Rollback() {}
 
 func TestOnProcessStart(t *testing.T) {
 	log.Init("info", "stdout", nil)

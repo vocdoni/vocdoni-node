@@ -50,7 +50,7 @@ var logTestTime, _ = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
 type testHook struct{}
 
 // To ensure that the log output in the test is deterministic.
-func (h *testHook) Run(e *zerolog.Event, _ zerolog.Level, _ string) {
+func (*testHook) Run(e *zerolog.Event, _ zerolog.Level, _ string) {
 	e.Stringer("time", logTestTime)
 }
 
@@ -60,7 +60,7 @@ type errorLevelWriter struct {
 
 var _ zerolog.LevelWriter = &errorLevelWriter{}
 
-func (w *errorLevelWriter) Write(_ []byte) (int, error) {
+func (*errorLevelWriter) Write(_ []byte) (int, error) {
 	panic("should be calling WriteLevel")
 }
 

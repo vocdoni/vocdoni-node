@@ -175,7 +175,7 @@ func (t *Tree) RootWithTx(rTx db.Reader) ([]byte, error) {
 	return rTx.Get(dbKeyRoot)
 }
 
-func (t *Tree) setRoot(wTx db.WriteTx, root []byte) error {
+func (*Tree) setRoot(wTx db.WriteTx, root []byte) error {
 	return wTx.Set(dbKeyRoot, root)
 }
 
@@ -1140,7 +1140,7 @@ func (t *Tree) incNLeafs(wTx db.WriteTx, nLeafs int) error {
 	return t.setNLeafs(wTx, newNLeafs)
 }
 
-func (t *Tree) setNLeafs(wTx db.WriteTx, nLeafs int) error {
+func (*Tree) setNLeafs(wTx db.WriteTx, nLeafs int) error {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, uint64(nLeafs))
 	if err := wTx.Set(dbKeyNLeafs, b); err != nil {
@@ -1156,7 +1156,7 @@ func (t *Tree) GetNLeafs() (int, error) {
 
 // GetNLeafsWithTx does the same than the GetNLeafs method, but allowing to
 // pass the db.ReadTx that is used.
-func (t *Tree) GetNLeafsWithTx(rTx db.Reader) (int, error) {
+func (*Tree) GetNLeafsWithTx(rTx db.Reader) (int, error) {
 	b, err := rTx.Get(dbKeyNLeafs)
 	if err != nil {
 		return 0, err

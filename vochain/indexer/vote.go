@@ -160,7 +160,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 // addLiveVote adds the envelope vote to the results. It does not commit to the database.
 // This method is triggered by OnVote callback for each vote added to the blockchain.
 // If encrypted vote, only weight will be updated.
-func (idx *Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
+func (*Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byte, weight *big.Int, results *results.Results) error {
 	// If live process, add vote to temporary results
 	var vote *state.VotePackage
 	if isOpenProcess(process) {
@@ -187,7 +187,7 @@ func (idx *Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byt
 // addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
 // This method is triggered by Commit callback for each vote added to the blockchain.
 // If txn is provided the vote will be added on the transaction (without performing a commit).
-func (idx *Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
+func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
 	weightStr := "1"
 	if vote.Weight != nil {
 		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
@@ -252,7 +252,7 @@ func (idx *Indexer) commitVotes(queries *indexerdb.Queries, pid []byte, partialR
 }
 
 // commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (idx *Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, _ uint32) error {
+func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, _ uint32) error {
 	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
 	// does not matter much in the end
 	procInner, err := queries.GetProcess(context.TODO(), pid)

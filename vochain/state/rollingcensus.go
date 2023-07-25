@@ -93,7 +93,7 @@ func (v *State) GetRollingCensusSize(pid []byte, committed bool) (uint64, error)
 
 // PurgeRollingCensus removes a rolling census from the permanent store
 // If the census does not exist, it does nothing.
-func (s *State) PurgeRollingCensus(pid []byte) error {
+func (*State) PurgeRollingCensus(pid []byte) error {
 	return fmt.Errorf("TODO")
 }
 

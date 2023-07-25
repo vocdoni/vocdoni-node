@@ -118,7 +118,7 @@ func (v *TreeView) Dump(w io.Writer) error {
 }
 
 // Import does nothing.
-func (v *TreeView) Import(_ io.Reader) error {
+func (*TreeView) Import(_ io.Reader) error {
 	return fmt.Errorf("tree is not writable")
 }
 
