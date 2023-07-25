@@ -446,14 +446,14 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-		if err := t.state.BurnTxCostIncrementNonce(
-			txAddress,
-			models.TxType_SET_ACCOUNT_SIK,
-			0,
-		); err != nil {
-			return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
-		}
 		if forCommit {
+			if err := t.state.BurnTxCostIncrementNonce(
+				txAddress,
+				models.TxType_SET_ACCOUNT_SIK,
+				0,
+			); err != nil {
+				return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+			}
 			if err := t.state.SetAddressSIK(txAddress, newSik); err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
 			}
@@ -465,15 +465,14 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		if err != nil {
 			return nil, fmt.Errorf("setSikTx: %w", err)
 		}
-		if err := t.state.BurnTxCostIncrementNonce(
-			txAddress,
-			models.TxType_DEL_ACCOUNT_SIK,
-			0,
-		); err != nil {
-			return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
-		}
-
 		if forCommit {
+			if err := t.state.BurnTxCostIncrementNonce(
+				txAddress,
+				models.TxType_DEL_ACCOUNT_SIK,
+				0,
+			); err != nil {
+				return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+			}
 			if err := t.state.InvalidateSIK(txAddress); err != nil {
 				return nil, fmt.Errorf("setSikTx: %w", err)
 			}
