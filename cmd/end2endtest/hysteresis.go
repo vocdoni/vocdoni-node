@@ -47,7 +47,7 @@ func (t *E2EHysteresis) Setup(api *apiclient.HTTPclient, c *config) error {
 	return nil
 }
 
-func (t *E2EHysteresis) Teardown() error {
+func (*E2EHysteresis) Teardown() error {
 	// nothing to do here
 	return nil
 }
@@ -56,7 +56,7 @@ func (t *E2EHysteresis) Run() error {
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	votes := []*apiclient.VoteData{}
+	var votes []*apiclient.VoteData
 	for i, acct := range t.voterAccounts {
 		votes = append(votes, &apiclient.VoteData{
 			ElectionID:   t.election.ElectionID,

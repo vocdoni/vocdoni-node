@@ -45,13 +45,13 @@ func (a *API) enableSikHandlers() error {
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{sikroots=[]string}
 //	@Router			/sik/roots [get]
-func (a *API) sikValidRootsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	validSikRoots, err := a.vocapp.State.ValidSIKRoots()
 	if err != nil {
 		return err
 	}
 
-	sikRoots := []types.HexBytes{}
+	var sikRoots []types.HexBytes
 	for _, root := range validSikRoots {
 		sikRoots = append(sikRoots, root)
 	}
@@ -77,7 +77,7 @@ func (a *API) sikValidRootsHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{sikproof=string, sikroot=string, siksiblings=[]string}
 //	@Router			/sik/proof/{address} [get]
-func (a *API) sikProofHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) sikProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get the address from the
 	address, err := censusKeyParse(ctx.URLParam("address"))
 	if err != nil {

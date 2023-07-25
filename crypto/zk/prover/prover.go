@@ -120,7 +120,7 @@ func (p *Proof) Nullifier() (*big.Int, error) {
 	return nullifier, nil
 }
 
-// SikRoot
+// SikRoot function returns the sikRoot included into the current proof.
 func (p *Proof) SikRoot() ([]byte, error) {
 	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat

@@ -214,9 +214,9 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 	return false, recoveredAddr, nil
 }
 
-// Sik method generates the Secret Identity Key for the current SignKeys with
-// the signature of the DefaultSikPayload and the user secret (if it
-// is provided) following the definition:
+// CustomSik method generates the Secret Identity Key for the current SignKeys 
+// with the signature of the DefaultSikPayload and the user secret (if it is 
+// provided) following the definition:
 //
 //	SIK = poseidon(address, signature, secret)
 //
@@ -241,10 +241,14 @@ func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
 }
 
+// Sik method returns the calculated SIK for the current SignKeys with any
+// password or secret as input.
 func (k *SignKeys) Sik() ([]byte, error) {
 	return k.CustomSik([]byte{})
 }
 
+// Nullifier method composes the nullifier of the current SignKeys for the 
+// desired election id and the secret provided.
 func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {
 	// sign the default Secret Identity Key seed
 	sign, err := k.SignVocdoniSik()

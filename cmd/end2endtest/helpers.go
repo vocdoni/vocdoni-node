@@ -118,13 +118,9 @@ func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.He
 	}
 
 	for i, voterAccount := range voterAccounts {
-		keyAddr, err := censusParticipantKey(voterAccount, censusType)
-		if err != nil {
-			return err
-		}
 		participants.Participants = append(participants.Participants,
 			vapi.CensusParticipant{
-				Key:    keyAddr,
+				Key:    voterAccount.Address().Bytes(),
 				Weight: (*types.BigInt)(new(big.Int).SetUint64(defaultWeight)),
 			})
 
@@ -578,11 +574,6 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 	default:
 		return apiclient.GetFaucetPackageFromRemoteService(faucet+myAddress, faucetAuthToken)
 	}
-}
-
-// TODO: remove this function
-func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
-	return voterAccount.Address().Bytes(), nil
 }
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {

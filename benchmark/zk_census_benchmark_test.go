@@ -68,11 +68,11 @@ func BenchmarkZkCensus(b *testing.B) {
 	b.ResetTimer()
 
 	b.Run("census", func(b *testing.B) {
-		zkCensusBenchmark(b, censusClient, sikClient, vocapp, censusID, electionID, router.Address().String())
+		zkCensusBenchmark(b, censusClient, sikClient, vocapp, censusID, electionID)
 	})
 }
 
-func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *vochain.BaseApplication, censusID string, electionID []byte, baseUrl string) {
+func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *vochain.BaseApplication, censusID string, electionID []byte) {
 	cparts := api.CensusParticipants{}
 	admin := ethereum.NewSignKeys()
 	for i := 0; i < 10; i++ {

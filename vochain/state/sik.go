@@ -122,7 +122,7 @@ func (v *State) ValidSIKRoots() ([][]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	validRoots := [][]byte{}
+	var validRoots [][]byte
 	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
 		validRoots = append(validRoots, root)
 		return true
@@ -171,7 +171,7 @@ func (v *State) UpdateSIKRoots() error {
 	// calculate the current minimun block to purge useless sik roots
 	currentBlock := v.CurrentHeight()
 	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
-		toPurge := [][]byte{}
+		var toPurge [][]byte
 		minBlock := currentBlock - SIKROOT_HYSTERESIS_BLOCKS
 		minBlockKey := make([]byte, 32)
 		binary.LittleEndian.PutUint32(minBlockKey, minBlock)
@@ -246,7 +246,7 @@ func (s SIK) InvalidateAt(height uint32) SIK {
 // DecodeInvalidatedHeight funtion returns the decoded height uint32 from the
 // leaf value that contains an invalidated SIK.
 func (s SIK) DecodeInvalidatedHeight() uint32 {
-	bHeight := []byte{}
+	var bHeight []byte
 	for i := sikLeafValueLen - 1; len(bHeight) < encodedHeightLen; i-- {
 		bHeight = append(bHeight, s[i])
 	}

@@ -272,8 +272,8 @@ func TestCensusZk(t *testing.T) {
 	id1 := censusData.CensusID.String()
 
 	// add a bunch of keys and values (weights)
-	accounts := []*ethereum.SignKeys{}
-	keys := [][]byte{}
+	var accounts []*ethereum.SignKeys
+	var keys [][]byte
 	for i := 1; i < 11; i++ {
 		acc := ethereum.NewSignKeys()
 		c.Assert(acc.Generate(), qt.IsNil)
