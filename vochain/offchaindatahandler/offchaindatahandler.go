@@ -68,7 +68,7 @@ func (d *OffChainDataHandler) Rollback() {
 
 // Commit is called when a new block is committed, so we execute the import actions
 // enqueued by the event handlers (else the queues are reverted by calling Rollback).
-func (d *OffChainDataHandler) Commit(height uint32) error {
+func (d *OffChainDataHandler) Commit(_ uint32) error {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
 	for _, item := range d.queue {
@@ -161,7 +161,7 @@ func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
 }
 
 // OnSetAccount is triggered when a new account is created or modifyied. If metadata info is present, it is enqueued.
-func (d *OffChainDataHandler) OnSetAccount(addr []byte, account *state.Account) {
+func (d *OffChainDataHandler) OnSetAccount(_ []byte, account *state.Account) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
 	if d.importOnlyNew && d.isFastSync {
