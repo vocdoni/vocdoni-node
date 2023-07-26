@@ -104,6 +104,7 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 		// check if the proof key is for an address (default) or a pubKey
 		var err error
 		key := vID.Address()
+		// TODO (lucasmenendez): Remove hashing of the address
 		if p.Type != models.ProofArbo_POSEIDON {
 			if key, err = hashFunc.Hash(key); err != nil {
 				return false, nil, fmt.Errorf("cannot hash proof key: %w", err)

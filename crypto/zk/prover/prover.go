@@ -95,11 +95,11 @@ func (p *Proof) Weight() (*big.Int, error) {
 		return nil, ErrPublicSignalFormat
 	}
 	// Get the weight from the fifth public signal of the proof
-	strWeight := p.PubSignals[4]
+	strWeight := p.PubSignals[3]
 	// Parse it into a big.Int
 	weight, ok := new(big.Int).SetString(strWeight, 10)
 	if !ok {
-		return nil, ErrParsingNullifier
+		return nil, ErrParsingWeight
 	}
 	return weight, nil
 }
@@ -115,7 +115,7 @@ func (p *Proof) Nullifier() (*big.Int, error) {
 	// Parse it into a big.Int
 	nullifier, ok := new(big.Int).SetString(strNullifier, 10)
 	if !ok {
-		return nil, ErrParsingWeight
+		return nil, ErrParsingNullifier
 	}
 	return nullifier, nil
 }
@@ -127,7 +127,7 @@ func (p *Proof) SikRoot() ([]byte, error) {
 	}
 	arboSik, ok := new(big.Int).SetString(p.PubSignals[6], 10)
 	if !ok {
-		return nil, ErrParsingNullifier
+		return nil, ErrParsingSikRoot
 	}
 
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), arboSik), nil

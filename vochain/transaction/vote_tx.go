@@ -166,6 +166,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 
 		log.Debugw("new vote",
 			"type", "zkSNARK",
+			"weight", vote.Weight,
 			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
