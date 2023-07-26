@@ -50,11 +50,11 @@ type Config struct {
 func (c *Config) ValidMode() bool {
 	switch c.Mode {
 	case types.ModeGateway:
-		break
+
 	case types.ModeMiner:
-		break
+
 	case types.ModeSeed:
-		break
+
 	default:
 		return false
 	}
@@ -65,7 +65,7 @@ func (c *Config) ValidMode() bool {
 func (c *VochainCfg) ValidDBType() bool {
 	switch c.DBType {
 	case db.TypePebble:
-		break
+
 	default:
 		return false
 	}
