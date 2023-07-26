@@ -92,7 +92,7 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
 }
 
-func testNewProcess(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
+func testNewProcess(t *testing.T, _ []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, process *models.Process) error {
 	var stx models.SignedTx
 	var err error
@@ -422,7 +422,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	return app, keys
 }
 
-func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
+func testCheckTxDeliverTxCommit(_ *testing.T, app *BaseApplication, stx *models.SignedTx) error {
 	cktx := new(abcitypes.RequestCheckTx)
 	var err error
 	// checkTx()
