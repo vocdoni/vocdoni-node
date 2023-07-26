@@ -489,7 +489,7 @@ func testSetAccountTx(t *testing.T,
 	create bool) error {
 	var err error
 
-	sik, err := signer.Sik()
+	sik, err := signer.AccountSIK(nil)
 	if err != nil {
 		return err
 	}

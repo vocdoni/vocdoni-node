@@ -31,9 +31,9 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	testSiblings, err := zk.ProofToCircomSiblings(testProof)
 	c.Assert(err, qt.IsNil)
 	// add the test account sik to the test app
-	testSik, err := testAccount.Sik()
+	testSIK, err := testAccount.AccountSIK(nil)
 	c.Assert(err, qt.IsNil)
-	c.Assert(app.State.SetAddressSIK(testAccount.Address(), testSik), qt.IsNil)
+	c.Assert(app.State.SetAddressSIK(testAccount.Address(), testSIK), qt.IsNil)
 	// get siktree root and proof
 	app.State.Tx.Lock()
 	sikTree, err := app.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
@@ -78,7 +78,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	proof, err := prover.Prove(devCircuit.ProvingKey, devCircuit.Wasm, encInputs)
 	c.Assert(err, qt.IsNil)
 	// generate nullifier
-	nullifier, err := testAccount.Nullifier(electionId, nil)
+	nullifier, err := testAccount.AccountSIKnullifier(electionId, nil)
 	c.Assert(err, qt.IsNil)
 	// encode the zk proof and create the vote tx
 	protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil, nil)

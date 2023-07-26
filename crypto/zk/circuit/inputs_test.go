@@ -28,7 +28,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	// mock voter account and vote nullifier
 	acc := ethereum.NewSignKeys()
 	c.Assert(acc.Generate(), qt.IsNil)
-	nullifier, err := acc.Nullifier(electionId, nil)
+	nullifier, err := acc.AccountSIKnullifier(electionId, nil)
 	c.Assert(err, qt.IsNil)
 	// mock the availableWeight
 	availableWeight := new(big.Int).SetUint64(10)
@@ -38,7 +38,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	hexTestRoot, err := hex.DecodeString(testRoot)
 	c.Assert(err, qt.IsNil)
 	// mock user signature
-	signature, err := acc.SignVocdoniSik()
+	signature, err := acc.SIKsignature()
 	c.Assert(err, qt.IsNil)
 	// mock expected circuit inputs
 	expected := &CircuitInputs{
@@ -46,7 +46,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: availableWeight.String(),
 		VoteHash:        voteHash,
-		SikRoot:         "7714269703880573582519379213888374390024853519732158909852028066903886590497",
+		SIKRoot:         "7714269703880573582519379213888374390024853519732158909852028066903886590497",
 		CensusRoot:      "7714269703880573582519379213888374390024853519732158909852028066903886590497",
 
 		Address:   arbo.BytesToBigInt(acc.Address().Bytes()).String(),
@@ -55,7 +55,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 
 		VoteWeight:     availableWeight.String(),
 		CensusSiblings: testSiblings,
-		SikSiblings:    testSiblings,
+		SIKSiblings:    testSiblings,
 	}
 	// Generate correct inputs
 	rawInputs, err := GenerateCircuitInput(acc, nil, electionId, hexTestRoot, hexTestRoot,

@@ -58,7 +58,7 @@ func (t *E2EAnonElection) Run() error {
 		votes = append(votes, &apiclient.VoteData{
 			ElectionID:   t.election.ElectionID,
 			ProofMkTree:  t.proofs[acct.AddressString()],
-			ProofSikTree: t.sikproofs[acct.AddressString()],
+			ProofSIKTree: t.sikproofs[acct.AddressString()],
 			Choices:      []int{i % 2},
 			VoterAccount: acct,
 		})

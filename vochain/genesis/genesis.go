@@ -111,8 +111,8 @@ var devGenesis = GenesisDoc{
 			AddDelegateForAccount:   1,
 			DelDelegateForAccount:   1,
 			CollectFaucet:           1,
-			SetAccountSik:           1,
-			DelAccountSik:           1,
+			SetAccountSIK:           1,
+			DelAccountSIK:           1,
 		},
 	},
 }

@@ -219,7 +219,7 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + ipfs.CalculateCIDv1json(metaData)
-	sik, err := signer.Sik()
+	sik, err := signer.AccountSIK(nil)
 	qt.Assert(t, err, qt.IsNil)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{

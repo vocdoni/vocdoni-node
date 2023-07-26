@@ -46,7 +46,7 @@ func BenchmarkZkCensus(b *testing.B) {
 	storage := ipfs.MockIPFS(b)
 	vocapp := vochain.TestBaseApplication(b)
 	vocApi.Attach(vocapp, nil, nil, storage, censusDB)
-	qt.Assert(b, vocApi.EnableHandlers(api.CensusHandler, api.SikHandler), qt.IsNil)
+	qt.Assert(b, vocApi.EnableHandlers(api.CensusHandler, api.SIKHandler), qt.IsNil)
 
 	censusUrl, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(b, err, qt.IsNil)
@@ -81,7 +81,7 @@ func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *voch
 			acc = ethereum.NewSignKeys()
 		}
 		qt.Assert(b, acc.Generate(), qt.IsNil)
-		sik, err := acc.Sik()
+		sik, err := acc.AccountSIK(nil)
 		qt.Assert(b, err, qt.IsNil)
 		qt.Assert(b, vapp.State.SetAddressSIK(acc.Address(), sik), qt.IsNil)
 

@@ -23,7 +23,7 @@ var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
 	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
 	ErrParsingNullifier   = fmt.Errorf("error parsing proof nullifier string to big.Int")
-	ErrParsingSikRoot     = fmt.Errorf("error parsing proof sikRoot string to []byte")
+	ErrParsingSIKRoot     = fmt.Errorf("error parsing proof sIKRoot string to []byte")
 	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
 	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
 	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
@@ -120,17 +120,17 @@ func (p *Proof) Nullifier() (*big.Int, error) {
 	return nullifier, nil
 }
 
-// SikRoot function returns the sikRoot included into the current proof.
-func (p *Proof) SikRoot() ([]byte, error) {
+// SIKRoot function returns the sIKRoot included into the current proof.
+func (p *Proof) SIKRoot() ([]byte, error) {
 	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat
 	}
-	arboSik, ok := new(big.Int).SetString(p.PubSignals[6], 10)
+	arboSIK, ok := new(big.Int).SetString(p.PubSignals[6], 10)
 	if !ok {
-		return nil, ErrParsingSikRoot
+		return nil, ErrParsingSIKRoot
 	}
 
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), arboSik), nil
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), arboSIK), nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based

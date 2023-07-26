@@ -206,7 +206,7 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 					log.Warn(err)
 				}
 				if isAnonymousVoting {
-					voterProof.sikproof, err = voterApi.SikGenProof()
+					voterProof.sikproof, err = voterApi.GenSIKProof()
 				}
 			}
 			if err != nil {

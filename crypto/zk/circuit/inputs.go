@@ -19,7 +19,7 @@ type CircuitInputs struct {
 	Nullifier       string   `json:"nullifier"`
 	AvailableWeight string   `json:"availableWeight"`
 	VoteHash        []string `json:"voteHash"`
-	SikRoot         string   `json:"sikRoot"`
+	SIKRoot         string   `json:"sikRoot"`
 	CensusRoot      string   `json:"censusRoot"`
 
 	// Private inputs
@@ -29,7 +29,7 @@ type CircuitInputs struct {
 
 	VoteWeight     string   `json:"voteWeight"`
 	CensusSiblings []string `json:"censusSiblings"`
-	SikSiblings    []string `json:"sikSiblings"`
+	SIKSiblings    []string `json:"sikSiblings"`
 }
 
 func (ci *CircuitInputs) String() string {
@@ -53,7 +53,7 @@ func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
 		voteWeight = availableWeight
 	}
 
-	nullifier, err := account.Nullifier(electionId, password)
+	nullifier, err := account.AccountSIKnullifier(electionId, password)
 	if err != nil {
 		return nil, fmt.Errorf("error generating nullifier: %w", err)
 	}
@@ -61,7 +61,7 @@ func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
 	if password != nil {
 		ffPassword = zk.BigToFF(new(big.Int).SetBytes(password))
 	}
-	signature, err := account.SignVocdoniSik()
+	signature, err := account.SIKsignature()
 	if err != nil {
 		return nil, err
 	}
@@ -70,7 +70,7 @@ func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: availableWeight.String(),
 		VoteHash:        zk.BytesToArboStr(availableWeight.Bytes()),
-		SikRoot:         arbo.BytesToBigInt(sikRoot).String(),
+		SIKRoot:         arbo.BytesToBigInt(sikRoot).String(),
 		CensusRoot:      arbo.BytesToBigInt(censusRoot).String(),
 
 		Address:   arbo.BytesToBigInt(account.Address().Bytes()).String(),
@@ -79,6 +79,6 @@ func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
 
 		VoteWeight:     voteWeight.String(),
 		CensusSiblings: censusSiblings,
-		SikSiblings:    sikSiblings,
+		SIKSiblings:    sikSiblings,
 	}, nil
 }

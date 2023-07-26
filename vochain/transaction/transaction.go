@@ -237,7 +237,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				// persist it in the state.
 				if sik != nil {
 					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
-						return nil, fmt.Errorf("setAccountTx: setSik %w", err)
+						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
 					}
 				}
 				if tx.FaucetPackage != nil {
@@ -442,9 +442,9 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 
 	case *models.Tx_SetSik:
-		txAddress, newSik, err := t.SetSikTxCheck(vtx)
+		txAddress, newSIK, err := t.SetSIKTxCheck(vtx)
 		if err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
+			return nil, fmt.Errorf("setSIKTx: %w", err)
 		}
 		if forCommit {
 			if err := t.state.BurnTxCostIncrementNonce(
@@ -452,18 +452,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				models.TxType_SET_ACCOUNT_SIK,
 				0,
 			); err != nil {
-				return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
 			}
-			if err := t.state.SetAddressSIK(txAddress, newSik); err != nil {
-				return nil, fmt.Errorf("setSikTx: %w", err)
+			if err := t.state.SetAddressSIK(txAddress, newSIK); err != nil {
+				return nil, fmt.Errorf("setSIKTx: %w", err)
 			}
 		}
 		return response, nil
 
 	case *models.Tx_DelSik:
-		txAddress, err := t.DelSikTxCheck(vtx)
+		txAddress, err := t.DelSIKTxCheck(vtx)
 		if err != nil {
-			return nil, fmt.Errorf("setSikTx: %w", err)
+			return nil, fmt.Errorf("setSIKTx: %w", err)
 		}
 		if forCommit {
 			if err := t.state.BurnTxCostIncrementNonce(
@@ -471,22 +471,22 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				models.TxType_DEL_ACCOUNT_SIK,
 				0,
 			); err != nil {
-				return nil, fmt.Errorf("setSikTx: burnTxCostIncrementNonce %w", err)
+				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
 			}
 			if err := t.state.InvalidateSIK(txAddress); err != nil {
-				return nil, fmt.Errorf("setSikTx: %w", err)
+				return nil, fmt.Errorf("setSIKTx: %w", err)
 			}
 		}
 		return response, nil
 
 	case *models.Tx_RegisterSik:
-		txAddress, sik, err := t.RegisterSikTxCheck(vtx)
+		txAddress, SIK, err := t.RegisterSIKTxCheck(vtx)
 		if err != nil {
-			return nil, fmt.Errorf("registerSikTx: %w", err)
+			return nil, fmt.Errorf("registerSIKTx: %w", err)
 		}
 		if forCommit {
-			if err := t.state.SetAddressSIK(txAddress, sik); err != nil {
-				return nil, fmt.Errorf("registerSikTx: %w", err)
+			if err := t.state.SetAddressSIK(txAddress, SIK); err != nil {
+				return nil, fmt.Errorf("registerSIKTx: %w", err)
 			}
 		}
 		return response, nil

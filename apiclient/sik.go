@@ -8,11 +8,11 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 )
 
-type SikRoots []string
+type SIKRoots []string
 
-// ValidSikRoots returns the currently valid roots of SIK merkle tree from the
+// ValidSIKRoots returns the currently valid roots of SIK merkle tree from the
 // API.
-func (c *HTTPclient) ValidSikRoots() (SikRoots, error) {
+func (c *HTTPclient) ValidSIKRoots() (SIKRoots, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "sik", "roots")
 	if err != nil {
 		return nil, err
@@ -21,16 +21,16 @@ func (c *HTTPclient) ValidSikRoots() (SikRoots, error) {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	sp := struct {
-		SikRoots []string `json:"sikroots"`
+		SIKRoots []string `json:"sikroots"`
 	}{}
 	if err := json.Unmarshal(resp, &sp); err != nil {
 		return nil, fmt.Errorf("could not unmarshal response: %w", err)
 	}
-	return sp.SikRoots, nil
+	return sp.SIKRoots, nil
 }
 
-// SikGenProof generates a proof for the voter address in the sik merkle tree.
-func (c *HTTPclient) SikGenProof() (*CensusProof, error) {
+// GenSIKProof generates a proof for the voter address in the sik merkle tree.
+func (c *HTTPclient) GenSIKProof() (*CensusProof, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "sik", "proof", c.account.AddressString())
 	if err != nil {
 		return nil, err

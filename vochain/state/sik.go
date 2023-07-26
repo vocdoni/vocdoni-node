@@ -38,7 +38,11 @@ type SIK []byte
 // SIKFromAddress function return the current SIK value associated to the provided
 // address.
 func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
-	return v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	return sik, nil
 }
 
 // SetAddressSIK function creates or update the SIK of the provided address in the
@@ -49,45 +53,45 @@ func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
 //     value provided.
 //   - If it exists but it is not valid, overwrite the stored value with the
 //     provided one.
-func (v *State) SetAddressSIK(address common.Address, newSik SIK) error {
+func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	// check if exists a registered sik for the provided address, query also for
 	// no commited tree version
 	v.Tx.Lock()
-	rawSik, err := siksTree.Get(address.Bytes())
+	rawSIK, err := siksTree.Get(address.Bytes())
 	v.Tx.Unlock()
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// if not exists create it
 		log.Debugw("setSIK (create)",
 			"address", address.String(),
-			"sik", newSik.String())
+			"sik", newSIK.String())
 		v.Tx.Lock()
-		err = siksTree.Add(address.Bytes(), newSik)
+		err = siksTree.Add(address.Bytes(), newSIK)
 		v.Tx.Unlock()
 		if err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrSIKSet, err)
 		}
 		return v.UpdateSIKRoots()
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKGet, err)
 	}
 	// check if is a valid sik
-	if SIK(rawSik).Valid() {
+	if SIK(rawSIK).Valid() {
 		return ErrRegisteredValidSIK
 	}
 	log.Debugw("setSIK (update)",
 		"address", address.String(),
-		"sik", SIK(rawSik).String())
+		"sik", SIK(rawSIK).String())
 	// if the hysteresis is reached update the sik for the address
 	v.Tx.Lock()
-	err = siksTree.Set(address.Bytes(), newSik)
+	err = siksTree.Set(address.Bytes(), newSIK)
 	v.Tx.Unlock()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKSet, err)
 	}
 	return v.UpdateSIKRoots()
 }
@@ -99,12 +103,12 @@ func (v *State) SetAddressSIK(address common.Address, newSik SIK) error {
 // have finished.
 func (v *State) InvalidateSIK(address common.Address) error {
 	// if the sik does not exists or something fails querying return the error
-	rawSik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	rawSIK, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKGet, err)
 	}
 	// if the stored sik is already invalidated return an error
-	if !SIK(rawSik).Valid() {
+	if !SIK(rawSIK).Valid() {
 		return ErrSIKAlreadyInvalid
 	}
 	v.Tx.Lock()
@@ -112,7 +116,7 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	err = v.Tx.DeepSet(address.Bytes(), invalidatedSIK, StateTreeCfg(TreeSIK))
 	v.Tx.Unlock()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
 	}
 	return v.UpdateSIKRoots()
 }
@@ -125,7 +129,7 @@ func (v *State) ValidSIKRoots() ([][]byte, error) {
 	defer v.Tx.Unlock()
 	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	var validRoots [][]byte
 	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
@@ -135,12 +139,12 @@ func (v *State) ValidSIKRoots() ([][]byte, error) {
 	return validRoots, nil
 }
 
-// ExpiredSik returns if the provided siksRoot is still valid or not, checking
+// ExpiredSIK returns if the provided siksRoot is still valid or not, checking
 // if it is included into the list of current valid sik roots.
-func (v *State) ExpiredSik(candidateRoot []byte) (bool, error) {
+func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
 	validRoots, err := v.ValidSIKRoots()
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
 	}
 	for _, sikRoot := range validRoots {
 		if bytes.Equal(sikRoot, candidateRoot) {
@@ -154,78 +158,75 @@ func (v *State) ExpiredSik(candidateRoot []byte) (bool, error) {
 // voting to already registered users when an election is on going and new users
 // are registered. When a new sikRoot is generated, the sikRoot’s from an older
 // block than the current block minus the hysteresis blocks will be deleted:
+//
 //   - If exists a sikRoot for the minimun hysteresis block number
 //     (currentBlock - hysteresis), just remove all the roots with a lower block
 //     number.
+//
 //   - If it does not exist, remove all roots with a lower block number except
 //     for the next lower sikRoot. It is becouse it still being validate for a
 //     period.
 func (v *State) UpdateSIKRoots() error {
-	// get sik roots key-value database associated to the siks tree
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
 	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	newSikRoot, err := siksTree.Root()
 	if err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
 	}
+	// instance the SIK's key-value DB and set the current block to the current
+	// network height.
 	sikRootsDB := siksTree.NoState()
-	// calculate the current minimun block to purge useless sik roots
 	currentBlock := v.CurrentHeight()
 	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
-		var toPurge [][]byte
+		// calculate the current minimun block to purge useless sik roots
 		minBlock := currentBlock - SIKROOT_HYSTERESIS_BLOCKS
 		minBlockKey := make([]byte, 32)
 		binary.LittleEndian.PutUint32(minBlockKey, minBlock)
-		if _, err := sikRootsDB.Get(minBlockKey); err == nil {
-			// if exists a sikRoot for the minimun block number just remove all
-			// the roots with a lower block number
-			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
-				if binary.LittleEndian.Uint32(key) < minBlock {
-					toPurge = append(toPurge, bytes.Clone(key))
-				}
-				return true
-			})
-		} else {
-			// If not, remove all roots with a lower block number except for
-			// the next lower sikRoot
-			nearestLowerBlock := minBlock
-			// iterate once to get the nearest lower block to the calculated
-			// min block
-			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
-				candidateKey := bytes.Clone(key)
-				blockNumber := binary.LittleEndian.Uint32(candidateKey)
-				if blockNumber < minBlock && blockNumber > nearestLowerBlock {
+		// if exists a sikRoot for the minimun block number just remove all
+		// the roots with a lower block number. If not, remove all roots with a
+		// lower block number except for the next lower sikRoot. To achieve that
+		// iterate to select all the nearest lower block to the calculated min
+		// block to delete them.
+		var toPurge [][]byte
+		var nearestLowerBlock uint32
+		sikRootsDB.Iterate(nil, func(key, value []byte) bool {
+			candidateKey := bytes.Clone(key)
+			blockNumber := binary.LittleEndian.Uint32(candidateKey)
+			if blockNumber < minBlock {
+				if _, err := sikRootsDB.Get(minBlockKey); err == nil || blockNumber > nearestLowerBlock {
+					toPurge = append(toPurge, candidateKey)
 					nearestLowerBlock = blockNumber
 				}
-				return true
-			})
-			// iterate again to get the sikRoots block numbers to delete
-			sikRootsDB.Iterate(nil, func(key, value []byte) bool {
-				if binary.LittleEndian.Uint32(key) < nearestLowerBlock {
-					toPurge = append(toPurge, bytes.Clone(key))
-				}
-				return true
-			})
-		}
+			}
+			return true
+		})
 		// delete the selected sikRoots by its block numbers
 		for _, blockToDelete := range toPurge {
 			if err := sikRootsDB.Delete(blockToDelete); err != nil {
-				return err
+				return fmt.Errorf("%w: %w", ErrSIKRootsDelete, err)
 			}
 			log.Debugw("updateSIKRoots (deleted)",
 				"blockNumber", binary.LittleEndian.Uint32(blockToDelete))
 		}
 	}
+
 	log.Debugw("updateSIKRoots (created)",
 		"newSikRoot", hex.EncodeToString(newSikRoot),
 		"blockNumber", currentBlock)
+
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
-	return sikRootsDB.Set(blockKey, newSikRoot)
+
+	if err := sikRootsDB.Set(blockKey, newSikRoot); err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
+	}
+
+	return nil
 }
 
 // InvalidateAt funtion sets the current SIK value to the encoded value of the

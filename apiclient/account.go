@@ -108,7 +108,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	}
 
 	if sik == nil {
-		if sik, err = c.account.Sik(); err != nil {
+		if sik, err = c.account.AccountSIK(nil); err != nil {
 			return nil, fmt.Errorf("could not generate the sik: %w", err)
 		}
 	}
@@ -235,16 +235,10 @@ func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*i
 	return transfers, nil
 }
 
-// SetSik function allows to update the Secret Identity Key for the current
+// SetSIK function allows to update the Secret Identity Key for the current
 // HTTPClient account. To do that, the function requires a secret user input.
-func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
-	var sik []byte
-	var err error
-	if secret == nil {
-		sik, err = c.account.Sik()
-	} else {
-		sik, err = c.account.CustomSik(secret)
-	}
+func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
+	sik, err := c.account.AccountSIK(secret)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate the sik: %w", err)
 	}
@@ -286,9 +280,9 @@ func (c *HTTPclient) SetSik(secret []byte) (types.HexBytes, error) {
 	return accv.Hash, nil
 }
 
-// DelSik function allows to delete the Secret Identity Key for the current
+// DelSIK function allows to delete the Secret Identity Key for the current
 // HTTPClient account if it already has a valid one.
-func (c *HTTPclient) DelSik() (types.HexBytes, error) {
+func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 	// Build the transaction
 	var err error
 	stx := models.SignedTx{}

@@ -34,9 +34,9 @@ var (
 		models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "c_addDelegateForAccount",
 		models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "c_delDelegateForAccount",
 		models.TxType_COLLECT_FAUCET:             "c_collectFaucet",
-		models.TxType_SET_ACCOUNT_SIK:            "c_setAccountSik",
-		models.TxType_DEL_ACCOUNT_SIK:            "c_delAccountSik",
-		models.TxType_REGISTER_SIK:               "c_registerSik",
+		models.TxType_SET_ACCOUNT_SIK:            "c_setAccountSIK",
+		models.TxType_DEL_ACCOUNT_SIK:            "c_delAccountSIK",
+		models.TxType_REGISTER_SIK:               "c_registerSIK",
 	}
 	ErrTxCostNotFound = fmt.Errorf("transaction cost is not set")
 )

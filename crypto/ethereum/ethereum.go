@@ -29,9 +29,9 @@ const (
 	PubKeyLengthBytesUncompressed = 65
 	// SigningPrefix is the prefix added when hashing
 	SigningPrefix = "\u0019Ethereum Signed Message:\n"
-	// DefaultSikPayload conatains the default seed to sing during
+	// DefaultSIKPayload conatains the default seed to sing during
 	// SIK generation
-	DefaultSikPayload = "vocdoni-sik-payload"
+	DefaultSIKPayload = "vocdoni-sik-payload"
 )
 
 // SignKeys represents an ECDSA pair of keys for signing.
@@ -188,12 +188,12 @@ func (k *SignKeys) SignVocdoniMsg(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
-// SignVocdoniSik signs the default vocdoni sik payload. It envolves the
-// SignEthereum method, using the DefaultSikPayload and discarding the last
+// SIKsignature signs the default vocdoni sik payload. It envolves the
+// SignEthereum method, using the DefaultSIKPayload and discarding the last
 // byte of the signature (used for recovery), different that the same byte of a
 // signature generated with javascript.
-func (k *SignKeys) SignVocdoniSik() ([]byte, error) {
-	sign, err := k.SignEthereum([]byte(DefaultSikPayload))
+func (k *SignKeys) SIKsignature() ([]byte, error) {
+	sign, err := k.SignEthereum([]byte(DefaultSIKPayload))
 	if err != nil {
 		return nil, err
 	}
@@ -214,18 +214,18 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 	return false, recoveredAddr, nil
 }
 
-// CustomSik method generates the Secret Identity Key for the current SignKeys
-// with the signature of the DefaultSikPayload and the user secret (if it is
+// AccountSIK method generates the Secret Identity Key for the current SignKeys
+// with the signature of the DefaultSIKPayload and the user secret (if it is
 // provided) following the definition:
 //
 //	SIK = poseidon(address, signature, secret)
 //
 // The secret could be nil.
-func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
+func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
 	if secret == nil {
 		return nil, fmt.Errorf("no secret provided")
 	}
-	sign, err := k.SignVocdoniSik()
+	sign, err := k.SIKsignature()
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}
@@ -241,17 +241,11 @@ func (k *SignKeys) CustomSik(secret []byte) ([]byte, error) {
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
 }
 
-// Sik method returns the calculated SIK for the current SignKeys with any
-// password or secret as input.
-func (k *SignKeys) Sik() ([]byte, error) {
-	return k.CustomSik([]byte{})
-}
-
-// Nullifier method composes the nullifier of the current SignKeys for the
-// desired election id and the secret provided.
-func (k *SignKeys) Nullifier(electionId, secret []byte) ([]byte, error) {
+// AccountSIKnullifier method composes the nullifier of the current SignKeys
+// for the desired election id and the secret provided.
+func (k *SignKeys) AccountSIKnullifier(electionId, secret []byte) ([]byte, error) {
 	// sign the default Secret Identity Key seed
-	sign, err := k.SignVocdoniSik()
+	sign, err := k.SIKsignature()
 	if err != nil {
 		return nil, fmt.Errorf("error signing default sik seed: %w", err)
 	}

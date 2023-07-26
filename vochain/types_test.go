@@ -23,8 +23,8 @@ func TestTransactionCostsAsMap(t *testing.T) {
 		DelDelegateForAccount:   1000,
 		CollectFaucet:           1100,
 		CreateAccount:           1200,
-		SetAccountSik:           1300,
-		DelAccountSik:           1400,
+		SetAccountSIK:           1300,
+		DelAccountSIK:           1400,
 	}
 	txCostsBytes := txCosts.AsMap()
 
@@ -59,8 +59,8 @@ func TestTxCostNameToTxType(t *testing.T) {
 		"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 		"DelDelegateForAccount":   models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 		"CollectFaucet":           models.TxType_COLLECT_FAUCET,
-		"SetAccountSik":           models.TxType_SET_ACCOUNT_SIK,
-		"DelAccountSik":           models.TxType_DEL_ACCOUNT_SIK,
+		"SetAccountSIK":           models.TxType_SET_ACCOUNT_SIK,
+		"DelAccountSIK":           models.TxType_DEL_ACCOUNT_SIK,
 	}
 	for k, v := range fields {
 		qt.Assert(t, genesis.TxCostNameToTxType(k), qt.Equals, v)

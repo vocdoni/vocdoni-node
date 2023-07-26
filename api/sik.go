@@ -11,10 +11,10 @@ import (
 )
 
 const (
-	SikHandler = "sik"
+	SIKHandler = "sik"
 )
 
-func (a *API) enableSikHandlers() error {
+func (a *API) enableSIKHandlers() error {
 	if err := a.endpoint.RegisterMethod(
 		"/sik/roots",
 		"GET",
@@ -39,26 +39,26 @@ func (a *API) enableSikHandlers() error {
 //
 //	@Summary		List of valid SIK roots
 //	@Description	Returns the list of currently valid roots of the merkle tree where the vochain account SIK's are stored.
-//	@Tags			Sik
+//	@Tags			SIK
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{sikroots=[]string}
 //	@Router			/sik/roots [get]
 func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	validSikRoots, err := a.vocapp.State.ValidSIKRoots()
+	validSIKRoots, err := a.vocapp.State.ValidSIKRoots()
 	if err != nil {
 		return err
 	}
 
 	var sikRoots []types.HexBytes
-	for _, root := range validSikRoots {
+	for _, root := range validSIKRoots {
 		sikRoots = append(sikRoots, root)
 	}
 	data, err := json.Marshal(
 		struct {
-			SikRoots []types.HexBytes `json:"sikroots"`
-		}{SikRoots: sikRoots},
+			SIKRoots []types.HexBytes `json:"sikroots"`
+		}{SIKRoots: sikRoots},
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
@@ -71,7 +71,7 @@ func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //
 //	@Summary		List of valid SIK roots
 //	@Description	Returns the list of currently valid roots of the merkle tree where the vochain account SIK's are stored.
-//	@Tags			Sik
+//	@Tags			SIK
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	uint64

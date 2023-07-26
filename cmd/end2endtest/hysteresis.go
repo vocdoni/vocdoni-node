@@ -61,7 +61,7 @@ func (t *E2EHysteresis) Run() error {
 		votes = append(votes, &apiclient.VoteData{
 			ElectionID:   t.election.ElectionID,
 			ProofMkTree:  t.proofs[acct.Address().Hex()],
-			ProofSikTree: t.sikproofs[acct.Address().Hex()],
+			ProofSIKTree: t.sikproofs[acct.Address().Hex()],
 			Choices:      []int{i % 2},
 			VoterAccount: acct,
 		})
@@ -78,7 +78,7 @@ func (t *E2EHysteresis) Run() error {
 		return err
 	}
 
-	forceUpdateSikRoots := func() error {
+	forceUpdateSIKRoots := func() error {
 		ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 		defer cancel()
 		if err := t.api.WaitUntilNBlocks(ctx, state.SIKROOT_HYSTERESIS_BLOCKS); err != nil {
@@ -95,11 +95,11 @@ func (t *E2EHysteresis) Run() error {
 		return nil
 	}
 	log.Info("watting to reach hysteresis to create new account and force to delete the last old sik root")
-	if err := forceUpdateSikRoots(); err != nil {
+	if err := forceUpdateSIKRoots(); err != nil {
 		return err
 	}
 	log.Info("watting again to reach hysteresis to create new account and force to delete the last root")
-	if err := forceUpdateSikRoots(); err != nil {
+	if err := forceUpdateSIKRoots(); err != nil {
 		return err
 	}
 	invalidVotes := len(votes) - validVotes

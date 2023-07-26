@@ -148,11 +148,11 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
 
-		proofSikRoot, err := proof.SikRoot()
+		proofSIKRoot, err := proof.SIKRoot()
 		if err != nil {
 			return nil, fmt.Errorf("failed getting sik root from the proof: %w", err)
 		}
-		if expired, err := t.state.ExpiredSik(proofSikRoot); err != nil {
+		if expired, err := t.state.ExpiredSIK(proofSIKRoot); err != nil {
 			return nil, fmt.Errorf("error checking sik root expiration")
 		} else if expired {
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")

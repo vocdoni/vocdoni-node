@@ -3,10 +3,12 @@ package transaction
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -241,8 +243,8 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	return nil
 }
 
-// DelSikTxCheck checks if a delete sik tx is valid
-func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, error) {
+// DelSIKTxCheck checks if a delete SIK tx is valid
+func (t *TransactionHandler) DelSIKTxCheck(vtx *vochaintx.Tx) (common.Address, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, ErrNilTx
 	}
@@ -266,8 +268,8 @@ func (t *TransactionHandler) DelSikTxCheck(vtx *vochaintx.Tx) (common.Address, e
 	return txAddress, nil
 }
 
-// SetSikTxCheck checks if a set sik tx is valid
-func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
+// SetSIKTxCheck checks if a set sik tx is valid
+func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, nil, ErrNilTx
 	}
@@ -288,28 +290,31 @@ func (t *TransactionHandler) SetSikTxCheck(vtx *vochaintx.Tx) (common.Address, v
 		return common.Address{}, nil, fmt.Errorf("cannot get tx account: %w", err)
 	}
 
-	newSik := vtx.Tx.GetSetSik().GetSik()
-	if newSik == nil {
+	newSIK := vtx.Tx.GetSetSik().GetSik()
+	if newSIK == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
 	}
 	// check if the address already has invalidated sik to ensure that it is
 	// not updated after reach the correct height to avoid double voting
-	if currentSik, err := t.state.SIKFromAddress(txAddress); err == nil {
+	if currentSIK, err := t.state.SIKFromAddress(txAddress); err == nil {
 		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
 		if err != nil {
+			if errors.Is(err, arbo.ErrKeyNotFound) {
+				return txAddress, newSIK, nil
+			}
 			return common.Address{}, nil, err
 		}
-		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
+		if height := currentSIK.DecodeInvalidatedHeight(); height >= maxEndBlock {
 			return txAddress, nil, fmt.Errorf("the sik could not be changed yet")
 		}
 	}
-	return txAddress, newSik, nil
+	return txAddress, newSIK, nil
 }
 
-// RegisterSikTxCheck checks if the provided RegisterSikTx is valid ensuring
+// RegisterSIKTxCheck checks if the provided RegisterSIKTx is valid ensuring
 // that the proof included on it is valid for the address of the transaction
 // signer.
-func (t *TransactionHandler) RegisterSikTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
+func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, nil, ErrNilTx
 	}
@@ -328,18 +333,18 @@ func (t *TransactionHandler) RegisterSikTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
 		return common.Address{}, nil, fmt.Errorf("cannot get the account for the tx address: %w", err)
 	}
-	newSik := tx.GetSik()
-	if newSik == nil {
+	newSIK := tx.GetSik()
+	if newSIK == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
 	}
 	// check if the address already has invalidated sik to ensure that it is
 	// not updated after reach the correct height to avoid double voting
-	if currentSik, err := t.state.SIKFromAddress(txAddress); err == nil {
+	if currentSIK, err := t.state.SIKFromAddress(txAddress); err == nil {
 		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
 		if err != nil {
 			return common.Address{}, nil, err
 		}
-		if height := currentSik.DecodeInvalidatedHeight(); height >= maxEndBlock {
+		if height := currentSIK.DecodeInvalidatedHeight(); height >= maxEndBlock {
 			return common.Address{}, nil, fmt.Errorf("the sik could not be changed yet")
 		}
 	}
@@ -368,5 +373,5 @@ func (t *TransactionHandler) RegisterSikTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if !valid {
 		return common.Address{}, nil, fmt.Errorf("proof not valid")
 	}
-	return txAddress, newSik, nil
+	return txAddress, newSIK, nil
 }
