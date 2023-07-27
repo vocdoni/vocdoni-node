@@ -1008,14 +1008,18 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) ([]byte, error) {
 
 // UnpackSiblings unpacks the siblings from a byte array.
 func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
+	if len(b) < 2 {
+		return nil, fmt.Errorf("no enought size of packed siblings provided")
+	}
+
 	fullLen := binary.LittleEndian.Uint16(b[0:2])
-	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
 	if len(b) != int(fullLen) {
 		return nil,
 			fmt.Errorf("expected len: %d, current len: %d",
 				fullLen, len(b))
 	}
 
+	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
 	bitmapBytes := b[4 : 4+l]
 	bitmap := bytesToBitmap(bitmapBytes)
 	siblingsBytes := b[4+l:]

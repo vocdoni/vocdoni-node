@@ -405,6 +405,14 @@ func TestPackAndUnpackSiblings(t *testing.T) {
 	unpacked, err = UnpackSiblings(HashFunctionPoseidon, packed)
 	c.Assert(err, qt.IsNil)
 	c.Assert(unpacked, qt.DeepEquals, siblings)
+
+	// test edge cases with invalid packed siblings
+	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{})
+	c.Assert(err, qt.IsNotNil)
+	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{1, 0})
+	c.Assert(err, qt.IsNotNil)
+	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{1, 0, 1, 0})
+	c.Assert(err, qt.IsNotNil)
 }
 
 func TestGenProofAndVerify(t *testing.T) {
