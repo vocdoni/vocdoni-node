@@ -247,32 +247,44 @@ func (t *TransactionHandler) DelSIKTxCheck(vtx *vochaintx.Tx) (common.Address, e
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, ErrNilTx
 	}
-	tx := vtx.Tx.GetDelSik()
+	tx := vtx.Tx.GetDelSIK()
 	if tx == nil {
 		return common.Address{}, fmt.Errorf("invalid transaction")
 	}
-
+	// get the pubkey from the tx signature
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
+	// get the account address from the pubkey
 	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
 		return common.Address{}, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-
+	// check if the address is already registered
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
 		return common.Address{}, fmt.Errorf("cannot get tx account: %w", err)
+	}
+	// check if the address already has a registered SIK
+	currentSIK, err := t.state.SIKFromAddress(txAddress)
+	if err != nil {
+		return common.Address{}, fmt.Errorf("cannot get current address SIK: %w", err)
+	}
+	// check that the registered SIK is still valid
+	if !currentSIK.Valid() {
+		return common.Address{}, fmt.Errorf("the SIK has already been deleted")
 	}
 	return txAddress, nil
 }
 
-// SetSIKTxCheck checks if a set sik tx is valid
+// SetSIKTxCheck checks if a set SIK tx is valid and it is if the current
+// address has not a SIK registered or the SIK registered had been already
+// deleted.
 func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, nil, ErrNilTx
 	}
-	tx := vtx.Tx.GetSetSik()
+	tx := vtx.Tx.GetSetSIK()
 	if tx == nil {
 		return common.Address{}, nil, fmt.Errorf("invalid transaction")
 	}
@@ -289,7 +301,7 @@ func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, v
 		return common.Address{}, nil, fmt.Errorf("cannot get tx account: %w", err)
 	}
 
-	newSIK := vtx.Tx.GetSetSik().GetSik()
+	newSIK := vtx.Tx.GetSetSIK().GetSIK()
 	if newSIK == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
 	}
@@ -317,39 +329,15 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return common.Address{}, nil, ErrNilTx
 	}
-	tx := vtx.Tx.GetRegisterSik()
+	// parse transaction
+	tx := vtx.Tx.GetRegisterSIK()
 	if tx == nil {
 		return common.Address{}, nil, fmt.Errorf("invalid transaction")
 	}
-	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
-	}
-	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
-	}
-	if _, err := t.state.GetAccount(txAddress, false); err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot get the account for the tx address: %w", err)
-	}
-	newSIK := tx.GetSik()
+	// get the SIK provided
+	newSIK := tx.GetSIK()
 	if newSIK == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
-	}
-	// check if the address already has invalidated sik to ensure that it is
-	// not updated after reach the correct height to avoid double voting
-	if currentSIK, err := t.state.SIKFromAddress(txAddress); err == nil {
-		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
-		if err != nil {
-			return common.Address{}, nil, err
-		}
-		if height := currentSIK.DecodeInvalidatedHeight(); height >= maxEndBlock {
-			return common.Address{}, nil, fmt.Errorf("the sik could not be changed yet")
-		}
-	}
-	// check if the address already has a valid sik
-	if _, err := t.state.SIKFromAddress(txAddress); err == nil {
-		return txAddress, nil, fmt.Errorf("this address already has a valid sik")
 	}
 	// get census proof and election information provided
 	censusProof := tx.GetCensusProof()
@@ -360,12 +348,35 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if electionId == nil {
 		return common.Address{}, nil, fmt.Errorf("no proof provided")
 	}
-	election, err := t.state.Process(electionId, false)
+	// get the pubkey from the tx signature
+	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("error getting the election info: %w", err)
+		return common.Address{}, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+	}
+	// get the account address from the pubkey
+	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	// check if the address is already registered
+	if _, err := t.state.GetAccount(txAddress, false); err != nil {
+		return common.Address{}, nil, fmt.Errorf("cannot get the account for the tx address: %w", err)
+	}
+	// check if the address already has a registered SIK
+	if _, err := t.state.SIKFromAddress(txAddress); err == nil {
+		return txAddress, nil, fmt.Errorf("this address already has a SIK")
+	}
+	// get the process data by its ID
+	process, err := t.state.Process(electionId, false)
+	if err != nil {
+		return common.Address{}, nil, fmt.Errorf("error getting the process info: %w", err)
+	}
+	// ensure that the process is in READY state
+	if process.GetStatus() != models.ProcessStatus_READY {
+		return common.Address{}, nil, fmt.Errorf("this process is not READY")
 	}
 	// verify the proof for the transaction signer address
-	valid, _, err := VerifyProof(election, censusProof, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
+	valid, _, err := VerifyProof(process, censusProof, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
 	if err != nil {
 		return common.Address{}, nil, fmt.Errorf("error verifying the proof: %w", err)
 	}

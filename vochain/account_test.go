@@ -499,7 +499,7 @@ func testSetAccountTx(t *testing.T,
 		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
 		Account:       account.Bytes(),
 		FaucetPackage: faucetPkg,
-		Sik:           sik,
+		SIK:           sik,
 	}
 	if create {
 		tx.Txtype = models.TxType_CREATE_ACCOUNT

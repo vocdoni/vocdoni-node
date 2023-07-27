@@ -123,7 +123,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPkg,
 				InfoURI:       &metadataURI,
-				Sik:           sik,
+				SIK:           sik,
 			},
 		}})
 	if err != nil {
@@ -245,10 +245,10 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 	// Build the transaction
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetSik{
-			SetSik: &models.SikTx{
+		Payload: &models.Tx_SetSIK{
+			SetSIK: &models.SIKTx{
 				Txtype: models.TxType_SET_ACCOUNT_SIK,
-				Sik:    sik,
+				SIK:    sik,
 			},
 		}})
 	if err != nil {
@@ -287,8 +287,8 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 	var err error
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_DelSik{
-			DelSik: &models.SikTx{
+		Payload: &models.Tx_DelSIK{
+			DelSIK: &models.SIKTx{
 				Txtype: models.TxType_DEL_ACCOUNT_SIK,
 			},
 		}})

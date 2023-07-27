@@ -232,7 +232,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
 				// if the tx includes a sik try to persist it in the state
-				if sik := tx.GetSik(); sik != nil {
+				if sik := tx.GetSIK(); sik != nil {
 					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
 						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
 					}
@@ -438,7 +438,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return response, nil
 		}
 
-	case *models.Tx_SetSik:
+	case *models.Tx_SetSIK:
 		txAddress, newSIK, err := t.SetSIKTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setSIKTx: %w", err)
@@ -457,10 +457,10 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		}
 		return response, nil
 
-	case *models.Tx_DelSik:
+	case *models.Tx_DelSIK:
 		txAddress, err := t.DelSIKTxCheck(vtx)
 		if err != nil {
-			return nil, fmt.Errorf("setSIKTx: %w", err)
+			return nil, fmt.Errorf("delSIKTx: %w", err)
 		}
 		if forCommit {
 			if err := t.state.BurnTxCostIncrementNonce(
@@ -468,15 +468,15 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				models.TxType_DEL_ACCOUNT_SIK,
 				0,
 			); err != nil {
-				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
+				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
 			}
 			if err := t.state.InvalidateSIK(txAddress); err != nil {
-				return nil, fmt.Errorf("setSIKTx: %w", err)
+				return nil, fmt.Errorf("delSIKTx: %w", err)
 			}
 		}
 		return response, nil
 
-	case *models.Tx_RegisterSik:
+	case *models.Tx_RegisterSIK:
 		txAddress, SIK, err := t.RegisterSIKTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("registerSIKTx: %w", err)

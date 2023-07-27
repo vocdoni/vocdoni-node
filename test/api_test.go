@@ -228,7 +228,7 @@ func TestAPIaccount(t *testing.T) {
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
-			Sik:           sik,
+			SIK:           sik,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)
