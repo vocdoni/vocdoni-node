@@ -58,3 +58,15 @@ func printPrettierDelegates(delegates [][]byte) []string {
 	}
 	return prettierDelegates
 }
+
+// toPrefixKey helper function returns the encoded key of the provided one
+// prefixing it with the prefix provided.
+func toPrefixKey(prefix, originaKey []byte) []byte {
+	return append([]byte(prefix), originaKey...)
+}
+
+// fromPrefixKey helper function returns the original key of the provided
+// encoded one stripping the prefix provided.
+func fromPrefixKey(prefix, key []byte) []byte {
+	return key[len(prefix):]
+}
