@@ -37,8 +37,8 @@ func (ci *CircuitInputs) String() string {
 	return string(bstr)
 }
 
-// CircuitInputsParameters struct envolves all the parameters to generate the 
-// inputs for the current ZK circuit. 
+// CircuitInputsParameters struct envolves all the parameters to generate the
+// inputs for the current ZK circuit.
 type CircuitInputsParameters struct {
 	Account         *ethereum.SignKeys
 	Password        []byte

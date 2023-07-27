@@ -17,96 +17,95 @@ import (
 )
 
 // CreateAccountTxCheck checks if an account creation tx is valid
-func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) (vstate.SIK, error) {
+func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if vtx == nil || vtx.SignedBody == nil || vtx.Signature == nil || vtx.Tx == nil {
-		return nil, ErrNilTx
+		return ErrNilTx
 	}
 	tx := vtx.Tx.GetSetAccount()
 	if tx == nil {
-		return nil, fmt.Errorf("invalid tx")
+		return fmt.Errorf("invalid tx")
 	}
 	if tx.Txtype != models.TxType_CREATE_ACCOUNT {
-		return nil, fmt.Errorf("invalid tx type, expected %s, got %s", models.TxType_CREATE_ACCOUNT, tx.Txtype)
+		return fmt.Errorf("invalid tx type, expected %s, got %s", models.TxType_CREATE_ACCOUNT, tx.Txtype)
 	}
-	sik := tx.GetSik()
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
 	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
-		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
+		return fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	txSenderAcc, err := t.state.GetAccount(txSenderAddress, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get account: %w", err)
+		return fmt.Errorf("cannot get account: %w", err)
 	}
 	if txSenderAcc != nil {
-		return nil, vstate.ErrAccountAlreadyExists
+		return vstate.ErrAccountAlreadyExists
 	}
 	infoURI := tx.GetInfoURI()
 	if len(infoURI) > types.MaxURLLength {
-		return nil, ErrInvalidURILength
+		return ErrInvalidURILength
 	}
 	if err := vstate.CheckDuplicateDelegates(tx.GetDelegates(), &txSenderAddress); err != nil {
-		return nil, fmt.Errorf("invalid delegates: %w", err)
+		return fmt.Errorf("invalid delegates: %w", err)
 	}
 	txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get tx cost: %w", err)
+		return fmt.Errorf("cannot get tx cost: %w", err)
 	}
 	if txCost == 0 {
-		return nil, nil
+		return nil
 	}
 	if tx.FaucetPackage == nil {
-		return nil, fmt.Errorf("invalid faucet package provided")
+		return fmt.Errorf("invalid faucet package provided")
 	}
 	if tx.FaucetPackage.Payload == nil {
-		return nil, fmt.Errorf("invalid faucet package payload")
+		return fmt.Errorf("invalid faucet package payload")
 	}
 	faucetPayload := &models.FaucetPayload{}
 	if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
-		return nil, fmt.Errorf("could not unmarshal faucet package: %w", err)
+		return fmt.Errorf("could not unmarshal faucet package: %w", err)
 	}
 	if faucetPayload.Amount == 0 {
-		return nil, fmt.Errorf("invalid faucet payload amount provided")
+		return fmt.Errorf("invalid faucet payload amount provided")
 	}
 	if faucetPayload.To == nil {
-		return nil, fmt.Errorf("invalid to address provided")
+		return fmt.Errorf("invalid to address provided")
 	}
 	if !bytes.Equal(faucetPayload.To, txSenderAddress.Bytes()) {
-		return nil, fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
+		return fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
 			faucetPayload.To, txSenderAddress.Bytes())
 	}
 	issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
 	if err != nil {
-		return nil, fmt.Errorf("cannot extract issuer address from faucet package vtx.Signature: %w", err)
+		return fmt.Errorf("cannot extract issuer address from faucet package vtx.Signature: %w", err)
 	}
 	issuerAcc, err := t.state.GetAccount(issuerAddress, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot get faucet issuer address account: %w", err)
+		return fmt.Errorf("cannot get faucet issuer address account: %w", err)
 	}
 	if issuerAcc == nil {
-		return nil, fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress.String())
+		return fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress.String())
 	}
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
 	keyHash := ethereum.HashRaw(append(issuerAddress.Bytes(), b...))
 	used, err := t.state.FaucetNonce(keyHash, false)
 	if err != nil {
-		return nil, fmt.Errorf("cannot check if faucet payload already used: %w", err)
+		return fmt.Errorf("cannot check if faucet payload already used: %w", err)
 	}
 	if used {
-		return nil, fmt.Errorf("faucet payload %x already used", keyHash)
+		return fmt.Errorf("faucet payload %x already used", keyHash)
 	}
 	if issuerAcc.Balance < faucetPayload.Amount+txCost {
-		return nil, fmt.Errorf(
+		return fmt.Errorf(
 			"issuer address does not have enough balance %d, required %d",
 			issuerAcc.Balance,
 			faucetPayload.Amount+txCost,
 		)
 	}
-	return sik, nil
+	return nil
 }
 
 // SetAccountDelegateTxCheck checks if a SetAccountDelegateTx and its data are valid

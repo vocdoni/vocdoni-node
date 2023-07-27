@@ -16,7 +16,7 @@ const (
 
 func (a *API) enableSIKHandlers() error {
 	if err := a.endpoint.RegisterMethod(
-		"/sik/roots",
+		"/siks/roots",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.sikValidRootsHandler,
@@ -24,7 +24,7 @@ func (a *API) enableSIKHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/sik/proof/{address}",
+		"/siks/proof/{address}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.sikProofHandler,
@@ -44,7 +44,7 @@ func (a *API) enableSIKHandlers() error {
 //	@Produce		json
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{sikroots=[]string}
-//	@Router			/sik/roots [get]
+//	@Router			/siks/roots [get]
 func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	validSIKRoots, err := a.vocapp.State.ValidSIKRoots()
 	if err != nil {
@@ -76,7 +76,7 @@ func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Produce		json
 //	@Success		200	{object}	uint64
 //	@Success		200	{object}	object{sikproof=string, sikroot=string, siksiblings=[]string}
-//	@Router			/sik/proof/{address} [get]
+//	@Router			/siks/proof/{address} [get]
 func (a *API) sikProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get the address from the
 	address, err := censusKeyParse(ctx.URLParam("address"))

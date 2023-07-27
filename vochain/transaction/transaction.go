@@ -196,11 +196,9 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
 
-		var err error
-		var sik vstate.SIK
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
-			if sik, err = t.CreateAccountTxCheck(vtx); err != nil {
+			if err := t.CreateAccountTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("createAccountTx: %w", err)
 			}
 
@@ -233,9 +231,8 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
 				}
-				// if the CreateAccountTxCheck returns a valid sik, try to
-				// persist it in the state.
-				if sik != nil {
+				// if the tx includes a sik try to persist it in the state
+				if sik := tx.GetSik(); sik != nil {
 					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
 						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
 					}
