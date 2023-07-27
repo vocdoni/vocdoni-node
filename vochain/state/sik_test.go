@@ -71,7 +71,8 @@ func Test_sikRoots(t *testing.T) {
 	s.SetHeight(1)
 	c.Assert(s.SetAddressSIK(address1, sik1), qt.IsNil)
 	// check the results
-	validSIKs, err := s.ValidSIKRoots()
+	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	validSIKs := s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 1)
 	sikTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
@@ -85,7 +86,8 @@ func Test_sikRoots(t *testing.T) {
 	s.SetHeight(33)
 	c.Assert(s.SetAddressSIK(address2, sik2), qt.IsNil)
 	// check the results
-	validSIKs, err = s.ValidSIKRoots()
+	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	validSIKs = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 2)
 	secondRoot, err := sikTree.Root()
@@ -98,7 +100,8 @@ func Test_sikRoots(t *testing.T) {
 	s.SetHeight(66)
 	c.Assert(s.SetAddressSIK(address3, sik3), qt.IsNil)
 	// check the results
-	validSIKs, err = s.ValidSIKRoots()
+	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	validSIKs = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 1)
 	thirdRoot, err := sikTree.Root()

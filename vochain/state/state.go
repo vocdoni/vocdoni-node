@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -93,6 +94,9 @@ type State struct {
 	// electionPriceCalc is the calculator for the election price
 	ElectionPriceCalc    *electionprice.Calculator
 	ProcessBlockRegistry *ProcessBlockRegistry
+
+	validSIKRoots    [][]byte
+	mtxValidSIKRoots *sync.Mutex
 }
 
 // NewState creates a new State
@@ -147,6 +151,8 @@ func NewState(dbType, dataDir string) (*State, error) {
 		dbLock:        &s.Tx,
 		mainTree:      s.mainTreeViewer(false),
 	}
+	s.validSIKRoots = [][]byte{}
+	s.mtxValidSIKRoots = &sync.Mutex{}
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }
 

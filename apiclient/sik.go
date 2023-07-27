@@ -13,7 +13,7 @@ type SIKRoots []string
 // ValidSIKRoots returns the currently valid roots of SIK merkle tree from the
 // API.
 func (c *HTTPclient) ValidSIKRoots() (SIKRoots, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "sik", "roots")
+	resp, code, err := c.Request(HTTPGET, nil, "siks", "roots")
 	if err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func (c *HTTPclient) ValidSIKRoots() (SIKRoots, error) {
 
 // GenSIKProof generates a proof for the voter address in the sik merkle tree.
 func (c *HTTPclient) GenSIKProof() (*CensusProof, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "sik", "proof", c.account.AddressString())
+	resp, code, err := c.Request(HTTPGET, nil, "siks", "proof", c.account.AddressString())
 	if err != nil {
 		return nil, err
 	}

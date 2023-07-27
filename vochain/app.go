@@ -392,6 +392,9 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.startBlockTimestamp.Store(t.Unix())
 	app.State.SetHeight(height)
 	go app.State.CachePurge(height)
+	if err := app.State.FetchValidSIKRoots(); err != nil {
+		log.Errorw(err, "error fetching valid SIK roots")
+	}
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
 		Time:   t,

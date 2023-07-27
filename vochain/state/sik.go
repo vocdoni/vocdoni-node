@@ -121,32 +121,39 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	return v.UpdateSIKRoots()
 }
 
-// ValidSIKRoots returns the list of current valid roots from the SIK's merkle
-// tree. It reads the roots from the key-value database associated to the SIK's
+// ValidSIKRoots method returns the current valid SIK roots that are cached in
+// the current State.
+func (v *State) ValidSIKRoots() [][]byte {
+	v.mtxValidSIKRoots.Lock()
+	defer v.mtxValidSIKRoots.Unlock()
+	return append([][]byte{}, v.validSIKRoots...)
+}
+
+// FetchValidSIKRoots updates the list of current valid SIK roots in the current
+// state. It reads the roots from the key-value database associated to the SIK's
 // subtree.
-func (v *State) ValidSIKRoots() ([][]byte, error) {
+func (v *State) FetchValidSIKRoots() error {
 	v.Tx.Lock()
 	defer v.Tx.Unlock()
 	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	var validRoots [][]byte
 	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
 		validRoots = append(validRoots, root)
 		return true
 	})
-	return validRoots, nil
+	v.mtxValidSIKRoots.Lock()
+	v.validSIKRoots = validRoots
+	v.mtxValidSIKRoots.Unlock()
+	return nil
 }
 
 // ExpiredSIK returns if the provided siksRoot is still valid or not, checking
 // if it is included into the list of current valid sik roots.
 func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
-	validRoots, err := v.ValidSIKRoots()
-	if err != nil {
-		return false, fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
-	}
-	for _, sikRoot := range validRoots {
+	for _, sikRoot := range v.ValidSIKRoots() {
 		if bytes.Equal(sikRoot, candidateRoot) {
 			return false, nil
 		}

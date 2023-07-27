@@ -34,6 +34,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	testSIK, err := testAccount.AccountSIK(nil)
 	c.Assert(err, qt.IsNil)
 	c.Assert(app.State.SetAddressSIK(testAccount.Address(), testSIK), qt.IsNil)
+	c.Assert(app.State.FetchValidSIKRoots(), qt.IsNil)
 	// get siktree root and proof
 	app.State.Tx.Lock()
 	sikTree, err := app.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))

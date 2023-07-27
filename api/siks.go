@@ -46,13 +46,8 @@ func (a *API) enableSIKHandlers() error {
 //	@Success		200	{object}	object{sikroots=[]string}
 //	@Router			/siks/roots [get]
 func (a *API) sikValidRootsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	validSIKRoots, err := a.vocapp.State.ValidSIKRoots()
-	if err != nil {
-		return err
-	}
-
 	var sikRoots []types.HexBytes
-	for _, root := range validSIKRoots {
+	for _, root := range a.vocapp.State.ValidSIKRoots() {
 		sikRoots = append(sikRoots, root)
 	}
 	data, err := json.Marshal(
