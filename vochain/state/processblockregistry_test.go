@@ -36,7 +36,7 @@ func TestSetStartBlock(t *testing.T) {
 	// check the database to ensure that the start block has been created
 	// succesfully
 	s.ProcessBlockRegistry.dbLock.Lock()
-	encBlockNum, err := s.ProcessBlockRegistry.startBlocksDB.Get(toPrefixKey(pbrPrefix, pid))
+	encBlockNum, err := s.ProcessBlockRegistry.startBlocksDB.Get(toPrefixKey(pbrDBPrefix, pid))
 	s.ProcessBlockRegistry.dbLock.Unlock()
 	c.Assert(err, qt.IsNil)
 	c.Assert(binary.LittleEndian.Uint32(encBlockNum), qt.Equals, uint32(100))

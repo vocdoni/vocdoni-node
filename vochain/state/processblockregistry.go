@@ -6,7 +6,7 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 )
 
-var pbrPrefix = []byte("pbr_")
+var pbrDBPrefix = []byte("pbr_")
 
 // ProcessBlockRegistry struct allows to keep in track the block number when the
 // current on going processes start. This information is important to know the
@@ -27,7 +27,7 @@ func (pbr *ProcessBlockRegistry) SetStartBlock(pid []byte, startBlock uint32) er
 	defer pbr.dbLock.Unlock()
 	newStartBlock := make([]byte, 32)
 	binary.LittleEndian.PutUint32(newStartBlock, startBlock)
-	return pbr.startBlocksDB.Set(toPrefixKey(pbrPrefix, pid), newStartBlock)
+	return pbr.startBlocksDB.Set(toPrefixKey(pbrDBPrefix, pid), newStartBlock)
 }
 
 // DeleteStartBlock method deletes the record on the key-value database
@@ -35,7 +35,7 @@ func (pbr *ProcessBlockRegistry) SetStartBlock(pid []byte, startBlock uint32) er
 func (pbr *ProcessBlockRegistry) DeleteStartBlock(pid []byte) error {
 	pbr.dbLock.Lock()
 	defer pbr.dbLock.Unlock()
-	return pbr.startBlocksDB.Delete(toPrefixKey(pbrPrefix, pid))
+	return pbr.startBlocksDB.Delete(toPrefixKey(pbrDBPrefix, pid))
 }
 
 // MinStartBlock returns the minimun start block of the current on going
@@ -50,7 +50,7 @@ func (pbr *ProcessBlockRegistry) MinStartBlock(fromBlock uint32, committed bool)
 	if err != nil {
 		return 0, err
 	}
-	if err := processTree.NoState().Iterate(pbrPrefix, func(_, value []byte) bool {
+	if err := processTree.NoState().Iterate(pbrDBPrefix, func(_, value []byte) bool {
 		startBlock := binary.LittleEndian.Uint32(value)
 		if startBlock < minStartBlock {
 			minStartBlock = startBlock
@@ -74,7 +74,7 @@ func (pbr *ProcessBlockRegistry) MaxEndBlock(fromBlock uint32, committed bool) (
 	if err != nil {
 		return 0, err
 	}
-	if err := processTree.NoState().Iterate(pbrPrefix, func(pid, _ []byte) bool {
+	if err := processTree.NoState().Iterate(pbrDBPrefix, func(pid, _ []byte) bool {
 		p, err := getProcess(pbr.mainTree, pid)
 		if err != nil {
 			return false

@@ -13,6 +13,8 @@ import (
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
+var sikDBPrefix = []byte("sik_")
+
 // SIKROOT_HYSTERESIS_BLOCKS constant defines the number of blocks that the
 // vochain will consider a sikRoot valid. In this way, any new sikRoot will be
 // valid for at least for this number of blocks. If the gap between the last
@@ -38,7 +40,8 @@ type SIK []byte
 // SIKFromAddress function return the current SIK value associated to the provided
 // address.
 func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
-	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	key := toPrefixKey(sikDBPrefix, address.Bytes())
+	sik, err := v.mainTreeViewer(false).DeepGet(key, StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
@@ -140,7 +143,7 @@ func (v *State) FetchValidSIKRoots() error {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	var validRoots [][]byte
-	siksTree.NoState().Iterate(nil, func(_, root []byte) bool {
+	siksTree.NoState().Iterate(sikDBPrefix, func(_, root []byte) bool {
 		validRoots = append(validRoots, root)
 		return true
 	})
@@ -194,6 +197,7 @@ func (v *State) UpdateSIKRoots() error {
 		minBlock := currentBlock - SIKROOT_HYSTERESIS_BLOCKS
 		minBlockKey := make([]byte, 32)
 		binary.LittleEndian.PutUint32(minBlockKey, minBlock)
+		minBlockKey = toPrefixKey(sikDBPrefix, minBlockKey)
 		// if exists a sikRoot for the minimun block number just remove all
 		// the roots with a lower block number. If not, remove all roots with a
 		// lower block number except for the next lower sikRoot. To achieve that
@@ -201,7 +205,7 @@ func (v *State) UpdateSIKRoots() error {
 		// block to delete them.
 		var toPurge [][]byte
 		var nearestLowerBlock uint32
-		sikRootsDB.Iterate(nil, func(key, value []byte) bool {
+		sikRootsDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
 			candidateKey := bytes.Clone(key)
 			blockNumber := binary.LittleEndian.Uint32(candidateKey)
 			if blockNumber < minBlock {
@@ -214,7 +218,8 @@ func (v *State) UpdateSIKRoots() error {
 		})
 		// delete the selected sikRoots by its block numbers
 		for _, blockToDelete := range toPurge {
-			if err := sikRootsDB.Delete(blockToDelete); err != nil {
+			key := toPrefixKey(sikDBPrefix, blockToDelete)
+			if err := sikRootsDB.Delete(key); err != nil {
 				return fmt.Errorf("%w: %w", ErrSIKRootsDelete, err)
 			}
 			log.Debugw("updateSIKRoots (deleted)",
@@ -228,8 +233,8 @@ func (v *State) UpdateSIKRoots() error {
 
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
-
-	if err := sikRootsDB.Set(blockKey, newSikRoot); err != nil {
+	key := toPrefixKey(sikDBPrefix, blockKey)
+	if err := sikRootsDB.Set(key, newSikRoot); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
 	}
 
