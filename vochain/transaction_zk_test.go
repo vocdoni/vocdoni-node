@@ -70,8 +70,15 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	_, err = app.State.Process(electionId, false)
 	c.Assert(err, qt.IsNil)
 	// generate circuit inputs and the zk proof
-	inputs, err := circuit.GenerateCircuitInput(testAccount, nil, electionId,
-		process.CensusRoot, sikRoot, testSiblings, sikSiblings, nil, testWeight)
+	inputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
+		Account:         testAccount,
+		ElectionId:      electionId,
+		CensusRoot:      process.CensusRoot,
+		SIKRoot:         sikRoot,
+		CensusSiblings:  testSiblings,
+		SIKSiblings:     sikSiblings,
+		AvailableWeight: testWeight,
+	})
 	c.Assert(err, qt.IsNil)
 	encInputs, err := json.Marshal(inputs)
 	c.Assert(err, qt.IsNil)

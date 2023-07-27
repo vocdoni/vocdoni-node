@@ -37,48 +37,60 @@ func (ci *CircuitInputs) String() string {
 	return string(bstr)
 }
 
+// CircuitInputsParameters struct envolves all the parameters to generate the 
+// inputs for the current ZK circuit. 
+type CircuitInputsParameters struct {
+	Account         *ethereum.SignKeys
+	Password        []byte
+	ElectionId      []byte
+	CensusRoot      []byte
+	SIKRoot         []byte
+	CensusSiblings  []string
+	SIKSiblings     []string
+	VoteWeight      *big.Int
+	AvailableWeight *big.Int
+}
+
 // GenerateCircuitInput receives the required parameters to encode them
 // correctly to return the expected CircuitInputs. This function uses the
 // ZkAddress to get the private key and generates the nullifier. Also encodes
 // the census root, the election id and the weight provided, and includes the
 // census siblings provided into the result.
-func GenerateCircuitInput(account *ethereum.SignKeys, password, electionId,
-	censusRoot, sikRoot []byte, censusSiblings, sikSiblings []string,
-	voteWeight, availableWeight *big.Int) (*CircuitInputs, error) {
-	if account == nil || electionId == nil || censusRoot == nil || sikRoot == nil ||
-		availableWeight == nil || len(censusSiblings) == 0 || len(sikSiblings) == 0 {
+func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
+	if p.Account == nil || p.ElectionId == nil || p.CensusRoot == nil || p.SIKRoot == nil ||
+		p.AvailableWeight == nil || len(p.CensusSiblings) == 0 || len(p.SIKSiblings) == 0 {
 		return nil, fmt.Errorf("bad arguments provided")
 	}
-	if voteWeight == nil {
-		voteWeight = availableWeight
+	if p.VoteWeight == nil {
+		p.VoteWeight = p.AvailableWeight
 	}
 
-	nullifier, err := account.AccountSIKnullifier(electionId, password)
+	nullifier, err := p.Account.AccountSIKnullifier(p.ElectionId, p.Password)
 	if err != nil {
 		return nil, fmt.Errorf("error generating nullifier: %w", err)
 	}
 	ffPassword := new(big.Int)
-	if password != nil {
-		ffPassword = zk.BigToFF(new(big.Int).SetBytes(password))
+	if p.Password != nil {
+		ffPassword = zk.BigToFF(new(big.Int).SetBytes(p.Password))
 	}
-	signature, err := account.SIKsignature()
+	signature, err := p.Account.SIKsignature()
 	if err != nil {
 		return nil, err
 	}
 	return &CircuitInputs{
-		ElectionId:      zk.BytesToArboStr(electionId),
+		ElectionId:      zk.BytesToArboStr(p.ElectionId),
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
-		AvailableWeight: availableWeight.String(),
-		VoteHash:        zk.BytesToArboStr(availableWeight.Bytes()),
-		SIKRoot:         arbo.BytesToBigInt(sikRoot).String(),
-		CensusRoot:      arbo.BytesToBigInt(censusRoot).String(),
+		AvailableWeight: p.AvailableWeight.String(),
+		VoteHash:        zk.BytesToArboStr(p.AvailableWeight.Bytes()),
+		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
+		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
 
-		Address:   arbo.BytesToBigInt(account.Address().Bytes()).String(),
+		Address:   arbo.BytesToBigInt(p.Account.Address().Bytes()).String(),
 		Password:  ffPassword.String(),
 		Signature: zk.BigToFF(new(big.Int).SetBytes(signature)).String(),
 
-		VoteWeight:     voteWeight.String(),
-		CensusSiblings: censusSiblings,
-		SIKSiblings:    sikSiblings,
+		VoteWeight:     p.VoteWeight.String(),
+		CensusSiblings: p.CensusSiblings,
+		SIKSiblings:    p.SIKSiblings,
 	}, nil
 }

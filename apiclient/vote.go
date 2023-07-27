@@ -87,9 +87,16 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		}
 		// generate circuit inputs with the election, census and voter
 		// information and encode it into a json
-		rawInputs, err := circuit.GenerateCircuitInput(c.account, nil, election.ElectionID,
-			election.Census.CensusRoot, v.ProofSIKTree.Root, v.ProofMkTree.Siblings,
-			v.ProofSIKTree.Siblings, v.VoteWeight, v.ProofMkTree.LeafWeight)
+		rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
+			Account:         c.account,
+			ElectionId:      election.ElectionID,
+			CensusRoot:      election.Census.CensusRoot,
+			SIKRoot:         v.ProofSIKTree.Root,
+			CensusSiblings:  v.ProofMkTree.Siblings,
+			SIKSiblings:     v.ProofSIKTree.Siblings,
+			VoteWeight:      v.VoteWeight,
+			AvailableWeight: v.ProofMkTree.LeafWeight,
+		})
 		if err != nil {
 			return nil, err
 		}

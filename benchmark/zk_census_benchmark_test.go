@@ -136,9 +136,16 @@ func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusD
 		weight = censusData.Weight.MathBigInt()
 	}
 	// Generate circuit inputs
-	rawInputs, err := circuit.GenerateCircuitInput(acc, nil, electionID,
-		censusData.CensusRoot, sikData.CensusRoot, censusData.CensusSiblings,
-		sikData.CensusSiblings, weight, censusData.Weight.MathBigInt())
+	rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
+		Account:         acc,
+		ElectionId:      electionID,
+		CensusRoot:      censusData.CensusRoot,
+		SIKRoot:         sikData.CensusRoot,
+		CensusSiblings:  censusData.CensusSiblings,
+		SIKSiblings:     sikData.CensusSiblings,
+		VoteWeight:      weight,
+		AvailableWeight: censusData.Weight.MathBigInt(),
+	})
 	qt.Assert(b, err, qt.IsNil)
 	// Encode the inputs into a JSON
 	inputs, err := json.Marshal(rawInputs)

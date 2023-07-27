@@ -58,17 +58,20 @@ func TestGenerateCircuitInput(t *testing.T) {
 		SIKSiblings:    testSiblings,
 	}
 	// Generate correct inputs
-	rawInputs, err := GenerateCircuitInput(acc, nil, electionId, hexTestRoot, hexTestRoot,
-		testSiblings, testSiblings, nil, availableWeight)
+	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings, nil,
+		availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
-	rawInputs, err = GenerateCircuitInput(acc, nil, electionId, hexTestRoot, hexTestRoot,
-		testSiblings, testSiblings, big.NewInt(1), availableWeight)
+	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings,
+		big.NewInt(1), availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
-	_, err = GenerateCircuitInput(nil, nil, electionId, hexTestRoot, hexTestRoot,
-		testSiblings, testSiblings, big.NewInt(1), availableWeight)
+	_, err = GenerateCircuitInput(CircuitInputsParameters{nil, nil, electionId,
+		hexTestRoot, hexTestRoot, testSiblings, testSiblings, big.NewInt(1),
+		availableWeight})
 	c.Assert(err, qt.IsNotNil)
 }
