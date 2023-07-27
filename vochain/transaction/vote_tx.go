@@ -129,49 +129,44 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		return vote, nil
 	}
 
-	// Verify the proof associated with the vote
+	// verify the proof associated with the vote
 	if process.EnvelopeType.Anonymous {
 		if t.ZkCircuit == nil {
 			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
-
-		// Supports Groth16 proof generated from circom snark compatible
-		// provoteEnveloper
+		// get snark proof from vote envelope
 		proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
 		if proofZkSNARK == nil {
 			return nil, fmt.Errorf("zkSNARK proof is empty")
 		}
-
-		// Parse the ZkProof protobuf to prover.Proof
+		// parse the ZkProof protobuf to prover.Proof
 		proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
 		if err != nil {
 			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 		}
-
+		// get sikroot from the proof
 		proofSIKRoot, err := proof.SIKRoot()
 		if err != nil {
 			return nil, fmt.Errorf("failed getting sik root from the proof: %w", err)
 		}
+		// check if it is expired
 		if expired, err := t.state.ExpiredSIK(proofSIKRoot); err != nil {
 			return nil, fmt.Errorf("error checking sik root expiration")
 		} else if expired {
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
-
-		// Get vote weight from proof publicSignals
+		// get vote weight from proof publicSignals
 		vote.Weight, err = proof.Weight()
 		if err != nil {
 			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}
-
 		log.Debugw("new vote",
 			"type", "zkSNARK",
 			"weight", vote.Weight,
 			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
-
-		// Get valid verification key and verify the proof parsed
+		// verify the proof with the circuit verification key
 		if err := proof.Verify(t.ZkCircuit.VerificationKey); err != nil {
 			return nil, fmt.Errorf("zkSNARK proof verification failed: %w", err)
 		}

@@ -213,8 +213,9 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	}
 	// update the process
 	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	if err := updateProcess(&v.Tx, p, pid); err != nil {
+	err := updateProcess(&v.Tx, p, pid)
+	v.Tx.Unlock()
+	if err != nil {
 		return err
 	}
 	// try to update startBlocks database

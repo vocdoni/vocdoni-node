@@ -223,11 +223,11 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 // The secret could be nil.
 func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
 	if secret == nil {
-		return nil, fmt.Errorf("no secret provided")
+		secret = []byte{0}
 	}
 	sign, err := k.SIKsignature()
 	if err != nil {
-		return nil, fmt.Errorf("error signing default sik seed: %w", err)
+		return nil, fmt.Errorf("error signing sik payload: %w", err)
 	}
 	seed := []*big.Int{
 		arbo.BytesToBigInt(k.Address().Bytes()),
