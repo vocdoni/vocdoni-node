@@ -1,5 +1,35 @@
 # Generating Vocdoni Node OpenAPI 3 Documentation
 
+## Notes for the developers
+
+This notes are a fast "how to" of how to document a new vocdoni node endpoint. 
+
+- Before merge any new endpoint some tags have to be added to the endpoint:
+
+```
+//    @Tags           Accounts
+//    @Accept         json
+//    @Produce        json
+```
+
+This tags are needed to properly show the information on the developer portal. 
+The `Accounts` tag refer to the namespace where the endpoint behalf, see 
+[`api.go tag.name`](../api.go) to see available tags.
+
+- Some other useful parameters to know are:
+
+```
+// For path params
+//    @Param            address    path        string    true    "Account address"
+// For body objects 
+//    @Param                    transaction    body        object{txPayload=string,metadata=string}    true    "Transaction payload and metadata object encoded using base64 "
+//    @Security                BasicAuth
+// If bearer token is needed (for some census ops for example)
+```
+
+## Generate vocdoni-node OAS3 specification (tldr)
+
+
 This guide explains how to generate the `vocdoni-node` specification in OpenApi 3 
 (OAS 3) format.
 
