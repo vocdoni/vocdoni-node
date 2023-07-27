@@ -219,6 +219,7 @@ type Account struct {
 	InfoURL       string           `json:"infoURL,omitempty"`
 	Token         *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
 	Metadata      *AccountMetadata `json:"metadata,omitempty"`
+	SIK           types.HexBytes   `json:"sik"`
 }
 
 type AccountSet struct {

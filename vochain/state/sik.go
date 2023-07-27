@@ -40,10 +40,12 @@ type SIK []byte
 // SIKFromAddress function return the current SIK value associated to the provided
 // address.
 func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
-	key := toPrefixKey(sikDBPrefix, address.Bytes())
-	sik, err := v.mainTreeViewer(false).DeepGet(key, StateTreeCfg(TreeSIK))
+	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
 	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+		if errors.Is(err, arbo.ErrKeyNotFound) {
+			return nil, fmt.Errorf("%w: %w", ErrSIKNotFound, err)
+		}
+		return nil, fmt.Errorf("%w: %w", ErrSIKGet, err)
 	}
 	return sik, nil
 }

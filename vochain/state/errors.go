@@ -16,6 +16,7 @@ var (
 	ErrSIKAlreadyInvalid    = fmt.Errorf("sik is already invalidated")
 	ErrSIKSubTree           = fmt.Errorf("error getting SIK deep sub tree")
 	ErrSIKGet               = fmt.Errorf("error getting SIK")
+	ErrSIKNotFound          = fmt.Errorf("SIK not found")
 	ErrSIKSet               = fmt.Errorf("error setting new SIK")
 	ErrSIKDelete            = fmt.Errorf("error deleting new SIK")
 	ErrSIKRootsGet          = fmt.Errorf("error getting current valid SIK root")
