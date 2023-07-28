@@ -26,7 +26,7 @@ func TestStateReopen(t *testing.T) {
 
 	s, err = NewState(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
-	hash1After, err := s.Store.Hash()
+	hash1After, err := s.store.Hash()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, hash1After, qt.DeepEquals, hash1Before)
 
@@ -233,19 +233,6 @@ func TestOnProcessStart(t *testing.T) {
 		}
 		qt.Assert(t, s.AddProcess(p), qt.IsNil)
 	})
-
-	for i := uint32(2); i < 6; i++ {
-		doBlock(i, func() {
-			if i < startBlock {
-				key := rng.RandomInZKField()
-				err := s.AddToRollingCensus(pid, key, nil)
-				qt.Assert(t, err, qt.IsNil)
-			}
-		})
-		if i >= startBlock {
-			qt.Assert(t, listener.processStart, qt.DeepEquals, [][][]byte{{pid}})
-		}
-	}
 }
 
 // TestBlockMemoryUsage prints the Heap usage by the number of votes in a

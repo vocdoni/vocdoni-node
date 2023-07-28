@@ -12,9 +12,6 @@ import (
 
 // TreeViewer groups the read-only methods that can be made on a subTree.
 type TreeViewer interface {
-	// NoState returns a read-only key-value database associated with this tree
-	// that doesn't affect the cryptographic integrity of the StateDB.
-	NoState() db.Reader
 	// Get returns the value at key in this tree.  `key` is the path of the leaf,
 	// and the returned value is the leaf's value.
 	Get(key []byte) ([]byte, error)
@@ -65,9 +62,9 @@ type TreeView struct {
 	cfg TreeConfig
 }
 
-// NoState returns a read-only key-value database associated with this tree
+// noState returns a read-only key-value database associated with this tree
 // that doesn't affect the cryptographic integrity of the StateDB.
-func (v *TreeView) NoState() db.Reader {
+func (v *TreeView) noState() db.Reader {
 	return subReader(v.db, subKeyNoState)
 }
 

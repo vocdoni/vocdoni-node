@@ -70,19 +70,16 @@ func NewISTC(s *state.State) *Controller {
 type ActionID int32
 
 const (
-	// ActionComputeResults computes and schedules the commit of results, for the given election and height.
-	ActionComputeResults ActionID = iota
 	// ActionCommitResults schedules the commit of the results to the state.
-	ActionCommitResults
+	ActionCommitResults ActionID = iota
 	// ActionEndProcess sets a process as ended. It schedules ActionComputeResults.
 	ActionEndProcess
 )
 
 // ActionsToString translates the action identifers to its corresponding human friendly string.
 var ActionsToString = map[ActionID]string{
-	ActionComputeResults: "compute-results",
-	ActionCommitResults:  "commit-results",
-	ActionEndProcess:     "end-process",
+	ActionCommitResults: "commit-results",
+	ActionEndProcess:    "end-process",
 }
 
 // Actions is the model used to store the list of IST actions for
@@ -183,7 +180,7 @@ func (c *Controller) Reschedule(id []byte, oldHeight, newHeight uint32) error {
 }
 
 // Commit executes the IST actions scheduled for the given height.
-func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
+func (c *Controller) Commit(height uint32) error {
 	actions, err := c.Actions(height)
 	if err != nil {
 		return fmt.Errorf("cannot commit IST actions: %w", err)
@@ -193,9 +190,9 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 	}
 	for id, action := range actions {
 		switch action.ID {
-		case ActionComputeResults:
-			log.Debugw("compute results", "height", height, "id", fmt.Sprintf("%x", id), "attempt", action.Attempts)
-			// check if we have all the revealed keys, else reschedule
+		case ActionCommitResults:
+			log.Debugw("commit results", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
+			var r *results.Results
 			if !c.checkRevealedKeys(action.ElectionID) {
 				// we are missing some keys, we cannot compute the results yet
 				newHeight := height + (1 + action.Attempts*2)
@@ -206,38 +203,9 @@ func (c *Controller) Commit(height uint32, isSynchronizing bool) error {
 				}
 				continue
 			}
-			if !isSynchronizing {
-				// compute results in a goroutine to avoid blocking the state transition
-				go func() {
-					if err := c.computeAndStoreResults(action.ElectionID); err != nil {
-						log.Errorw(err, fmt.Sprintf("cannot compute results for election %x", action.ElectionID))
-					}
-				}()
-			}
-			// schedule the commit results action
-			if err := c.scheduleCommitResults(action.ElectionID); err != nil {
-				return fmt.Errorf("cannot schedule commit results for election %x: %w",
-					action.ElectionID, err)
-			}
-		case ActionCommitResults:
-			log.Debugw("commit results", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
-			var r *results.Results
-			// if we are synchronizing, we compute the results here, otherwise we get them from the store
-			if isSynchronizing {
-				if !c.checkRevealedKeys(action.ElectionID) {
-					// we are missing some keys, we cannot compute the results yet
-					newHeight := height + (1 + action.Attempts*2)
-					log.Infow("missing keys, rescheduling IST action", "newHeight", newHeight, "id",
-						fmt.Sprintf("%x", id), "action", ActionsToString[action.ID], "attempt", action.Attempts)
-					if err := c.Reschedule([]byte(id), height, newHeight); err != nil {
-						return fmt.Errorf("cannot reschedule IST action: %w", err)
-					}
-					continue
-				}
-				r, err = results.ComputeResults(action.ElectionID, c.state)
-				if err != nil {
-					return fmt.Errorf("cannot compute results on commit: %w", err)
-				}
+			r, err = results.ComputeResults(action.ElectionID, c.state)
+			if err != nil {
+				return fmt.Errorf("cannot compute results on commit: %w", err)
 			}
 			if err := c.commitResults(action.ElectionID, r); err != nil {
 				return fmt.Errorf("cannot commit results for election %x: %w",
@@ -292,7 +260,7 @@ func (c *Controller) endElection(electionID []byte) error {
 	}
 	// schedule the IST action to compute the results
 	return c.Schedule(c.state.CurrentHeight()+1, electionID, Action{
-		ID:         ActionComputeResults,
+		ID:         ActionCommitResults,
 		ElectionID: electionID,
 	})
 }

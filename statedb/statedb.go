@@ -203,8 +203,10 @@ var mainTreeCfg = NewTreeSingletonConfig(TreeParams{
 // trees can be cryptographically represented by a single hash, the
 // StateDB.Root (which corresponds to the mainTree.Root).
 type StateDB struct {
-	hashLen int
-	db      db.Database
+	hashLen        int
+	db             db.Database
+	NoStateWriteTx db.WriteTx
+	NoStateReadTx  db.Reader
 }
 
 // NewStateDB returns an instance of the StateDB.
@@ -321,6 +323,8 @@ func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
 			return nil, err
 		}
 	}
+	s.NoStateReadTx = subReader(tx, subKeyNoState)
+	s.NoStateWriteTx = subWriteTx(tx, subKeyNoState)
 	return &TreeTx{
 		sdb: s,
 		TreeUpdate: TreeUpdate{

@@ -11,9 +11,35 @@ import (
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/tree"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
-func TestStateSnapshot(t *testing.T) {
+func TestSnapshot(t *testing.T) {
+	st := newStateForTest(t)
+
+	err := st.AddValidator(&models.Validator{
+		Address: []byte("validator1"),
+		Power:   10,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	err = st.AddValidator(&models.Validator{
+		Address: []byte("validator2"),
+		Power:   20,
+	})
+	qt.Assert(t, err, qt.IsNil)
+
+	nostate := st.NoState(true)
+	err = nostate.Set([]byte("nostate1"), []byte("value1"))
+	qt.Assert(t, err, qt.IsNil)
+	err = nostate.Set([]byte("nostate2"), []byte("value2"))
+	qt.Assert(t, err, qt.IsNil)
+
+	hash, err := st.Save()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, hash, qt.Not(qt.IsNil))
+}
+
+func TestTreeExportImport(t *testing.T) {
 	rnd := testutil.NewRandom(10)
 	mainRoot := rnd.RandomBytes(32)
 
@@ -124,4 +150,10 @@ func newEmptyTreeForTest(t *testing.T) *tree.Tree {
 	tr, err := tree.New(nil, tree.Options{DB: db, MaxLevels: 256, HashFunc: arbo.HashFunctionBlake2b})
 	qt.Assert(t, err, qt.IsNil)
 	return tr
+}
+
+func newStateForTest(t *testing.T) *State {
+	state, err := NewState(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	return state
 }

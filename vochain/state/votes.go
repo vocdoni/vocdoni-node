@@ -100,10 +100,10 @@ func (v *Vote) DeepCopy() *Vote {
 // When committed is true, the operation is executed on the last committed version.
 func (s *State) CountTotalVotes(committed bool) (uint64, error) {
 	if !committed {
-		s.Tx.RLock()
-		defer s.Tx.RUnlock()
+		s.tx.RLock()
+		defer s.tx.RUnlock()
 	}
-	noState := s.mainTreeViewer(committed).NoState()
+	noState := s.NoState(false)
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil
@@ -115,7 +115,7 @@ func (s *State) CountTotalVotes(committed bool) (uint64, error) {
 
 // voteCountInc increases by 1 the global vote count.
 func (s *State) voteCountInc() error {
-	noState := s.Tx.NoState()
+	noState := s.NoState(false)
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		voteCountLE = make([]byte, 8)
@@ -171,16 +171,16 @@ func (s *State) AddVote(vote *Vote) error {
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
 	}
-	s.Tx.Lock()
+	s.tx.Lock()
 	err = func() error {
 		treeCfg := StateChildTreeCfg(ChildTreeVotes)
-		if err := s.Tx.DeepSet(vid, sdbVoteBytes,
+		if err := s.tx.DeepSet(vid, sdbVoteBytes,
 			StateTreeCfg(TreeProcess), treeCfg.WithKey(vote.ProcessID)); err != nil {
 			return err
 		}
 		return s.voteCountInc()
 	}()
-	s.Tx.Unlock()
+	s.tx.Unlock()
 	if err != nil {
 		return err
 	}
@@ -228,8 +228,8 @@ func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 		// acquire a write lock, since DeepSubTree will create some temporary trees in memory
 		// that might be read concurrently by DeliverTx path during block commit, leading to race #581
 		// https://github.com/vocdoni/vocdoni-node/issues/581
-		s.Tx.Lock()
-		defer s.Tx.Unlock()
+		s.tx.Lock()
+		defer s.tx.Unlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
@@ -256,8 +256,8 @@ func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 // Once the callback returns true, the iteration stops.
 func (s *State) IterateVotes(processID []byte, committed bool, callback func(vote *models.StateDBVote) bool) error {
 	if !committed {
-		s.Tx.Lock()
-		defer s.Tx.Unlock()
+		s.tx.Lock()
+		defer s.tx.Unlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
@@ -301,8 +301,8 @@ func (s *State) VoteExists(processID, nullifier []byte, committed bool) (bool, e
 func (s *State) iterateVotes(processID []byte,
 	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool) error {
 	if !committed {
-		s.Tx.RLock()
-		defer s.Tx.RUnlock()
+		s.tx.RLock()
+		defer s.tx.RUnlock()
 	}
 	treeCfg := StateChildTreeCfg(ChildTreeVotes)
 	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(

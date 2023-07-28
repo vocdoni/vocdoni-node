@@ -8,7 +8,6 @@ import (
 
 	secp "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/privval"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -135,15 +134,9 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 
 func NewVochainStateWithProcess(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
+	p := StateDBProcessHardcoded.GetProcess()
 	// add process
-	processBytes, err := proto.Marshal(StateDBProcessHardcoded)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	if err = s.Tx.DeepSet(
-		testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		processBytes,
-		state.StateTreeCfg(state.TreeProcess)); err != nil {
+	if err := s.AddProcess(p); err != nil {
 		tb.Fatal(err)
 	}
 	return s
