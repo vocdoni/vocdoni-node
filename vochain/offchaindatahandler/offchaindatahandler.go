@@ -16,7 +16,6 @@ import (
 
 const (
 	itemTypeExternalCensus = iota
-	itemTypeRollingCensus
 	itemTypeOrganizationMetadata
 	itemTypeElectionMetadata
 	itemTypeAccountMetadata
@@ -26,7 +25,6 @@ type importItem struct {
 	itemType   int
 	uri        string
 	censusRoot string
-	pid        []byte
 }
 
 // TBD: A startup process for importing on-going process census
@@ -80,9 +78,6 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
 			log.Infow("importing data", "type", "election metadata", "uri", item.uri)
 			go d.enqueueMetadata(item.uri)
-		case itemTypeRollingCensus:
-			log.Infow("importing data", "type", "rolling census", "uri", item.uri)
-			d.importRollingCensus(item.pid)
 		default:
 			log.Errorf("unknown item %d", item.itemType)
 		}
@@ -140,24 +135,8 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 
 }
 
-// OnProcessesStart is triggered when a process starts. It checks if the process contains a rolling census.
-func (d *OffChainDataHandler) OnProcessesStart(pids [][]byte) {
-	for _, pid := range pids {
-		process, err := d.vochain.State.Process(pid, false)
-		if err != nil {
-			log.Errorf("onProcessStart: could find process with pid %x: %v", pid, err)
-			continue
-		}
-		// enqueue for import rolling census (zkSnarks voting with preregister enabled)
-		if process.Mode.PreRegister && process.EnvelopeType.Anonymous {
-			d.queueLock.Lock()
-			d.queue = append(d.queue, importItem{
-				itemType: itemTypeRollingCensus,
-				pid:      pid,
-			})
-			d.queueLock.Unlock()
-		}
-	}
+// OnProcessesStart is triggered when a process starts. Does nothing.
+func (d *OffChainDataHandler) OnProcessesStart(_ [][]byte) {
 }
 
 // OnSetAccount is triggered when a new account is created or modifyied. If metadata info is present, it is enqueued.

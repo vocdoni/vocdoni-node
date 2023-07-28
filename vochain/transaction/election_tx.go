@@ -3,9 +3,7 @@ package transaction
 import (
 	"bytes"
 	"fmt"
-	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/log"
@@ -203,114 +201,6 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	default:
 		return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
-}
-
-// RegisterKeyTxCheck validates a registerKeyTx transaction against the state
-func (t *TransactionHandler) RegisterKeyTxCheck(vtx *vochaintx.Tx, forCommit bool) error {
-	if vtx.Signature == nil || vtx.Tx == nil || vtx.SignedBody == nil {
-		return ErrNilTx
-	}
-	tx := vtx.Tx.GetRegisterKey()
-	// Sanity checks
-	if tx == nil {
-		return fmt.Errorf("register key transaction is nil")
-	}
-	process, err := t.state.Process(tx.ProcessId, false)
-	if err != nil {
-		return fmt.Errorf("cannot fetch processId: %w", err)
-	}
-	if process == nil || process.EnvelopeType == nil || process.Mode == nil {
-		return fmt.Errorf("process %x malformed", tx.ProcessId)
-	}
-	if t.state.CurrentHeight() >= process.StartBlock {
-		return fmt.Errorf("process %x already started", tx.ProcessId)
-	}
-	if !(process.Mode.PreRegister && process.EnvelopeType.Anonymous) {
-		return fmt.Errorf("RegisterKeyTx only supported with " +
-			"Mode.PreRegister and EnvelopeType.Anonymous")
-	}
-	if process.Status != models.ProcessStatus_READY {
-		return fmt.Errorf("process %x not in READY state", tx.ProcessId)
-	}
-	if tx.Proof == nil {
-		return fmt.Errorf("proof missing on registerKeyTx")
-	}
-	if vtx.Signature == nil {
-		return fmt.Errorf("vtx.Signature missing on voteTx")
-	}
-	if len(tx.NewKey) != 32 {
-		return fmt.Errorf("newKey wrong size")
-	}
-	// Verify that we are not over maxCensusSize
-	censusSize, err := t.state.GetRollingCensusSize(tx.ProcessId, false)
-	if err != nil {
-		return err
-	}
-	if censusSize >= process.MaxCensusSize {
-		return fmt.Errorf("maxCensusSize already reached")
-	}
-
-	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
-	if err != nil {
-		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
-	}
-
-	voterID := vstate.NewVoterID(vstate.VoterIDTypeECDSA, pubKey)
-	var valid bool
-	var weight *big.Int
-	valid, weight, err = VerifyProof(process, tx.Proof, voterID)
-	if err != nil {
-		return fmt.Errorf("proof not valid: %w", err)
-	}
-	if !valid {
-		return fmt.Errorf("proof not valid")
-	}
-
-	// Validate that this user is not registering more keys than possible
-	// with the users weight.
-	usedWeight, err := t.state.GetPreRegisterAddrUsedWeight(
-		process.ProcessId,
-		common.Address(voterID.Address()),
-	)
-	if err != nil {
-		return fmt.Errorf("cannot get address used weight: %w", err)
-	}
-	txWeight, ok := new(big.Int).SetString(tx.Weight, 10)
-	if !ok {
-		return fmt.Errorf("cannot parse tx weight %s", txWeight)
-	}
-	usedWeight.Add(usedWeight, txWeight)
-
-	// TODO: In order to support tx.Weight != 1 for anonymous voting, we
-	// need to add the weight to the leaf in the CensusPoseidon Tree, and
-	// also add the weight as a public input in the circuit to verify it anonymously.
-	// The following check ensures that weight != 1 is not used, once the above is
-	// implemented we can remove it
-	if usedWeight.Cmp(bigOne) != 0 {
-		return fmt.Errorf("weight != 1 is not yet supported, received %s, used weight: %s",
-			txWeight, usedWeight)
-	}
-
-	if usedWeight.Cmp(weight) > 0 {
-		return fmt.Errorf("cannot register more keys: "+
-			"usedWeight + RegisterKey.Weight (%v) > proof weight (%v)",
-			usedWeight, weight)
-	}
-	if forCommit {
-		if err := t.state.SetPreRegisterAddrUsedWeight(
-			process.ProcessId,
-			common.Address(voterID.Address()),
-			usedWeight); err != nil {
-			return fmt.Errorf("cannot set address used weight: %w", err)
-		}
-	}
-
-	// TODO: Add cache like in VoteEnvelopeCheck for the registered key so that:
-	// A. We can skip the proof verification when forcommitting
-	// B. We can detect invalid key registration (due to no more weight
-	//    available) at mempool tx insertion
-
-	return nil
 }
 
 func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {

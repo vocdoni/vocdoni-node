@@ -79,7 +79,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) 
 	vc.mempool = make(chan []byte, mempoolSize)
 	vc.blockTimeTarget = DefaultBlockTimeTarget
 	vc.txsPerBlock = DefaultTxsPerBlock
-	version, err := vc.app.State.Store.Version()
+	version, err := vc.app.State.LastHeight()
 	if err != nil {
 		return nil, err
 	}

@@ -46,10 +46,11 @@ func TestISTCschedule(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	istc.Schedule(2, pid, Action{ID: ActionComputeResults, ElectionID: pid})
+	err = istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
+	qt.Assert(t, err, qt.IsNil)
 
 	// commit block 0
-	testAdvanceBlock(t, s, istc, false)
+	testAdvanceBlock(t, s, istc)
 
 	vp, err := state.NewVotePackage([]int{1, 0}).Encode()
 	qt.Assert(t, err, qt.IsNil)
@@ -67,27 +68,12 @@ func TestISTCschedule(t *testing.T) {
 	} // results should be equal to: [ [0,10], [10,0] ]
 
 	// commit block 1, finalize election
-	testAdvanceBlock(t, s, istc, false)
+	testAdvanceBlock(t, s, istc)
 	err = s.SetProcessStatus(pid, models.ProcessStatus_ENDED, true)
 	qt.Assert(t, err, qt.IsNil)
 
-	// start block 2, on this block results should be scheduled for computation
-	testAdvanceBlock(t, s, istc, false)
-
-	// start block 3
-	testAdvanceBlock(t, s, istc, false)
-
-	// start block 4, results should be committed
-	testAdvanceBlock(t, s, istc, false)
-
-	// Wait for results
-	for {
-		p, err := s.Process(pid, true)
-		qt.Assert(t, err, qt.IsNil)
-		if p.Results.GetVotes() != nil {
-			break
-		}
-	}
+	// start block 2, on this block results should be scheduled for commit
+	testAdvanceBlock(t, s, istc)
 
 	// check results
 	p, err = s.Process(pid, true)
@@ -130,10 +116,11 @@ func TestISTCsyncing(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
+	err = istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
+	qt.Assert(t, err, qt.IsNil)
 
 	// commit block 0
-	testAdvanceBlock(t, s, istc, true)
+	testAdvanceBlock(t, s, istc)
 
 	vp, err := state.NewVotePackage([]int{1, 0}).Encode()
 	qt.Assert(t, err, qt.IsNil)
@@ -151,11 +138,11 @@ func TestISTCsyncing(t *testing.T) {
 	} // results should be equal to: [ [0,10], [10,0] ]
 
 	// commit block 1
-	testAdvanceBlock(t, s, istc, true)
+	testAdvanceBlock(t, s, istc)
 
 	// commit block 2 with synchronization flag to true
 	// the commit action should compute the results
-	testAdvanceBlock(t, s, istc, true)
+	testAdvanceBlock(t, s, istc)
 
 	// check results
 	p, err = s.Process(pid, true)
@@ -164,9 +151,9 @@ func TestISTCsyncing(t *testing.T) {
 	qt.Assert(t, r.String(), qt.Equals, "[0,10][10,0]")
 }
 
-func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller, syncFlag bool) {
+func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller) {
 	height := s.CurrentHeight()
-	err := istc.Commit(height, syncFlag)
+	err := istc.Commit(height)
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Save()
 	qt.Assert(t, err, qt.IsNil)

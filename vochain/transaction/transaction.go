@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"fmt"
-	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	snarkTypes "github.com/vocdoni/go-snark/types"
@@ -160,7 +159,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if tx.GetStatus() == models.ProcessStatus_ENDED {
 					// schedule results computations on the ISTC
 					if err := t.istc.Schedule(t.state.CurrentHeight()+1, tx.ProcessId, ist.Action{
-						ID:         ist.ActionComputeResults,
+						ID:         ist.ActionCommitResults,
 						ElectionID: tx.ProcessId,
 					}); err != nil {
 						return nil, fmt.Errorf("setProcessTx: cannot schedule end process: %w", err)
@@ -178,19 +177,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
 			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, 0)
-		}
-
-	case *models.Tx_RegisterKey:
-		if err := t.RegisterKeyTxCheck(vtx, forCommit); err != nil {
-			return nil, fmt.Errorf("registerKeyTx: %w", err)
-		}
-		if forCommit {
-			tx := vtx.Tx.GetRegisterKey()
-			weight, ok := new(big.Int).SetString(tx.Weight, 10)
-			if !ok {
-				return nil, fmt.Errorf("cannot parse weight %s", weight)
-			}
-			return response, t.state.AddToRollingCensus(tx.ProcessId, tx.NewKey, weight)
 		}
 
 	case *models.Tx_SetAccount:

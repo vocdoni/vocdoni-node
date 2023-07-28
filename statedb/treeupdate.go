@@ -109,10 +109,10 @@ func (u *TreeUpdate) Import(r io.Reader) error {
 	return u.tree.ImportDump(buf.Bytes())
 }
 
-// NoState returns a key-value database associated with this tree that doesn't
+// noState returns a key-value database associated with this tree that doesn't
 // affect the cryptographic integrity of the StateDB.  Writing to this database
 // won't change the StateDB.Root.
-func (u *TreeUpdate) NoState() Updater {
+func (u *TreeUpdate) noState() Updater {
 	return subWriteTx(u.tx, subKeyNoState)
 }
 
@@ -359,11 +359,6 @@ func (t *TreeTx) SaveWithoutCommit() error {
 // treeUpdateView is a wrapper over TreeUpdate that fulfills the TreeViewer
 // interface.
 type treeUpdateView TreeUpdate
-
-// NoState implements the TreeViewer.NoState method.
-func (v *treeUpdateView) NoState() db.Reader {
-	return (*TreeUpdate)(v).NoState()
-}
 
 // SubTree implements the TreeViewer.SubTree method.
 func (v *treeUpdateView) SubTree(c TreeConfig) (TreeViewer, error) {

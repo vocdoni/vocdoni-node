@@ -49,9 +49,9 @@ func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 	if err != nil {
 		return err
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
 }
 
 // Treasurer returns the address and the Treasurer nonce
@@ -60,8 +60,8 @@ func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
 // When committed is true, the operation is executed on the last committed version.
 func (v *State) Treasurer(committed bool) (*models.Treasurer, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
 	if err != nil {
@@ -93,15 +93,15 @@ func (v *State) IncrementTreasurerNonce() error {
 	if err != nil {
 		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	t.Nonce++
 	tBytes, err := proto.Marshal(t)
 	if err != nil {
 		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
 	}
 	log.Debugf("incrementing treasurer nonce, new nonce is %d", t.Nonce)
-	return v.Tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
+	return v.tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
 }
 
 // VerifyTreasurer checks is an address is the treasurer and the
@@ -129,12 +129,12 @@ func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {
 	if !ok {
 		return fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	log.Debugf("setting tx cost %d for tx %s", cost, txType.String())
 	costBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(costBytes, cost)
-	return v.Tx.DeepSet([]byte(key), costBytes, StateTreeCfg(TreeExtra))
+	return v.tx.DeepSet([]byte(key), costBytes, StateTreeCfg(TreeExtra))
 }
 
 // TxBaseCost returns the base cost of a given transaction
@@ -147,8 +147,8 @@ func (v *State) TxBaseCost(txType models.TxType, committed bool) (uint64, error)
 		return 0, fmt.Errorf("txType %v shouldn't cost anything", txType)
 	}
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
 	if err != nil {
@@ -166,8 +166,8 @@ func (v *State) TxBaseCost(txType models.TxType, committed bool) (uint64, error)
 // committed is relative to the state on which the function is executed
 func (v *State) FaucetNonce(key []byte, committed bool) (bool, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	faucetNonceTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeFaucet))
 	if err != nil {
@@ -191,9 +191,9 @@ func (v *State) FaucetNonce(key []byte, committed bool) (bool, error) {
 // SetFaucetNonce stores an already used faucet nonce in the
 // FaucetNonce subtree
 func (v *State) SetFaucetNonce(key []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(key, nil, StateTreeCfg(TreeFaucet))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet(key, nil, StateTreeCfg(TreeFaucet))
 }
 
 // ConsumeFaucetPayload consumes a given faucet payload storing

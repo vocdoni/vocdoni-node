@@ -317,7 +317,7 @@ func TestNoState(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Set key-value in mainTree.NoState
-	mainTreeNoState := mainTree.NoState()
+	mainTreeNoState := mainTree.noState()
 	qt.Assert(t, mainTreeNoState.Set([]byte("key0"), []byte("value0")), qt.IsNil)
 	v0, err := mainTreeNoState.Get([]byte("key0"))
 	qt.Assert(t, err, qt.IsNil)
@@ -334,7 +334,7 @@ func TestNoState(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// Set key-value in single.NoState
-	singleNoState := single.NoState()
+	singleNoState := single.noState()
 	qt.Assert(t, singleNoState.Set([]byte("key1"), []byte("value1")), qt.IsNil)
 	v1, err := singleNoState.Get([]byte("key1"))
 	qt.Assert(t, err, qt.IsNil)
@@ -353,7 +353,7 @@ func TestNoState(t *testing.T) {
 		qt.Assert(t, mainTreeRoot1, qt.DeepEquals, mainTreeRoot)
 
 		// Expect the value in mainTree.NoState
-		mainTreeNoState := mainTreeView.NoState()
+		mainTreeNoState := mainTreeView.noState()
 		v0, err := mainTreeNoState.Get([]byte("key0"))
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, v0, qt.DeepEquals, []byte("value0"))
@@ -364,12 +364,6 @@ func TestNoState(t *testing.T) {
 		singleRoot1, err := single.Root()
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, singleRoot1, qt.DeepEquals, singleRoot)
-
-		// Expect the value in single.NoState
-		singleNoState := single.NoState()
-		v1, err := singleNoState.Get([]byte("key1"))
-		qt.Assert(t, err, qt.IsNil)
-		qt.Assert(t, v1, qt.DeepEquals, []byte("value1"))
 	}
 
 	// dumpPrint(sdb.db)
