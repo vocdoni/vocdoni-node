@@ -158,7 +158,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
 		// get vote weight from proof publicSignals
-		vote.Weight, err = proof.Weight()
+		vote.Weight, err = proof.VoteWeight()
 		if err != nil {
 			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}

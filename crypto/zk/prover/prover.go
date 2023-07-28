@@ -86,16 +86,16 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	return proofData, pubSignals, nil
 }
 
-// Weight decodes the vote weight value from the current proof public signals
-// and return it as a big.Int.
-func (p *Proof) Weight() (*big.Int, error) {
+// VoteWeight decodes the vote weight value from the current proof public
+// signals and return it as a big.Int.
+func (p *Proof) VoteWeight() (*big.Int, error) {
 	// Check if the current proof contains public signals and it contains the
 	// correct number of positions.
 	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat
 	}
 	// Get the weight from the fifth public signal of the proof
-	strWeight := p.PubSignals[3]
+	strWeight := p.PubSignals[7]
 	// Parse it into a big.Int
 	weight, ok := new(big.Int).SetString(strWeight, 10)
 	if !ok {
@@ -125,7 +125,7 @@ func (p *Proof) SIKRoot() ([]byte, error) {
 	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat
 	}
-	arboSIK, ok := new(big.Int).SetString(p.PubSignals[6], 10)
+	arboSIK, ok := new(big.Int).SetString(p.PubSignals[5], 10)
 	if !ok {
 		return nil, ErrParsingSIKRoot
 	}

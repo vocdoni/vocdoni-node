@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/big"
 	"os"
 	"time"
 
@@ -61,6 +62,7 @@ func (t *E2EAnonElection) Run() error {
 			ProofSIKTree: t.sikproofs[acct.AddressString()],
 			Choices:      []int{i % 2},
 			VoterAccount: acct,
+			VoteWeight:   big.NewInt(defaultWeight / 2),
 		})
 	}
 	t.sendVotes(votes)
