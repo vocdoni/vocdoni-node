@@ -42,7 +42,7 @@ type TransactionHandler struct {
 	dataDir string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
-
+	// ZkCircuit contains the current chain circuit
 	ZkCircuit *circuit.ZkCircuit
 }
 

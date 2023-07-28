@@ -231,6 +231,8 @@ var stageGenesis = GenesisDoc{
 			AddDelegateForAccount:   1,
 			DelDelegateForAccount:   1,
 			CollectFaucet:           1,
+			SetAccountSIK:           1,
+			DelAccountSIK:           1,
 		},
 	},
 }
