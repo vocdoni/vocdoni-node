@@ -51,7 +51,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	// mock an election ID and add it to the state process block registry with
 	// its startBlock
-	electionId := util.RandomBytes(32)
+	electionId := util.RandomBytes(types.ProcessIDsize)
 	entityID := util.RandomBytes(types.EntityIDsize)
 	c.Assert(app.State.ProcessBlockRegistry.SetStartBlock(electionId, 100), qt.IsNil)
 	// create and add the process to the state with the census created

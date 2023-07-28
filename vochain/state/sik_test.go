@@ -7,7 +7,9 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -133,6 +135,43 @@ func Test_sikRoots(t *testing.T) {
 	thirdRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
 	c.Assert(thirdRoot, qt.ContentEquals, validSIKs[0])
+}
+
+func TestAssignSIKToElectionAndPurge(t *testing.T) {
+	c := qt.New(t)
+	// create a state for testing
+	dir := t.TempDir()
+	s, err := NewState(db.TypePebble, dir)
+	qt.Assert(t, err, qt.IsNil)
+	// mock an account
+	testAccount := ethereum.NewSignKeys()
+	c.Assert(testAccount.Generate(), qt.IsNil)
+	// generate the SIK
+	sik, err := testAccount.AccountSIK(nil)
+	c.Assert(err, qt.IsNil)
+	// register the SIK
+	c.Assert(s.SetAddressSIK(testAccount.Address(), sik), qt.IsNil)
+	// assing to a process
+	pid := util.RandomBytes(types.ProcessIDsize)
+	c.Assert(s.AssignSIKToElection(pid, testAccount.Address()), qt.IsNil)
+	// check if the relation exists on db
+	key := toPrefixKey(pid, testAccount.Address().Bytes())
+	s.Tx.Lock()
+	siksTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	s.Tx.Unlock()
+	c.Assert(err, qt.IsNil)
+	_, err = siksTree.NoState().Get(key)
+	c.Assert(err, qt.IsNil)
+	// purge siks and check
+	c.Assert(s.PurgeSIKsByElection(pid), qt.IsNil)
+	s.Tx.Lock()
+	siksTree, err = s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	s.Tx.Unlock()
+	c.Assert(err, qt.IsNil)
+	_, err = siksTree.NoState().Get(key)
+	c.Assert(err, qt.IsNotNil)
+	_, err = s.SIKFromAddress(testAccount.Address())
+	c.Assert(err, qt.IsNil)
 }
 
 func Test_heightEncoding(t *testing.T) {

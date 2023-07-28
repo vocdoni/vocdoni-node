@@ -323,6 +323,63 @@ func (v *State) CountRegisterSIK(pid []byte) (uint32, error) {
 	return binary.LittleEndian.Uint32(rawCount), nil
 }
 
+// SIKAssingTo function persists the relation between a created SIK (without
+// registered account) and the election where the SIK is valid. This relation
+// allows to remove all SIKs when the election ends.
+func (v *State) AssignSIKToElection(pid []byte, address common.Address) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// instance the SIK's key-value DB
+	sikNoStateDB := siksTree.NoState()
+	// compose the key with the pid and the address and store with no value on
+	// the no state database
+	key := toPrefixKey(pid, address.Bytes())
+	if err := sikNoStateDB.Set(key, nil); err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSet, err)
+	}
+	return nil
+}
+
+// PurgeSIKsByElection function iterates over the stored relations between a
+// process and a SIK without account and remove both of them, the SIKs and also
+// the relation.
+func (v *State) PurgeSIKsByElection(pid []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// instance the SIK's key-value DB
+	sikNoStateDB := siksTree.NoState()
+	// iterate to remove the assigned SIK to every address of this process and
+	// also the relation between them
+	var iterErr error
+	if err := siksTree.NoState().Iterate(pid, func(address, _ []byte) bool {
+		// remove the SIK by the address
+		if iterErr = siksTree.Del(address); iterErr != nil {
+			return false
+		}
+		// remove the relation between process and address
+		if iterErr = sikNoStateDB.Delete(toPrefixKey(pid, address)); iterErr != nil {
+			return false
+		}
+		return true
+	}); err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+	}
+	if iterErr != nil {
+		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+	}
+	return nil
+}
+
 // InvalidateAt funtion sets the current SIK value to the encoded value of the
 // height provided, ready to use in the SIK subTree as leaf value to invalidate
 // it. The encoded value will have 32 bytes:
