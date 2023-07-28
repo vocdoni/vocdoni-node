@@ -326,73 +326,73 @@ func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, v
 // RegisterSIKTxCheck checks if the provided RegisterSIKTx is valid ensuring
 // that the proof included on it is valid for the address of the transaction
 // signer.
-func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, []byte, error) {
+func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Address, vstate.SIK, []byte, bool, error) {
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
-		return common.Address{}, nil, nil, ErrNilTx
+		return common.Address{}, nil, nil, false, ErrNilTx
 	}
 	// parse transaction
 	tx := vtx.Tx.GetRegisterSIK()
 	if tx == nil {
-		return common.Address{}, nil, nil, fmt.Errorf("invalid transaction")
+		return common.Address{}, nil, nil, false, fmt.Errorf("invalid transaction")
 	}
 	// get the SIK provided
 	newSIK := tx.GetSIK()
 	if newSIK == nil {
-		return common.Address{}, nil, nil, fmt.Errorf("no sik value provided")
+		return common.Address{}, nil, nil, false, fmt.Errorf("no sik value provided")
 	}
 	// get census proof and election information provided
 	censusProof := tx.GetCensusProof()
 	if censusProof == nil {
-		return common.Address{}, nil, nil, fmt.Errorf("no proof provided")
+		return common.Address{}, nil, nil, false, fmt.Errorf("no proof provided")
 	}
 	pid := tx.GetElectionId()
 	if pid == nil {
-		return common.Address{}, nil, nil, fmt.Errorf("no election provided")
+		return common.Address{}, nil, nil, false, fmt.Errorf("no election provided")
 	}
 	// get the pubkey from the tx signature
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
 	}
 	// get the account address from the pubkey
 	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
 	log.Info(txAddress.String())
 	// check if the address is already registered
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("cannot get the account for the tx address: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("cannot get the account for the tx address: %w", err)
 	}
 	// check if the address already has a registered SIK
 	if _, err := t.state.SIKFromAddress(txAddress); err == nil {
-		return txAddress, nil, nil, fmt.Errorf("this address already has a SIK")
+		return txAddress, nil, nil, false, fmt.Errorf("this address already has a SIK")
 	}
 	// get the process data by its ID
 	process, err := t.state.Process(pid, false)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("error getting the process info: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("error getting the process info: %w", err)
 	}
 	// ensure that the process is in READY state
 	if process.GetStatus() != models.ProcessStatus_READY {
-		return common.Address{}, nil, nil, fmt.Errorf("this process is not READY")
+		return common.Address{}, nil, nil, false, fmt.Errorf("this process is not READY")
 	}
 	// check if the number of registered SIK via RegisterSIKTx associated to
 	// this process reaches the MaxCensusSize
 	numberOfRegisterSIK, err := t.state.CountRegisterSIK(pid)
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("error getting the counter of RegisterSIKTx: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("error getting the counter of RegisterSIKTx: %w", err)
 	}
 	if process.GetMaxCensusSize() <= uint64(numberOfRegisterSIK) {
-		return common.Address{}, nil, nil, fmt.Errorf("process MaxCensusSize reached")
+		return common.Address{}, nil, nil, false, fmt.Errorf("process MaxCensusSize reached")
 	}
 	// verify the proof for the transaction signer address
 	valid, _, err := VerifyProof(process, censusProof, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
 	if err != nil {
-		return common.Address{}, nil, nil, fmt.Errorf("error verifying the proof: %w", err)
+		return common.Address{}, nil, nil, false, fmt.Errorf("error verifying the proof: %w", err)
 	}
 	if !valid {
-		return common.Address{}, nil, nil, fmt.Errorf("proof not valid")
+		return common.Address{}, nil, nil, false, fmt.Errorf("proof not valid")
 	}
-	return txAddress, newSIK, pid, nil
+	return txAddress, newSIK, pid, process.GetTempSIKs(), nil
 }

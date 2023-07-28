@@ -188,13 +188,13 @@ func TestMaxCensusSizeRegisterSIKTx(t *testing.T) {
 
 	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), testWeight)
 	tx := testBuildSignedRegisterSIKTx(t, accounts[0], pid, proofs[0], encWeight, app.chainID)
-	_, _, _, err := app.TransactionHandler.RegisterSIKTxCheck(tx)
+	_, _, _, _, err := app.TransactionHandler.RegisterSIKTxCheck(tx)
 	c.Assert(err, qt.IsNil)
 
 	for i := 0; i < 10; i++ {
 		app.State.IncreaseRegisterSIKCounter(pid)
 	}
-	_, _, _, err = app.TransactionHandler.RegisterSIKTxCheck(tx)
+	_, _, _, _, err = app.TransactionHandler.RegisterSIKTxCheck(tx)
 	c.Assert(err, qt.IsNotNil)
 	c.Assert(err, qt.ErrorMatches, "process MaxCensusSize reached")
 }

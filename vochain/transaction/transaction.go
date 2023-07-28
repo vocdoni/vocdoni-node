@@ -481,7 +481,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		return response, nil
 
 	case *models.Tx_RegisterSIK:
-		txAddress, SIK, pid, err := t.RegisterSIKTxCheck(vtx)
+		txAddress, SIK, pid, tempSIKs, err := t.RegisterSIKTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("registerSIKTx: %w", err)
 		}
@@ -493,6 +493,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			// increase the RegisterSIKTx counter
 			if err := t.state.IncreaseRegisterSIKCounter(pid); err != nil {
 				return nil, fmt.Errorf("registerSIKTx: %w", err)
+			}
+			if tempSIKs {
+				if err := t.state.AssignSIKToElection(pid, txAddress); err != nil {
+					return nil, fmt.Errorf("registerSIKTx: %w", err)
+				}
 			}
 		}
 		return response, nil
