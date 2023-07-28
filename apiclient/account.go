@@ -320,3 +320,57 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 	}
 	return accv.Hash, nil
 }
+
+// RegisterSIKForVote function performs the free RegisterSIKTx to the vochain
+// helping to non registered accounts to vote in a on going election, but only
+// if the account is in the election census. The function returns the hash of
+// the sent transaction, and requires the election ID. The census proof and the
+// secret are optional. If no proof is provided, it will be generated.
+func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *CensusProof, secret []byte) (types.HexBytes, error) {
+	// get process info
+	process, err := c.Election(electionId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting election info: %w", err)
+	}
+	// if any proof has been provided, get it from the API
+	if proof == nil {
+		proof, err = c.CensusGenProof(process.Census.CensusRoot, c.account.Address().Bytes())
+		if err != nil {
+			return nil, fmt.Errorf("error generating census proof: %w", err)
+		}
+	}
+	// get the account SIK using the secret provided
+	sik, err := c.account.AccountSIK(secret)
+	if err != nil {
+		return nil, fmt.Errorf("error generating SIK: %w", err)
+	}
+	// compose and encode the transaction
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_RegisterSIK{
+			RegisterSIK: &models.RegisterSIKTx{
+				SIK:        sik,
+				ElectionId: electionId,
+				CensusProof: &models.Proof{
+					Payload: &models.Proof_Arbo{
+						Arbo: &models.ProofArbo{
+							Type:            models.ProofArbo_POSEIDON,
+							Siblings:        proof.Proof,
+							KeyType:         proof.KeyType,
+							AvailableWeight: proof.LeafValue,
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error enconsing RegisterSIKTx: %w", err)
+	}
+	// sign it and send it
+	hash, _, err := c.SignAndSendTx(stx)
+	if err != nil {
+		return nil, fmt.Errorf("error signing or sending the Tx: %w", err)
+	}
+	return hash, nil
+}
