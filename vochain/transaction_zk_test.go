@@ -6,14 +6,17 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestVoteCheckZkSNARK(t *testing.T) {
@@ -113,4 +116,86 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		TxID:       txID,
 	}, commit)
 	c.Assert(err, qt.IsNil)
+}
+
+func testBuildSignedRegisterSIKTx(t *testing.T, account *ethereum.SignKeys, pid,
+	proof, availableWeight []byte, chainID string) *vochaintx.Tx {
+	c := qt.New(t)
+
+	sik, err := account.AccountSIK(nil)
+	c.Assert(err, qt.IsNil)
+
+	tx := &models.Tx{
+		Payload: &models.Tx_RegisterSIK{
+			RegisterSIK: &models.RegisterSIKTx{
+				SIK:        sik,
+				ElectionId: pid,
+				CensusProof: &models.Proof{
+					Payload: &models.Proof_Arbo{
+						Arbo: &models.ProofArbo{
+							Type:            models.ProofArbo_POSEIDON,
+							Siblings:        proof,
+							AvailableWeight: availableWeight,
+							KeyType:         models.ProofArbo_ADDRESS,
+							VoteWeight:      availableWeight,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	txPayload, err := proto.Marshal(tx)
+	c.Assert(err, qt.IsNil)
+	stx := &models.SignedTx{Tx: txPayload}
+	stx.Signature, err = account.SignVocdoniTx(txPayload, chainID)
+	c.Assert(err, qt.IsNil)
+	bstx, err := proto.Marshal(stx)
+	c.Assert(err, qt.IsNil)
+
+	resTx := new(vochaintx.Tx)
+	c.Assert(resTx.Unmarshal(bstx, chainID), qt.IsNil)
+	return resTx
+}
+
+func TestMaxCensusSizeRegisterSIKTx(t *testing.T) {
+	c := qt.New(t)
+
+	// create test app and load zk circuit
+	app := TestBaseApplication(t)
+	// initial accounts
+	testWeight := big.NewInt(10)
+	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 10, testWeight)
+
+	// create a process with max census size 10
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId: pid,
+		EntityId:  util.RandomBytes(types.EntityIDsize),
+		EnvelopeType: &models.EnvelopeType{
+			Anonymous: true,
+		},
+		Mode:          &models.ProcessMode{},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
+		Status:        models.ProcessStatus_READY,
+		CensusRoot:    censusRoot,
+		StartBlock:    0,
+		BlockCount:    3,
+		MaxCensusSize: 10,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+	}
+	c.Check(app.State.AddProcess(process), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), testWeight)
+	tx := testBuildSignedRegisterSIKTx(t, accounts[0], pid, proofs[0], encWeight, app.chainID)
+	_, _, _, err := app.TransactionHandler.RegisterSIKTxCheck(tx)
+	c.Assert(err, qt.IsNil)
+
+	for i := 0; i < 10; i++ {
+		app.State.IncreaseRegisterSIKCounter(pid)
+	}
+	_, _, _, err = app.TransactionHandler.RegisterSIKTxCheck(tx)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(err, qt.ErrorMatches, "process MaxCensusSize reached")
 }

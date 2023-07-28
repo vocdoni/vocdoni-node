@@ -152,7 +152,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
-					return nil, fmt.Errorf("set process status, status unknown")
+					return nil, fmt.Errorf("setProcessStatus: status unknown")
 				}
 				if err := t.state.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
@@ -163,7 +163,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 						ID:         ist.ActionComputeResults,
 						ElectionID: tx.ProcessId,
 					}); err != nil {
-						return nil, fmt.Errorf("setProcessTx: cannot schedule end process: %w", err)
+						return nil, fmt.Errorf("setProcessStatus: cannot schedule end process: %w", err)
+					}
+					// purge RegisterSIKTx counter if it exists
+					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
+						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
 					}
 				}
 
@@ -477,12 +481,17 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		return response, nil
 
 	case *models.Tx_RegisterSIK:
-		txAddress, SIK, err := t.RegisterSIKTxCheck(vtx)
+		txAddress, SIK, pid, err := t.RegisterSIKTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("registerSIKTx: %w", err)
 		}
 		if forCommit {
+			// register the SIK
 			if err := t.state.SetAddressSIK(txAddress, SIK); err != nil {
+				return nil, fmt.Errorf("registerSIKTx: %w", err)
+			}
+			// increase the RegisterSIKTx counter
+			if err := t.state.IncreaseRegisterSIKCounter(pid); err != nil {
 				return nil, fmt.Errorf("registerSIKTx: %w", err)
 			}
 		}

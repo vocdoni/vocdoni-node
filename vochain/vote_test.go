@@ -29,22 +29,27 @@ func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.
 		t.Fatal(err)
 	}
 
+	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), weight)
 	keys := ethereum.NewSignKeysBatch(size)
 	for _, k := range keys {
 		qt.Check(t, err, qt.IsNil)
-		err = tr.Add(k.Address().Bytes(), arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), weight))
+		err = tr.Add(k.Address().Bytes(), encWeight)
 		qt.Check(t, err, qt.IsNil)
 	}
 
 	tr.Publish()
+
+	root, err := tr.Root()
+	qt.Check(t, err, qt.IsNil)
 	var proofs [][]byte
 	for _, k := range keys {
 		_, proof, err := tr.GenProof(k.Address().Bytes())
 		qt.Check(t, err, qt.IsNil)
 		proofs = append(proofs, proof)
+		valid, err := tr.VerifyProof(k.Address().Bytes(), encWeight, proof, root)
+		qt.Check(t, err, qt.IsNil)
+		qt.Check(t, valid, qt.IsTrue)
 	}
-	root, err := tr.Root()
-	qt.Check(t, err, qt.IsNil)
 	return keys, root, proofs
 }
 

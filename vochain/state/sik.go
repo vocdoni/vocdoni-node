@@ -9,11 +9,13 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 var sikDBPrefix = []byte("sik_")
+var anonSIKDBPrefix = []byte("asik_")
 
 // SIKROOT_HYSTERESIS_BLOCKS constant defines the number of blocks that the
 // vochain will consider a sikRoot valid. In this way, any new sikRoot will be
@@ -192,7 +194,7 @@ func (v *State) UpdateSIKRoots() error {
 	}
 	// instance the SIK's key-value DB and set the current block to the current
 	// network height.
-	sikRootsDB := siksTree.NoState()
+	sikNoStateDB := siksTree.NoState()
 	currentBlock := v.CurrentHeight()
 	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
 		// calculate the current minimun block to purge useless sik roots
@@ -207,11 +209,11 @@ func (v *State) UpdateSIKRoots() error {
 		// block to delete them.
 		var toPurge [][]byte
 		var nearestLowerBlock uint32
-		sikRootsDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
+		sikNoStateDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
 			candidateKey := bytes.Clone(key)
 			blockNumber := binary.LittleEndian.Uint32(candidateKey)
 			if blockNumber < minBlock {
-				if _, err := sikRootsDB.Get(minBlockKey); err == nil || blockNumber > nearestLowerBlock {
+				if _, err := sikNoStateDB.Get(minBlockKey); err == nil || blockNumber > nearestLowerBlock {
 					toPurge = append(toPurge, candidateKey)
 					nearestLowerBlock = blockNumber
 				}
@@ -221,26 +223,104 @@ func (v *State) UpdateSIKRoots() error {
 		// delete the selected sikRoots by its block numbers
 		for _, blockToDelete := range toPurge {
 			key := toPrefixKey(sikDBPrefix, blockToDelete)
-			if err := sikRootsDB.Delete(key); err != nil {
+			if err := sikNoStateDB.Delete(key); err != nil {
 				return fmt.Errorf("%w: %w", ErrSIKRootsDelete, err)
 			}
 			log.Debugw("updateSIKRoots (deleted)",
 				"blockNumber", binary.LittleEndian.Uint32(blockToDelete))
 		}
 	}
-
-	log.Debugw("updateSIKRoots (created)",
-		"newSikRoot", hex.EncodeToString(newSikRoot),
-		"blockNumber", currentBlock)
-
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
 	key := toPrefixKey(sikDBPrefix, blockKey)
-	if err := sikRootsDB.Set(key, newSikRoot); err != nil {
+	if err := sikNoStateDB.Set(key, newSikRoot); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
 	}
-
+	log.Debugw("updateSIKRoots (created)",
+		"newSikRoot", hex.EncodeToString(newSikRoot),
+		"blockNumber", currentBlock)
 	return nil
+}
+
+// IncreaseRegisterSIKCounter method allows to keep in track the number of
+// RegisterSIK actions by electionId (or processID). This helps to prevent
+// attacks using the free tx of RegisterSIKTx. If the desired election has not
+// any RegisterSIKTx associated, it will initialize the counter.
+func (v *State) IncreaseRegisterSIKCounter(pid []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// instance the SIK's key-value DB
+	sikNoStateDB := siksTree.NoState()
+	// prepare the prefixed key and get the current counter
+	key := toPrefixKey(anonSIKDBPrefix, pid)
+	rawCount, err := sikNoStateDB.Get(key)
+	if err != nil {
+		// if the key not exists, initialize the counter
+		if errors.Is(err, db.ErrKeyNotFound) {
+			rawCount = make([]byte, 32)
+			binary.LittleEndian.PutUint32(rawCount, 1)
+			if err := sikNoStateDB.Set(key, rawCount); err != nil {
+				return fmt.Errorf("%w: %w", ErrSIKSet, err)
+			}
+			return nil
+		}
+		return fmt.Errorf("%w: %w", ErrSIKGet, err)
+	}
+	// If not, decode the current counter and increase by one
+	count := binary.LittleEndian.Uint32(rawCount)
+	binary.LittleEndian.PutUint32(rawCount, count+1)
+	if err := sikNoStateDB.Set(key, rawCount); err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSet, err)
+	}
+	return nil
+}
+
+// PurgeRegisterSIK method removes the counter of RegisterSIKTx for the provided
+// electionId (or processID)
+func (v *State) PurgeRegisterSIK(pid []byte) error {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// instance the SIK's key-value DB
+	sikNoStateDB := siksTree.NoState()
+	// prepare the prefixed key and delete its records counter
+	key := toPrefixKey(anonSIKDBPrefix, pid)
+	if err := sikNoStateDB.Delete(key); err != nil && !errors.Is(err, db.ErrKeyNotFound) {
+		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+	}
+	return nil
+}
+
+// CountRegisterSIK method returns the number of RegisterSIKTx associated to
+// the provided electionId (or processID)
+func (v *State) CountRegisterSIK(pid []byte) (uint32, error) {
+	v.Tx.Lock()
+	defer v.Tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return 0, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// instance the SIK's key-value DB
+	sikNoStateDB := siksTree.NoState()
+	// prepare the prefixed key and get its records counter
+	rawCount, err := sikNoStateDB.Get(toPrefixKey(anonSIKDBPrefix, pid))
+	if err != nil {
+		if errors.Is(err, db.ErrKeyNotFound) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("%w: %w", ErrSIKDelete, err)
+	}
+	return binary.LittleEndian.Uint32(rawCount), nil
 }
 
 // InvalidateAt funtion sets the current SIK value to the encoded value of the

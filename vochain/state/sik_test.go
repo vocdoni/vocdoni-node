@@ -8,6 +8,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/util"
 )
 
 func TestSetAddressSIK(t *testing.T) {
@@ -57,6 +58,31 @@ func TestDelSIK(t *testing.T) {
 	// try a success deletion
 	s.SetHeight(2)
 	c.Assert(s.InvalidateSIK(address), qt.IsNil)
+}
+
+func Test_registerSIKCounter(t *testing.T) {
+	c := qt.New(t)
+	// create a state for testing
+	dir := t.TempDir()
+	s, err := NewState(db.TypePebble, dir)
+	c.Assert(err, qt.IsNil)
+
+	pid := util.RandomBytes(32)
+	c.Assert(s.IncreaseRegisterSIKCounter(pid), qt.IsNil)
+
+	counter, err := s.CountRegisterSIK(pid)
+	c.Assert(err, qt.IsNil)
+	c.Assert(counter, qt.Equals, uint32(1))
+
+	c.Assert(s.IncreaseRegisterSIKCounter(pid), qt.IsNil)
+	counter, err = s.CountRegisterSIK(pid)
+	c.Assert(err, qt.IsNil)
+	c.Assert(counter, qt.Equals, uint32(2))
+
+	c.Assert(s.PurgeRegisterSIK(pid), qt.IsNil)
+	counter, err = s.CountRegisterSIK(pid)
+	c.Assert(err, qt.IsNil)
+	c.Assert(counter, qt.Equals, uint32(0))
 }
 
 func Test_sikRoots(t *testing.T) {
