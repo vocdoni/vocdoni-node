@@ -28,8 +28,8 @@ CREATE TABLE processes (
   vote_opts_pb BLOB NOT NULL,
 
   -- TODO: store as a proper list
-  private_keys TEXT NOT NULL, -- comma-separated list of hex keys
-  public_keys  TEXT NOT NULL, -- comma-separated list of hex keys
+  private_keys TEXT NOT NULL, -- json array
+  public_keys  TEXT NOT NULL, -- json array
 
   question_index      INTEGER NOT NULL,
   creation_time       DATETIME NOT NULL,
