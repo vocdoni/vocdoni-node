@@ -4,10 +4,10 @@ CREATE TABLE votes (
   process_id             BLOB NOT NULL,
   block_height           INTEGER NOT NULL,
   block_index            INTEGER NOT NULL,
-  weight                 TEXT NOT NULL, -- a bigint in Go, so we store via MarshalText
+  weight                 TEXT NOT NULL, -- json integer-string
   voter_id               BLOB NOT NULL,
   overwrite_count        INTEGER NOT NULL,
-  encryption_key_indexes TEXT NOT NULL, -- json
+  encryption_key_indexes TEXT NOT NULL, -- json integer array
   package                TEXT NOT NULL, -- plaintext or encrypted json
 
   FOREIGN KEY(process_id) REFERENCES processes(id)

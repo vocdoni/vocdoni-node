@@ -257,7 +257,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
 			ID:         indxR.ProcessID,
 			Votes:      indexertypes.EncodeJSON(indxR.Votes),
-			Weight:     encodeBigint(indxR.Weight),
+			Weight:     indexertypes.EncodeJSON(indxR.Weight),
 			VoteOptsPb: encodedPb(indxR.VoteOpts),
 			EnvelopePb: encodedPb(indxR.EnvelopeType),
 		}); err != nil {
@@ -569,16 +569,4 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 		})
 	}
 	return tt, nil
-}
-
-// GetFriendlyResults translates votes into a matrix of strings
-func GetFriendlyResults(votes [][]*types.BigInt) [][]string {
-	r := [][]string{}
-	for i := range votes {
-		r = append(r, []string{})
-		for j := range votes[i] {
-			r[i] = append(r[i], encodeBigint(votes[i][j]))
-		}
-	}
-	return r
 }
