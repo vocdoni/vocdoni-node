@@ -2,7 +2,6 @@ package indexertypes
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/log"
@@ -86,7 +85,7 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
 		PublicKeys:         json.RawMessage(dbproc.PublicKeys),
 		VoteCount:          uint64(dbproc.VoteCount),
-		ResultsVotes:       decodeVotes(dbproc.ResultsVotes),
+		ResultsVotes:       decodeJSON[[][]*types.BigInt](dbproc.ResultsVotes),
 		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
 		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
@@ -111,19 +110,6 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	return proc
 }
 
-func decodeVotes(input string) [][]*types.BigInt {
-	// "a,b,c x,y,z ..."
-	var votes [][]*types.BigInt
-	for _, group := range strings.Split(input, " ") {
-		var element []*types.BigInt
-		for _, s := range strings.Split(group, ",") {
-			element = append(element, decodeBigint(s))
-		}
-		votes = append(votes, element)
-	}
-	return votes
-}
-
 func decodeBigint(s string) *types.BigInt {
 	if s == "" {
 		return nil
@@ -133,6 +119,15 @@ func decodeBigint(s string) *types.BigInt {
 		panic(err) // should never happen
 	}
 	return n
+}
+
+func decodeJSON[T any](s string) T {
+	var v T
+	err := json.Unmarshal([]byte(s), &v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return v
 }
 
 func nonEmptyBytes(p []byte) []byte {

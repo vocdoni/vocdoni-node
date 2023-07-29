@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -39,23 +38,6 @@ func encodedPb(msg proto.Message) types.EncodedProtoBuf {
 		panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
 	}
 	return nonNullBytes(enc)
-}
-
-func encodeVotes(votes [][]*types.BigInt) string {
-	// "a,b,c x,y,z ..."
-	var b strings.Builder
-	for i, row := range votes {
-		if i > 0 {
-			b.WriteByte(' ')
-		}
-		for j, n := range row {
-			if j > 0 {
-				b.WriteByte(',')
-			}
-			b.WriteString(encodeBigint(n))
-		}
-	}
-	return b.String()
 }
 
 func encodeBigint(n *types.BigInt) string {
@@ -226,7 +208,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      encodeJSON(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 
 	idx.blockMu.Lock()
