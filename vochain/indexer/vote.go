@@ -36,7 +36,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          []byte(voteRef.Package),
-		EncryptionKeyIndexes: decodeArrayJSON[uint32](voteRef.EncryptionKeyIndexes),
+		EncryptionKeyIndexes: decodeJSON[[]uint32](voteRef.EncryptionKeyIndexes),
 		Weight:               voteRef.Weight,
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime,
@@ -200,7 +200,7 @@ func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vo
 		Weight:               weightStr,
 		OverwriteCount:       int64(vote.Overwrites),
 		VoterID:              nonNullBytes(vote.VoterID),
-		EncryptionKeyIndexes: encodeArrayJSON(vote.EncryptionKeyIndexes),
+		EncryptionKeyIndexes: encodeJSON(vote.EncryptionKeyIndexes),
 		Package:              string(vote.VotePackage),
 	}); err != nil {
 		return err
@@ -208,7 +208,7 @@ func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vo
 	return nil
 }
 
-func encodeArrayJSON[T any](v []T) string {
+func encodeJSON[T any](v T) string {
 	p, err := json.Marshal(v)
 	if err != nil {
 		panic(err) // should not happen
@@ -216,8 +216,8 @@ func encodeArrayJSON[T any](v []T) string {
 	return string(p)
 }
 
-func decodeArrayJSON[T any](s string) []T {
-	var v []T
+func decodeJSON[T any](s string) T {
+	var v T
 	err := json.Unmarshal([]byte(s), &v)
 	if err != nil {
 		panic(err) // should not happen
