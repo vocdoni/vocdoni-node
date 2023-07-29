@@ -134,7 +134,11 @@ func (t *E2EDynamicensusElection) Run() error {
 				VoterAccount: acct,
 			})
 		}
-		t.elections[0].sendVotes(votes)
+		errs := t.elections[0].sendVotes(votes)
+		if len(errs) > 0 {
+			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
+			return
+		}
 
 		log.Infow("votes submitted successfully",
 			"n", len(t.elections[0].voterAccounts[1:]), "time", time.Since(startTime),
@@ -252,7 +256,11 @@ func (t *E2EDynamicensusElection) Run() error {
 				VoterAccount: acct,
 			})
 		}
-		t.elections[1].sendVotes(votes)
+		errs := t.elections[1].sendVotes(votes)
+		if len(errs) > 0 {
+			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
+			return
+		}
 
 		log.Infow("votes submitted successfully",
 			"n", len(t.elections[1].voterAccounts[1:]), "time", time.Since(startTime),

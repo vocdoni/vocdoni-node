@@ -71,7 +71,10 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 			VoterAccount: acct,
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", len(t.voterAccounts[1:]), "time", time.Since(startTime),
