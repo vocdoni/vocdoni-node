@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
@@ -36,7 +35,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          []byte(voteRef.Package),
-		EncryptionKeyIndexes: decodeJSON[[]uint32](voteRef.EncryptionKeyIndexes),
+		EncryptionKeyIndexes: indexertypes.DecodeJSON[[]uint32](voteRef.EncryptionKeyIndexes),
 		Weight:               voteRef.Weight,
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime,
@@ -114,7 +113,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	r := results.ProtoToResults(process.Results)
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:          processID,
-		Votes:       encodeJSON(r.Votes),
+		Votes:       indexertypes.EncodeJSON(r.Votes),
 		Weight:      encodeBigint(r.Weight),
 		BlockHeight: int64(r.BlockHeight),
 	}); err != nil {
@@ -200,29 +199,12 @@ func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vo
 		Weight:               weightStr,
 		OverwriteCount:       int64(vote.Overwrites),
 		VoterID:              nonNullBytes(vote.VoterID),
-		EncryptionKeyIndexes: encodeJSON(vote.EncryptionKeyIndexes),
+		EncryptionKeyIndexes: indexertypes.EncodeJSON(vote.EncryptionKeyIndexes),
 		Package:              string(vote.VotePackage),
 	}); err != nil {
 		return err
 	}
 	return nil
-}
-
-func encodeJSON[T any](v T) string {
-	p, err := json.Marshal(v)
-	if err != nil {
-		panic(err) // should not happen
-	}
-	return string(p)
-}
-
-func decodeJSON[T any](s string) T {
-	var v T
-	err := json.Unmarshal([]byte(s), &v)
-	if err != nil {
-		panic(err) // should not happen
-	}
-	return v
 }
 
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
@@ -273,7 +255,7 @@ func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partia
 
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:          pid,
-		Votes:       encodeJSON(results.Votes),
+		Votes:       indexertypes.EncodeJSON(results.Votes),
 		Weight:      encodeBigint(results.Weight),
 		BlockHeight: int64(results.BlockHeight),
 	}); err != nil {

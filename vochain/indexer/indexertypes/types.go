@@ -85,7 +85,7 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
 		PublicKeys:         json.RawMessage(dbproc.PublicKeys),
 		VoteCount:          uint64(dbproc.VoteCount),
-		ResultsVotes:       decodeJSON[[][]*types.BigInt](dbproc.ResultsVotes),
+		ResultsVotes:       DecodeJSON[[][]*types.BigInt](dbproc.ResultsVotes),
 		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
 		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
@@ -121,7 +121,15 @@ func decodeBigint(s string) *types.BigInt {
 	return n
 }
 
-func decodeJSON[T any](s string) T {
+func EncodeJSON[T any](v T) string {
+	p, err := json.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return string(p)
+}
+
+func DecodeJSON[T any](s string) T {
 	var v T
 	err := json.Unmarshal([]byte(s), &v)
 	if err != nil {
@@ -135,11 +143,6 @@ func nonEmptyBytes(p []byte) []byte {
 		return nil
 	}
 	return p
-}
-
-func (p Process) String() string {
-	b, _ := json.Marshal(p)
-	return string(b)
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
