@@ -37,9 +37,9 @@ type Process struct {
 	CensusOrigin       int64
 	Status             int64
 	Namespace          int64
-	EnvelopePb         types.EncodedProtoBuf
-	ModePb             types.EncodedProtoBuf
-	VoteOptsPb         types.EncodedProtoBuf
+	Envelope           string
+	Mode               string
+	VoteOpts           string
 	PrivateKeys        string
 	PublicKeys         string
 	QuestionIndex      int64

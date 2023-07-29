@@ -8,10 +8,8 @@ import (
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -31,14 +29,6 @@ func nonNullBytes(p []byte) []byte {
 }
 
 // TODO(mvdan): funcs to safely convert integers
-
-func encodedPb(msg proto.Message) types.EncodedProtoBuf {
-	enc, err := proto.Marshal(msg)
-	if err != nil {
-		panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
-	}
-	return nonNullBytes(enc)
-}
 
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
@@ -188,9 +178,9 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		CensusOrigin:      int64(p.CensusOrigin),
 		Status:            int64(p.Status),
 		Namespace:         int64(p.Namespace),
-		EnvelopePb:        encodedPb(p.EnvelopeType),
-		ModePb:            encodedPb(p.Mode),
-		VoteOptsPb:        encodedPb(p.VoteOptions),
+		Envelope:          indexertypes.EncodeProtoJSON(p.EnvelopeType),
+		Mode:              indexertypes.EncodeProtoJSON(p.Mode),
+		VoteOpts:          indexertypes.EncodeProtoJSON(p.VoteOptions),
 		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
 		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		CreationTime:      currentBlockTime,

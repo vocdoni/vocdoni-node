@@ -8,8 +8,8 @@ CREATE TABLE processes (
 
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
-  results_votes           TEXT NOT NULL, -- bigint matrix like "a,b,c x,y,z ..."
-  results_weight          TEXT NOT NULL, -- bigint
+  results_votes           TEXT NOT NULL, -- json integer-string matrix, e.g. [["3", "4"]]
+  results_weight          TEXT NOT NULL, -- json integer-string, e.g. "3"
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,
@@ -22,12 +22,10 @@ CREATE TABLE processes (
   status              INTEGER NOT NULL,
   namespace           INTEGER NOT NULL,
 
-  -- TODO: don't store protobuf
-  envelope_pb  BLOB NOT NULL,
-  mode_pb      BLOB NOT NULL,
-  vote_opts_pb BLOB NOT NULL,
+  envelope  TEXT NOT NULL, -- json object
+  mode      TEXT NOT NULL, -- json object
+  vote_opts TEXT NOT NULL, -- json object
 
-  -- TODO: store as a proper list
   private_keys TEXT NOT NULL, -- json array
   public_keys  TEXT NOT NULL, -- json array
 
