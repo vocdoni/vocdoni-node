@@ -9,6 +9,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -31,7 +32,7 @@ type Process struct {
 	Envelope          *models.EnvelopeType       `json:"envelopeType"`
 	Mode              *models.ProcessMode        `json:"processMode"`
 	VoteOpts          *models.ProcessVoteOptions `json:"voteOptions"`
-	QuestionIndex     uint32                     `json:"questionIndex"`
+	QuestionIndex     uint32                     `json:"questionIndex"` // TODO: unset?
 	CreationTime      time.Time                  `json:"creationTime"`
 	HaveResults       bool                       `json:"haveResults"`
 	FinalResults      bool                       `json:"finalResults"`
@@ -78,6 +79,9 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		CensusOrigin:      int32(dbproc.CensusOrigin),
 		Status:            int32(dbproc.Status),
 		Namespace:         uint32(dbproc.Namespace),
+		Envelope:          DecodeProtoJSON(new(models.EnvelopeType), dbproc.Envelope),
+		Mode:              DecodeProtoJSON(new(models.ProcessMode), dbproc.Mode),
+		VoteOpts:          DecodeProtoJSON(new(models.ProcessVoteOptions), dbproc.VoteOpts),
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
@@ -95,22 +99,10 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	} else {
 		proc.SourceNetworkId = models.SourceNetworkId(dbproc.SourceNetworkID).String()
 	}
-	proc.Envelope = new(models.EnvelopeType)
-	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
-		log.Error(err)
-	}
-	proc.Mode = new(models.ProcessMode)
-	if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
-		log.Error(err)
-	}
-	proc.VoteOpts = new(models.ProcessVoteOptions)
-	if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
-		log.Error(err)
-	}
 	return proc
 }
 
-func EncodeJSON[T any](v T) string {
+func EncodeJSON(v any) string {
 	p, err := json.Marshal(v)
 	if err != nil {
 		panic(err) // should not happen
@@ -125,6 +117,25 @@ func DecodeJSON[T any](s string) T {
 		panic(err) // should not happen
 	}
 	return v
+}
+
+func EncodeProtoJSON(v proto.Message) string {
+	p, err := protojson.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return string(p)
+}
+
+func DecodeProtoJSON[T proto.Message](newT T, s string) T {
+	// Note how proto.Message implementations are pointer types,
+	// so we can't use new(T) here as that would give us a double pointer.
+	// We can't "dereference" a type, so the caller has to pass us a new(T) value.
+	err := protojson.Unmarshal([]byte(s), newT)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return newT
 }
 
 func nonEmptyBytes(p []byte) []byte {

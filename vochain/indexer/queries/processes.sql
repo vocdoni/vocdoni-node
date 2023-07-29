@@ -5,7 +5,7 @@ INSERT INTO processes (
 	census_root, rolling_census_root, rolling_census_size,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
-	envelope_pb, mode_pb, vote_opts_pb,
+	envelope, mode, vote_opts,
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
@@ -107,8 +107,8 @@ WHERE final_results = ?;
 UPDATE processes
 SET results_votes  = sqlc.arg(votes),
     results_weight = sqlc.arg(weight),
-    vote_opts_pb = sqlc.arg(vote_opts_pb),
-    envelope_pb = sqlc.arg(envelope_pb)
+    vote_opts = sqlc.arg(vote_opts),
+    envelope = sqlc.arg(envelope)
 WHERE id = sqlc.arg(id);
 
 -- name: UpdateProcessEndBlock :execresult

@@ -255,11 +255,11 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		}
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
-			ID:         indxR.ProcessID,
-			Votes:      indexertypes.EncodeJSON(indxR.Votes),
-			Weight:     indexertypes.EncodeJSON(indxR.Weight),
-			VoteOptsPb: encodedPb(indxR.VoteOpts),
-			EnvelopePb: encodedPb(indxR.EnvelopeType),
+			ID:       indxR.ProcessID,
+			Votes:    indexertypes.EncodeJSON(indxR.Votes),
+			Weight:   indexertypes.EncodeJSON(indxR.Weight),
+			VoteOpts: indexertypes.EncodeProtoJSON(indxR.VoteOpts),
+			Envelope: indexertypes.EncodeProtoJSON(indxR.EnvelopeType),
 		}); err != nil {
 			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
