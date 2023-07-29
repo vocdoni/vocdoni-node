@@ -202,13 +202,13 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		EnvelopePb:        encodedPb(p.EnvelopeType),
 		ModePb:            encodedPb(p.Mode),
 		VoteOptsPb:        encodedPb(p.VoteOptions),
-		PrivateKeys:       encodeJSON(p.EncryptionPrivateKeys),
-		PublicKeys:        encodeJSON(p.EncryptionPublicKeys),
+		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-		ResultsVotes:      encodeJSON(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 
 	idx.blockMu.Lock()
@@ -240,8 +240,8 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		CensusUri:         p.GetCensusURI(),
-		PrivateKeys:       encodeJSON(p.EncryptionPrivateKeys),
-		PublicKeys:        encodeJSON(p.EncryptionPublicKeys),
+		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		Metadata:          p.GetMetadata(),
 		Status:            int64(p.Status),
 	}); err != nil {
