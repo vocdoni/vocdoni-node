@@ -139,7 +139,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 //	@Param			privateKey	path		string	true	"Private key to add"
 //	@Success		200			{object}	object{token=string,address=string}
 //	@Router			/wallet/add/{privateKey} [post]
-func (a *API) walletAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) walletAddHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check private key format is correct and transorm it to wallet and bytes
 	wallet := ethereum.SignKeys{}
 	if err := wallet.AddHexKey(ctx.URLParam("privateKey")); err != nil {

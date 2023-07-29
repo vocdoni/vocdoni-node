@@ -33,6 +33,7 @@ type ElectionSummary struct {
 	VoteCount      uint64            `json:"voteCount"`
 	FinalResults   bool              `json:"finalResults"`
 	Results        [][]*types.BigInt `json:"result,omitempty"`
+	ManuallyEnded  bool              `json:"manuallyEnded"`
 }
 
 // ElectionResults is the struct used to wrap the results of an election

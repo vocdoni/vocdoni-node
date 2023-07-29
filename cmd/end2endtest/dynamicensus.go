@@ -71,7 +71,7 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 	return nil
 }
 
-func (t *E2EDynamicensusElection) Teardown() error {
+func (*E2EDynamicensusElection) Teardown() error {
 	// nothing to do here
 	return nil
 }

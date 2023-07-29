@@ -22,6 +22,7 @@ type Process struct {
 	EntityID           types.EntityID
 	StartBlock         int64
 	EndBlock           int64
+	BlockCount         int64
 	HaveResults        bool
 	FinalResults       bool
 	ResultsVotes       string

@@ -189,7 +189,7 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string, txindex int32) {
+func (k *KeyKeeper) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -221,7 +221,7 @@ func (k *KeyKeeper) OnProcess(pid, eid []byte, censusRoot, censusURI string, txi
 }
 
 // OnCancel will publish the private and reveal keys of the canceled process, if required
-func (k *KeyKeeper) OnCancel(pid []byte, txindex int32) { // LEGACY
+func (k *KeyKeeper) OnCancel(pid []byte, _ int32) { // LEGACY
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -246,22 +246,22 @@ func (k *KeyKeeper) Commit(height uint32) error {
 }
 
 // OnVote is not used by the KeyKeeper
-func (k *KeyKeeper) OnVote(v *state.Vote, txindex int32) {
+func (*KeyKeeper) OnVote(_ *state.Vote, _ int32) {
 	// do nothing
 }
 
 // OnNewTx is not used by the KeyKeeper
-func (k *KeyKeeper) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {
+func (*KeyKeeper) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32) {
 	// do nothing
 }
 
-func (k *KeyKeeper) OnBeginBlock(state.BeginBlock) {
+func (*KeyKeeper) OnBeginBlock(state.BeginBlock) {
 	// do nothing
 }
 
 // OnProcessStatusChange will publish the private
 // keys of the ended process, if required
-func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, txindex int32) {
+func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatus, _ int32) {
 	p, err := k.vochain.State.Process(pid, false)
 	if err != nil {
 		log.Errorf("cannot get process from state: (%s)", err)
@@ -278,7 +278,7 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 	}
 }
 
-func (k *KeyKeeper) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {}
+func (*KeyKeeper) OnCensusUpdate(_, _ []byte, _ string) {}
 
 // Generate Keys generates a set of encryption/commitment keys for a process.
 // Encryption private key = hash(signer.privKey + processId + keyIndex).
@@ -492,19 +492,19 @@ func (k *KeyKeeper) signAndSendTx(tx *models.AdminTx) error {
 }
 
 // OnProcessKeys does nothing
-func (k *KeyKeeper) OnProcessKeys(pid []byte, pub string, txindex int32) {}
+func (*KeyKeeper) OnProcessKeys(_ []byte, _ string, _ int32) {}
 
 // OnRevealKeys does nothing
-func (k *KeyKeeper) OnRevealKeys(pid []byte, priv string, txindex int32) {}
+func (*KeyKeeper) OnRevealKeys(_ []byte, _ string, _ int32) {}
 
 // OnProcessResults does nothing
-func (k *KeyKeeper) OnProcessResults(pid []byte, results *models.ProcessResult, txindex int32) {}
+func (*KeyKeeper) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32) {}
 
 // OnProcessesStart does nothing
-func (k *KeyKeeper) OnProcessesStart(pids [][]byte) {}
+func (*KeyKeeper) OnProcessesStart(_ [][]byte) {}
 
 // OnSetAccount does nothing
-func (k *KeyKeeper) OnSetAccount(addr []byte, account *state.Account) {}
+func (*KeyKeeper) OnSetAccount(_ []byte, _ *state.Account) {}
 
 // OnTransferTokens does nothing
-func (k *KeyKeeper) OnTransferTokens(tx *vochaintx.TokenTransfer) {}
+func (*KeyKeeper) OnTransferTokens(_ *vochaintx.TokenTransfer) {}

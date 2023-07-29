@@ -40,7 +40,10 @@ import (
 //	@tag.name			Wallet
 //	@tag.description	Operations for the wallets managed backend side
 
-//	@BasePath					https://api-dev.vocdoni.net/v2/
+//	@schemes	https
+//	@host		api-dev.vocdoni.net
+//	@BasePath	/v2
+
 //	@securityDefinitions.basic	BasicAuth
 
 // MaxPageSize defines the maximum number of results returned by the paginated endpoints

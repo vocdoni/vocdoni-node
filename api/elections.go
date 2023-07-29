@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
-	"errors" // required for evm encoding
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -125,7 +125,7 @@ func (a *API) enableElectionHandlers() error {
 //	@Param			page	path		number	true	"Page "
 //	@Success		200		{object}	ElectionSummary
 //	@Router			/elections/page/{page} [get]
-func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
 	if ctx.URLParam("page") != "" {
 		var err error
@@ -145,15 +145,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		if err != nil {
 			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
-		list = append(list, ElectionSummary{
-			ElectionID:     eid,
-			OrganizationID: e.EntityID,
-			Status:         models.ProcessStatus_name[e.Status],
-			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults:   e.FinalResults,
-			VoteCount:      e.VoteCount,
-		})
+		list = append(list, a.electionSummary(e))
 	}
 	// wrap list in a struct to consistently return list in a object, return empty
 	// object if the list does not contains any result
@@ -176,7 +168,7 @@ func (a *API) electionFullListHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	Election
 //	@Router			/elections/{electionID} [get]
-func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -190,20 +182,12 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	}
 
 	election := Election{
-		ElectionSummary: ElectionSummary{
-			ElectionID:     electionID,
-			OrganizationID: proc.EntityID,
-			Status:         strings.ToLower(models.ProcessStatus_name[proc.Status]),
-			StartDate:      a.vocinfo.HeightTime(int64(proc.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(proc.EndBlock)),
-			FinalResults:   proc.FinalResults,
-			VoteCount:      proc.VoteCount,
-		},
-		MetadataURL:  proc.Metadata,
-		CreationTime: proc.CreationTime,
-		VoteMode:     VoteMode{EnvelopeType: proc.Envelope},
-		ElectionMode: ElectionMode{ProcessMode: proc.Mode},
-		TallyMode:    TallyMode{ProcessVoteOptions: proc.VoteOpts},
+		ElectionSummary: a.electionSummary(proc),
+		MetadataURL:     proc.Metadata,
+		CreationTime:    proc.CreationTime,
+		VoteMode:        VoteMode{EnvelopeType: proc.Envelope},
+		ElectionMode:    ElectionMode{ProcessMode: proc.Mode},
+		TallyMode:       TallyMode{ProcessVoteOptions: proc.VoteOpts},
 		Census: &ElectionCensus{
 			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
 			CensusRoot:             proc.CensusRoot,
@@ -250,7 +234,7 @@ func (a *API) electionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	object{count=number}
 //	@Router			/elections/{electionID}/votes/count [get]
-func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -288,7 +272,7 @@ func (a *API) electionVotesCountHandler(msg *apirest.APIdata, ctx *httprouter.HT
 //	@Param			electionID	path		string	true	"Election id"
 //	@Success		200			{object}	ElectionKeys
 //	@Router			/elections/{electionID}/keys [get]
-func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -340,7 +324,7 @@ func (a *API) electionKeysHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Param			page		path		number	true	"Page "
 //	@Success		200			{object}	Vote
 //	@Router			/elections/{electionID}/votes/page/{page} [get]
-func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionVotesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -394,7 +378,7 @@ func (a *API) electionVotesHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Param					electionID	path		string	true	"Election id"
 //	@Success				200			{object}	ElectionResults
 //	@Router					/elections/{electionID}/scrutiny [get]
-func (a *API) electionScrutinyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionScrutinyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
 	if err != nil || electionID == nil {
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
@@ -549,7 +533,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Param			transaction	body		object{payload=string}	true	"File bytes base64 encoded"
 //	@Success		200			{object}	File
 //	@Router			/files/cid [post]
-func (a *API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (*API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(msg.Data) > MaxOffchainFileSize {
 		return ErrFileSizeTooBig.Withf("%d vs %d bytes", len(msg.Data), MaxOffchainFileSize)
 	}
@@ -672,15 +656,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		if err != nil {
 			return ErrCantFetchElection.WithErr(err)
 		}
-		list = append(list, ElectionSummary{
-			OrganizationID: e.EntityID,
-			ElectionID:     eid,
-			Status:         models.ProcessStatus_name[e.Status],
-			StartDate:      a.vocinfo.HeightTime(int64(e.StartBlock)),
-			EndDate:        a.vocinfo.HeightTime(int64(e.EndBlock)),
-			FinalResults:   e.FinalResults,
-			VoteCount:      e.VoteCount,
-		})
+		list = append(list, a.electionSummary(e))
 	}
 	data, err := json.Marshal(struct {
 		Elections []ElectionSummary `json:"elections"`

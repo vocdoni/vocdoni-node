@@ -196,7 +196,7 @@ func newVochain(chain, dataDir string) *vochain.BaseApplication {
 	return vochain.NewVochain(cfg, genesisBytes)
 }
 
-func listBlockVotes(height int64, blockStoreDir string) {
+func listBlockVotes(_ int64, _ string) {
 	// TODO: reimplement this? @altergui dropped this during tendermint v0.34 -> v0.35 bump
 	// since store package was not found, possibly renamed or whatever but didn't look into it
 	log.Fatal("listBlockVotes is not yet implemented since tendermint v0.35")

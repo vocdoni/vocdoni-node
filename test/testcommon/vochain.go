@@ -2,12 +2,13 @@ package testcommon
 
 import (
 	"encoding/base64"
-	secp "github.com/cometbft/cometbft/crypto/secp256k1"
-	"github.com/cometbft/cometbft/privval"
-	"google.golang.org/protobuf/proto"
 	"math/rand"
 	"strconv"
 	"testing"
+
+	secp "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/privval"
+	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"

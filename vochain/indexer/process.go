@@ -191,6 +191,11 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	// Get the block time from the Header
 	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
 
+	// If startBlock is zero, then we use the current block height (zero means start right now)
+	if p.StartBlock == 0 {
+		p.StartBlock = idx.App.Height()
+	}
+
 	compResultsHeight := uint32(0)
 	if !p.EnvelopeType.EncryptedVotes { // like isOpenProcess, but on the state type
 		compResultsHeight = p.BlockCount + p.StartBlock + 1
@@ -202,6 +207,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		EntityID:          nonNullBytes(eid),
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
+		BlockCount:        int64(p.BlockCount),
 		HaveResults:       compResultsHeight > 0,
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
@@ -244,9 +250,10 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	if err != nil {
 		return err
 	}
+
+	// Update the process in the indexer database
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
 		ID:                pid,
-		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
@@ -257,6 +264,17 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		Status:            int64(p.Status),
 	}); err != nil {
 		return err
+	}
+
+	// If the process is in ENDED status, and it was not in ENDED status before, then update the end block
+	if p.Status == models.ProcessStatus_ENDED &&
+		models.ProcessStatus(previousStatus) != models.ProcessStatus_ENDED {
+		if _, err := queries.UpdateProcessEndBlock(ctx, indexerdb.UpdateProcessEndBlockParams{
+			ID:       pid,
+			EndBlock: int64(idx.App.Height()),
+		}); err != nil {
+			return err
+		}
 	}
 
 	// If the process is in RESULTS status, and it was not in RESULTS status before, then finalize the results

@@ -45,17 +45,17 @@ type HashFunction interface {
 type HashSha256 struct{}
 
 // Type returns the type of HashFunction for the HashSha256
-func (f HashSha256) Type() []byte {
+func (HashSha256) Type() []byte {
 	return TypeHashSha256
 }
 
 // Len returns the length of the Hash output
-func (f HashSha256) Len() int {
+func (HashSha256) Len() int {
 	return 32
 }
 
 // Hash implements the hash method for the HashFunction HashSha256
-func (f HashSha256) Hash(b ...[]byte) ([]byte, error) {
+func (HashSha256) Hash(b ...[]byte) ([]byte, error) {
 	var toHash []byte
 	for i := 0; i < len(b); i++ {
 		toHash = append(toHash, b[i]...)
@@ -68,12 +68,12 @@ func (f HashSha256) Hash(b ...[]byte) ([]byte, error) {
 type HashPoseidon struct{}
 
 // Type returns the type of HashFunction for the HashPoseidon
-func (f HashPoseidon) Type() []byte {
+func (HashPoseidon) Type() []byte {
 	return TypeHashPoseidon
 }
 
 // Len returns the length of the Hash output
-func (f HashPoseidon) Len() int {
+func (HashPoseidon) Len() int {
 	return 32
 }
 
@@ -98,17 +98,17 @@ func (f HashPoseidon) Hash(b ...[]byte) ([]byte, error) {
 type HashBlake2b struct{}
 
 // Type returns the type of HashFunction for the HashBlake2b
-func (f HashBlake2b) Type() []byte {
+func (HashBlake2b) Type() []byte {
 	return TypeHashBlake2b
 }
 
 // Len returns the length of the Hash output
-func (f HashBlake2b) Len() int {
+func (HashBlake2b) Len() int {
 	return 32
 }
 
 // Hash implements the hash method for the HashFunction HashBlake2b
-func (f HashBlake2b) Hash(b ...[]byte) ([]byte, error) {
+func (HashBlake2b) Hash(b ...[]byte) ([]byte, error) {
 	hasher, err := blake2b.New256(nil)
 	if err != nil {
 		return nil, err

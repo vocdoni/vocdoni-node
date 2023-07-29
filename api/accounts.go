@@ -98,7 +98,7 @@ func (a *API) enableAccountHandlers() error {
 //	@Param			address	path		string	true	"Account address"
 //	@Success		200		{object}	Account
 //	@Router			/accounts/{address} [get]
-func (a *API) accountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return ErrAddressMalformed
 	}
@@ -244,7 +244,7 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Produce		json
 //	@Success		200	{object}	object{address=string}
 //	@Router			/accounts/treasurer [get]
-func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) treasurerHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	acc, err := a.vocapp.State.Treasurer(true)
 	if err != nil {
 		return err
@@ -274,7 +274,7 @@ func (a *API) treasurerHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Success		200				{object}	object{elections=[]ElectionSummary}
 //	@Router			/accounts/{organizationID}/elections/page/{page} [get]
 //	/accounts/{organizationID}/elections/status/{status}/page/{page} [post] Endpoint docs generated on docs/models/model.go
-func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return ErrCantParseOrgID.Withf("%q", ctx.URLParam("organizationID"))
@@ -325,9 +325,14 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return ErrParamStatusMissing
 	}
 
-	elections, err := a.electionSummaryList(pids...)
-	if err != nil {
-		return err
+	elections := []*ElectionSummary{}
+	for _, pid := range pids {
+		procInfo, err := a.indexer.ProcessInfo(pid)
+		if err != nil {
+			return ErrCantFetchElection.WithErr(err)
+		}
+		summary := a.electionSummary(procInfo)
+		elections = append(elections, &summary)
 	}
 	data, err := json.Marshal(&Organization{
 		Elections: elections,
@@ -348,7 +353,7 @@ func (a *API) electionListHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Param			organizationID	path		string	true	"Specific organizationID"
 //	@Success		200				{object}	object{count=number}
 //	@Router			/accounts/{organizationID}/elections/count [get]
-func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) electionCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
 	if err != nil || organizationID == nil {
 		return ErrCantParseOrgID.Withf("%q", ctx.URLParam("organizationID"))
@@ -382,7 +387,7 @@ func (a *API) electionCountHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Param			page		path		string	true	"Paginator page"
 //	@Success		200			{object}	object{transfers=[]indexertypes.TokenTransferMeta}
 //	@Router			/accounts/{accountID}/transfers/page/{page} [get]
-func (a *API) tokenTransfersHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) tokenTransfersHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
 	if err != nil || accountID == nil {
 		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))

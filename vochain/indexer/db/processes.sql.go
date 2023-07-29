@@ -15,7 +15,7 @@ import (
 
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, start_block, end_block,
+	id, entity_id, start_block, end_block, block_count,
 	have_results, final_results,
 	census_root, rolling_census_root, rolling_census_size,
 	max_census_size, census_uri, metadata,
@@ -27,7 +27,7 @@ INSERT INTO processes (
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
-	?, ?, ?, ?,
+	?, ?, ?, ?, ?,
 	?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -46,6 +46,7 @@ type CreateProcessParams struct {
 	EntityID          types.EntityID
 	StartBlock        int64
 	EndBlock          int64
+	BlockCount        int64
 	HaveResults       bool
 	FinalResults      bool
 	CensusRoot        types.CensusRoot
@@ -75,6 +76,7 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.EntityID,
 		arg.StartBlock,
 		arg.EndBlock,
+		arg.BlockCount,
 		arg.HaveResults,
 		arg.FinalResults,
 		arg.CensusRoot,
@@ -111,7 +113,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT p.id, p.entity_id, p.start_block, p.end_block, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope_pb, p.mode_pb, p.vote_opts_pb, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
+SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope_pb, p.mode_pb, p.vote_opts_pb, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
 LEFT JOIN votes AS v
 	ON p.id = v.process_id
 WHERE p.id = ?
@@ -124,6 +126,7 @@ type GetProcessRow struct {
 	EntityID           types.EntityID
 	StartBlock         int64
 	EndBlock           int64
+	BlockCount         int64
 	HaveResults        bool
 	FinalResults       bool
 	ResultsVotes       string
@@ -158,6 +161,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProces
 		&i.EntityID,
 		&i.StartBlock,
 		&i.EndBlock,
+		&i.BlockCount,
 		&i.HaveResults,
 		&i.FinalResults,
 		&i.ResultsVotes,
@@ -375,24 +379,37 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 	)
 }
 
+const updateProcessEndBlock = `-- name: UpdateProcessEndBlock :execresult
+UPDATE processes
+SET end_block  = ?1
+WHERE id = ?2
+`
+
+type UpdateProcessEndBlockParams struct {
+	EndBlock int64
+	ID       types.ProcessID
+}
+
+func (q *Queries) UpdateProcessEndBlock(ctx context.Context, arg UpdateProcessEndBlockParams) (sql.Result, error) {
+	return q.db.ExecContext(ctx, updateProcessEndBlock, arg.EndBlock, arg.ID)
+}
+
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
 ;
 
 UPDATE processes
-SET end_block           = ?1,
-	census_root         = ?2,
-	rolling_census_root = ?3,
-	census_uri          = ?4,
-	private_keys        = ?5,
-	public_keys         = ?6,
-	metadata            = ?7,
-	rolling_census_size = ?8,
-	status              = ?9
-WHERE id = ?10
+SET census_root         = ?1,
+	rolling_census_root = ?2,
+	census_uri          = ?3,
+	private_keys        = ?4,
+	public_keys         = ?5,
+	metadata            = ?6,
+	rolling_census_size = ?7,
+	status              = ?8
+WHERE id = ?9
 `
 
 type UpdateProcessFromStateParams struct {
-	EndBlock          int64
 	CensusRoot        types.CensusRoot
 	RollingCensusRoot types.CensusRoot
 	CensusUri         string
@@ -406,7 +423,6 @@ type UpdateProcessFromStateParams struct {
 
 func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessFromStateParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateProcessFromState,
-		arg.EndBlock,
 		arg.CensusRoot,
 		arg.RollingCensusRoot,
 		arg.CensusUri,

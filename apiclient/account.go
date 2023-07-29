@@ -220,7 +220,7 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 }
 
 // GetTransfers returns the list of token transfers associated with an account
-func (c *HTTPclient) GetTransfers(from common.Address, page, pageSize int) ([]*indexertypes.TokenTransferMeta, error) {
+func (c *HTTPclient) GetTransfers(from common.Address, page int) ([]*indexertypes.TokenTransferMeta, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "accounts", from.Hex(), "transfers", "page", strconv.Itoa(page))
 	if err != nil {
 		return nil, err

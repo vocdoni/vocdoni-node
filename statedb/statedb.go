@@ -352,25 +352,25 @@ var ErrReadOnly = errors.New("read only")
 var ErrEmptyTree = errors.New("empty tree")
 
 // Set implements db.WriteTx.Set but returns error always.
-func (t *readOnlyWriteTx) Set(key []byte, value []byte) error {
+func (*readOnlyWriteTx) Set(_ []byte, _ []byte) error {
 	return ErrReadOnly
 }
 
 // Set implements db.WriteTx.Delete but returns error always.
-func (t *readOnlyWriteTx) Delete(key []byte) error {
+func (*readOnlyWriteTx) Delete(_ []byte) error {
 	return ErrReadOnly
 }
 
 // Apply implements db.WriteTx.Apply but returns error always.
-func (t *readOnlyWriteTx) Apply(w db.WriteTx) error {
+func (*readOnlyWriteTx) Apply(_ db.WriteTx) error {
 	return ErrReadOnly
 }
 
 // Commit implements db.WriteTx.Commit but returns nil always.
-func (t *readOnlyWriteTx) Commit() error { return nil }
+func (*readOnlyWriteTx) Commit() error { return nil }
 
 // Commit implements db.WriteTx.Discard as a no-op.
-func (t *readOnlyWriteTx) Discard() {}
+func (*readOnlyWriteTx) Discard() {}
 
 // TreeView returns the mainTree opened at root as a TreeView for read-only.
 // If root is nil, the last version's root is used.

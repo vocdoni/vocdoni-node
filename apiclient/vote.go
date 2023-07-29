@@ -257,7 +257,7 @@ func (c *HTTPclient) voteEnvelopeWithKeys(choices []int, keysEnc []api.Key, elec
 // prepareVotePackageBytes returns a plaintext json.Marshal(vp) if keys is nil,
 // else assigns a random hex string to vp.Nonce
 // and encrypts the vp bytes for each given key as recipient
-func (c *HTTPclient) prepareVotePackageBytes(vp *state.VotePackage, keys []types.HexBytes) ([]byte, error) {
+func (*HTTPclient) prepareVotePackageBytes(vp *state.VotePackage, keys []types.HexBytes) ([]byte, error) {
 	if len(keys) > 0 {
 		vp.Nonce = fmt.Sprintf("%x", util.RandomHex(32))
 	}

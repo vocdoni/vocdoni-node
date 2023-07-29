@@ -132,7 +132,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 // ensuring that Commit is never called twice for the same block height.
 //
 // We use this method to initialize some state variables.
-func (app *BaseApplication) Info(ctx context.Context,
+func (app *BaseApplication) Info(_ context.Context,
 	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
@@ -160,7 +160,7 @@ func (app *BaseApplication) Info(ctx context.Context,
 // InitChain called once upon genesis
 // ResponseInitChain can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
-func (app *BaseApplication) InitChain(ctx context.Context,
+func (app *BaseApplication) InitChain(_ context.Context,
 	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
@@ -259,7 +259,7 @@ func (app *BaseApplication) InitChain(ctx context.Context,
 }
 
 // CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(ctx context.Context,
+func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		if app.Height()%recheckTxHeightInterval != 0 {
@@ -291,7 +291,7 @@ func (app *BaseApplication) CheckTx(ctx context.Context,
 // Cryptographic commitments to the block and transaction results, returned via the corresponding
 // parameters in ResponseFinalizeBlock, are included in the header of the next block.
 // CometBFT calls it when a new block is decided.
-func (app *BaseApplication) FinalizeBlock(ctx context.Context,
+func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	height := uint32(req.GetHeight())
 	app.beginBlock(req.GetTime(), height)
@@ -323,7 +323,7 @@ func (app *BaseApplication) FinalizeBlock(ctx context.Context,
 }
 
 // Commit saves the current vochain state and returns a commit hash
-func (app *BaseApplication) Commit(ctx context.Context, req *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
 	// save state
 	_, err := app.State.Save()
 	if err != nil {
@@ -403,7 +403,7 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 }
 
 // endBlock is called at the end of every block.
-func (app *BaseApplication) endBlock(t time.Time, height uint32) {
+func (app *BaseApplication) endBlock(t time.Time, _ uint32) {
 	app.endBlockTimestamp.Store(t.Unix())
 }
 
@@ -462,8 +462,8 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 }
 
 // Query does nothing
-func (app *BaseApplication) Query(ctx context.Context,
-	req *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
+func (*BaseApplication) Query(_ context.Context,
+	_ *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
 	return &abcitypes.ResponseQuery{}, nil
 }
 
@@ -510,45 +510,45 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
-func (app *BaseApplication) ProcessProposal(ctx context.Context,
-	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+func (*BaseApplication) ProcessProposal(_ context.Context,
+	_ *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
 	}, nil
 }
 
 // ListSnapshots returns a list of available snapshots.
-func (app *BaseApplication) ListSnapshots(context.Context,
+func (*BaseApplication) ListSnapshots(context.Context,
 	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
 	return &abcitypes.ResponseListSnapshots{}, nil
 }
 
 // OfferSnapshot returns the response to a snapshot offer.
-func (app *BaseApplication) OfferSnapshot(context.Context,
+func (*BaseApplication) OfferSnapshot(context.Context,
 	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
 	return &abcitypes.ResponseOfferSnapshot{}, nil
 }
 
 // LoadSnapshotChunk returns the response to a snapshot chunk loading request.
-func (app *BaseApplication) LoadSnapshotChunk(context.Context,
+func (*BaseApplication) LoadSnapshotChunk(context.Context,
 	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
 	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
 }
 
 // ApplySnapshotChunk returns the response to a snapshot chunk applying request.
-func (app *BaseApplication) ApplySnapshotChunk(context.Context,
+func (*BaseApplication) ApplySnapshotChunk(context.Context,
 	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
 	return &abcitypes.ResponseApplySnapshotChunk{}, nil
 }
 
 // ExtendVote creates application specific vote extension
-func (app *BaseApplication) ExtendVote(context.Context,
+func (*BaseApplication) ExtendVote(context.Context,
 	*abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
 	return &abcitypes.ResponseExtendVote{}, nil
 }
 
 // VerifyVoteExtension verifies application's vote extension data
-func (app *BaseApplication) VerifyVoteExtension(context.Context,
+func (*BaseApplication) VerifyVoteExtension(context.Context,
 	*abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
 	return &abcitypes.ResponseVerifyVoteExtension{}, nil
 }
@@ -589,6 +589,9 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
+	if app.Service == nil {
+		return true
+	}
 	return app.Service.(*node.Node).ConsensusReactor().WaitSync()
 }
 

@@ -196,7 +196,7 @@ func (s *State) AddVote(vote *Vote) error {
 // NOTE(Edu): Changed this from byte(processID+nullifier) to
 // hash(processID+nullifier) to allow using it as a key in Arbo tree.
 // voteID = hash(processID+nullifier)
-func (s *State) voteID(pid, nullifier []byte) ([]byte, error) {
+func (*State) voteID(pid, nullifier []byte) ([]byte, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("wrong processID size %d", len(pid))
 	}

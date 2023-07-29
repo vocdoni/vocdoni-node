@@ -79,9 +79,9 @@ func VerifyProof(process *models.Process, proof *models.Proof, vID state.VoterID
 
 // VerifyProofOffChainTree verifies a proof with census origin OFF_CHAIN_TREE.
 // Returns verification result and weight.
-func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
-	censusOrigin models.CensusOrigin,
-	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
+func VerifyProofOffChainTree(_ *models.Process, proof *models.Proof,
+	_ models.CensusOrigin,
+	censusRoot, _ []byte, vID state.VoterID) (bool, *big.Int, error) {
 	switch proof.Payload.(type) {
 	case *models.Proof_Arbo:
 		p := proof.GetArbo()
@@ -140,8 +140,8 @@ func VerifyProofOffChainTree(process *models.Process, proof *models.Proof,
 
 // VerifyProofOffChainCSP verifies a proof with census origin OFF_CHAIN_CA.
 // Returns verification result and weight.
-func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
-	censusOrigin models.CensusOrigin,
+func VerifyProofOffChainCSP(_ *models.Process, proof *models.Proof,
+	_ models.CensusOrigin,
 	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
 	key := vID.Address()
 
@@ -229,8 +229,8 @@ func VerifyProofOffChainCSP(process *models.Process, proof *models.Proof,
 // VerifyProofERC20 verifies a proof with census origin ERC20 (mapbased).
 // Returns verification result and weight.
 func VerifyProofERC20(process *models.Process, proof *models.Proof,
-	censusOrigin models.CensusOrigin,
-	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
+	_ models.CensusOrigin,
+	censusRoot, _ []byte, vID state.VoterID) (bool, *big.Int, error) {
 	if process.EthIndexSlot == nil {
 		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 	}
@@ -259,8 +259,8 @@ func VerifyProofERC20(process *models.Process, proof *models.Proof,
 // VerifyProofMiniMe verifies a proof with census origin MiniMe.
 // Returns verification result and weight.
 func VerifyProofMiniMe(process *models.Process, proof *models.Proof,
-	censusOrigin models.CensusOrigin,
-	censusRoot, processID []byte, vID state.VoterID) (bool, *big.Int, error) {
+	_ models.CensusOrigin,
+	censusRoot, _ []byte, vID state.VoterID) (bool, *big.Int, error) {
 	if process.EthIndexSlot == nil {
 		return false, nil, fmt.Errorf("index slot not found for process %x", process.ProcessId)
 	}

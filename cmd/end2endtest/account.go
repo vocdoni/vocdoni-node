@@ -74,7 +74,7 @@ func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 	return nil
 }
 
-func (t *E2ETokenTxs) Teardown() error {
+func (*E2ETokenTxs) Teardown() error {
 	// nothing to do here
 	return nil
 }

@@ -54,7 +54,7 @@ var (
 )
 
 // registerMetrics registers each of the vochain prometheus metrics
-func (vi *VochainInfo) registerMetrics(ma *metrics.Agent) {
+func (*VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainHeight)
 	ma.Register(VochainMempool)
 	ma.Register(VochainAppTree)

@@ -32,7 +32,7 @@ var (
 )
 
 // RegisterMetrics to initialize the metrics to the agent
-func (i *Handler) registerMetrics(ma *metrics.Agent) {
+func (*Handler) registerMetrics(ma *metrics.Agent) {
 	ma.Register(FilePeers)
 	ma.Register(FileAddresses)
 	ma.Register(FilePins)

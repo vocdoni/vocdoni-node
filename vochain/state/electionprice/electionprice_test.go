@@ -130,7 +130,7 @@ func TestCalculatorPriceWithZeroValues(t *testing.T) {
 	}
 }
 
-func TestCalculatorPriceTable(t *testing.T) {
+func TestCalculatorPriceTable(_ *testing.T) {
 	c := NewElectionPriceCalculator(DefaultElectionPriceFactors)
 	c.SetCapacity(1000)
 	c.SetBasePrice(10)

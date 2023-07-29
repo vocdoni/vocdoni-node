@@ -1364,3 +1364,53 @@ func TestCensusUpdate(t *testing.T) {
 	// check the census uri is correct
 	qt.Assert(t, proc.CensusURI, qt.DeepEquals, *newCensusURI)
 }
+
+func TestEndBlock(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+
+	pid := util.RandomBytes(32)
+
+	if err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    100,
+		StartBlock:    1,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+		Mode:          &models.ProcessMode{AutoStart: true, Interruptible: true},
+		MaxCensusSize: 1000,
+		CensusRoot:    util.RandomBytes(32),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	app.AdvanceTestBlock()
+
+	// get created process
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	// check the endblock matches the startblock + blockcount
+	qt.Assert(t, proc.EndBlock, qt.Equals, uint32(101))
+	// check the status is READY
+	qt.Assert(t, proc.Status, qt.Equals, int32(models.ProcessStatus_READY))
+
+	// advance block and finalize process
+	app.AdvanceTestBlock()
+	err = app.State.SetProcessStatus(pid, models.ProcessStatus_ENDED, true)
+	qt.Assert(t, err, qt.IsNil)
+
+	app.AdvanceTestBlock()
+
+	// check the status is ENDED
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Status, qt.Equals, int32(models.ProcessStatus_ENDED))
+
+	// check the endblock is equal to the current height
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.EndBlock, qt.Equals, app.Height()-1)
+
+	// check the block count is still the original value
+	qt.Assert(t, proc.BlockCount, qt.Equals, uint32(100))
+}

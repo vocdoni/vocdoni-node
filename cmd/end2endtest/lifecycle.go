@@ -54,7 +54,7 @@ func (t *E2ELifecycleElection) Setup(api *apiclient.HTTPclient, c *config) error
 	return nil
 }
 
-func (t *E2ELifecycleElection) Teardown() error {
+func (*E2ELifecycleElection) Teardown() error {
 	// nothing to do here
 	return nil
 }

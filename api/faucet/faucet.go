@@ -43,7 +43,7 @@ func AttachFaucetAPI(signingKey *ethereum.SignKeys, networks map[string]uint64,
 	)
 }
 
-func (f *FaucetAPI) faucetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (f *FaucetAPI) faucetHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// check network is correct and get amount to send
 	network := ctx.URLParam("network")
 	amount, ok := f.networks[network]

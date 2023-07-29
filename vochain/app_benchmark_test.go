@@ -39,7 +39,7 @@ func BenchmarkCheckTx(b *testing.B) {
 }
 
 func prepareBenchCheckTx(b *testing.B, app *BaseApplication,
-	nvoters int, tmpDir string) (voters []*models.SignedTx) {
+	nvoters int, _ string) (voters []*models.SignedTx) {
 	db := metadb.NewTest(b)
 	tr, err := censustree.New(censustree.Options{Name: util.RandomHex(12), ParentDB: db,
 		MaxLevels: 256, CensusType: models.Census_ARBO_BLAKE2B})
