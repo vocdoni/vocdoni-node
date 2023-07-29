@@ -114,7 +114,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	r := results.ProtoToResults(process.Results)
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:          processID,
-		Votes:       encodeVotes(r.Votes),
+		Votes:       encodeJSON(r.Votes),
 		Weight:      encodeBigint(r.Weight),
 		BlockHeight: int64(r.BlockHeight),
 	}); err != nil {
@@ -273,7 +273,7 @@ func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partia
 
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:          pid,
-		Votes:       encodeVotes(results.Votes),
+		Votes:       encodeJSON(results.Votes),
 		Weight:      encodeBigint(results.Weight),
 		BlockHeight: int64(results.BlockHeight),
 	}); err != nil {

@@ -256,7 +256,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 
 		if _, err := queries.UpdateProcessResultByID(ctx, indexerdb.UpdateProcessResultByIDParams{
 			ID:         indxR.ProcessID,
-			Votes:      encodeVotes(indxR.Votes),
+			Votes:      encodeJSON(indxR.Votes),
 			Weight:     encodeBigint(indxR.Weight),
 			VoteOptsPb: encodedPb(indxR.VoteOpts),
 			EnvelopePb: encodedPb(indxR.EnvelopeType),
