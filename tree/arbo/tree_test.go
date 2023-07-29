@@ -413,6 +413,10 @@ func TestPackAndUnpackSiblings(t *testing.T) {
 	c.Assert(err, qt.IsNotNil)
 	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{1, 0, 1, 0})
 	c.Assert(err, qt.IsNotNil)
+	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{3, 0, 0})
+	c.Assert(err, qt.IsNotNil)
+	_, err = UnpackSiblings(HashFunctionPoseidon, []byte{4, 0, 1, 0})
+	c.Assert(err, qt.IsNotNil)
 }
 
 func TestGenProofAndVerify(t *testing.T) {
