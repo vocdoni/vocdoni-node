@@ -114,7 +114,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:          processID,
 		Votes:       indexertypes.EncodeJSON(r.Votes),
-		Weight:      encodeBigint(r.Weight),
+		Weight:      indexertypes.EncodeJSON(r.Weight),
 		BlockHeight: int64(r.BlockHeight),
 	}); err != nil {
 		return err
@@ -189,7 +189,7 @@ func (*Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byte, w
 func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
 	weightStr := "1"
 	if vote.Weight != nil {
-		weightStr = encodeBigint((*types.BigInt)(vote.Weight))
+		weightStr = indexertypes.EncodeJSON((*types.BigInt)(vote.Weight))
 	}
 	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
 		Nullifier:            vote.Nullifier,
@@ -256,7 +256,7 @@ func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partia
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:          pid,
 		Votes:       indexertypes.EncodeJSON(results.Votes),
-		Weight:      encodeBigint(results.Weight),
+		Weight:      indexertypes.EncodeJSON(results.Weight),
 		BlockHeight: int64(results.BlockHeight),
 	}); err != nil {
 		return err

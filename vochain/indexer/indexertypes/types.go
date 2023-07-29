@@ -86,7 +86,7 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		PublicKeys:         json.RawMessage(dbproc.PublicKeys),
 		VoteCount:          uint64(dbproc.VoteCount),
 		ResultsVotes:       DecodeJSON[[][]*types.BigInt](dbproc.ResultsVotes),
-		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
+		ResultsWeight:      DecodeJSON[*types.BigInt](dbproc.ResultsWeight),
 		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
 
@@ -108,17 +108,6 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		log.Error(err)
 	}
 	return proc
-}
-
-func decodeBigint(s string) *types.BigInt {
-	if s == "" {
-		return nil
-	}
-	n := new(types.BigInt)
-	if err := n.UnmarshalText([]byte(s)); err != nil {
-		panic(err) // should never happen
-	}
-	return n
 }
 
 func EncodeJSON[T any](v T) string {

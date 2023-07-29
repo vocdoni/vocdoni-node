@@ -37,7 +37,7 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 
-	?, '0', 0
+	?, '"0"', 0
 )
 `
 

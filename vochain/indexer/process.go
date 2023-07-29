@@ -40,17 +40,6 @@ func encodedPb(msg proto.Message) types.EncodedProtoBuf {
 	return nonNullBytes(enc)
 }
 
-func encodeBigint(n *types.BigInt) string {
-	if n == nil {
-		return ""
-	}
-	p, err := n.MarshalText()
-	if err != nil {
-		panic(err) // should never happen
-	}
-	return string(p)
-}
-
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 	procInner, err := idx.readOnlyQuery.GetProcess(context.TODO(), pid)
