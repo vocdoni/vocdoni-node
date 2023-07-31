@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/httprouter"
@@ -15,6 +16,14 @@ const (
 )
 
 func (a *API) enableSIKHandlers() error {
+	if err := a.endpoint.RegisterMethod(
+		"/siks/{address}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.sikValidHandler,
+	); err != nil {
+		return err
+	}
 	if err := a.endpoint.RegisterMethod(
 		"/siks/roots",
 		"GET",
@@ -33,6 +42,25 @@ func (a *API) enableSIKHandlers() error {
 	}
 
 	return nil
+}
+
+// sikValidHandler
+//
+//	@Summary		Returns if the address provided has a valid SIK
+//	@Description	Returns if the address provided, associated to an a registered account or not, has a valid SIK already registered or not.
+//	@Tags			SIK
+//	@Success		200
+//	@Router			/siks/{address} [get]
+func (a *API) sikValidHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get the address from the
+	address := addressParse(ctx.URLParam("address"))
+	// check for the SIK assigned to this address
+	if _, err := a.vocapp.State.SIKFromAddress(address); err != nil {
+		if errors.Is(err, state.ErrSIKNotFound) {
+			return ErrSIKNotFound
+		}
+	}
+	return ctx.Send(nil, apirest.HTTPstatusOK)
 }
 
 // sikValidRootsHandler
