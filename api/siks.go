@@ -49,18 +49,27 @@ func (a *API) enableSIKHandlers() error {
 //	@Summary		Returns if the address provided has a valid SIK
 //	@Description	Returns if the address provided, associated to an a registered account or not, has a valid SIK already registered or not.
 //	@Tags			SIK
-//	@Success		200
+//	@Produce		json
+//	@Success		200	{object}	object{sik=string}
 //	@Router			/siks/{address} [get]
 func (a *API) sikValidHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get the address from the
 	address := addressParse(ctx.URLParam("address"))
 	// check for the SIK assigned to this address
-	if _, err := a.vocapp.State.SIKFromAddress(address); err != nil {
+	sik, err := a.vocapp.State.SIKFromAddress(address)
+	if err != nil {
 		if errors.Is(err, state.ErrSIKNotFound) {
 			return ErrSIKNotFound
 		}
 	}
-	return ctx.Send(nil, apirest.HTTPstatusOK)
+	response, err := json.Marshal(struct {
+		SIK types.HexBytes `json:"sik"`
+	}{types.HexBytes(sik)})
+	if err != nil {
+		return ErrMarshalingJSONFailed.With("error encoding SIK")
+	}
+
+	return ctx.Send(response, apirest.HTTPstatusOK)
 }
 
 // sikValidRootsHandler
