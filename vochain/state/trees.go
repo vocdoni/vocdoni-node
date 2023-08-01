@@ -67,7 +67,7 @@ func (v *State) mainTreeViewer(committed bool) statedb.TreeViewer {
 	if committed {
 		return v.MainTreeView()
 	}
-	return v.Tx.AsTreeView()
+	return v.tx.AsTreeView()
 }
 
 var (

@@ -35,9 +35,7 @@ func TestSetStartBlock(t *testing.T) {
 	c.Assert(s.ProcessBlockRegistry.SetStartBlock(pid, 100), qt.IsNil)
 	// check the database to ensure that the start block has been created
 	// succesfully
-	s.ProcessBlockRegistry.dbLock.Lock()
-	encBlockNum, err := s.ProcessBlockRegistry.startBlocksDB.Get(toPrefixKey(pbrDBPrefix, pid))
-	s.ProcessBlockRegistry.dbLock.Unlock()
+	encBlockNum, err := s.ProcessBlockRegistry.db.Get(toPrefixKey(pbrDBPrefix, pid))
 	c.Assert(err, qt.IsNil)
 	c.Assert(binary.LittleEndian.Uint32(encBlockNum), qt.Equals, uint32(100))
 }
@@ -54,9 +52,7 @@ func TestDeleteStartBlock(t *testing.T) {
 	c.Assert(s.ProcessBlockRegistry.DeleteStartBlock(pid), qt.IsNil)
 	// check the database to ensure that the start block has been deleted
 	// succesfully
-	s.ProcessBlockRegistry.dbLock.Lock()
-	_, err = s.ProcessBlockRegistry.startBlocksDB.Get(pid)
-	s.ProcessBlockRegistry.dbLock.Unlock()
+	_, err = s.ProcessBlockRegistry.db.Get(pid)
 	c.Assert(err, qt.IsNotNil)
 }
 

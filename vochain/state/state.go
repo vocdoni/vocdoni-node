@@ -2,12 +2,10 @@ package state
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -74,7 +72,7 @@ type State struct {
 	db db.Database
 	// Store contains the StateDB.  We match every StateDB commit version
 	// with the block height.
-	Store          *statedb.StateDB
+	store          *statedb.StateDB
 	eventListeners []EventListener
 	// Tx must always be accessed via mutex because there will be
 	// concurrent operations on it.  In particular, while the Tx is being
@@ -82,7 +80,7 @@ type State struct {
 	// by processing Vochain transactions), parallel calls of Tendermint
 	// CheckTx happen (which read the temporary state kept in the Tx to
 	// validate Vochain transactions).
-	Tx                treeTxWithMutex
+	tx                treeTxWithMutex
 	mainTreeViewValue atomic.Pointer[statedb.TreeView]
 	DisableVoteCache  atomic.Bool
 	voteCache         *lru.Cache[string, *Vote]
@@ -134,22 +132,17 @@ func NewState(dbType, dataDir string) (*State, error) {
 	s := &State{
 		dataDir:           dataDir,
 		db:                database,
-		Store:             sdb,
-		Tx:                treeTxWithMutex{TreeTx: tx},
+		store:             sdb,
+		tx:                treeTxWithMutex{TreeTx: tx},
 		voteCache:         voteCache,
 		ElectionPriceCalc: &electionprice.Calculator{Disable: true},
 	}
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
 
-	processesTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeProcess))
-	if err != nil {
-		return nil, err
-	}
 	s.ProcessBlockRegistry = &ProcessBlockRegistry{
-		startBlocksDB: processesTree.NoState(),
-		dbLock:        &s.Tx,
-		mainTree:      s.mainTreeViewer(false),
+		db:    s.NoState(true),
+		state: s,
 	}
 	s.validSIKRoots = [][]byte{}
 	s.mtxValidSIKRoots = &sync.Mutex{}
@@ -270,9 +263,9 @@ func (v *State) SetElectionPriceCalc() error {
 
 // RemoveValidator removes a tendermint validator identified by its address
 func (v *State) RemoveValidator(address []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	validators, err := v.Tx.SubTree(StateTreeCfg(TreeValidators))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	validators, err := v.tx.SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
 		return err
 	}
@@ -290,8 +283,8 @@ func (v *State) RemoveValidator(address []byte) error {
 // When committed is true, the operation is executed on the last committed version.
 func (v *State) Validators(committed bool) (map[string]*models.Validator, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 
 	validatorsTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeValidators))
@@ -389,103 +382,22 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
-// pathProcessIDsByStartBlock is the db path used to store ProcessIDs indexed
-// by their StartBlock.
-const pathProcessIDsByStartBlock = "pidByStartBlock"
-
-// keyProcessIDsByStartBlock returns the db key where ProcessesIDs with
-// startBlock are stored.
-func keyProcessIDsByStartBlock(startBlock uint32) []byte {
-	key := make([]byte, 4)
-	binary.LittleEndian.PutUint32(key, startBlock)
-	return []byte(path.Join(pathProcessIDsByStartBlock, string(key)))
-}
-
-// processIDsByStartBlock returns the ProcessIDs of processes with startBlock.
-func (v *State) processIDsByStartBlock(startBlock uint32) ([][]byte, error) {
-	noState := v.Tx.NoState()
-	pidsBytes, err := noState.Get(keyProcessIDsByStartBlock(startBlock))
-	if err == db.ErrKeyNotFound {
-		return [][]byte{}, nil
-	} else if err != nil {
-		return nil, err
-	}
-	var pids models.ProcessIdList
-	if err := proto.Unmarshal(pidsBytes, &pids); err != nil {
-		return nil, fmt.Errorf("cannot proto.Unmarshal pids: %w", err)
-	}
-	return pids.ProcessIds, nil
-}
-
-// setProcessIDByStartBlock indexes the processIDs to by its processes
-// startBlock.
-func (v *State) setProcessIDByStartBlock(processID []byte, startBlock uint32) error {
-	noState := v.Tx.NoState()
-	var pids models.ProcessIdList
-	if pidsBytes, err := noState.Get(keyProcessIDsByStartBlock(startBlock)); err == db.ErrKeyNotFound {
-		// no pids indexed by startBlock, so we build upon an empty pids
-	} else if err != nil {
-		return err
-	} else {
-		if err := proto.Unmarshal(pidsBytes, &pids); err != nil {
-			return fmt.Errorf("cannot proto.Unmarshal pids: %w", err)
-		}
-	}
-	pids.ProcessIds = append(pids.ProcessIds, processID)
-	pidsBytes, err := proto.Marshal(&pids)
-	if err != nil {
-		return err
-	}
-	return noState.Set(keyProcessIDsByStartBlock(startBlock), pidsBytes)
-}
-
-// setRollingCensusSize loads all processes from pids, and for those that are
-// rolling, it sets the RollingCensusSize parameter.
-func (v *State) setRollingCensusSize(pids [][]byte) error {
-	mainTreeView := v.mainTreeViewer(false)
-	for _, pid := range pids {
-		process, err := getProcess(mainTreeView, pid)
-		if err != nil {
-			return err
-		}
-		if !process.Mode.GetPreRegister() {
-			continue
-		}
-		censusSize, err := getRollingCensusSize(mainTreeView, pid)
-		if err != nil {
-			return err
-		}
-		process.RollingCensusSize = &censusSize
-		if err := updateProcess(&v.Tx, process, pid); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // Save persistent save of vochain mem trees. It returns the new root hash. It also notifies the event listeners.
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
 	var pidsStartNextBlock [][]byte
-	v.Tx.Lock()
+	v.tx.Lock()
 	err := func() error {
 		var err error
-		pidsStartNextBlock, err = v.processIDsByStartBlock(height + 1)
-		if err != nil {
-			return fmt.Errorf("cannot get processIDs by StartBlock: %w", err)
-		}
-		if err = v.setRollingCensusSize(pidsStartNextBlock); err != nil {
-			return fmt.Errorf("cannot set rollingCensusSize for processes")
-		}
-		if err := v.Tx.Commit(height); err != nil {
+		if err := v.tx.Commit(height); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
-		if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
+		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
 		return nil
 	}()
-	v.Tx.Unlock()
+	v.tx.Unlock()
 	if err != nil {
 		return nil, err
 	}
@@ -503,18 +415,13 @@ func (v *State) Save() ([]byte, error) {
 	}
 
 	// Update the main state tree
-	mainTreeView, err := v.Store.TreeView(nil)
+	mainTreeView, err := v.store.TreeView(nil)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
 
-	// TODO: Purge rolling censuses from all processes that start now
-	// for _, pid := range pids {
-	//   v.PurgeRollingCensus(pid)
-	// }
-
-	return v.Store.Hash()
+	return v.store.Hash()
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -522,11 +429,11 @@ func (v *State) Rollback() {
 	for _, l := range v.eventListeners {
 		l.Rollback()
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	v.Tx.Discard()
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	v.tx.Discard()
 	var err error
-	if v.Tx.TreeTx, err = v.Store.BeginTx(); err != nil {
+	if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 		log.Errorf("cannot begin statedb tx: %s", err)
 		return
 	}
@@ -535,9 +442,9 @@ func (v *State) Rollback() {
 
 // Close closes the vochain StateDB.
 func (v *State) Close() error {
-	v.Tx.Lock()
-	v.Tx.Discard()
-	v.Tx.Unlock()
+	v.tx.Lock()
+	v.tx.Discard()
+	v.tx.Unlock()
 
 	return v.db.Close()
 }
@@ -545,7 +452,7 @@ func (v *State) Close() error {
 // LastHeight returns the last committed height (block count).  We match the
 // StateDB Version with the height via the Commits done in Save.
 func (v *State) LastHeight() (uint32, error) {
-	return v.Store.Version()
+	return v.store.Version()
 }
 
 // CurrentHeight returns the current state height (block count).
@@ -560,9 +467,9 @@ func (v *State) SetHeight(height uint32) {
 
 // WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
 func (v *State) WorkingHash() []byte {
-	v.Tx.RLock()
-	defer v.Tx.RUnlock()
-	hash, err := v.Tx.Root()
+	v.tx.RLock()
+	defer v.tx.RUnlock()
+	hash, err := v.tx.Root()
 	if err != nil {
 		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
 	}

@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -39,14 +38,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(app.State.SetAddressSIK(testAccount.Address(), testSIK), qt.IsNil)
 	c.Assert(app.State.FetchValidSIKRoots(), qt.IsNil)
 	// get siktree root and proof
-	app.State.Tx.Lock()
-	sikTree, err := app.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
-	c.Assert(err, qt.IsNil)
-	sikRoot, err := sikTree.Root()
-	c.Assert(err, qt.IsNil)
-	_, sikProof, err := sikTree.GenProof(testAccount.Address().Bytes())
-	c.Assert(err, qt.IsNil)
-	app.State.Tx.Unlock()
+	_, sikProof, err := app.State.SIKGenProof(testAccount.Address())
 	sikSiblings, err := zk.ProofToCircomSiblings(sikProof)
 	c.Assert(err, qt.IsNil)
 	// mock an election ID and add it to the state process block registry with
@@ -74,6 +66,8 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	_, err = app.State.Process(electionId, false)
 	c.Assert(err, qt.IsNil)
 	// generate circuit inputs and the zk proof
+	sikRoot, err := app.State.SIKRoot()
+	c.Assert(err, qt.IsNil)
 	inputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
 		Account:         testAccount,
 		ElectionId:      electionId,

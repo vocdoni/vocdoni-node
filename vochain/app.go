@@ -139,10 +139,7 @@ func (app *BaseApplication) Info(_ context.Context,
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
 	app.State.SetHeight(lastHeight)
-	appHash, err := app.State.Store.Hash()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get Store.Hash: %w", err)
-	}
+	appHash := app.State.WorkingHash()
 	if err := app.State.SetElectionPriceCalc(); err != nil {
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
@@ -312,7 +309,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		}
 	}
 	// execute internal state transition commit
-	if err := app.Istc.Commit(height, app.IsSynchronizing()); err != nil {
+	if err := app.Istc.Commit(height); err != nil {
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(req.GetTime(), height)

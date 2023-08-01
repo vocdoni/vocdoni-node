@@ -23,7 +23,7 @@ const (
 	snapshotHeaderLenSize = 32
 )
 
-// A StateSnapshot is a copy in a specific point in time of the blockchain state.
+// StateSnapshot is a copy in a specific point in time of the blockchain state.
 // The state is supposed to be a list of nested merkle trees.
 // The StateSnapshot contains the methods for building a single file snapshot of
 // the state containing multiple trees.
@@ -31,7 +31,7 @@ const (
 //
 // The structure of the snapshot encoded file is:
 //
-//	[headerLen][header][tree1][tree2][treeN]
+//	[headerLen][header][noState][tree1][tree2][treeN]
 //
 // - headerlen is a fixed 32 bytes little endian number indicating the size of the header.
 //
@@ -50,11 +50,12 @@ type StateSnapshot struct {
 
 // SnapshotHeader is the header structure of StateSnapshot containing the list of merkle trees.
 type SnapshotHeader struct {
-	Version int
-	Root    []byte
-	ChainID string
-	Height  uint32
-	Trees   []SnapshotHeaderTree
+	Version     int
+	Root        []byte
+	ChainID     string
+	Height      uint32
+	NoStateSize uint32
+	Trees       []SnapshotHeaderTree
 }
 
 // SnapshotHeaderTree represents a merkle tree of the StateSnapshot.
@@ -78,6 +79,11 @@ func (s *StateSnapshot) SetHeight(height uint32) {
 // SetChainID sets the blockchain identifier for the snapshot.
 func (s *StateSnapshot) SetChainID(chainID string) {
 	s.header.ChainID = chainID
+}
+
+// SetNoStateSize sets the noState database size
+func (s *StateSnapshot) SetNoStateSize(size uint32) {
+	s.header.NoStateSize = size
 }
 
 // Open reads an existing snapshot file and decodes the header.
@@ -310,6 +316,12 @@ func (v *State) Snapshot() (string, error) {
 	snap.SetHeight(height)
 	snap.SetChainID(v.chainID)
 
+	noStateSize, err := ExportNoStateDB(&snap, v.NoState(false))
+	if err != nil {
+		return "", err
+	}
+	snap.SetNoStateSize(noStateSize)
+
 	dumpTree := func(name, parent string, tr statedb.TreeViewer) error {
 		root, err := tr.Root()
 		if err != nil {
@@ -423,4 +435,54 @@ func (v *State) ListSnapshots() []DiskSnapshotInfo {
 		}
 	}
 	return list
+}
+
+// DBPair is a key value pair for the no state db.
+type DBPair struct {
+	Key   []byte
+	Value []byte
+}
+
+// ExportNoStateDB exports the no state db to a gob encoder and writes it to the given writer.
+func ExportNoStateDB(w io.Writer, reader *NoState) (uint32, error) {
+	pairs := []DBPair{}
+	err := reader.Iterate(nil, func(key []byte, value []byte) bool {
+		pairs = append(pairs, DBPair{Key: key, Value: value})
+		return true
+	})
+	if err != nil {
+		return 0, err
+	}
+	if err != nil {
+		return 0, err
+	}
+	cw := &countingWriter{w: w}
+	enc := gob.NewEncoder(cw)
+	return cw.n, enc.Encode(pairs)
+}
+
+// ImportNoStateDB imports the no state db from a gob decoder and writes it to the given db updater.
+func ImportNoStateDB(r io.Reader, db *NoState) error {
+	dec := gob.NewDecoder(r)
+	var pairs []DBPair
+	if err := dec.Decode(&pairs); err != nil {
+		return err
+	}
+	for _, pair := range pairs {
+		if err := db.Set(pair.Key, pair.Value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type countingWriter struct {
+	w io.Writer
+	n uint32
+}
+
+func (cw *countingWriter) Write(p []byte) (int, error) {
+	n, err := cw.w.Write(p)
+	cw.n += uint32(n)
+	return n, err
 }

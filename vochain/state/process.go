@@ -15,54 +15,20 @@ import (
 )
 
 var (
-	emptyVotesRoot                 = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
-	emptyCensusRoot                = make([]byte, StateChildTreeCfg(ChildTreeCensus).HashFunc().Len())
-	emptyPreRegisterNullifiersRoot = make([]byte, StateChildTreeCfg(ChildTreePreRegisterNullifiers).HashFunc().Len())
+	emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
 )
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
 func (v *State) AddProcess(p *models.Process) error {
-	preRegister := p.Mode != nil && p.Mode.PreRegister
-	anonymous := p.EnvelopeType != nil && p.EnvelopeType.Anonymous
-	if preRegister {
-		p.RollingCensusRoot = emptyCensusRoot
-		p.NullifiersRoot = emptyPreRegisterNullifiersRoot
-	}
-
 	newProcessBytes, err := proto.Marshal(
 		&models.StateDBProcess{Process: p, VotesRoot: emptyVotesRoot})
 	if err != nil {
 		return fmt.Errorf("cannot marshal process bytes: %w", err)
 	}
-	v.Tx.Lock()
-	err = func() error {
-		if err := v.Tx.DeepAdd(p.ProcessId, newProcessBytes, StateTreeCfg(TreeProcess)); err != nil {
-			return err
-		}
-		// If Mode.PreRegister && EnvelopeType.Anonymous we create (by
-		// opening) a new empty poseidon census tree and nullifier tree
-		// at p.ProcessId.
-		if preRegister && anonymous {
-			census, err := v.Tx.DeepSubTree(
-				StateTreeCfg(TreeProcess),
-				StateChildTreeCfg(ChildTreeCensusPoseidon).WithKey(p.ProcessId),
-			)
-			if err != nil {
-				return err
-			}
-			// We store census size as little endian 64 bits.  Set it to 0.
-			if err := statedb.SetUint64(census.NoState(), keyCensusLen, 0); err != nil {
-				return err
-			}
-			if _, err = v.Tx.DeepSubTree(StateTreeCfg(TreeProcess),
-				StateChildTreeCfg(ChildTreePreRegisterNullifiers).WithKey(p.ProcessId)); err != nil {
-				return err
-			}
-		}
-		return v.setProcessIDByStartBlock(p.ProcessId, p.StartBlock)
-	}()
-	v.Tx.Unlock()
+	v.tx.Lock()
+	err = v.tx.DeepAdd(p.ProcessId, newProcessBytes, StateTreeCfg(TreeProcess))
+	v.tx.Unlock()
 	if err != nil {
 		return err
 	}
@@ -85,7 +51,7 @@ func (v *State) AddProcess(p *models.Process) error {
 		"height", v.CurrentHeight(),
 		"censusURI", censusURI)
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.txCounter.Load())
 	}
 	return nil
 }
@@ -104,14 +70,14 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 	if err != nil {
 		return fmt.Errorf("cannot marshal updated process bytes: %w", err)
 	}
-	v.Tx.Lock()
-	err = v.Tx.DeepSet(pid, updatedProcessBytes, StateTreeCfg(TreeProcess))
-	v.Tx.Unlock()
+	v.tx.Lock()
+	err = v.tx.DeepSet(pid, updatedProcessBytes, StateTreeCfg(TreeProcess))
+	v.tx.Unlock()
 	if err != nil {
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnCancel(pid, v.TxCounter())
+		l.OnCancel(pid, v.txCounter.Load())
 	}
 	return nil
 }
@@ -134,8 +100,8 @@ func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, e
 // Process returns a process info given a processId if exists
 func (v *State) Process(pid []byte, committed bool) (*models.Process, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	return getProcess(v.mainTreeViewer(committed), pid)
 }
@@ -144,8 +110,8 @@ func (v *State) Process(pid []byte, committed bool) (*models.Process, error) {
 func (v *State) CountProcesses(committed bool) (uint64, error) {
 	// TODO: Once statedb.TreeView.Size() works, replace this by that.
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
 	if err != nil {
@@ -164,8 +130,8 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 // ListProcessIDs returns the full list of process identifiers (pid).
 func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	processesTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeProcess))
 	if err != nil {
@@ -212,12 +178,6 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 		return ErrProcessNotFound
 	}
 	// update the process
-	v.Tx.Lock()
-	err := updateProcess(&v.Tx, p, pid)
-	v.Tx.Unlock()
-	if err != nil {
-		return err
-	}
 	// try to update startBlocks database
 	switch p.Status {
 	case models.ProcessStatus_READY:
@@ -233,7 +193,9 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 			return err
 		}
 	}
-	return nil
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return updateProcess(&v.tx, p, pid)
 }
 
 // SetProcessStatus changes the process status to the one provided.
@@ -309,7 +271,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnProcessStatusChange(process.ProcessId, process.Status, v.TxCounter())
+			l.OnProcessStatusChange(process.ProcessId, process.Status, v.txCounter.Load())
 		}
 	}
 	return nil
@@ -339,7 +301,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult) erro
 	}
 	// Call event listeners
 	for _, l := range v.eventListeners {
-		l.OnProcessResults(process.ProcessId, result, v.TxCounter())
+		l.OnProcessResults(process.ProcessId, result, v.txCounter.Load())
 	}
 	return nil
 }
@@ -406,16 +368,16 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 
 // SetMaxProcessSize sets the global maximum number voters allowed in an election.
 func (v *State) SetMaxProcessSize(size uint64) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte("maxProcessSize"), []byte(strconv.FormatUint(size, 10)), StateTreeCfg(TreeExtra))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet([]byte("maxProcessSize"), []byte(strconv.FormatUint(size, 10)), StateTreeCfg(TreeExtra))
 }
 
 // MaxProcessSize returns the global maximum number voters allowed in an election.
 func (v *State) MaxProcessSize() (uint64, error) {
-	v.Tx.RLock()
-	defer v.Tx.RUnlock()
-	size, err := v.Tx.DeepGet([]byte("maxProcessSize"), StateTreeCfg(TreeExtra))
+	v.tx.RLock()
+	defer v.tx.RUnlock()
+	size, err := v.tx.DeepGet([]byte("maxProcessSize"), StateTreeCfg(TreeExtra))
 	if err != nil {
 		return 0, err
 	}
@@ -424,16 +386,16 @@ func (v *State) MaxProcessSize() (uint64, error) {
 
 // SetNetworkCapacity sets the total capacity (in votes per block) of the network.
 func (v *State) SetNetworkCapacity(capacity uint64) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet([]byte("networkCapacity"), []byte(strconv.FormatUint(capacity, 10)), StateTreeCfg(TreeExtra))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet([]byte("networkCapacity"), []byte(strconv.FormatUint(capacity, 10)), StateTreeCfg(TreeExtra))
 }
 
 // NetworkCapacity returns the total capacity (in votes per block) of the network.
 func (v *State) NetworkCapacity() (uint64, error) {
-	v.Tx.RLock()
-	defer v.Tx.RUnlock()
-	size, err := v.Tx.DeepGet([]byte("networkCapacity"), StateTreeCfg(TreeExtra))
+	v.tx.RLock()
+	defer v.tx.RUnlock()
+	size, err := v.tx.DeepGet([]byte("networkCapacity"), StateTreeCfg(TreeExtra))
 	if err != nil {
 		if errors.Is(err, arbo.ErrKeyNotFound) {
 			return 0, nil

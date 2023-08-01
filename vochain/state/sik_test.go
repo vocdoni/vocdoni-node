@@ -26,9 +26,9 @@ func TestSetAddressSIK(t *testing.T) {
 	// try to overwrite a valid sik with another
 	c.Assert(s.SetAddressSIK(address, sik), qt.ErrorIs, ErrRegisteredValidSIK)
 	// mock invalid leaf value with small encoded height
-	s.Tx.Lock()
-	err = s.Tx.DeepSet(address.Bytes(), make(SIK, sikLeafValueLen).InvalidateAt(10), StateTreeCfg(TreeSIK))
-	s.Tx.Unlock()
+	s.tx.Lock()
+	err = s.tx.DeepSet(address.Bytes(), make(SIK, sikLeafValueLen).InvalidateAt(10), StateTreeCfg(TreeSIK))
+	s.tx.Unlock()
 	c.Assert(err, qt.IsNil)
 	// try to update the sik
 	c.Assert(s.SetAddressSIK(address, sik), qt.IsNil)
@@ -46,16 +46,16 @@ func TestDelSIK(t *testing.T) {
 	// try to delete it when it not exists yet
 	c.Assert(s.InvalidateSIK(address), qt.IsNotNil)
 	// mock a deleted sik
-	s.Tx.Lock()
-	err = s.Tx.DeepSet(address.Bytes(), make(SIK, sikLeafValueLen).InvalidateAt(5), StateTreeCfg(TreeSIK))
-	s.Tx.Unlock()
+	s.tx.Lock()
+	err = s.tx.DeepSet(address.Bytes(), make(SIK, sikLeafValueLen).InvalidateAt(5), StateTreeCfg(TreeSIK))
+	s.tx.Unlock()
 	c.Assert(err, qt.IsNil)
 	// try to delete a sik already deleted
 	c.Assert(s.InvalidateSIK(address), qt.ErrorIs, ErrSIKAlreadyInvalid)
 	// mock a valid sik
-	s.Tx.Lock()
-	err = s.Tx.DeepSet(address.Bytes(), sik, StateTreeCfg(TreeSIK))
-	s.Tx.Unlock()
+	s.tx.Lock()
+	err = s.tx.DeepSet(address.Bytes(), sik, StateTreeCfg(TreeSIK))
+	s.tx.Unlock()
 	c.Assert(err, qt.IsNil)
 	// try a success deletion
 	s.SetHeight(2)
@@ -103,7 +103,7 @@ func Test_sikRoots(t *testing.T) {
 	validSIKs := s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 1)
-	sikTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	sikTree, err := s.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	c.Assert(err, qt.IsNil)
 	firstRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
@@ -156,19 +156,13 @@ func TestAssignSIKToElectionAndPurge(t *testing.T) {
 	c.Assert(s.AssignSIKToElection(pid, testAccount.Address()), qt.IsNil)
 	// check if the relation exists on db
 	key := toPrefixKey(pid, testAccount.Address().Bytes())
-	s.Tx.Lock()
-	siksTree, err := s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	s.Tx.Unlock()
 	c.Assert(err, qt.IsNil)
-	_, err = siksTree.NoState().Get(key)
+	_, err = s.NoState(true).Get(key)
 	c.Assert(err, qt.IsNil)
 	// purge siks and check
 	c.Assert(s.PurgeSIKsByElection(pid), qt.IsNil)
-	s.Tx.Lock()
-	siksTree, err = s.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	s.Tx.Unlock()
 	c.Assert(err, qt.IsNil)
-	_, err = siksTree.NoState().Get(key)
+	_, err = s.NoState(true).Get(key)
 	c.Assert(err, qt.IsNotNil)
 	_, err = s.SIKFromAddress(testAccount.Address())
 	c.Assert(err, qt.IsNil)

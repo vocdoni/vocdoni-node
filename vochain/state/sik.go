@@ -61,23 +61,23 @@ func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
 //   - If it exists but it is not valid, overwrite the stored value with the
 //     provided one.
 func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	// check if exists a registered sik for the provided address, query also for
-	// no commited tree version
-	v.Tx.Lock()
+	// no committed tree version
+	v.tx.Lock()
 	rawSIK, err := siksTree.Get(address.Bytes())
-	v.Tx.Unlock()
+	v.tx.Unlock()
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// if not exists create it
 		log.Debugw("setSIK (create)",
 			"address", address.String(),
 			"sik", newSIK.String())
-		v.Tx.Lock()
+		v.tx.Lock()
 		err = siksTree.Add(address.Bytes(), newSIK)
-		v.Tx.Unlock()
+		v.tx.Unlock()
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrSIKSet, err)
 		}
@@ -94,9 +94,9 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 		"address", address.String(),
 		"sik", SIK(rawSIK).String())
 	// if the hysteresis is reached update the sik for the address
-	v.Tx.Lock()
+	v.tx.Lock()
 	err = siksTree.Set(address.Bytes(), newSIK)
-	v.Tx.Unlock()
+	v.tx.Unlock()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSet, err)
 	}
@@ -118,10 +118,10 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	if !SIK(rawSIK).Valid() {
 		return ErrSIKAlreadyInvalid
 	}
-	v.Tx.Lock()
+	v.tx.Lock()
 	invalidatedSIK := make(SIK, sikLeafValueLen).InvalidateAt(v.CurrentHeight())
-	err = v.Tx.DeepSet(address.Bytes(), invalidatedSIK, StateTreeCfg(TreeSIK))
-	v.Tx.Unlock()
+	err = v.tx.DeepSet(address.Bytes(), invalidatedSIK, StateTreeCfg(TreeSIK))
+	v.tx.Unlock()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
 	}
@@ -140,17 +140,13 @@ func (v *State) ValidSIKRoots() [][]byte {
 // state. It reads the roots from the key-value database associated to the SIK's
 // subtree.
 func (v *State) FetchValidSIKRoots() error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
 	var validRoots [][]byte
-	siksTree.NoState().Iterate(sikDBPrefix, func(_, root []byte) bool {
+	if err := v.NoState(true).Iterate(sikDBPrefix, func(_, root []byte) bool {
 		validRoots = append(validRoots, root)
 		return true
-	})
+	}); err != nil {
+		return err
+	}
 	v.mtxValidSIKRoots.Lock()
 	v.validSIKRoots = validRoots
 	v.mtxValidSIKRoots.Unlock()
@@ -178,13 +174,13 @@ func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
 //     number.
 //
 //   - If it does not exist, remove all roots with a lower block number except
-//     for the next lower sikRoot. It is becouse it still being validate for a
+//     for the next lower sikRoot. It is because it still being validate for a
 //     period.
 func (v *State) UpdateSIKRoots() error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
@@ -194,7 +190,7 @@ func (v *State) UpdateSIKRoots() error {
 	}
 	// instance the SIK's key-value DB and set the current block to the current
 	// network height.
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(false)
 	currentBlock := v.CurrentHeight()
 	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
 		// calculate the current minimun block to purge useless sik roots
@@ -209,7 +205,7 @@ func (v *State) UpdateSIKRoots() error {
 		// block to delete them.
 		var toPurge [][]byte
 		var nearestLowerBlock uint32
-		sikNoStateDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
+		if err := sikNoStateDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
 			candidateKey := bytes.Clone(key)
 			blockNumber := binary.LittleEndian.Uint32(candidateKey)
 			if blockNumber < minBlock {
@@ -219,7 +215,9 @@ func (v *State) UpdateSIKRoots() error {
 				}
 			}
 			return true
-		})
+		}); err != nil {
+			return err
+		}
 		// delete the selected sikRoots by its block numbers
 		for _, blockToDelete := range toPurge {
 			key := toPrefixKey(sikDBPrefix, blockToDelete)
@@ -247,15 +245,9 @@ func (v *State) UpdateSIKRoots() error {
 // attacks using the free tx of RegisterSIKTx. If the desired election has not
 // any RegisterSIKTx associated, it will initialize the counter.
 func (v *State) IncreaseRegisterSIKCounter(pid []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
 	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
 	// instance the SIK's key-value DB
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(true)
 	// prepare the prefixed key and get the current counter
 	key := toPrefixKey(anonSIKDBPrefix, pid)
 	rawCount, err := sikNoStateDB.Get(key)
@@ -283,15 +275,8 @@ func (v *State) IncreaseRegisterSIKCounter(pid []byte) error {
 // PurgeRegisterSIK method removes the counter of RegisterSIKTx for the provided
 // electionId (or processID)
 func (v *State) PurgeRegisterSIK(pid []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
 	// instance the SIK's key-value DB
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(true)
 	// prepare the prefixed key and delete its records counter
 	key := toPrefixKey(anonSIKDBPrefix, pid)
 	if err := sikNoStateDB.Delete(key); err != nil && !errors.Is(err, db.ErrKeyNotFound) {
@@ -303,15 +288,8 @@ func (v *State) PurgeRegisterSIK(pid []byte) error {
 // CountRegisterSIK method returns the number of RegisterSIKTx associated to
 // the provided electionId (or processID)
 func (v *State) CountRegisterSIK(pid []byte) (uint32, error) {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return 0, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
 	// instance the SIK's key-value DB
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(true)
 	// prepare the prefixed key and get its records counter
 	rawCount, err := sikNoStateDB.Get(toPrefixKey(anonSIKDBPrefix, pid))
 	if err != nil {
@@ -323,19 +301,12 @@ func (v *State) CountRegisterSIK(pid []byte) (uint32, error) {
 	return binary.LittleEndian.Uint32(rawCount), nil
 }
 
-// SIKAssingTo function persists the relation between a created SIK (without
+// AssignSIKToElection function persists the relation between a created SIK (without
 // registered account) and the election where the SIK is valid. This relation
 // allows to remove all SIKs when the election ends.
 func (v *State) AssignSIKToElection(pid []byte, address common.Address) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
 	// instance the SIK's key-value DB
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(true)
 	// compose the key with the pid and the address and store with no value on
 	// the no state database
 	key := toPrefixKey(pid, address.Bytes())
@@ -349,19 +320,19 @@ func (v *State) AssignSIKToElection(pid []byte, address common.Address) error {
 // process and a SIK without account and remove both of them, the SIKs and also
 // the relation.
 func (v *State) PurgeSIKsByElection(pid []byte) error {
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.Tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	// instance the SIK's key-value DB
-	sikNoStateDB := siksTree.NoState()
+	sikNoStateDB := v.NoState(false)
 	// iterate to remove the assigned SIK to every address of this process and
 	// also the relation between them
 	var iterErr error
-	if err := siksTree.NoState().Iterate(pid, func(address, _ []byte) bool {
+	if err := sikNoStateDB.Iterate(pid, func(address, _ []byte) bool {
 		// remove the SIK by the address
 		if iterErr = siksTree.Del(address); iterErr != nil {
 			return false
@@ -380,7 +351,27 @@ func (v *State) PurgeSIKsByElection(pid []byte) error {
 	return nil
 }
 
-// InvalidateAt funtion sets the current SIK value to the encoded value of the
+// SIKGenProof returns the proof of the provided address in the SIKs tree.
+// The first returned value is the leaf value and the second the proof siblings.
+func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return nil, nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// get the sik proof
+	return siksTree.GenProof(address.Bytes())
+}
+
+// SIKRoot returns the last root hash of the SIK merkle tree.
+func (v *State) SIKRoot() ([]byte, error) {
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	return siksTree.Root()
+}
+
+// InvalidateAt function sets the current SIK value to the encoded value of the
 // height provided, ready to use in the SIK subTree as leaf value to invalidate
 // it. The encoded value will have 32 bytes:
 //   - The initial 28 bytes must be zero.

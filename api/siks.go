@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -115,19 +116,10 @@ func (a *API) sikProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 	if err != nil {
 		return err
 	}
-	// get the sik tree from the state
-	sikTree, err := a.vocapp.State.Tx.DeepSubTree(state.StateTreeCfg(state.TreeSIK))
-	if err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
-	}
 	response := Census{}
-	// get merkle root
-	if response.CensusRoot, err = sikTree.Root(); err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
-	}
-	// get sik merkle tree proof
-	if response.Value, response.CensusProof, err = sikTree.GenProof(address); err != nil {
-		return ErrCantGetCircomSiblings.WithErr(err)
+	response.Value, response.CensusProof, err = a.vocapp.State.SIKGenProof(common.BytesToAddress(address))
+	if err != nil {
+		return ErrSIKNotFound.WithErr(err)
 	}
 	// get sik merkle tree circom siblings
 	if response.CensusSiblings, err = zk.ProofToCircomSiblings(response.CensusProof); err != nil {

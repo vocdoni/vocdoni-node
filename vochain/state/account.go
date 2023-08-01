@@ -90,8 +90,8 @@ func (a *Account) DelDelegate(addr common.Address) error {
 func (v *State) GetAccount(address common.Address, committed bool) (*Account, error) {
 	var acc Account
 	if !committed {
-		v.Tx.RLock()
-		defer v.Tx.RUnlock()
+		v.tx.RLock()
+		defer v.tx.RUnlock()
 	}
 	raw, err := v.mainTreeViewer(committed).DeepGet(address.Bytes(), StateTreeCfg(TreeAccounts))
 	if errors.Is(err, arbo.ErrKeyNotFound) {
@@ -204,9 +204,9 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 			},
 		})
 	}
-	v.Tx.Lock()
-	defer v.Tx.Unlock()
-	return v.Tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet(accountAddress.Bytes(), accBytes, StateTreeCfg(TreeAccounts))
 }
 
 // BurnTxCostIncrementNonce reduces the transaction cost from the account balance and increments nonce.

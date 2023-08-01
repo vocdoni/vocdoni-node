@@ -10,37 +10,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/proto/build/go/models"
 
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain/state"
 )
-
-func TestVochainState(t *testing.T) {
-	t.Parallel()
-
-	s, err := state.NewState(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
-	defer s.Close()
-
-	// This used to panic due to nil *ImmutableTree fields.
-	exists, err := s.VoteExists(util.RandomBytes(32), util.RandomBytes(32), false)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, exists, qt.Equals, false)
-
-	treeCfg := state.StateTreeCfg(state.TreeProcess)
-	s.Tx.Add(treeCfg.Key(), make([]byte, treeCfg.HashFunc().Len()))
-	for i := 0; i < 10; i++ {
-		s.Tx.Add([]byte(fmt.Sprintf("%d", i)), []byte(fmt.Sprintf("number %d", i)))
-		s.Tx.DeepAdd([]byte(fmt.Sprintf("%d", i+1)),
-			[]byte(fmt.Sprintf("number %d", i+1)), treeCfg)
-	}
-	s.Save()
-
-	_, err = s.Store.Hash()
-	qt.Assert(t, err, qt.IsNil)
-}
 
 func TestAddValidator(t *testing.T) {
 	t.Parallel()
