@@ -40,8 +40,8 @@ var Genesis = map[string]VochainGenesis{
 }
 
 var devGenesis = GenesisDoc{
-	GenesisTime: time.Date(2023, time.July, 31, 10, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-dev-13",
+	GenesisTime: time.Date(2023, time.August, 1, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-dev-15",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -59,7 +59,7 @@ var devGenesis = GenesisDoc{
 		},
 	},
 	AppState: GenesisAppState{
-		MaxElectionSize: 50000,
+		MaxElectionSize: 100000,
 		NetworkCapacity: 20000,
 		Validators: []AppStateValidators{
 			{ // 0
@@ -99,9 +99,8 @@ var devGenesis = GenesisDoc{
 		},
 		Treasurer: types.HexStringToHexBytes("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"),
 		TxCost: TransactionCosts{
-			SetProcessStatus:        1,
-			SetProcessCensus:        1,
-			SetProcessResults:       1,
+			SetProcessStatus:        2,
+			SetProcessCensus:        2,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              5,
@@ -221,7 +220,6 @@ var stageGenesis = GenesisDoc{
 		TxCost: TransactionCosts{
 			SetProcessStatus:        1,
 			SetProcessCensus:        1,
-			SetProcessResults:       1,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              5,
@@ -334,7 +332,6 @@ var apexGenesis = GenesisDoc{
 		TxCost: TransactionCosts{
 			SetProcessStatus:        1,
 			SetProcessCensus:        5,
-			SetProcessResults:       1,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              10,

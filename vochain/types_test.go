@@ -13,7 +13,6 @@ func TestTransactionCostsAsMap(t *testing.T) {
 	txCosts := genesis.TransactionCosts{
 		SetProcessStatus:        100,
 		SetProcessCensus:        200,
-		SetProcessResults:       300,
 		SetProcessQuestionIndex: 400,
 		RegisterKey:             500,
 		NewProcess:              600,

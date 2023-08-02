@@ -10,7 +10,6 @@ import (
 type TransactionCosts struct {
 	SetProcessStatus        uint32 `json:"Tx_SetProcessStatus"`
 	SetProcessCensus        uint32 `json:"Tx_SetProcessCensus"`
-	SetProcessResults       uint32 `json:"Tx_SetProcessResults"`
 	SetProcessQuestionIndex uint32 `json:"Tx_SetProcessQuestionIndex"`
 	RegisterKey             uint32 `json:"Tx_RegisterKey"`
 	NewProcess              uint32 `json:"Tx_NewProcess"`

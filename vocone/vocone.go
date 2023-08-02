@@ -530,7 +530,6 @@ func defaultTxCosts() genesis.TransactionCosts {
 	return genesis.TransactionCosts{
 		SetProcessStatus:        1,
 		SetProcessCensus:        1,
-		SetProcessResults:       1,
 		SetProcessQuestionIndex: 1,
 		RegisterKey:             1,
 		NewProcess:              10,
