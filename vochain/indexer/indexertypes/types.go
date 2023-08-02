@@ -2,7 +2,6 @@ package indexertypes
 
 import (
 	"encoding/json"
-	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/log"
@@ -10,6 +9,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -32,9 +32,7 @@ type Process struct {
 	Envelope          *models.EnvelopeType       `json:"envelopeType"`
 	Mode              *models.ProcessMode        `json:"processMode"`
 	VoteOpts          *models.ProcessVoteOptions `json:"voteOptions"`
-	PrivateKeys       []string                   `json:"-"`
-	PublicKeys        []string                   `json:"-"`
-	QuestionIndex     uint32                     `json:"questionIndex"`
+	QuestionIndex     uint32                     `json:"questionIndex"` // TODO: unset?
 	CreationTime      time.Time                  `json:"creationTime"`
 	HaveResults       bool                       `json:"haveResults"`
 	FinalResults      bool                       `json:"finalResults"`
@@ -42,6 +40,9 @@ type Process struct {
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
 	RollingCensusSize uint64                     `json:"rollingCensusSize"`
+
+	PrivateKeys json.RawMessage `json:"-"` // json array
+	PublicKeys  json.RawMessage `json:"-"` // json array
 
 	VoteCount uint64 `json:"-"` // via LEFT JOIN
 
@@ -63,29 +64,33 @@ func (p *Process) Results() *results.Results {
 
 func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	proc := &Process{
-		ID:                 dbproc.ID,
-		EntityID:           nonEmptyBytes(dbproc.EntityID),
-		StartBlock:         uint32(dbproc.StartBlock),
-		EndBlock:           uint32(dbproc.EndBlock),
-		BlockCount:         uint32(dbproc.BlockCount),
-		HaveResults:        dbproc.HaveResults,
-		FinalResults:       dbproc.FinalResults,
-		CensusRoot:         nonEmptyBytes(dbproc.CensusRoot),
-		RollingCensusRoot:  nonEmptyBytes(dbproc.RollingCensusRoot),
-		RollingCensusSize:  uint64(dbproc.RollingCensusSize),
-		MaxCensusSize:      uint64(dbproc.MaxCensusSize),
-		CensusURI:          dbproc.CensusUri,
-		CensusOrigin:       int32(dbproc.CensusOrigin),
-		Status:             int32(dbproc.Status),
-		Namespace:          uint32(dbproc.Namespace),
-		PrivateKeys:        nonEmptySplit(dbproc.PrivateKeys, ","),
-		PublicKeys:         nonEmptySplit(dbproc.PublicKeys, ","),
-		CreationTime:       dbproc.CreationTime,
-		SourceBlockHeight:  uint64(dbproc.SourceBlockHeight),
-		Metadata:           dbproc.Metadata,
+		ID:                dbproc.ID,
+		EntityID:          nonEmptyBytes(dbproc.EntityID),
+		StartBlock:        uint32(dbproc.StartBlock),
+		EndBlock:          uint32(dbproc.EndBlock),
+		BlockCount:        uint32(dbproc.BlockCount),
+		HaveResults:       dbproc.HaveResults,
+		FinalResults:      dbproc.FinalResults,
+		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
+		RollingCensusRoot: nonEmptyBytes(dbproc.RollingCensusRoot),
+		RollingCensusSize: uint64(dbproc.RollingCensusSize),
+		MaxCensusSize:     uint64(dbproc.MaxCensusSize),
+		CensusURI:         dbproc.CensusUri,
+		CensusOrigin:      int32(dbproc.CensusOrigin),
+		Status:            int32(dbproc.Status),
+		Namespace:         uint32(dbproc.Namespace),
+		Envelope:          DecodeProtoJSON(new(models.EnvelopeType), dbproc.Envelope),
+		Mode:              DecodeProtoJSON(new(models.ProcessMode), dbproc.Mode),
+		VoteOpts:          DecodeProtoJSON(new(models.ProcessVoteOptions), dbproc.VoteOpts),
+		CreationTime:      dbproc.CreationTime,
+		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
+		Metadata:          dbproc.Metadata,
+
+		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
+		PublicKeys:         json.RawMessage(dbproc.PublicKeys),
 		VoteCount:          uint64(dbproc.VoteCount),
-		ResultsVotes:       decodeVotes(dbproc.ResultsVotes),
-		ResultsWeight:      decodeBigint(dbproc.ResultsWeight),
+		ResultsVotes:       DecodeJSON[[][]*types.BigInt](dbproc.ResultsVotes),
+		ResultsWeight:      DecodeJSON[*types.BigInt](dbproc.ResultsWeight),
 		ResultsBlockHeight: uint32(dbproc.ResultsBlockHeight),
 	}
 
@@ -94,43 +99,43 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 	} else {
 		proc.SourceNetworkId = models.SourceNetworkId(dbproc.SourceNetworkID).String()
 	}
-	proc.Envelope = new(models.EnvelopeType)
-	if err := proto.Unmarshal(dbproc.EnvelopePb, proc.Envelope); err != nil {
-		log.Error(err)
-	}
-	proc.Mode = new(models.ProcessMode)
-	if err := proto.Unmarshal(dbproc.ModePb, proc.Mode); err != nil {
-		log.Error(err)
-	}
-	proc.VoteOpts = new(models.ProcessVoteOptions)
-	if err := proto.Unmarshal(dbproc.VoteOptsPb, proc.VoteOpts); err != nil {
-		log.Error(err)
-	}
 	return proc
 }
 
-func decodeVotes(input string) [][]*types.BigInt {
-	// "a,b,c x,y,z ..."
-	var votes [][]*types.BigInt
-	for _, group := range strings.Split(input, " ") {
-		var element []*types.BigInt
-		for _, s := range strings.Split(group, ",") {
-			element = append(element, decodeBigint(s))
-		}
-		votes = append(votes, element)
+func EncodeJSON(v any) string {
+	p, err := json.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
 	}
-	return votes
+	return string(p)
 }
 
-func decodeBigint(s string) *types.BigInt {
-	if s == "" {
-		return nil
+func DecodeJSON[T any](s string) T {
+	var v T
+	err := json.Unmarshal([]byte(s), &v)
+	if err != nil {
+		panic(err) // should not happen
 	}
-	n := new(types.BigInt)
-	if err := n.UnmarshalText([]byte(s)); err != nil {
-		panic(err) // should never happen
+	return v
+}
+
+func EncodeProtoJSON(v proto.Message) string {
+	p, err := protojson.Marshal(v)
+	if err != nil {
+		panic(err) // should not happen
 	}
-	return n
+	return string(p)
+}
+
+func DecodeProtoJSON[T proto.Message](newT T, s string) T {
+	// Note how proto.Message implementations are pointer types,
+	// so we can't use new(T) here as that would give us a double pointer.
+	// We can't "dereference" a type, so the caller has to pass us a new(T) value.
+	err := protojson.Unmarshal([]byte(s), newT)
+	if err != nil {
+		panic(err) // should not happen
+	}
+	return newT
 }
 
 func nonEmptyBytes(p []byte) []byte {
@@ -138,19 +143,6 @@ func nonEmptyBytes(p []byte) []byte {
 		return nil
 	}
 	return p
-}
-
-func nonEmptySplit(s, sep string) []string {
-	list := strings.Split(s, sep)
-	if len(list) == 1 && list[0] == "" {
-		return nil // avoid []string{""} for s==""
-	}
-	return list
-}
-
-func (p Process) String() string {
-	b, _ := json.Marshal(p)
-	return string(b)
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api

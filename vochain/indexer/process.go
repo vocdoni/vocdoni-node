@@ -5,14 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
@@ -32,42 +29,6 @@ func nonNullBytes(p []byte) []byte {
 }
 
 // TODO(mvdan): funcs to safely convert integers
-
-func encodedPb(msg proto.Message) types.EncodedProtoBuf {
-	enc, err := proto.Marshal(msg)
-	if err != nil {
-		panic(err) // TODO(mvdan): propagate errors via a database/sql interface?
-	}
-	return nonNullBytes(enc)
-}
-
-func encodeVotes(votes [][]*types.BigInt) string {
-	// "a,b,c x,y,z ..."
-	var b strings.Builder
-	for i, row := range votes {
-		if i > 0 {
-			b.WriteByte(' ')
-		}
-		for j, n := range row {
-			if j > 0 {
-				b.WriteByte(',')
-			}
-			b.WriteString(encodeBigint(n))
-		}
-	}
-	return b.String()
-}
-
-func encodeBigint(n *types.BigInt) string {
-	if n == nil {
-		return ""
-	}
-	p, err := n.MarshalText()
-	if err != nil {
-		panic(err) // should never happen
-	}
-	return string(p)
-}
 
 // ProcessInfo returns the available information regarding an election process id
 func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
@@ -217,16 +178,16 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		CensusOrigin:      int64(p.CensusOrigin),
 		Status:            int64(p.Status),
 		Namespace:         int64(p.Namespace),
-		EnvelopePb:        encodedPb(p.EnvelopeType),
-		ModePb:            encodedPb(p.Mode),
-		VoteOptsPb:        encodedPb(p.VoteOptions),
-		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
-		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+		Envelope:          indexertypes.EncodeProtoJSON(p.EnvelopeType),
+		Mode:              indexertypes.EncodeProtoJSON(p.Mode),
+		VoteOpts:          indexertypes.EncodeProtoJSON(p.VoteOptions),
+		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		CreationTime:      currentBlockTime,
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-		ResultsVotes:      encodeVotes(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
 	}
 
 	idx.blockMu.Lock()
@@ -258,8 +219,8 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
 		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		CensusUri:         p.GetCensusURI(),
-		PrivateKeys:       strings.Join(p.EncryptionPrivateKeys, ","),
-		PublicKeys:        strings.Join(p.EncryptionPublicKeys, ","),
+		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		Metadata:          p.GetMetadata(),
 		Status:            int64(p.Status),
 	}); err != nil {

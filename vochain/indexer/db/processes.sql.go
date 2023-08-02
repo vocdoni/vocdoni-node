@@ -20,7 +20,7 @@ INSERT INTO processes (
 	census_root, rolling_census_root, rolling_census_size,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
-	envelope_pb, mode_pb, vote_opts_pb,
+	envelope, mode, vote_opts,
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
@@ -37,7 +37,7 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 
-	?, '0', 0
+	?, '"0"', 0
 )
 `
 
@@ -58,9 +58,9 @@ type CreateProcessParams struct {
 	CensusOrigin      int64
 	Status            int64
 	Namespace         int64
-	EnvelopePb        types.EncodedProtoBuf
-	ModePb            types.EncodedProtoBuf
-	VoteOptsPb        types.EncodedProtoBuf
+	Envelope          string
+	Mode              string
+	VoteOpts          string
 	PrivateKeys       string
 	PublicKeys        string
 	QuestionIndex     int64
@@ -88,9 +88,9 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.CensusOrigin,
 		arg.Status,
 		arg.Namespace,
-		arg.EnvelopePb,
-		arg.ModePb,
-		arg.VoteOptsPb,
+		arg.Envelope,
+		arg.Mode,
+		arg.VoteOpts,
 		arg.PrivateKeys,
 		arg.PublicKeys,
 		arg.QuestionIndex,
@@ -113,7 +113,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope_pb, p.mode_pb, p.vote_opts_pb, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
+SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
 LEFT JOIN votes AS v
 	ON p.id = v.process_id
 WHERE p.id = ?
@@ -141,9 +141,9 @@ type GetProcessRow struct {
 	CensusOrigin       int64
 	Status             int64
 	Namespace          int64
-	EnvelopePb         types.EncodedProtoBuf
-	ModePb             types.EncodedProtoBuf
-	VoteOptsPb         types.EncodedProtoBuf
+	Envelope           string
+	Mode               string
+	VoteOpts           string
 	PrivateKeys        string
 	PublicKeys         string
 	QuestionIndex      int64
@@ -176,9 +176,9 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProces
 		&i.CensusOrigin,
 		&i.Status,
 		&i.Namespace,
-		&i.EnvelopePb,
-		&i.ModePb,
-		&i.VoteOptsPb,
+		&i.Envelope,
+		&i.Mode,
+		&i.VoteOpts,
 		&i.PrivateKeys,
 		&i.PublicKeys,
 		&i.QuestionIndex,
@@ -439,25 +439,25 @@ const updateProcessResultByID = `-- name: UpdateProcessResultByID :execresult
 UPDATE processes
 SET results_votes  = ?1,
     results_weight = ?2,
-    vote_opts_pb = ?3,
-    envelope_pb = ?4
+    vote_opts = ?3,
+    envelope = ?4
 WHERE id = ?5
 `
 
 type UpdateProcessResultByIDParams struct {
-	Votes      string
-	Weight     string
-	VoteOptsPb types.EncodedProtoBuf
-	EnvelopePb types.EncodedProtoBuf
-	ID         types.ProcessID
+	Votes    string
+	Weight   string
+	VoteOpts string
+	Envelope string
+	ID       types.ProcessID
 }
 
 func (q *Queries) UpdateProcessResultByID(ctx context.Context, arg UpdateProcessResultByIDParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateProcessResultByID,
 		arg.Votes,
 		arg.Weight,
-		arg.VoteOptsPb,
-		arg.EnvelopePb,
+		arg.VoteOpts,
+		arg.Envelope,
 		arg.ID,
 	)
 }
