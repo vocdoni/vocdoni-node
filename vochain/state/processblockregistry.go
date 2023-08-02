@@ -33,7 +33,7 @@ func (pbr *ProcessBlockRegistry) DeleteStartBlock(pid []byte) error {
 
 // MinStartBlock returns the minimun start block of the current on going
 // processes from the no-state db associated to the process sub tree.
-func (pbr *ProcessBlockRegistry) MinStartBlock(fromBlock uint32, _ bool) (uint32, error) {
+func (pbr *ProcessBlockRegistry) MinStartBlock(fromBlock uint32) (uint32, error) {
 	minStartBlock := fromBlock
 	if err := pbr.db.Iterate(pbrDBPrefix, func(_, value []byte) bool {
 		startBlock := binary.LittleEndian.Uint32(value)
@@ -49,7 +49,7 @@ func (pbr *ProcessBlockRegistry) MinStartBlock(fromBlock uint32, _ bool) (uint32
 
 // MaxEndBlock returns the maximun end block of the current on going
 // processes from the no-state db associated to the process sub tree.
-func (pbr *ProcessBlockRegistry) MaxEndBlock(fromBlock uint32, _ bool) (uint32, error) {
+func (pbr *ProcessBlockRegistry) MaxEndBlock(fromBlock uint32) (uint32, error) {
 	maxEndBlock := fromBlock
 	if err := pbr.db.Iterate(pbrDBPrefix, func(pid, _ []byte) bool {
 		p, err := pbr.state.Process(pid, false)

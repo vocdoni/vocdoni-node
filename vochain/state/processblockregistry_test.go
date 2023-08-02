@@ -65,18 +65,18 @@ func TestMinStartBlock(t *testing.T) {
 	fromBlock := uint32(100)
 	// check min start block without create any election, fromBlock value
 	// expected
-	min, err := s.ProcessBlockRegistry.MinStartBlock(fromBlock, false)
+	min, err := s.ProcessBlockRegistry.MinStartBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(min, qt.Equals, fromBlock)
 	// create a startBlock greater than the fromBlock, fromBlock value expected
 	c.Assert(s.ProcessBlockRegistry.SetStartBlock(util.RandomBytes(32), 200), qt.IsNil)
-	min, err = s.ProcessBlockRegistry.MinStartBlock(fromBlock, false)
+	min, err = s.ProcessBlockRegistry.MinStartBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(min, qt.Equals, fromBlock)
 	// create a startBlock lower than the fromBlock, startBlock value expected
 	startBlock := fromBlock - 1
 	c.Assert(s.ProcessBlockRegistry.SetStartBlock(util.RandomBytes(32), startBlock), qt.IsNil)
-	min, err = s.ProcessBlockRegistry.MinStartBlock(fromBlock, false)
+	min, err = s.ProcessBlockRegistry.MinStartBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(min, qt.Equals, startBlock)
 }
@@ -90,21 +90,21 @@ func TestMaxEndBlock(t *testing.T) {
 	fromBlock := uint32(100)
 	// check max endBlock without create any election, fromBlock value
 	// expected
-	max, err := s.ProcessBlockRegistry.MaxEndBlock(fromBlock, false)
+	max, err := s.ProcessBlockRegistry.MaxEndBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(max, qt.Equals, fromBlock)
 	// create a process with an endBlock lower than the fromBlock, fromBlock
 	// value expected
 	pid1 := util.RandomBytes(32)
 	c.Assert(mockEndBlockProcessOnState(s, pid1, fromBlock-2, 1), qt.IsNil)
-	max, err = s.ProcessBlockRegistry.MaxEndBlock(fromBlock, false)
+	max, err = s.ProcessBlockRegistry.MaxEndBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(max, qt.Equals, fromBlock)
 	// create a process with an endBlock greater than the fromBlock, endBlock
 	// value expected
 	pid2 := util.RandomBytes(32)
 	c.Assert(mockEndBlockProcessOnState(s, pid2, fromBlock, 1), qt.IsNil)
-	max, err = s.ProcessBlockRegistry.MaxEndBlock(fromBlock, false)
+	max, err = s.ProcessBlockRegistry.MaxEndBlock(fromBlock)
 	c.Assert(err, qt.IsNil)
 	c.Assert(max, qt.Equals, fromBlock+1)
 }

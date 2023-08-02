@@ -309,7 +309,7 @@ func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, v
 	// check if the address already has invalidated sik to ensure that it is
 	// not updated after reach the correct height to avoid double voting
 	if currentSIK, err := t.state.SIKFromAddress(txAddress); err == nil {
-		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight(), false)
+		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight())
 		if err != nil {
 			if errors.Is(err, arbo.ErrKeyNotFound) {
 				return txAddress, newSIK, nil
