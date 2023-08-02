@@ -39,6 +39,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(app.State.FetchValidSIKRoots(), qt.IsNil)
 	// get siktree root and proof
 	_, sikProof, err := app.State.SIKGenProof(testAccount.Address())
+	c.Assert(err, qt.IsNil)
 	sikSiblings, err := zk.ProofToCircomSiblings(sikProof)
 	c.Assert(err, qt.IsNil)
 	// mock an election ID and add it to the state process block registry with
