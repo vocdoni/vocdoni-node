@@ -95,7 +95,7 @@ func ProverProofToProtobufZKProof(p *prover.Proof, electionId, sikRoot,
 	// generate the correct public signals
 	if p.PubSignals == nil {
 		if electionId == nil || sikRoot == nil || censusRoot == nil || nullifier == nil || voteWeight == nil {
-			return nil, fmt.Errorf("no enought arguments to generate the calc signals")
+			return nil, fmt.Errorf("not enough arguments to generate the public signals")
 		}
 		proof.PublicInputs = zkProofPublicInputs(electionId, sikRoot, censusRoot, nullifier, voteWeight)
 	}

@@ -1011,7 +1011,7 @@ func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
 	// to prevent runtime slice out of bounds error check if the length of the
 	// rest of the slice is at least equal to the encoded full length value
 	if len(b) < 4 {
-		return nil, fmt.Errorf("no enought size of packed siblings provided")
+		return nil, fmt.Errorf("no packed siblings provided")
 	}
 
 	fullLen := binary.LittleEndian.Uint16(b[0:2])
