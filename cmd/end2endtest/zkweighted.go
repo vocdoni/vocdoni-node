@@ -1,6 +1,7 @@
 package main
 
 import (
+	"math/big"
 	"os"
 	"time"
 
@@ -57,9 +58,11 @@ func (t *E2EAnonElection) Run() error {
 	for i, acct := range t.voterAccounts {
 		votes = append(votes, &apiclient.VoteData{
 			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.Address().Hex()],
+			ProofMkTree:  t.proofs[acct.AddressString()],
+			ProofSIKTree: t.sikproofs[acct.AddressString()],
 			Choices:      []int{i % 2},
 			VoterAccount: acct,
+			VoteWeight:   big.NewInt(defaultWeight / 2),
 		})
 	}
 	t.sendVotes(votes)

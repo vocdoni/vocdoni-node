@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -330,7 +331,7 @@ func (a *API) censusRootHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	}
 	var data []byte
 	if data, err = json.Marshal(Census{
-		Root: root,
+		CensusRoot: root,
 	}); err != nil {
 		return err
 	}
@@ -678,11 +679,10 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	key, err := censusKeyParse(ctx.URLParam("key"))
+	address, err := censusKeyParse(ctx.URLParam("key"))
 	if err != nil {
 		return err
 	}
-
 	ref, err := a.censusdb.Load(censusID, nil)
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
@@ -699,43 +699,41 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	// ZkAddress which follows a specific transformation process that must be
 	// implemented into the circom circuit also, and it is already hashed.
 	// Otherwhise, hash the key before get the proof.
-	leafKey := key
+	leafKey := address
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
-		leafKey, err = ref.Tree().Hash(key)
+		leafKey, err = ref.Tree().Hash(address)
 		if err != nil {
 			return err
 		}
 	}
-	leafV, siblings, err := ref.Tree().GenProof(leafKey)
+	response := Census{Type: censusType}
+	response.Value, response.CensusProof, err = ref.Tree().GenProof(leafKey)
 	if err != nil {
 		return ErrKeyNotFoundInCensus.With(hex.EncodeToString(leafKey))
 	}
-	response := Census{
-		Proof: siblings,
-		Value: leafV,
-		Type:  censusType,
+	if response.CensusRoot, err = ref.Tree().Root(); err != nil {
+		return ErrCensusRootIsNil.WithErr(err)
 	}
 
 	// Get the leaf siblings from arbo based on the key received and include
 	// them into the response, only if it is zkweighted.
 	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
-		response.Siblings, err = ref.Tree().GetCircomSiblings(leafKey)
+		response.CensusSiblings, err = zk.ProofToCircomSiblings(response.CensusProof)
 		if err != nil {
 			return ErrCantGetCircomSiblings.WithErr(err)
 		}
 	}
-	if len(leafV) > 0 {
+	if len(response.Value) > 0 {
 		// return the string representation of the census value (weight)
 		// to make the client know his voting power for the census
-		weight := ref.Tree().BytesToBigInt(leafV)
+		weight := ref.Tree().BytesToBigInt(response.Value)
 		response.Weight = (*types.BigInt)(weight)
 	}
-
+	// encode response
 	var data []byte
 	if data, err = json.Marshal(&response); err != nil {
 		return err
 	}
-
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
@@ -759,7 +757,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	if err := json.Unmarshal(msg.Data, &cdata); err != nil {
 		return err
 	}
-	if cdata.Key == nil || cdata.Proof == nil {
+	if cdata.Key == nil || cdata.CensusProof == nil {
 		return ErrParamKeyOrProofMissing
 	}
 
@@ -785,7 +783,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		}
 	}
 
-	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.Proof, cdata.Root)
+	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.CensusRoot)
 	if err != nil {
 		return ErrCensusProofVerificationFailed.WithErr(err)
 	}

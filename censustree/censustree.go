@@ -343,8 +343,3 @@ func (t *Tree) GetCensusWeight() (*big.Int, error) {
 
 	return t.BytesToBigInt(weight), nil
 }
-
-// GetCircomSiblings wraps the Arbo tree GetCircomSiblings function
-func (t *Tree) GetCircomSiblings(key []byte) ([]string, error) {
-	return t.tree.GetCircomSiblings(key)
-}

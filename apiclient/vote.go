@@ -26,7 +26,7 @@ import (
 //
 // Choices is a list of choices, where each position represents a question.
 // ElectionID is the ID of the election.
-// VotingWeight is the desired weight for voting. It can be less than or equal
+// VoteWeight is the desired weight for voting. It can be less than or equal
 // to the  weight registered in the census. If is defined as nil, it will be
 // equal to the registered one.
 // ProofMkTree is the proof of the vote for an off chain tree, weighted election.
@@ -36,13 +36,14 @@ import (
 // either models.ProofArbo_ADDRESS (default) or models.ProofArbo_PUBKEY
 // (deprecated).
 type VoteData struct {
-	Choices      []int
-	ElectionID   types.HexBytes
-	VotingWeight *big.Int
+	Choices    []int
+	ElectionID types.HexBytes
+	VoteWeight *big.Int
 
-	ProofMkTree *CensusProof
-	ProofCSP    types.HexBytes
-	Keys        []api.Key
+	ProofMkTree  *CensusProof
+	ProofSIKTree *CensusProof
+	ProofCSP     types.HexBytes
+	Keys         []api.Key
 
 	// if VoterAccount is set, it will be used to sign the vote
 	// instead of the keys found in HTTPclient.account
@@ -81,14 +82,21 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	switch {
 	case election.VoteMode.Anonymous:
 		// support no vote weight provided
-		if v.VotingWeight == nil {
-			v.VotingWeight = v.ProofMkTree.LeafWeight
+		if v.VoteWeight == nil {
+			v.VoteWeight = v.ProofMkTree.LeafWeight
 		}
-
 		// generate circuit inputs with the election, census and voter
 		// information and encode it into a json
-		rawInputs, err := circuit.GenerateCircuitInput(c.zkAddr, election.Census.CensusRoot, election.ElectionID,
-			v.ProofMkTree.LeafWeight, v.VotingWeight, v.ProofMkTree.Siblings)
+		rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
+			Account:         c.account,
+			ElectionId:      election.ElectionID,
+			CensusRoot:      election.Census.CensusRoot,
+			SIKRoot:         v.ProofSIKTree.Root,
+			CensusSiblings:  v.ProofMkTree.Siblings,
+			SIKSiblings:     v.ProofSIKTree.Siblings,
+			VoteWeight:      v.VoteWeight,
+			AvailableWeight: v.ProofMkTree.LeafWeight,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +116,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			return nil, err
 		}
 		// encode the proof into a protobuf
-		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil)
+		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil, nil)
 		if err != nil {
 			return nil, err
 		}
@@ -130,20 +138,20 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		}
 	case election.Census.CensusOrigin == censusOriginWeighted:
 		// support custom vote weight
-		var votingWeight []byte
-		if v.VotingWeight != nil {
-			votingWeight = v.VotingWeight.Bytes()
+		var voteWeight []byte
+		if v.VoteWeight != nil {
+			voteWeight = v.VoteWeight.Bytes()
 		}
 
 		// copy the census proof in a VoteEnvelope
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
-					Type:         models.ProofArbo_BLAKE2B,
-					Siblings:     v.ProofMkTree.Proof,
-					LeafWeight:   v.ProofMkTree.LeafValue,
-					KeyType:      v.ProofMkTree.KeyType,
-					VotingWeight: votingWeight,
+					Type:            models.ProofArbo_BLAKE2B,
+					Siblings:        v.ProofMkTree.Proof,
+					AvailableWeight: v.ProofMkTree.LeafValue,
+					KeyType:         v.ProofMkTree.KeyType,
+					VoteWeight:      voteWeight,
 				},
 			},
 		}

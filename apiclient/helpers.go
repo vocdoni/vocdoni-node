@@ -314,5 +314,4 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 		Payload:   fpackage.FaucetPayload,
 		Signature: fpackage.Signature,
 	}, nil
-
 }

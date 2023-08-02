@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -89,7 +90,11 @@ type State struct {
 	// chainID identifies the blockchain
 	chainID string
 	// electionPriceCalc is the calculator for the election price
-	ElectionPriceCalc *electionprice.Calculator
+	ElectionPriceCalc    *electionprice.Calculator
+	ProcessBlockRegistry *ProcessBlockRegistry
+
+	validSIKRoots    [][]byte
+	mtxValidSIKRoots *sync.Mutex
 }
 
 // NewState creates a new State
@@ -135,6 +140,12 @@ func NewState(dbType, dataDir string) (*State, error) {
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
 
+	s.ProcessBlockRegistry = &ProcessBlockRegistry{
+		db:    s.NoState(true),
+		state: s,
+	}
+	s.validSIKRoots = [][]byte{}
+	s.mtxValidSIKRoots = &sync.Mutex{}
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
 }
 
@@ -194,6 +205,14 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	treeCfg = StateTreeCfg(TreeFaucet)
+	if err := update.Add(treeCfg.Key(),
+		make([]byte, treeCfg.HashFunc().Len())); err != nil {
+		return nil, err
+	}
+	if _, err := update.SubTree(treeCfg); err != nil {
+		return nil, err
+	}
+	treeCfg = StateTreeCfg(TreeSIK)
 	if err := update.Add(treeCfg.Key(),
 		make([]byte, treeCfg.HashFunc().Len())); err != nil {
 		return nil, err

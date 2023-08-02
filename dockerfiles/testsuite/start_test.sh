@@ -16,7 +16,7 @@
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
 
-COMPOSE_CMD=${COMPOSE_CMD:-"docker-compose"}
+COMPOSE_CMD=${COMPOSE_CMD:-"docker compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
 [ -n "$NOTTY" ] && COMPOSE_CMD_RUN="$COMPOSE_CMD_RUN -T"
 
@@ -84,11 +84,12 @@ e2etest() {
 	shift
 	args=$@
 	id="${op}_$(echo $args | md5sum | awk '{print $1}')"
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 300 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 60000 \
 		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
 		  --operation=$op \
 		  --parallel=$CONCURRENT_CONNECTIONS \
+		  --timeout=10m \
 		  $args
 }
 
@@ -106,6 +107,10 @@ e2etest_encryptedelection() {
 
 e2etest_anonelection() {
 	e2etest anonelection
+}
+
+e2etest_hysteresis() {
+	e2etest hysteresis
 }
 
 e2etest_tokentxs() {

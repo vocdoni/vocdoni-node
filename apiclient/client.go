@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
@@ -43,7 +42,6 @@ type HTTPclient struct {
 	account *ethereum.SignKeys
 	chainID string
 	circuit circuit.ZkCircuitConfig
-	zkAddr  *zk.ZkAddress
 	retries int
 }
 
@@ -97,8 +95,6 @@ func (c *HTTPclient) SetAccount(accountPrivateKey string) error {
 	if err != nil {
 		return err
 	}
-
-	c.zkAddr, err = zk.AddressFromString(accountPrivateKey)
 	return err
 }
 
@@ -116,12 +112,6 @@ func (c *HTTPclient) Clone(accountPrivateKey string) *HTTPclient {
 // MyAddress returns the address of the account used for signing transactions.
 func (c *HTTPclient) MyAddress() common.Address {
 	return c.account.Address()
-}
-
-// MyZkAddress returns the zkAddress of the current account used for anonymous
-// voting
-func (c *HTTPclient) MyZkAddress() *zk.ZkAddress {
-	return c.zkAddr
 }
 
 // SetAuthToken configures the bearer authentication token.

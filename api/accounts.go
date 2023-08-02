@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -121,6 +123,12 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		}
 	}
 
+	sik, err := a.vocapp.State.SIKFromAddress(addr)
+	if err != nil && !errors.Is(err, state.ErrSIKNotFound) {
+		log.Warnf("uknown error getting SIK: %v", err)
+		return ErrGettingSIK.WithErr(err)
+	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
 		Address:       addr.Bytes(),
@@ -129,6 +137,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		ElectionIndex: acc.GetProcessIndex(),
 		InfoURL:       acc.GetInfoURI(),
 		Metadata:      accMetadata,
+		SIK:           types.HexBytes(sik),
 	}); err != nil {
 		return err
 	}

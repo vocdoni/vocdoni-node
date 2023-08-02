@@ -5,51 +5,73 @@ import (
 	"math/big"
 	"testing"
 
-	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/tree/arbo"
+
+	qt "github.com/frankban/quicktest"
 )
 
 const (
-	testAccountPrivateKey = "6430ab787ad5130942369901498a118fade013ebab5450efbfb6acac66d8fb88"
-	testElectionId        = "c5d2460186f760d51371516148fd334b4199052f01538553aa9a020200000000"
-	testCensusRoot        = "21f20a61be6bb9415b777367989313a2640109990d187e397fa74256361f0e11"
+	testElectionId = "c5d2460186f760d51371516148fd334b4199052f01538553aa9a020200000000"
+	testRoot       = "21f20a61be6bb9415b777367989313a2640109990d187e397fa74256361f0e11"
 )
 
-var testCensusSiblings = []string{"580248495380568564123114759404848148595751514101110571080218449954471889552", "633773650715998492339991508741183573324294111862264796224228057688802848801", "4989687640539066742397958643613126020089632025064585620245735039080884277747", "3863931244154987782138626341091989752721559524607603934673141845608721144566", "4688361268219000735189072482478199217683515606859266889918935760406393255791", "13548759886643907861771470850568634627625204202812868538547476494298706407763", "2714600331130374821301177119574534122901226309274343707259485383900427657102", "11263980701448890785172384726839875656945350242204041401041770089765910047533", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"}
+var testSiblings = []string{"580248495380568564123114759404848148595751514101110571080218449954471889552", "633773650715998492339991508741183573324294111862264796224228057688802848801", "4989687640539066742397958643613126020089632025064585620245735039080884277747", "3863931244154987782138626341091989752721559524607603934673141845608721144566", "4688361268219000735189072482478199217683515606859266889918935760406393255791", "13548759886643907861771470850568634627625204202812868538547476494298706407763", "2714600331130374821301177119574534122901226309274343707259485383900427657102", "11263980701448890785172384726839875656945350242204041401041770089765910047533", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0", "0"}
 
 func TestGenerateCircuitInput(t *testing.T) {
 	c := qt.New(t)
-	// Decode correctly the census root
-	censusRoot, err := hex.DecodeString(testCensusRoot)
-	c.Assert(err, qt.IsNil)
-	// Decode correctly the election ID
+
+	// decode the election ID
 	electionId, err := hex.DecodeString(testElectionId)
 	c.Assert(err, qt.IsNil)
-	// Generate the ZkAddress from the seed
-	zkAddr, err := zk.AddressFromString(testAccountPrivateKey)
+	// mock voter account and vote nullifier
+	acc := ethereum.NewSignKeys()
+	c.Assert(acc.Generate(), qt.IsNil)
+	nullifier, err := acc.AccountSIKnullifier(electionId, nil)
 	c.Assert(err, qt.IsNil)
-	// Instance the correct vote weight
-	factoryWeight := new(big.Int).SetUint64(10)
-	// Instance expected inputs
+	// mock the availableWeight
+	availableWeight := new(big.Int).SetUint64(10)
+	// calc vote hash
+	voteHash := zk.BytesToArboStr(availableWeight.Bytes())
+	// decode the test root
+	hexTestRoot, err := hex.DecodeString(testRoot)
+	c.Assert(err, qt.IsNil)
+	// mock user signature
+	signature, err := acc.SIKsignature()
+	c.Assert(err, qt.IsNil)
+	// mock expected circuit inputs
 	expected := &CircuitInputs{
-		CensusRoot:     "7714269703880573582519379213888374390024853519732158909852028066903886590497",
-		CensusSiblings: testCensusSiblings,
-		VotingWeight:   "10",
-		FactoryWeight:  "10",
-		PrivateKey:     "6735248701457559886126785742277482466576784161746903995071090348762482970571",
-		VoteHash:       []string{"242108076058607163538102198631955675649", "142667662805314151155817304537028292174"},
-		ProcessId:      []string{"18517551409637235305922365793037451371", "135271561984151624501280044000043030166"},
-		Nullifier:      "13830839320176376721270728875863016529251254252806875185281289627544884475042",
+		ElectionId:      []string{"18517551409637235305922365793037451371", "135271561984151624501280044000043030166"},
+		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
+		AvailableWeight: availableWeight.String(),
+		VoteHash:        voteHash,
+		SIKRoot:         "7714269703880573582519379213888374390024853519732158909852028066903886590497",
+		CensusRoot:      "7714269703880573582519379213888374390024853519732158909852028066903886590497",
+
+		Address:   arbo.BytesToBigInt(acc.Address().Bytes()).String(),
+		Password:  "0",
+		Signature: zk.BigToFF(new(big.Int).SetBytes(signature)).String(),
+
+		VoteWeight:     availableWeight.String(),
+		CensusSiblings: testSiblings,
+		SIKSiblings:    testSiblings,
 	}
 	// Generate correct inputs
-	rawInputs, err := GenerateCircuitInput(zkAddr, censusRoot, electionId, factoryWeight, factoryWeight, testCensusSiblings)
+	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings, nil,
+		availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
-	rawInputs, err = GenerateCircuitInput(zkAddr, censusRoot, electionId, new(big.Int).SetInt64(1), factoryWeight, testCensusSiblings)
+	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings,
+		big.NewInt(1), availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
-	_, err = GenerateCircuitInput(zkAddr, nil, electionId, new(big.Int).SetInt64(1), factoryWeight, testCensusSiblings)
+	_, err = GenerateCircuitInput(CircuitInputsParameters{nil, nil, electionId,
+		hexTestRoot, hexTestRoot, testSiblings, testSiblings, big.NewInt(1),
+		availableWeight})
 	c.Assert(err, qt.IsNotNil)
 }

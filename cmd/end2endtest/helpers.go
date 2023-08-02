@@ -15,7 +15,6 @@ import (
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -61,10 +60,17 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 	}
 }
 
-func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
+func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclient.HTTPclient, error) {
+	accountApi := t.api.Clone(privateKey)
+	if acc, err := accountApi.Account(""); err == nil {
+		return acc, accountApi, nil
+	}
+
+	address := accountApi.MyAddress().Hex()
+
 	faucetPkg, err := faucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	accountMetadata := &vapi.AccountMetadata{
@@ -74,33 +80,33 @@ func (t *e2eElection) createAccount(address string) (*vapi.Account, error) {
 	}
 
 	log.Infof("creating Vocdoni account %s", address)
-	hash, err := t.api.AccountBootstrap(faucetPkg, accountMetadata)
+	hash, err := accountApi.AccountBootstrap(faucetPkg, accountMetadata, nil)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 	defer cancel()
 
-	if _, err := t.api.WaitUntilTxIsMined(ctx, hash); err != nil {
+	if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
 		log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	// check the account
-	acc, err := t.api.Account("")
+	acc, err := accountApi.Account("")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if t.config.faucet != "" && acc.Balance == 0 {
 		log.Error("account balance is 0")
-		return nil, err
+		return nil, nil, err
 	}
-	return acc, nil
+	return acc, accountApi, nil
 
 }
 
-func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.HexBytes, nvoterKeys int) error {
+func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, nvoterKeys int) error {
 	participants := &vapi.CensusParticipants{}
 
 	voterAccounts := t.voterAccounts
@@ -112,13 +118,9 @@ func (t *e2eElection) addParticipantsCensus(censusType string, censusID types.He
 	}
 
 	for i, voterAccount := range voterAccounts {
-		keyAddr, err := censusParticipantKey(voterAccount, censusType)
-		if err != nil {
-			return err
-		}
 		participants.Participants = append(participants.Participants,
 			vapi.CensusParticipant{
-				Key:    keyAddr,
+				Key:    voterAccount.Address().Bytes(),
 				Weight: (*types.BigInt)(new(big.Int).SetUint64(defaultWeight)),
 			})
 
@@ -165,12 +167,14 @@ func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.
 	return election, nil
 }
 
-func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) map[string]*apiclient.CensusProof {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) (map[string]*apiclient.CensusProof, map[string]*apiclient.CensusProof) {
 	type voterProof struct {
-		proof   *apiclient.CensusProof
-		address string
+		proof    *apiclient.CensusProof
+		sikproof *apiclient.CensusProof
+		address  string
 	}
 	proofs := make(map[string]*apiclient.CensusProof, len(t.voterAccounts))
+	sikProofs := make(map[string]*apiclient.CensusProof, len(t.voterAccounts))
 	proofCh := make(chan *voterProof)
 	stopProofs := make(chan bool)
 	go func() {
@@ -178,52 +182,41 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 			select {
 			case p := <-proofCh:
 				proofs[p.address] = p.proof
+				sikProofs[p.address] = p.sikproof
 			case <-stopProofs:
 				return
 			}
 		}
 	}()
 
-	apiClientMtx := &sync.Mutex{}
 	addNaccounts := func(accounts []*ethereum.SignKeys, wg *sync.WaitGroup) {
 		defer wg.Done()
 		log.Infof("generating %d voting proofs", len(accounts))
 		for _, acc := range accounts {
-			voterKey := acc.Address().Bytes()
+			voterProof := &voterProof{address: acc.Address().Hex()}
 
-			if isAnonymousVoting {
-				apiClientMtx.Lock()
-				privKey := acc.PrivateKey()
-				if err := t.api.SetAccount(privKey.String()); err != nil {
-					apiClientMtx.Unlock()
-					log.Fatal(err)
-					return
-				}
-				voterKey = t.api.MyZkAddress().Bytes()
-			}
-
-			var pr *apiclient.CensusProof
 			var err error
 			if csp != nil {
-				pr, err = cspGenProof(t.election.ElectionID, voterKey, csp)
+				voterProof.proof, err = cspGenProof(t.election.ElectionID, acc.Address().Bytes(), csp)
 			} else {
-				pr, err = t.api.CensusGenProof(root, voterKey)
+				voterPrivKey := acc.PrivateKey()
+				voterApi := t.api.Clone(voterPrivKey.String())
+				voterProof.proof, err = voterApi.CensusGenProof(root, acc.Address().Bytes())
+				if err != nil {
+					log.Warn(err)
+				}
 				if isAnonymousVoting {
-					apiClientMtx.Unlock()
+					voterProof.sikproof, err = voterApi.GenSIKProof()
 				}
 			}
-
 			if err != nil {
-				log.Fatal(err)
+				log.Warn(err)
 			}
 
 			if !isAnonymousVoting {
-				pr.KeyType = models.ProofArbo_ADDRESS
+				voterProof.proof.KeyType = models.ProofArbo_ADDRESS
 			}
-			proofCh <- &voterProof{
-				proof:   pr,
-				address: acc.Address().Hex(),
-			}
+			proofCh <- voterProof
 		}
 	}
 
@@ -242,25 +235,16 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 	log.Debugf("%d/%d voting proofs generated successfully", len(proofs), len(t.voterAccounts))
 	stopProofs <- true
 
-	return proofs
+	return proofs, sikProofs
 }
 
 func (t *e2eElection) setupAccount() error {
-	// Set the account in the API client, so we can sign transactions
-	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
+	account, accountApi, err := t.createAccount(t.config.accountPrivKeys[0])
+	if err != nil {
 		return err
 	}
-
-	// If the account does not exist, create a new one
-	// TODO: check if the account balance is low and use the faucet
-	acc, err := t.api.Account("")
-	if err != nil {
-		acc, err = t.createAccount(t.api.MyAddress().Hex())
-		if err != nil {
-			return err
-		}
-	}
-	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), acc.Balance)
+	t.api = accountApi
+	log.Infof("account %s balance is %d", t.api.MyAddress().Hex(), account.Balance)
 	return nil
 }
 
@@ -276,8 +260,23 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes,
 	// Generate nAcct participant accounts
 	t.voterAccounts = append(t.voterAccounts, ethereum.NewSignKeysBatch(nAcct)...)
 
+	// Register the accounts in the vochain if is required
+	if censusType == vapi.CensusTypeZKWeighted {
+		for _, acc := range t.voterAccounts {
+			pKey := acc.PrivateKey()
+			if _, _, err := t.createAccount(pKey.String()); err != nil &&
+				!strings.Contains(err.Error(), "createAccountTx: account already exists") {
+				return nil, "", err
+			}
+		}
+
+		if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
+			return nil, "", err
+		}
+	}
+
 	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(censusType, censusID, nAcct); err != nil {
+	if err := t.addParticipantsCensus(censusID, nAcct); err != nil {
 		return nil, "", err
 	}
 
@@ -342,7 +341,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 		return err
 	}
 	t.election = election
-	t.proofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
+	t.proofs, t.sikproofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
 
 	return nil
 }
@@ -389,7 +388,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 	t.election = election
 	prc.ProcessId = t.election.ElectionID
 
-	t.proofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
+	t.proofs, t.sikproofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
 
 	return nil
 }
@@ -530,7 +529,9 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 			for len(queue) > 0 {
 				log.Infow("thread sending votes", "queue", len(queue))
 				for i, vote := range queue {
-					_, err := t.api.Vote(vote)
+					accPrivKey := vote.VoterAccount.PrivateKey()
+					voterApi := t.api.Clone(accPrivKey.String())
+					_, err := voterApi.Vote(vote)
 					switch {
 					case err == nil:
 						delete(queue, i)
@@ -540,10 +541,13 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 					case strings.Contains(err.Error(), "mempool is full"):
 						log.Warn(err)
 						// wait and retry
-						_ = t.api.WaitUntilNextBlock()
+						_ = voterApi.WaitUntilNextBlock()
 					case strings.Contains(err.Error(), "already exists") ||
 						strings.Contains(err.Error(), "overwrite count reached"):
 						// don't retry
+						delete(queue, i)
+						errs[i] = err
+					case strings.Contains(err.Error(), "expired sik root"):
 						delete(queue, i)
 						errs[i] = err
 					default:
@@ -570,22 +574,6 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 	default:
 		return apiclient.GetFaucetPackageFromRemoteService(faucet+myAddress, faucetAuthToken)
 	}
-}
-
-func censusParticipantKey(voterAccount *ethereum.SignKeys, censusType string) ([]byte, error) {
-	var key []byte
-
-	switch censusType {
-	case vapi.CensusTypeWeighted:
-		key = voterAccount.Address().Bytes()
-	case vapi.CensusTypeZKWeighted:
-		zkAddr, err := zk.AddressFromSignKeys(voterAccount)
-		if err != nil {
-			return nil, err
-		}
-		key = zkAddr.Bytes()
-	}
-	return key, nil
 }
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {
@@ -660,7 +648,7 @@ func (t *e2eElection) verifyVoteCount(nvotesExpected int) error {
 	}
 
 	log.Infof("%d votes registered successfully, took %s (%d votes/second)",
-		t.config.nvotes, time.Since(startTime), int(float64(nvotesExpected)/time.Since(startTime).Seconds()))
+		nvotesExpected, time.Since(startTime), int(float64(nvotesExpected)/time.Since(startTime).Seconds()))
 
 	return nil
 }

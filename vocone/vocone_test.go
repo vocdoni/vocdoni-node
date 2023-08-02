@@ -65,7 +65,7 @@ func TestVocone(t *testing.T) {
 
 func testCreateAccount(cli *apiclient.HTTPclient) error {
 	// Create a new account
-	txhash, err := cli.AccountBootstrap(nil, nil)
+	txhash, err := cli.AccountBootstrap(nil, nil, nil)
 	if err != nil {
 		return err
 	}

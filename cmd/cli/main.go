@@ -308,7 +308,7 @@ func bootStrapAccount(cli *vocdoniCLI) error {
 
 	txHash, err := cli.api.AccountBootstrap(faucetPkg, &api.AccountMetadata{
 		Name: map[string]string{"default": "vocdoni cli account " + cli.getCurrentAccount().Address.Hex()},
-	})
+	}, nil)
 	if err != nil {
 		return err
 	}

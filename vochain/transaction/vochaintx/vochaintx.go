@@ -1,6 +1,8 @@
 package vochaintx
 
 import (
+	"fmt"
+
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
@@ -27,6 +29,9 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 		return err
 	}
 	tx.Tx = new(models.Tx)
+	if stx.GetTx() == nil {
+		return fmt.Errorf("nil transaction")
+	}
 	if err := proto.Unmarshal(stx.GetTx(), tx.Tx); err != nil {
 		return err
 	}

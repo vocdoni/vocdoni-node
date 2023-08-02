@@ -1008,17 +1008,32 @@ func PackSiblings(hashFunc HashFunction, siblings [][]byte) ([]byte, error) {
 
 // UnpackSiblings unpacks the siblings from a byte array.
 func UnpackSiblings(hashFunc HashFunction, b []byte) ([][]byte, error) {
-	fullLen := binary.LittleEndian.Uint16(b[0:2])
-	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
-	if len(b) != int(fullLen) {
-		return nil,
-			fmt.Errorf("expected len: %d, current len: %d",
-				fullLen, len(b))
+	// to prevent runtime slice out of bounds error check if the length of the
+	// rest of the slice is at least equal to the encoded full length value
+	if len(b) < 4 {
+		return nil, fmt.Errorf("no packed siblings provided")
 	}
 
+	fullLen := binary.LittleEndian.Uint16(b[0:2])
+	if len(b) != int(fullLen) {
+		return nil, fmt.Errorf("expected len: %d, current len: %d", fullLen, len(b))
+	}
+
+	l := binary.LittleEndian.Uint16(b[2:4]) // bitmap bytes length
+	// to prevent runtime slice out of bounds error check if the length of the
+	// rest of the slice is at least equal to the encoded bitmap length value
+	if len(b) < int(4+l) {
+		return nil, fmt.Errorf("expected len: %d, current len: %d", 4+l, len(b))
+	}
 	bitmapBytes := b[4 : 4+l]
 	bitmap := bytesToBitmap(bitmapBytes)
 	siblingsBytes := b[4+l:]
+	// to prevent a runtime slice out of bounds error, check if the length of
+	// the siblings slice is a multiple of hashFunc length, because the
+	// following loop will iterate over it in steps of that length.
+	if len(siblingsBytes)%hashFunc.Len() != 0 {
+		return nil, fmt.Errorf("bad formated siblings")
+	}
 	iSibl := 0
 	emptySibl := make([]byte, hashFunc.Len())
 	var siblings [][]byte

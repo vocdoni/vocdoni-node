@@ -14,6 +14,7 @@ import (
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/iden3/go-rapidsnark/witness"
+	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // TODO: Refactor the error handling to include the trace of the original error
@@ -22,6 +23,7 @@ var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
 	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
 	ErrParsingNullifier   = fmt.Errorf("error parsing proof nullifier string to big.Int")
+	ErrParsingSIKRoot     = fmt.Errorf("error parsing proof sIKRoot string to []byte")
 	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
 	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
 	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
@@ -32,6 +34,10 @@ var (
 	ErrDecodingProof      = fmt.Errorf("error decoding prove as []byte")
 	ErrVerifyProof        = fmt.Errorf("error during zksnark verification")
 )
+
+// DefaultPubSignals constant contains the default number of public signal that
+// a proof has.
+const DefaultPubSignals = 8
 
 // ProofData struct contains the calculated parameters of a Proof. It allows to
 // encode and decode go-rapidsnark inputs and outputs easily.
@@ -54,12 +60,12 @@ type Proof struct {
 func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 	data := ProofData{}
 	if err := json.Unmarshal(proofData, &data); err != nil {
-		return nil, ErrEncodingProof
+		return nil, fmt.Errorf("%w: %w", ErrEncodingProof, err)
 	}
 
 	signals := []string{}
 	if err := json.Unmarshal(pubSignals, &signals); err != nil {
-		return nil, ErrEncodingProof
+		return nil, fmt.Errorf("%w: %w", ErrEncodingProof, err)
 	}
 	return &Proof{Data: data, PubSignals: signals}, nil
 }
@@ -69,31 +75,31 @@ func ParseProof(proofData, pubSignals []byte) (*Proof, error) {
 func (p *Proof) Bytes() ([]byte, []byte, error) {
 	proofData, err := json.Marshal(p.Data)
 	if err != nil {
-		return nil, nil, ErrDecodingProof
+		return nil, nil, fmt.Errorf("%w: %w", ErrDecodingProof, err)
 	}
 
 	pubSignals, err := json.Marshal(p.PubSignals)
 	if err != nil {
-		return nil, nil, ErrDecodingProof
+		return nil, nil, fmt.Errorf("%w: %w", ErrDecodingProof, err)
 	}
 
 	return proofData, pubSignals, nil
 }
 
-// Weight decodes the vote weight value from the current proof public signals
-// and return it as a big.Int.
-func (p *Proof) Weight() (*big.Int, error) {
+// VoteWeight decodes the vote weight value from the current proof public
+// signals and return it as a big.Int.
+func (p *Proof) VoteWeight() (*big.Int, error) {
 	// Check if the current proof contains public signals and it contains the
 	// correct number of positions.
-	if p.PubSignals == nil || len(p.PubSignals) < 5 {
+	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat
 	}
-	// Get the weight from the fourth public signal of the proof
-	strWeight := p.PubSignals[4]
+	// Get the weight from the fifth public signal of the proof
+	strWeight := p.PubSignals[7]
 	// Parse it into a big.Int
 	weight, ok := new(big.Int).SetString(strWeight, 10)
 	if !ok {
-		return nil, ErrParsingNullifier
+		return nil, ErrParsingWeight
 	}
 	return weight, nil
 }
@@ -101,17 +107,30 @@ func (p *Proof) Weight() (*big.Int, error) {
 // Nullifier decodes the vote nullifier value from the current proof public
 // signals and return it as a big.Int
 func (p *Proof) Nullifier() (*big.Int, error) {
-	if p.PubSignals == nil || len(p.PubSignals) < 5 {
+	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
 		return nil, ErrPublicSignalFormat
 	}
-	// Get the nullifier from the fourth public signal of the proof
-	strNullifier := p.PubSignals[3]
+	// Get the nullifier from the third public signal of the proof
+	strNullifier := p.PubSignals[2]
 	// Parse it into a big.Int
 	nullifier, ok := new(big.Int).SetString(strNullifier, 10)
 	if !ok {
-		return nil, ErrParsingWeight
+		return nil, ErrParsingNullifier
 	}
 	return nullifier, nil
+}
+
+// SIKRoot function returns the sIKRoot included into the current proof.
+func (p *Proof) SIKRoot() ([]byte, error) {
+	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
+		return nil, ErrPublicSignalFormat
+	}
+	arboSIK, ok := new(big.Int).SetString(p.PubSignals[5], 10)
+	if !ok {
+		return nil, ErrParsingSIKRoot
+	}
+
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), arboSIK), nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based
@@ -123,7 +142,8 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// catch the panic and return an error instead.
 	defer func() {
 		if p := recover(); p != nil {
-			panicErr = ErrParsingWitness
+			err, _ := p.(error)
+			panicErr = fmt.Errorf("%w: %w", ErrParsingWitness, err)
 		}
 	}()
 
@@ -132,20 +152,20 @@ func calcWitness(wasmBytes, inputsBytes []byte) (res []byte, panicErr error) {
 	// witness calculation.
 	inputs, err := witness.ParseInputs(inputsBytes)
 	if err != nil {
-		return nil, ErrParsingWitness
+		return nil, fmt.Errorf("%w: %w", ErrParsingWitness, err)
 	}
 
 	// Instances a go-rapidsnark/witness calculator with the provided wasm
 	// []byte
 	calculator, err := witness.NewCircom2WitnessCalculator(wasmBytes, true)
 	if err != nil {
-		return nil, ErrInitWitnessCalc
+		return nil, fmt.Errorf("%w: %w", ErrInitWitnessCalc, err)
 	}
 
 	// Perform the witness calculation
 	wtns, err := calculator.CalculateWTNSBin(inputs, true)
 	if err != nil {
-		return nil, ErrWitnessCalc
+		return nil, fmt.Errorf("%w: %w", ErrWitnessCalc, err)
 	}
 
 	return wtns, nil
@@ -168,7 +188,7 @@ func Prove(zKey, wasm, inputs []byte) (*Proof, error) {
 	// proving zkey provided.
 	strProofData, strPubSignals, err := prover.Groth16ProverRaw(zKey, wtns)
 	if err != nil {
-		return nil, ErrProofGen
+		return nil, fmt.Errorf("%w: %w", ErrProofGen, err)
 	}
 
 	// Parse the components generated into a prover.Proof struct
@@ -194,7 +214,7 @@ func (p *Proof) Verify(vKey []byte) error {
 	}
 	// Try to verify the provided proof with go-rapidsnark/verifier.
 	if err := verifier.VerifyGroth16(proof, vKey); err != nil {
-		return ErrVerifyProof
+		return fmt.Errorf("%w: %w", ErrVerifyProof, err)
 	}
 
 	// Return nil if everything is ok.

@@ -1,9 +1,11 @@
 package circuit
 
 import (
+	"encoding/json"
 	"fmt"
 	"math/big"
 
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/tree/arbo"
 )
@@ -12,14 +14,41 @@ import (
 // strings or slices of strings, and the struct must be able to be encoded in
 // json.
 type CircuitInputs struct {
-	CensusRoot     string   `json:"censusRoot"`
+	// Public inputs
+	ElectionId      []string `json:"electionId"`
+	Nullifier       string   `json:"nullifier"`
+	AvailableWeight string   `json:"availableWeight"`
+	VoteHash        []string `json:"voteHash"`
+	SIKRoot         string   `json:"sikRoot"`
+	CensusRoot      string   `json:"censusRoot"`
+
+	// Private inputs
+	Address   string `json:"address"`
+	Password  string `json:"password"`
+	Signature string `json:"signature"`
+
+	VoteWeight     string   `json:"voteWeight"`
 	CensusSiblings []string `json:"censusSiblings"`
-	VotingWeight   string   `json:"votingWeight"`
-	FactoryWeight  string   `json:"factoryWeight"`
-	PrivateKey     string   `json:"privateKey"`
-	VoteHash       []string `json:"voteHash"`
-	ProcessId      []string `json:"processId"`
-	Nullifier      string   `json:"nullifier"`
+	SIKSiblings    []string `json:"sikSiblings"`
+}
+
+func (ci *CircuitInputs) String() string {
+	bstr, _ := json.Marshal(ci)
+	return string(bstr)
+}
+
+// CircuitInputsParameters struct envolves all the parameters to generate the
+// inputs for the current ZK circuit.
+type CircuitInputsParameters struct {
+	Account         *ethereum.SignKeys
+	Password        []byte
+	ElectionId      []byte
+	CensusRoot      []byte
+	SIKRoot         []byte
+	CensusSiblings  []string
+	SIKSiblings     []string
+	VoteWeight      *big.Int
+	AvailableWeight *big.Int
 }
 
 // GenerateCircuitInput receives the required parameters to encode them
@@ -27,30 +56,41 @@ type CircuitInputs struct {
 // ZkAddress to get the private key and generates the nullifier. Also encodes
 // the census root, the election id and the weight provided, and includes the
 // census siblings provided into the result.
-func GenerateCircuitInput(zkAddr *zk.ZkAddress, censusRoot, electionId []byte,
-	factoryWeight, votingWeight *big.Int, censusSiblings []string) (*CircuitInputs, error) {
-	if zkAddr == nil || censusRoot == nil || electionId == nil ||
-		factoryWeight == nil || votingWeight == nil || len(censusSiblings) == 0 {
+func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
+	if p.Account == nil || p.ElectionId == nil || p.CensusRoot == nil || p.SIKRoot == nil ||
+		p.AvailableWeight == nil || len(p.CensusSiblings) == 0 || len(p.SIKSiblings) == 0 {
 		return nil, fmt.Errorf("bad arguments provided")
 	}
-
-	// get nullifier
-	nullifier, err := zkAddr.Nullifier(electionId)
-	if err != nil {
-		return nil, fmt.Errorf("error generating the nullifier: %w", err)
+	if p.VoteWeight == nil {
+		p.VoteWeight = p.AvailableWeight
 	}
 
+	nullifier, err := p.Account.AccountSIKnullifier(p.ElectionId, p.Password)
+	if err != nil {
+		return nil, fmt.Errorf("error generating nullifier: %w", err)
+	}
+	ffPassword := new(big.Int)
+	if p.Password != nil {
+		ffPassword = zk.BigToFF(new(big.Int).SetBytes(p.Password))
+	}
+	signature, err := p.Account.SIKsignature()
+	if err != nil {
+		return nil, err
+	}
 	return &CircuitInputs{
-		// Encode census root
-		CensusRoot:     arbo.BytesToBigInt(censusRoot).String(),
-		CensusSiblings: censusSiblings,
-		VotingWeight:   votingWeight.String(),
-		FactoryWeight:  factoryWeight.String(),
-		PrivateKey:     zkAddr.PrivKey.String(),
-		// Encode weight into voteHash
-		VoteHash: zk.BytesToArboStr(factoryWeight.Bytes()),
-		// Encode electionId
-		ProcessId: zk.BytesToArboStr(electionId),
-		Nullifier: nullifier.String(),
+		ElectionId:      zk.BytesToArboStr(p.ElectionId),
+		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
+		AvailableWeight: p.AvailableWeight.String(),
+		VoteHash:        zk.BytesToArboStr(p.AvailableWeight.Bytes()),
+		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
+		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
+
+		Address:   arbo.BytesToBigInt(p.Account.Address().Bytes()).String(),
+		Password:  ffPassword.String(),
+		Signature: zk.BigToFF(new(big.Int).SetBytes(signature)).String(),
+
+		VoteWeight:     p.VoteWeight.String(),
+		CensusSiblings: p.CensusSiblings,
+		SIKSiblings:    p.SIKSiblings,
 	}, nil
 }

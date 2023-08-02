@@ -11,8 +11,9 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/util"
+
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
@@ -112,9 +113,9 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, keyWeight.String())
 
 	proof := &Census{
-		Key:   key,
-		Proof: censusData.Proof,
-		Value: censusData.Value,
+		Key:         key,
+		CensusProof: censusData.CensusProof,
+		Value:       censusData.Value,
 	}
 	resp, code = c.Request("POST", proof, id2, "verify")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
@@ -225,9 +226,10 @@ func TestCensusProof(t *testing.T) {
 		&models.Proof{
 			Payload: &models.Proof_Arbo{
 				Arbo: &models.ProofArbo{
-					Type:       models.ProofArbo_BLAKE2B,
-					Siblings:   censusData.Proof,
-					LeafWeight: censusData.Value,
+					Type:            models.ProofArbo_BLAKE2B,
+					Siblings:        censusData.CensusProof,
+					AvailableWeight: censusData.Value,
+					VoteWeight:      censusData.Value,
 				},
 			},
 		},
@@ -239,42 +241,49 @@ func TestCensusProof(t *testing.T) {
 }
 
 func TestCensusZk(t *testing.T) {
+	c := qt.New(t)
+
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
-	qt.Assert(t, err, qt.IsNil)
+	c.Assert(err, qt.IsNil)
 
-	api, err := NewAPI(&router, "/", t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	testApi, err := NewAPI(&router, "/", t.TempDir())
+	c.Assert(err, qt.IsNil)
 
 	// Create local key value database
 	db, err := metadb.New(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
+	c.Assert(err, qt.IsNil)
 	censusDB := censusdb.NewCensusDB(db)
 
 	storage := ipfs.MockIPFS(t)
 	app := vochain.TestBaseApplication(t)
-	api.Attach(app, nil, nil, storage, censusDB)
-	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
+	testApi.Attach(app, nil, nil, storage, censusDB)
+	c.Assert(testApi.EnableHandlers(CensusHandler), qt.IsNil)
 
 	token1 := uuid.New()
-	c := testutil.NewTestHTTPclient(t, addr, &token1)
+	httpClient := testutil.NewTestHTTPclient(t, addr, &token1)
 
 	// create a new zk census
-	resp, code := c.Request("POST", nil, CensusTypeZKWeighted)
-	qt.Assert(t, code, qt.Equals, 200)
+	resp, code := httpClient.Request("POST", nil, CensusTypeZKWeighted)
+	c.Assert(code, qt.Equals, 200)
 	censusData := &Census{}
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
 	id1 := censusData.CensusID.String()
 
 	// add a bunch of keys and values (weights)
-	keys := [][]byte{}
+	var accounts []*ethereum.SignKeys
+	var keys [][]byte
 	for i := 1; i < 11; i++ {
-		zkAddr, err := zk.NewRandAddress()
-		qt.Assert(t, err, qt.IsNil)
-		keys = append(keys, zkAddr.Bytes())
+		acc := ethereum.NewSignKeys()
+		c.Assert(acc.Generate(), qt.IsNil)
+		accounts = append(accounts, acc)
+		keys = append(keys, acc.Address().Bytes())
+		// generate sik and create the vochain account for this voter with it
+		sik, err := acc.AccountSIK(nil)
+		c.Assert(err, qt.IsNil)
+		c.Assert(testApi.vocapp.State.SetAddressSIK(acc.Address(), sik), qt.IsNil)
 	}
-
 	weight := 0
 	index := uint64(0)
 	cparts := CensusParticipants{}
@@ -286,30 +295,55 @@ func TestCensusZk(t *testing.T) {
 		weight += i
 		index++
 	}
-	_, code = c.Request("POST", &cparts, id1, "participants")
-	qt.Assert(t, code, qt.Equals, 200)
+	_, code = httpClient.Request("POST", &cparts, id1, "participants")
+	c.Assert(code, qt.Equals, 200)
 
 	// check weight and size
-	resp, code = c.Request("GET", nil, id1, "weight")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, fmt.Sprintf("%d", weight))
+	resp, code = httpClient.Request("GET", nil, id1, "weight")
+	c.Assert(code, qt.Equals, 200)
+	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
+	c.Assert(censusData.Weight.String(), qt.Equals, fmt.Sprintf("%d", weight))
 
-	resp, code = c.Request("GET", nil, id1, "size")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Size, qt.Equals, index)
+	resp, code = httpClient.Request("GET", nil, id1, "size")
+	c.Assert(code, qt.Equals, 200)
+	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
+	c.Assert(censusData.Size, qt.Equals, index)
 
 	// publish the census
-	resp, code = c.Request("POST", nil, id1, "publish")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
+	resp, code = httpClient.Request("POST", nil, id1, "publish")
+	c.Assert(code, qt.Equals, 200)
+	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
+	c.Assert(censusData.CensusID, qt.IsNotNil)
 	root := censusData.CensusID.String()
 
 	// generate a proof
-	resp, code = c.Request("GET", nil, root, "proof", fmt.Sprintf("%x", keys[0]))
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
+	resp, code = httpClient.Request("GET", nil, root, "proof", accounts[0].AddressString())
+	c.Assert(code, qt.Equals, 200)
+	c.Assert(json.Unmarshal(resp, censusData), qt.IsNil)
+	c.Assert(censusData.Weight.String(), qt.Equals, "1")
+
+	// verify the proof
+	electionID := util.RandomBytes(32)
+	valid, newWeight, err := transaction.VerifyProof(
+		&models.Process{
+			ProcessId:    electionID,
+			CensusRoot:   censusData.CensusID,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		},
+		&models.Proof{
+			Payload: &models.Proof_Arbo{
+				Arbo: &models.ProofArbo{
+					Type:            models.ProofArbo_POSEIDON,
+					Siblings:        censusData.CensusProof,
+					AvailableWeight: censusData.Value,
+					VoteWeight:      censusData.Value,
+				},
+			},
+		},
+		state.NewVoterID(state.VoterIDTypeECDSA, accounts[0].PublicKey()),
+	)
+
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, valid, qt.IsTrue)
+	qt.Assert(t, newWeight.Uint64(), qt.Equals, uint64(1))
 }

@@ -3,6 +3,7 @@ package vochain
 import (
 	"context"
 	"encoding/json"
+	"math/big"
 	"testing"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
@@ -10,11 +11,47 @@ import (
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
+
+// testCreateKeysAndBuildCensus creates a bunch of random keys and a new zk
+// friendly census tree (using Poseidon as tree hash and the weight provided as
+// leaf value). It returns the keys, the census root and the proofs for each key.
+func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.Int) ([]*ethereum.SignKeys, []byte, [][]byte) {
+	db := metadb.NewTest(t)
+	tr, err := censustree.New(censustree.Options{Name: "testcensus", ParentDB: db,
+		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_POSEIDON})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), weight)
+	keys := ethereum.NewSignKeysBatch(size)
+	for _, k := range keys {
+		qt.Check(t, err, qt.IsNil)
+		err = tr.Add(k.Address().Bytes(), encWeight)
+		qt.Check(t, err, qt.IsNil)
+	}
+
+	tr.Publish()
+
+	root, err := tr.Root()
+	qt.Check(t, err, qt.IsNil)
+	var proofs [][]byte
+	for _, k := range keys {
+		_, proof, err := tr.GenProof(k.Address().Bytes())
+		qt.Check(t, err, qt.IsNil)
+		proofs = append(proofs, proof)
+		valid, err := tr.VerifyProof(k.Address().Bytes(), encWeight, proof, root)
+		qt.Check(t, err, qt.IsNil)
+		qt.Check(t, valid, qt.IsTrue)
+	}
+	return keys, root, proofs
+}
 
 // testCreateKeysAndBuildCensus creates a bunch of random keys and a new census tree.
 // It returns the keys, the census root and the proofs for each key.

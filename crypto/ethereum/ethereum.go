@@ -8,25 +8,31 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"math/big"
 	"sync"
 
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	"github.com/iden3/go-iden3-crypto/poseidon"
+	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 )
 
-// SignatureLength is the size of an ECDSA signature in hexString format
-const SignatureLength = ethcrypto.SignatureLength
-
-// PubKeyLengthBytes is the size of a Public Key
-const PubKeyLengthBytes = 33
-
-// PubKeyLengthBytesUncompressed is the size of a uncompressed Public Key
-const PubKeyLengthBytesUncompressed = 65
-
-// SigningPrefix is the prefix added when hashing
-const SigningPrefix = "\u0019Ethereum Signed Message:\n"
+const (
+	// SignatureLength is the size of an ECDSA signature in hexString format
+	SignatureLength = ethcrypto.SignatureLength
+	// PubKeyLengthBytes is the size of a Public Key
+	PubKeyLengthBytes = 33
+	// PubKeyLengthBytesUncompressed is the size of a uncompressed Public Key
+	PubKeyLengthBytesUncompressed = 65
+	// SigningPrefix is the prefix added when hashing
+	SigningPrefix = "\u0019Ethereum Signed Message:\n"
+	// DefaultSIKPayload conatains the default seed to sing during
+	// SIK generation
+	DefaultSIKPayload = "vocdoni-sik-payload"
+)
 
 // SignKeys represents an ECDSA pair of keys for signing.
 // Authorized addresses is a list of Ethereum like addresses which are checked on Verify
@@ -182,6 +188,18 @@ func (k *SignKeys) SignVocdoniMsg(message []byte) ([]byte, error) {
 	return signature, nil
 }
 
+// SIKsignature signs the default vocdoni sik payload. It envolves the
+// SignEthereum method, using the DefaultSIKPayload and discarding the last
+// byte of the signature (used for recovery), different that the same byte of a
+// signature generated with javascript.
+func (k *SignKeys) SIKsignature() ([]byte, error) {
+	sign, err := k.SignEthereum([]byte(DefaultSIKPayload))
+	if err != nil {
+		return nil, err
+	}
+	return sign[:SignatureLength-1], nil
+}
+
 // VerifySender verifies if a message is sent by some Authorized address key
 func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Address, error) {
 	recoveredAddr, err := AddrFromSignature(message, signature)
@@ -194,6 +212,60 @@ func (k *SignKeys) VerifySender(message, signature []byte) (bool, ethcommon.Addr
 		return true, recoveredAddr, nil
 	}
 	return false, recoveredAddr, nil
+}
+
+// AccountSIK method generates the Secret Identity Key for the current SignKeys
+// with the signature of the DefaultSIKPayload and the user secret (if it is
+// provided) following the definition:
+//
+//	SIK = poseidon(address, signature, secret)
+//
+// The secret could be nil.
+func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
+	if secret == nil {
+		secret = []byte{0}
+	}
+	sign, err := k.SIKsignature()
+	if err != nil {
+		return nil, fmt.Errorf("error signing sik payload: %w", err)
+	}
+	seed := []*big.Int{
+		arbo.BytesToBigInt(k.Address().Bytes()),
+		zk.BigToFF(new(big.Int).SetBytes(secret)),
+		zk.BigToFF(new(big.Int).SetBytes(sign)),
+	}
+	hash, err := poseidon.Hash(seed)
+	if err != nil {
+		return nil, err
+	}
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
+}
+
+// AccountSIKnullifier method composes the nullifier of the current SignKeys
+// for the desired election id and the secret provided.
+func (k *SignKeys) AccountSIKnullifier(electionId, secret []byte) ([]byte, error) {
+	// sign the default Secret Identity Key seed
+	sign, err := k.SIKsignature()
+	if err != nil {
+		return nil, fmt.Errorf("error signing default sik seed: %w", err)
+	}
+	// get the representation of the signature on the finite field and repeat
+	// the same with the secret if it is provided, if not add a zero
+	seed := []*big.Int{zk.BigToFF(new(big.Int).SetBytes(sign))}
+	if secret != nil {
+		seed = append(seed, zk.BigToFF(new(big.Int).SetBytes(secret)))
+	} else {
+		seed = append(seed, big.NewInt(0))
+	}
+	// encode the election id for circom and include it into the nullifier
+	encElectionId := zk.BytesToArbo(electionId)
+	seed = append(seed, encElectionId...)
+	// calculate the poseidon image --> H(signature + secret + electionId)
+	hash, err := poseidon.Hash(seed)
+	if err != nil {
+		return nil, err
+	}
+	return hash.Bytes(), nil
 }
 
 // AddrFromPublicKey standaolone function to obtain the Ethereum address from a ECDSA public key

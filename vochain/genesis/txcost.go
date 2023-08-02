@@ -10,7 +10,6 @@ import (
 type TransactionCosts struct {
 	SetProcessStatus        uint32 `json:"Tx_SetProcessStatus"`
 	SetProcessCensus        uint32 `json:"Tx_SetProcessCensus"`
-	SetProcessResults       uint32 `json:"Tx_SetProcessResults"`
 	SetProcessQuestionIndex uint32 `json:"Tx_SetProcessQuestionIndex"`
 	RegisterKey             uint32 `json:"Tx_RegisterKey"`
 	NewProcess              uint32 `json:"Tx_NewProcess"`
@@ -20,6 +19,8 @@ type TransactionCosts struct {
 	AddDelegateForAccount   uint32 `json:"Tx_AddDelegateForAccount"`
 	DelDelegateForAccount   uint32 `json:"Tx_DelDelegateForAccount"`
 	CollectFaucet           uint32 `json:"Tx_CollectFaucet"`
+	SetAccountSIK           uint32 `json:"Tx_SetSik"`
+	DelAccountSIK           uint32 `json:"Tx_DelSik"`
 }
 
 // AsMap returns the contents of TransactionCosts as a map. Its purpose
@@ -51,6 +52,8 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"AddDelegateForAccount":   models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 	"DelDelegateForAccount":   models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 	"CollectFaucet":           models.TxType_COLLECT_FAUCET,
+	"SetAccountSIK":           models.TxType_SET_ACCOUNT_SIK,
+	"DelAccountSIK":           models.TxType_DEL_ACCOUNT_SIK,
 }
 
 // TxCostNameToTxType converts a valid string to a txType
@@ -75,6 +78,8 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_ADD_DELEGATE_FOR_ACCOUNT:   "AddDelegateForAccount",
 	models.TxType_DEL_DELEGATE_FOR_ACCOUNT:   "DelDelegateForAccount",
 	models.TxType_COLLECT_FAUCET:             "CollectFaucet",
+	models.TxType_SET_ACCOUNT_SIK:            "SetAccountSIK",
+	models.TxType_DEL_ACCOUNT_SIK:            "DelAccountSIK",
 }
 
 // TxTypeToCostName converts a valid txType to a string

@@ -80,6 +80,7 @@ var (
 	ErrInvalidCensusKeyLength           = apirest.APIerror{Code: 4051, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid census key length")}
 	ErrUnmarshalingServerProto          = apirest.APIerror{Code: 4052, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error unmarshaling protobuf data")}
 	ErrMarshalingServerProto            = apirest.APIerror{Code: 4053, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error marshaling protobuf data")}
+	ErrSIKNotFound                      = apirest.APIerror{Code: 4054, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("SIK not found")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}
@@ -111,4 +112,5 @@ var (
 	ErrCensusProofVerificationFailed    = apirest.APIerror{Code: 5028, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("census proof verification failed")}
 	ErrCantCountVotes                   = apirest.APIerror{Code: 5029, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot count votes")}
 	ErrVochainOverloaded                = apirest.APIerror{Code: 5030, HTTPstatus: apirest.HTTPstatusServiceUnavailable, Err: fmt.Errorf("vochain overloaded")}
+	ErrGettingSIK                       = apirest.APIerror{Code: 5031, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error getting SIK")}
 )

@@ -144,9 +144,10 @@ func TestAPIcensusAndVote(t *testing.T) {
 	vote.Proof = &models.Proof{
 		Payload: &models.Proof_Arbo{
 			Arbo: &models.ProofArbo{
-				Type:       models.ProofArbo_BLAKE2B,
-				Siblings:   censusData.Proof,
-				LeafWeight: censusData.Value,
+				Type:            models.ProofArbo_BLAKE2B,
+				Siblings:        censusData.CensusProof,
+				AvailableWeight: censusData.Value,
+				VoteWeight:      censusData.Value,
 			},
 		},
 	}
@@ -218,6 +219,8 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	stx := models.SignedTx{}
 	infoURI := server.Storage.URIprefix() + ipfs.CalculateCIDv1json(metaData)
+	sik, err := signer.AccountSIK(nil)
+	qt.Assert(t, err, qt.IsNil)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -225,6 +228,7 @@ func TestAPIaccount(t *testing.T) {
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
+			SIK:           sik,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)

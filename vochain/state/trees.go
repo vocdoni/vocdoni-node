@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sync"
 
+	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -15,22 +16,20 @@ import (
 //   - Extra (key: string, value: []byte)
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
+//   - SIK: (key: address, value: []byte)
 //   - Processes (key: ProcessId, value: models.StateDBProcess)
 //     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
-//     - Nullifiers (key: pre-census user nullifier, value: weight used)
 //     - Votes (key: VoteId, value: models.StateDBVote)
 //   - FaucetNonce (key: hash(address + identifier), value: nil)
 
 const (
-	TreeProcess                    = "Processes"
-	TreeExtra                      = "Extra"
-	TreeValidators                 = "Validators"
-	TreeAccounts                   = "Accounts"
-	TreeFaucet                     = "FaucetNonce"
-	ChildTreeCensus                = "Census"
-	ChildTreeCensusPoseidon        = "CensusPoseidon"
-	ChildTreePreRegisterNullifiers = "PreRegisterNullifiers"
-	ChildTreeVotes                 = "Votes"
+	TreeProcess    = "Processes"
+	TreeExtra      = "Extra"
+	TreeValidators = "Validators"
+	TreeAccounts   = "Accounts"
+	TreeFaucet     = "FaucetNonce"
+	TreeSIK        = "CensusSIK"
+	ChildTreeVotes = "Votes"
 )
 
 var (
@@ -114,45 +113,19 @@ var (
 			ParentLeafGetRoot: rootLeafGetRoot,
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
+
+		// CensusSIK is the Secret Identity Keys subTree configuration
+		"CensusSIK": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+			HashFunc:          arbo.HashFunctionPoseidon,
+			KindID:            "sik",
+			MaxLevels:         censustree.DefaultMaxLevels,
+			ParentLeafGetRoot: rootLeafGetRoot,
+			ParentLeafSetRoot: rootLeafSetRoot,
+		}),
 	}
 
 	// ChildTrees contains the configuration for the state trees dependent on a main tree.
 	ChildTrees = map[string]*statedb.TreeNonSingletonConfig{
-		// Census is the Rolling census subTree (found under a Process leaf)
-		// configuration for a process that supports non-anonymous voting with
-		// rolling census.
-		"Census": statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-			HashFunc:          arbo.HashFunctionSha256,
-			KindID:            "cen",
-			MaxLevels:         256,
-			ParentLeafGetRoot: processGetCensusRoot,
-			ParentLeafSetRoot: processSetCensusRoot,
-		}),
-
-		// CensusPoseidon is the Rolling census subTree (found under a
-		// Process leaf) configuration when the process supports anonymous
-		// voting with rolling census.  This Census subTree uses the SNARK
-		// friendly hash function Poseidon.
-		"CensusPoseidon": statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-			HashFunc:          arbo.HashFunctionPoseidon,
-			KindID:            "cenPos",
-			MaxLevels:         64,
-			ParentLeafGetRoot: processGetCensusRoot,
-			ParentLeafSetRoot: processSetCensusRoot,
-		}),
-
-		// PreRegisterNullifiers is the Nullifiers subTree (found under a
-		// Process leaf) configuration when the process supports anonymous
-		// voting with rolling census.  This tree contains the pre-census
-		// nullifiers that have pre-registered.
-		"PreRegisterNullifiers": statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
-			HashFunc:          arbo.HashFunctionSha256,
-			KindID:            "prNul",
-			MaxLevels:         256,
-			ParentLeafGetRoot: processGetPreRegisterNullifiersRoot,
-			ParentLeafSetRoot: processSetPreRegisterNullifiersRoot,
-		}),
-
 		// Votes is the Votes subTree (found under a Process leaf) configuration.
 		"Votes": statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
@@ -208,67 +181,6 @@ func rootLeafSetRoot(value []byte, root []byte) ([]byte, error) {
 		return nil, fmt.Errorf("len(value) = %v != %v", len(value), defaultHashLen)
 	}
 	return root, nil
-}
-
-// processGetCensusRoot is the GetRootFn function to get the rolling census
-// root of a process leaf.
-func processGetCensusRoot(value []byte) ([]byte, error) {
-	var sdbProc models.StateDBProcess
-	if err := proto.Unmarshal(value, &sdbProc); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
-	}
-	if len(sdbProc.Process.RollingCensusRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.Process.RollingCensusRoot) != %v: %w",
-			defaultHashLen,
-			ErrProcessChildLeafRootUnknown)
-	}
-	return sdbProc.Process.RollingCensusRoot, nil
-}
-
-// processSetCensusRoot is the SetRootFn function to set the rolling census
-// root of a process leaf.
-func processSetCensusRoot(value []byte, root []byte) ([]byte, error) {
-	var sdbProc models.StateDBProcess
-	if err := proto.Unmarshal(value, &sdbProc); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
-	}
-	sdbProc.Process.RollingCensusRoot = root
-	newValue, err := proto.Marshal(&sdbProc)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
-	}
-	return newValue, nil
-}
-
-// processGetPreRegisterNullifiersRoot is the GetRootFn function to get the nullifiers
-// root of a process leaf.
-func processGetPreRegisterNullifiersRoot(value []byte) ([]byte, error) {
-	var sdbProc models.StateDBProcess
-	if err := proto.Unmarshal(value, &sdbProc); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
-	}
-	if len(sdbProc.Process.NullifiersRoot) != defaultHashLen {
-		return nil, fmt.Errorf("len(sdbProc.Process.NullifiersRoot) != %v: %w",
-			defaultHashLen,
-			ErrProcessChildLeafRootUnknown,
-		)
-	}
-	return sdbProc.Process.NullifiersRoot, nil
-}
-
-// processSetPreRegisterNullifiersRoot is the SetRootFn function to set the nullifiers
-// root of a process leaf.
-func processSetPreRegisterNullifiersRoot(value []byte, root []byte) ([]byte, error) {
-	var sdbProc models.StateDBProcess
-	if err := proto.Unmarshal(value, &sdbProc); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal StateDBProcess: %w", err)
-	}
-	sdbProc.Process.NullifiersRoot = root
-	newValue, err := proto.Marshal(&sdbProc)
-	if err != nil {
-		return nil, fmt.Errorf("cannot marshal StateDBProcess: %w", err)
-	}
-	return newValue, nil
 }
 
 // processGetVotesRoot is the GetRootFn function to get the votes root of a

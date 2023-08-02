@@ -95,7 +95,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 
 // AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
 // to pay for the costs of the transaction if the blockchain requires it.  Returns the transaction hash.
-func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata) (types.HexBytes, error) {
+func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata, sik []byte) (types.HexBytes, error) {
 	var err error
 	var metadataBytes []byte
 	var metadataURI string
@@ -105,6 +105,12 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
 		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+	}
+
+	if sik == nil {
+		if sik, err = c.account.AccountSIK(nil); err != nil {
+			return nil, fmt.Errorf("could not generate the sik: %w", err)
+		}
 	}
 
 	// Build the transaction
@@ -117,6 +123,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 				Account:       c.account.Address().Bytes(),
 				FaucetPackage: faucetPkg,
 				InfoURI:       &metadataURI,
+				SIK:           sik,
 			},
 		}})
 	if err != nil {
@@ -226,4 +233,144 @@ func (c *HTTPclient) GetTransfers(from common.Address, page int) ([]*indexertype
 		return nil, err
 	}
 	return transfers, nil
+}
+
+// SetSIK function allows to update the Secret Identity Key for the current
+// HTTPClient account. To do that, the function requires a secret user input.
+func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
+	sik, err := c.account.AccountSIK(secret)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate the sik: %w", err)
+	}
+	// Build the transaction
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetSIK{
+			SetSIK: &models.SIKTx{
+				Txtype: models.TxType_SET_ACCOUNT_SIK,
+				SIK:    sik,
+			},
+		}})
+	if err != nil {
+		return nil, err
+	}
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPOST, &api.Transaction{
+		Payload: stxb,
+	}, "chain", "transaction")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.Transaction{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+	return accv.Hash, nil
+}
+
+// DelSIK function allows to delete the Secret Identity Key for the current
+// HTTPClient account if it already has a valid one.
+func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
+	// Build the transaction
+	var err error
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_DelSIK{
+			DelSIK: &models.SIKTx{
+				Txtype: models.TxType_DEL_ACCOUNT_SIK,
+			},
+		}})
+	if err != nil {
+		return nil, err
+	}
+	// Sign and send the transaction
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPDELETE, &api.Transaction{
+		Payload: stxb,
+	}, "accounts", "sik")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.Transaction{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+	return accv.Hash, nil
+}
+
+// RegisterSIKForVote function performs the free RegisterSIKTx to the vochain
+// helping to non registered accounts to vote in a on going election, but only
+// if the account is in the election census. The function returns the hash of
+// the sent transaction, and requires the election ID. The census proof and the
+// secret are optional. If no proof is provided, it will be generated.
+func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *CensusProof, secret []byte) (types.HexBytes, error) {
+	// get process info
+	process, err := c.Election(electionId)
+	if err != nil {
+		return nil, fmt.Errorf("error getting election info: %w", err)
+	}
+	// if any proof has been provided, get it from the API
+	if proof == nil {
+		proof, err = c.CensusGenProof(process.Census.CensusRoot, c.account.Address().Bytes())
+		if err != nil {
+			return nil, fmt.Errorf("error generating census proof: %w", err)
+		}
+	}
+	// get the account SIK using the secret provided
+	sik, err := c.account.AccountSIK(secret)
+	if err != nil {
+		return nil, fmt.Errorf("error generating SIK: %w", err)
+	}
+	// compose and encode the transaction
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_RegisterSIK{
+			RegisterSIK: &models.RegisterSIKTx{
+				SIK:        sik,
+				ElectionId: electionId,
+				CensusProof: &models.Proof{
+					Payload: &models.Proof_Arbo{
+						Arbo: &models.ProofArbo{
+							Type:            models.ProofArbo_POSEIDON,
+							Siblings:        proof.Proof,
+							KeyType:         proof.KeyType,
+							AvailableWeight: proof.LeafValue,
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error enconsing RegisterSIKTx: %w", err)
+	}
+	// sign it and send it
+	hash, _, err := c.SignAndSendTx(stx)
+	if err != nil {
+		return nil, fmt.Errorf("error signing or sending the Tx: %w", err)
+	}
+	return hash, nil
 }

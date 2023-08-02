@@ -220,6 +220,7 @@ type Account struct {
 	InfoURL       string           `json:"infoURL,omitempty"`
 	Token         *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
 	Metadata      *AccountMetadata `json:"metadata,omitempty"`
+	SIK           types.HexBytes   `json:"sik"`
 }
 
 type AccountSet struct {
@@ -230,17 +231,18 @@ type AccountSet struct {
 }
 
 type Census struct {
-	CensusID types.HexBytes `json:"censusID,omitempty" `
+	CensusID types.HexBytes `json:"censusID,omitempty"`
 	Type     string         `json:"type,omitempty"`
-	Root     types.HexBytes `json:"root,omitempty" `
 	Weight   *types.BigInt  `json:"weight,omitempty"`
-	Key      types.HexBytes `json:"key,omitempty" `
-	Proof    types.HexBytes `json:"proof,omitempty" `
-	Value    types.HexBytes `json:"value,omitempty" `
 	Size     uint64         `json:"size,omitempty"`
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
-	Siblings []string       `json:"siblings,omitempty"`
+	// proof stuff
+	CensusRoot     types.HexBytes `json:"censusRoot,omitempty"`
+	CensusProof    types.HexBytes `json:"censusProof,omitempty"`
+	Key            types.HexBytes `json:"key,omitempty"`
+	Value          types.HexBytes `json:"value,omitempty"`
+	CensusSiblings []string       `json:"censusSiblings,omitempty"`
 }
 
 type File struct {

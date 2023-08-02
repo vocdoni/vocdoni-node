@@ -41,7 +41,7 @@ type TransactionHandler struct {
 	dataDir string
 	// ZkVKs contains the VerificationKey for each circuit parameters index
 	ZkVKs []*snarkTypes.Vk
-
+	// ZkCircuit contains the current chain circuit
 	ZkCircuit *circuit.ZkCircuit
 }
 
@@ -151,7 +151,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			switch tx.Txtype {
 			case models.TxType_SET_PROCESS_STATUS:
 				if tx.GetStatus() == models.ProcessStatus_PROCESS_UNKNOWN {
-					return nil, fmt.Errorf("set process status, status unknown")
+					return nil, fmt.Errorf("setProcessStatus: status unknown")
 				}
 				if err := t.state.SetProcessStatus(tx.ProcessId, tx.GetStatus(), true); err != nil {
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
@@ -162,7 +162,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 						ID:         ist.ActionCommitResults,
 						ElectionID: tx.ProcessId,
 					}); err != nil {
-						return nil, fmt.Errorf("setProcessTx: cannot schedule end process: %w", err)
+						return nil, fmt.Errorf("setProcessStatus: cannot schedule end process: %w", err)
+					}
+					// purge RegisterSIKTx counter if it exists
+					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
+						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
 					}
 				}
 
@@ -181,22 +185,20 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 
 	case *models.Tx_SetAccount:
 		tx := vtx.Tx.GetSetAccount()
+
 		switch tx.Txtype {
 		case models.TxType_CREATE_ACCOUNT:
-			err := t.CreateAccountTxCheck(vtx)
-			if err != nil {
+			if err := t.CreateAccountTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("createAccountTx: %w", err)
 			}
 
 		case models.TxType_SET_ACCOUNT_INFO_URI:
-			err := t.SetAccountInfoTxCheck(vtx)
-			if err != nil {
+			if err := t.SetAccountInfoTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountInfoTx: %w", err)
 			}
 
 		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT, models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-			err := t.SetAccountDelegateTxCheck(vtx)
-			if err != nil {
+			if err := t.SetAccountDelegateTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
 			}
 
@@ -218,6 +220,12 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
+				}
+				// if the tx includes a sik try to persist it in the state
+				if sik := tx.GetSIK(); sik != nil {
+					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
+						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
+					}
 				}
 				if tx.FaucetPackage != nil {
 					faucetIssuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
@@ -419,6 +427,66 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 			return response, nil
 		}
+
+	case *models.Tx_SetSIK:
+		txAddress, newSIK, err := t.SetSIKTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("setSIKTx: %w", err)
+		}
+		if forCommit {
+			if err := t.state.BurnTxCostIncrementNonce(
+				txAddress,
+				models.TxType_SET_ACCOUNT_SIK,
+				0,
+			); err != nil {
+				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
+			}
+			if err := t.state.SetAddressSIK(txAddress, newSIK); err != nil {
+				return nil, fmt.Errorf("setSIKTx: %w", err)
+			}
+		}
+		return response, nil
+
+	case *models.Tx_DelSIK:
+		txAddress, err := t.DelSIKTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("delSIKTx: %w", err)
+		}
+		if forCommit {
+			if err := t.state.BurnTxCostIncrementNonce(
+				txAddress,
+				models.TxType_DEL_ACCOUNT_SIK,
+				0,
+			); err != nil {
+				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
+			}
+			if err := t.state.InvalidateSIK(txAddress); err != nil {
+				return nil, fmt.Errorf("delSIKTx: %w", err)
+			}
+		}
+		return response, nil
+
+	case *models.Tx_RegisterSIK:
+		txAddress, SIK, pid, tempSIKs, err := t.RegisterSIKTxCheck(vtx)
+		if err != nil {
+			return nil, fmt.Errorf("registerSIKTx: %w", err)
+		}
+		if forCommit {
+			// register the SIK
+			if err := t.state.SetAddressSIK(txAddress, SIK); err != nil {
+				return nil, fmt.Errorf("registerSIKTx: %w", err)
+			}
+			// increase the RegisterSIKTx counter
+			if err := t.state.IncreaseRegisterSIKCounter(pid); err != nil {
+				return nil, fmt.Errorf("registerSIKTx: %w", err)
+			}
+			if tempSIKs {
+				if err := t.state.AssignSIKToElection(pid, txAddress); err != nil {
+					return nil, fmt.Errorf("registerSIKTx: %w", err)
+				}
+			}
+		}
+		return response, nil
 
 	default:
 		return nil, fmt.Errorf("invalid transaction type")

@@ -51,7 +51,7 @@ func (v *State) AddProcess(p *models.Process) error {
 		"height", v.CurrentHeight(),
 		"censusURI", censusURI)
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.TxCounter())
+		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.txCounter.Load())
 	}
 	return nil
 }
@@ -77,7 +77,7 @@ func (v *State) CancelProcess(pid []byte) error { // LEGACY
 		return err
 	}
 	for _, l := range v.eventListeners {
-		l.OnCancel(pid, v.TxCounter())
+		l.OnCancel(pid, v.txCounter.Load())
 	}
 	return nil
 }
@@ -177,6 +177,22 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
+	// update the process
+	// try to update startBlocks database
+	switch p.Status {
+	case models.ProcessStatus_READY:
+		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, p.StartBlock); err != nil {
+			return err
+		}
+	case models.ProcessStatus_PAUSED:
+		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, v.CurrentHeight()); err != nil {
+			return err
+		}
+	case models.ProcessStatus_ENDED:
+		if err := v.ProcessBlockRegistry.DeleteStartBlock(p.ProcessId); err != nil {
+			return err
+		}
+	}
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	return updateProcess(&v.tx, p, pid)
@@ -255,7 +271,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnProcessStatusChange(process.ProcessId, process.Status, v.TxCounter())
+			l.OnProcessStatusChange(process.ProcessId, process.Status, v.txCounter.Load())
 		}
 	}
 	return nil
@@ -285,7 +301,7 @@ func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult) erro
 	}
 	// Call event listeners
 	for _, l := range v.eventListeners {
-		l.OnProcessResults(process.ProcessId, result, v.TxCounter())
+		l.OnProcessResults(process.ProcessId, result, v.txCounter.Load())
 	}
 	return nil
 }
