@@ -30,7 +30,6 @@ func TestTransactionCostsAsMap(t *testing.T) {
 	expected := map[models.TxType]uint64{
 		models.TxType_SET_PROCESS_STATUS:         100,
 		models.TxType_SET_PROCESS_CENSUS:         200,
-		models.TxType_SET_PROCESS_RESULTS:        300,
 		models.TxType_SET_PROCESS_QUESTION_INDEX: 400,
 		models.TxType_REGISTER_VOTER_KEY:         500,
 		models.TxType_NEW_PROCESS:                600,
@@ -49,7 +48,6 @@ func TestTxCostNameToTxType(t *testing.T) {
 	fields := map[string]models.TxType{
 		"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
 		"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
-		"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
 		"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 		"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
 		"NewProcess":              models.TxType_NEW_PROCESS,
