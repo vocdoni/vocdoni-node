@@ -95,7 +95,7 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)
 	}
-	if len(voteID) != types.VoteNullifierSize {
+	if len(voteID) == 0 {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
 
@@ -149,7 +149,7 @@ func (a *API) verifyVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)
 	}
-	if len(voteID) != types.VoteNullifierSize {
+	if len(voteID) == 0 {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))

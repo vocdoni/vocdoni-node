@@ -33,8 +33,6 @@ const (
 	// EntityIDsizeV2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
 	EntityIDsize = 20
-	// VoteNullifierSize is the size of a vote nullifier
-	VoteNullifierSize = 32
 	// KeyIndexSeparator is the default char used to split keys
 	KeyIndexSeparator = ":"
 	// EthereumConfirmationsThreshold is the minimum amout of blocks
