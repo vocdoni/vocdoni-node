@@ -98,12 +98,8 @@ func (v *Vote) DeepCopy() *Vote {
 // When committed is false, the operation is executed also on not yet committed
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last committed version.
-func (s *State) CountTotalVotes(committed bool) (uint64, error) {
-	if !committed {
-		s.tx.RLock()
-		defer s.tx.RUnlock()
-	}
-	noState := s.NoState(false)
+func (s *State) CountTotalVotes() (uint64, error) {
+	noState := s.NoState(true)
 	voteCountLE, err := noState.Get(voteCountKey)
 	if errors.Is(err, db.ErrKeyNotFound) {
 		return 0, nil

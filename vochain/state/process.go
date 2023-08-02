@@ -117,14 +117,7 @@ func (v *State) CountProcesses(committed bool) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	var count uint64
-	if err := processesTree.Iterate(func(key []byte, value []byte) bool {
-		count++
-		return false
-	}); err != nil {
-		return 0, err
-	}
-	return count, nil
+	return processesTree.Size()
 }
 
 // ListProcessIDs returns the full list of process identifiers (pid).
