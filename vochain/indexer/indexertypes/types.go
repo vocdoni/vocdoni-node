@@ -23,7 +23,6 @@ type Process struct {
 	EndBlock          uint32                     `json:"endBlock"`
 	BlockCount        uint32                     `json:"blockCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
-	RollingCensusRoot types.HexBytes             `json:"rollingCensusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
@@ -39,7 +38,6 @@ type Process struct {
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
-	RollingCensusSize uint64                     `json:"rollingCensusSize"`
 
 	PrivateKeys json.RawMessage `json:"-"` // json array
 	PublicKeys  json.RawMessage `json:"-"` // json array
@@ -72,8 +70,6 @@ func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
 		HaveResults:       dbproc.HaveResults,
 		FinalResults:      dbproc.FinalResults,
 		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),
-		RollingCensusRoot: nonEmptyBytes(dbproc.RollingCensusRoot),
-		RollingCensusSize: uint64(dbproc.RollingCensusSize),
 		MaxCensusSize:     uint64(dbproc.MaxCensusSize),
 		CensusURI:         dbproc.CensusUri,
 		CensusOrigin:      int32(dbproc.CensusOrigin),

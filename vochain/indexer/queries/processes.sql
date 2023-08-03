@@ -1,8 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block, block_count,
-	have_results, final_results,
-	census_root, rolling_census_root, rolling_census_size,
+	have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -13,7 +12,6 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
-	?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -50,12 +48,10 @@ OFFSET sqlc.arg(offset)
 -- name: UpdateProcessFromState :execresult
 UPDATE processes
 SET census_root         = sqlc.arg(census_root),
-	rolling_census_root = sqlc.arg(rolling_census_root),
 	census_uri          = sqlc.arg(census_uri),
 	private_keys        = sqlc.arg(private_keys),
 	public_keys         = sqlc.arg(public_keys),
 	metadata            = sqlc.arg(metadata),
-	rolling_census_size = sqlc.arg(rolling_census_size),
 	status              = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 

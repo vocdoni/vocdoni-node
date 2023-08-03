@@ -510,7 +510,7 @@ func (idx *Indexer) OnProcessResults(pid []byte, _ *models.ProcessResult,
 }
 
 // OnProcessesStart adds the processes to blockUpdateProcs.
-// This is required to update potential changes when a process is started, such as the rolling census.
+// This is required to update potential changes when a process is started, such as the census root.
 func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()

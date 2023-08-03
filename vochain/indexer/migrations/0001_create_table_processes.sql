@@ -13,8 +13,6 @@ CREATE TABLE processes (
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,
-  rolling_census_root BLOB NOT NULL,
-  rolling_census_size INTEGER NOT NULL,
   max_census_size     INTEGER NOT NULL,
   census_uri          TEXT NOT NULL,
   metadata            TEXT NOT NULL,
