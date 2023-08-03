@@ -7,6 +7,7 @@ package indexerdb
 import (
 	"context"
 	"database/sql"
+	"fmt"
 )
 
 type DBTX interface {
@@ -20,12 +21,358 @@ func New(db DBTX) *Queries {
 	return &Queries{db: db}
 }
 
+func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
+	q := Queries{db: db}
+	var err error
+	if q.countTransactionsStmt, err = db.PrepareContext(ctx, countTransactions); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTransactions: %w", err)
+	}
+	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
+		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
+	}
+	if q.countVotesByProcessIDStmt, err = db.PrepareContext(ctx, countVotesByProcessID); err != nil {
+		return nil, fmt.Errorf("error preparing query CountVotesByProcessID: %w", err)
+	}
+	if q.createBlockStmt, err = db.PrepareContext(ctx, createBlock); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateBlock: %w", err)
+	}
+	if q.createProcessStmt, err = db.PrepareContext(ctx, createProcess); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateProcess: %w", err)
+	}
+	if q.createTokenTransferStmt, err = db.PrepareContext(ctx, createTokenTransfer); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateTokenTransfer: %w", err)
+	}
+	if q.createTransactionStmt, err = db.PrepareContext(ctx, createTransaction); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateTransaction: %w", err)
+	}
+	if q.createVoteStmt, err = db.PrepareContext(ctx, createVote); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateVote: %w", err)
+	}
+	if q.getBlockStmt, err = db.PrepareContext(ctx, getBlock); err != nil {
+		return nil, fmt.Errorf("error preparing query GetBlock: %w", err)
+	}
+	if q.getEntityCountStmt, err = db.PrepareContext(ctx, getEntityCount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetEntityCount: %w", err)
+	}
+	if q.getLastTransactionsStmt, err = db.PrepareContext(ctx, getLastTransactions); err != nil {
+		return nil, fmt.Errorf("error preparing query GetLastTransactions: %w", err)
+	}
+	if q.getProcessStmt, err = db.PrepareContext(ctx, getProcess); err != nil {
+		return nil, fmt.Errorf("error preparing query GetProcess: %w", err)
+	}
+	if q.getProcessCountStmt, err = db.PrepareContext(ctx, getProcessCount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetProcessCount: %w", err)
+	}
+	if q.getProcessIDsByFinalResultsStmt, err = db.PrepareContext(ctx, getProcessIDsByFinalResults); err != nil {
+		return nil, fmt.Errorf("error preparing query GetProcessIDsByFinalResults: %w", err)
+	}
+	if q.getProcessStatusStmt, err = db.PrepareContext(ctx, getProcessStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query GetProcessStatus: %w", err)
+	}
+	if q.getTokenTransferStmt, err = db.PrepareContext(ctx, getTokenTransfer); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTokenTransfer: %w", err)
+	}
+	if q.getTokenTransfersByFromAccountStmt, err = db.PrepareContext(ctx, getTokenTransfersByFromAccount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTokenTransfersByFromAccount: %w", err)
+	}
+	if q.getTransactionStmt, err = db.PrepareContext(ctx, getTransaction); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTransaction: %w", err)
+	}
+	if q.getTransactionByHashStmt, err = db.PrepareContext(ctx, getTransactionByHash); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTransactionByHash: %w", err)
+	}
+	if q.getTxReferenceByBlockHeightAndBlockIndexStmt, err = db.PrepareContext(ctx, getTxReferenceByBlockHeightAndBlockIndex); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTxReferenceByBlockHeightAndBlockIndex: %w", err)
+	}
+	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
+		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
+	}
+	if q.searchEntitiesStmt, err = db.PrepareContext(ctx, searchEntities); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchEntities: %w", err)
+	}
+	if q.searchProcessesStmt, err = db.PrepareContext(ctx, searchProcesses); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchProcesses: %w", err)
+	}
+	if q.searchVotesStmt, err = db.PrepareContext(ctx, searchVotes); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchVotes: %w", err)
+	}
+	if q.setProcessResultsCancelledStmt, err = db.PrepareContext(ctx, setProcessResultsCancelled); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessResultsCancelled: %w", err)
+	}
+	if q.setProcessResultsReadyStmt, err = db.PrepareContext(ctx, setProcessResultsReady); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessResultsReady: %w", err)
+	}
+	if q.updateProcessEndBlockStmt, err = db.PrepareContext(ctx, updateProcessEndBlock); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessEndBlock: %w", err)
+	}
+	if q.updateProcessFromStateStmt, err = db.PrepareContext(ctx, updateProcessFromState); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessFromState: %w", err)
+	}
+	if q.updateProcessResultByIDStmt, err = db.PrepareContext(ctx, updateProcessResultByID); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessResultByID: %w", err)
+	}
+	if q.updateProcessResultsStmt, err = db.PrepareContext(ctx, updateProcessResults); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessResults: %w", err)
+	}
+	return &q, nil
+}
+
+func (q *Queries) Close() error {
+	var err error
+	if q.countTransactionsStmt != nil {
+		if cerr := q.countTransactionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTransactionsStmt: %w", cerr)
+		}
+	}
+	if q.countVotesStmt != nil {
+		if cerr := q.countVotesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countVotesStmt: %w", cerr)
+		}
+	}
+	if q.countVotesByProcessIDStmt != nil {
+		if cerr := q.countVotesByProcessIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countVotesByProcessIDStmt: %w", cerr)
+		}
+	}
+	if q.createBlockStmt != nil {
+		if cerr := q.createBlockStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createBlockStmt: %w", cerr)
+		}
+	}
+	if q.createProcessStmt != nil {
+		if cerr := q.createProcessStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createProcessStmt: %w", cerr)
+		}
+	}
+	if q.createTokenTransferStmt != nil {
+		if cerr := q.createTokenTransferStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createTokenTransferStmt: %w", cerr)
+		}
+	}
+	if q.createTransactionStmt != nil {
+		if cerr := q.createTransactionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createTransactionStmt: %w", cerr)
+		}
+	}
+	if q.createVoteStmt != nil {
+		if cerr := q.createVoteStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createVoteStmt: %w", cerr)
+		}
+	}
+	if q.getBlockStmt != nil {
+		if cerr := q.getBlockStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getBlockStmt: %w", cerr)
+		}
+	}
+	if q.getEntityCountStmt != nil {
+		if cerr := q.getEntityCountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getEntityCountStmt: %w", cerr)
+		}
+	}
+	if q.getLastTransactionsStmt != nil {
+		if cerr := q.getLastTransactionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getLastTransactionsStmt: %w", cerr)
+		}
+	}
+	if q.getProcessStmt != nil {
+		if cerr := q.getProcessStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getProcessStmt: %w", cerr)
+		}
+	}
+	if q.getProcessCountStmt != nil {
+		if cerr := q.getProcessCountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getProcessCountStmt: %w", cerr)
+		}
+	}
+	if q.getProcessIDsByFinalResultsStmt != nil {
+		if cerr := q.getProcessIDsByFinalResultsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getProcessIDsByFinalResultsStmt: %w", cerr)
+		}
+	}
+	if q.getProcessStatusStmt != nil {
+		if cerr := q.getProcessStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getProcessStatusStmt: %w", cerr)
+		}
+	}
+	if q.getTokenTransferStmt != nil {
+		if cerr := q.getTokenTransferStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTokenTransferStmt: %w", cerr)
+		}
+	}
+	if q.getTokenTransfersByFromAccountStmt != nil {
+		if cerr := q.getTokenTransfersByFromAccountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTokenTransfersByFromAccountStmt: %w", cerr)
+		}
+	}
+	if q.getTransactionStmt != nil {
+		if cerr := q.getTransactionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTransactionStmt: %w", cerr)
+		}
+	}
+	if q.getTransactionByHashStmt != nil {
+		if cerr := q.getTransactionByHashStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTransactionByHashStmt: %w", cerr)
+		}
+	}
+	if q.getTxReferenceByBlockHeightAndBlockIndexStmt != nil {
+		if cerr := q.getTxReferenceByBlockHeightAndBlockIndexStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTxReferenceByBlockHeightAndBlockIndexStmt: %w", cerr)
+		}
+	}
+	if q.getVoteStmt != nil {
+		if cerr := q.getVoteStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
+		}
+	}
+	if q.searchEntitiesStmt != nil {
+		if cerr := q.searchEntitiesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchEntitiesStmt: %w", cerr)
+		}
+	}
+	if q.searchProcessesStmt != nil {
+		if cerr := q.searchProcessesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchProcessesStmt: %w", cerr)
+		}
+	}
+	if q.searchVotesStmt != nil {
+		if cerr := q.searchVotesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchVotesStmt: %w", cerr)
+		}
+	}
+	if q.setProcessResultsCancelledStmt != nil {
+		if cerr := q.setProcessResultsCancelledStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessResultsCancelledStmt: %w", cerr)
+		}
+	}
+	if q.setProcessResultsReadyStmt != nil {
+		if cerr := q.setProcessResultsReadyStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessResultsReadyStmt: %w", cerr)
+		}
+	}
+	if q.updateProcessEndBlockStmt != nil {
+		if cerr := q.updateProcessEndBlockStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessEndBlockStmt: %w", cerr)
+		}
+	}
+	if q.updateProcessFromStateStmt != nil {
+		if cerr := q.updateProcessFromStateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessFromStateStmt: %w", cerr)
+		}
+	}
+	if q.updateProcessResultByIDStmt != nil {
+		if cerr := q.updateProcessResultByIDStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessResultByIDStmt: %w", cerr)
+		}
+	}
+	if q.updateProcessResultsStmt != nil {
+		if cerr := q.updateProcessResultsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessResultsStmt: %w", cerr)
+		}
+	}
+	return err
+}
+
+func (q *Queries) exec(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (sql.Result, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).ExecContext(ctx, args...)
+	case stmt != nil:
+		return stmt.ExecContext(ctx, args...)
+	default:
+		return q.db.ExecContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) query(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) (*sql.Rows, error) {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryContext(ctx, args...)
+	default:
+		return q.db.QueryContext(ctx, query, args...)
+	}
+}
+
+func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, args ...interface{}) *sql.Row {
+	switch {
+	case stmt != nil && q.tx != nil:
+		return q.tx.StmtContext(ctx, stmt).QueryRowContext(ctx, args...)
+	case stmt != nil:
+		return stmt.QueryRowContext(ctx, args...)
+	default:
+		return q.db.QueryRowContext(ctx, query, args...)
+	}
+}
+
 type Queries struct {
-	db DBTX
+	db                                           DBTX
+	tx                                           *sql.Tx
+	countTransactionsStmt                        *sql.Stmt
+	countVotesStmt                               *sql.Stmt
+	countVotesByProcessIDStmt                    *sql.Stmt
+	createBlockStmt                              *sql.Stmt
+	createProcessStmt                            *sql.Stmt
+	createTokenTransferStmt                      *sql.Stmt
+	createTransactionStmt                        *sql.Stmt
+	createVoteStmt                               *sql.Stmt
+	getBlockStmt                                 *sql.Stmt
+	getEntityCountStmt                           *sql.Stmt
+	getLastTransactionsStmt                      *sql.Stmt
+	getProcessStmt                               *sql.Stmt
+	getProcessCountStmt                          *sql.Stmt
+	getProcessIDsByFinalResultsStmt              *sql.Stmt
+	getProcessStatusStmt                         *sql.Stmt
+	getTokenTransferStmt                         *sql.Stmt
+	getTokenTransfersByFromAccountStmt           *sql.Stmt
+	getTransactionStmt                           *sql.Stmt
+	getTransactionByHashStmt                     *sql.Stmt
+	getTxReferenceByBlockHeightAndBlockIndexStmt *sql.Stmt
+	getVoteStmt                                  *sql.Stmt
+	searchEntitiesStmt                           *sql.Stmt
+	searchProcessesStmt                          *sql.Stmt
+	searchVotesStmt                              *sql.Stmt
+	setProcessResultsCancelledStmt               *sql.Stmt
+	setProcessResultsReadyStmt                   *sql.Stmt
+	updateProcessEndBlockStmt                    *sql.Stmt
+	updateProcessFromStateStmt                   *sql.Stmt
+	updateProcessResultByIDStmt                  *sql.Stmt
+	updateProcessResultsStmt                     *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db: tx,
+		db:                                 tx,
+		tx:                                 tx,
+		countTransactionsStmt:              q.countTransactionsStmt,
+		countVotesStmt:                     q.countVotesStmt,
+		countVotesByProcessIDStmt:          q.countVotesByProcessIDStmt,
+		createBlockStmt:                    q.createBlockStmt,
+		createProcessStmt:                  q.createProcessStmt,
+		createTokenTransferStmt:            q.createTokenTransferStmt,
+		createTransactionStmt:              q.createTransactionStmt,
+		createVoteStmt:                     q.createVoteStmt,
+		getBlockStmt:                       q.getBlockStmt,
+		getEntityCountStmt:                 q.getEntityCountStmt,
+		getLastTransactionsStmt:            q.getLastTransactionsStmt,
+		getProcessStmt:                     q.getProcessStmt,
+		getProcessCountStmt:                q.getProcessCountStmt,
+		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
+		getProcessStatusStmt:               q.getProcessStatusStmt,
+		getTokenTransferStmt:               q.getTokenTransferStmt,
+		getTokenTransfersByFromAccountStmt: q.getTokenTransfersByFromAccountStmt,
+		getTransactionStmt:                 q.getTransactionStmt,
+		getTransactionByHashStmt:           q.getTransactionByHashStmt,
+		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
+		getVoteStmt:                    q.getVoteStmt,
+		searchEntitiesStmt:             q.searchEntitiesStmt,
+		searchProcessesStmt:            q.searchProcessesStmt,
+		searchVotesStmt:                q.searchVotesStmt,
+		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,
+		setProcessResultsReadyStmt:     q.setProcessResultsReadyStmt,
+		updateProcessEndBlockStmt:      q.updateProcessEndBlockStmt,
+		updateProcessFromStateStmt:     q.updateProcessFromStateStmt,
+		updateProcessResultByIDStmt:    q.updateProcessResultByIDStmt,
+		updateProcessResultsStmt:       q.updateProcessResultsStmt,
 	}
 }

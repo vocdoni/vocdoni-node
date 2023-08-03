@@ -19,7 +19,7 @@ SELECT COUNT(*) FROM votes
 `
 
 func (q *Queries) CountVotes(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countVotes)
+	row := q.queryRow(ctx, q.countVotesStmt, countVotes)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -31,7 +31,7 @@ WHERE process_id = ?
 `
 
 func (q *Queries) CountVotesByProcessID(ctx context.Context, processID types.ProcessID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countVotesByProcessID, processID)
+	row := q.queryRow(ctx, q.countVotesByProcessIDStmt, countVotesByProcessID, processID)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -62,7 +62,7 @@ type CreateVoteParams struct {
 }
 
 func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createVote,
+	return q.exec(ctx, q.createVoteStmt, createVote,
 		arg.Nullifier,
 		arg.ProcessID,
 		arg.BlockHeight,
@@ -101,7 +101,7 @@ type GetVoteRow struct {
 }
 
 func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVoteRow, error) {
-	row := q.db.QueryRowContext(ctx, getVote, nullifier)
+	row := q.queryRow(ctx, q.getVoteStmt, getVote, nullifier)
 	var i GetVoteRow
 	err := row.Scan(
 		&i.Nullifier,
@@ -152,7 +152,7 @@ type SearchVotesRow struct {
 }
 
 func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]SearchVotesRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchVotes,
+	rows, err := q.query(ctx, q.searchVotesStmt, searchVotes,
 		arg.ProcessID,
 		arg.NullifierSubstr,
 		arg.Offset,

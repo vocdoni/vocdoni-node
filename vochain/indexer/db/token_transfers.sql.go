@@ -33,7 +33,7 @@ type CreateTokenTransferParams struct {
 }
 
 func (q *Queries) CreateTokenTransfer(ctx context.Context, arg CreateTokenTransferParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createTokenTransfer,
+	return q.exec(ctx, q.createTokenTransferStmt, createTokenTransfer,
 		arg.TxHash,
 		arg.BlockHeight,
 		arg.FromAccount,
@@ -50,7 +50,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (TokenTransfer, error) {
-	row := q.db.QueryRowContext(ctx, getTokenTransfer, txHash)
+	row := q.queryRow(ctx, q.getTokenTransferStmt, getTokenTransfer, txHash)
 	var i TokenTransfer
 	err := row.Scan(
 		&i.TxHash,
@@ -78,7 +78,7 @@ type GetTokenTransfersByFromAccountParams struct {
 }
 
 func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTokenTransfersByFromAccountParams) ([]TokenTransfer, error) {
-	rows, err := q.db.QueryContext(ctx, getTokenTransfersByFromAccount, arg.FromAccount, arg.Offset, arg.Limit)
+	rows, err := q.query(ctx, q.getTokenTransfersByFromAccountStmt, getTokenTransfersByFromAccount, arg.FromAccount, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
