@@ -223,25 +223,10 @@ func (idx *Indexer) isProcessLiveResults(pid []byte) bool {
 	return ok
 }
 
-// commitVotes adds the votes and weight from results to the local database.
+// commitVotesUnsafe adds the votes and weight from results to the local database.
 // Important: it does not overwrite the already stored results but update them
 // by adding the new content to the existing results.
-func (idx *Indexer) commitVotes(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, height uint32) error {
-	// If the recovery bootstrap is running, wait
-	idx.recoveryBootLock.RLock()
-	defer idx.recoveryBootLock.RUnlock()
-	return idx.commitVotesUnsafe(queries, pid, partialResults, partialSubResults, height)
-}
-
-// commitVotesUnsafe does the same as commitVotes but it does not use locks.
-func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, partialResults, partialSubResults *results.Results, _ uint32) error {
-	// TODO(sqlite): getting the whole process is perhaps wasteful, but probably
-	// does not matter much in the end
-	procInner, err := queries.GetProcess(context.TODO(), pid)
-	if err != nil {
-		return err
-	}
-	results := indexertypes.ProcessFromDB(&procInner).Results()
+func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, results, partialResults, partialSubResults *results.Results, _ uint32) error {
 	if partialSubResults != nil {
 		if err := results.Sub(partialSubResults); err != nil {
 			return err

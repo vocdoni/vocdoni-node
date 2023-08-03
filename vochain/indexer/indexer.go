@@ -265,21 +265,21 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			continue
 		}
 
-		// Count the votes, add them to results (in memory, without any db transaction)
-		results := &results.Results{
+		// Count the votes, add them to partialResults (in memory, without any db transaction)
+		partialResults := &results.Results{
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.Envelope,
 		}
 		// Get the votes from the state
 		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
-			if err := idx.addLiveVote(process, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), results); err != nil {
+			if err := idx.addLiveVote(process, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), partialResults); err != nil {
 				log.Errorw(err, "could not add live vote")
 			}
 			return false
 		})
 		// Store the results on the persistent database
-		if err := idx.commitVotesUnsafe(queries, p, results, nil, idx.App.Height()); err != nil {
+		if err := idx.commitVotesUnsafe(queries, p, indxR, partialResults, nil, idx.App.Height()); err != nil {
 			log.Errorw(err, "could not commit live votes")
 			continue
 		}
@@ -387,9 +387,15 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		if err := idx.commitVotes(queries, pid, addedResults, subtractedResults, idx.App.Height()); err != nil {
-			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
-		}
+		func() {
+			// If the recovery bootstrap is running, wait
+			idx.recoveryBootLock.RLock()
+			defer idx.recoveryBootLock.RUnlock()
+
+			if err := idx.commitVotesUnsafe(queries, pid, proc.Results(), addedResults, subtractedResults, idx.App.Height()); err != nil {
+				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
+			}
+		}()
 	}
 
 	if err := idx.blockTx.Commit(); err != nil {
