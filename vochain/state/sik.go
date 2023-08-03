@@ -14,18 +14,19 @@ import (
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
-var sikDBPrefix = []byte("sik_")
-var anonSIKDBPrefix = []byte("asik_")
-
-// SIKROOT_HYSTERESIS_BLOCKS constant defines the number of blocks that the
-// vochain will consider a sikRoot valid. In this way, any new sikRoot will be
-// valid for at least for this number of blocks. If the gap between the last
-// two valid roots is greater than the value of this constant, the oldest will
-// be valid until a new sikroot is calculated.
-// TODO: Move the definition to the right place
-const SIKROOT_HYSTERESIS_BLOCKS = 32
+var (
+	sikDBPrefix     = []byte("sik/")
+	anonSIKDBPrefix = []byte("asik/")
+)
 
 const (
+	// SIKROOT_HYSTERESIS_BLOCKS constant defines the number of blocks that the
+	// vochain will consider a sikRoot valid. In this way, any new sikRoot will be
+	// valid for at least for this number of blocks. If the gap between the last
+	// two valid roots is greater than the value of this constant, the oldest will
+	// be valid until a new sikroot is calculated.
+	// TODO: Move the definition to the right place
+	SIKROOT_HYSTERESIS_BLOCKS = 32
 	// encodedHeightLen constant is the number of bytes of the encoded
 	// hysteresis that contains the hysteresis height value, starting from the
 	// last byte
@@ -129,7 +130,8 @@ func (v *State) InvalidateSIK(address common.Address) error {
 }
 
 // ValidSIKRoots method returns the current valid SIK roots that are cached in
-// the current State.
+// the current State. It is thread safe, but the returned value should not be modified
+// by the caller.
 func (v *State) ValidSIKRoots() [][]byte {
 	v.mtxValidSIKRoots.Lock()
 	defer v.mtxValidSIKRoots.Unlock()

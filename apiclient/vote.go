@@ -98,7 +98,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			AvailableWeight: v.ProofMkTree.LeafWeight,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not generate zk circuit inputs: %w", err)
 		}
 		inputs, err := json.Marshal(rawInputs)
 		if err != nil {
@@ -113,7 +113,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		// proof for the calculated inputs
 		proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not generate anonymous proof: %w", err)
 		}
 		// encode the proof into a protobuf
 		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil, nil)
@@ -134,7 +134,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		// prepare an unsigned vote transaction with the VoteEnvelope
 		voteAPI, err = c.prepareVoteTx(vote, false)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not prepare vote transaction: %w", err)
 		}
 	case election.Census.CensusOrigin == censusOriginWeighted:
 		// support custom vote weight

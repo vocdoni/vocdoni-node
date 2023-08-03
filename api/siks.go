@@ -117,6 +117,10 @@ func (a *API) sikProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		return err
 	}
 	response := Census{}
+	response.CensusRoot, err = a.vocapp.State.SIKRoot()
+	if err != nil {
+		return ErrGettingSIK.WithErr(err)
+	}
 	response.Value, response.CensusProof, err = a.vocapp.State.SIKGenProof(common.BytesToAddress(address))
 	if err != nil {
 		return ErrSIKNotFound.WithErr(err)

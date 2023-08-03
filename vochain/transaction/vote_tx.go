@@ -215,8 +215,7 @@ func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) *vstate.
 }
 
 // initializeSignedVote initializes a signed vote. It does not check the proof nor includes the weight of the vote.
-func initializeSignedVote(voteEnvelope *models.VoteEnvelope,
-	signedBody, signature []byte, height uint32) (*vstate.Vote, error) {
+func initializeSignedVote(voteEnvelope *models.VoteEnvelope, signedBody, signature []byte, height uint32) (*vstate.Vote, error) {
 	// Create a new vote object with the provided parameters
 	vote := &vstate.Vote{
 		Height:               height,
