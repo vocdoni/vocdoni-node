@@ -19,7 +19,7 @@ SELECT COUNT(*) FROM transactions
 `
 
 func (q *Queries) CountTransactions(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, countTransactions)
+	row := q.queryRow(ctx, q.countTransactionsStmt, countTransactions)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -41,7 +41,7 @@ type CreateTransactionParams struct {
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createTransaction,
+	return q.exec(ctx, q.createTransactionStmt, createTransaction,
 		arg.Hash,
 		arg.BlockHeight,
 		arg.BlockIndex,
@@ -62,7 +62,7 @@ type GetLastTransactionsParams struct {
 }
 
 func (q *Queries) GetLastTransactions(ctx context.Context, arg GetLastTransactionsParams) ([]Transaction, error) {
-	rows, err := q.db.QueryContext(ctx, getLastTransactions, arg.Limit, arg.Offset)
+	rows, err := q.query(ctx, q.getLastTransactionsStmt, getLastTransactions, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, getTransaction, id)
+	row := q.queryRow(ctx, q.getTransactionStmt, getTransaction, id)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
@@ -116,7 +116,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, getTransactionByHash, hash)
+	row := q.queryRow(ctx, q.getTransactionByHashStmt, getTransactionByHash, hash)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,
@@ -140,7 +140,7 @@ type GetTxReferenceByBlockHeightAndBlockIndexParams struct {
 }
 
 func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, arg GetTxReferenceByBlockHeightAndBlockIndexParams) (Transaction, error) {
-	row := q.db.QueryRowContext(ctx, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
+	row := q.queryRow(ctx, q.getTxReferenceByBlockHeightAndBlockIndexStmt, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
 	var i Transaction
 	err := row.Scan(
 		&i.ID,

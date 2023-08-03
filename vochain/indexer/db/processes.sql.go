@@ -67,7 +67,7 @@ type CreateProcessParams struct {
 }
 
 func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, createProcess,
+	return q.exec(ctx, q.createProcessStmt, createProcess,
 		arg.ID,
 		arg.EntityID,
 		arg.StartBlock,
@@ -100,7 +100,7 @@ SELECT COUNT(DISTINCT entity_id) FROM processes
 `
 
 func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getEntityCount)
+	row := q.queryRow(ctx, q.getEntityCountStmt, getEntityCount)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -146,7 +146,7 @@ type GetProcessRow struct {
 }
 
 func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProcessRow, error) {
-	row := q.db.QueryRowContext(ctx, getProcess, id)
+	row := q.queryRow(ctx, q.getProcessStmt, getProcess, id)
 	var i GetProcessRow
 	err := row.Scan(
 		&i.ID,
@@ -185,7 +185,7 @@ SELECT COUNT(*) FROM processes
 `
 
 func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getProcessCount)
+	row := q.queryRow(ctx, q.getProcessCountStmt, getProcessCount)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -199,7 +199,7 @@ WHERE final_results = ?
 `
 
 func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
-	rows, err := q.db.QueryContext(ctx, getProcessIDsByFinalResults, finalResults)
+	rows, err := q.query(ctx, q.getProcessIDsByFinalResultsStmt, getProcessIDsByFinalResults, finalResults)
 	if err != nil {
 		return nil, err
 	}
@@ -228,7 +228,7 @@ LIMIT 1
 `
 
 func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int64, error) {
-	row := q.db.QueryRowContext(ctx, getProcessStatus, id)
+	row := q.queryRow(ctx, q.getProcessStatusStmt, getProcessStatus, id)
 	var status int64
 	err := row.Scan(&status)
 	return status, err
@@ -255,7 +255,7 @@ type SearchEntitiesRow struct {
 }
 
 func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
-	rows, err := q.db.QueryContext(ctx, searchEntities, arg.EntityIDSubstr, arg.Offset, arg.Limit)
+	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities, arg.EntityIDSubstr, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +303,7 @@ type SearchProcessesParams struct {
 }
 
 func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
-	rows, err := q.db.QueryContext(ctx, searchProcesses,
+	rows, err := q.query(ctx, q.searchProcessesStmt, searchProcesses,
 		arg.EntityID,
 		arg.Namespace,
 		arg.Status,
@@ -341,7 +341,7 @@ WHERE id = ?1
 `
 
 func (q *Queries) SetProcessResultsCancelled(ctx context.Context, id types.ProcessID) (sql.Result, error) {
-	return q.db.ExecContext(ctx, setProcessResultsCancelled, id)
+	return q.exec(ctx, q.setProcessResultsCancelledStmt, setProcessResultsCancelled, id)
 }
 
 const setProcessResultsReady = `-- name: SetProcessResultsReady :execresult
@@ -361,7 +361,7 @@ type SetProcessResultsReadyParams struct {
 }
 
 func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResultsReadyParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, setProcessResultsReady,
+	return q.exec(ctx, q.setProcessResultsReadyStmt, setProcessResultsReady,
 		arg.Votes,
 		arg.Weight,
 		arg.BlockHeight,
@@ -381,7 +381,7 @@ type UpdateProcessEndBlockParams struct {
 }
 
 func (q *Queries) UpdateProcessEndBlock(ctx context.Context, arg UpdateProcessEndBlockParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateProcessEndBlock, arg.EndBlock, arg.ID)
+	return q.exec(ctx, q.updateProcessEndBlockStmt, updateProcessEndBlock, arg.EndBlock, arg.ID)
 }
 
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
@@ -408,7 +408,7 @@ type UpdateProcessFromStateParams struct {
 }
 
 func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessFromStateParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateProcessFromState,
+	return q.exec(ctx, q.updateProcessFromStateStmt, updateProcessFromState,
 		arg.CensusRoot,
 		arg.CensusUri,
 		arg.PrivateKeys,
@@ -437,7 +437,7 @@ type UpdateProcessResultByIDParams struct {
 }
 
 func (q *Queries) UpdateProcessResultByID(ctx context.Context, arg UpdateProcessResultByIDParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateProcessResultByID,
+	return q.exec(ctx, q.updateProcessResultByIDStmt, updateProcessResultByID,
 		arg.Votes,
 		arg.Weight,
 		arg.VoteOpts,
@@ -462,7 +462,7 @@ type UpdateProcessResultsParams struct {
 }
 
 func (q *Queries) UpdateProcessResults(ctx context.Context, arg UpdateProcessResultsParams) (sql.Result, error) {
-	return q.db.ExecContext(ctx, updateProcessResults,
+	return q.exec(ctx, q.updateProcessResultsStmt, updateProcessResults,
 		arg.Votes,
 		arg.Weight,
 		arg.BlockHeight,

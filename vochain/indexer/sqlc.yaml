@@ -7,6 +7,7 @@ sql:
     go:
       package: "indexerdb"
       out: "db"
+      emit_prepared_queries: true
       overrides:
       # Defaults to int32 for integers, which is a bit small.
       - db_type: "int"
