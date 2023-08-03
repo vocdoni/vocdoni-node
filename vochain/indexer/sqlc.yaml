@@ -21,8 +21,6 @@ sql:
         go_type: "go.vocdoni.io/dvote/types.EntityID"
       - column: "processes.census_root"
         go_type: "go.vocdoni.io/dvote/types.CensusRoot"
-      - column: "processes.rolling_census_root"
-        go_type: "go.vocdoni.io/dvote/types.CensusRoot"
       - column: "votes.nullifier"
         go_type: "go.vocdoni.io/dvote/types.Nullifier"
       - column: "votes.voter_id"

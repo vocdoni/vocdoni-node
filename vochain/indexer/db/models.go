@@ -29,8 +29,6 @@ type Process struct {
 	ResultsWeight      string
 	ResultsBlockHeight int64
 	CensusRoot         types.CensusRoot
-	RollingCensusRoot  types.CensusRoot
-	RollingCensusSize  int64
 	MaxCensusSize      int64
 	CensusUri          string
 	Metadata           string

@@ -171,8 +171,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		BlockCount:        int64(p.BlockCount),
 		HaveResults:       compResultsHeight > 0,
 		CensusRoot:        nonNullBytes(p.CensusRoot),
-		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
-		RollingCensusSize: int64(p.GetRollingCensusSize()),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),
 		CensusUri:         p.GetCensusURI(),
 		CensusOrigin:      int64(p.CensusOrigin),
@@ -214,15 +212,13 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 
 	// Update the process in the indexer database
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
-		ID:                pid,
-		CensusRoot:        nonNullBytes(p.CensusRoot),
-		RollingCensusRoot: nonNullBytes(p.RollingCensusRoot),
-		RollingCensusSize: int64(p.GetRollingCensusSize()),
-		CensusUri:         p.GetCensusURI(),
-		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
-		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
-		Metadata:          p.GetMetadata(),
-		Status:            int64(p.Status),
+		ID:          pid,
+		CensusRoot:  nonNullBytes(p.CensusRoot),
+		CensusUri:   p.GetCensusURI(),
+		PrivateKeys: indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:  indexertypes.EncodeJSON(p.EncryptionPublicKeys),
+		Metadata:    p.GetMetadata(),
+		Status:      int64(p.Status),
 	}); err != nil {
 		return err
 	}

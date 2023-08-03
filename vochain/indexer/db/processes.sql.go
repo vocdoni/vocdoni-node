@@ -16,8 +16,7 @@ import (
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block, block_count,
-	have_results, final_results,
-	census_root, rolling_census_root, rolling_census_size,
+	have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -28,7 +27,6 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
-	?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -50,8 +48,6 @@ type CreateProcessParams struct {
 	HaveResults       bool
 	FinalResults      bool
 	CensusRoot        types.CensusRoot
-	RollingCensusRoot types.CensusRoot
-	RollingCensusSize int64
 	MaxCensusSize     int64
 	CensusUri         string
 	Metadata          string
@@ -80,8 +76,6 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.HaveResults,
 		arg.FinalResults,
 		arg.CensusRoot,
-		arg.RollingCensusRoot,
-		arg.RollingCensusSize,
 		arg.MaxCensusSize,
 		arg.CensusUri,
 		arg.Metadata,
@@ -113,7 +107,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.rolling_census_root, p.rolling_census_size, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
+SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
 LEFT JOIN votes AS v
 	ON p.id = v.process_id
 WHERE p.id = ?
@@ -133,8 +127,6 @@ type GetProcessRow struct {
 	ResultsWeight      string
 	ResultsBlockHeight int64
 	CensusRoot         types.CensusRoot
-	RollingCensusRoot  types.CensusRoot
-	RollingCensusSize  int64
 	MaxCensusSize      int64
 	CensusUri          string
 	Metadata           string
@@ -168,8 +160,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProces
 		&i.ResultsWeight,
 		&i.ResultsBlockHeight,
 		&i.CensusRoot,
-		&i.RollingCensusRoot,
-		&i.RollingCensusSize,
 		&i.MaxCensusSize,
 		&i.CensusUri,
 		&i.Metadata,
@@ -399,37 +389,31 @@ const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
 
 UPDATE processes
 SET census_root         = ?1,
-	rolling_census_root = ?2,
-	census_uri          = ?3,
-	private_keys        = ?4,
-	public_keys         = ?5,
-	metadata            = ?6,
-	rolling_census_size = ?7,
-	status              = ?8
-WHERE id = ?9
+	census_uri          = ?2,
+	private_keys        = ?3,
+	public_keys         = ?4,
+	metadata            = ?5,
+	status              = ?6
+WHERE id = ?7
 `
 
 type UpdateProcessFromStateParams struct {
-	CensusRoot        types.CensusRoot
-	RollingCensusRoot types.CensusRoot
-	CensusUri         string
-	PrivateKeys       string
-	PublicKeys        string
-	Metadata          string
-	RollingCensusSize int64
-	Status            int64
-	ID                types.ProcessID
+	CensusRoot  types.CensusRoot
+	CensusUri   string
+	PrivateKeys string
+	PublicKeys  string
+	Metadata    string
+	Status      int64
+	ID          types.ProcessID
 }
 
 func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessFromStateParams) (sql.Result, error) {
 	return q.db.ExecContext(ctx, updateProcessFromState,
 		arg.CensusRoot,
-		arg.RollingCensusRoot,
 		arg.CensusUri,
 		arg.PrivateKeys,
 		arg.PublicKeys,
 		arg.Metadata,
-		arg.RollingCensusSize,
 		arg.Status,
 		arg.ID,
 	)

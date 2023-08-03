@@ -189,11 +189,10 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		ElectionMode:    ElectionMode{ProcessMode: proc.Mode},
 		TallyMode:       TallyMode{ProcessVoteOptions: proc.VoteOpts},
 		Census: &ElectionCensus{
-			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
-			CensusRoot:             proc.CensusRoot,
-			PostRegisterCensusRoot: proc.RollingCensusRoot,
-			CensusURL:              proc.CensusURI,
-			MaxCensusSize:          proc.MaxCensusSize,
+			CensusOrigin:  models.CensusOrigin_name[proc.CensusOrigin],
+			CensusRoot:    proc.CensusRoot,
+			CensusURL:     proc.CensusURI,
+			MaxCensusSize: proc.MaxCensusSize,
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
