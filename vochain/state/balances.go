@@ -25,7 +25,6 @@ var (
 		models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
 		models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
 		models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
-		models.TxType_SET_PROCESS_RESULTS:        "c_setProcessQuestionIndex",
 		models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
 		models.TxType_NEW_PROCESS:                "c_newProcess",
 		models.TxType_SEND_TOKENS:                "c_sendTokens",

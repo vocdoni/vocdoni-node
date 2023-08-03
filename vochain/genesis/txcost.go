@@ -42,7 +42,6 @@ func (t *TransactionCosts) AsMap() map[models.TxType]uint64 {
 var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
 	"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
-	"SetProcessResults":       models.TxType_SET_PROCESS_RESULTS,
 	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 	"SendTokens":              models.TxType_SEND_TOKENS,
 	"SetAccountInfoURI":       models.TxType_SET_ACCOUNT_INFO_URI,
@@ -68,7 +67,6 @@ func TxCostNameToTxType(key string) models.TxType {
 var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_STATUS:         "SetProcessStatus",
 	models.TxType_SET_PROCESS_CENSUS:         "SetProcessCensus",
-	models.TxType_SET_PROCESS_RESULTS:        "SetProcessResults",
 	models.TxType_SET_PROCESS_QUESTION_INDEX: "SetProcessQuestionIndex",
 	models.TxType_SEND_TOKENS:                "SendTokens",
 	models.TxType_SET_ACCOUNT_INFO_URI:       "SetAccountInfoURI",
