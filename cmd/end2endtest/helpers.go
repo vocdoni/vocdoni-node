@@ -28,13 +28,6 @@ const (
 	defaultWeight = 10
 )
 
-type ballotData struct {
-	maxValue     uint32
-	maxTotalCost uint32
-	costExponent uint32
-	maxCount     uint32
-}
-
 func newTestElectionDescription() *vapi.ElectionDescription {
 	return &vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
@@ -56,6 +49,26 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 					},
 				},
 			},
+		},
+	}
+}
+
+func newTestProcess() *models.Process {
+	return &models.Process{
+		StartBlock: 0,
+		BlockCount: 100,
+		Status:     models.ProcessStatus_READY,
+		EnvelopeType: &models.EnvelopeType{
+			EncryptedVotes: false,
+			UniqueValues:   true},
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1,
+			MaxValue: 1,
+		},
+		Mode: &models.ProcessMode{
+			AutoStart:     true,
+			Interruptible: true,
 		},
 	}
 }
@@ -352,6 +365,10 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 		return err
 	}
 
+	if prc.MaxCensusSize == 0 {
+		prc.MaxCensusSize = uint64(t.config.nvotes)
+	}
+
 	csp := &ethereum.SignKeys{}
 
 	switch prc.CensusOrigin {
@@ -438,71 +455,112 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 }
 
 // ballotVotes from a default list of 10 vote values that exceed the max value, max total cost and is not unique will
-func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
+func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUniqueV bool) ([][]int, [][]*types.BigInt) {
 	votes := make([][]int, 0, nvotes)
-	var resultsField1, resultsField2 []*types.BigInt
+	var resultsFields [][]*types.BigInt
+	var v [][]int
 
-	// initial 10 votes to be sent by the ballot test
-	var v = [][]int{
-		{0, 0}, {0, 7}, {5, 7}, {2, 0}, {2, 3},
-		{1, 6}, {0, 8}, {6, 5}, {2, 7}, {6, 4},
+	switch ballotType {
+	// fill initial 10 votes to be sent by the ballot test
+	case "ranked":
+		v = [][]int{
+			{0, 5, 0, 2}, {3, 1, 0, 2}, {3, 2, 0, 1}, {1, 0, 3, 2},
+			{2, 3, 1, 1}, {4, 1, 1, 0}, {0, 0, 2, 1}, {0, 2, 1, 3},
+			{1, 1, 1, 4}, {0, 3, 2, 1},
+		}
+		// default results on field 1,2,3,4 for 10 votes
+		resultsFields = append(resultsFields, votesToBigInt(20, 10, 0, 20),
+			votesToBigInt(10, 10, 20, 10), votesToBigInt(20, 10, 10, 10),
+			votesToBigInt(0, 20, 20, 10))
+
+	case "quadratic":
+		v = [][]int{
+			{2, 4, 2, 0}, {3, 3, 2, 2}, {2, 3, 0, 1}, {0, 2, 3, 3},
+			{1, 2, 1, 2}, {5, 0, 1, 0}, {0, 2, 2, 2}, {2, 1, 1, 2},
+			{1, 3, 0, 1}, {1, 3, 1, 1},
+		}
+		resultsFields = append(resultsFields, votesToBigInt(10, 30, 10, 0),
+			votesToBigInt(0, 10, 20, 20), votesToBigInt(10, 30, 10, 0),
+			votesToBigInt(0, 20, 30, 0))
+
+	case "range":
+		v = [][]int{
+			{5, 0, 4, 2}, {3, 1, 2, 4}, {6, 0, 1, 3}, {0, 3, 2, 1},
+			{2, 1, 3, 0}, {3, 2, 1, 3}, {1, 3, 2, 0}, {2, 1, 1, 2},
+			{1, 2, 0, 3}, {4, 3, 1, 1},
+		}
+		resultsFields = append(resultsFields, votesToBigInt(10, 20, 10, 0),
+			votesToBigInt(0, 10, 10, 20), votesToBigInt(10, 0, 20, 10),
+			votesToBigInt(20, 10, 0, 10))
+
+	case "approval":
+		v = [][]int{
+			{1, 0, 0, 0}, {2, 1, 0, 1}, {0, 1, 2, 3}, {0, 0, 0, 1},
+			{0, 0, 1, 1}, {2, 2, 1, 0}, {1, 0, 1, 1}, {0, 0, 0, 0},
+			{1, 1, 0, 3}, {1, 1, 1, 1},
+		}
+		resultsFields = append(resultsFields, votesToBigInt(30, 30, 0, 0),
+			votesToBigInt(50, 10, 0, 0), votesToBigInt(30, 30, 0, 0),
+			votesToBigInt(20, 40, 0, 0))
 	}
 
 	// less than 10 votes
 	if nvotes < 10 {
-		// default results with zero values on field 1 for less than 10 votes
-		resultsField1 = votesToBigInt(make([]uint64, b.maxValue+1)...)
-		// default results with zero values on field 2 for less than 10 votes
-		resultsField2 = votesToBigInt(make([]uint64, b.maxValue+1)...)
+		for i := 0; i < int(vop.MaxCount); i++ {
+			// initialize default results with zero values on field 1,2,3,4 for less than 10 votes
+			resultsFields[i] = votesToBigInt(make([]uint64, vop.MaxCount)...)
+		}
 	} else {
 		// greater o equal than 10 votes
 		for i := 0; i < nvotes/10; i++ {
 			votes = append(votes, v...)
 		}
-		// default results on field 1 for 10 votes
-		resultsField1 = votesToBigInt(0, 10, 20, 0, 0, 0, 10)
-		// default results on field 2 for 10 votes
-		resultsField2 = votesToBigInt(10, 0, 0, 10, 10, 0, 10)
-
 		// nvotes split 10, for example for 44 nvotes, nvoteDid10 will be 4
 		// and that number will be multiplied by each default result to obtain the results for 40 votes
 		nvotesDiv10 := new(types.BigInt).SetUint64(uint64(nvotes / 10))
 
-		for i := 0; i <= int(b.maxValue); i++ {
-			newvalField1 := new(types.BigInt).Mul(resultsField1[i], nvotesDiv10)
-			newvalField2 := new(types.BigInt).Mul(resultsField2[i], nvotesDiv10)
-
-			resultsField1[i] = newvalField1
-			resultsField2[i] = newvalField2
+		for _, field := range resultsFields {
+			field[0] = new(types.BigInt).Mul(field[0], nvotesDiv10)
+			field[1] = new(types.BigInt).Mul(field[1], nvotesDiv10)
+			field[2] = new(types.BigInt).Mul(field[2], nvotesDiv10)
+			field[3] = new(types.BigInt).Mul(field[3], nvotesDiv10)
 		}
 	}
 
-	// remainVotes check if exists remain votes to add and count, note that if nvotes < 10 raminVote will be nvotes
 	remainVotes := nvotes % 10
 	if remainVotes != 0 {
 		votes = append(votes, v[:remainVotes]...)
-		// update expected results
-		for i := 0; i < remainVotes; i++ {
-			isValidTotalCost := math.Pow(float64(v[i][0]), float64(b.costExponent))+
-				math.Pow(float64(v[i][1]), float64(b.costExponent)) <= float64(b.maxTotalCost)
-			isValidValues := v[i][0] <= int(b.maxValue) && v[i][1] <= int(b.maxValue)
-			isUniqueValues := v[i][0] != v[i][1]
 
-			if isValidTotalCost && isValidValues && isUniqueValues {
-				newvalField1 := new(types.BigInt).Add(resultsField1[v[i][0]], new(types.BigInt).SetUint64(10))
-				newvalField2 := new(types.BigInt).Add(resultsField2[v[i][1]], new(types.BigInt).SetUint64(10))
+		for _, vote := range v[:remainVotes] {
+			isValidTotalCost := math.Pow(float64(vote[0]), float64(vop.CostExponent))+
+				math.Pow(float64(vote[1]), float64(vop.CostExponent))+
+				math.Pow(float64(vote[2]), float64(vop.CostExponent))+
+				math.Pow(float64(vote[3]), float64(vop.CostExponent)) <= float64(vop.MaxTotalCost)
+			isValidValues := vote[0] <= int(vop.MaxValue) &&
+				vote[1] <= int(vop.MaxValue) &&
+				vote[2] <= int(vop.MaxValue) &&
+				vote[3] <= int(vop.MaxValue)
 
-				resultsField1[v[i][0]] = newvalField1
-				resultsField2[v[i][1]] = newvalField2
+			repeatValues := vote[0] == vote[1] || vote[2] == vote[1] ||
+				vote[2] == vote[0] || vote[0] == vote[3] ||
+				vote[1] == vote[3] || vote[2] == vote[3]
+
+			if expectUniqueV && repeatValues {
+				continue
+			}
+
+			if isValidTotalCost && isValidValues {
+				resultsFields[0][vote[0]].Add(resultsFields[0][vote[0]], new(types.BigInt).SetUint64(10))
+				resultsFields[1][vote[1]].Add(resultsFields[1][vote[1]], new(types.BigInt).SetUint64(10))
+				resultsFields[2][vote[2]].Add(resultsFields[2][vote[2]], new(types.BigInt).SetUint64(10))
+				resultsFields[3][vote[3]].Add(resultsFields[3][vote[3]], new(types.BigInt).SetUint64(10))
 			}
 		}
 	}
 
-	expectedResults := [][]*types.BigInt{resultsField1, resultsField2}
-
 	log.Debug("vote values generated", votes)
-	log.Debug("results expected", expectedResults)
-	return votes, expectedResults
+	log.Debug("results expected", resultsFields)
+	return votes, resultsFields
 }
 
 // sendVotes sends a batch of votes concurrently
@@ -578,9 +636,9 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {
 	// iterate over each question to check if the results match with the expected results
-	for i := 0; i < len(results); i++ {
-		for q := range results[i] {
-			if !(expectedResults[i][q].String() == results[i][q].String()) {
+	for i, result := range results {
+		for q, r := range result {
+			if !(expectedResults[i][q].String() == r.String()) {
 				return false
 			}
 		}
@@ -672,4 +730,21 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 		return nil, fmt.Errorf("error waiting for election publish final results %w", err)
 	}
 	return results, nil
+}
+
+// newE2EElections configure new private key for each election in order to avoid nonce update when manage more than one election
+func newE2EElections(api *apiclient.HTTPclient, c *config, numElections int) ([]e2eElection, error) {
+	elections := make([]e2eElection, numElections)
+	for i := range elections {
+		cfgCopy := *c
+		elections[i].api = api
+		cfgCopy.accountPrivKeys = []string{util.RandomHex(32)}
+		ak, err := privKeyToSigner(cfgCopy.accountPrivKeys[0])
+		if err != nil {
+			return nil, err
+		}
+		cfgCopy.accountKeys[0] = ak
+		elections[i].config = &cfgCopy
+	}
+	return elections, nil
 }
