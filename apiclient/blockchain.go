@@ -162,12 +162,17 @@ func (c *HTTPclient) TransactionSetCensus(electionID types.HexBytes, census api.
 		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
 	}
 
+	val := true
+
 	tx := &models.SetProcessTx{
 		Txtype:     models.TxType_SET_PROCESS_CENSUS,
 		Nonce:      acc.Nonce,
 		ProcessId:  electionID,
 		CensusRoot: census.CensusRoot,
 		CensusURI:  &census.CensusURL,
+
+		TempSIKs:    &val,
+		DummyChange: &val,
 	}
 
 	txb, err := proto.Marshal(&models.Tx{
