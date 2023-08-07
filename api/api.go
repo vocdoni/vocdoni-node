@@ -39,6 +39,8 @@ import (
 //	@tag.description	Submit, get, and verify votes
 //	@tag.name			Wallet
 //	@tag.description	Operations for the wallets managed backend side
+//	@tag.name			SIK
+//	@tag.description	The Secret Identity Key (SIK) operations used on anonymous voting
 
 //	@schemes	https
 //	@host		api-dev.vocdoni.net
