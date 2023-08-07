@@ -130,8 +130,8 @@ func (v *State) InvalidateSIK(address common.Address) error {
 }
 
 // ValidSIKRoots method returns the current valid SIK roots that are cached in
-// the current State. It is thread safe, but the returned value should not be modified
-// by the caller.
+// the current State. It is thread safe, but the returned value should not be
+// modified by the caller.
 func (v *State) ValidSIKRoots() [][]byte {
 	v.mtxValidSIKRoots.Lock()
 	defer v.mtxValidSIKRoots.Unlock()
@@ -158,12 +158,24 @@ func (v *State) FetchValidSIKRoots() error {
 // ExpiredSIK returns if the provided siksRoot is still valid or not, checking
 // if it is included into the list of current valid sik roots.
 func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
+	// for _, sikRoot := range v.ValidSIKRoots() {
+	// 	if bytes.Equal(sikRoot, candidateRoot) {
+	// 		return false, nil
+	// 	}
+	// }
+	// return true, nil
+	notExists := true
+	current := []string{}
 	for _, sikRoot := range v.ValidSIKRoots() {
 		if bytes.Equal(sikRoot, candidateRoot) {
-			return false, nil
+			notExists = false
 		}
+		current = append(current, hex.EncodeToString(sikRoot))
 	}
-	return true, nil
+	log.Infow("sikroot received",
+		"candidate", hex.EncodeToString(candidateRoot),
+		"current", current)
+	return notExists, nil
 }
 
 // UpdateSIKRoots keep on track the last valid SIK Merkle Tree roots to support
