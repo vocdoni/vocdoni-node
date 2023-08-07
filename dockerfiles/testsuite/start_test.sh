@@ -54,7 +54,10 @@ tests_to_run=(
 	"e2etest_anonelection"
 	"e2etest_overwritelection"
 	"e2etest_censusizelection"
-	"e2etest_ballotelection"
+	"e2etest_ballotRanked"
+	"e2etest_ballotQuadratic"
+	"e2etest_ballotRange"
+	"e2etest_ballotApproval"
 	"e2etest_tokentxs"
 	"e2etest_lifecyclelection"
 	"e2etest_cspelection"
@@ -125,8 +128,20 @@ e2etest_censusizelection() {
   e2etest censusizelection
 }
 
-e2etest_ballotelection() {
-  e2etest ballotelection
+e2etest_ballotRanked() {
+  e2etest ballotRanked
+}
+
+e2etest_ballotQuadratic() {
+  e2etest ballotQuadratic
+}
+
+e2etest_ballotRange() {
+  e2etest ballotRange
+}
+
+e2etest_ballotApproval() {
+  e2etest ballotApproval
 }
 
 e2etest_lifecyclelection() {

@@ -731,20 +731,3 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 	}
 	return results, nil
 }
-
-// newE2EElections configure new private key for each election in order to avoid nonce update when manage more than one election
-func newE2EElections(api *apiclient.HTTPclient, c *config, numElections int) ([]e2eElection, error) {
-	elections := make([]e2eElection, numElections)
-	for i := range elections {
-		cfgCopy := *c
-		elections[i].api = api
-		cfgCopy.accountPrivKeys = []string{util.RandomHex(32)}
-		ak, err := privKeyToSigner(cfgCopy.accountPrivKeys[0])
-		if err != nil {
-			return nil, err
-		}
-		cfgCopy.accountKeys[0] = ak
-		elections[i].config = &cfgCopy
-	}
-	return elections, nil
-}
