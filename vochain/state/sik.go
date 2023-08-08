@@ -157,13 +157,13 @@ func (v *State) FetchValidSIKRoots() error {
 
 // ExpiredSIK returns if the provided siksRoot is still valid or not, checking
 // if it is included into the list of current valid sik roots.
-func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
+func (v *State) ExpiredSIKRoot(candidateRoot []byte) bool {
 	// for _, sikRoot := range v.ValidSIKRoots() {
 	// 	if bytes.Equal(sikRoot, candidateRoot) {
-	// 		return false, nil
+	// 		return false
 	// 	}
 	// }
-	// return true, nil
+	// return true
 	notExists := true
 	current := []string{}
 	for _, sikRoot := range v.ValidSIKRoots() {
@@ -175,7 +175,7 @@ func (v *State) ExpiredSIK(candidateRoot []byte) (bool, error) {
 	log.Infow("sikroot received",
 		"candidate", hex.EncodeToString(candidateRoot),
 		"current", current)
-	return notExists, nil
+	return notExists
 }
 
 // UpdateSIKRoots keep on track the last valid SIK Merkle Tree roots to support
@@ -368,6 +368,8 @@ func (v *State) PurgeSIKsByElection(pid []byte) error {
 // SIKGenProof returns the proof of the provided address in the SIKs tree.
 // The first returned value is the leaf value and the second the proof siblings.
 func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
@@ -378,11 +380,22 @@ func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
 
 // SIKRoot returns the last root hash of the SIK merkle tree.
 func (v *State) SIKRoot() ([]byte, error) {
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
-	return siksTree.Root()
+	currentRoot, err := siksTree.Root()
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
+	}
+
+	// if v.ExpiredSIKRoot(currentRoot) {
+	// 	return currentRoot, v.UpdateSIKRoots()
+	// }
+
+	return currentRoot, nil
 }
 
 // InvalidateAt function sets the current SIK value to the encoded value of the

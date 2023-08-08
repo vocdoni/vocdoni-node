@@ -150,11 +150,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("failed getting sik root from the proof: %w", err)
 		}
 		// check if it is expired
-		expired, err := t.state.ExpiredSIK(proofSIKRoot)
-		if err != nil {
-			return nil, fmt.Errorf("error checking sik root expiration")
-		}
-		if expired {
+		if t.state.ExpiredSIKRoot(proofSIKRoot) {
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
 		// get vote weight from proof publicSignals
