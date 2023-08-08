@@ -149,6 +149,12 @@ func (v *State) FetchValidSIKRoots() error {
 	}); err != nil {
 		return err
 	}
+	if err := v.NoState(true).Iterate(anonSIKDBPrefix, func(_, root []byte) bool {
+		validRoots = append(validRoots, root)
+		return true
+	}); err != nil {
+		return err
+	}
 	v.mtxValidSIKRoots.Lock()
 	v.validSIKRoots = validRoots
 	v.mtxValidSIKRoots.Unlock()
@@ -381,22 +387,16 @@ func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
 // SIKRoot returns the last root hash of the SIK merkle tree.
 func (v *State) SIKRoot() ([]byte, error) {
 	v.tx.Lock()
+	defer v.tx.Unlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		v.tx.Unlock()
 		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	currentRoot, err := siksTree.Root()
-	v.tx.Unlock()
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
 	}
-
-	if v.ExpiredSIKRoot(currentRoot) {
-		log.Info("sikRoot not registered, updating...")
-		return currentRoot, v.UpdateSIKRoots()
-	}
-
 	return currentRoot, nil
 }
 
