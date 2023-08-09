@@ -155,8 +155,8 @@ func (v *State) FetchValidSIKRoots() error {
 	return nil
 }
 
-// ExpiredSIK returns if the provided siksRoot is still valid or not, checking
-// if it is included into the list of current valid sik roots.
+// ExpiredSIKRoot returns if the provided siksRoot is still valid or not,
+// checking if it is included into the list of current valid sik roots.
 func (v *State) ExpiredSIKRoot(candidateRoot []byte) bool {
 	for _, sikRoot := range v.ValidSIKRoots() {
 		if bytes.Equal(sikRoot, candidateRoot) {
