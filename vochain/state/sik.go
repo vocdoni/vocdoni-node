@@ -147,13 +147,7 @@ func (v *State) FetchValidSIKRoots() error {
 		validRoots = append(validRoots, root)
 		return true
 	}); err != nil {
-		return err
-	}
-	if err := v.NoState(true).Iterate(anonSIKDBPrefix, func(_, root []byte) bool {
-		validRoots = append(validRoots, root)
-		return true
-	}); err != nil {
-		return err
+		return fmt.Errorf("%w: %w", ErrSIKIterate, err)
 	}
 	v.mtxValidSIKRoots.Lock()
 	v.validSIKRoots = validRoots
@@ -197,17 +191,6 @@ func (v *State) ExpiredSIKRoot(candidateRoot []byte) bool {
 //     for the next lower sikRoot. It is because it still being validate for a
 //     period.
 func (v *State) UpdateSIKRoots() error {
-	v.tx.Lock()
-	defer v.tx.Unlock()
-	// get sik roots key-value database associated to the siks tree
-	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
-	newSikRoot, err := siksTree.Root()
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
-	}
 	// instance the SIK's key-value DB and set the current block to the current
 	// network height.
 	sikNoStateDB := v.NoState(false)
@@ -225,6 +208,11 @@ func (v *State) UpdateSIKRoots() error {
 		// block to delete them.
 		var toPurge [][]byte
 		var nearestLowerBlock uint32
+
+		//// TODO: ONLY FOR DEBUG
+		strToPurge := []string{}
+		////
+
 		if err := sikNoStateDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
 			candidateKey := bytes.Clone(key)
 			blockNumber := binary.LittleEndian.Uint32(candidateKey)
@@ -232,12 +220,22 @@ func (v *State) UpdateSIKRoots() error {
 				if _, err := sikNoStateDB.Get(minBlockKey); err == nil || blockNumber > nearestLowerBlock {
 					toPurge = append(toPurge, candidateKey)
 					nearestLowerBlock = blockNumber
+
+					//// TODO: ONLY FOR DEBUG
+					strToPurge = append(strToPurge, hex.EncodeToString(value))
+					////
 				}
 			}
 			return true
 		}); err != nil {
-			return err
+			return fmt.Errorf("%w: %w", ErrSIKIterate, err)
 		}
+
+		//// TODO: ONLY FOR DEBUG
+		log.Debugw("[SIK ISSUE DEBUG] some sikroots to delete",
+			"toDelete", strToPurge)
+		////
+
 		// delete the selected sikRoots by its block numbers
 		for _, blockToDelete := range toPurge {
 			key := toPrefixKey(sikDBPrefix, blockToDelete)
@@ -248,9 +246,24 @@ func (v *State) UpdateSIKRoots() error {
 				"blockNumber", binary.LittleEndian.Uint32(blockToDelete))
 		}
 	}
+
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// get new sik tree root hash
+	newSikRoot, err := siksTree.Root()
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
+	}
+	// encode current blockNumber as key
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
 	key := toPrefixKey(sikDBPrefix, blockKey)
+	// store the new sik tree root in no-state database
 	if err := sikNoStateDB.Set(key, newSikRoot); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
 	}
@@ -321,9 +334,9 @@ func (v *State) CountRegisterSIK(pid []byte) (uint32, error) {
 	return binary.LittleEndian.Uint32(rawCount), nil
 }
 
-// AssignSIKToElection function persists the relation between a created SIK (without
-// registered account) and the election where the SIK is valid. This relation
-// allows to remove all SIKs when the election ends.
+// AssignSIKToElection function persists the relation between a created SIK
+// (without registered account) and the election where the SIK is valid. This
+// relation allows to remove all SIKs when the election ends.
 func (v *State) AssignSIKToElection(pid []byte, address common.Address) error {
 	// instance the SIK's key-value DB
 	sikNoStateDB := v.NoState(true)
