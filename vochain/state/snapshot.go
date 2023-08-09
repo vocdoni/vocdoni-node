@@ -187,7 +187,7 @@ func (s *StateSnapshot) Path() string {
 }
 
 // Create starts the creation of a new snapshot as a disk file.
-// This method must be called only once and its operation is oposed to `Open`.
+// This method must be called only once and its operation is opposed to `Open`.
 func (s *StateSnapshot) Create(filePath string) error {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -276,7 +276,7 @@ func (s *StateSnapshot) Save() error {
 }
 
 // Write implements the io.Writer interface.
-// Writes a chunck of bytes as part of the current merkle tree.
+// Writes a chunk of bytes as part of the current merkle tree.
 func (s *StateSnapshot) Write(b []byte) (int, error) {
 	n, err := s.file.Write(b)
 	s.header.Trees[s.currentTree].Size += uint32(n)

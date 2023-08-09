@@ -774,7 +774,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	// key. It is because the zk friendly key of any census leaf is the
 	// ZkAddress which follows a specific transformation process that must be
 	// implemented into the circom circuit also, and it is already hashed.
-	// Otherwhise, hash the key before get the proof.
+	// Otherwise, hash the key before get the proof.
 	leafKey := cdata.Key
 	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
 		leafKey, err = ref.Tree().Hash(cdata.Key)

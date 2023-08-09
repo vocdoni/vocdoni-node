@@ -76,7 +76,7 @@ const (
 	ActionEndProcess
 )
 
-// ActionsToString translates the action identifers to its corresponding human friendly string.
+// ActionsToString translates the action identifiers to its corresponding human friendly string.
 var ActionsToString = map[ActionID]string{
 	ActionCommitResults: "commit-results",
 	ActionEndProcess:    "end-process",

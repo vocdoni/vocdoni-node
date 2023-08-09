@@ -99,7 +99,7 @@ var _ db.WriteTx = (*PrefixedWriteTx)(nil)
 
 // NewPrefixedWriteTx creates a new db.WriteTx.  If the tx is already a
 // PrefixedWriteTx, instead of wrapping again, the prefixes are appended to avoid
-// unecessay layers.
+// unnecessary layers.
 func NewPrefixedWriteTx(tx db.WriteTx, prefix []byte) *PrefixedWriteTx {
 	if ptx, ok := tx.(*PrefixedWriteTx); ok {
 		return &PrefixedWriteTx{prefixSlice(ptx.prefix, prefix), ptx.tx}

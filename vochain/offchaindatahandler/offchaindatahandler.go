@@ -139,7 +139,7 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 func (d *OffChainDataHandler) OnProcessesStart(_ [][]byte) {
 }
 
-// OnSetAccount is triggered when a new account is created or modifyied. If metadata info is present, it is enqueued.
+// OnSetAccount is triggered when a new account is created or modified. If metadata info is present, it is enqueued.
 func (d *OffChainDataHandler) OnSetAccount(_ []byte, account *state.Account) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()

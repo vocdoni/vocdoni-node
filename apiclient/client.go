@@ -29,7 +29,7 @@ const (
 
 	errCodeNot200 = "API error"
 
-	// This enables Request() to handle the situation where the server replies
+	// DefaultRetries this enables Request() to handle the situation where the server replies
 	// "mempool is full", it will wait for next block and retry sending the tx
 	DefaultRetries = 3
 )

@@ -6,7 +6,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-// Genesis is a map containing the defaut Genesis details
+// Genesis is a map containing the default Genesis details
 var Genesis = map[string]VochainGenesis{
 
 	// Development network

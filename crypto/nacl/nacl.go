@@ -18,7 +18,7 @@ const KeyLength = 32
 
 // key represents a single nacl key, public or private. It contains common
 // methods to represent the key as a byte slice or as a byte array, as well as
-// decodig from hex.
+// decoding from hex.
 type key [KeyLength]byte
 
 func (k *key) Bytes() []byte { return k[:] }

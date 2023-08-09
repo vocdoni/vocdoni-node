@@ -44,7 +44,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	d.Storage = &data.DataMockTest{}
 	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
 
-	// creeate the API router
+	// create the API router
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + router.Address().String() + "/")

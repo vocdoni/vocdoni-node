@@ -106,7 +106,7 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 }
 
 // RevealUnpublished is a rescue function for revealing keys that should be already revealed.
-// It should be callend once the Vochain is syncronized in order to have the correct height.
+// It should be callend once the Vochain is synchronized in order to have the correct height.
 func (k *KeyKeeper) RevealUnpublished() {
 	// wait for vochain sync?
 	height, err := k.vochain.State.LastHeight()

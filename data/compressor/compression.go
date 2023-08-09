@@ -65,7 +65,7 @@ func (c Compressor) DecompressBytes(src []byte) []byte {
 		// compressing census dumps when publishing to ipfs.
 		return src
 	}
-	// We use a compressione stimate of 1/10th the size. Let's use 5x as a
+	// We use a compression estimate of 1/10th the size. Let's use 5x as a
 	// starting point, following the same rule while being conservative.
 	estimate := len(src) * 5
 	start := time.Now()
