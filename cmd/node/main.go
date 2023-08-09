@@ -404,7 +404,7 @@ func main() {
 				log.Fatalf("error adding hex key: (%s)", err)
 			}
 		} else {
-			log.Fatal("wrong signing key length (32 hexadecomal chars expected)")
+			log.Fatal("wrong signing key length (32 hexadecimal chars expected)")
 		}
 		log.Infof("signing address %s, pubKey %x", srv.Signer.AddressString(), srv.Signer.PublicKey())
 	}

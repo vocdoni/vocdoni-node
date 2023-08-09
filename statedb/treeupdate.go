@@ -226,7 +226,7 @@ func (u *TreeUpdate) DeepSet(key, value []byte, cfgs ...TreeConfig) error {
 // TreeTx is a wrapper over TreeUpdate that includes the Commit and Discard
 // methods to control the transaction used to update the StateDB.  It contains
 // the mainTree opened in the wrapped TreeUpdate.  The TreeTx is not safe for
-// concurent use.
+// concurrent use.
 type TreeTx struct {
 	sdb *StateDB
 	// TreeUpdate contains the mainTree opened for updates.

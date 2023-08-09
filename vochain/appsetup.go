@@ -139,7 +139,7 @@ func (app *BaseApplication) SetFnGetTxHash(fn func(height uint32, txIndex int32)
 	app.fnGetTxHash = fn
 }
 
-// SetFnMempoolSize sets the mempool size method method
+// SetFnMempoolSize sets the mempool size method
 func (app *BaseApplication) SetFnMempoolSize(fn func() int) {
 	app.fnMempoolSize = fn
 }

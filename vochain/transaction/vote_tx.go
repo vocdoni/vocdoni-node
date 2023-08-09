@@ -71,8 +71,8 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	// In order to avoid double vote check (on checkTx and deliverTx), we use a memory vote cache.
 	// An element can only be added to the vote cache during checkTx.
 	// Every N seconds the old votes which are not yet in the blockchain will be removoteEnveloped from cache.
-	// If the same vote (but different transaction) is send to the mempool, the cache will detect it
-	// and vote will be discarted.
+	// If the same vote (but different transaction) is sent to the mempool, the cache will detect it
+	// and vote will be discarded.
 	//
 	// We use CacheGetCopy because we will modify the vote to set
 	// the Height.  If we don't work with a copy we are racing with

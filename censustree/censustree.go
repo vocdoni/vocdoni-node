@@ -270,8 +270,8 @@ func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
 // Add adds a new key and value to the census merkle tree.
 // The key must ideally be hashed with the tree function. If not, caller must
 // ensure the key is inside the hashing function field.
-// The value is considered the weight for the voter. So a serialzied big.Int()
-// is expected. Value must be inside the hasing function field too.
+// The value is considered the weight for the voter. So a serialized big.Int()
+// is expected. Value must be inside the hashing function field too.
 // If the census is indexed (indexAsKeysCensus), the value must be nil.
 func (t *Tree) Add(key, value []byte) error {
 	t.Lock()

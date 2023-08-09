@@ -140,7 +140,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 //	@Success		200			{object}	object{token=string,address=string}
 //	@Router			/wallet/add/{privateKey} [post]
 func (a *API) walletAddHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// check private key format is correct and transorm it to wallet and bytes
+	// check private key format is correct and transform it to wallet and bytes
 	wallet := ethereum.SignKeys{}
 	if err := wallet.AddHexKey(ctx.URLParam("privateKey")); err != nil {
 		return err
@@ -157,7 +157,7 @@ func (a *API) walletAddHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	token := uuid.New()
 	// the encryption key is the hash of the token with a common prefix
 	encryptKey := ethereum.HashRaw(append([]byte(privateKeyHashPrefix), token[:]...))
-	// create the cipher with the new ecryption key
+	// create the cipher with the new encryption key
 	cipher, err := nacl.DecodePrivate(fmt.Sprintf("%x", encryptKey))
 	if err != nil {
 		return err

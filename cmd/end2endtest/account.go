@@ -180,7 +180,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 
 	// try to send tokens at the same time:
 	// alice sends 1/4 of her balance to bob
-	// bob sends 1/3 of his balance to alice
+	// sends 1/3 of his balance to alice
 	amountAtoB := aliceAcc.Balance / 4
 	amountBtoA := bobAcc.Balance / 3
 

@@ -60,7 +60,7 @@ type Verifier interface {
 	Verify(message, signature []byte) error
 }
 
-// Hash represents cryptographic hash algorihms.
+// Hash represents cryptographic hash algorithms.
 type Hash interface {
 	Hash(message []byte) []byte
 }

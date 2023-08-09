@@ -18,7 +18,7 @@ import (
 
 // Vochain initializes the Vochain service.  It takes the service configuration and
 // initializes the missing services of the VocdoniService struct.  All started services will be
-// respected unless the App, which is the main service and thus overwriten by this function.
+// respected unless the App, which is the main service and thus overwritten by this function.
 func (vs *VocdoniService) Vochain() error {
 	// node + app layer
 	if len(vs.Config.PublicAddr) == 0 {
@@ -149,7 +149,7 @@ func (vs *VocdoniService) Start() error {
 			if i%10 == 0 {
 				log.Monitor("vochain fastsync", map[string]interface{}{
 					"height":   vs.Stats.Height(),
-					"blocks/s": float64((vs.Stats.Height() - lastHeight)) / time.Since(timeCounter).Seconds(),
+					"blocks/s": float64(vs.Stats.Height()-lastHeight) / time.Since(timeCounter).Seconds(),
 					"peers":    vs.Stats.NPeers(),
 				})
 				timeCounter = time.Now()
