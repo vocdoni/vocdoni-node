@@ -267,6 +267,10 @@ func (v *State) UpdateSIKRoots() error {
 	if err := sikNoStateDB.Set(key, newSikRoot); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
 	}
+	// include the new root into the cached list
+	v.mtxValidSIKRoots.Lock()
+	v.validSIKRoots = append(v.validSIKRoots, newSikRoot)
+	v.mtxValidSIKRoots.Unlock()
 	log.Debugw("updateSIKRoots (created)",
 		"newSikRoot", hex.EncodeToString(newSikRoot),
 		"blockNumber", currentBlock)
