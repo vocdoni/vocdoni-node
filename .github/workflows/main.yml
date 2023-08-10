@@ -88,10 +88,10 @@ jobs:
         with:
           go-version: '1.20'
       - name: Run Go test (and collect code coverage)
-        if: github.event_name == 'pull_request' # quicker, non-race test in case it's a PR
+        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' # quicker, non-race test in case it's a PR or push to dev
         run: go test -coverprofile=unit.covdata.txt ./...
       - name: Run Go test -race (and collect code coverage)
-        if: github.event_name == 'push' # this is limited to selected branches at the beginning of this file
+        if: github.event_name == 'push' && github.ref != 'refs/heads/dev' # this is further limited to selected branches at the beginning of this file
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
 
   job_compose_test:
