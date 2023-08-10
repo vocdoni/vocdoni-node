@@ -95,6 +95,7 @@ type ElectionDescription struct {
 	ElectionType ElectionType          `json:"electionType"`
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
+	TempSIKs     bool                  `json:"tempSIKs"`
 }
 
 type ElectionFilter struct {

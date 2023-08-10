@@ -178,7 +178,7 @@ func TestMaxCensusSizeRegisterSIKTx(t *testing.T) {
 		MaxCensusSize: 10,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 	}
-	c.Check(app.State.AddProcess(process), qt.IsNil)
+	c.Assert(app.State.AddProcess(process), qt.IsNil)
 	app.AdvanceTestBlock()
 
 	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), testWeight)

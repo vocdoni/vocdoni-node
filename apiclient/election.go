@@ -214,6 +214,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		CensusOrigin:  censusOrigin,
 		Metadata:      &metadataURI,
 		MaxCensusSize: description.Census.Size,
+		TempSIKs:      &description.TempSIKs,
 	}
 	log.Debugf("election transaction: %+v", log.FormatProto(process))
 

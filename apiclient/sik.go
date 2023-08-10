@@ -10,6 +10,19 @@ import (
 
 type SIKRoots []string
 
+// ValidSIK checks if the current client account has a valid SIK registered in
+// the vochain
+func (c *HTTPclient) ValidSIK() (bool, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "siks", c.account.AddressString())
+	if err != nil {
+		return false, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return false, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	return true, nil
+}
+
 // ValidSIKRoots returns the currently valid roots of SIK merkle tree from the
 // API.
 func (c *HTTPclient) ValidSIKRoots() (SIKRoots, error) {

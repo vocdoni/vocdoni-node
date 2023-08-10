@@ -211,6 +211,18 @@ func (c *Controller) Commit(height uint32) error {
 				return fmt.Errorf("cannot commit results for election %x: %w",
 					action.ElectionID, err)
 			}
+			// if the election is setted up with tempSIKs as true, purge the election
+			// related SIKs
+			process, err := c.state.Process(action.ElectionID, false)
+			if err != nil {
+				return fmt.Errorf("cannot get process: %w", err)
+			}
+			if process.GetTempSIKs() {
+				log.Infow("purge temporal siks", "pid", hex.EncodeToString(process.ProcessId))
+				if err := c.state.PurgeSIKsByElection(process.ProcessId); err != nil {
+					return fmt.Errorf("cannot end election: %w", err)
+				}
+			}
 		case ActionEndProcess:
 			log.Debugw("end process", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 			if err := c.endElection(action.ElectionID); err != nil {
@@ -253,7 +265,6 @@ func (c *Controller) endElection(electionID []byte) error {
 		models.ProcessStatus_RESULTS:
 		return nil
 	}
-
 	// set the election to ended
 	if err := c.state.SetProcessStatus(electionID, models.ProcessStatus_ENDED, true); err != nil {
 		return fmt.Errorf("cannot end election: %w", err)

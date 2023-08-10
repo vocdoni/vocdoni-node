@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	"math/big"
 	"os"
 	"time"
@@ -11,20 +13,20 @@ import (
 )
 
 func init() {
-	ops["anonelection"] = operation{
-		test:        &E2EAnonElection{},
-		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
-		example:     os.Args[0] + " --operation=anonelection --votes=1000",
+	ops["tempsiks"] = operation{
+		test:        &E2ETempSIKs{},
+		description: "Performs a test of anonymous election with temporal SIKS",
+		example:     os.Args[0] + " --operation=tempsiks --votes=1000",
 	}
 }
 
-var _ VochainTest = (*E2EAnonElection)(nil)
+var _ VochainTest = (*E2ETempSIKs)(nil)
 
-type E2EAnonElection struct {
+type E2ETempSIKs struct {
 	e2eElection
 }
 
-func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
+func (t *E2ETempSIKs) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
@@ -36,22 +38,44 @@ func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeZKWeighted}
+	ed.TempSIKs = true
 
-	if err := t.setupElection(ed, true); err != nil {
+	if err := t.setupElection(ed, false); err != nil {
 		return err
 	}
 	log.Debugf("election details: %+v", *t.election)
 	return nil
 }
 
-func (*E2EAnonElection) Teardown() error {
+func (*E2ETempSIKs) Teardown() error {
 	// nothing to do here
 	return nil
 }
 
-func (t *E2EAnonElection) Run() error {
+func (t *E2ETempSIKs) Run() error {
 	// Send the votes (parallelized)
 	startTime := time.Now()
+
+	// register temporal SIKs
+	for i, acc := range t.voterAccounts {
+		log.Infow(fmt.Sprintf("register temporal sik %d/%d", i, t.config.nvotes),
+			"address", acc.AddressString())
+		pKey := acc.PrivateKey()
+		client := t.api.Clone(pKey.String())
+		hash, err := client.RegisterSIKForVote(t.election.ElectionID, t.proofs[acc.AddressString()], nil)
+		if err != nil {
+			return err
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		if _, err := client.WaitUntilTxIsMined(ctx, hash); err != nil {
+			return err
+		}
+		t.sikproofs[acc.AddressString()], err = client.GenSIKProof()
+		if err != nil {
+			return err
+		}
+	}
 
 	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
 	votes := []*apiclient.VoteData{}
@@ -78,6 +102,15 @@ func (t *E2EAnonElection) Run() error {
 	elres, err := t.endElectionAndFetchResults()
 	if err != nil {
 		return err
+	}
+
+	log.Info("check if temporal SIKs are purged")
+	for _, acc := range t.voterAccounts {
+		pKey := acc.PrivateKey()
+		client := t.api.Clone(pKey.String())
+		if valid, err := client.ValidSIK(); err == nil || valid {
+			return fmt.Errorf("sik expected to be removed")
+		}
 	}
 
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())

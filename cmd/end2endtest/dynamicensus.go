@@ -48,7 +48,7 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 
 		// create a census with 2 voterAccounts less than the nvotes passed, that will allow to create another
 		// census with the missing nvotes
-		censusRoot, censusURI, err := t.elections[i].setupCensus(vapi.CensusTypeWeighted, t.elections[i].config.nvotes-2)
+		censusRoot, censusURI, err := t.elections[i].setupCensus(vapi.CensusTypeWeighted, t.elections[i].config.nvotes-2, false)
 		if err != nil {
 			return err
 		}
@@ -62,7 +62,7 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		}
 
 		// set up the election with the custom census created
-		if err := t.elections[i].setupElection(ed.d); err != nil {
+		if err := t.elections[i].setupElection(ed.d, false); err != nil {
 			return err
 		}
 		log.Debugf("election detail: %+v", *t.elections[i].election)
@@ -84,7 +84,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		api := election.api
 		nvotes := election.config.nvotes
 
-		censusRoot2, censusURI2, err := election.setupCensus(vapi.CensusTypeWeighted, 2)
+		censusRoot2, censusURI2, err := election.setupCensus(vapi.CensusTypeWeighted, 2, false)
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}
