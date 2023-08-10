@@ -167,7 +167,7 @@ func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.
 	return election, nil
 }
 
-func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys) (map[string]*apiclient.CensusProof, map[string]*apiclient.CensusProof) {
+func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool, csp *ethereum.SignKeys, generateSIKProofs bool) (map[string]*apiclient.CensusProof, map[string]*apiclient.CensusProof) {
 	type voterProof struct {
 		proof    *apiclient.CensusProof
 		sikproof *apiclient.CensusProof
@@ -205,7 +205,7 @@ func (t *e2eElection) generateProofs(root types.HexBytes, isAnonymousVoting bool
 				if err != nil {
 					log.Warn(err)
 				}
-				if isAnonymousVoting {
+				if generateSIKProofs {
 					voterProof.sikproof, err = voterApi.GenSIKProof()
 				}
 			}
@@ -249,7 +249,7 @@ func (t *e2eElection) setupAccount() error {
 }
 
 // setupCensus create a new census that will have nAcct voterAccounts and participants
-func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes, string, error) {
+func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts bool) (types.HexBytes, string, error) {
 	// Create a new census
 	censusID, err := t.api.NewCensus(censusType)
 	if err != nil {
@@ -261,7 +261,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes,
 	t.voterAccounts = append(t.voterAccounts, ethereum.NewSignKeysBatch(nAcct)...)
 
 	// Register the accounts in the vochain if is required
-	if censusType == vapi.CensusTypeZKWeighted {
+	if createAccounts {
 		for _, acc := range t.voterAccounts {
 			pKey := acc.PrivateKey()
 			if _, _, err := t.createAccount(pKey.String()); err != nil &&
@@ -300,7 +300,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes,
 	return censusRoot, censusURI, nil
 }
 
-func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
+func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, createAccounts bool) error {
 	if err := t.setupAccount(); err != nil {
 		return err
 	}
@@ -308,7 +308,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 	// if the census is not defined yet, set up a new census that will have
 	// nvotes voterAccounts and participants
 	if ed.Census.RootHash == nil {
-		censusRoot, censusURI, err := t.setupCensus(ed.Census.Type, t.config.nvotes)
+		censusRoot, censusURI, err := t.setupCensus(ed.Census.Type, t.config.nvotes, createAccounts)
 		if err != nil {
 			return err
 		}
@@ -341,7 +341,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription) error {
 		return err
 	}
 	t.election = election
-	t.proofs, t.sikproofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil)
+	t.proofs, t.sikproofs = t.generateProofs(ed.Census.RootHash, ed.ElectionType.Anonymous, nil, createAccounts)
 
 	return nil
 }
@@ -366,7 +366,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 
 	default:
 		censusType := vapi.CensusTypeWeighted
-		censusRoot, censusURI, err := t.setupCensus(censusType, t.config.nvotes)
+		censusRoot, censusURI, err := t.setupCensus(censusType, t.config.nvotes, false)
 		if err != nil {
 			return err
 		}
@@ -388,7 +388,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 	t.election = election
 	prc.ProcessId = t.election.ElectionID
 
-	t.proofs, t.sikproofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp)
+	t.proofs, t.sikproofs = t.generateProofs(prc.CensusRoot, prc.EnvelopeType.Anonymous, csp, false)
 
 	return nil
 }

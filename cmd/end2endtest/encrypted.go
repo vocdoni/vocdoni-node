@@ -36,7 +36,7 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, false); err != nil {
 		return err
 	}
 

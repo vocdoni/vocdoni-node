@@ -340,22 +340,23 @@ func (v *State) PurgeSIKsByElection(pid []byte) error {
 	sikNoStateDB := v.NoState(false)
 	// iterate to remove the assigned SIK to every address of this process and
 	// also the relation between them
-	var iterErr error
+	toPurge := [][]byte{}
 	if err := sikNoStateDB.Iterate(pid, func(address, _ []byte) bool {
-		// remove the SIK by the address
-		if iterErr = siksTree.Del(address); iterErr != nil {
-			return false
-		}
-		// remove the relation between process and address
-		if iterErr = sikNoStateDB.Delete(toPrefixKey(pid, address)); iterErr != nil {
-			return false
-		}
+		toPurge = append(toPurge, bytes.Clone(address))
 		return true
 	}); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
 	}
-	if iterErr != nil {
-		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+	for _, address := range toPurge {
+		// remove the SIK by the address
+		if err := siksTree.Del(address); err != nil {
+			return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+		}
+		// remove the relation between process and address
+		if err := sikNoStateDB.Delete(toPrefixKey(pid, address)); err != nil {
+			return fmt.Errorf("%w: %w", ErrSIKDelete, err)
+		}
+		log.Infow("temporal SIK purged", "address", hex.EncodeToString(address))
 	}
 	return nil
 }

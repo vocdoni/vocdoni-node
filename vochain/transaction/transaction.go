@@ -7,6 +7,7 @@ import (
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -481,6 +482,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				return nil, fmt.Errorf("registerSIKTx: %w", err)
 			}
 			if tempSIKs {
+				log.Infow("registering tempSIK", "address", txAddress.String())
 				if err := t.state.AssignSIKToElection(pid, txAddress); err != nil {
 					return nil, fmt.Errorf("registerSIKTx: %w", err)
 				}
