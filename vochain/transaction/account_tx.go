@@ -392,7 +392,7 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 		return common.Address{}, nil, nil, false, fmt.Errorf("error verifying the proof: %w", err)
 	}
 	if !valid {
-		return common.Address{}, nil, nil, false, fmt.Errorf("proof not valid")
+		return common.Address{}, nil, nil, false, fmt.Errorf("proof not valid: %x", process.CensusRoot)
 	}
 	return txAddress, newSIK, pid, process.GetTempSIKs(), nil
 }

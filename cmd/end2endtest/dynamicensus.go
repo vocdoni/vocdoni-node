@@ -62,7 +62,7 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		}
 
 		// set up the election with the custom census created
-		if err := t.elections[i].setupElection(ed.d, false); err != nil {
+		if err := t.elections[i].setupElection(ed.d); err != nil {
 			return err
 		}
 		log.Debugf("election detail: %+v", *t.elections[i].election)

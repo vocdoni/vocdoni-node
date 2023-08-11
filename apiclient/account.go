@@ -365,7 +365,7 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		},
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error enconsing RegisterSIKTx: %w", err)
+		return nil, fmt.Errorf("error enconding RegisterSIKTx: %w", err)
 	}
 	// sign it and send it
 	hash, _, err := c.SignAndSendTx(stx)

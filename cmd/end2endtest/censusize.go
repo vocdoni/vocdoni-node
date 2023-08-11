@@ -41,7 +41,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 		Size: uint64(t.config.nvotes - 1),
 	}
 
-	if err := t.setupElection(ed, false); err != nil {
+	if err := t.setupElection(ed); err != nil {
 		return err
 	}
 

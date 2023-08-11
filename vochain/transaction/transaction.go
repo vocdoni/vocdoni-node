@@ -158,16 +158,16 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
 				if tx.GetStatus() == models.ProcessStatus_ENDED {
+					// purge RegisterSIKTx counter if it exists
+					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
+						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
+					}
 					// schedule results computations on the ISTC
 					if err := t.istc.Schedule(t.state.CurrentHeight()+1, tx.ProcessId, ist.Action{
 						ID:         ist.ActionCommitResults,
 						ElectionID: tx.ProcessId,
 					}); err != nil {
 						return nil, fmt.Errorf("setProcessStatus: cannot schedule end process: %w", err)
-					}
-					// purge RegisterSIKTx counter if it exists
-					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
-						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
 					}
 				}
 
