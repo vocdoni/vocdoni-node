@@ -37,7 +37,7 @@ func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeZKWeighted}
 
-	if err := t.setupElection(ed, true); err != nil {
+	if err := t.setupElection(ed); err != nil {
 		return err
 	}
 	log.Debugf("election details: %+v", *t.election)
