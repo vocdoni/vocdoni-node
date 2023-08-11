@@ -164,6 +164,7 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 		api.WalletHandler,
 		api.AccountHandler,
 		api.CensusHandler,
+		api.SIKHandler,
 	)
 }
 
