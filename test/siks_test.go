@@ -164,5 +164,5 @@ func TestTempSIKs(t *testing.T) {
 	c.Assert(electionData.Status, qt.Equals, "ENDED")
 	// check that the voter sik has been deleted
 	_, err = server.VochainAPP.State.SIKFromAddress(voter.Address())
-	c.Assert(err, qt.IsNotNil)
+	c.Assert(err, qt.IsNotNil, qt.Commentf("voter sik should have been deleted"))
 }

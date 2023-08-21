@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"fmt"
 	"runtime"
 	"testing"
@@ -391,4 +392,54 @@ func TestStateSetGetTxCostByTxType(t *testing.T) {
 	cost, err := s.TxBaseCost(models.TxType_SET_PROCESS_CENSUS, false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, cost, qt.Equals, uint64(100))
+}
+
+func TestNoState(t *testing.T) {
+	s, err := NewState(db.TypePebble, "")
+	qt.Assert(t, err, qt.IsNil)
+	defer func() {
+		_ = s.Close()
+	}()
+
+	doBlock := func(height uint32, fn func()) []byte {
+		s.Rollback()
+		s.SetHeight(height)
+		fn()
+		h, err := s.Save()
+		qt.Assert(t, err, qt.IsNil)
+		return h
+	}
+
+	ns := s.NoState(true)
+
+	// commit first block
+	hash1 := doBlock(1, func() {})
+
+	// commit second block
+	hash2 := doBlock(2, func() {
+		err = ns.Set([]byte("foo"), []byte("bar"))
+		qt.Assert(t, err, qt.IsNil)
+	})
+
+	// compare hash1 and hash 2, root hash should be the same
+	qt.Assert(t, bytes.Equal(hash1, hash2), qt.IsTrue)
+
+	// check that the is still in the nostate
+	value, err := ns.Get([]byte("foo"))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, value, qt.CmpEquals(), []byte("bar"))
+
+	// commit third block
+	hash3 := doBlock(3, func() {
+		err = ns.Delete([]byte("foo"))
+		qt.Assert(t, err, qt.IsNil)
+	})
+
+	// compare hash2 and hash3, root hash should be the same
+	qt.Assert(t, bytes.Equal(hash2, hash3), qt.IsTrue)
+
+	// check that the value is not in the nostate
+	_, err = ns.Get([]byte("foo"))
+	qt.Assert(t, err, qt.Equals, db.ErrKeyNotFound)
+
 }
