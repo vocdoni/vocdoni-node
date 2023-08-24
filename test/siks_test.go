@@ -153,16 +153,17 @@ func TestTempSIKs(t *testing.T) {
 		ElectionID: electionId,
 	}), qt.IsNil)
 
-	// Block 5
+	// Block 6
 	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, client, 5)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, client, 6)
 	// check that the election has ended
 	electionData := &api.Election{}
 	resp, code = client.Request("GET", nil, "elections", electionId.String())
 	c.Assert(code, qt.Equals, 200)
 	c.Assert(json.Unmarshal(resp, electionData), qt.IsNil)
-	c.Assert(electionData.Status, qt.Equals, "ENDED")
+	c.Assert(electionData.Status, qt.Equals, "RESULTS")
 	// check that the voter sik has been deleted
 	_, err = server.VochainAPP.State.SIKFromAddress(voter.Address())
-	c.Assert(err, qt.IsNotNil, qt.Commentf("voter sik should have been deleted"))
+	c.Assert(err, qt.IsNotNil, qt.Commentf("voter sik should have been deleted: %x", voter.Address()))
 }
