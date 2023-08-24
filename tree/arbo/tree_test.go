@@ -903,6 +903,66 @@ func TestKeyLenBiggerThan32(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 }
 
+func TestDelete(t *testing.T) {
+	c := qt.New(t)
+	database := metadb.NewTest(t)
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon})
+	c.Assert(err, qt.IsNil)
+
+	bLen := 32
+	// Add multiple key/value pairs to the tree
+	keys := [][]byte{
+		BigIntToBytes(bLen, big.NewInt(int64(1))),
+		BigIntToBytes(bLen, big.NewInt(int64(2))),
+		BigIntToBytes(bLen, big.NewInt(int64(3))),
+		BigIntToBytes(bLen, big.NewInt(int64(4))),
+	}
+	values := [][]byte{
+		BigIntToBytes(bLen, big.NewInt(int64(10))),
+		BigIntToBytes(bLen, big.NewInt(int64(20))),
+		BigIntToBytes(bLen, big.NewInt(int64(30))),
+		BigIntToBytes(bLen, big.NewInt(int64(40))),
+	}
+	for i, key := range keys {
+		err := tree.Add(key, values[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	originalRoot, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+
+	// Delete a key from the tree
+	err = tree.Delete(keys[2])
+	c.Assert(err, qt.IsNil)
+
+	// Check if the key was deleted
+	_, _, err = tree.Get(keys[2])
+	c.Assert(err, qt.Equals, ErrKeyNotFound)
+
+	// Check the root has changed
+	afterDeleteRoot, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(afterDeleteRoot, qt.Not(qt.DeepEquals), originalRoot)
+
+	// Check if other keys are unaffected
+	for i, key := range keys {
+		if i == 2 {
+			continue // skip the deleted key
+		}
+		_, value, err := tree.Get(key)
+		c.Assert(err, qt.IsNil)
+		c.Check(value, qt.DeepEquals, values[i])
+	}
+
+	// Check the root hash is the same after re-adding the deleted key
+	err = tree.Add(keys[2], values[2]) // re-add the deleted key
+	c.Assert(err, qt.IsNil)
+	afterAddRoot, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Check(afterAddRoot, qt.DeepEquals, originalRoot)
+}
+
 func BenchmarkAdd(b *testing.B) {
 	bLen := 32 // for both Poseidon & Sha256
 	// prepare inputs

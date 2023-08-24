@@ -165,7 +165,7 @@ func TestAssignSIKToElectionAndPurge(t *testing.T) {
 	_, err = s.NoState(true).Get(key)
 	c.Assert(err, qt.IsNotNil)
 	_, err = s.SIKFromAddress(testAccount.Address())
-	c.Assert(err, qt.IsNil)
+	c.Assert(err, qt.IsNotNil)
 }
 
 func Test_heightEncoding(t *testing.T) {

@@ -97,13 +97,20 @@ func (app *BaseApplication) SetTestingMethods() {
 // AdvanceTestBlock commits the current state, ends the current block and starts a new one.
 // Advances the block height and timestamp.
 func (app *BaseApplication) AdvanceTestBlock() {
+	height := uint32(app.testMockBlockStore.Height())
+	// execute internal state transition commit
+	if err := app.Istc.Commit(height); err != nil {
+		panic(err)
+	}
+	// finalize block
+	app.endBlock(time.Now(), height)
+	// save the state
 	_, err := app.Commit(context.TODO(), nil)
 	if err != nil {
 		panic(err)
 	}
-	app.endBlock(time.Now(), uint32(app.testMockBlockStore.Height()))
-	newHeight := app.testMockBlockStore.EndBlock()
 	// The next block begins 50ms later
+	newHeight := app.testMockBlockStore.EndBlock()
 	time.Sleep(time.Millisecond * 50)
 	nextStartTime := time.Now()
 	app.testMockBlockStore.NewBlock(newHeight)

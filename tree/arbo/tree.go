@@ -618,7 +618,6 @@ func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byt
 	if err != nil {
 		return nil, err
 	}
-
 	if err := wTx.Set(leafKey, leafValue); err != nil {
 		return nil, err
 	}
@@ -920,10 +919,110 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	}
 
 	// store root to db
-	if err := t.setRoot(wTx, root); err != nil {
+	return t.setRoot(wTx, root)
+}
+
+// Delete removes the key from the Tree.
+func (t *Tree) Delete(k []byte) error {
+	wTx := t.db.WriteTx()
+	defer wTx.Discard()
+
+	if err := t.DeleteWithTx(wTx, k); err != nil {
 		return err
 	}
-	return nil
+
+	return wTx.Commit()
+}
+
+// DeleteWithTx does the same as the Delete method, but allows passing the
+// db.WriteTx that is used. The db.WriteTx will not be committed inside this
+// method.
+func (t *Tree) DeleteWithTx(wTx db.WriteTx, k []byte) error {
+	t.Lock()
+	defer t.Unlock()
+
+	if !t.editable() {
+		return ErrSnapshotNotEditable
+	}
+	return t.deleteWithTx(wTx, k)
+}
+
+// deleteWithTx deletes a key-value pair from the tree.
+func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
+	root, err := t.RootWithTx(wTx)
+	if err != nil {
+		return err
+	}
+
+	// Navigate down the tree to find the key and collect siblings.
+	var siblings [][]byte
+	path := getPath(t.maxLevels, k)
+	_, _, siblings, err = t.down(wTx, k, root, siblings, path, 0, true)
+	if err != nil {
+		if err == ErrKeyNotFound {
+			// Key not found, nothing to delete.
+			return nil
+		}
+		return err
+	}
+
+	// Navigate back up the tree, updating the intermediate nodes.
+	if len(siblings) == 0 {
+		// The tree is empty after deletion.
+		return t.setRoot(wTx, t.emptyHash)
+	}
+	newRoot, err := t.upAfterDelete(wTx, t.emptyHash, siblings, path, len(siblings)-1)
+	if err != nil {
+		return err
+	}
+
+	// Update the root of the tree.
+	if err := t.setRoot(wTx, newRoot); err != nil {
+		return err
+	}
+
+	// Update the number of leaves.
+	return t.decNLeafs(wTx, 1)
+}
+
+// upAfterDelete navigates back up the tree after a delete operation, updating
+// the intermediate nodes and potentially removing nodes that are no longer needed.
+func (t *Tree) upAfterDelete(wTx db.WriteTx, key []byte, siblings [][]byte, path []bool, currLvl int) ([]byte, error) {
+	if currLvl < 0 {
+		return key, nil
+	}
+
+	var k, v []byte
+	var err error
+	if path[currLvl] {
+		k, v, err = t.newIntermediate(siblings[currLvl], key)
+	} else {
+		k, v, err = t.newIntermediate(key, siblings[currLvl])
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// If both children are empty, remove the intermediate node.
+	if bytes.Equal(siblings[currLvl], t.emptyHash) && bytes.Equal(key, t.emptyHash) {
+		return t.emptyHash, nil
+	}
+
+	// Otherwise, store the updated intermediate node.
+	if err = wTx.Set(k, v); err != nil {
+		return nil, err
+	}
+
+	return t.upAfterDelete(wTx, k, siblings, path, currLvl-1)
+}
+
+// decNLeafs decreases the number of leaves in the tree.
+func (t *Tree) decNLeafs(wTx db.WriteTx, n int) error {
+	nLeafs, err := t.GetNLeafsWithTx(wTx)
+	if err != nil {
+		return err
+	}
+	return t.setNLeafs(wTx, nLeafs-n)
 }
 
 // GenProof generates a MerkleTree proof for the given key. The leaf value is

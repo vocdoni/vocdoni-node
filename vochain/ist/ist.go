@@ -188,6 +188,7 @@ func (c *Controller) Commit(height uint32) error {
 	if len(actions) == 0 {
 		return nil
 	}
+
 	for id, action := range actions {
 		switch action.ID {
 		case ActionCommitResults:

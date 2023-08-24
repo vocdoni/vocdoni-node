@@ -127,8 +127,8 @@ func (t *Tree) Del(wTx db.WriteTx, key []byte) error {
 		wTx = t.DB().WriteTx()
 		defer wTx.Discard()
 	}
-	if err := wTx.Delete(key); err != nil {
-		return err
+	if err := t.tree.DeleteWithTx(wTx, key); err != nil {
+		return fmt.Errorf("could not remove key: %w", err)
 	}
 	if !givenTx {
 		return wTx.Commit()
