@@ -153,7 +153,7 @@ func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
 		}
 		return &t, nil
 	} else if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("unknown database error: %w", err)
 	}
 	return &t, nil
 }
@@ -733,30 +733,38 @@ func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
 	return siblings, nil
 }
 
-// up goes up recursively updating the intermediate nodes
-func (t *Tree) up(wTx db.WriteTx, key []byte, siblings [][]byte, path []bool,
-	currLvl, toLvl int) ([]byte, error) {
+// up navigates back up the tree after a delete operation, updating
+// the intermediate nodes and potentially removing nodes that are no longer needed.
+func (t *Tree) up(wTx db.WriteTx, key []byte, siblings [][]byte, path []bool, currLvl, toLvl int) ([]byte, error) {
+	if currLvl < 0 {
+		return key, nil
+	}
+
 	var k, v []byte
 	var err error
 	if path[currLvl+toLvl] {
 		k, v, err = t.newIntermediate(siblings[currLvl], key)
-		if err != nil {
-			return nil, err
-		}
 	} else {
 		k, v, err = t.newIntermediate(key, siblings[currLvl])
-		if err != nil {
-			return nil, err
-		}
 	}
-	// store k-v to db
-	if err = wTx.Set(k, v); err != nil {
+	if err != nil {
 		return nil, err
 	}
 
-	if currLvl == 0 {
-		// reached the root
-		return k, nil
+	// If both children are empty, remove the intermediate node and its children.
+	if bytes.Equal(k, t.emptyHash) && bytes.Equal(v, t.emptyHash) {
+		if err := wTx.Delete(key); err != nil {
+			return nil, err
+		}
+		if err := wTx.Delete(siblings[currLvl]); err != nil {
+			return nil, err
+		}
+		return t.emptyHash, wTx.Set(k, t.emptyHash)
+	}
+
+	// Otherwise, store the updated intermediate node.
+	if err = wTx.Set(k, v); err != nil {
+		return nil, err
 	}
 
 	return t.up(wTx, k, siblings, path, currLvl-1, toLvl)
@@ -971,7 +979,7 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		// The tree is empty after deletion.
 		return t.setRoot(wTx, t.emptyHash)
 	}
-	newRoot, err := t.upAfterDelete(wTx, t.emptyHash, siblings, path, len(siblings)-1)
+	newRoot, err := t.up(wTx, t.emptyHash, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
 	}
@@ -983,37 +991,6 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 
 	// Update the number of leaves.
 	return t.decNLeafs(wTx, 1)
-}
-
-// upAfterDelete navigates back up the tree after a delete operation, updating
-// the intermediate nodes and potentially removing nodes that are no longer needed.
-func (t *Tree) upAfterDelete(wTx db.WriteTx, key []byte, siblings [][]byte, path []bool, currLvl int) ([]byte, error) {
-	if currLvl < 0 {
-		return key, nil
-	}
-
-	var k, v []byte
-	var err error
-	if path[currLvl] {
-		k, v, err = t.newIntermediate(siblings[currLvl], key)
-	} else {
-		k, v, err = t.newIntermediate(key, siblings[currLvl])
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// If both children are empty, remove the intermediate node.
-	if bytes.Equal(siblings[currLvl], t.emptyHash) && bytes.Equal(key, t.emptyHash) {
-		return t.emptyHash, nil
-	}
-
-	// Otherwise, store the updated intermediate node.
-	if err = wTx.Set(k, v); err != nil {
-		return nil, err
-	}
-
-	return t.upAfterDelete(wTx, k, siblings, path, currLvl-1)
 }
 
 // decNLeafs decreases the number of leaves in the tree.

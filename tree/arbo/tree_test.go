@@ -2,6 +2,7 @@ package arbo
 
 import (
 	"encoding/hex"
+	"fmt"
 	"math"
 	"math/big"
 	"os"
@@ -103,8 +104,7 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 func TestAddBatch(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -120,8 +120,7 @@ func TestAddBatch(t *testing.T) {
 		"296519252211642170490407814696803112091039265640052570497930797516015811235")
 
 	database = metadb.NewTest(t)
-	tree2, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree2, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	var keys, values [][]byte
@@ -142,8 +141,7 @@ func TestAddBatch(t *testing.T) {
 func TestAddDifferentOrder(t *testing.T) {
 	c := qt.New(t)
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -156,8 +154,7 @@ func TestAddDifferentOrder(t *testing.T) {
 	}
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	for i := 16 - 1; i >= 0; i-- {
@@ -180,8 +177,7 @@ func TestAddDifferentOrder(t *testing.T) {
 func TestAddRepeatedIndex(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -197,8 +193,7 @@ func TestAddRepeatedIndex(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -994,4 +989,126 @@ func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func TestDiskSizeBench(t *testing.T) {
+	c := qt.New(t)
+
+	nLeafs := 20_000
+	printTestContext("TestDiskSizeBench: ", nLeafs, "Blake2b", "pebble")
+
+	// prepare inputs
+	var ks, vs [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := randomBytes(32)
+		v := randomBytes(32)
+		ks = append(ks, k)
+		vs = append(vs, v)
+	}
+
+	// create the database and tree
+	dbDir := t.TempDir()
+	database, err := metadb.New(db.TypePebble, dbDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs, HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	countDBitems := func() int {
+		count := 0
+		if err := tree.db.Iterate(nil, func(k, v []byte) bool {
+			count++
+			return true
+		}); err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+
+	// add the leafs
+	start := time.Now()
+	tx := tree.db.WriteTx()
+	for i := 0; i < len(ks); i++ {
+		err = tree.AddWithTx(tx, ks[i], vs[i])
+		c.Assert(err, qt.IsNil)
+		//	fmt.Printf("add %x\n", ks[i])
+	}
+	c.Assert(tx.Commit(), qt.IsNil)
+	printRes("	Add loop", time.Since(start))
+	tree.dbg.print("		")
+	size, err := dirSize(dbDir)
+	c.Assert(err, qt.IsNil)
+	printRes("	Disk size (add)", fmt.Sprintf("%d MiB", size/(1024*1024)))
+	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+
+	// delete the leafs
+	start = time.Now()
+	tx = tree.db.WriteTx()
+	for i := 0; i < len(ks)/2; i++ {
+		err = tree.DeleteWithTx(tx, ks[i])
+		c.Assert(err, qt.IsNil)
+		//fmt.Printf("deleted %x\n", ks[i])
+	}
+	c.Assert(tx.Commit(), qt.IsNil)
+	printRes("	Delete loop", time.Since(start))
+	tree.dbg.print("		")
+	size, err = dirSize(dbDir)
+	c.Assert(err, qt.IsNil)
+	printRes("	Disk size (delete)", fmt.Sprintf("%d MiB", size/(1024*1024)))
+	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+
+	// add the leafs deleted again
+	start = time.Now()
+	tx = tree.db.WriteTx()
+	for i := 0; i < len(ks)/2; i++ {
+		err = tree.AddWithTx(tx, ks[i], vs[i])
+		c.Assert(err, qt.IsNil)
+		//fmt.Printf("added %x\n", ks[i])
+	}
+	c.Assert(tx.Commit(), qt.IsNil)
+	printRes("	Add2 loop", time.Since(start))
+	tree.dbg.print("		")
+	size, err = dirSize(dbDir)
+	c.Assert(err, qt.IsNil)
+	printRes("	Disk size (add2)", fmt.Sprintf("%d MiB", size/(1024*1024)))
+	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+
+	// update the leafs
+	start = time.Now()
+	tx = tree.db.WriteTx()
+	for i := 0; i < len(ks); i++ {
+		err = tree.UpdateWithTx(tx, ks[i], vs[len(ks)-i-1])
+		c.Assert(err, qt.IsNil, qt.Commentf("k=%x", ks[i]))
+		//fmt.Printf("updated %x\n", ks[i])
+	}
+	c.Assert(tx.Commit(), qt.IsNil)
+	printRes("	Update loop", time.Since(start))
+	tree.dbg.print("		")
+	size, err = dirSize(dbDir)
+	c.Assert(err, qt.IsNil)
+	printRes("	Disk size (update)", fmt.Sprintf("%d MiB", size/(1024*1024)))
+	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+
+	start = time.Now()
+	c.Assert(tree.db.Compact(), qt.IsNil)
+	printRes("	Compact DB", time.Since(start))
+	printRes("	Disk size (compact)", fmt.Sprintf("%d MiB", size/(1024*1024)))
+	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+}
+
+func dirSize(path string) (int64, error) {
+	var size int64
+	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if !info.IsDir() {
+			size += info.Size()
+		}
+		return nil
+	})
+	return size, err
 }
