@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"os"
 	"runtime"
 	"sort"
 	"testing"
@@ -17,7 +18,7 @@ import (
 	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
-var debug = false
+var debug = os.Getenv("LOG_LEVEL") == "debug"
 
 func printTestContext(prefix string, nLeafs int, hashName, dbName string) {
 	if debug {
@@ -26,9 +27,9 @@ func printTestContext(prefix string, nLeafs int, hashName, dbName string) {
 	}
 }
 
-func printRes(name string, duration time.Duration) {
+func printRes(name string, value interface{}) {
 	if debug {
-		fmt.Printf("%s:	%s \n", name, duration)
+		fmt.Printf("%s:	%s \n", name, value)
 	}
 }
 
@@ -72,8 +73,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	nLeafs := 1024
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs, HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -94,8 +94,7 @@ func TestAddBatchTreeEmpty(t *testing.T) {
 	time1 := time.Since(start)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs, HashFunctionPoseidon})
 	c.Assert(err, qt.IsNil)
 	tree2.dbgInit()
 
@@ -763,8 +762,7 @@ func benchAdd(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs, HashFunctionBlake2b})
 	c.Assert(err, qt.IsNil)
 
 	start := time.Now()
