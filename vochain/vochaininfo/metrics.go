@@ -51,6 +51,24 @@ var (
 		Name:      "vote_cache",
 		Help:      "Size of the current vote cache",
 	})
+
+	VochainAccountTree = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "vochain",
+		Name:      "account_tree",
+		Help:      "Size of the account tree",
+	})
+
+	VochainSIKTree = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "vochain",
+		Name:      "sik_tree",
+		Help:      "Size of the SIK tree",
+	})
+
+	VochainTokensBurned = prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: "vochain",
+		Name:      "tokens_burned",
+		Help:      "Balance of the burn address",
+	})
 )
 
 // registerMetrics registers each of the vochain prometheus metrics
@@ -62,6 +80,9 @@ func (*VochainInfo) registerMetrics(ma *metrics.Agent) {
 	ma.Register(VochainVoteTree)
 	ma.Register(VochainVotesPerMinute)
 	ma.Register(VochainVoteCache)
+	ma.Register(VochainAccountTree)
+	ma.Register(VochainSIKTree)
+	ma.Register(VochainTokensBurned)
 }
 
 // setMetrics updates the metrics values to the current state
@@ -73,6 +94,9 @@ func (vi *VochainInfo) setMetrics() {
 	VochainVoteTree.Set(float64(v))
 	VochainVotesPerMinute.Set(float64(vxm))
 	VochainVoteCache.Set(float64(vi.VoteCacheSize()))
+	VochainAccountTree.Set(float64(vi.AccountTreeSize()))
+	VochainSIKTree.Set(float64(vi.SIKTreeSize()))
+	VochainTokensBurned.Set(float64(vi.TokensBurned()))
 }
 
 // CollectMetrics constantly updates the metric values for prometheus

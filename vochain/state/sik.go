@@ -389,6 +389,20 @@ func (v *State) SIKRoot() ([]byte, error) {
 	return currentRoot, nil
 }
 
+// CountSIKs returns the overall number of SIKs the vochain has
+func (v *State) CountSIKs(committed bool) (uint64, error) {
+	// TODO: Once statedb.TreeView.Size() works, replace this by that.
+	if !committed {
+		v.tx.RLock()
+		defer v.tx.RUnlock()
+	}
+	t, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return 0, err
+	}
+	return t.Size()
+}
+
 // InvalidateAt function sets the current SIK value to the encoded value of the
 // height provided, ready to use in the SIK subTree as leaf value to invalidate
 // it. The encoded value will have 32 bytes:
