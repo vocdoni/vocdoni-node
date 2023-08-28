@@ -10,6 +10,7 @@ import (
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain
@@ -22,6 +23,8 @@ type VochainInfo struct {
 	// more appropriate name for this variable would be voteCount
 	voteTreeSize    uint64
 	processTreeSize uint64
+	accountTreeSize uint64
+	sikTreeSize     uint64
 	mempoolSize     int
 	voteCacheSize   int
 	votesPerMinute  int
@@ -173,6 +176,31 @@ func (vi *VochainInfo) VoteCacheSize() int {
 	return vi.voteCacheSize
 }
 
+// AccountTreeSize returns the current number of validated votes waiting to be
+// included in the blockchain
+func (vi *VochainInfo) AccountTreeSize() uint64 {
+	vi.lock.RLock()
+	defer vi.lock.RUnlock()
+	return vi.accountTreeSize
+}
+
+// SIKTreeSize returns the current number of validated votes waiting to be
+// included in the blockchain
+func (vi *VochainInfo) SIKTreeSize() uint64 {
+	vi.lock.RLock()
+	defer vi.lock.RUnlock()
+	return vi.sikTreeSize
+}
+
+// TokensBurned returns the current balance of the burn address
+func (vi *VochainInfo) TokensBurned() uint64 {
+	acc, err := vi.vnode.State.GetAccount(state.BurnAddress, true)
+	if err != nil {
+		return 0
+	}
+	return acc.Balance
+}
+
 // NetInfo returns network info (mainly, peers)
 func (vi *VochainInfo) NetInfo() (*coretypes.ResultNetInfo, error) {
 	if vi.vnode.Node != nil {
@@ -268,6 +296,14 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			vi.voteTreeSize, err = vi.vnode.State.CountTotalVotes()
 			if err != nil {
 				log.Errorf("cannot access vote count: %s", err)
+			}
+			vi.accountTreeSize, err = vi.vnode.State.CountAccounts(true)
+			if err != nil {
+				log.Errorf("cannot count accounts: %s", err)
+			}
+			vi.sikTreeSize, err = vi.vnode.State.CountSIKs(true)
+			if err != nil {
+				log.Errorf("cannot count SIKs: %s", err)
 			}
 			if sleepSecs*vm >= 60 {
 				vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)

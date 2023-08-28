@@ -102,6 +102,20 @@ func (v *State) GetAccount(address common.Address, committed bool) (*Account, er
 	return &acc, acc.Unmarshal(raw)
 }
 
+// CountAccounts returns the overall number of accounts the vochain has
+func (v *State) CountAccounts(committed bool) (uint64, error) {
+	// TODO: Once statedb.TreeView.Size() works, replace this by that.
+	if !committed {
+		v.tx.RLock()
+		defer v.tx.RUnlock()
+	}
+	accountsTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeAccounts))
+	if err != nil {
+		return 0, err
+	}
+	return accountsTree.Size()
+}
+
 // AccountFromSignature extracts an address from a signed message and returns an account if exists
 func (v *State) AccountFromSignature(message, signature []byte) (*common.Address, *Account, error) {
 	pubKey, err := ethereum.PubKeyFromSignature(message, signature)
