@@ -41,6 +41,11 @@ func (d *PrefixedDatabase) Close() error {
 	return d.db.Close()
 }
 
+// Compact implements the db.Database.Compact interface method.
+func (d *PrefixedDatabase) Compact() error {
+	return d.db.Compact()
+}
+
 // WriteTx returns a db.WriteTx
 func (d *PrefixedDatabase) WriteTx() db.WriteTx {
 	return NewPrefixedWriteTx(d.db.WriteTx(), d.prefix)

@@ -6,7 +6,10 @@ import (
 )
 
 // TypePebble defines the type of db that uses PebbleDB
-const TypePebble = "pebble"
+const (
+	TypePebble  = "pebble"
+	TypeLevelDB = "leveldb"
+)
 
 // ErrKeyNotFound is used to indicate that a key does not exist in the db.
 var ErrKeyNotFound = fmt.Errorf("key not found")
@@ -33,6 +36,9 @@ type Database interface {
 
 	// WriteTx creates a new write transaction.
 	WriteTx() WriteTx
+
+	// Compact compacts the underlying storage.
+	Compact() error
 }
 
 // Reader contains the read-only database operations.

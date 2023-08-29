@@ -110,7 +110,13 @@ func New(opts db.Options) (*PebbleDB, error) {
 	if err := os.MkdirAll(opts.Path, os.ModePerm); err != nil {
 		return nil, err
 	}
-	o := &pebble.Options{}
+	o := &pebble.Options{
+		Levels: []pebble.LevelOptions{
+			{
+				Compression: pebble.SnappyCompression,
+			},
+		},
+	}
 	db, err := pebble.Open(opts.Path, o)
 	if err != nil {
 		return nil, err
@@ -154,4 +160,21 @@ func keyUpperBound(b []byte) []byte {
 // Iterate implements the db.Database.Iterate interface method
 func (db *PebbleDB) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
 	return iterate(db.db, prefix, callback)
+}
+
+// Compact implements the db.Database.Compact interface method
+func (db *PebbleDB) Compact() error {
+	// from https://github.com/cockroachdb/pebble/issues/1474#issuecomment-1022313365
+	iter := db.db.NewIter(nil)
+	var first, last []byte
+	if iter.First() {
+		first = append(first, iter.Key()...)
+	}
+	if iter.Last() {
+		last = append(last, iter.Key()...)
+	}
+	if err := iter.Close(); err != nil {
+		return err
+	}
+	return db.db.Compact(first, last, true)
 }
