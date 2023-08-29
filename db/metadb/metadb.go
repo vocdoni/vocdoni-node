@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/goleveldb"
 	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
@@ -16,6 +17,11 @@ func New(typ, dir string) (db.Database, error) {
 	switch typ {
 	case db.TypePebble:
 		database, err = pebbledb.New(opts)
+		if err != nil {
+			return nil, err
+		}
+	case db.TypeLevelDB:
+		database, err = goleveldb.New(opts)
 		if err != nil {
 			return nil, err
 		}
