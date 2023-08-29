@@ -994,7 +994,7 @@ func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 func TestDiskSizeBench(t *testing.T) {
 	c := qt.New(t)
 
-	nLeafs := 20_000
+	nLeafs := 20
 	printTestContext("TestDiskSizeBench: ", nLeafs, "Blake2b", "pebble")
 
 	// prepare inputs
@@ -1020,6 +1020,7 @@ func TestDiskSizeBench(t *testing.T) {
 	countDBitems := func() int {
 		count := 0
 		if err := tree.db.Iterate(nil, func(k, v []byte) bool {
+			//fmt.Printf("db item: %x\n", k)
 			count++
 			return true
 		}); err != nil {
@@ -1027,7 +1028,6 @@ func TestDiskSizeBench(t *testing.T) {
 		}
 		return count
 	}
-
 	// add the leafs
 	start := time.Now()
 	tx := tree.db.WriteTx()
@@ -1044,6 +1044,8 @@ func TestDiskSizeBench(t *testing.T) {
 	printRes("	Disk size (add)", fmt.Sprintf("%d MiB", size/(1024*1024)))
 	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
 
+	tree.PrintGraphviz(nil)
+
 	// delete the leafs
 	start = time.Now()
 	tx = tree.db.WriteTx()
@@ -1059,6 +1061,10 @@ func TestDiskSizeBench(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	printRes("	Disk size (delete)", fmt.Sprintf("%d MiB", size/(1024*1024)))
 	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+
+	tree.PrintGraphviz(nil)
+
+	return
 
 	// add the leafs deleted again
 	start = time.Now()
