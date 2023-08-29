@@ -102,6 +102,9 @@ type Tree struct {
 	// (check if it has been initialized)
 	emptyHash []byte
 
+	// emptyNode is the hash of an empty node (with both childs empty)
+	emptyNode []byte
+
 	dbg *dbgStats
 }
 
@@ -138,11 +141,18 @@ func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
 	if cfg.ThresholdNLeafs == 0 {
 		cfg.ThresholdNLeafs = DefaultThresholdNLeafs
 	}
+
 	t := Tree{db: cfg.Database, maxLevels: cfg.MaxLevels,
 		thresholdNLeafs: cfg.ThresholdNLeafs, hashFunction: cfg.HashFunction}
-	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
 
-	_, err := wTx.Get(dbKeyRoot)
+	t.emptyHash = make([]byte, t.hashFunction.Len()) // empty
+	var err error
+	t.emptyNode, _, err = t.newIntermediate(t.emptyHash, t.emptyHash)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = wTx.Get(dbKeyRoot)
 	if err == db.ErrKeyNotFound {
 		// store new root 0 (empty)
 		if err = wTx.Set(dbKeyRoot, t.emptyHash); err != nil {
@@ -609,7 +619,9 @@ func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byt
 
 	// go down to the leaf
 	var siblings [][]byte
-	_, _, siblings, err = t.down(wTx, k, root, siblings, path, fromLvl, false)
+	intermediates := make([][]byte, t.maxLevels)
+
+	_, _, siblings, intermediates, err = t.down(wTx, k, root, siblings, intermediates, path, fromLvl, false)
 	if err != nil {
 		return nil, err
 	}
@@ -627,86 +639,12 @@ func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byt
 		// return the leafKey as root
 		return leafKey, nil
 	}
-	root, err = t.up(wTx, leafKey, siblings, path, len(siblings)-1, fromLvl)
+	root, err = t.up(wTx, intermediates, leafKey, siblings, path, len(siblings)-1, fromLvl)
 	if err != nil {
 		return nil, err
 	}
 
 	return root, nil
-}
-
-// down goes down to the leaf recursively
-func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte,
-	path []bool, currLvl int, getLeaf bool) (
-	[]byte, []byte, [][]byte, error) {
-	if currLvl > t.maxLevels {
-		return nil, nil, nil, ErrMaxLevel
-	}
-
-	var err error
-	var currValue []byte
-	if bytes.Equal(currKey, t.emptyHash) {
-		// empty value
-		return currKey, emptyValue, siblings, nil
-	}
-	currValue, err = rTx.Get(currKey)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	switch currValue[0] {
-	case PrefixValueEmpty: // empty
-		fmt.Printf("newKey: %s, currKey: %s, currLvl: %d, currValue: %s\n",
-			hex.EncodeToString(newKey), hex.EncodeToString(currKey),
-			currLvl, hex.EncodeToString(currValue))
-		panic("This point should not be reached, as the 'if currKey==t.emptyHash'" +
-			" above should avoid reaching this point. This panic is temporary" +
-			" for reporting purposes, will be deleted in future versions." +
-			" Please paste this log (including the previous log lines) in a" +
-			" new issue: https://go.vocdoni.io/dvote/tree/arbo/issues/new") // TMP
-	case PrefixValueLeaf: // leaf
-		if !bytes.Equal(currValue, emptyValue) {
-			if getLeaf {
-				return currKey, currValue, siblings, nil
-			}
-			oldLeafKey, _ := ReadLeafValue(currValue)
-			if bytes.Equal(newKey, oldLeafKey) {
-				return nil, nil, nil, ErrKeyAlreadyExists
-			}
-
-			oldLeafKeyFull, err := keyPathFromKey(t.maxLevels, oldLeafKey)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-
-			// if currKey is already used, go down until paths diverge
-			oldPath := getPath(t.maxLevels, oldLeafKeyFull)
-			siblings, err = t.downVirtually(siblings, currKey, newKey, oldPath, path, currLvl)
-			if err != nil {
-				return nil, nil, nil, err
-			}
-		}
-		return currKey, currValue, siblings, nil
-	case PrefixValueIntermediate: // intermediate
-		if len(currValue) != PrefixValueLen+t.hashFunction.Len()*2 {
-			return nil, nil, nil,
-				fmt.Errorf("intermediate value invalid length (expected: %d, actual: %d)",
-					PrefixValueLen+t.hashFunction.Len()*2, len(currValue))
-		}
-		// collect siblings while going down
-		if path[currLvl] {
-			// right
-			lChild, rChild := ReadIntermediateChilds(currValue)
-			siblings = append(siblings, lChild)
-			return t.down(rTx, newKey, rChild, siblings, path, currLvl+1, getLeaf)
-		}
-		// left
-		lChild, rChild := ReadIntermediateChilds(currValue)
-		siblings = append(siblings, rChild)
-		return t.down(rTx, newKey, lChild, siblings, path, currLvl+1, getLeaf)
-	default:
-		return nil, nil, nil, ErrInvalidValuePrefix
-	}
 }
 
 // downVirtually is used when in a leaf already exists, and a new leaf which
@@ -731,43 +669,6 @@ func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath,
 	siblings = append(siblings, oldKey)
 
 	return siblings, nil
-}
-
-// up navigates back up the tree after a delete operation, updating
-// the intermediate nodes and potentially removing nodes that are no longer needed.
-func (t *Tree) up(wTx db.WriteTx, key []byte, siblings [][]byte, path []bool, currLvl, toLvl int) ([]byte, error) {
-	if currLvl < 0 {
-		return key, nil
-	}
-
-	var k, v []byte
-	var err error
-	if path[currLvl+toLvl] {
-		k, v, err = t.newIntermediate(siblings[currLvl], key)
-	} else {
-		k, v, err = t.newIntermediate(key, siblings[currLvl])
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	// If both children are empty, remove the intermediate node and its children.
-	if bytes.Equal(k, t.emptyHash) && bytes.Equal(v, t.emptyHash) {
-		if err := wTx.Delete(key); err != nil {
-			return nil, err
-		}
-		if err := wTx.Delete(siblings[currLvl]); err != nil {
-			return nil, err
-		}
-		return t.emptyHash, wTx.Set(k, t.emptyHash)
-	}
-
-	// Otherwise, store the updated intermediate node.
-	if err = wTx.Set(k, v); err != nil {
-		return nil, err
-	}
-
-	return t.up(wTx, k, siblings, path, currLvl-1, toLvl)
 }
 
 func (t *Tree) newLeafValue(k, v []byte) ([]byte, []byte, error) {
@@ -817,53 +718,6 @@ func (t *Tree) newIntermediate(l, r []byte) ([]byte, []byte, error) {
 	return newIntermediate(t.hashFunction, l, r)
 }
 
-// newIntermediate takes the left & right keys of a intermediate node, and
-// computes its hash. Returns the hash of the node, which is the node key, and a
-// byte array that contains the value (which contains the left & right child
-// keys) to store in the DB.
-// [     1 byte   |     1 byte         | N bytes  |  N bytes  ]
-// [ type of node | length of left key | left key | right key ]
-func newIntermediate(hashFunc HashFunction, l, r []byte) ([]byte, []byte, error) {
-	b := make([]byte, PrefixValueLen+hashFunc.Len()*2)
-	b[0] = PrefixValueIntermediate
-	if len(l) > maxUint8 {
-		return nil, nil, fmt.Errorf("newIntermediate: len(l) > %v", maxUint8)
-	}
-	b[1] = byte(len(l))
-	copy(b[PrefixValueLen:PrefixValueLen+hashFunc.Len()], l)
-	copy(b[PrefixValueLen+hashFunc.Len():], r)
-
-	key, err := hashFunc.Hash(l, r)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	return key, b, nil
-}
-
-// ReadIntermediateChilds reads from a byte array the two childs keys
-func ReadIntermediateChilds(b []byte) ([]byte, []byte) {
-	if len(b) < PrefixValueLen {
-		return []byte{}, []byte{}
-	}
-
-	lLen := b[1]
-	if len(b) < PrefixValueLen+int(lLen) {
-		return []byte{}, []byte{}
-	}
-	l := b[PrefixValueLen : PrefixValueLen+lLen]
-	r := b[PrefixValueLen+lLen:]
-	return l, r
-}
-
-func getPath(numLevels int, k []byte) []bool {
-	path := make([]bool, numLevels)
-	for n := 0; n < numLevels; n++ {
-		path[n] = k[n/8]&(1<<(n%8)) != 0
-	}
-	return path
-}
-
 // Update updates the value for a given existing key. If the given key does not
 // exist, returns an error.
 func (t *Tree) Update(k, v []byte) error {
@@ -899,7 +753,9 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	}
 
 	var siblings [][]byte
-	_, valueAtBottom, siblings, err := t.down(wTx, k, root, siblings, path, 0, true)
+	intermediates := make([][]byte, t.maxLevels)
+
+	_, valueAtBottom, siblings, intermediates, err := t.down(wTx, k, root, siblings, intermediates, path, 0, true)
 	if err != nil {
 		return err
 	}
@@ -921,7 +777,7 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	if len(siblings) == 0 {
 		return t.setRoot(wTx, leafKey)
 	}
-	root, err = t.up(wTx, leafKey, siblings, path, len(siblings)-1, 0)
+	root, err = t.up(wTx, intermediates, leafKey, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
 	}
@@ -964,8 +820,10 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 
 	// Navigate down the tree to find the key and collect siblings.
 	var siblings [][]byte
+	intermediates := make([][]byte, t.maxLevels)
+
 	path := getPath(t.maxLevels, k)
-	_, _, siblings, err = t.down(wTx, k, root, siblings, path, 0, true)
+	leafKey, _, siblings, intermediates, err := t.down(wTx, k, root, siblings, intermediates, path, 0, true)
 	if err != nil {
 		if err == ErrKeyNotFound {
 			// Key not found, nothing to delete.
@@ -974,12 +832,17 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		return err
 	}
 
+	// delete the leaf key
+	if err := wTx.Delete(leafKey); err != nil {
+		return fmt.Errorf("error deleting key %x: %w", leafKey, err)
+	}
+
 	// Navigate back up the tree, updating the intermediate nodes.
 	if len(siblings) == 0 {
 		// The tree is empty after deletion.
 		return t.setRoot(wTx, t.emptyHash)
 	}
-	newRoot, err := t.up(wTx, t.emptyHash, siblings, path, len(siblings)-1, 0)
+	newRoot, err := t.up(wTx, intermediates, t.emptyHash, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
 	}
@@ -1025,7 +888,9 @@ func (t *Tree) GenProofWithTx(rTx db.Reader, k []byte) ([]byte, []byte, []byte, 
 
 	// go down to the leaf
 	var siblings [][]byte
-	_, value, siblings, err := t.down(rTx, k, root, siblings, path, 0, true)
+	intermediates := make([][]byte, t.maxLevels)
+
+	_, value, siblings, intermediates, err := t.down(rTx, k, root, siblings, intermediates, path, 0, true)
 	if err != nil {
 		return nil, nil, nil, false, err
 	}
@@ -1174,7 +1039,9 @@ func (t *Tree) GetWithTx(rTx db.Reader, k []byte) ([]byte, []byte, error) {
 
 	// go down to the leaf
 	var siblings [][]byte
-	_, value, _, err := t.down(rTx, k, root, siblings, path, 0, true)
+	intermediates := make([][]byte, t.maxLevels)
+
+	_, value, _, intermediates, err := t.down(rTx, k, root, siblings, intermediates, path, 0, true)
 	if err != nil {
 		return nil, nil, err
 	}
