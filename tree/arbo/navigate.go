@@ -9,21 +9,21 @@ import (
 )
 
 // down goes down to the leaf recursively
-func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, intermediates [][]byte,
-	path []bool, currLvl int, getLeaf bool) ([]byte, []byte, [][]byte, [][]byte, error) {
+func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, intermediates *[][]byte,
+	path []bool, currLvl int, getLeaf bool) ([]byte, []byte, [][]byte, error) {
 	if currLvl > t.maxLevels {
-		return nil, nil, nil, nil, ErrMaxLevel
+		return nil, nil, nil, ErrMaxLevel
 	}
 
 	var err error
 	var currValue []byte
 	if bytes.Equal(currKey, t.emptyHash) {
 		// empty value
-		return currKey, emptyValue, siblings, intermediates, nil
+		return currKey, emptyValue, siblings, nil
 	}
 	currValue, err = rTx.Get(currKey)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not get value for key %x: %w", currKey, err)
+		return nil, nil, nil, fmt.Errorf("could not get value for key %x: %w", currKey, err)
 	}
 
 	switch currValue[0] {
@@ -39,33 +39,33 @@ func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, in
 	case PrefixValueLeaf: // leaf
 		if !bytes.Equal(currValue, emptyValue) {
 			if getLeaf {
-				return currKey, currValue, siblings, intermediates, nil
+				return currKey, currValue, siblings, nil
 			}
 			oldLeafKey, _ := ReadLeafValue(currValue)
 			if bytes.Equal(newKey, oldLeafKey) {
-				return nil, nil, nil, nil, ErrKeyAlreadyExists
+				return nil, nil, nil, ErrKeyAlreadyExists
 			}
 
 			oldLeafKeyFull, err := keyPathFromKey(t.maxLevels, oldLeafKey)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, err
 			}
 
 			// if currKey is already used, go down until paths diverge
 			oldPath := getPath(t.maxLevels, oldLeafKeyFull)
 			siblings, err = t.downVirtually(siblings, currKey, newKey, oldPath, path, currLvl)
 			if err != nil {
-				return nil, nil, nil, nil, err
+				return nil, nil, nil, err
 			}
 		}
-		return currKey, currValue, siblings, intermediates, nil
+		return currKey, currValue, siblings, nil
 	case PrefixValueIntermediate: // intermediate
 		if len(currValue) != PrefixValueLen+t.hashFunction.Len()*2 {
-			return nil, nil, nil, nil,
+			return nil, nil, nil,
 				fmt.Errorf("intermediate value invalid length (expected: %d, actual: %d)",
 					PrefixValueLen+t.hashFunction.Len()*2, len(currValue))
 		}
-		intermediates[currLvl] = currKey
+		*intermediates = append(*intermediates, currKey)
 
 		// collect siblings while going down
 		if path[currLvl] {
@@ -79,17 +79,13 @@ func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, in
 		siblings = append(siblings, rChild)
 		return t.down(rTx, newKey, lChild, siblings, intermediates, path, currLvl+1, getLeaf)
 	default:
-		return nil, nil, nil, nil, ErrInvalidValuePrefix
+		return nil, nil, nil, ErrInvalidValuePrefix
 	}
 }
 
-// up navigates back up the tree after a delete operation, updating
-// the intermediate nodes and potentially removing nodes that are no longer needed.
-func (t *Tree) up(wTx db.WriteTx, intermediates [][]byte, newKey []byte, siblings [][]byte, path []bool, currLvl, toLvl int) ([]byte, error) {
-	if currLvl < 0 {
-		return newKey, nil
-	}
-
+// up navigates back up the tree, updating the intermediate nodes and potentially
+// removing nodes that are no longer needed.
+func (t *Tree) up(wTx db.WriteTx, newKey []byte, siblings [][]byte, path []bool, currLvl, toLvl int) ([]byte, error) {
 	var k, v []byte
 	var err error
 	if path[currLvl+toLvl] {
@@ -97,27 +93,51 @@ func (t *Tree) up(wTx db.WriteTx, intermediates [][]byte, newKey []byte, sibling
 	} else {
 		k, v, err = t.newIntermediate(newKey, siblings[currLvl])
 	}
-
 	if err != nil {
 		return nil, fmt.Errorf("could not compute intermediary node: %w", err)
 	}
 
-	// If the new key is not the empty node, store it in the database
-	// extra empty childs are stored. find the way to remove them
-	if err = wTx.Set(k, v); err != nil {
-		return nil, err
-	}
-
-	// If the node is modified, remove the old key
-	oldKey := intermediates[currLvl]
-	if !bytes.Equal(oldKey, k) && oldKey != nil {
-		fmt.Printf("Removing old key: %s\n", hex.EncodeToString(oldKey))
-		if err := wTx.Delete(oldKey); err != nil {
-			return nil, fmt.Errorf("could not delete old key: %w", err)
+	// store the new intermediate node
+	if bytes.Equal(k, t.emptyNode) {
+		// if both children are empty, the parent is empty too, we return the empty hash,
+		// so next up() calls know it
+		k = t.emptyHash
+	} else {
+		// if the parent is not empty, store it
+		if err = wTx.Set(k, v); err != nil {
+			return nil, err
 		}
 	}
 
-	return t.up(wTx, intermediates, k, siblings, path, currLvl-1, toLvl)
+	if currLvl == 0 {
+		// reached the root
+		return k, nil
+	}
+
+	return t.up(wTx, k, siblings, path, currLvl-1, toLvl)
+}
+
+// downVirtually is used when in a leaf already exists, and a new leaf which
+// shares the path until the existing leaf is being added
+func (t *Tree) downVirtually(siblings [][]byte, oldKey, newKey []byte, oldPath, newPath []bool, currLvl int) ([][]byte, error) {
+	var err error
+	if currLvl > t.maxLevels-1 {
+		return nil, ErrMaxVirtualLevel
+	}
+
+	if oldPath[currLvl] == newPath[currLvl] {
+		siblings = append(siblings, t.emptyHash)
+
+		siblings, err = t.downVirtually(siblings, oldKey, newKey, oldPath, newPath, currLvl+1)
+		if err != nil {
+			return nil, err
+		}
+		return siblings, nil
+	}
+	// reached the divergence
+	siblings = append(siblings, oldKey)
+
+	return siblings, nil
 }
 
 // newIntermediate takes the left & right keys of a intermediate node, and
