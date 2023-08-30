@@ -587,3 +587,8 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 	}
 	return tt, nil
 }
+
+// OnSpendTokens does nothing
+func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference []byte) {
+	// TODO: fill the table token_spendings
+}

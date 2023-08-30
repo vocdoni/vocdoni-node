@@ -139,6 +139,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				common.Address(txSender),
 				models.TxType_NEW_PROCESS,
 				t.txElectionCostFromProcess(p),
+				p.GetProcessId(),
 			)
 		}
 
@@ -181,7 +182,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, 0)
+			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, 0, tx.ProcessId)
 		}
 
 	case *models.Tx_SetAccount:
@@ -275,6 +276,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					txSenderAddress,
 					models.TxType_SET_ACCOUNT_INFO_URI,
 					0,
+					[]byte(tx.GetInfoURI()),
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: burnCostIncrementNonce %w", err)
 				}
@@ -299,6 +301,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					txSenderAddress,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 					0,
+					nil,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegateTx: burnTxCostIncrementNonce %w", err)
 				}
@@ -318,6 +321,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					txSenderAddress,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 					0,
+					nil,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
 				}
@@ -375,7 +379,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 		if forCommit {
 			tx := vtx.Tx.GetSendTokens()
 			from, to := common.BytesToAddress(tx.From), common.BytesToAddress(tx.To)
-			err := t.state.BurnTxCostIncrementNonce(from, models.TxType_SEND_TOKENS, 0)
+			err := t.state.BurnTxCostIncrementNonce(from, models.TxType_SEND_TOKENS, 0, to.Bytes())
 			if err != nil {
 				return nil, fmt.Errorf("sendTokensTx: burnTxCostIncrementNonce %w", err)
 			}
@@ -401,7 +405,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			if err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: cannot get issuerAddress %w", err)
 			}
-			if err := t.state.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET, 0); err != nil {
+			if err := t.state.BurnTxCostIncrementNonce(issuerAddress, models.TxType_COLLECT_FAUCET, 0, nil); err != nil {
 				return nil, fmt.Errorf("collectFaucetTx: burnTxCost %w", err)
 			}
 			faucetPayload := &models.FaucetPayload{}
@@ -439,6 +443,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				txAddress,
 				models.TxType_SET_ACCOUNT_SIK,
 				0,
+				newSIK,
 			); err != nil {
 				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
 			}
@@ -458,6 +463,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				txAddress,
 				models.TxType_DEL_ACCOUNT_SIK,
 				0,
+				nil,
 			); err != nil {
 				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
 			}

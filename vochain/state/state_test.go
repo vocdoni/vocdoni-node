@@ -182,13 +182,11 @@ func (*Listener) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32
 func (*Listener) OnCancel(_ []byte, _ int32)                                      {}
 func (*Listener) OnProcessKeys(_ []byte, _ string, _ int32)                       {}
 func (*Listener) OnRevealKeys(_ []byte, _ string, _ int32)                        {}
-func (*Listener) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32) {
-}
-func (*Listener) OnCensusUpdate(_, _ []byte, _ string) {}
-func (*Listener) OnSetAccount(_ []byte, _ *Account) {
-}
-func (*Listener) OnTransferTokens(_ *vochaintx.TokenTransfer) {
-}
+func (*Listener) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32)     {}
+func (*Listener) OnCensusUpdate(_, _ []byte, _ string)                            {}
+func (*Listener) OnSetAccount(_ []byte, _ *Account)                               {}
+func (*Listener) OnTransferTokens(_ *vochaintx.TokenTransfer)                     {}
+func (*Listener) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ []byte)     {}
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }
