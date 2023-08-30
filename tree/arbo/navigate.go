@@ -251,3 +251,54 @@ func (t *Tree) getLeavesFromSubPath(rTx db.Reader, node []byte) ([][]byte, [][]b
 	}
 	return keys, values, nil
 }
+
+// RootsFromLevel retrieves all intermediary nodes at a specified level of the tree.
+// The function traverses the tree from the root down to the given level, collecting
+// all the intermediary nodes along the way. If the specified level exceeds the maximum
+// depth of the tree, an error is returned.
+func (t *Tree) RootsFromLevel(level int) ([][]byte, error) {
+	if level > t.maxLevels {
+		return nil, fmt.Errorf("requested level %d exceeds tree's max level %d", level, t.maxLevels)
+	}
+
+	var nodes [][]byte
+	root, err := t.Root()
+	if err != nil {
+		return nil, err
+	}
+
+	err = t.collectNodesAtLevel(t.db, root, 0, level, &nodes)
+	return nodes, err
+}
+
+func (t *Tree) collectNodesAtLevel(rTx db.Reader, nodeKey []byte, currentLevel, targetLevel int, nodes *[][]byte) error {
+	nodeValue, err := rTx.Get(nodeKey)
+	if err != nil {
+		return fmt.Errorf("could not get value for key %x: %w", nodeKey, err)
+	}
+
+	// Check the type of the node
+	switch nodeValue[0] {
+	case PrefixValueEmpty, PrefixValueLeaf:
+		// Do nothing for empty nodes and leaves, just return
+		return nil
+	case PrefixValueIntermediate:
+		// If the current level is the target level, add the node to the list
+		if currentLevel == targetLevel {
+			*nodes = append(*nodes, nodeKey)
+			return nil
+		}
+
+		// Otherwise, continue traversing down the tree
+		lChild, rChild := ReadIntermediateChilds(nodeValue)
+		if err := t.collectNodesAtLevel(rTx, lChild, currentLevel+1, targetLevel, nodes); err != nil {
+			return err
+		}
+		if err := t.collectNodesAtLevel(rTx, rChild, currentLevel+1, targetLevel, nodes); err != nil {
+			return err
+		}
+	default:
+		return ErrInvalidValuePrefix
+	}
+	return nil
+}

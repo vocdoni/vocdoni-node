@@ -571,7 +571,9 @@ func (*Tree) GetNLeafsWithTx(rTx db.Reader) (int, error) {
 	return int(nLeafs), nil
 }
 
-// SetRoot sets the root to the given root
+// SetRoot sets the root to the given root. The root hash must be a valid existing
+// intermediate node in the tree. The list of roots for a level can be obtained
+// using tree.RootsFromLevel().
 func (t *Tree) SetRoot(root []byte) error {
 	wTx := t.db.WriteTx()
 	defer wTx.Discard()
@@ -593,7 +595,10 @@ func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
 	return wTx.Set(dbKeyRoot, root)
 }
 
-// Snapshot returns a read-only copy of the Tree from the given root
+// Snapshot returns a read-only copy of the Tree from the given root.
+// If no root is given, the current root is used.
+// The provided root must be a valid existing intermediate node in the tree.
+// The list of roots for a level can be obtained using tree.RootsFromLevel().
 func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
 	// allow to define which root to use
 	if fromRoot == nil {
@@ -626,12 +631,18 @@ func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
 
 // Iterate iterates through the full Tree, executing the given function on each
 // node of the Tree.
+// The iteration starts from the given root. If no root is given, the current
+// root is used. The provided root must be a valid existing intermediate node in
+// the tree.
 func (t *Tree) Iterate(fromRoot []byte, f func([]byte, []byte)) error {
 	return t.IterateWithTx(t.db, fromRoot, f)
 }
 
 // IterateWithTx does the same than the Iterate method, but allowing to pass
 // the db.ReadTx that is used.
+// The iteration starts from the given root. If no root is given, the current
+// root is used. The provided root must be a valid existing intermediate node in
+// the tree.
 func (t *Tree) IterateWithTx(rTx db.Reader, fromRoot []byte, f func([]byte, []byte)) error {
 	// allow to define which root to use
 	if fromRoot == nil {
@@ -661,8 +672,7 @@ func (t *Tree) IterateWithStop(fromRoot []byte, f func(int, []byte, []byte) bool
 
 // IterateWithStopWithTx does the same than the IterateWithStop method, but
 // allowing to pass the db.ReadTx that is used.
-func (t *Tree) IterateWithStopWithTx(rTx db.Reader, fromRoot []byte,
-	f func(int, []byte, []byte) bool) error {
+func (t *Tree) IterateWithStopWithTx(rTx db.Reader, fromRoot []byte, f func(int, []byte, []byte) bool) error {
 	// allow to define which root to use
 	if fromRoot == nil {
 		var err error
@@ -674,8 +684,7 @@ func (t *Tree) IterateWithStopWithTx(rTx db.Reader, fromRoot []byte,
 	return t.iterWithStop(rTx, fromRoot, 0, f)
 }
 
-func (t *Tree) iterWithStop(rTx db.Reader, k []byte, currLevel int,
-	f func(int, []byte, []byte) bool) error {
+func (t *Tree) iterWithStop(rTx db.Reader, k []byte, currLevel int, f func(int, []byte, []byte) bool) error {
 	var v []byte
 	var err error
 	if bytes.Equal(k, t.emptyHash) {
@@ -719,12 +728,16 @@ func (t *Tree) iter(rTx db.Reader, k []byte, f func([]byte, []byte)) error {
 	return t.iterWithStop(rTx, k, 0, f2)
 }
 
-// Dump exports all the Tree leafs in a byte array
+// Dump exports all the Tree leafs in a byte array.
+// The provided root must be a valid existing intermediate node in the tree.
+// Or nil to use the current root.
 func (t *Tree) Dump(fromRoot []byte) ([]byte, error) {
 	return t.dump(fromRoot, nil)
 }
 
-// DumpWriter exports all the Tree leafs writing the bytes in the given Writer
+// DumpWriter exports all the Tree leafs writing the bytes in the given Writer.
+// The provided root must be a valid existing intermediate node in the tree.
+// Or nil to use the current root.
 func (t *Tree) DumpWriter(fromRoot []byte, w io.Writer) error {
 	_, err := t.dump(fromRoot, w)
 	return err
