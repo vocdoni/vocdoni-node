@@ -1,6 +1,7 @@
 package arbo
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"math"
@@ -664,9 +665,10 @@ func TestSetRoot(t *testing.T) {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
-	indexes, err := tree.AddBatch(keys, values)
-	c.Assert(err, qt.IsNil)
-	c.Check(len(indexes), qt.Equals, 0)
+	for i, k := range keys {
+		err := tree.Add(k, values[i])
+		c.Assert(err, qt.IsNil)
+	}
 	checkRootBIString(c, tree,
 		expectedRoot)
 
@@ -688,9 +690,9 @@ func TestSetRoot(t *testing.T) {
 	checkRootBIString(c, tree, expectedRoot)
 
 	// check that the tree can be updated
-	err = tree.Add([]byte("test"), []byte("test"))
+	err = tree.Add(BigIntToBytes(bLen, big.NewInt(int64(1024))), []byte("test"))
 	c.Assert(err, qt.IsNil)
-	err = tree.Update([]byte("test"), []byte("test"))
+	err = tree.Update(BigIntToBytes(bLen, big.NewInt(int64(1024))), []byte("test2"))
 	c.Assert(err, qt.IsNil)
 
 	// check that the k-v '1000' does not exist in the new tree
@@ -1111,4 +1113,143 @@ func dirSize(path string) (int64, error) {
 		return nil
 	})
 	return size, err
+}
+
+func TestGetLeavesFromSubPath(t *testing.T) {
+	c := qt.New(t)
+	database := metadb.NewTest(t)
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon})
+	c.Assert(err, qt.IsNil)
+
+	bLen := 32
+	// Add keys with shared prefix and some without shared prefix
+	keys := [][]byte{
+		// Shared prefix keys
+		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(1)))...),
+		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(2)))...),
+		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(3)))...),
+		// Non-shared prefix keys
+		BigIntToBytes(bLen, big.NewInt(int64(4))),
+		BigIntToBytes(bLen, big.NewInt(int64(5))),
+	}
+	sharedPrefixKeyNotAdded := append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(4)))...)
+	values := [][]byte{
+		BigIntToBytes(bLen, big.NewInt(int64(10))),
+		BigIntToBytes(bLen, big.NewInt(int64(20))),
+		BigIntToBytes(bLen, big.NewInt(int64(30))),
+		BigIntToBytes(bLen, big.NewInt(int64(40))),
+		BigIntToBytes(bLen, big.NewInt(int64(50))),
+	}
+	for i, key := range keys {
+		err := tree.Add(key, values[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+
+	// Use the down function to get intermediate nodes on the path to a given leaf with shared prefix
+	var intermediates [][]byte
+	_, _, _, err = tree.down(
+		database,
+		sharedPrefixKeyNotAdded,
+		root,
+		[][]byte{},
+		&intermediates,
+		getPath(tree.maxLevels, sharedPrefixKeyNotAdded),
+		0,
+		false,
+	)
+	c.Assert(err, qt.IsNil)
+
+	// For our test, we'll use the third intermediate node in the path
+	//  (this assumes that it's the one shared by the leaves with the shared prefix)
+	if len(intermediates) == 0 {
+		t.Fatal("No intermediates found")
+	}
+	intermediateNodeKey := intermediates[2]
+
+	subKeys, _, err := tree.getLeavesFromSubPath(database, intermediateNodeKey)
+	c.Assert(err, qt.IsNil)
+
+	// Check if all leaves with shared prefix are present in the result and leaves without the shared prefix are not
+	for _, key := range keys {
+		found := false
+		for _, sk := range subKeys {
+			if bytes.Equal(sk, key) {
+				found = true
+				break
+			}
+		}
+		if bytes.HasPrefix(key, []byte{0xFF, 0xFF}) {
+			c.Assert(found, qt.IsTrue, qt.Commentf("Expected leaf %x not found", key))
+		} else {
+			c.Assert(found, qt.IsFalse, qt.Commentf("Leaf %x should not have been found", key))
+		}
+	}
+}
+
+func TestTreeAfterDeleteAndReconstruct(t *testing.T) {
+	nLeafs := 1000
+
+	c := qt.New(t)
+	database1 := metadb.NewTest(t)
+	database2 := metadb.NewTest(t)
+
+	// 1. A new tree (tree1) is created and filled with some data
+	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
+		HashFunction: HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	// prepare inputs
+	var keys, values [][]byte
+	for i := 0; i < nLeafs; i++ {
+		k := randomBytes(32)
+		v := randomBytes(32)
+		keys = append(keys, k)
+		values = append(values, v)
+	}
+
+	for i, key := range keys {
+		err := tree1.Add(key, values[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 2. Delete some keys from the tree
+	keysToDelete := [][]byte{keys[1], keys[3]}
+	for _, key := range keysToDelete {
+		err := tree1.Delete(key)
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 3. Create a second tree (tree2)
+	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
+		HashFunction: HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	// 4. Add the non-deleted keys from tree1 to tree2
+	for i, key := range keys {
+		if !contains(keysToDelete, key) {
+			err := tree2.Add(key, values[i])
+			c.Assert(err, qt.IsNil)
+		}
+	}
+
+	root1, err := tree1.Root()
+	c.Assert(err, qt.IsNil)
+	root2, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+	// 5. verify the root hash is the same for tree1 and tree2
+	c.Assert(bytes.Equal(root1, root2), qt.IsTrue, qt.Commentf("Roots of tree1 and tree2 do not match"))
+}
+
+// Helper function to check if a byte slice array contains a byte slice
+func contains(arr [][]byte, item []byte) bool {
+	for _, a := range arr {
+		if bytes.Equal(a, item) {
+			return true
+		}
+	}
+	return false
 }

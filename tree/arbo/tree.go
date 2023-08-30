@@ -438,9 +438,18 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 	}
 
 	// if the neighbor is not empty, set the leaf key to the empty hash
+
+	var neighbourKeys, neighbourValues [][]byte
 	if !bytes.Equal(siblings[len(siblings)-1], t.emptyHash) {
-		if err := wTx.Set(leafKey, t.emptyHash); err != nil {
-			return fmt.Errorf("error setting leaf key %x to empty hash: %w", leafKey, err)
+		neighbourKeys, neighbourValues, err = t.getLeavesFromSubPath(wTx, siblings[len(siblings)-1])
+		if err != nil {
+			return fmt.Errorf("error getting leafs from subpath on Delete: %w", err)
+		}
+		// if there are no neighbours, set the leaf key to the empty hash
+		if len(neighbourKeys) == 0 {
+			if err := wTx.Set(leafKey, t.emptyHash); err != nil {
+				return fmt.Errorf("error setting leaf key %x to empty hash: %w", leafKey, err)
+			}
 		}
 	} else {
 		// else delete the leaf key
@@ -464,8 +473,19 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		return err
 	}
 
+	// Delete the orphan intermediate nodes.
 	if err := deleteNodes(wTx, intermediates); err != nil {
 		return fmt.Errorf("error deleting orphan intermediate nodes: %v", err)
+	}
+
+	// If there are neighbours deleted, add them back to the tree.
+	for i, k := range neighbourKeys {
+		if err := t.deleteWithTx(wTx, k); err != nil {
+			return fmt.Errorf("error deleting neighbour %d: %w", i, err)
+		}
+		if err := t.addWithTx(wTx, k, neighbourValues[i]); err != nil {
+			return fmt.Errorf("error adding neighbour %d: %w", i, err)
+		}
 	}
 
 	// Update the number of leaves.
@@ -567,21 +587,9 @@ func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
-
 	if root == nil {
 		return fmt.Errorf("can not SetRoot with nil root")
 	}
-
-	// check that the root exists in the db
-	if !bytes.Equal(root, t.emptyHash) {
-		if _, err := wTx.Get(root); err == ErrKeyNotFound {
-			return fmt.Errorf("can not SetRoot with root %x, as it"+
-				" does not exist in the db", root)
-		} else if err != nil {
-			return err
-		}
-	}
-
 	return wTx.Set(dbKeyRoot, root)
 }
 
