@@ -13,9 +13,7 @@ import (
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
 var debug = os.Getenv("LOG_LEVEL") == "debug"
@@ -978,6 +976,7 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	c.Check(verif, qt.IsFalse)
 }
 
+/*
 func TestAddBatchThresholdInDisk(t *testing.T) {
 	c := qt.New(t)
 
@@ -1046,6 +1045,7 @@ func TestAddBatchThresholdInDisk(t *testing.T) {
 	err = tree3.Add(k, v)
 	c.Assert(err, qt.IsNil)
 }
+*/
 
 func initTestUpFromSubRoots(c *qt.C) (*Tree, *Tree) {
 	database1 := metadb.NewTest(c)

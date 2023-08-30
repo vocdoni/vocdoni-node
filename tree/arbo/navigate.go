@@ -180,9 +180,74 @@ func ReadIntermediateChilds(b []byte) ([]byte, []byte) {
 }
 
 func getPath(numLevels int, k []byte) []bool {
+	requiredLen := (numLevels + 7) / 8 // Calculate the ceil value of numLevels/8
+	if len(k) < requiredLen {
+		// The provided key is shorter than expected for the given number of levels.
+		// Handle this case appropriately, either by returning an error or by handling it in some other way.
+		panic(fmt.Sprintf("key length is too short: expected at least %d bytes, got %d bytes", requiredLen, len(k)))
+	}
+
 	path := make([]bool, numLevels)
 	for n := 0; n < numLevels; n++ {
 		path[n] = k[n/8]&(1<<(n%8)) != 0
 	}
 	return path
+}
+
+// getLeavesFromSubPath navigates the Merkle tree from a given node key
+// and collects all the leaves found within its subpath. The function can
+// start from an intermediate node or a leaf itself.
+// Returns the list of keys and values of the leaves found.
+func (t *Tree) getLeavesFromSubPath(rTx db.Reader, node []byte) ([][]byte, [][]byte, error) {
+	if bytes.Equal(node, t.emptyHash) {
+		return [][]byte{}, [][]byte{}, nil
+	}
+	// Fetch the node value from the database
+	nodeValue, err := rTx.Get(node)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get value for key %x: %w", node, err)
+	}
+
+	// Depending on the node type, decide what to do
+	var keys, values [][]byte
+	switch nodeValue[0] {
+	case PrefixValueEmpty:
+		// No leaves in an empty node
+
+	case PrefixValueLeaf:
+		// Add the leaf value to the list
+		key, value := ReadLeafValue(nodeValue)
+		keys = append(keys, key)
+		values = append(values, value)
+
+	case PrefixValueIntermediate:
+		if len(nodeValue) != PrefixValueLen+t.hashFunction.Len()*2 {
+			return nil, nil, fmt.Errorf("intermediate value invalid length (expected: %d, actual: %d)",
+				PrefixValueLen+t.hashFunction.Len()*2, len(nodeValue))
+		}
+		// If it's an intermediate node, traverse its children
+		lChild, rChild := ReadIntermediateChilds(nodeValue)
+
+		// Fetch leaves from the left child
+		leftKeys, leftValues, err := t.getLeavesFromSubPath(rTx, lChild)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Fetch leaves from the right child
+		rightKeys, rightValues, err := t.getLeavesFromSubPath(rTx, rChild)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// Merge leaves from both children
+		keys = append(keys, leftKeys...)
+		keys = append(keys, rightKeys...)
+		values = append(values, leftValues...)
+		values = append(values, rightValues...)
+
+	default:
+		return nil, nil, ErrInvalidValuePrefix
+	}
+	return keys, values, nil
 }
