@@ -680,14 +680,15 @@ func TestSetRoot(t *testing.T) {
 	checkRootBIString(c, tree,
 		"10747149055773881257049574592162159501044114324358186833013814735296193179713")
 
-	// do a SetRoot, and expect the same root than the original tree
-	pastRootBI, ok := new(big.Int).SetString(expectedRoot, 10)
-	c.Assert(ok, qt.IsTrue)
-	pastRoot := BigIntToBytes(32, pastRootBI)
-
-	err = tree.SetRoot(pastRoot)
+	// get the roots from level 2 and set one of them as the new root
+	roots, err := tree.RootsFromLevel(2)
 	c.Assert(err, qt.IsNil)
-	checkRootBIString(c, tree, expectedRoot)
+	c.Assert(tree.SetRoot(roots[0]), qt.IsNil)
+
+	// check that the new root is the same as the one set
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(string(root), qt.Equals, string(roots[0]))
 
 	// check that the tree can be updated
 	err = tree.Add(BigIntToBytes(bLen, big.NewInt(int64(1024))), []byte("test"))
