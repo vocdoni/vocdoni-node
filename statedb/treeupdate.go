@@ -2,6 +2,7 @@ package statedb
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"path"
 	"sync"
@@ -136,6 +137,11 @@ func (u *TreeUpdate) Del(key []byte) error {
 	return u.tree.Del(u.tree.tx, key)
 }
 
+// PrintGraphviz prints the tree in Graphviz format.
+func (u *TreeUpdate) PrintGraphviz() error {
+	return u.tree.PrintGraphviz(u.tree.tx)
+}
+
 // SubTree is used to open the subTree (singleton and non-singleton) as a
 // TreeUpdate.  The treeUpdate.tx is created from u.tx appending the prefix
 // `subKeySubTree | cfg.prefix`.  In turn the treeUpdate.tree uses the
@@ -164,9 +170,12 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 		return nil, err
 	}
 	if !bytes.Equal(root, lastRoot) {
-		if err := tree.SetRoot(txTree, root); err != nil {
-			return nil, err
-		}
+		panic(fmt.Sprintf("root for %s mismatch: %x != %x", cfg.kindID, root, lastRoot))
+		// Note (Pau): since we modified arbo to remove all unecessary intermediate nodes,
+		// we cannot set a past root.We should probably remove this code.
+		//if err := tree.SetRoot(txTree, root); err != nil {
+		//	return nil, err
+		//}
 	}
 	treeUpdate = &TreeUpdate{
 		tx: tx,
@@ -296,16 +305,16 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 	for key, updates := range updatesByKey {
 		leaf, err := treeUpdate.tree.Get(treeUpdate.tree.tx, []byte(key))
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get leaf %x: %w", key, err)
 		}
 		for _, update := range updates {
 			leaf, err = update.setRoot(leaf, update.root)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("failed to set root for leaf %x: %w", key, err)
 			}
 		}
 		if err := treeUpdate.tree.Set(treeUpdate.tree.tx, []byte(key), leaf); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to set leaf %x: %w", key, err)
 		}
 	}
 	// We either updated leaves here, or treeUpdate.tree was dirty, so we
@@ -324,22 +333,22 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 func (t *TreeTx) Commit(version uint32) error {
 	root, err := propagateRoot(&t.TreeUpdate)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not propagate root: %w", err)
 	}
 	t.openSubs = sync.Map{}
 	curVersion, err := getVersion(t.tx)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not get current version: %w", err)
 	}
 	// If root is nil, it means that there were no updates to the StateDB,
 	// so the next version root is the current version root.
 	if root == nil {
 		if root, err = t.sdb.getVersionRoot(t.tx, curVersion); err != nil {
-			return err
+			return fmt.Errorf("could not get current version root: %w", err)
 		}
 	}
 	if err := setVersionRoot(t.tx, version, root); err != nil {
-		return err
+		return fmt.Errorf("could not set version root: %w", err)
 	}
 	return t.tx.Commit()
 }
@@ -407,7 +416,7 @@ func (v *treeUpdateView) Import(r io.Reader) error {
 }
 
 func (v *treeUpdateView) PrintGraphviz() error {
-	return v.tree.PrintGraphviz()
+	return v.tree.PrintGraphviz(v.tx)
 }
 
 // verify that treeUpdateView fulfills the TreeViewer interface.
