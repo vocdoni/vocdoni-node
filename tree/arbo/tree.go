@@ -357,15 +357,23 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 		return ErrKeyNotFound
 	}
 
-	// delete the old leaf key
-	if err := wTx.Delete(oldLeafKey); err != nil {
-		return fmt.Errorf("error deleting old leaf on update: %w", err)
-	}
-
 	// compute the new leaf key and value
 	leafKey, leafValue, err := t.newLeafValue(k, v)
 	if err != nil {
 		return err
+	}
+
+	if bytes.Equal(oldLeafKey, leafKey) {
+		// The key is the same, just return, nothing to do.
+		// Note that if we don't exit here, the code below will delete
+		// the valid intermediate nodes up to the root, and we don't want that.
+		// (took me a while to figure out)
+		return nil
+	}
+
+	// delete the old leaf key
+	if err := wTx.Delete(oldLeafKey); err != nil {
+		return fmt.Errorf("error deleting old leaf on update: %w", err)
 	}
 
 	// add the new leaf key
@@ -374,7 +382,6 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	}
 
 	// go up to the root
-
 	if len(siblings) == 0 {
 		return t.setRoot(wTx, leafKey)
 	}
@@ -384,6 +391,7 @@ func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 		return err
 	}
 
+	// delete the old intermediate nodes
 	if err := deleteNodes(wTx, intermediates); err != nil {
 		return fmt.Errorf("error deleting orphan intermediate nodes: %v", err)
 	}
@@ -438,6 +446,9 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 	}
 
 	// if the neighbor is not empty, set the leaf key to the empty hash
+	if len(siblings) == 0 {
+		return nil
+	}
 
 	var neighbourKeys, neighbourValues [][]byte
 	if !bytes.Equal(siblings[len(siblings)-1], t.emptyHash) {
@@ -517,9 +528,9 @@ func (t *Tree) GetWithTx(rTx db.Reader, k []byte) ([]byte, []byte, error) {
 	}
 
 	// go down to the leaf
-	var siblings, intermediates [][]byte
+	var siblings [][]byte
 
-	_, value, _, err := t.down(rTx, k, root, siblings, &intermediates, path, 0, true)
+	_, value, _, err := t.down(rTx, k, root, siblings, nil, path, 0, true)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -591,6 +602,10 @@ func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
 	}
 	if root == nil {
 		return fmt.Errorf("can not SetRoot with nil root")
+	}
+	if _, err := wTx.Get(root); err != nil {
+		return fmt.Errorf("could not SetRoot to %x,"+
+			" as it does not exist in the db: %w", root, err)
 	}
 	return wTx.Set(dbKeyRoot, root)
 }
@@ -862,13 +877,13 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 // Graphviz iterates across the full tree to generate a string Graphviz
 // representation of the tree and writes it to w
 func (t *Tree) Graphviz(w io.Writer, fromRoot []byte) error {
-	return t.GraphvizFirstNLevels(w, fromRoot, t.maxLevels)
+	return t.GraphvizFirstNLevels(t.db, w, fromRoot, t.maxLevels)
 }
 
 // GraphvizFirstNLevels iterates across the first NLevels of the tree to
 // generate a string Graphviz representation of the first NLevels of the tree
 // and writes it to w
-func (t *Tree) GraphvizFirstNLevels(w io.Writer, fromRoot []byte, untilLvl int) error {
+func (t *Tree) GraphvizFirstNLevels(rTx db.Reader, w io.Writer, fromRoot []byte, untilLvl int) error {
 	fmt.Fprintf(w, `digraph hierarchy {
 node [fontname=Monospace,fontsize=10,shape=box]
 `)
@@ -882,25 +897,31 @@ node [fontname=Monospace,fontsize=10,shape=box]
 	}
 
 	nEmpties := 0
-	err := t.iterWithStop(t.db, fromRoot, 0, func(currLvl int, k, v []byte) bool {
+	err := t.iterWithStop(rTx, fromRoot, 0, func(currLvl int, k, v []byte) bool {
 		if currLvl == untilLvl {
 			return true // to stop the iter from going down
+		}
+		firstChars := func(b []byte) string {
+			if len(b) > nChars {
+				return hex.EncodeToString(b[:nChars])
+			}
+			return hex.EncodeToString(b)
 		}
 		switch v[0] {
 		case PrefixValueEmpty:
 		case PrefixValueLeaf:
-			fmt.Fprintf(w, "\"%v\" [style=filled];\n", hex.EncodeToString(k[:nChars]))
+			fmt.Fprintf(w, "\"%v\" [style=filled];\n", firstChars(k))
 			// key & value from the leaf
 			kB, vB := ReadLeafValue(v)
 			fmt.Fprintf(w, "\"%v\" -> {\"k:%v\\nv:%v\"}\n",
-				hex.EncodeToString(k[:nChars]), hex.EncodeToString(kB[:nChars]),
-				hex.EncodeToString(vB[:nChars]))
+				firstChars(k), firstChars(kB),
+				firstChars(vB))
 			fmt.Fprintf(w, "\"k:%v\\nv:%v\" [style=dashed]\n",
-				hex.EncodeToString(kB[:nChars]), hex.EncodeToString(vB[:nChars]))
+				firstChars(kB), firstChars(vB))
 		case PrefixValueIntermediate:
 			l, r := ReadIntermediateChilds(v)
-			lStr := hex.EncodeToString(l[:nChars])
-			rStr := hex.EncodeToString(r[:nChars])
+			lStr := firstChars(l)
+			rStr := firstChars(r)
 			eStr := ""
 			if bytes.Equal(l, t.emptyHash) {
 				lStr = fmt.Sprintf("empty%v", nEmpties)
@@ -914,7 +935,7 @@ node [fontname=Monospace,fontsize=10,shape=box]
 					rStr)
 				nEmpties++
 			}
-			fmt.Fprintf(w, "\"%v\" -> {\"%v\" \"%v\"}\n", hex.EncodeToString(k[:nChars]),
+			fmt.Fprintf(w, "\"%v\" -> {\"%v\" \"%v\"}\n", firstChars(k),
 				lStr, rStr)
 			fmt.Fprint(w, eStr)
 		default:
@@ -934,22 +955,25 @@ func (t *Tree) PrintGraphviz(fromRoot []byte) error {
 			return err
 		}
 	}
-	return t.PrintGraphvizFirstNLevels(fromRoot, t.maxLevels)
+	return t.PrintGraphvizFirstNLevels(t.db, fromRoot, t.maxLevels)
 }
 
 // PrintGraphvizFirstNLevels prints the output of Tree.GraphvizFirstNLevels
-func (t *Tree) PrintGraphvizFirstNLevels(fromRoot []byte, untilLvl int) error {
+func (t *Tree) PrintGraphvizFirstNLevels(rTx db.Reader, fromRoot []byte, untilLvl int) error {
 	if fromRoot == nil {
 		var err error
-		fromRoot, err = t.Root()
+		fromRoot, err = t.RootWithTx(rTx)
 		if err != nil {
 			return err
 		}
 	}
+	if untilLvl == 0 {
+		untilLvl = t.maxLevels
+	}
 	w := bytes.NewBufferString("")
 	fmt.Fprintf(w,
 		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(fromRoot)+":\n")
-	err := t.GraphvizFirstNLevels(w, fromRoot, untilLvl)
+	err := t.GraphvizFirstNLevels(rTx, w, fromRoot, untilLvl)
 	if err != nil {
 		fmt.Println(w)
 		return err

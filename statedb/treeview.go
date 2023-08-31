@@ -83,7 +83,7 @@ func (v *TreeView) IterateNodes(callback func(key, value []byte) bool) error {
 }
 
 func (v *TreeView) PrintGraphviz() error {
-	return v.tree.PrintGraphviz()
+	return v.tree.PrintGraphviz(v.db)
 }
 
 // Iterate iterates over all leafs of this tree.  When callback returns true,

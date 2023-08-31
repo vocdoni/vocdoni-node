@@ -38,16 +38,28 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 		signers[i] = &signer
 	}
 	// create burn account
-	app.State.SetAccount(state.BurnAddress, &state.Account{})
+	if err := app.State.SetAccount(state.BurnAddress, &state.Account{}); err != nil {
+		return nil, nil, err
+	}
 	// set tx costs
-	app.State.SetTxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, 100)
-	app.State.SetTxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100)
-	app.State.SetTxBaseCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 100)
-	app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 100)
-	app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 100)
+	if err := app.State.SetTxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, 100); err != nil {
+		return nil, nil, err
+	}
+	if err := app.State.SetTxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 100); err != nil {
+		return nil, nil, err
+	}
+	if err := app.State.SetTxBaseCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, 100); err != nil {
+		return nil, nil, err
+	}
+	if err := app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 100); err != nil {
+		return nil, nil, err
+	}
+	if err := app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 100); err != nil {
+		return nil, nil, err
+	}
 	// save state
-	app.Commit(context.TODO(), nil)
-	return app, signers, nil
+	_, err := app.Commit(context.TODO(), nil)
+	return app, signers, err
 }
 
 func TestSetAccountTx(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 // down goes down to the leaf recursively
 func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, intermediates *[][]byte,
 	path []bool, currLvl int, getLeaf bool) ([]byte, []byte, [][]byte, error) {
+
 	if currLvl > t.maxLevels {
 		return nil, nil, nil, ErrMaxLevel
 	}
@@ -23,7 +24,7 @@ func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, in
 	}
 	currValue, err = rTx.Get(currKey)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("could not get value for key %x: %w", currKey, err)
+		return nil, nil, nil, fmt.Errorf("while down, could not get value for key %x: %w", currKey, err)
 	}
 
 	switch currValue[0] {
@@ -65,7 +66,9 @@ func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, in
 				fmt.Errorf("intermediate value invalid length (expected: %d, actual: %d)",
 					PrefixValueLen+t.hashFunction.Len()*2, len(currValue))
 		}
-		*intermediates = append(*intermediates, currKey)
+		if intermediates != nil {
+			*intermediates = append(*intermediates, currKey)
+		}
 
 		// collect siblings while going down
 		if path[currLvl] {

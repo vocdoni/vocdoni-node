@@ -285,6 +285,9 @@ func (t *Tree) ImportDump(b []byte) error {
 	return t.tree.ImportDump(b)
 }
 
-func (t *Tree) PrintGraphviz() error {
-	return t.tree.PrintGraphviz(nil)
+func (t *Tree) PrintGraphviz(rTx db.Reader) error {
+	if rTx == nil {
+		rTx = t.db
+	}
+	return t.tree.PrintGraphvizFirstNLevels(rTx, nil, 0)
 }

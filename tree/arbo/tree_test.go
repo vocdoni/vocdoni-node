@@ -537,56 +537,6 @@ func TestRWMutex(t *testing.T) {
 	}
 }
 
-// TODO UPDATE
-// func TestSetGetNLeafs(t *testing.T) {
-//         c := qt.New(t)
-//         database := metadb.NewTest(t).IsNil)
-//         tree, err := NewTree(database, 100, HashFunctionPoseidon)
-//         c.Assert(err, qt.IsNil)
-//
-//         // 0
-//         tree.dbBatch = tree.db.NewBatch()
-//
-//         err = tree.setNLeafs(0)
-//         c.Assert(err, qt.IsNil)
-//
-//         err = tree.dbBatch.Write()
-//         c.Assert(err, qt.IsNil)
-//
-//         n, err := tree.GetNLeafs()
-//         c.Assert(err, qt.IsNil)
-//         c.Assert(n, qt.Equals, 0)
-//
-//         // 1024
-//         tree.dbBatch = tree.db.NewBatch()
-//
-//         err = tree.setNLeafs(1024)
-//         c.Assert(err, qt.IsNil)
-//
-//         err = tree.dbBatch.Write()
-//         c.Assert(err, qt.IsNil)
-//
-//         n, err = tree.GetNLeafs()
-//         c.Assert(err, qt.IsNil)
-//         c.Assert(n, qt.Equals, 1024)
-//
-//         // 2**64 -1
-//         tree.dbBatch = tree.db.NewBatch()
-//
-//         maxUint := ^uint(0)
-//         maxInt := int(maxUint >> 1)
-//
-//         err = tree.setNLeafs(maxInt)
-//         c.Assert(err, qt.IsNil)
-//
-//         err = tree.dbBatch.Write()
-//         c.Assert(err, qt.IsNil)
-//
-//         n, err = tree.GetNLeafs()
-//         c.Assert(err, qt.IsNil)
-//         c.Assert(n, qt.Equals, maxInt)
-// }
-
 func TestAddBatchFullyUsed(t *testing.T) {
 	c := qt.New(t)
 
@@ -700,9 +650,9 @@ func TestSetRoot(t *testing.T) {
 	_, _, err = tree.Get(k)
 	c.Assert(err, qt.Equals, ErrKeyNotFound)
 
-	// check that can be set an empty root
+	// check that the root can't be set to an empty root
 	err = tree.SetRoot(tree.emptyHash)
-	c.Assert(err, qt.IsNil)
+	c.Assert(err, qt.IsNotNil)
 }
 
 func TestSnapshot(t *testing.T) {
