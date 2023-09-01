@@ -363,7 +363,13 @@ func (idx *Indexer) Commit(height uint32) error {
 			// TODO: can we get previousVote from sqlite via blockTx?
 			var previousVote *models.StateDBVote
 			if v.Overwrites > 0 {
-				previousVote, _ = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
+				previousVote, err = idx.App.State.Vote(v.ProcessID, v.Nullifier, true)
+				if err != nil {
+					log.Warnw("cannot get previous vote",
+						"nullifier", hex.EncodeToString(v.Nullifier),
+						"processID", hex.EncodeToString(v.ProcessID),
+						"error", err.Error())
+				}
 			}
 			if previousVote != nil {
 				log.Debugw("vote overwrite, previous vote",

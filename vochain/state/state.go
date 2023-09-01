@@ -386,6 +386,23 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
 	var pidsStartNextBlock [][]byte
+
+	// Notify listeners about processes that start in the next block.
+	if len(pidsStartNextBlock) > 0 {
+		for _, l := range v.eventListeners {
+			l.OnProcessesStart(pidsStartNextBlock)
+		}
+	}
+	// Notify listeners about the commit state
+	for _, l := range v.eventListeners {
+		if err := l.Commit(height); err != nil {
+			log.Warnf("event callback error on commit: %v", err)
+		}
+	}
+
+	// Commit the statedb tx
+	// Note that we need to commit the tx after calling listeners, because
+	// the listeners may need to get the previous (not committed) state.
 	v.tx.Lock()
 	err := func() error {
 		var err error
@@ -400,18 +417,6 @@ func (v *State) Save() ([]byte, error) {
 	v.tx.Unlock()
 	if err != nil {
 		return nil, err
-	}
-	// Notify listeners about processes that start in the next block.
-	if len(pidsStartNextBlock) > 0 {
-		for _, l := range v.eventListeners {
-			l.OnProcessesStart(pidsStartNextBlock)
-		}
-	}
-	// Notify listeners about the commit state
-	for _, l := range v.eventListeners {
-		if err := l.Commit(height); err != nil {
-			log.Warnf("event callback error on commit: %v", err)
-		}
 	}
 
 	// Update the main state tree
