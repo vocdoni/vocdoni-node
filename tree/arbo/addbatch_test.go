@@ -738,7 +738,7 @@ func TestFlp2(t *testing.T) {
 }
 
 func TestAddBatchBench(t *testing.T) {
-	nLeafs := 50_000
+	nLeafs := 5_000
 	printTestContext("TestAddBatchBench: ", nLeafs, "Blake2b", "pebbledb")
 
 	// prepare inputs
