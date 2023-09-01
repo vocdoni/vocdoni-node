@@ -235,6 +235,7 @@ func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 	} else if err != nil {
 		return nil, err
 	}
+
 	sdbVoteBytes, err := votesTree.Get(vid)
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		return nil, ErrVoteNotFound
