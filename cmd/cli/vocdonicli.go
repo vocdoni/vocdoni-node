@@ -31,6 +31,7 @@ func (c *Config) Load(filepath string) error {
 	data, err := os.ReadFile(filepath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
+			c.LastAccountUsed = -1
 			return nil
 		}
 		return err
@@ -94,7 +95,7 @@ func NewVocdoniCLI(configFile, host string) (*vocdoniCLI, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(cfg.Accounts)-1 >= cfg.LastAccountUsed {
+	if len(cfg.Accounts)-1 >= cfg.LastAccountUsed && cfg.LastAccountUsed >= 0 {
 		log.Infof("using account %d", cfg.LastAccountUsed)
 		if err := api.SetAccount(cfg.Accounts[cfg.LastAccountUsed].PrivKey.String()); err != nil {
 			return nil, err

@@ -11,7 +11,6 @@ import (
 // down goes down to the leaf recursively
 func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, intermediates *[][]byte,
 	path []bool, currLvl int, getLeaf bool) ([]byte, []byte, [][]byte, error) {
-
 	if currLvl > t.maxLevels {
 		return nil, nil, nil, ErrMaxLevel
 	}
@@ -184,10 +183,11 @@ func ReadIntermediateChilds(b []byte) ([]byte, []byte) {
 
 func getPath(numLevels int, k []byte) []bool {
 	requiredLen := (numLevels + 7) / 8 // Calculate the ceil value of numLevels/8
+
+	// If the provided key is shorter than expected, extend it with zero bytes
 	if len(k) < requiredLen {
-		// The provided key is shorter than expected for the given number of levels.
-		// Handle this case appropriately, either by returning an error or by handling it in some other way.
-		panic(fmt.Sprintf("key length is too short: expected at least %d bytes, got %d bytes", requiredLen, len(k)))
+		padding := make([]byte, requiredLen-len(k))
+		k = append(k, padding...)
 	}
 
 	path := make([]bool, numLevels)

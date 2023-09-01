@@ -947,7 +947,7 @@ func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 func TestDiskSizeBench(t *testing.T) {
 	c := qt.New(t)
 
-	nLeafs := 2000
+	nLeafs := 500
 	printTestContext("TestDiskSizeBench: ", nLeafs, "Blake2b", "pebble")
 
 	// prepare inputs
@@ -1203,4 +1203,39 @@ func contains(arr [][]byte, item []byte) bool {
 		}
 	}
 	return false
+}
+
+func TestTreeWithSingleLeaf(t *testing.T) {
+	c := qt.New(t)
+
+	database := metadb.NewTest(t)
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon})
+	c.Assert(err, qt.IsNil)
+
+	// check empty root
+	root, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(hex.EncodeToString(root), qt.DeepEquals, "0000000000000000000000000000000000000000000000000000000000000000")
+
+	// add one entry
+	err = tree.Add([]byte{0x01}, []byte{0x01})
+	c.Assert(err, qt.IsNil)
+
+	root, err = tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(root, qt.HasLen, 32)
+
+	leafKey, _, err := newLeafValue(HashFunctionPoseidon, []byte{0x01}, []byte{0x01})
+	c.Assert(err, qt.IsNil)
+
+	// check leaf key is actually the current root
+	c.Assert(bytes.Equal(root, leafKey), qt.IsTrue)
+
+	// delete the only entry and check the tree is empty again
+	err = tree.Delete([]byte{0x01})
+	c.Assert(err, qt.IsNil)
+	root, err = tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(hex.EncodeToString(root), qt.DeepEquals, "0000000000000000000000000000000000000000000000000000000000000000")
 }

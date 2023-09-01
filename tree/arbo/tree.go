@@ -157,13 +157,7 @@ func NewTreeWithTx(wTx db.WriteTx, cfg Config) (*Tree, error) {
 	_, err = wTx.Get(dbKeyRoot)
 	if err == db.ErrKeyNotFound {
 		// store new root 0 (empty)
-		if err = wTx.Set(dbKeyRoot, t.emptyHash); err != nil {
-			return nil, err
-		}
-		if err = t.setNLeafs(wTx, 0); err != nil {
-			return nil, err
-		}
-		return &t, nil
+		return &t, t.setToEmptyTree(wTx)
 	} else if err != nil {
 		return nil, fmt.Errorf("unknown database error: %w", err)
 	}
@@ -286,9 +280,11 @@ func (t *Tree) add(wTx db.WriteTx, root []byte, fromLvl int, k, v []byte) ([]byt
 
 	// go up to the root
 	if len(siblings) == 0 {
-		// return the leafKey as root
+		// if there are no siblings, means that the tree is empty.
+		// We consider the leafKey as root
 		return leafKey, nil
 	}
+
 	root, err = t.up(wTx, leafKey, siblings, path, len(siblings)-1, fromLvl)
 	if err != nil {
 		return nil, err
@@ -425,6 +421,14 @@ func (t *Tree) DeleteWithTx(wTx db.WriteTx, k []byte) error {
 	return t.deleteWithTx(wTx, k)
 }
 
+// setToEmptyTree sets the tree to an empty tree.
+func (t *Tree) setToEmptyTree(wTx db.WriteTx) error {
+	if err := wTx.Set(dbKeyRoot, t.emptyHash); err != nil {
+		return err
+	}
+	return t.setNLeafs(wTx, 0)
+}
+
 // deleteWithTx deletes a key-value pair from the tree.
 func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 	root, err := t.RootWithTx(wTx)
@@ -445,12 +449,17 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		return err
 	}
 
-	// if the neighbor is not empty, set the leaf key to the empty hash
 	if len(siblings) == 0 {
-		return nil
+		// if no siblings, means the tree is now empty,
+		// just delete the leaf key and set the root to empty
+		if err := wTx.Delete(leafKey); err != nil {
+			return fmt.Errorf("error deleting leaf key %x: %w", leafKey, err)
+		}
+		return t.setToEmptyTree(wTx)
 	}
 
 	var neighbourKeys, neighbourValues [][]byte
+	// if the neighbour is not empty, we set it to empty (instead of remove)
 	if !bytes.Equal(siblings[len(siblings)-1], t.emptyHash) {
 		neighbourKeys, neighbourValues, err = t.getLeavesFromSubPath(wTx, siblings[len(siblings)-1])
 		if err != nil {
@@ -470,10 +479,6 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 	}
 
 	// Navigate back up the tree, updating the intermediate nodes.
-	if len(siblings) == 0 {
-		// The tree is empty after deletion.
-		return t.setRoot(wTx, t.emptyHash)
-	}
 	newRoot, err := t.up(wTx, t.emptyHash, siblings, path, len(siblings)-1, 0)
 	if err != nil {
 		return err
@@ -489,7 +494,7 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		return fmt.Errorf("error deleting orphan intermediate nodes: %v", err)
 	}
 
-	// If there are neighbours deleted, add them back to the tree.
+	// Delete the neighbour's childs and add them back to the tree in the right place.
 	for i, k := range neighbourKeys {
 		if err := t.deleteWithTx(wTx, k); err != nil {
 			return fmt.Errorf("error deleting neighbour %d: %w", i, err)

@@ -159,13 +159,14 @@ func TestAssignSIKToElectionAndPurge(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	_, err = s.NoState(true).Get(key)
 	c.Assert(err, qt.IsNil)
+
 	// purge siks and check
 	c.Assert(s.PurgeSIKsByElection(pid), qt.IsNil)
 	c.Assert(err, qt.IsNil)
 	_, err = s.NoState(true).Get(key)
 	c.Assert(err, qt.IsNotNil)
-	_, err = s.SIKFromAddress(testAccount.Address())
-	c.Assert(err, qt.IsNotNil)
+	sik, err = s.SIKFromAddress(testAccount.Address())
+	c.Assert(err, qt.IsNotNil, qt.Commentf("SIK should be deleted"))
 }
 
 func Test_heightEncoding(t *testing.T) {
