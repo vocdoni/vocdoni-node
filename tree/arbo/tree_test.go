@@ -947,7 +947,7 @@ func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 func TestDiskSizeBench(t *testing.T) {
 	c := qt.New(t)
 
-	nLeafs := 500
+	nLeafs := 1000
 	printTestContext("TestDiskSizeBench: ", nLeafs, "Blake2b", "pebble")
 
 	// prepare inputs
@@ -994,8 +994,9 @@ func TestDiskSizeBench(t *testing.T) {
 	tree.dbg.print("		")
 	size, err := dirSize(dbDir)
 	c.Assert(err, qt.IsNil)
+	dbItemsAdd := countDBitems()
 	printRes("	Disk size (add)", fmt.Sprintf("%d MiB", size/(1024*1024)))
-	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+	printRes("	DB items", fmt.Sprintf("%d", dbItemsAdd))
 
 	// delete the leafs
 	start = time.Now()
@@ -1010,8 +1011,13 @@ func TestDiskSizeBench(t *testing.T) {
 	tree.dbg.print("		")
 	size, err = dirSize(dbDir)
 	c.Assert(err, qt.IsNil)
+	dbItemsDelete := countDBitems()
 	printRes("	Disk size (delete)", fmt.Sprintf("%d MiB", size/(1024*1024)))
-	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+	printRes("	DB items", fmt.Sprintf("%d", dbItemsDelete))
+
+	if dbItemsDelete+(dbItemsDelete/4) >= dbItemsAdd {
+		t.Fatal("DB items after delete is too big")
+	}
 
 	// add the leafs deleted again
 	start = time.Now()
@@ -1019,15 +1025,18 @@ func TestDiskSizeBench(t *testing.T) {
 	for i := 0; i < len(ks)/2; i++ {
 		err = tree.AddWithTx(tx, ks[i], vs[i])
 		c.Assert(err, qt.IsNil)
-		//fmt.Printf("added %x\n", ks[i])
 	}
 	c.Assert(tx.Commit(), qt.IsNil)
 	printRes("	Add2 loop", time.Since(start))
 	tree.dbg.print("		")
 	size, err = dirSize(dbDir)
+	dbItemsAdd2 := countDBitems()
 	c.Assert(err, qt.IsNil)
 	printRes("	Disk size (add2)", fmt.Sprintf("%d MiB", size/(1024*1024)))
-	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+	printRes("	DB items", fmt.Sprintf("%d", dbItemsAdd2))
+	if dbItemsAdd2 != dbItemsAdd {
+		t.Fatal("DB items after add2 is not equal to DB items after add")
+	}
 
 	// update the leafs
 	start = time.Now()
@@ -1041,9 +1050,13 @@ func TestDiskSizeBench(t *testing.T) {
 	printRes("	Update loop", time.Since(start))
 	tree.dbg.print("		")
 	size, err = dirSize(dbDir)
+	dbItemsUpdate := countDBitems()
 	c.Assert(err, qt.IsNil)
 	printRes("	Disk size (update)", fmt.Sprintf("%d MiB", size/(1024*1024)))
-	printRes("	DB items", fmt.Sprintf("%d", countDBitems()))
+	printRes("	DB items", fmt.Sprintf("%d", dbItemsUpdate))
+	if dbItemsUpdate != dbItemsAdd {
+		t.Fatal("DB items after update is not equal to DB items after add")
+	}
 
 	start = time.Now()
 	c.Assert(tree.db.Compact(), qt.IsNil)
@@ -1238,4 +1251,189 @@ func TestTreeWithSingleLeaf(t *testing.T) {
 	root, err = tree.Root()
 	c.Assert(err, qt.IsNil)
 	c.Assert(hex.EncodeToString(root), qt.DeepEquals, "0000000000000000000000000000000000000000000000000000000000000000")
+}
+
+// BenchmarkAddVsAddBatch benchmarks the Add and AddBatch functions and compare they produce the same output.
+// go test -run=NONE -bench=BenchmarkAddVsAddBatch -benchmem
+func BenchmarkAddVsAddBatch(b *testing.B) {
+	nLeaves := 200000
+	bLen := 32
+	// Prepare the initial set of keys and values
+	ks1, vs1 := generateKV(bLen, nLeaves/2, 0)
+	// Prepare the second set of keys and values
+	ks2, vs2 := generateKV(bLen, nLeaves/2, nLeaves)
+
+	var rootAdd, rootAddBatch []byte
+
+	b.Run("Add", func(b *testing.B) {
+		database := metadb.NewTest(b)
+		tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionBlake2b})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Add the first set of key/values
+		for i := 0; i < len(ks1); i++ {
+			if err := tree.Add(ks1[i], vs1[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Execute some deletes
+		for i := 0; i < len(ks1)/4; i++ {
+			if err := tree.Delete(ks1[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Execute some updates
+		for i := len(ks1)/4 + 1; i < len(ks1)/2; i++ {
+			if err := tree.Update(ks1[i], vs2[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Add the second set of key/values
+		for i := 0; i < len(ks2); i++ {
+			if err := tree.Add(ks2[i], vs2[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		rootAdd, err = tree.Root()
+		if err != nil {
+			b.Fatal(err)
+		}
+	})
+
+	b.Run("AddBatch", func(b *testing.B) {
+		database := metadb.NewTest(b)
+		tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionBlake2b})
+		if err != nil {
+			b.Fatal(err)
+		}
+
+		// Add the first set of key/values
+		if _, err := tree.AddBatch(ks1, vs1); err != nil {
+			b.Fatal(err)
+		}
+
+		// Execute some deletes
+		for i := 0; i < len(ks1)/4; i++ {
+			if err := tree.Delete(ks1[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+
+		// Execute some updates
+		for i := len(ks1)/4 + 1; i < len(ks1)/2; i++ {
+			if err := tree.Update(ks1[i], vs2[i]); err != nil {
+				b.Fatal(err)
+			}
+		}
+		// Add the second set of key/values
+		if _, err := tree.AddBatch(ks2, vs2); err != nil {
+			b.Fatal(err)
+		}
+
+		rootAddBatch, err = tree.Root()
+		if err != nil {
+			b.Fatal(err)
+		}
+	})
+
+	// Verify that the roots are the same
+	if !bytes.Equal(rootAdd, rootAddBatch) {
+		b.Fatalf("Roots are different: Add root = %x, AddBatch root = %x", rootAdd, rootAddBatch)
+	}
+}
+
+// generateKV generates a slice of keys and a slice of values.
+// The keys are byte representations of sequential integers, and the values are random bytes.
+func generateKV(bLen, count, offset int) ([][]byte, [][]byte) {
+	var keys, values [][]byte
+
+	for i := 0; i < count; i++ {
+		// Convert integer i to a byte slice
+		key := BigIntToBytes(bLen, big.NewInt(int64(offset+i)))
+		value := randomBytes(bLen)
+
+		keys = append(keys, key)
+		values = append(values, value)
+	}
+
+	return keys, values
+}
+
+// TestAddVsAddBatch tests that the Add and AddBatch functions produce the same output.
+func TestAddVsAddBatch(t *testing.T) {
+	c := qt.New(t)
+
+	// Create a new tree
+	database := metadb.NewTest(t)
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	// 1. Generate initial key-values and add them
+	keys1, values1 := generateKV(32, 1000, 0)
+	keys2, values2 := generateKV(32, 1000, 1000)
+
+	for i, key := range keys1 {
+		err := tree.Add(key, values1[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 2. Execute some Deletes and Updates
+	for i := 0; i < len(keys1)/2; i++ {
+		err := tree.Delete(keys1[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	for i := len(keys1) / 2; i < len(keys1); i++ {
+		err := tree.Update(keys1[i], values2[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 3. Add the second set of key-values
+	for i, key := range keys2 {
+		err := tree.Add(key, values2[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// Store the root hash after using Add method
+	addRoot, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+
+	// Repeat the operations using AddBatch
+	database2 := metadb.NewTest(t)
+	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256, HashFunction: HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	// 1. Add initial key-values
+	inv, err := tree2.AddBatch(keys1, values1)
+	c.Assert(err, qt.IsNil)
+	c.Assert(inv, qt.HasLen, 0)
+
+	// 2. Execute some Deletes and Updates
+	for i := 0; i < len(keys1)/2; i++ {
+		err := tree2.Delete(keys1[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	for i := len(keys1) / 2; i < len(keys1); i++ {
+		err := tree2.Update(keys1[i], values2[i])
+		c.Assert(err, qt.IsNil)
+	}
+
+	// 3. Add more key-values
+	inv, err = tree2.AddBatch(keys2, values2)
+	c.Assert(err, qt.IsNil)
+	c.Assert(inv, qt.HasLen, 0)
+
+	// Get root after AddBatch method
+	addBatchRoot, err := tree2.Root()
+	c.Assert(err, qt.IsNil)
+
+	// Compare the root hashes of the two trees
+	c.Assert(addRoot, qt.DeepEquals, addBatchRoot)
 }
