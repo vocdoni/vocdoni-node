@@ -64,7 +64,7 @@ func initRepository() error {
 		return fmt.Errorf("ipfs daemon is running. please stop it to run this command")
 	}
 
-	if err := os.MkdirAll(ConfigRoot, 0o770); err != nil {
+	if err := os.MkdirAll(ConfigRoot, 0750); err != nil {
 		return err
 	}
 
@@ -248,7 +248,7 @@ func checkWritable(dir string) error {
 
 	if os.IsNotExist(err) {
 		// dir doesn't exist, check that we can create it
-		return os.Mkdir(dir, 0o775)
+		return os.Mkdir(dir, 0750)
 	}
 
 	if os.IsPermission(err) {

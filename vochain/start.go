@@ -114,10 +114,10 @@ func newTendermint(app *BaseApplication,
 
 	tconfig := tmcfg.DefaultConfig()
 	tconfig.SetRoot(localConfig.DataDir)
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0750); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0750); err != nil {
 		log.Fatal(err)
 	}
 
