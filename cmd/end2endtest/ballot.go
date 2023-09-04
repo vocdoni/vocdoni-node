@@ -303,9 +303,9 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			{0, 0, 1, 1}, {2, 2, 1, 0}, {1, 0, 1, 1}, {0, 0, 0, 0},
 			{1, 1, 0, 3}, {1, 1, 1, 1},
 		}
-		resultsFields = append(resultsFields, votesToBigInt(30, 30, 0, 0),
-			votesToBigInt(50, 10, 0, 0), votesToBigInt(30, 30, 0, 0),
-			votesToBigInt(20, 40, 0, 0))
+		resultsFields = append(resultsFields, votesToBigInt(30, 30),
+			votesToBigInt(50, 10), votesToBigInt(30, 30),
+			votesToBigInt(20, 40))
 	}
 
 	// less than 10 votes
@@ -319,15 +319,14 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 		for i := 0; i < nvotes/10; i++ {
 			votes = append(votes, v...)
 		}
-		// nvotes split 10, for example for 44 nvotes, nvoteDid10 will be 4
+		// nvotes split 10, for example for 44 nvotes, nvotesDiv10 will be 4
 		// and that number will be multiplied by each default result to obtain the results for 40 votes
 		nvotesDiv10 := new(types.BigInt).SetUint64(uint64(nvotes / 10))
 
 		for _, field := range resultsFields {
-			field[0] = new(types.BigInt).Mul(field[0], nvotesDiv10)
-			field[1] = new(types.BigInt).Mul(field[1], nvotesDiv10)
-			field[2] = new(types.BigInt).Mul(field[2], nvotesDiv10)
-			field[3] = new(types.BigInt).Mul(field[3], nvotesDiv10)
+			for i := 0; i < len(field); i++ {
+				field[i] = new(types.BigInt).Mul(field[i], nvotesDiv10)
+			}
 		}
 	}
 
@@ -336,28 +335,20 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 		votes = append(votes, v[:remainVotes]...)
 
 		for _, vote := range v[:remainVotes] {
-			isValidTotalCost := math.Pow(float64(vote[0]), float64(vop.CostExponent))+
-				math.Pow(float64(vote[1]), float64(vop.CostExponent))+
-				math.Pow(float64(vote[2]), float64(vop.CostExponent))+
-				math.Pow(float64(vote[3]), float64(vop.CostExponent)) <= float64(vop.MaxTotalCost)
-			isValidValues := vote[0] <= int(vop.MaxValue) &&
-				vote[1] <= int(vop.MaxValue) &&
-				vote[2] <= int(vop.MaxValue) &&
-				vote[3] <= int(vop.MaxValue)
-
-			repeatValues := vote[0] == vote[1] || vote[2] == vote[1] ||
-				vote[2] == vote[0] || vote[0] == vote[3] ||
-				vote[1] == vote[3] || vote[2] == vote[3]
-
-			if expectUniqueV && repeatValues {
+			if expectUniqueV && containsRepeatedValues(vote) {
 				continue
 			}
 
-			if isValidTotalCost && isValidValues {
-				resultsFields[0][vote[0]].Add(resultsFields[0][vote[0]], new(types.BigInt).SetUint64(10))
-				resultsFields[1][vote[1]].Add(resultsFields[1][vote[1]], new(types.BigInt).SetUint64(10))
-				resultsFields[2][vote[2]].Add(resultsFields[2][vote[2]], new(types.BigInt).SetUint64(10))
-				resultsFields[3][vote[3]].Add(resultsFields[3][vote[3]], new(types.BigInt).SetUint64(10))
+			if totalCost(vote, int(vop.CostExponent)) > float64(vop.MaxTotalCost) {
+				continue
+			}
+
+			if valuesExceedMax(vote, int(vop.MaxValue)) {
+				continue
+			}
+
+			for i, resultField := range resultsFields {
+				resultField[vote[i]].Add(resultField[vote[i]], new(types.BigInt).SetUint64(10))
 			}
 		}
 	}
@@ -365,4 +356,32 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 	log.Debug("vote values generated", votes)
 	log.Debug("results expected", resultsFields)
 	return votes, resultsFields
+}
+
+func valuesExceedMax(vote []int, max int) bool {
+	for _, v := range vote {
+		if v > max {
+			return true
+		}
+	}
+	return false
+}
+
+func totalCost(vote []int, exp int) float64 {
+	var total float64
+	for _, v := range vote {
+		total += math.Pow(float64(v), float64(exp))
+	}
+	return total
+}
+
+func containsRepeatedValues(vote []int) bool {
+	dups := make(map[int]bool)
+	for _, v := range vote {
+		if dups[v] {
+			return true
+		}
+		dups[v] = true
+	}
+	return false
 }

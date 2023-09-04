@@ -30,7 +30,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 	t.api = api
 	t.config = c
 
-	ed := newTestElectionDescription()
+	ed := newTestElectionDescription(2)
 	ed.ElectionType = vapi.ElectionType{
 		Autostart:     true,
 		Interruptible: true,
@@ -81,7 +81,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		"vps", int(float64(len(t.voterAccounts[1:]))/time.Since(startTime).Seconds()))
 
 	// the missing vote should fail due maxCensusSize constrain
-	time.Sleep(time.Second * 4)
+	_ = t.api.WaitUntilNextBlock()
 	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
 
 	v := apiclient.VoteData{

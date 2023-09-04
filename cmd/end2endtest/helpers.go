@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -28,7 +29,18 @@ const (
 	retriesSend   = retries / 2
 )
 
-func newTestElectionDescription() *vapi.ElectionDescription {
+func newTestElectionDescription(numChoices int) *vapi.ElectionDescription {
+	choices := []vapi.ChoiceMetadata{}
+	if numChoices < 2 {
+		numChoices = 2
+	}
+	for i := 0; i < numChoices; i++ {
+		choices = append(choices, vapi.ChoiceMetadata{
+			Title: map[string]string{"default": fmt.Sprintf("Choice number %d", i)},
+			Value: uint32(i),
+		})
+	}
+
 	return &vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
 		Description: map[string]string{"default": "Test election description"},
@@ -38,16 +50,7 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 			{
 				Title:       map[string]string{"default": "Test question 1"},
 				Description: map[string]string{"default": "Test question 1 description"},
-				Choices: []vapi.ChoiceMetadata{
-					{
-						Title: map[string]string{"default": "Yes"},
-						Value: 0,
-					},
-					{
-						Title: map[string]string{"default": "No"},
-						Value: 1,
-					},
-				},
+				Choices:     choices,
 			},
 		},
 	}
@@ -520,11 +523,7 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 			}
 			log.Debug("error expected: ", err.Error())
 		}
-		switch waitType {
-		case sameBlock:
-			time.Sleep(time.Second * 5)
-
-		case nextBlock:
+		if waitType == nextBlock {
 			_ = t.api.WaitUntilNextBlock()
 		}
 	}
@@ -626,15 +625,7 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 }
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {
-	// iterate over each question to check if the results match with the expected results
-	for i, result := range results {
-		for q, r := range result {
-			if !(expectedResults[i][q].String() == r.String()) {
-				return false
-			}
-		}
-	}
-	return true
+	return reflect.DeepEqual(results, expectedResults)
 }
 
 func votesToBigInt(votes ...uint64) []*types.BigInt {

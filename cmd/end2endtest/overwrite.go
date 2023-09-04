@@ -30,7 +30,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 	t.api = api
 	t.config = c
 
-	ed := newTestElectionDescription()
+	ed := newTestElectionDescription(7)
 	ed.ElectionType = vapi.ElectionType{
 		Autostart:     true,
 		Interruptible: true,
@@ -78,19 +78,17 @@ func (t *E2EOverwriteElection) Run() error {
 
 	// overwrite the previous vote (choice 0) associated with account of index 0, using enough time to do it in the nextBlock
 	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
-	err := t.overwriteVote([]int{0, 1, 0}, 0, nextBlock)
+	err := t.overwriteVote([]int{1, 2, 3}, 0, nextBlock)
 	if err != nil {
 		return err
 	}
 	log.Infof("the account %v send an overwrite vote", t.voterAccounts[0].Address())
-	time.Sleep(time.Second * 5)
 
 	// now the overwrite vote is done in the sameBlock using account of index 1
-	if err = t.overwriteVote([]int{1, 1, 0}, 1, sameBlock); err != nil {
+	if err = t.overwriteVote([]int{4, 5, 6}, 1, sameBlock); err != nil {
 		return err
 	}
 	log.Infof("the account %v send an overwrite vote", t.voterAccounts[1].Address())
-	time.Sleep(time.Second * 5)
 
 	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
 		return err
@@ -102,7 +100,7 @@ func (t *E2EOverwriteElection) Run() error {
 	}
 
 	// should count only the first overwrite
-	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-2)*10, 20, 0)}
+	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-2)*10, 0, 10, 0, 0, 10, 0, 0)}
 
 	// only the first overwrite should be valid in the results and must math with the expected results
 	if !matchResults(elres.Results, expectedResults) {

@@ -36,8 +36,8 @@ func (t *E2ELifecycleElection) Setup(api *apiclient.HTTPclient, c *config) error
 		d             *vapi.ElectionDescription
 		interruptible bool
 	}{
-		{d: newTestElectionDescription(), interruptible: false},
-		{d: newTestElectionDescription(), interruptible: true},
+		{d: newTestElectionDescription(2), interruptible: false},
+		{d: newTestElectionDescription(2), interruptible: true},
 	}
 
 	for i, ed := range electionDescriptions {

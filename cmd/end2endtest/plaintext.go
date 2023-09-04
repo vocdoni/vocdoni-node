@@ -28,7 +28,7 @@ func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, c *config) error
 	t.api = api
 	t.config = c
 
-	ed := newTestElectionDescription()
+	ed := newTestElectionDescription(2)
 	ed.ElectionType = vapi.ElectionType{
 		Autostart:     true,
 		Interruptible: true,

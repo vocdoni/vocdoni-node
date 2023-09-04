@@ -36,8 +36,8 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		d             *vapi.ElectionDescription
 		dynamicCensus bool
 	}{
-		{d: newTestElectionDescription(), dynamicCensus: true},
-		{d: newTestElectionDescription(), dynamicCensus: false},
+		{d: newTestElectionDescription(2), dynamicCensus: true},
+		{d: newTestElectionDescription(2), dynamicCensus: false},
 	}
 
 	for i, ed := range eDescriptions {
