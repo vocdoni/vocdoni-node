@@ -176,7 +176,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		MaxValue:          uint32(maxChoiceValue),
 		MaxVoteOverwrites: uint32(description.VoteType.MaxVoteOverwrites),
 		MaxTotalCost:      uint32(len(description.Questions) * maxChoiceValue),
-		CostExponent:      10000,
+		CostExponent:      1,
 	}
 
 	// Census Origin
