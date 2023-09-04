@@ -274,7 +274,10 @@ func (r *HTTProuter) generateTLScert(host string, port int) (*http.Server, *auto
 		Cache:      autocert.DirCache(r.TLSdirCert),
 	}
 	if r.TLSconfig == nil {
-		r.TLSconfig = &tls.Config{}
+		r.TLSconfig = &tls.Config{
+			MinVersion: tls.VersionTLS13, // secure version of TLS
+			MaxVersion: 0,                // setting MaxVersion to 0 means that the highest version available in the package will be used
+		}
 	}
 	r.TLSconfig.GetCertificate = m.GetCertificate
 	serverConfig := &http.Server{
