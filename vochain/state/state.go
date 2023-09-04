@@ -146,7 +146,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 	}
 	s.validSIKRoots = [][]byte{}
 	s.mtxValidSIKRoots = &sync.Mutex{}
-	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0775)
+	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
 }
 
 // initStateDB initializes the StateDB with the default subTrees
