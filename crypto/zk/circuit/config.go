@@ -47,6 +47,18 @@ func (config ZkCircuitConfig) KeySize() int {
 	return config.Levels / 8
 }
 
+// SupportsCensusSize returns if the provided censusSize is supported by the
+// current circuit configuration. It ensures that the provided value is lower
+// than 2^config.Levels.
+func (config ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
+	return true
+	// The current circuit supports 160 levels, so the largest supported census
+	// size will always be greater than any uint64. If this logic changes a
+	// possible implementation is suggested:
+	// circuitMaxCensusSize := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(config.Levels)), nil)
+	// return circuitMaxCensusSize.Cmp(new(big.Int).SetUint64(maxCensusSize)) != 1
+}
+
 // CircuitsConfigurations stores the relation between the different vochain nets
 // and the associated circuit configuration. Any circuit configuration must have
 // the remote and local location of the circuits artifacts and their metadata

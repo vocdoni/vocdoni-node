@@ -123,7 +123,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 
 	// if pre-register is enabled, check that the census size is not bigger than the circuit levels
 	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		if tx.Process.GetMaxCensusSize() >= uint64(t.ZkCircuit.Config.Levels) {
+		if !t.ZkCircuit.Config.SupportsCensusSize(tx.Process.GetMaxCensusSize()) {
 			return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 				"cannot be bigger than the number of levels of the circuit (%d)",
 				t.ZkCircuit.Config.Levels)
