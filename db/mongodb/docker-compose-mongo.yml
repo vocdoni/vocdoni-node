@@ -1,0 +1,22 @@
+version: '3.1'
+
+services:
+
+  mongo:
+    image: 'bitnami/mongodb:latest'
+    restart: ${RESTART:-no}
+    ports:
+      - 27017:27017
+    environment:
+      - MONGODB_USERNAME=root
+      - MONGODB_PASSWORD=vocdoni
+      - MONGODB_DATABASE=vocdoni
+      - MONGODB_ROOT_PASSWORD=vocdoni
+    volumes:
+      - mongodb:/bitnami/mongodb
+
+# MONGODB_URL=mongodb://root:vocdoni@mongo:27017/
+# MONGODB_URL=mongodb://root:vocdoni@127.0.0.1:27017/
+
+volumes:
+  mongodb: {}

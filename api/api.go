@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/db/prefixeddb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/vochain"
@@ -75,9 +76,12 @@ type API struct {
 }
 
 // NewAPI creates a new instance of the API.  Attach must be called next.
-func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, error) {
+func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*API, error) {
 	if router == nil {
 		return nil, ErrHTTPRouterIsNil
+	}
+	if dbType == "" {
+		dbType = db.TypePebble
 	}
 	if len(baseRoute) == 0 || baseRoute[0] != '/' {
 		return nil, fmt.Errorf("%w (invalid given: %s)", ErrBaseRouteInvalid, baseRoute)
@@ -95,10 +99,11 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir string) (*API, err
 	if err != nil {
 		return nil, err
 	}
-	api.db, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "db"))
+	mdb, err := metadb.New(dbType, filepath.Join(dataDir, "db"))
 	if err != nil {
 		return nil, err
 	}
+	api.db = prefixeddb.NewPrefixedDatabase(mdb, []byte("api/"))
 	return &api, nil
 }
 

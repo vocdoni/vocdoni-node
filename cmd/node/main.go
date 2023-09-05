@@ -75,7 +75,7 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.vocdoni",
 		"directory where data is stored")
 	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
-		fmt.Sprintf("key-value db type (%s)", db.TypePebble))
+		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
 	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
@@ -361,10 +361,6 @@ func main() {
 	if !globalCfg.ValidMode() {
 		log.Fatalf("mode %s is invalid", globalCfg.Mode)
 	}
-	// Check the dbType is valid
-	if !globalCfg.Vochain.ValidDBType() {
-		log.Fatalf("dbType %s is invalid. Valid ones: %s", globalCfg.Vochain.DBType, db.TypePebble)
-	}
 
 	// If dev enabled, expose debugging profiles under an http server
 	// If PprofPort is not set, a random port between 61000 and 61100 is choosed.
@@ -531,7 +527,7 @@ func main() {
 		// HTTP API REST service
 		if globalCfg.EnableAPI {
 			log.Info("enabling API")
-			uAPI, err := urlapi.NewAPI(srv.Router, "/v2", globalCfg.DataDir)
+			uAPI, err := urlapi.NewAPI(srv.Router, "/v2", globalCfg.DataDir, globalCfg.Vochain.DBType)
 			if err != nil {
 				log.Fatal(err)
 			}

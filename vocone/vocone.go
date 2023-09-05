@@ -146,7 +146,7 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 	if err := httpRouter.Init(host, port); err != nil {
 		return nil, err
 	}
-	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.dataDir)
+	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.dataDir, db.TypePebble)
 	if err != nil {
 		return nil, err
 	}
