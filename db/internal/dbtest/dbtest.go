@@ -32,6 +32,8 @@ func TestWriteTx(t *testing.T, database db.Database) {
 	// Discard should not give any problem
 	wTx.Discard()
 
+	qt.Assert(t, err, qt.IsNil)
+
 	// get value from a new db after the previous commit
 	wTx = database.WriteTx()
 	v, err = wTx.Get([]byte("a"))

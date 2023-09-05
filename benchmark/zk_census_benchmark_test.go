@@ -35,7 +35,7 @@ func BenchmarkZkCensus(b *testing.B) {
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 
-	vocApi, err := api.NewAPI(&router, "/", b.TempDir())
+	vocApi, err := api.NewAPI(&router, "/", b.TempDir(), db.TypePebble)
 	qt.Assert(b, err, qt.IsNil)
 
 	// Create local key value database

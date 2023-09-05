@@ -1,7 +1,6 @@
 package config
 
 import (
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -54,17 +53,6 @@ func (c *Config) ValidMode() bool {
 	case types.ModeMiner:
 
 	case types.ModeSeed:
-
-	default:
-		return false
-	}
-	return true
-}
-
-// ValidDBType checks if the configured dbType is valid
-func (c *VochainCfg) ValidDBType() bool {
-	switch c.DBType {
-	case db.TypePebble:
 
 	default:
 		return false

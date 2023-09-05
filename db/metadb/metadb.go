@@ -7,6 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/goleveldb"
+	"go.vocdoni.io/dvote/db/mongodb"
 	"go.vocdoni.io/dvote/db/pebbledb"
 )
 
@@ -25,8 +26,14 @@ func New(typ, dir string) (db.Database, error) {
 		if err != nil {
 			return nil, err
 		}
+	case db.TypeMongo:
+		database, err = mongodb.New(opts)
+		if err != nil {
+			return nil, err
+		}
 	default:
-		return nil, fmt.Errorf("invalid dbType: %q. Available types: %q", typ, db.TypePebble)
+		return nil, fmt.Errorf("invalid dbType: %q. Available types: %q %q %q",
+			typ, db.TypePebble, db.TypeLevelDB, db.TypeMongo)
 	}
 	return database, nil
 }

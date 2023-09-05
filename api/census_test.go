@@ -32,7 +32,7 @@ func TestCensus(t *testing.T) {
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(t, err, qt.IsNil)
 
-	api, err := NewAPI(&router, "/", t.TempDir())
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Create local key value database
@@ -162,7 +162,7 @@ func TestCensusProof(t *testing.T) {
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	qt.Assert(t, err, qt.IsNil)
 
-	api, err := NewAPI(&router, "/", t.TempDir())
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	qt.Assert(t, err, qt.IsNil)
 	// Create local key value database
 	db, err := metadb.New(db.TypePebble, t.TempDir())
@@ -248,7 +248,7 @@ func TestCensusZk(t *testing.T) {
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
 	c.Assert(err, qt.IsNil)
 
-	testApi, err := NewAPI(&router, "/", t.TempDir())
+	testApi, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	c.Assert(err, qt.IsNil)
 
 	// Create local key value database

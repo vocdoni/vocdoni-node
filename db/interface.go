@@ -9,6 +9,7 @@ import (
 const (
 	TypePebble  = "pebble"
 	TypeLevelDB = "leveldb"
+	TypeMongo   = "mongodb"
 )
 
 // ErrKeyNotFound is used to indicate that a key does not exist in the db.

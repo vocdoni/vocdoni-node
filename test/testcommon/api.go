@@ -51,7 +51,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	qt.Assert(t, err, qt.IsNil)
 	d.ListenAddr = addr
 	t.Logf("address: %s", addr.String())
-	api, err := api.NewAPI(&router, "/", t.TempDir())
+	api, err := api.NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	qt.Assert(t, err, qt.IsNil)
 
 	// create vochain application
