@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"math/big"
 	"os"
 	"time"
@@ -65,7 +66,10 @@ func (t *E2EAnonElection) Run() error {
 			VoteWeight:   big.NewInt(defaultWeight / 2),
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", len(t.voterAccounts), "time", time.Since(startTime),

@@ -141,6 +141,13 @@ e2etest_dynamicensuselection() {
   e2etest dynamicensuselection
 }
 
+e2etest_ballotelection() {
+  e2etest ballotRanked
+  e2etest ballotQuadratic
+  e2etest ballotRange
+  e2etest ballotApproval
+}
+
 ### end tests definition
 
 # useful for debugging bash flow

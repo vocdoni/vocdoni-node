@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -27,24 +28,10 @@ func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
-	p := &models.Process{
-		StartBlock: 0,
-		BlockCount: 100,
-		Status:     models.ProcessStatus_READY,
-		EnvelopeType: &models.EnvelopeType{
-			EncryptedVotes: false,
-			UniqueValues:   true},
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA,
-		VoteOptions: &models.ProcessVoteOptions{
-			MaxCount: 1,
-			MaxValue: 1,
-		},
-		Mode: &models.ProcessMode{
-			AutoStart:     true,
-			Interruptible: true,
-		},
-		MaxCensusSize: uint64(t.config.nvotes),
-	}
+	//setup for ranked voting
+	p := newTestProcess()
+	// update to use csp origin
+	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA
 
 	if err := t.setupElectionRaw(p); err != nil {
 		return err
@@ -75,7 +62,10 @@ func (t *E2ECSPElection) Run() error {
 			VoterAccount: acct,
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", c.nvotes, "time", time.Since(startTime),
