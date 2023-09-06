@@ -16,7 +16,7 @@ require (
 	github.com/cockroachdb/pebble v0.0.0-20230620232302-06034ff014e0
 	github.com/cometbft/cometbft v0.38.0-rc3
 	github.com/cometbft/cometbft-db v0.8.0
-	github.com/ethereum/go-ethereum v1.11.6
+	github.com/ethereum/go-ethereum v1.12.1
 	github.com/fatih/color v1.15.0
 	github.com/frankban/quicktest v1.14.5
 	github.com/glendc/go-external-ip v0.1.0
@@ -59,7 +59,7 @@ require (
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.vocdoni.io/proto v1.14.6-0.20230802094125-e07a41fda290
 	golang.org/x/crypto v0.11.0
-	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
+	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc
 	golang.org/x/net v0.12.0
 	google.golang.org/protobuf v1.30.0
 )
@@ -143,7 +143,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/golang-lru v0.6.0 // indirect
 	github.com/hashicorp/hcl v1.0.1-vault-5 // indirect
-	github.com/holiman/uint256 v1.2.2 // indirect
+	github.com/holiman/uint256 v1.2.3 // indirect
 	github.com/huin/goupnp v1.2.0 // indirect
 	github.com/ipfs/bbloom v0.0.4 // indirect
 	github.com/ipfs/go-bitfield v1.1.0 // indirect
@@ -297,7 +297,7 @@ require (
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
 	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.8.0 // indirect
-	golang.org/x/sync v0.2.0 // indirect
+	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.11.0 // indirect
 	golang.org/x/tools v0.9.1 // indirect
