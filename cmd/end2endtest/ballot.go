@@ -85,7 +85,10 @@ func (t *E2EBallotElection) Run() error {
 			VoterAccount: acct,
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", len(t.voterAccounts), "time", time.Since(startTime),

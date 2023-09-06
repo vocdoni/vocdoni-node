@@ -26,6 +26,7 @@ const (
 	nextBlock     = "nextBlock"
 	sameBlock     = "sameBlock"
 	defaultWeight = 10
+	retriesSend   = retries / 2
 )
 
 type ballotData struct {
@@ -474,11 +475,10 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 			Choices:      []int{choices[i]}}})
 		for _, err := range errs {
 			// check the error expected for overwrite with waitUntilNextBlock
-			if strings.Contains(err.Error(), "overwrite count reached") {
-				log.Debug("error expected: ", err.Error())
-			} else {
+			if !strings.Contains(err.Error(), "overwrite count reached") {
 				return fmt.Errorf("unexpected overwrite error: %w", err)
 			}
+			log.Debug("error expected: ", err.Error())
 		}
 		switch waitType {
 		case sameBlock:
@@ -561,11 +561,16 @@ func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
 
 // sendVotes sends a batch of votes concurrently
 // (number of goroutines defined in t.config.parallelCount)
-func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error) {
-	errs = make(map[int]error)
-	var timeouts atomic.Uint32
+// sendVotes sends a batch of votes concurrently
+// (number of goroutines defined in t.config.parallelCount)
+func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
+	var errs = make(map[int]error)
+	// used to avoid infinite for loop
+	var timeoutsRetry, mempoolRetry, warnRetry atomic.Uint32
 	var wg sync.WaitGroup
 	var queues []map[int]*apiclient.VoteData
+	var mutex sync.Mutex
+
 	for p := 0; p < t.config.parallelCount; p++ {
 		queues = append(queues, make(map[int]*apiclient.VoteData, len(votes)))
 	}
@@ -583,31 +588,49 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 			for len(queue) > 0 {
 				log.Infow("thread sending votes", "queue", len(queue))
 				for i, vote := range queue {
-					accPrivKey := vote.VoterAccount.PrivateKey()
-					voterApi := t.api.Clone(accPrivKey.String())
-					_, err := voterApi.Vote(vote)
+					_, err := t.api.Vote(vote)
 					switch {
 					case err == nil:
 						delete(queue, i)
 					case errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err):
 						// if the context deadline is reached, no need to print it, just retry
-						timeouts.Add(1)
+						if timeoutsRetry.Load() > retriesSend {
+							mutex.Lock()
+							errs[i] = err
+							mutex.Unlock()
+							return
+						}
+						timeoutsRetry.Add(1)
 					case strings.Contains(err.Error(), "mempool is full"):
 						log.Warn(err)
 						// wait and retry
-						_ = voterApi.WaitUntilNextBlock()
-					case strings.Contains(err.Error(), "already exists") ||
-						strings.Contains(err.Error(), "overwrite count reached"):
+						waitErr := t.api.WaitUntilNextBlock()
+						if waitErr != nil {
+							if mempoolRetry.Load() > retriesSend {
+								mutex.Lock()
+								errs[i] = err
+								mutex.Unlock()
+								return
+							}
+							mempoolRetry.Add(1)
+						}
+					case strings.Contains(err.Error(), "already exists"):
 						// don't retry
 						delete(queue, i)
+						mutex.Lock()
 						errs[i] = err
-					case strings.Contains(err.Error(), "expired sik root"):
-						delete(queue, i)
-						errs[i] = err
+						mutex.Unlock()
 					default:
+						if warnRetry.Load() > retriesSend {
+							mutex.Lock()
+							errs[i] = err
+							mutex.Unlock()
+							return
+						}
 						// any other error, print it and wait a bit
 						log.Warn(err)
 						time.Sleep(100 * time.Millisecond)
+						warnRetry.Add(1)
 					}
 				}
 			}
@@ -615,7 +638,7 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) (errs map[int]error
 	}
 	wg.Wait()
 	log.Infow("sent votes",
-		"n", len(votes), "timeouts", timeouts.Load(), "failed", len(errs))
+		"n", len(votes), "timeouts", timeoutsRetry.Load(), "errors", len(errs))
 	return errs
 }
 

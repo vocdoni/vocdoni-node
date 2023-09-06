@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -72,7 +73,10 @@ func (t *E2EEncryptedElection) Run() error {
 			Keys:         keys,
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", len(t.voterAccounts), "time", time.Since(startTime),

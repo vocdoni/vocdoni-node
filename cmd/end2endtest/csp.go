@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"time"
 
@@ -75,7 +76,10 @@ func (t *E2ECSPElection) Run() error {
 			VoterAccount: acct,
 		})
 	}
-	t.sendVotes(votes)
+	errs := t.sendVotes(votes)
+	if len(errs) > 0 {
+		return fmt.Errorf("error in sendVotes %+v", errs)
+	}
 
 	log.Infow("votes submitted successfully",
 		"n", c.nvotes, "time", time.Since(startTime),
