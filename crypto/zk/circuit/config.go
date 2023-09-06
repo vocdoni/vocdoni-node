@@ -3,6 +3,7 @@ package circuit
 import (
 	"encoding/hex"
 	"log"
+	"math/big"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -39,24 +40,34 @@ type ZkCircuitConfig struct {
 	// FilenameWasm defines the name of the file of the circuit wasm compiled
 	// version
 	WasmFilename string `json:"wasmFilename"` // circuit.wasm
+	// maxCensusSize contains a precomputed max size of a census for the
+	// circuit, which is defined by the expresion:
+	//   maxCensusSize = 2^circuitLevels
+	maxCensusSize *big.Int
 }
 
 // KeySize returns the maximum number of bytes of a leaf key according to the
 // number of levels of the current circuit (nBytes = nLevels / 8).
-func (config ZkCircuitConfig) KeySize() int {
-	return config.Levels / 8
+func (conf ZkCircuitConfig) KeySize() int {
+	return conf.Levels / 8
+}
+
+// MaxCensusSize returns the maximum number of keys that circuit merkle tree
+// for the census supports. The method checks if it is already precalculated
+// or not. If it is not precalculated, it will calculate and initialise it. In
+// any case, the value is returned as big.Int.
+func (conf ZkCircuitConfig) MaxCensusSize() *big.Int {
+	if conf.maxCensusSize == nil {
+		conf.maxCensusSize = new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(conf.Levels)), nil)
+	}
+	return conf.maxCensusSize
 }
 
 // SupportsCensusSize returns if the provided censusSize is supported by the
 // current circuit configuration. It ensures that the provided value is lower
 // than 2^config.Levels.
-func (config ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
-	return true
-	// The current circuit supports 160 levels, so the largest supported census
-	// size will always be greater than any uint64. If this logic changes a
-	// possible implementation is suggested:
-	// circuitMaxCensusSize := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(config.Levels)), nil)
-	// return circuitMaxCensusSize.Cmp(new(big.Int).SetUint64(maxCensusSize)) != 1
+func (conf ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
+	return conf.MaxCensusSize().Cmp(new(big.Int).SetUint64(maxCensusSize)) != 1
 }
 
 // CircuitsConfigurations stores the relation between the different vochain nets
@@ -82,6 +93,8 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 // provided tag or gets the default one.
 func GetCircuitConfiguration(configTag string) ZkCircuitConfig {
 	if conf, ok := CircuitsConfigurations[configTag]; ok {
+		// pre-calculate the max census size by default
+		_ = conf.MaxCensusSize()
 		return conf
 	}
 	return CircuitsConfigurations[DefaultCircuitConfigurationTag]
