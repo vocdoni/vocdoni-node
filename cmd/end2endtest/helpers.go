@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"os"
 	"strings"
@@ -29,13 +28,6 @@ const (
 	retriesSend   = retries / 2
 )
 
-type ballotData struct {
-	maxValue     uint32
-	maxTotalCost uint32
-	costExponent uint32
-	maxCount     uint32
-}
-
 func newTestElectionDescription() *vapi.ElectionDescription {
 	return &vapi.ElectionDescription{
 		Title:       map[string]string{"default": fmt.Sprintf("Test election %s", util.RandomHex(8))},
@@ -57,6 +49,26 @@ func newTestElectionDescription() *vapi.ElectionDescription {
 					},
 				},
 			},
+		},
+	}
+}
+
+func newTestProcess() *models.Process {
+	return &models.Process{
+		StartBlock: 0,
+		BlockCount: 100,
+		Status:     models.ProcessStatus_READY,
+		EnvelopeType: &models.EnvelopeType{
+			EncryptedVotes: false,
+			UniqueValues:   true},
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1,
+			MaxValue: 1,
+		},
+		Mode: &models.ProcessMode{
+			AutoStart:     true,
+			Interruptible: true,
 		},
 	}
 }
@@ -404,6 +416,10 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 		return err
 	}
 
+	if prc.MaxCensusSize == 0 {
+		prc.MaxCensusSize = uint64(t.config.nvotes)
+	}
+
 	csp := &ethereum.SignKeys{}
 
 	switch prc.CensusOrigin {
@@ -489,74 +505,6 @@ func (t *e2eElection) overwriteVote(choices []int, indexAcct int, waitType strin
 		}
 	}
 	return nil
-}
-
-// ballotVotes from a default list of 10 vote values that exceed the max value, max total cost and is not unique will
-func ballotVotes(b ballotData, nvotes int) ([][]int, [][]*types.BigInt) {
-	votes := make([][]int, 0, nvotes)
-	var resultsField1, resultsField2 []*types.BigInt
-
-	// initial 10 votes to be sent by the ballot test
-	var v = [][]int{
-		{0, 0}, {0, 7}, {5, 7}, {2, 0}, {2, 3},
-		{1, 6}, {0, 8}, {6, 5}, {2, 7}, {6, 4},
-	}
-
-	// less than 10 votes
-	if nvotes < 10 {
-		// default results with zero values on field 1 for less than 10 votes
-		resultsField1 = votesToBigInt(make([]uint64, b.maxValue+1)...)
-		// default results with zero values on field 2 for less than 10 votes
-		resultsField2 = votesToBigInt(make([]uint64, b.maxValue+1)...)
-	} else {
-		// greater o equal than 10 votes
-		for i := 0; i < nvotes/10; i++ {
-			votes = append(votes, v...)
-		}
-		// default results on field 1 for 10 votes
-		resultsField1 = votesToBigInt(0, 10, 20, 0, 0, 0, 10)
-		// default results on field 2 for 10 votes
-		resultsField2 = votesToBigInt(10, 0, 0, 10, 10, 0, 10)
-
-		// nvotes split 10, for example for 44 nvotes, nvoteDid10 will be 4
-		// and that number will be multiplied by each default result to obtain the results for 40 votes
-		nvotesDiv10 := new(types.BigInt).SetUint64(uint64(nvotes / 10))
-
-		for i := 0; i <= int(b.maxValue); i++ {
-			newvalField1 := new(types.BigInt).Mul(resultsField1[i], nvotesDiv10)
-			newvalField2 := new(types.BigInt).Mul(resultsField2[i], nvotesDiv10)
-
-			resultsField1[i] = newvalField1
-			resultsField2[i] = newvalField2
-		}
-	}
-
-	// remainVotes check if exists remain votes to add and count, note that if nvotes < 10 raminVote will be nvotes
-	remainVotes := nvotes % 10
-	if remainVotes != 0 {
-		votes = append(votes, v[:remainVotes]...)
-		// update expected results
-		for i := 0; i < remainVotes; i++ {
-			isValidTotalCost := math.Pow(float64(v[i][0]), float64(b.costExponent))+
-				math.Pow(float64(v[i][1]), float64(b.costExponent)) <= float64(b.maxTotalCost)
-			isValidValues := v[i][0] <= int(b.maxValue) && v[i][1] <= int(b.maxValue)
-			isUniqueValues := v[i][0] != v[i][1]
-
-			if isValidTotalCost && isValidValues && isUniqueValues {
-				newvalField1 := new(types.BigInt).Add(resultsField1[v[i][0]], new(types.BigInt).SetUint64(10))
-				newvalField2 := new(types.BigInt).Add(resultsField2[v[i][1]], new(types.BigInt).SetUint64(10))
-
-				resultsField1[v[i][0]] = newvalField1
-				resultsField2[v[i][1]] = newvalField2
-			}
-		}
-	}
-
-	expectedResults := [][]*types.BigInt{resultsField1, resultsField2}
-
-	log.Debug("vote values generated", votes)
-	log.Debug("results expected", expectedResults)
-	return votes, expectedResults
 }
 
 // sendVotes sends a batch of votes concurrently
@@ -655,9 +603,9 @@ func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPac
 
 func matchResults(results, expectedResults [][]*types.BigInt) bool {
 	// iterate over each question to check if the results match with the expected results
-	for i := 0; i < len(results); i++ {
-		for q := range results[i] {
-			if !(expectedResults[i][q].String() == results[i][q].String()) {
+	for i, result := range results {
+		for q, r := range result {
+			if !(expectedResults[i][q].String() == r.String()) {
 				return false
 			}
 		}
