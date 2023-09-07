@@ -323,7 +323,13 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 
 	// Register the accounts in the vochain if is required
 	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
-		for _, acc := range t.voterAccounts {
+		for i, acc := range t.voterAccounts {
+			if i%10 == 0 {
+				// Print some information about progress on large censuses
+				log.Infof("creating anonymous census accounts... (%d/%d - %.0f%%)",
+					i, len(t.voterAccounts), float64(i)/float64(len(t.voterAccounts))*100)
+			}
+
 			pKey := acc.PrivateKey()
 			if _, _, err := t.createAccount(pKey.String()); err != nil &&
 				!strings.Contains(err.Error(), "createAccountTx: account already exists") {
@@ -334,6 +340,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 		if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
 			return nil, "", err
 		}
+		log.Info("anonymous census accounts created")
 	}
 
 	// Add the accounts to the census by batches

@@ -41,7 +41,7 @@ type ZkCircuit struct {
 	ProvingKey      []byte
 	VerificationKey []byte
 	Wasm            []byte
-	Config          ZkCircuitConfig
+	Config          *ZkCircuitConfig
 }
 
 // LoadZkCircuitByTag gets the circuit configuration associated to the provided
@@ -57,7 +57,7 @@ func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
 // LoadZkCircuit load the circuit artifacts based on the configuration provided.
 // First, tries to load the artifacts from local storage, if they are not
 // available, tries to download from their remote location.
-func LoadZkCircuit(ctx context.Context, config ZkCircuitConfig) (*ZkCircuit, error) {
+func LoadZkCircuit(ctx context.Context, config *ZkCircuitConfig) (*ZkCircuit, error) {
 	circuit := &ZkCircuit{Config: config}
 	// load the artifacts of the provided circuit from the local storage
 	if err := circuit.LoadLocal(); err == nil {
