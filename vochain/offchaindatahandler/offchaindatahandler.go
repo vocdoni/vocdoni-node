@@ -166,4 +166,4 @@ func (*OffChainDataHandler) OnRevealKeys(_ []byte, _ string, _ int32)           
 func (*OffChainDataHandler) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32) {}
 func (*OffChainDataHandler) OnTransferTokens(_ *vochaintx.TokenTransfer)                     {}
 func (*OffChainDataHandler) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32)     {}
-func (*OffChainDataHandler) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ []byte)     {}
+func (*OffChainDataHandler) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ string)     {}

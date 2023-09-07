@@ -510,4 +510,4 @@ func (*KeyKeeper) OnSetAccount(_ []byte, _ *state.Account) {}
 func (*KeyKeeper) OnTransferTokens(_ *vochaintx.TokenTransfer) {}
 
 // OnSpendTokens does nothing
-func (*KeyKeeper) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ []byte)
+func (*KeyKeeper) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ string) {}

@@ -226,7 +226,7 @@ func (v *State) SetAccount(accountAddress common.Address, account *Account) erro
 // BurnTxCostIncrementNonce reduces the transaction cost from the account balance and increments nonce.
 // If cost is set to 0, the cost is calculated from the tx type base cost.
 // Reference is optional and can be used to store a reference to the transaction that caused the burn.
-func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType models.TxType, cost uint64, reference []byte) error {
+func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType models.TxType, cost uint64, reference string) error {
 	// get tx cost
 	if cost == 0 {
 		var err error

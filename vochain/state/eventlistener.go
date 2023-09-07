@@ -28,7 +28,7 @@ type EventListener interface {
 	OnProcessesStart(pids [][]byte)
 	OnSetAccount(addr []byte, account *Account)
 	OnTransferTokens(tx *vochaintx.TokenTransfer)
-	OnSpendTokens(addr []byte, txType models.TxType, cost uint64, reference []byte)
+	OnSpendTokens(addr []byte, txType models.TxType, cost uint64, reference string)
 	OnCensusUpdate(pid, censusRoot []byte, censusURI string)
 	Commit(height uint32) (err error)
 	OnBeginBlock(BeginBlock)

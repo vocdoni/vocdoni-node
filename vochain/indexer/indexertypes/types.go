@@ -210,3 +210,14 @@ type TokenTransferMeta struct {
 	Timestamp time.Time       `json:"timestamp"`
 	To        types.AccountID `json:"to"`
 }
+
+// TokenFeeMeta contains the information of a token fees and some extra useful information.
+// The types are compatible with the SQL defined schema.
+type TokenFeeMeta struct {
+	Cost      uint64          `json:"cost"`
+	From      types.AccountID `json:"from"`
+	Height    uint64          `json:"height"`
+	Reference string          `json:"reference"`
+	Timestamp time.Time       `json:"timestamp"`
+	TxType    string          `json:"txType"`
+}
