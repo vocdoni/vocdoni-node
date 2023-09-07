@@ -38,7 +38,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		EncryptionKeyIndexes: indexertypes.DecodeJSON[[]uint32](voteRef.EncryptionKeyIndexes),
 		Weight:               voteRef.Weight,
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
-		Date:                 voteRef.BlockTime,
+		Date:                 voteRef.BlockTime.Time,
 		Meta: indexertypes.EnvelopeMetadata{
 			VoterID:   voteRef.VoterID.Address(),
 			ProcessId: voteRef.ProcessID,
