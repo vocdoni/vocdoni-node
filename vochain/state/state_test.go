@@ -186,7 +186,7 @@ func (*Listener) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32)   
 func (*Listener) OnCensusUpdate(_, _ []byte, _ string)                            {}
 func (*Listener) OnSetAccount(_ []byte, _ *Account)                               {}
 func (*Listener) OnTransferTokens(_ *vochaintx.TokenTransfer)                     {}
-func (*Listener) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ []byte)     {}
+func (*Listener) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ string)     {}
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }

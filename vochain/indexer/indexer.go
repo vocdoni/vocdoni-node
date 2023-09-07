@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -493,8 +494,7 @@ func (idx *Indexer) OnProcessKeys(pid []byte, _ string, _ int32) {
 }
 
 // OnProcessStatusChange adds the process to blockUpdateProcs and, if ended, the resultsPool
-func (idx *Indexer) OnProcessStatusChange(pid []byte, _ models.ProcessStatus,
-	_ int32) {
+func (idx *Indexer) OnProcessStatusChange(pid []byte, _ models.ProcessStatus, _ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
@@ -540,6 +540,7 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 func (*Indexer) OnSetAccount(_ []byte, _ *state.Account) {}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
+	t := time.Now()
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
@@ -549,7 +550,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 		FromAccount:  tx.FromAddress.Bytes(),
 		ToAccount:    tx.ToAddress.Bytes(),
 		Amount:       int64(tx.Amount),
-		TransferTime: time.Now(),
+		TransferTime: t,
 	}); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
@@ -588,7 +589,119 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 	return tt, nil
 }
 
-// OnSpendTokens does nothing
-func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference []byte) {
-	// TODO: fill the table token_spendings
+// OnSpendTokens indexes a token spending event.
+func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference string) {
+	t := time.Now()
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+	queries := idx.blockTxQueries()
+	if _, err := queries.CreateTokenFee(context.TODO(), indexerdb.CreateTokenFeeParams{
+		FromAccount: address,
+		TxType:      strings.ToLower(txType.String()),
+		Cost:        int64(cost),
+		Reference:   reference,
+		SpendTime:   t,
+		BlockHeight: int64(idx.App.Height()),
+	}); err != nil {
+		log.Errorw(err, "cannot index new token spending")
+	}
+}
+
+// GetTokenFeesByFromAccount returns all the token transfers made from a given account
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenFeesByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
+	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByFromAccount(context.TODO(), indexerdb.GetTokenFeesByFromAccountParams{
+		FromAccount: from,
+		Limit:       int64(maxItems),
+		Offset:      int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []*indexertypes.TokenFeeMeta{}
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(t.Cost),
+			From:      t.FromAccount,
+			TxType:    t.TxType,
+			Height:    uint64(t.BlockHeight),
+			Reference: string(t.Reference),
+			Timestamp: t.SpendTime,
+		})
+	}
+	return tt, nil
+}
+
+// GetTokenFees returns all the token transfers from the database, ordered
+// by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenFees(offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
+	ttFromDB, err := idx.readOnlyQuery.GetTokenFees(context.TODO(), indexerdb.GetTokenFeesParams{
+		Limit:  int64(maxItems),
+		Offset: int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []*indexertypes.TokenFeeMeta{}
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(t.Cost),
+			From:      t.FromAccount,
+			TxType:    t.TxType,
+			Height:    uint64(t.BlockHeight),
+			Reference: string(t.Reference),
+			Timestamp: t.SpendTime,
+		})
+	}
+	return tt, nil
+}
+
+// GetTokenFeesByReference returns all the token fees associated with a given reference
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenFeesByReference(reference string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
+	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByReference(context.TODO(), indexerdb.GetTokenFeesByReferenceParams{
+		Reference: reference,
+		Limit:     int64(maxItems),
+		Offset:    int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []*indexertypes.TokenFeeMeta{}
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(t.Cost),
+			From:      t.FromAccount,
+			TxType:    t.TxType,
+			Height:    uint64(t.BlockHeight),
+			Reference: string(t.Reference),
+			Timestamp: t.SpendTime,
+		})
+	}
+	return tt, nil
+}
+
+// GetTokenFeesByType returns all the token fees associated with a given transaction type
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenFeesByType(txType string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
+	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByTxType(context.TODO(), indexerdb.GetTokenFeesByTxTypeParams{
+		TxType: txType,
+		Limit:  int64(maxItems),
+		Offset: int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []*indexertypes.TokenFeeMeta{}
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(t.Cost),
+			From:      t.FromAccount,
+			TxType:    t.TxType,
+			Height:    uint64(t.BlockHeight),
+			Reference: string(t.Reference),
+			Timestamp: t.SpendTime,
+		})
+	}
+	return tt, nil
 }

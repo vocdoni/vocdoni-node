@@ -46,13 +46,13 @@ type Process struct {
 	SourceNetworkID    int64
 }
 
-type TokenSpending struct {
+type TokenFee struct {
 	ID          int64
 	BlockHeight int64
 	FromAccount []byte
-	Reference   []byte
+	Reference   string
 	Cost        int64
-	Txtype      string
+	TxType      string
 	SpendTime   time.Time
 }
 

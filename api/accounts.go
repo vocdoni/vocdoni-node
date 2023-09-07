@@ -83,6 +83,14 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := a.endpoint.RegisterMethod(
+		"/accounts/{accountID}/fees/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.tokenFeesHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -415,6 +423,53 @@ func (a *API) tokenTransfersHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 		struct {
 			Transfers []*indexertypes.TokenTransferMeta `json:"transfers"`
 		}{Transfers: transfers},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// tokenFeesHandler
+//
+//	@Summary		List account token fees
+//	@Description	Returns the token fees for an account. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			accountID	path		string	true	"Specific accountID"
+//	@Param			page		path		string	true	"Paginator page"
+//	@Success		200			{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Router			/accounts/{accountID}/fees/page/{page} [get]
+func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	if err != nil || accountID == nil {
+		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
+	}
+	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
+	if acc == nil {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return err
+	}
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber
+		}
+	}
+	page = page * MaxPageSize
+
+	fees, err := a.indexer.GetTokenFeesByFromAccount(accountID, int32(page), MaxPageSize)
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
+		}{Fees: fees},
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)

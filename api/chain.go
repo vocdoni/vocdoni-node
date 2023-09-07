@@ -178,6 +178,30 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/fees/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainListFeesHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/fees/reference/{reference}/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainListFeesByReferenceHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.endpoint.RegisterMethod(
+		"/chain/fees/type/{type}/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainListFeesByTypeHandler,
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -844,5 +868,125 @@ func (a *API) chainTxCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainListFeesHandler
+//
+//	@Summary		List all token fees
+//	@Description	Returns the token fees list ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		string	true	"Paginator page"
+//	@Success		200		{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Router			/chain/fees/page/{page} [get]
+func (a *API) chainListFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber
+		}
+	}
+	page = page * MaxPageSize
+
+	fees, err := a.indexer.GetTokenFees(int32(page), MaxPageSize)
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
+		}{Fees: fees},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainListFeesByReferenceHandler
+//
+//	@Summary		List all token fees by reference
+//	@Description	Returns the token fees list filtered by reference and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			reference	path		string	true	"Reference filter"
+//	@Param			page		path		string	true	"Paginator page"
+//	@Success		200			{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Router			/chain/fees/reference/{reference}/page/{page} [get]
+func (a *API) chainListFeesByReferenceHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber
+		}
+	}
+	page = page * MaxPageSize
+
+	reference := ctx.URLParam("reference")
+	if reference == "" {
+		return ErrMissingParameter
+	}
+
+	fees, err := a.indexer.GetTokenFeesByReference(reference, int32(page), MaxPageSize)
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
+		}{Fees: fees},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainListFeesByTypeHandler
+//
+//	@Summary		List all token fees by type
+//	@Description	Returns the token fees list filtered by type and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			type	path		string	true	"Type filter"
+//	@Param			page	path		string	true	"Paginator page"
+//	@Success		200		{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Router			/chain/fees/type/{type}/page/{page} [get]
+func (a *API) chainListFeesByTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber
+		}
+	}
+	page = page * MaxPageSize
+
+	typeFilter := ctx.URLParam("type")
+	if typeFilter == "" {
+		return ErrMissingParameter
+	}
+
+	fees, err := a.indexer.GetTokenFeesByType(typeFilter, int32(page), MaxPageSize)
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
+		}{Fees: fees},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
