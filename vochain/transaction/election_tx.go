@@ -59,16 +59,23 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range
-	if tx.Process.GetMaxCensusSize() == 0 {
+	txMaxCensusSize := tx.Process.GetMaxCensusSize()
+	if txMaxCensusSize == 0 {
 		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize is zero")
 	}
 	maxProcessSize, err := t.state.MaxProcessSize()
 	if err != nil {
 		return nil, ethereum.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
 	}
-	if maxProcessSize > 0 && tx.Process.GetMaxCensusSize() > maxProcessSize {
+	if maxProcessSize > 0 && txMaxCensusSize > maxProcessSize {
 		return nil, ethereum.Address{},
 			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
+	}
+	// check that the census size is not bigger than the circuit levels
+	if tx.Process.EnvelopeType.Anonymous && !t.ZkCircuit.Config.SupportsCensusSize(txMaxCensusSize) {
+		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
+			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
+			t.ZkCircuit.Config.MaxCensusSize().Int64(), txMaxCensusSize)
 	}
 
 	// check signature
@@ -120,15 +127,6 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		return nil, ethereum.Address{}, fmt.Errorf("cannot build processID: %w", err)
 	}
 	tx.Process.ProcessId = pid.Marshal()
-
-	// if pre-register is enabled, check that the census size is not bigger than the circuit levels
-	if tx.Process.Mode.PreRegister && tx.Process.EnvelopeType.Anonymous {
-		if !t.ZkCircuit.Config.SupportsCensusSize(tx.Process.GetMaxCensusSize()) {
-			return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
-				"cannot be bigger than the number of levels of the circuit (%d)",
-				t.ZkCircuit.Config.Levels)
-		}
-	}
 
 	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
 	// all the required changes to support a process with a rolling census

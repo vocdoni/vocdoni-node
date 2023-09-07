@@ -323,24 +323,41 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 
 	// Register the accounts in the vochain if is required
 	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
+		errorChan := make(chan error, 1) // Create a buffered channel to prevent deadlock
+		wg := &sync.WaitGroup{}
+
 		for i, acc := range t.voterAccounts {
 			if i%10 == 0 {
 				// Print some information about progress on large censuses
-				log.Infof("creating anonymous census accounts... (%d/%d - %.0f%%)",
-					i, len(t.voterAccounts), float64(i)/float64(len(t.voterAccounts))*100)
+				log.Infof("creating %d anonymous census accounts...", len(t.voterAccounts))
 			}
 
-			pKey := acc.PrivateKey()
-			if _, _, err := t.createAccount(pKey.String()); err != nil &&
-				!strings.Contains(err.Error(), "createAccountTx: account already exists") {
-				return nil, "", err
-			}
+			wg.Add(1)
+			go func(i int, acc *ethereum.SignKeys) {
+				defer wg.Done()
+				pKey := acc.PrivateKey()
+				if _, _, err := t.createAccount(pKey.String()); err != nil &&
+					!strings.Contains(err.Error(), "createAccountTx: account already exists") {
+					errorChan <- err
+				}
+				log.Infow("anonymous census account created", "index", i, "address", acc.AddressString())
+			}(i, acc) // Pass the acc variable as a parameter to avoid data race
 		}
 
+		wg.Wait()
+		close(errorChan) // Close the error channel after all goroutines have finished
+
+		select {
+		case err := <-errorChan:
+			if err != nil {
+				return nil, "", err
+			}
+		default:
+		}
+		// Set the first account as the default account
 		if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
 			return nil, "", err
 		}
-		log.Info("anonymous census accounts created")
 	}
 
 	// Add the accounts to the census by batches

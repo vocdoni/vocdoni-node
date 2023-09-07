@@ -2,8 +2,9 @@ package circuit
 
 import (
 	"encoding/hex"
-	"log"
 	"math/big"
+
+	"go.vocdoni.io/dvote/log"
 
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -57,18 +58,21 @@ func (conf *ZkCircuitConfig) KeySize() int {
 // or not. If it is not precalculated, it will calculate and initialise it. In
 // any case, the value is returned as big.Int.
 func (conf *ZkCircuitConfig) MaxCensusSize() *big.Int {
-	circuitMaxCensusSize := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(conf.Levels)), nil)
-	if conf.maxCensusSize == nil {
-		conf.maxCensusSize = circuitMaxCensusSize
+	if conf.maxCensusSize != nil {
+		return conf.maxCensusSize
 	}
-	return circuitMaxCensusSize
+	if conf.Levels == 0 {
+		log.Fatalf("Circuit levels not defined")
+	}
+	conf.maxCensusSize = new(big.Int).Exp(big.NewInt(2), new(big.Int).SetInt64(int64(conf.Levels)), nil)
+	return conf.maxCensusSize
 }
 
 // SupportsCensusSize returns if the provided censusSize is supported by the
 // current circuit configuration. It ensures that the provided value is lower
 // than 2^config.Levels.
 func (conf *ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
-	return conf.MaxCensusSize().Cmp(new(big.Int).SetUint64(maxCensusSize)) != 1
+	return conf.MaxCensusSize().Cmp(new(big.Int).SetUint64(maxCensusSize)) > 0
 }
 
 // CircuitsConfigurations stores the relation between the different vochain nets
@@ -95,14 +99,10 @@ var CircuitsConfigurations = map[string]*ZkCircuitConfig{
 func GetCircuitConfiguration(configTag string) *ZkCircuitConfig {
 	// check if the provided config tag exists and return it if it does
 	if conf, ok := CircuitsConfigurations[configTag]; ok {
-		// precomputed the max census size by default
-		_ = conf.MaxCensusSize()
 		return conf
 	}
-	// if not, return default configuration with the precomputed max census size
-	conf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
-	_ = conf.MaxCensusSize()
-	return conf
+	// if not, return default configuration
+	return CircuitsConfigurations[DefaultCircuitConfigurationTag]
 }
 
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
