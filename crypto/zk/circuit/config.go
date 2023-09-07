@@ -48,7 +48,7 @@ type ZkCircuitConfig struct {
 
 // KeySize returns the maximum number of bytes of a leaf key according to the
 // number of levels of the current circuit (nBytes = nLevels / 8).
-func (conf ZkCircuitConfig) KeySize() int {
+func (conf *ZkCircuitConfig) KeySize() int {
 	return conf.Levels / 8
 }
 
@@ -56,17 +56,18 @@ func (conf ZkCircuitConfig) KeySize() int {
 // for the census supports. The method checks if it is already precalculated
 // or not. If it is not precalculated, it will calculate and initialise it. In
 // any case, the value is returned as big.Int.
-func (conf ZkCircuitConfig) MaxCensusSize() *big.Int {
+func (conf *ZkCircuitConfig) MaxCensusSize() *big.Int {
+	circuitMaxCensusSize := new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(conf.Levels)), nil)
 	if conf.maxCensusSize == nil {
-		conf.maxCensusSize = new(big.Int).Exp(big.NewInt(2), big.NewInt(int64(conf.Levels)), nil)
+		conf.maxCensusSize = circuitMaxCensusSize
 	}
-	return conf.maxCensusSize
+	return circuitMaxCensusSize
 }
 
 // SupportsCensusSize returns if the provided censusSize is supported by the
 // current circuit configuration. It ensures that the provided value is lower
 // than 2^config.Levels.
-func (conf ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
+func (conf *ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
 	return conf.MaxCensusSize().Cmp(new(big.Int).SetUint64(maxCensusSize)) != 1
 }
 
@@ -74,7 +75,7 @@ func (conf ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
 // and the associated circuit configuration. Any circuit configuration must have
 // the remote and local location of the circuits artifacts and their metadata
 // such as artifacts hash or the number of parameters.
-var CircuitsConfigurations = map[string]ZkCircuitConfig{
+var CircuitsConfigurations = map[string]*ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
 			"zk-franchise-proof-circuit/feature/new-circuit",
@@ -91,13 +92,17 @@ var CircuitsConfigurations = map[string]ZkCircuitConfig{
 
 // GetCircuitConfiguration returns the circuit configuration associated with the
 // provided tag or gets the default one.
-func GetCircuitConfiguration(configTag string) ZkCircuitConfig {
+func GetCircuitConfiguration(configTag string) *ZkCircuitConfig {
+	// check if the provided config tag exists and return it if it does
 	if conf, ok := CircuitsConfigurations[configTag]; ok {
-		// pre-calculate the max census size by default
+		// precomputed the max census size by default
 		_ = conf.MaxCensusSize()
 		return conf
 	}
-	return CircuitsConfigurations[DefaultCircuitConfigurationTag]
+	// if not, return default configuration with the precomputed max census size
+	conf := CircuitsConfigurations[DefaultCircuitConfigurationTag]
+	_ = conf.MaxCensusSize()
+	return conf
 }
 
 // hexToBytes parses a hex string and returns the byte array from it. Warning,
