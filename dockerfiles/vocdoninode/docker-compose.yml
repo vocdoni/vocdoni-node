@@ -3,7 +3,7 @@ services:
   vocdoninode:
     build:
       context: ../../
-    image: "ghcr.io/vocdoni/vocdoni-node:main"
+    image: "ghcr.io/vocdoni/vocdoni-node:stage"
     env_file: env
     volumes:
       - "run:/app/run"

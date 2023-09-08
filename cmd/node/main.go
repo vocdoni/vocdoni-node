@@ -76,7 +76,7 @@ func newConfig() (*config.Config, config.Error) {
 		"directory where data is stored")
 	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
-	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
+	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "stage",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
 	flag.BoolVar(&globalCfg.Dev, "dev", false,
 		"use developer mode (less security)")
