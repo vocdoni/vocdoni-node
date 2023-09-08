@@ -841,14 +841,7 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
-	root, err := t.Root()
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(root, t.emptyHash) {
-		return ErrTreeNotEmpty
-	}
-
+	var err error
 	var keys, values [][]byte
 	for {
 		l := make([]byte, 3)
