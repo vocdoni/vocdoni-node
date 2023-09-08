@@ -40,8 +40,8 @@ var Genesis = map[string]VochainGenesis{
 }
 
 var devGenesis = GenesisDoc{
-	GenesisTime: time.Date(2023, time.September, 4, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-dev-18",
+	GenesisTime: time.Date(2023, time.September, 8, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-dev-19",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -117,8 +117,8 @@ var devGenesis = GenesisDoc{
 }
 
 var stageGenesis = GenesisDoc{
-	GenesisTime: time.Date(2023, time.June, 21, 13, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-stage-6",
+	GenesisTime: time.Date(2023, time.September, 8, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-stage-7",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -136,8 +136,8 @@ var stageGenesis = GenesisDoc{
 		},
 	},
 	AppState: GenesisAppState{
-		MaxElectionSize: 40000,
-		NetworkCapacity: 5000,
+		MaxElectionSize: 50000,
+		NetworkCapacity: 2000,
 		Validators: []AppStateValidators{
 			{ // 0
 				Address:  types.HexStringToHexBytes("321d141cf1fcb41d7844af611b5347afc380a03f"),
@@ -213,13 +213,13 @@ var stageGenesis = GenesisDoc{
 		Accounts: []GenesisAccount{
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
-				Balance: 100000000,
+				Balance: 1000000000,
 			},
 		},
 		Treasurer: types.HexStringToHexBytes("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"),
 		TxCost: TransactionCosts{
-			SetProcessStatus:        1,
-			SetProcessCensus:        1,
+			SetProcessStatus:        2,
+			SetProcessCensus:        50,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              5,
