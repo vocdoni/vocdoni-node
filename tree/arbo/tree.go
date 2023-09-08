@@ -841,7 +841,20 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
-	var err error
+	wTx := t.db.WriteTx()
+	defer wTx.Discard()
+
+	// create the root node if it does not exist
+	_, err := t.db.Get(dbKeyRoot)
+	if err == db.ErrKeyNotFound {
+		// store new root 0 (empty)
+		if err := t.setToEmptyTree(wTx); err != nil {
+			return fmt.Errorf("could not set empty tree: %w", err)
+		}
+	} else if err != nil {
+		return fmt.Errorf("unknown database error: %w", err)
+	}
+
 	var keys, values [][]byte
 	for {
 		l := make([]byte, 3)
@@ -863,13 +876,18 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 		if err != nil {
 			return err
 		}
+
 		keys = append(keys, k)
 		values = append(values, v)
 	}
-	if _, err = t.AddBatch(keys, values); err != nil {
-		return err
+	invalid, err := t.AddBatchWithTx(wTx, keys, values)
+	if err != nil {
+		return fmt.Errorf("error adding batch: %w", err)
 	}
-	return nil
+	if len(invalid) > 0 {
+		return fmt.Errorf("%d invalid keys found in batch", len(invalid))
+	}
+	return wTx.Commit()
 }
 
 // Graphviz iterates across the full tree to generate a string Graphviz
