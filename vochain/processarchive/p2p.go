@@ -66,14 +66,14 @@ func (pa *ProcessArchive) publishLoop() {
 			log.Infof("publishing process archive")
 			start := time.Now()
 			ctx, cancel := context.WithTimeout(context.Background(), publishInterval)
-			ipnsentry, err := pa.ipfs.PublishIPNSpath(ctx, pa.storage.datadir, ipnsKeyAlias)
+			name, rpath, err := pa.ipfs.PublishIPNSpath(ctx, pa.storage.datadir, ipnsKeyAlias)
 			defer cancel()
 			if err != nil {
 				log.Warnf("could not publish to IPFS: %v", err)
 				return
 			}
 			log.Infof("published to /ipns/%s with value %s, took %s",
-				ipnsentry.Name(), ipnsentry.Value(), time.Since(start))
+				name, rpath, time.Since(start))
 		case <-pa.close:
 			return
 		}

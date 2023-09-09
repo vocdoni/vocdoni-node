@@ -17,6 +17,7 @@ import (
 
 	"github.com/ipfs/boxo/coreiface/options"
 	corepath "github.com/ipfs/boxo/coreiface/path"
+	"github.com/ipfs/boxo/ipns"
 	ipfscmds "github.com/ipfs/kubo/commands"
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
@@ -333,25 +334,28 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 // The execution of this method might take a while (some minutes),
 // so the caller must handle properly the logic by using goroutines, channels or other
 // mechanisms in order to not block the whole program execution.
-func (i *Handler) PublishIPNSpath(ctx context.Context, path string,
-	keyalias string) (coreiface.IpnsEntry, error) {
+func (i *Handler) PublishIPNSpath(ctx context.Context, path string, keyalias string) (ipns.Name, corepath.Resolved, error) {
 	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
-		return nil, err
+		return ipns.Name{}, nil, err
 	}
 	if keyalias == "" {
 		ck, err := i.CoreAPI.Key().Self(ctx)
 		if err != nil {
-			return nil, err
+			return ipns.Name{}, nil, err
 		}
 		keyalias = ck.Name()
 	}
-	return i.CoreAPI.Name().Publish(
+	name, err := i.CoreAPI.Name().Publish(
 		ctx,
 		rpath,
 		options.Name.TTL(time.Minute*10),
 		options.Name.Key(keyalias),
 	)
+	if err != nil {
+		return ipns.Name{}, nil, err
+	}
+	return name, rpath, nil
 }
 
 // AddKeyToKeystore adds a marshaled IPFS private key to the IPFS keystore.
