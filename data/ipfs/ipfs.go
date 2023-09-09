@@ -296,7 +296,7 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 		maxSize = MaxFileSizeBytes
 	}
 
-	if fsize > int64(maxSize) {
+	if fsize > maxSize {
 		return nil, fmt.Errorf("file too big: %d", fsize)
 	}
 

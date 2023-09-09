@@ -625,7 +625,7 @@ func (idx *Indexer) GetTokenFeesByFromAccount(from []byte, offset, maxItems int3
 			From:      t.FromAccount,
 			TxType:    t.TxType,
 			Height:    uint64(t.BlockHeight),
-			Reference: string(t.Reference),
+			Reference: t.Reference,
 			Timestamp: t.SpendTime,
 		})
 	}
@@ -649,7 +649,7 @@ func (idx *Indexer) GetTokenFees(offset, maxItems int32) ([]*indexertypes.TokenF
 			From:      t.FromAccount,
 			TxType:    t.TxType,
 			Height:    uint64(t.BlockHeight),
-			Reference: string(t.Reference),
+			Reference: t.Reference,
 			Timestamp: t.SpendTime,
 		})
 	}
@@ -674,7 +674,7 @@ func (idx *Indexer) GetTokenFeesByReference(reference string, offset, maxItems i
 			From:      t.FromAccount,
 			TxType:    t.TxType,
 			Height:    uint64(t.BlockHeight),
-			Reference: string(t.Reference),
+			Reference: t.Reference,
 			Timestamp: t.SpendTime,
 		})
 	}
@@ -699,7 +699,7 @@ func (idx *Indexer) GetTokenFeesByType(txType string, offset, maxItems int32) ([
 			From:      t.FromAccount,
 			TxType:    t.TxType,
 			Height:    uint64(t.BlockHeight),
-			Reference: string(t.Reference),
+			Reference: t.Reference,
 			Timestamp: t.SpendTime,
 		})
 	}
