@@ -19,7 +19,6 @@ import (
 
 	tmlog "github.com/cometbft/cometbft/libs/log"
 	tmos "github.com/cometbft/cometbft/libs/os"
-	"github.com/cometbft/cometbft/libs/service"
 	tmnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
 )
@@ -109,7 +108,7 @@ func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
 func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (service.Service, error) {
+	localConfig *config.VochainCfg, genesis []byte) (*tmnode.Node, error) {
 	var err error
 
 	tconfig := tmcfg.DefaultConfig()
@@ -265,7 +264,7 @@ func newTendermint(app *BaseApplication,
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
-	service, err := tmnode.NewNode(tconfig,
+	node, err := tmnode.NewNode(tconfig,
 		pv,
 		nodeKey,
 		proxy.NewLocalClientCreator(app),
@@ -279,5 +278,5 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 
-	return service, nil
+	return node, nil
 }

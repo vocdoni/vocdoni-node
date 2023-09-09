@@ -470,10 +470,10 @@ func main() {
 			log.Fatal(err)
 		}
 		defer func() {
-			if err := srv.App.Service.Stop(); err != nil {
+			if err := srv.App.Node.Stop(); err != nil {
 				log.Warn(err)
 			}
-			ch := srv.App.Service.Quit()
+			ch := srv.App.Node.Quit()
 			select {
 			case <-ch:
 				log.Info("vochain service stopped")

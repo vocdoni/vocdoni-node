@@ -12,8 +12,7 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
-	"github.com/cometbft/cometbft/libs/service"
-	"github.com/cometbft/cometbft/node"
+	tmnode "github.com/cometbft/cometbft/node"
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
@@ -48,8 +47,8 @@ var (
 type BaseApplication struct {
 	State              *vstate.State
 	Istc               *ist.Controller
-	Service            service.Service
-	Node               *tmcli.Local
+	Node               *tmnode.Node
+	NodeClient         *tmcli.Local
 	TransactionHandler *transaction.TransactionHandler
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
@@ -586,10 +585,10 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
-	if app.Service == nil {
+	if app.Node == nil {
 		return true
 	}
-	return app.Service.(*node.Node).ConsensusReactor().WaitSync()
+	return app.Node.ConsensusReactor().WaitSync()
 }
 
 // IsSynchronizing informes if the blockchain is synchronizing or not.

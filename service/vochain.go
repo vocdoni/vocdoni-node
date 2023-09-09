@@ -111,7 +111,7 @@ func (vs *VocdoniService) Vochain() error {
 // Start the vochain node and the vochaininfo service. Blocks until the node is ready if config.NoWaitSync is false.
 func (vs *VocdoniService) Start() error {
 	for {
-		if err := vs.App.Service.Start(); err != nil {
+		if err := vs.App.Node.Start(); err != nil {
 			// failed to start PEX: address book is empty and couldn't resolve any seed nodes
 			// may happen if the seed nodes are down or there are issues with the network.
 			// So we retry until it works.
