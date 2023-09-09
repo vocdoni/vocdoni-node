@@ -23,9 +23,8 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if vochaincfg.IsSeedNode {
 		return nil
 	}
-	if app.Node = tmcli.New(app.Service.(*node.Node)); err != nil {
-		return fmt.Errorf("could not start tendermint node client: %w", err)
-	}
+	// Note that tmcli.New logs any error rather than returning it.
+	app.Node = tmcli.New(app.Service.(*node.Node))
 	nodeGenesis, err := app.Node.Genesis(context.TODO())
 	if err != nil {
 		return err
