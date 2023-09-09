@@ -95,13 +95,13 @@ func main() {
 		go service.VochainPrintInfo(20, vi)
 
 		defer func() {
-			vnode.Node.Stop()
-			vnode.Node.Wait()
+			vnode.NodeClient.Stop()
+			vnode.NodeClient.Wait()
 		}()
 
 		// Wait for Vochain to be ready
 		var h, hPrev uint32
-		for vnode.Node == nil {
+		for vnode.NodeClient == nil {
 			hPrev = h
 			time.Sleep(time.Second * 10)
 			h = vnode.Height()
@@ -112,7 +112,7 @@ func main() {
 
 	case "blockList":
 		vnode := newVochain(chain, dataDir)
-		vnode.Node.Stop()
+		vnode.NodeClient.Stop()
 		height, err := vnode.State.LastHeight()
 		if err != nil {
 			log.Error(err)
@@ -129,7 +129,7 @@ func main() {
 
 	case "block":
 		vnode := newVochain(chain, dataDir)
-		vnode.Node.Stop()
+		vnode.NodeClient.Stop()
 		blk := vnode.GetBlockByHeight(int64(blockHeight))
 		if blk == nil {
 			log.Fatalf("block %d does not exist", blockHeight)

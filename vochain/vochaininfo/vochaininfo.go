@@ -203,8 +203,8 @@ func (vi *VochainInfo) TokensBurned() uint64 {
 
 // NetInfo returns network info (mainly, peers)
 func (vi *VochainInfo) NetInfo() (*coretypes.ResultNetInfo, error) {
-	if vi.vnode.Node != nil {
-		return vi.vnode.Node.NetInfo(context.Background())
+	if vi.vnode.NodeClient != nil {
+		return vi.vnode.NodeClient.NetInfo(context.Background())
 	}
 	return nil, fmt.Errorf("vochain node not ready")
 }
