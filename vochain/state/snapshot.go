@@ -453,9 +453,6 @@ func ExportNoStateDB(w io.Writer, reader *NoState) (uint32, error) {
 	if err != nil {
 		return 0, err
 	}
-	if err != nil {
-		return 0, err
-	}
 	cw := &countingWriter{w: w}
 	enc := gob.NewEncoder(cw)
 	return cw.n, enc.Encode(pairs)

@@ -65,9 +65,6 @@ func VerifyProof(process *models.Process, proof *models.Proof, vID state.VoterID
 	default:
 		return false, nil, fmt.Errorf("census origin not compatible")
 	}
-	if process == nil || proof == nil {
-		return false, nil, fmt.Errorf("nil process or proof: %v / %v", process, proof)
-	}
 	valid, weight, err := verifyProof(process, proof,
 		process.CensusOrigin, process.CensusRoot, process.ProcessId,
 		vID)
