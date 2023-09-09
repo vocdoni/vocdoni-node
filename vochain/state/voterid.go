@@ -28,7 +28,7 @@ var voterIDTypeName = map[VoterIDType]string{
 
 // NewVoterID creates a new VoterID from a VoterIDType and a key.
 func NewVoterID(voterIDType VoterIDType, key []byte) VoterID {
-	return append([]byte{byte(voterIDType)}, key...)
+	return append([]byte{voterIDType}, key...)
 }
 
 // Type returns the VoterID type defined in VoterIDTypeName
