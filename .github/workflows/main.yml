@@ -93,6 +93,11 @@ jobs:
       - name: Run Go test -race (and collect code coverage)
         if: github.event_name == 'push' && github.ref != 'refs/heads/dev' # this is further limited to selected branches at the beginning of this file
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
+      - name: Store code coverage artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-covdata
+          path: unit.covdata.txt
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
@@ -110,6 +115,11 @@ jobs:
           CONCURRENT: 1 # run all the start_test.sh tests concurrently
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
+      - name: Store code coverage artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: integration-covdata
+          path: dockerfiles/testsuite/gocoverage/covdata.txt
 
   job_go_build_for_mac:
     runs-on: ubuntu-latest
@@ -126,6 +136,39 @@ jobs:
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
+
+  job_upload_coverage:
+    name: Publish code coverage
+    runs-on: ubuntu-latest
+    needs: [job_go_test, job_compose_test]
+    steps:
+      - uses: actions/checkout@v3
+      - name: Fetch coverage (unit)
+        uses: actions/download-artifact@v3
+        with:
+          name: unit-covdata
+      - name: Fetch coverage (integration)
+        uses: actions/download-artifact@v3
+        with:
+          name: integration-covdata
+  
+      - name: Send coverage to coveralls.io (unit)
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: unit.covdata.txt
+          flag-name: unit
+          parallel: true
+      - name: Send coverage to coveralls.io (integration)
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: covdata.txt
+          flag-name: integration
+          parallel: true
+      - name: Tell coveralls.io we're done
+        if: ${{ always() }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
 
   call-docker-release:
     name: Docker
