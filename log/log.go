@@ -175,7 +175,7 @@ func Level() string {
 }
 
 // Debug sends a debug level log message
-func Debug(args ...interface{}) {
+func Debug(args ...any) {
 	if log.GetLevel() > zerolog.DebugLevel {
 		return
 	}
@@ -183,29 +183,29 @@ func Debug(args ...interface{}) {
 }
 
 // Info sends an info level log message
-func Info(args ...interface{}) {
+func Info(args ...any) {
 	log.Info().Msg(fmt.Sprint(args...))
 }
 
 // Monitor is a wrapper around Info that allows passing a map of key-value pairs.
 // This is useful for structured logging and monitoring.
 // The caller information is skipped.
-func Monitor(msg string, args map[string]interface{}) {
+func Monitor(msg string, args map[string]any) {
 	log.Info().CallerSkipFrame(100).Fields(args).Msg(msg)
 }
 
 // Warn sends a warn level log message
-func Warn(args ...interface{}) {
+func Warn(args ...any) {
 	log.Warn().Msg(fmt.Sprint(args...))
 }
 
 // Error sends an error level log message
-func Error(args ...interface{}) {
+func Error(args ...any) {
 	log.Error().Msg(fmt.Sprint(args...))
 }
 
 // Fatal sends a fatal level log message
-func Fatal(args ...interface{}) {
+func Fatal(args ...any) {
 	log.Fatal().Msg(fmt.Sprint(args...) + "\n" + string(debug.Stack()))
 	// We don't support log levels lower than "fatal". Help analyzers like
 	// staticcheck see that, in this package, Fatal will always exit the
@@ -223,42 +223,42 @@ func FormatProto(arg protoreflect.ProtoMessage) string {
 }
 
 // Debugf sends a formatted debug level log message
-func Debugf(template string, args ...interface{}) {
+func Debugf(template string, args ...any) {
 	Logger().Debug().Msgf(template, args...)
 }
 
 // Infof sends a formatted info level log message
-func Infof(template string, args ...interface{}) {
+func Infof(template string, args ...any) {
 	Logger().Info().Msgf(template, args...)
 }
 
 // Warnf sends a formatted warn level log message
-func Warnf(template string, args ...interface{}) {
+func Warnf(template string, args ...any) {
 	Logger().Warn().Msgf(template, args...)
 }
 
 // Errorf sends a formatted error level log message
-func Errorf(template string, args ...interface{}) {
+func Errorf(template string, args ...any) {
 	Logger().Error().Msgf(template, args...)
 }
 
 // Fatalf sends a formatted fatal level log message
-func Fatalf(template string, args ...interface{}) {
+func Fatalf(template string, args ...any) {
 	Logger().Fatal().Msgf(template+"\n"+string(debug.Stack()), args...)
 }
 
 // Debugw sends a debug level log message with key-value pairs.
-func Debugw(msg string, keyvalues ...interface{}) {
+func Debugw(msg string, keyvalues ...any) {
 	Logger().Debug().Fields(keyvalues).Msg(msg)
 }
 
 // Infow sends an info level log message with key-value pairs.
-func Infow(msg string, keyvalues ...interface{}) {
+func Infow(msg string, keyvalues ...any) {
 	Logger().Info().Fields(keyvalues).Msg(msg)
 }
 
 // Warnw sends a warning level log message with key-value pairs.
-func Warnw(msg string, keyvalues ...interface{}) {
+func Warnw(msg string, keyvalues ...any) {
 	Logger().Warn().Fields(keyvalues).Msg(msg)
 }
 

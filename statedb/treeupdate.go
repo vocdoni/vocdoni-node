@@ -257,7 +257,7 @@ type update struct {
 func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 	// End of recursion
 	emptySubs := true
-	treeUpdate.openSubs.Range(func(k, value interface{}) bool {
+	treeUpdate.openSubs.Range(func(k, value any) bool {
 		emptySubs = false
 		return false
 	})
@@ -272,7 +272,7 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 	// treeUpdate.tree leaves, by leaf key
 	updatesByKey := make(map[string][]update)
 	var gerr error
-	treeUpdate.openSubs.Range(func(k, v interface{}) bool {
+	treeUpdate.openSubs.Range(func(k, v any) bool {
 		sub := v.(*TreeUpdate)
 		root, err := propagateRoot(sub)
 		if err != nil {

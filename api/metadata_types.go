@@ -6,7 +6,7 @@ type ElectionMetadata struct {
 	Version     string                 `json:"version"`
 	Description LanguageString         `json:"description"`
 	Media       ProcessMedia           `json:"media,omitempty"`
-	Meta        interface{}            `json:"meta,omitempty"`
+	Meta        any                    `json:"meta,omitempty"`
 	Questions   []Question             `json:"questions,omitempty"`
 	Results     ElectionResultsDetails `json:"results,omitempty"`
 }
@@ -49,8 +49,8 @@ type AccountMetadata struct {
 	Description LanguageString `json:"description,omitempty"`
 	NewsFeed    LanguageString `json:"newsFeed,omitempty"`
 	Media       *AccountMedia  `json:"media,omitempty"`
-	Meta        interface{}    `json:"meta,omitempty"`
-	Actions     interface{}    `json:"actions,omitempty"`
+	Meta        any            `json:"meta,omitempty"`
+	Actions     any            `json:"actions,omitempty"`
 }
 
 // AccountMedia stores the avatar, header, and logo for an entity metadata

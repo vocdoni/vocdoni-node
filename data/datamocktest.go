@@ -81,7 +81,7 @@ func (d *DataMockTest) URIprefix() string {
 	return d.prefix
 }
 
-func (*DataMockTest) Stats(_ context.Context) map[string]interface{} {
+func (*DataMockTest) Stats(_ context.Context) map[string]any {
 	return nil
 }
 

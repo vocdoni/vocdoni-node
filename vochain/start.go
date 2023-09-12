@@ -52,7 +52,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 // failures to connect to peers, we route all log levels to our debug level.
 // They will only surface if dvote's log level is "debug".
 type TenderLogger struct {
-	keyvals  []interface{}
+	keyvals  []any
 	Artifact string
 	logLevel int // 0:debug 1:info 2:error 3:disabled
 }
@@ -72,25 +72,25 @@ func (l *TenderLogger) SetLogLevel(logLevel string) {
 	}
 }
 
-func (l *TenderLogger) Debug(msg string, keyvals ...interface{}) {
+func (l *TenderLogger) Debug(msg string, keyvals ...any) {
 	if l.logLevel == 0 {
 		log.Logger().Debug().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
-func (l *TenderLogger) Info(msg string, keyvals ...interface{}) {
+func (l *TenderLogger) Info(msg string, keyvals ...any) {
 	if l.logLevel <= 1 {
 		log.Logger().Info().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
-func (l *TenderLogger) Error(msg string, keyvals ...interface{}) {
+func (l *TenderLogger) Error(msg string, keyvals ...any) {
 	if l.logLevel <= 2 {
 		log.Logger().Error().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
 	}
 }
 
-func (l *TenderLogger) With(keyvals ...interface{}) tmlog.Logger {
+func (l *TenderLogger) With(keyvals ...any) tmlog.Logger {
 	// Make sure we copy the values, to avoid modifying the parent.
 	// TODO(mvdan): use zap's With method directly.
 	l2 := &TenderLogger{Artifact: l.Artifact, logLevel: l.logLevel}

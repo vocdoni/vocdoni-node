@@ -139,8 +139,8 @@ func (s *SubPub) String() string {
 }
 
 // Stats returns the current stats of the SubPub instance.
-func (s *SubPub) Stats() map[string]interface{} {
-	return map[string]interface{}{
+func (s *SubPub) Stats() map[string]any {
+	return map[string]any{
 		"peers":   len(s.node.PeerHost.Network().Peers()),
 		"known":   len(s.node.PeerHost.Peerstore().PeersWithAddrs()),
 		"cluster": len(s.gossip.topic.ListPeers())}

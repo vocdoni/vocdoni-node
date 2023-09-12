@@ -57,8 +57,8 @@ const (
 // RouterNamespace is the interface that a HTTProuter handler should follow in order
 // to become a valid namespace.
 type RouterNamespace interface {
-	AuthorizeRequest(data interface{}, accessType AuthAccessType) (valid bool, err error)
-	ProcessData(req *http.Request) (data interface{}, err error)
+	AuthorizeRequest(data any, accessType AuthAccessType) (valid bool, err error)
+	ProcessData(req *http.Request) (data any, err error)
 }
 
 // RouterHandlerFn is the function signature for adding handlers to the HTTProuter.
@@ -322,4 +322,4 @@ type stdLogger struct {
 	log *zerolog.Logger
 }
 
-func (l stdLogger) Print(v ...interface{}) { l.log.Debug().Msg(fmt.Sprint(v...)) }
+func (l stdLogger) Print(v ...any) { l.log.Debug().Msg(fmt.Sprint(v...)) }
