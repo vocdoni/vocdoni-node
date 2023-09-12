@@ -13,7 +13,7 @@ import (
 // Data is set by the namespace and can be of any type (implementation details
 // should be checked). In order to send a reply, Context.Send() should be called.
 type Message struct {
-	Data      interface{}
+	Data      any
 	TimeStamp time.Time
 	Path      []string
 	Context   *HTTPContext

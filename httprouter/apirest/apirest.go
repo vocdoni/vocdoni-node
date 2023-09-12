@@ -99,7 +99,7 @@ func (e APIerror) Send(ctx *httprouter.HTTPContext) error {
 }
 
 // Withf returns a copy of APIerror with the Sprintf formatted string appended at the end of e.Err
-func (e APIerror) Withf(format string, args ...interface{}) APIerror {
+func (e APIerror) Withf(format string, args ...any) APIerror {
 	return APIerror{
 		Err:        fmt.Errorf("%w: %v", e.Err, fmt.Sprintf(format, args...)),
 		Code:       e.Code,
@@ -144,8 +144,7 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute string) (*API, error) {
 
 // AuthorizeRequest is a function for the RouterNamespace interface.
 // On private handlers checks if the supplied bearer token have still request credits
-func (a *API) AuthorizeRequest(data interface{},
-	accessType httprouter.AuthAccessType) (bool, error) {
+func (a *API) AuthorizeRequest(data any, accessType httprouter.AuthAccessType) (bool, error) {
 	msg, ok := data.(*APIdata)
 	if !ok {
 		panic("type is not bearerStandardApi")
@@ -178,7 +177,7 @@ func (a *API) AuthorizeRequest(data interface{},
 
 // ProcessData is a function for the RouterNamespace interface.
 // The body of the http requests and the bearer auth token are readed.
-func (a *API) ProcessData(req *http.Request) (interface{}, error) {
+func (a *API) ProcessData(req *http.Request) (any, error) {
 	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
 		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)

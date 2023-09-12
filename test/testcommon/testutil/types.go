@@ -58,7 +58,7 @@ func (b *MockBlockStore) Get(height int64) *tmtypes.Block {
 
 func (b *MockBlockStore) GetByHash(hash []byte) *tmtypes.Block {
 	var block *tmtypes.Block
-	b.store.Range(func(key, value interface{}) bool {
+	b.store.Range(func(key, value any) bool {
 		if bytes.Equal(value.(*tmtypes.Block).Hash().Bytes(), hash) {
 			block = value.(*tmtypes.Block)
 			return false

@@ -24,7 +24,7 @@ func printTestContext(prefix string, nLeafs int, hashName, dbName string) {
 	}
 }
 
-func printRes(name string, value interface{}) {
+func printRes(name string, value any) {
 	if debug {
 		fmt.Printf("%s:	%s \n", name, value)
 	}

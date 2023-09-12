@@ -78,7 +78,7 @@ func (d *Downloader) Start() {
 func (d *Downloader) PrintLogInfo(period time.Duration) {
 	for {
 		time.Sleep(period)
-		log.Monitor("offchain downloader", map[string]interface{}{
+		log.Monitor("offchain downloader", map[string]any{
 			"total":    d.TotalItemsAdded(),
 			"enqueued": d.QueueSize(),
 			"retrying": d.ImportFailedQueueSize(),

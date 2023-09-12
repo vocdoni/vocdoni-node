@@ -19,7 +19,7 @@ type Storage interface {
 	Unpin(ctx context.Context, path string) error
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
-	Stats(ctx context.Context) map[string]interface{}
+	Stats(ctx context.Context) map[string]any
 	CollectMetrics(ctx context.Context, ma *metrics.Agent) error
 	Stop() error
 }

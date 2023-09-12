@@ -147,7 +147,7 @@ func (vs *VocdoniService) Start() error {
 		for syncCounter > 0 {
 			time.Sleep(time.Second * 1)
 			if i%10 == 0 {
-				log.Monitor("vochain fastsync", map[string]interface{}{
+				log.Monitor("vochain fastsync", map[string]any{
 					"height":   vs.Stats.Height(),
 					"blocks/s": float64(vs.Stats.Height()-lastHeight) / time.Since(timeCounter).Seconds(),
 					"peers":    vs.Stats.NPeers(),
@@ -202,7 +202,7 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
 		log.Monitor("vochain status",
-			map[string]interface{}{
+			map[string]any{
 				"height":    h,
 				"mempool":   m,
 				"peers":     vi.NPeers(),
@@ -228,7 +228,7 @@ func vochainPrintPeers(interval time.Duration, vi *vochaininfo.VochainInfo) {
 			log.Warn(err)
 			continue
 		}
-		peers := make(map[string]interface{})
+		peers := make(map[string]any)
 		for _, peer := range ni.Peers {
 			peers[string(peer.NodeInfo.ID())] = peer.RemoteIP
 		}

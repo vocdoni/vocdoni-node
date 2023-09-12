@@ -205,20 +205,20 @@ func (i *Handler) Unpin(ctx context.Context, path string) error {
 }
 
 // Stats returns stats about the IPFS node.
-func (i *Handler) Stats(ctx context.Context) map[string]interface{} {
+func (i *Handler) Stats(ctx context.Context) map[string]any {
 	peers, err := i.CoreAPI.Swarm().Peers(ctx)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]any{"error": err.Error()}
 	}
 	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]any{"error": err.Error()}
 	}
 	pins, err := i.countPins(ctx)
 	if err != nil {
-		return map[string]interface{}{"error": err.Error()}
+		return map[string]any{"error": err.Error()}
 	}
-	return map[string]interface{}{"peers": len(peers), "addresses": len(addresses), "pins": pins}
+	return map[string]any{"peers": len(peers), "addresses": len(addresses), "pins": pins}
 }
 
 func (i *Handler) countPins(ctx context.Context) (int, error) {
