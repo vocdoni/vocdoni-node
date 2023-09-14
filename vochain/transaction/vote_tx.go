@@ -76,7 +76,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	//
 	// We use CacheGetCopy because we will modify the vote to set
 	// the Height.  If we don't work with a copy we are racing with
-	// concurrent reads to the votes in the cache which happen in
+	// concurrent reads to the votes in the cache which happen
 	// in State.CachePurge run via a goroutine in
 	// started in BaseApplication.BeginBlock.
 	// Warning: vote cache might change during the execution of this function.

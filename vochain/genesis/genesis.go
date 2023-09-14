@@ -7,8 +7,7 @@ import (
 )
 
 // Genesis is a map containing the default Genesis details
-var Genesis = map[string]VochainGenesis{
-
+var Genesis = map[string]Vochain{
 	// Development network
 	"dev": {
 		AutoUpdateGenesis: true,
@@ -39,7 +38,7 @@ var Genesis = map[string]VochainGenesis{
 	},
 }
 
-var devGenesis = GenesisDoc{
+var devGenesis = Doc{
 	GenesisTime: time.Date(2023, time.September, 21, 1, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni-dev-20",
 	ConsensusParams: &ConsensusParams{
@@ -58,7 +57,7 @@ var devGenesis = GenesisDoc{
 			AppVersion: 0,
 		},
 	},
-	AppState: GenesisAppState{
+	AppState: AppState{
 		MaxElectionSize: 100000,
 		NetworkCapacity: 20000,
 		Validators: []AppStateValidators{
@@ -91,7 +90,7 @@ var devGenesis = GenesisDoc{
 				KeyIndex: 4,
 			},
 		},
-		Accounts: []GenesisAccount{
+		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
 				Balance: 100000000,
@@ -116,7 +115,7 @@ var devGenesis = GenesisDoc{
 	},
 }
 
-var stageGenesis = GenesisDoc{
+var stageGenesis = Doc{
 	GenesisTime: time.Date(2023, time.September, 21, 1, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni-stage-8",
 	ConsensusParams: &ConsensusParams{
@@ -135,7 +134,7 @@ var stageGenesis = GenesisDoc{
 			AppVersion: 0,
 		},
 	},
-	AppState: GenesisAppState{
+	AppState: AppState{
 		MaxElectionSize: 50000,
 		NetworkCapacity: 2000,
 		Validators: []AppStateValidators{
@@ -210,7 +209,7 @@ var stageGenesis = GenesisDoc{
 				KeyIndex: 4,
 			},
 		},
-		Accounts: []GenesisAccount{
+		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
 				Balance: 1000000000,
@@ -235,7 +234,7 @@ var stageGenesis = GenesisDoc{
 	},
 }
 
-var apexGenesis = GenesisDoc{
+var apexGenesis = Doc{
 	GenesisTime: time.Date(2023, time.May, 24, 9, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni-apex-v1",
 	ConsensusParams: &ConsensusParams{
@@ -254,7 +253,7 @@ var apexGenesis = GenesisDoc{
 			AppVersion: 0,
 		},
 	},
-	AppState: GenesisAppState{
+	AppState: AppState{
 		MaxElectionSize: 1000000,
 		NetworkCapacity: 5000,
 		Validators: []AppStateValidators{
@@ -311,7 +310,7 @@ var apexGenesis = GenesisDoc{
 				Address:  types.HexStringToHexBytes("4945fd40d29870a931561b26a30a529081ded677"),
 				PubKey:   types.HexStringToHexBytes("038276c348971ef9d8b11abaf0cdce50e6cb89bd0f87df14301ef02d46db09db6d"),
 				Power:    10,
-				Name:     "vocdoni-validtaor7",
+				Name:     "vocdoni-validator7",
 				KeyIndex: 0,
 			},
 			{ // 8
@@ -322,7 +321,7 @@ var apexGenesis = GenesisDoc{
 				KeyIndex: 4,
 			},
 		},
-		Accounts: []GenesisAccount{
+		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("863a75f41025f0c8878d3a100c8c16576fe8fe4f"),
 				Balance: 10000000,

@@ -96,7 +96,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 
 }
 
-// CountVotes returns the total number of envelopes.
+// CountTotalVotes returns the total number of envelopes.
 func (idx *Indexer) CountTotalVotes() (uint64, error) {
 	height, err := idx.readOnlyQuery.CountVotes(context.TODO())
 	return uint64(height), err

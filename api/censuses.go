@@ -273,7 +273,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 // censusTypeHandler
 //
 //	@Summary		Get type of census
-//	@Description	Get the type of a census
+//	@Description	Get the census type
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json

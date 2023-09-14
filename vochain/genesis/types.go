@@ -11,12 +11,12 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-// VochainGenesis is a struct containing the genesis details.
-type VochainGenesis struct {
+// Vochain is a struct containing the genesis details.
+type Vochain struct {
 	AutoUpdateGenesis bool
 	SeedNodes         []string
 	CircuitsConfigTag string
-	Genesis           *GenesisDoc
+	Genesis           *Doc
 }
 
 // The genesis app state types are copied from
@@ -24,18 +24,18 @@ type VochainGenesis struct {
 // lightweight and not have it import heavy indirect dependencies like grpc or
 // crypto/*.
 
-// GenesisDoc defines the initial conditions for a Vocdoni blockchain.
+// Doc defines the initial conditions for a Vocdoni blockchain.
 // It is mostly a wrapper around the Tendermint GenesisDoc.
-type GenesisDoc struct {
+type Doc struct {
 	GenesisTime     time.Time        `json:"genesis_time"`
 	ChainID         string           `json:"chain_id"`
 	ConsensusParams *ConsensusParams `json:"consensus_params,omitempty"`
 	AppHash         types.HexBytes   `json:"app_hash"`
-	AppState        GenesisAppState  `json:"app_state,omitempty"`
+	AppState        AppState         `json:"app_state,omitempty"`
 }
 
-// TendermintDoc returns the Tendermint GenesisDoc from the Vocdoni GenesisDoc.
-func (g *GenesisDoc) TendermintDoc() tmtypes.GenesisDoc {
+// TendermintDoc returns the Tendermint GenesisDoc from the Vocdoni genesis.Doc.
+func (g *Doc) TendermintDoc() tmtypes.GenesisDoc {
 	appState, err := json.Marshal(g.AppState)
 	if err != nil {
 		// must never happen
@@ -56,8 +56,8 @@ func (g *GenesisDoc) TendermintDoc() tmtypes.GenesisDoc {
 	}
 }
 
-// Marshal returns the JSON encoding of the GenesisDoc.
-func (g *GenesisDoc) Marshal() []byte {
+// Marshal returns the JSON encoding of the genesis.Doc.
+func (g *Doc) Marshal() []byte {
 	data, err := json.Marshal(g)
 	if err != nil {
 		panic(err)
@@ -65,8 +65,8 @@ func (g *GenesisDoc) Marshal() []byte {
 	return data
 }
 
-// Hash returns the hash of the GenesisDoc.
-func (g *GenesisDoc) Hash() []byte {
+// Hash returns the hash of the genesis.Doc.
+func (g *Doc) Hash() []byte {
 	data, err := json.Marshal(g)
 	if err != nil {
 		panic(err)
@@ -90,32 +90,35 @@ type BlockParams struct {
 	MaxGas   StringifiedInt64 `json:"max_gas"`
 }
 
+// EvidenceParams define limits on max evidence age and max duration
 type EvidenceParams struct {
 	MaxAgeNumBlocks StringifiedInt64 `json:"max_age_num_blocks"`
 	// only accept new evidence more recent than this
 	MaxAgeDuration StringifiedInt64 `json:"max_age_duration"`
 }
 
+// ValidatorParams define the validator key
 type ValidatorParams struct {
 	PubKeyTypes []string `json:"pub_key_types"`
 }
 
+// VersionParams define the version app information
 type VersionParams struct {
 	AppVersion StringifiedInt64 `json:"app_version"`
 }
 
 // ________________________ GENESIS APP STATE ________________________
 
-// GenesisAccount represents an account in the genesis app state
-type GenesisAccount struct {
+// Account represents an account in the genesis app state
+type Account struct {
 	Address types.HexBytes `json:"address"`
 	Balance uint64         `json:"balance"`
 }
 
-// GenesisAppState is the main application state in the genesis file.
-type GenesisAppState struct {
+// AppState is the main application state in the genesis file.
+type AppState struct {
 	Validators      []AppStateValidators `json:"validators"`
-	Accounts        []GenesisAccount     `json:"accounts"`
+	Accounts        []Account            `json:"accounts"`
 	Treasurer       types.HexBytes       `json:"treasurer"`
 	TxCost          TransactionCosts     `json:"tx_cost"`
 	MaxElectionSize uint64               `json:"max_election_size"`

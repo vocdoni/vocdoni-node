@@ -155,7 +155,7 @@ func (vc *Vocone) Start() {
 	go vochainPrintInfo(10, vc.Stats)
 	if vc.App.Height() == 0 {
 		log.Infof("initializing new blockchain")
-		genesisAppData, err := json.Marshal(&genesis.GenesisAppState{
+		genesisAppData, err := json.Marshal(&genesis.AppState{
 			MaxElectionSize: 1000000,
 			NetworkCapacity: uint64(vc.txsPerBlock),
 			TxCost:          defaultTxCosts(),

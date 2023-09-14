@@ -132,7 +132,7 @@ func (a *API) walletSignAndSendTx(stx *models.SignedTx, wallet *ethereum.SignKey
 // walletAddHandler
 //
 //	@Summary		Add account
-//	@Description	Add a new account to the local store. It return a token used to manage this account on the future.
+//	@Description	Add a new account to the local store. It returns a token used to manage this account on the future.
 //	@Tags			Wallet
 //	@Accept			json
 //	@Produce		json

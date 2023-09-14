@@ -438,7 +438,7 @@ func main() {
 		// set IsSeedNode to true if seed mode configured
 		globalCfg.Vochain.IsSeedNode = types.ModeSeed == globalCfg.Mode
 		// do we need indexer?
-		globalCfg.Vochain.Indexer.Enabled = (globalCfg.Mode == types.ModeGateway)
+		globalCfg.Vochain.Indexer.Enabled = globalCfg.Mode == types.ModeGateway
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway

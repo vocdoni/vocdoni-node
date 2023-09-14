@@ -158,7 +158,6 @@ func (r *HTTProuter) Init(host string, port int) error {
 	}
 	r.address = ln.Addr()
 	return nil
-
 }
 
 // EnablePrometheusMetrics enables go-chi prometheus metrics under specified ID.
