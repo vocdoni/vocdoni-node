@@ -48,6 +48,7 @@ log() { echo $(date --rfc-3339=s) "$@" ; }
 ### newtest() { whatever ; }
 
 tests_to_run=(
+	"e2etest_raceDuringCommit"
 	"e2etest_plaintextelection_empty"
 	"e2etest_plaintextelection"
 	"e2etest_encryptedelection"
@@ -91,6 +92,10 @@ e2etest() {
 		  --parallel=$CONCURRENT_CONNECTIONS \
 		  --timeout=10m \
 		  $args
+}
+
+e2etest_raceDuringCommit() {
+  e2etest raceDuringCommit
 }
 
 e2etest_plaintextelection() {
@@ -176,7 +181,7 @@ results="/tmp/.vocdoni-test$RANDOM"
 mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
-	if [ $test == "tokentransactions" ] || [ $CONCURRENT -eq 0 ] ; then
+	if [ $test == "e2etest_raceDuringCommit" ] || [ $CONCURRENT -eq 0 ] ; then
 		log "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	else
