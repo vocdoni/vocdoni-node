@@ -404,6 +404,7 @@ func (v *State) Save() ([]byte, error) {
 	// Note that we need to commit the tx after calling listeners, because
 	// the listeners may need to get the previous (not committed) state.
 	v.tx.Lock()
+	defer v.tx.Unlock()
 	err := func() error {
 		var err error
 		if err := v.tx.Commit(height); err != nil {
@@ -414,7 +415,6 @@ func (v *State) Save() ([]byte, error) {
 		}
 		return nil
 	}()
-	v.tx.Unlock()
 	if err != nil {
 		return nil, err
 	}
