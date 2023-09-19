@@ -113,6 +113,7 @@ jobs:
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
           GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
           CONCURRENT: 1 # run all the start_test.sh tests concurrently
+          BUILDARGS: "-race" # this makes the integration test only slightly slower (around +10%) unlike the abismal effect in unit test (10x)
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
       - name: Store code coverage artifact
