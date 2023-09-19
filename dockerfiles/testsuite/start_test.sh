@@ -14,7 +14,7 @@
 #  e2etest_dynamicensuselection: run dynamic census test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
-[ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
+[ -n "$GOCOVERDIR" ] && export BUILDARGS="$BUILDARGS -cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
 
 COMPOSE_CMD=${COMPOSE_CMD:-"docker compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
