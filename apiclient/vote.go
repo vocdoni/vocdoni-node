@@ -236,7 +236,7 @@ func (c *HTTPclient) voteEnvelopeWithKeys(choices []int, keysEnc []api.Key, elec
 			}
 		}
 		if len(keys) == 0 {
-			return nil, fmt.Errorf("no keys for election %s", election.ElectionID)
+			return nil, fmt.Errorf("no keys for election %x", election.ElectionID)
 		}
 	}
 
