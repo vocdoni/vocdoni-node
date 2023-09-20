@@ -37,7 +37,7 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
 
@@ -51,6 +51,7 @@ func (*E2EEncryptedElection) Teardown() error {
 }
 
 func (t *E2EEncryptedElection) Run() error {
+	var vcount int
 	api := t.api
 
 	// get the encryption key, that will be use each voter
@@ -62,25 +63,30 @@ func (t *E2EEncryptedElection) Run() error {
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	log.Infow("enqueuing votes", "n", t.config.nvotes, "election", t.election.ElectionID)
 	votes := []*apiclient.VoteData{}
-	for i, acct := range t.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.Address().Hex()],
-			Choices:      []int{i % 2},
-			VoterAccount: acct,
-			Keys:         keys,
-		})
-	}
+
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				Choices:      []int{vcount % 2},
+				VoterAccount: acctp.account,
+				Keys:         keys,
+			})
+			vcount += 1
+		}
+		return true
+	})
 	errs := t.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}
 
 	log.Infow("votes submitted successfully",
-		"n", len(t.voterAccounts), "time", time.Since(startTime),
-		"vps", int(float64(len(t.voterAccounts))/time.Since(startTime).Seconds()))
+		"n", t.config.nvotes, "time", time.Since(startTime),
+		"vps", int(float64(t.config.nvotes)/time.Since(startTime).Seconds()))
 
 	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
 		return err

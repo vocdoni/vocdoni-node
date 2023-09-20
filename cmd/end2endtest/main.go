@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -35,13 +36,10 @@ type VochainTest interface {
 }
 
 type e2eElection struct {
-	api    *apiclient.HTTPclient
-	config *config
-
-	election      *vapi.Election
-	voterAccounts []*ethereum.SignKeys
-	proofs        map[string]*apiclient.CensusProof
-	sikproofs     map[string]*apiclient.CensusProof
+	api      *apiclient.HTTPclient
+	config   *config
+	election *vapi.Election
+	voters   *sync.Map // key:acc.Public, value: acctProof struct {account, proof, proofSik}
 }
 
 type operation struct {

@@ -38,7 +38,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 2}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
 
@@ -57,16 +57,20 @@ func (t *E2EOverwriteElection) Run() error {
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	log.Infow("enqueuing votes", "n", len(t.voterAccounts), "election", t.election.ElectionID)
+	log.Infow("enqueuing votes", "n", t.config.nvotes, "election", t.election.ElectionID)
 	votes := []*apiclient.VoteData{}
-	for _, acct := range t.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.Address().Hex()],
-			Choices:      []int{0},
-			VoterAccount: acct,
-		})
-	}
+
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				Choices:      []int{0},
+				VoterAccount: acctp.account,
+			})
+		}
+		return true
+	})
 	errs := t.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
@@ -78,17 +82,17 @@ func (t *E2EOverwriteElection) Run() error {
 
 	// overwrite the previous vote (choice 0) associated with account of index 0, using enough time to do it in the nextBlock
 	// try to make 3 overwrites (number of choices passed to the method). The last overwrite should fail due the maxVoteOverwrite constrain
-	err := t.overwriteVote([]int{1, 2, 3}, 0, nextBlock)
+	err := t.overwriteVote([]int{1, 2, 3}, votes[0], nextBlock)
 	if err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote", t.voterAccounts[0].Address())
+	log.Infof("the account %v send an overwrite vote", votes[0].VoterAccount.Address())
 
 	// now the overwrite vote is done in the sameBlock using account of index 1
-	if err = t.overwriteVote([]int{4, 5, 6}, 1, sameBlock); err != nil {
+	if err = t.overwriteVote([]int{4, 5, 6}, votes[1], sameBlock); err != nil {
 		return err
 	}
-	log.Infof("the account %v send an overwrite vote", t.voterAccounts[1].Address())
+	log.Infof("the account %v send an overwrite vote", votes[0].VoterAccount.Address())
 
 	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
 		return err

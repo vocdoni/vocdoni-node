@@ -36,7 +36,7 @@ func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
 
@@ -50,21 +50,28 @@ func (*E2EPlaintextElection) Teardown() error {
 }
 
 func (t *E2EPlaintextElection) Run() error {
+	var vcount int
 	c := t.config
 
 	// Send the votes (parallelized)
 	startTime := time.Now()
 
-	log.Infof("enqueuing %d votes", len(t.voterAccounts))
+	log.Infof("enqueuing %d votes", t.config.nvotes)
 	votes := []*apiclient.VoteData{}
-	for i, acct := range t.voterAccounts {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.Address().Hex()],
-			Choices:      []int{i % 2},
-			VoterAccount: acct,
-		})
-	}
+
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				Choices:      []int{vcount % 2},
+				VoterAccount: acctp.account,
+			})
+			vcount += 1
+		}
+		return true
+	})
+
 	errs := t.sendVotes(votes)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)

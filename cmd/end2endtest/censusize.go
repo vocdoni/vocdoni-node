@@ -41,7 +41,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 		Size: uint64(t.config.nvotes - 1),
 	}
 
-	if err := t.setupElection(ed); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
 
@@ -61,36 +61,34 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	startTime := time.Now()
 
 	// send nvotes - 1 votes should be fine, due the censusSize was defined previously with nvotes - 1
-	log.Infow("enqueuing votes", "n", len(t.voterAccounts[1:]), "election", t.election.ElectionID)
+	log.Infow("enqueuing votes", "n", t.config.nvotes-1, "election", t.election.ElectionID)
 	votes := []*apiclient.VoteData{}
-	for _, acct := range t.voterAccounts[1:] {
-		votes = append(votes, &apiclient.VoteData{
-			ElectionID:   t.election.ElectionID,
-			ProofMkTree:  t.proofs[acct.Address().Hex()],
-			Choices:      []int{0},
-			VoterAccount: acct,
-		})
-	}
-	errs := t.sendVotes(votes)
+
+	t.voters.Range(func(key, value any) bool {
+		if acctp, ok := value.(acctProof); ok {
+			votes = append(votes, &apiclient.VoteData{
+				ElectionID:   t.election.ElectionID,
+				ProofMkTree:  acctp.proof,
+				Choices:      []int{0},
+				VoterAccount: acctp.account,
+			})
+		}
+		return true
+	})
+	errs := t.sendVotes(votes[1:])
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}
 
 	log.Infow("votes submitted successfully",
-		"n", len(t.voterAccounts[1:]), "time", time.Since(startTime),
-		"vps", int(float64(len(t.voterAccounts[1:]))/time.Since(startTime).Seconds()))
+		"n", len(votes[1:]), "time", time.Since(startTime),
+		"vps", int(float64(len(votes[1:]))/time.Since(startTime).Seconds()))
 
 	// the missing vote should fail due maxCensusSize constrain
 	_ = t.api.WaitUntilNextBlock()
-	log.Infof("sending the missing vote associated with the account %v", t.voterAccounts[0].Address())
+	log.Infof("sending the missing vote associated with the account %v", votes[0].VoterAccount.Address())
 
-	v := apiclient.VoteData{
-		ElectionID:   t.election.ElectionID,
-		ProofMkTree:  t.proofs[t.voterAccounts[0].Address().Hex()],
-		VoterAccount: t.voterAccounts[0],
-		Choices:      []int{0},
-	}
-	if _, err := t.api.Vote(&v); err != nil {
+	if _, err := t.api.Vote(votes[0]); err != nil {
 		// check the error expected for maxCensusSize
 		if strings.Contains(err.Error(), "maxCensusSize reached") {
 			log.Infof("error expected: %s", err.Error())
