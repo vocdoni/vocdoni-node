@@ -195,7 +195,8 @@ func newConfig() (*config.Config, config.Error) {
 	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
 	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
 	viper.BindPFlag("signingKey", flag.Lookup("signingKey"))
-
+	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
+	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
 	viper.BindPFlag("enableAPI", flag.Lookup("enableAPI"))
 	viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount"))
 	viper.Set("TLS.DirCert", globalCfg.DataDir+"/tls")
