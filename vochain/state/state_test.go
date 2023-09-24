@@ -393,7 +393,7 @@ func TestStateSetGetTxCostByTxType(t *testing.T) {
 }
 
 func TestNoState(t *testing.T) {
-	s, err := NewState(db.TypePebble, "")
+	s, err := NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer func() {
 		_ = s.Close()
