@@ -101,7 +101,7 @@ services:
     command: "true"
 
   gocoverage:
-    image: golang:1.20
+    image: golang:1.21
     volumes:
       - gocoverage-seed:/app/run/gocoverage/seed
       - gocoverage-miner0:/app/run/gocoverage/miner0
