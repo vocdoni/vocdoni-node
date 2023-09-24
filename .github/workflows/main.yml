@@ -29,7 +29,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.21'
       - name: Tidy go module
         run: |
           go mod tidy
@@ -86,7 +86,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.21'
       - name: Run Go test (and collect code coverage)
         if: github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' # quicker, non-race test in case it's a PR or push to dev
         run: go test -coverprofile=unit.covdata.txt ./...
@@ -130,7 +130,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.21'
       - name: Run go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
