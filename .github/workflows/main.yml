@@ -92,6 +92,8 @@ jobs:
         run: go test -coverprofile=unit.covdata.txt ./...
       - name: Run Go test -race (and collect code coverage)
         if: github.event_name == 'push' && github.ref != 'refs/heads/dev' # this is further limited to selected branches at the beginning of this file
+        env:
+          GORACE: atexit_sleep_ms=10 # the default of 1000 makes every Go package test sleep for 1s; see https://go.dev/issues/20364
         run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
       - name: Store code coverage artifact
         uses: actions/upload-artifact@v3
