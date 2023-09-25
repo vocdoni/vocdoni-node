@@ -2,77 +2,86 @@ package ipfs
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
+	"go.uber.org/atomic"
 
 	"go.vocdoni.io/dvote/metrics"
 )
 
-// File collectors
-var (
-	// FilePeers ...
-	FilePeers = prometheus.NewGauge(prometheus.GaugeOpts{
+var stats struct {
+	Peers      atomic.Float64
+	KnownAddrs atomic.Float64
+	Pins       atomic.Float64
+}
+
+// registerMetrics registers prometheus metrics
+func (i *Handler) registerMetrics() {
+	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Namespace: "file",
 		Name:      "peers",
 		Help:      "The number of connected peers",
-	})
-	// FileAddresses ...
-	FileAddresses = prometheus.NewGauge(prometheus.GaugeOpts{
+	},
+		stats.Peers.Load))
+
+	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Namespace: "file",
 		Name:      "addresses",
 		Help:      "The number of registered addresses",
-	})
-	// FilePins ...
-	FilePins = prometheus.NewGauge(prometheus.GaugeOpts{
+	},
+		stats.KnownAddrs.Load))
+
+	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
 		Namespace: "file",
 		Name:      "pins",
 		Help:      "The number of pinned files",
-	})
-)
-
-// RegisterMetrics to initialize the metrics to the agent
-func (*Handler) registerMetrics(ma *metrics.Agent) {
-	ma.Register(FilePeers)
-	ma.Register(FileAddresses)
-	ma.Register(FilePins)
+	},
+		stats.Pins.Load))
 }
 
-// setMetrics to be called as a loop and grab metrics
-func (i *Handler) setMetrics(ctx context.Context) error {
-	peers, err := i.CoreAPI.Swarm().Peers(ctx)
-	if err != nil {
-		return err
-	}
-	FilePeers.Set(float64(len(peers)))
-	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
-	if err != nil {
-		return err
-	}
-	FileAddresses.Set(float64(len(addresses)))
-	pins, err := i.countPins(ctx)
-	if err != nil {
-		return err
-	}
-	FilePins.Set(float64(pins))
-	return nil
-}
-
-// CollectMetrics constantly updates the metric values for prometheus
+// updateStats constantly updates the ipfs stats (Peers, KnownAddrs, Pins)
 // The function is blocking, should be called in a go routine
-// If the metrics Agent is nil, do nothing
-func (i *Handler) CollectMetrics(ctx context.Context, ma *metrics.Agent) error {
-	if ma != nil {
-		i.registerMetrics(ma)
-		for {
-			time.Sleep(ma.RefreshInterval)
-			tctx, cancel := context.WithTimeout(ctx, time.Minute)
-			err := i.setMetrics(tctx)
-			cancel()
-			if err != nil {
-				return err
+func (i *Handler) updateStats(interval time.Duration) {
+	for {
+		t := time.Now()
+
+		ctx, cancel := context.WithTimeout(context.Background(), interval)
+
+		var wg sync.WaitGroup
+
+		wg.Add(1)
+		go func() {
+			list, err := i.CoreAPI.Swarm().Peers(ctx)
+			if err == nil {
+				stats.Peers.Store(float64(len(list)))
 			}
-		}
+			wg.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			list, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
+			if err == nil {
+				stats.KnownAddrs.Store(float64(len(list)))
+			}
+			wg.Done()
+		}()
+
+		wg.Add(1)
+		go func() {
+			count, err := i.countPins(ctx)
+			if err == nil {
+				stats.Pins.Store(float64(count))
+			}
+			wg.Done()
+		}()
+
+		wg.Wait()
+
+		cancel()
+
+		time.Sleep(interval - time.Since(t))
 	}
-	return nil
 }

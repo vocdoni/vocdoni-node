@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/data/ipfs"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 )
@@ -80,11 +79,7 @@ func (d *DataMockTest) URIprefix() string {
 	return d.prefix
 }
 
-func (*DataMockTest) Stats(_ context.Context) map[string]any {
-	return nil
-}
-
-func (*DataMockTest) CollectMetrics(_ context.Context, _ *metrics.Agent) error {
+func (*DataMockTest) Stats() map[string]any {
 	return nil
 }
 

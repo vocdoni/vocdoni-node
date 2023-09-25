@@ -132,9 +132,6 @@ func (vs *VocdoniService) Start() error {
 	if vs.Stats == nil {
 		vs.Stats = vochaininfo.NewVochainInfo(vs.App)
 		go vs.Stats.Start(10)
-
-		// Grab metrics
-		go vs.Stats.CollectMetrics(vs.MetricsAgent)
 	}
 
 	if !vs.Config.NoWaitSync {
