@@ -3,8 +3,8 @@
 To run the tests:
 
 ```
-docker-compose build
-docker-compose up -d
+docker compose build
+docker compose up -d
 go run ../../cmd/end2endtest/
 ```
 
@@ -18,15 +18,13 @@ NOTTY=1 ./start_test.sh
 the testnet is composed of:
 
  * one [seed node](https://docs.tendermint.com/master/nodes/#seed-nodes)
- * seven [miners](https://docs.vocdoni.io/architecture/services/vochain.html#miner) (aka [validator nodes](https://docs.tendermint.com/master/nodes/#validators) in tendermint jargon)
- * one [oracle](https://docs.vocdoni.io/architecture/components.html#oracle)
+ * four [miners](https://docs.vocdoni.io/architecture/services/vochain.html#miner) (aka [validator nodes](https://docs.tendermint.com/master/nodes/#validators) in tendermint jargon)
  * one [gateway](https://docs.vocdoni.io/architecture/components.html#gateway)
 
 the `genesis.json` file lists the public keys of all the miners, since vochain is a Proof-of-Authority.
-it also specifies which nodes are trusted oracles.
 
 the seed node will serve to bootstrap the network: it'll just wait for incoming connections from other nodes, and provide them a list of peers which they can connect to.
-the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 4 miners online, they can reach consensus and start producing blocks.
+the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 3 miners online, they can reach consensus and start producing blocks.
 
 when the network is up and running, the tool `end2endtest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (a transaction that costs a certain amount of tokens), `end2endtest` uses a faucet offered by the testsuite (passed in `--faucet`) to fund the accounts.
 
@@ -62,16 +60,6 @@ docker ps -a
 docker logs <container name>
 ```
 
-## Generate custom testnet
-
-if you want to generate a custom-sized testnet (with X miners, Y gateways, Z oracles, and so on), check the `ansible` directory:
-```sh
-cd ansible
-cat README.md
-ansible-playbook generate_testnet.yml
-../start_test.sh
-```
-
 ## Troubleshooting
 
 if you run this interactively in a headless environment (remote server), you might face the following error:
@@ -85,3 +73,18 @@ you can simply install `pass`, or an even more simple workaround is to make a du
 # ln -s /bin/true /usr/local/bin/pass
 ```
 since `docker login` just checks that `pass` is available, but doesn't actually need it for login, all of the repos accesed are public.
+
+## Grafana
+
+if you want to collect Prometheus metrics and visualize them in a local Grafana, enable `grafana` [profile](https://docs.docker.com/compose/profiles/):
+
+```sh
+export COMPOSE_PROFILES=grafana
+docker compose up -d
+```
+
+or simply
+
+```sh
+docker compose --profile grafana up -d
+```
