@@ -392,9 +392,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 	maxChoiceValue := 0
 	for _, question := range description.Questions {
-		if len(question.Choices) > maxChoiceValue {
-			maxChoiceValue = len(question.Choices)
-		}
+		maxChoiceValue = max(maxChoiceValue, len(question.Choices))
 		metaQuestion := Question{
 			Choices:     []ChoiceMetadata{},
 			Description: question.Description,

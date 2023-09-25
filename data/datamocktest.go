@@ -2,11 +2,10 @@ package data
 
 import (
 	"context"
+	"maps"
 	"os"
 	"sync"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/metrics"

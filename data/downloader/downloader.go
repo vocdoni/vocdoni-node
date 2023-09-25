@@ -3,13 +3,12 @@ package downloader
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/exp/maps"
 
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
