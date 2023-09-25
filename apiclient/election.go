@@ -153,9 +153,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 
 	maxChoiceValue := 0
 	for _, question := range description.Questions {
-		if len(question.Choices) > maxChoiceValue {
-			maxChoiceValue = len(question.Choices)
-		}
+		maxChoiceValue = max(maxChoiceValue, len(question.Choices))
 		metaQuestion := api.Question{
 			Choices:     []api.ChoiceMetadata{},
 			Description: question.Description,

@@ -325,7 +325,7 @@ func (idx *Indexer) Commit(height uint32) error {
 		}
 		log.Debugw("updated process", "processID", hex.EncodeToString(pid))
 	}
-	maps.Clear(idx.blockUpdateProcs)
+	clear(idx.blockUpdateProcs)
 
 	// Add votes collected by onVote (live results)
 	newVotes := 0
@@ -437,7 +437,7 @@ func (idx *Indexer) Rollback() {
 		}
 		idx.blockTx = nil
 	}
-	maps.Clear(idx.blockUpdateProcs)
+	clear(idx.blockUpdateProcs)
 }
 
 // OnProcess indexer stores the processID
