@@ -290,39 +290,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 
 	// Register the accounts in the vochain if is required
 	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
-		errorChan := make(chan error) // Create a buffered channel to prevent deadlock
-		wg := &sync.WaitGroup{}
-
-		for i, acc := range voterAccounts {
-			if i%10 == 0 {
-				// Print some information about progress on large censuses
-				log.Infof("creating %d anonymous census accounts...", len(voterAccounts))
-			}
-
-			wg.Add(1)
-			go func(i int, acc *ethereum.SignKeys) {
-				defer wg.Done()
-				pKey := acc.PrivateKey()
-				if _, _, err := t.createAccount(pKey.String()); err != nil &&
-					!strings.Contains(err.Error(), "createAccountTx: account already exists") {
-					errorChan <- err
-				}
-				log.Infow("anonymous census account created", "index", i, "address", acc.AddressString())
-			}(i, acc) // Pass the acc variable as a parameter to avoid data race
-		}
-
-		go func() { // avoid blocking the main goroutine
-			wg.Wait()
-			close(errorChan) // close the error channel after all goroutines have finished
-		}()
-
-		for err := range errorChan { // receive errors from the errorChan until it's closed.
-			if err != nil {
-				return nil, nil, err
-			}
-		}
-		// Set the first account as the default account
-		if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
+		if err := t.registerAnonAccts(voterAccounts); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -331,17 +299,15 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 }
 
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int) error {
-	var voterAccounts []*ethereum.SignKeys
-
 	if err := t.setupAccount(); err != nil {
 		return err
 	}
 
-	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts, true)
+	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts, !ed.TempSIKs)
 	if err != nil {
 		return err
 	}
-	voterAccounts = voterAccts
+
 	ed.Census.RootHash, ed.Census.URL, err = t.publishCheckCensus(censusID, uint64(nvAccts))
 	if err != nil {
 		return err
@@ -371,7 +337,53 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int) e
 		return err
 	}
 	t.election = election
-	if err := t.generateProofs(nil, voterAccounts); err != nil {
+
+	if ed.TempSIKs {
+		errorChan := make(chan error)
+		wg := &sync.WaitGroup{}
+		halfAccts := len(voterAccts) / 2
+
+		// register SIK for 1/2 accounts and left the rest to vote with account registered
+		for i, acc := range voterAccts[:halfAccts] {
+			wg.Add(1)
+			go func(i int, acc *ethereum.SignKeys) {
+				defer wg.Done()
+				pKey := acc.PrivateKey()
+				accountApi := t.api.Clone(pKey.String())
+				hash, err := accountApi.RegisterSIKForVote(electionID, nil, nil)
+				if err != nil {
+					log.Errorf("could not register SIK for vote, address: %s, %v", acc.AddressString(), err)
+					errorChan <- err
+				}
+				log.Infow("sik registered for anonymous census uncreated account", "index", i, "address", acc.AddressString())
+				ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+				defer cancel()
+
+				if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
+					log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
+					errorChan <- err
+				}
+			}(i, acc)
+		}
+
+		go func() { // avoid blocking the main goroutine
+			wg.Wait()
+			close(errorChan) // close the error channel after all goroutines have finished
+		}()
+
+		for err := range errorChan { // receive errors from the errorChan until it's closed.
+			if err != nil {
+				return err
+			}
+		}
+
+		// register the remaining accounts
+		if err := t.registerAnonAccts(voterAccts[halfAccts:]); err != nil {
+			return err
+		}
+
+	}
+	if err := t.generateProofs(nil, voterAccts); err != nil {
 		return err
 	}
 
@@ -654,4 +666,43 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 		return nil, fmt.Errorf("error waiting for election publish final results %w", err)
 	}
 	return results, nil
+}
+
+func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) error {
+	errorChan := make(chan error)
+	wg := &sync.WaitGroup{}
+
+	for i, acc := range voterAccounts {
+		if i%10 == 0 {
+			// Print some information about progress on large censuses
+			log.Infof("creating %d anonymous census accounts...", len(voterAccounts))
+		}
+
+		wg.Add(1)
+		go func(i int, acc *ethereum.SignKeys) {
+			defer wg.Done()
+			pKey := acc.PrivateKey()
+			if _, _, err := t.createAccount(pKey.String()); err != nil &&
+				!strings.Contains(err.Error(), "createAccountTx: account already exists") {
+				errorChan <- err
+			}
+			log.Infow("anonymous census account created", "index", i, "address", acc.AddressString())
+		}(i, acc) // Pass the acc variable as a parameter to avoid data race
+	}
+
+	go func() { // avoid blocking the main goroutine
+		wg.Wait()
+		close(errorChan) // close the error channel after all goroutines have finished
+	}()
+
+	for err := range errorChan { // receive errors from the errorChan until it's closed.
+		if err != nil {
+			return err
+		}
+	}
+	// Set the first account as the default account
+	if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
+		return err
+	}
+	return nil
 }
