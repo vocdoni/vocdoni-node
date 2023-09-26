@@ -290,7 +290,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 
 	// Register the accounts in the vochain if is required
 	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
-		errorChan := make(chan error, 1) // Create a buffered channel to prevent deadlock
+		errorChan := make(chan error) // Create a buffered channel to prevent deadlock
 		wg := &sync.WaitGroup{}
 
 		for i, acc := range voterAccounts {
@@ -311,15 +311,15 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 			}(i, acc) // Pass the acc variable as a parameter to avoid data race
 		}
 
-		wg.Wait()
-		close(errorChan) // Close the error channel after all goroutines have finished
+		go func() { // avoid blocking the main goroutine
+			wg.Wait()
+			close(errorChan) // close the error channel after all goroutines have finished
+		}()
 
-		select {
-		case err := <-errorChan:
+		for err := range errorChan { // receive errors from the errorChan until it's closed.
 			if err != nil {
 				return nil, nil, err
 			}
-		default:
 		}
 		// Set the first account as the default account
 		if err := t.api.SetAccount(t.config.accountPrivKeys[0]); err != nil {
