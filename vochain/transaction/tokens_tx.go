@@ -27,10 +27,6 @@ func (t *TransactionHandler) SetTransactionCostsTxCheck(vtx *vochaintx.Tx) (uint
 	if err != nil {
 		return 0, err
 	}
-	// check nonce
-	if tx.Nonce != treasurer.Nonce {
-		return 0, fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
-	}
 	// check valid tx type
 	if _, ok := vstate.TxTypeCostToStateKey[tx.Txtype]; !ok {
 		return 0, fmt.Errorf("tx type not supported")
@@ -85,9 +81,6 @@ func (t *TransactionHandler) MintTokensTxCheck(vtx *vochaintx.Tx) error {
 			treasurerAddress.String(),
 			txSenderAddress.String(),
 		)
-	}
-	if tx.Nonce != treasurer.Nonce {
-		return fmt.Errorf("invalid nonce %d, expected: %d", tx.Nonce, treasurer.Nonce)
 	}
 	toAddr := common.BytesToAddress(tx.To)
 	toAcc, err := t.state.GetAccount(toAddr, false)
@@ -147,9 +140,6 @@ func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.Tx) error {
 	}
 	if acc == nil {
 		return vstate.ErrAccountNotExist
-	}
-	if tx.Nonce != acc.Nonce {
-		return fmt.Errorf("invalid nonce, expected %d got %d", acc.Nonce, tx.Nonce)
 	}
 	cost, err := t.state.TxBaseCost(models.TxType_SEND_TOKENS, false)
 	if err != nil {

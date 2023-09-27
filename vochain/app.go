@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"path/filepath"
+	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -16,6 +18,7 @@ import (
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
+	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -33,7 +36,10 @@ import (
 const (
 	// recheckTxHeightInterval is the number of blocks after which the mempool is
 	// checked for transactions to be rechecked.
-	recheckTxHeightInterval = 12
+	recheckTxHeightInterval = 6 * 5 // 5 minutes
+	// transactionBlocksTTL is the number of blocks after which a transaction is
+	// removed from the mempool.
+	transactionBlocksTTL = 6 * 10 // 10 minutes
 )
 
 var (
@@ -64,6 +70,8 @@ type BaseApplication struct {
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
 	blockCache         *lru.Cache[int64, *tmtypes.Block]
+	// txTTLReferences is a map of tx hashes to the block height where they failed.
+	txTTLReferences sync.Map
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
@@ -73,6 +81,9 @@ type BaseApplication struct {
 	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
+
+	// prepareProposalLock is used to avoid concurrent calls between PrepareProposal and FinalizeBlock
+	prepareProposalLock sync.Mutex
 
 	// testMockBlockStore is used for testing purposes only
 	testMockBlockStore *testutil.MockBlockStore
@@ -257,11 +268,23 @@ func (app *BaseApplication) InitChain(_ context.Context,
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
+	txReference := vochaintx.TxKey(req.Tx)
+	// store the initial height of the tx
+	initialTTLheight, isReferenced := app.txTTLReferences.LoadOrStore(txReference, app.Height())
+	// check if the tx is referenced by a previous block and the TTL has expired
+	if isReferenced && app.Height() > initialTTLheight.(uint32)+transactionBlocksTTL {
+		// remove tx reference and return checkTx error
+		log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
+		app.txTTLReferences.Delete(txReference)
+		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
+	}
+	// execute recheck mempool every recheckTxHeightInterval blocks
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		if app.Height()%recheckTxHeightInterval != 0 {
 			return &abcitypes.ResponseCheckTx{Code: 0}, nil
 		}
 	}
+	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
 		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
@@ -289,6 +312,8 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 // CometBFT calls it when a new block is decided.
 func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
+	app.prepareProposalLock.Lock()
+	defer app.prepareProposalLock.Unlock()
 	height := uint32(req.GetHeight())
 	app.beginBlock(req.GetTime(), height)
 	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
@@ -314,7 +339,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	app.endBlock(req.GetTime(), height)
 	return &abcitypes.ResponseFinalizeBlock{
 		AppHash:   app.State.WorkingHash(),
-		TxResults: txResults, // TODO: check if we can remove this
+		TxResults: txResults,
 	}, nil
 }
 
@@ -363,6 +388,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 		log.Errorw(err, "rejected tx")
 		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
 	}
+	app.txTTLReferences.Delete(tx.TxID)
 	// call event listeners
 	for _, e := range app.State.EventListeners() {
 		e.OnNewTx(tx, app.Height(), app.State.TxCounter())
@@ -474,25 +500,75 @@ func (*BaseApplication) Query(_ context.Context,
 // the ResponsePrepareProposal call. The logic modifying the raw proposal MAY be non-deterministic.
 func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
-	// TODO: Prepare Proposal should check the validity of the transactions for the next block.
-	// Currently they are executed by CheckTx, but it does not allow height to be passed in.
-	validTxs := [][]byte{}
-	for _, tx := range req.GetTxs() {
-		resp, err := app.CheckTx(ctx, &abcitypes.RequestCheckTx{
-			Tx: tx, Type: abcitypes.CheckTxType_New,
-		})
-		if err != nil || resp.Code != 0 {
-			log.Warnw("discard invalid tx on prepare proposal",
-				"err", err,
-				"code", resp.Code,
-				"data", string(resp.Data),
-				"info", resp.Info,
-				"log", resp.Log)
-			continue
-		}
-		validTxs = append(validTxs, tx)
+	app.prepareProposalLock.Lock()
+	defer app.prepareProposalLock.Unlock()
+	type txInfo struct {
+		Data      []byte
+		Addr      *common.Address
+		Nonce     uint32
+		DecodedTx *vochaintx.Tx
 	}
 
+	validTxInfos := []txInfo{}
+	for _, tx := range req.GetTxs() {
+		vtx := new(vochaintx.Tx)
+		if err := vtx.Unmarshal(tx, app.ChainID()); err != nil {
+			// invalid transaction
+			log.Warnw("could not unmarshal transaction", "err", err)
+			continue
+		}
+		senderAddr, nonce, err := app.TransactionHandler.ExtractNonceAndSender(vtx)
+		if err != nil {
+			log.Warnw("could not extract nonce and/or sender from transaction", "err", err)
+			continue
+		}
+
+		validTxInfos = append(validTxInfos, txInfo{
+			Data:      tx,
+			Addr:      senderAddr,
+			Nonce:     nonce,
+			DecodedTx: vtx,
+		})
+	}
+
+	// Sort the transactions based on the sender's address and nonce
+	sort.Slice(validTxInfos, func(i, j int) bool {
+		if validTxInfos[i].Addr == nil && validTxInfos[j].Addr != nil {
+			return true
+		}
+		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr == nil {
+			return false
+		}
+		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr != nil {
+			if validTxInfos[i].Addr.String() == validTxInfos[j].Addr.String() {
+				return validTxInfos[i].Nonce < validTxInfos[j].Nonce
+			}
+			return validTxInfos[i].Addr.String() < validTxInfos[j].Addr.String()
+		}
+		return false
+	})
+
+	// Check the validity of the transactions
+	validTxs := [][]byte{}
+	for _, txInfo := range validTxInfos {
+		// Check the validity of the transaction using forCommit true
+		resp, err := app.TransactionHandler.CheckTx(txInfo.DecodedTx, true)
+		if err != nil {
+			log.Warnw("discard invalid tx on prepare proposal",
+				"err", err,
+				"hash", fmt.Sprintf("%x", txInfo.DecodedTx.TxID),
+				"data", func() string {
+					if resp != nil {
+						return string(resp.Data)
+					}
+					return ""
+				}())
+			continue
+		}
+		validTxs = append(validTxs, txInfo.Data)
+	}
+	// Rollback the state to discard the changes made by CheckTx
+	app.State.Rollback()
 	return &abcitypes.ResponsePrepareProposal{
 		Txs: validTxs,
 	}, nil
@@ -506,8 +582,42 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
-func (*BaseApplication) ProcessProposal(_ context.Context,
-	_ *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+func (app *BaseApplication) ProcessProposal(_ context.Context,
+	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+	app.prepareProposalLock.Lock()
+	defer app.prepareProposalLock.Unlock()
+	valid := true
+	for _, tx := range req.Txs {
+		vtx := new(vochaintx.Tx)
+		if err := vtx.Unmarshal(tx, app.ChainID()); err != nil {
+			// invalid transaction
+			log.Warnw("could not unmarshal transaction", "err", err)
+			valid = false
+			break
+		}
+		// Check the validity of the transaction using forCommit true
+		resp, err := app.TransactionHandler.CheckTx(vtx, true)
+		if err != nil {
+			log.Warnw("discard invalid tx on process proposal",
+				"err", err,
+				"data", func() string {
+					if resp != nil {
+						return string(resp.Data)
+					}
+					return ""
+				}())
+			valid = false
+			break
+		}
+	}
+	// Rollback the state to discard the changes made by CheckTx
+	app.State.Rollback()
+
+	if !valid {
+		return &abcitypes.ResponseProcessProposal{
+			Status: abcitypes.ResponseProcessProposal_REJECT,
+		}, nil
+	}
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
 	}, nil
