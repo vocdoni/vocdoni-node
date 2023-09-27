@@ -144,8 +144,10 @@ func NewState(dbType, dataDir string) (*State, error) {
 		db:    s.NoState(true),
 		state: s,
 	}
-	s.validSIKRoots = [][]byte{}
 	s.mtxValidSIKRoots = &sync.Mutex{}
+	if err := s.FetchValidSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
+	}
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
 }
 
@@ -425,7 +427,9 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-
+	if err := v.UpdateSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
+	}
 	return v.store.Hash()
 }
 

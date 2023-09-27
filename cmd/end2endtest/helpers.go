@@ -186,6 +186,10 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 		wg     sync.WaitGroup
 		vcount int32
 	)
+	// Wait for the next block to assure the SIK root is updated
+	if err := t.api.WaitUntilNextBlock(); err != nil {
+		return err
+	}
 	errorChan := make(chan error)
 	t.voters = new(sync.Map)
 	addNaccounts := func(accounts []*ethereum.SignKeys) {

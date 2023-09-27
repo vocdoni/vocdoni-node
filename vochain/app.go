@@ -18,7 +18,6 @@ import (
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
-	"github.com/ethereum/go-ethereum/common"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -414,9 +413,6 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.startBlockTimestamp.Store(t.Unix())
 	app.State.SetHeight(height)
 	go app.State.CachePurge(height)
-	if err := app.State.FetchValidSIKRoots(); err != nil {
-		log.Errorw(err, "error fetching valid SIK roots")
-	}
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
 		Time:   t,
@@ -504,7 +500,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	defer app.prepareProposalLock.Unlock()
 	type txInfo struct {
 		Data      []byte
-		Addr      *common.Address
+		Addr      *ethcommon.Address
 		Nonce     uint32
 		DecodedTx *vochaintx.Tx
 	}

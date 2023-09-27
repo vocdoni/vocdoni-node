@@ -188,11 +188,6 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	amountAtoB := (aliceAcc.Balance) / 4
 	amountBtoA := (bobAcc.Balance) / 3
 
-	_, err = alice.TransferWithNonce(state.BurnAddress, 2, aliceAcc.Nonce+10)
-	if err != nil {
-		log.Fatalf("cannot burn tokens: %v", err)
-	}
-
 	// send a couple of token txs to increase the nonce, without waiting for them to be mined
 	// this tests that the mempool transactions are properly ordered.
 	wg := sync.WaitGroup{}
