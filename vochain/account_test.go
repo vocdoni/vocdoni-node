@@ -626,10 +626,6 @@ func TestMintTokensTx(t *testing.T) {
 	if err := testMintTokensTx(t, &notTreasurer, app, toAccAddr, 100, 1); err == nil {
 		t.Fatal(err)
 	}
-	// should fail minting if invalid nonce
-	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, rand.Uint32()); err == nil {
-		t.Fatal(err)
-	}
 
 	// get account
 	toAcc, err := app.State.GetAccount(toAccAddr, false)

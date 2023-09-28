@@ -194,15 +194,12 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	wg.Add(1)
 	go func() {
 		// send 1 token to burn address with nonce + 1 (should be mined after the other txs)
-		_, err = alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1)
-		if err != nil {
+		if _, err = alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
 			log.Fatalf("cannot burn tokens: %v", err)
 		}
-		_, err = bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1)
-		if err != nil {
+		if _, err = bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1); err != nil {
 			log.Fatalf("cannot burn tokens: %v", err)
 		}
-
 		wg.Done()
 	}()
 

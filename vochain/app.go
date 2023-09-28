@@ -81,7 +81,7 @@ type BaseApplication struct {
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
 
-	// prepareProposalLock is used to avoid concurrent calls between PrepareProposal and FinalizeBlock
+	// prepareProposalLock is used to avoid concurrent calls between Prepare/Process Proposal and FinalizeBlock
 	prepareProposalLock sync.Mutex
 
 	// testMockBlockStore is used for testing purposes only

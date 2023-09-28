@@ -66,6 +66,9 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	_, err = app.State.Process(electionId, false)
 	c.Assert(err, qt.IsNil)
+	// advance the app block so the SIK tree is updated
+	app.AdvanceTestBlock()
+
 	// generate circuit inputs and the zk proof
 	sikRoot, err := app.State.SIKRoot()
 	c.Assert(err, qt.IsNil)
