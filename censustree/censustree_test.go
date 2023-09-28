@@ -209,7 +209,7 @@ func TestGetCensusWeight(t *testing.T) {
 		keys = append(keys, []byte("keysWithoutWeight" + strconv.Itoa(i))[:DefaultMaxKeyLen])
 	}
 
-	invalids, err = tree.AddBatch(keys, nil)
+	invalids, err = tree.AddBatch(keys, make([][]byte, len(keys)))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(invalids), qt.Equals, 0)
 
