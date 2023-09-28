@@ -1,6 +1,7 @@
 package censustree
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -236,32 +237,30 @@ func (t *Tree) updateCensusWeight(wTx db.WriteTx, w []byte) error {
 
 // AddBatch wraps t.tree.AddBatch while acquiring the lock.
 func (t *Tree) AddBatch(keys, values [][]byte) ([]int, error) {
+	if len(keys) != len(values) {
+		return nil, fmt.Errorf("keys and values must have the same length")
+	}
 	t.Lock()
 	defer t.Unlock()
 	wTx := t.tree.DB().WriteTx()
 	defer wTx.Discard()
 
-	invalids, err := t.tree.AddBatch(wTx, keys, values)
-	if err != nil {
-		return invalids, fmt.Errorf("addBatch failed: %w", err)
+	var invalids []int
+	weight := big.NewInt(0)
+	for i := 0; i < len(keys); i++ {
+		if err := t.tree.Add(wTx, keys[i], values[i]); err != nil {
+			log.Debugw("could not add key to census",
+				"key", hex.EncodeToString(keys[i]),
+				"value", hex.EncodeToString(values[i]),
+				"err", err)
+			invalids = append(invalids, i)
+			continue
+		}
+		weight = new(big.Int).Add(weight, t.BytesToBigInt(values[i]))
 	}
 
-	// The census weight update should be done only for the
-	// censuses that have weight.
-	if values != nil {
-		// get value of all added keys
-		addedWeight := big.NewInt(0)
-		for i := 0; i < len(values); i++ {
-			addedWeight = new(big.Int).Add(addedWeight, t.BytesToBigInt(values[i]))
-		}
-		// remove weight of invalid leafs
-		for i := 0; i < len(invalids); i++ {
-			addedWeight = new(big.Int).Sub(addedWeight, t.BytesToBigInt(values[invalids[i]]))
-		}
-
-		if err := t.updateCensusWeight(wTx, t.BigIntToBytes(addedWeight)); err != nil {
-			return nil, err
-		}
+	if err := t.updateCensusWeight(wTx, t.BigIntToBytes(weight)); err != nil {
+		return nil, err
 	}
 
 	return invalids, wTx.Commit()

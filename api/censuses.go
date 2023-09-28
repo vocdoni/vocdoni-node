@@ -257,13 +257,14 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 
 	// add the keys and values to the tree in a single transaction
+	log.Infow("adding participants to census", "census", hex.EncodeToString(censusID), "count", len(keys))
 	failed, err := ref.Tree().AddBatch(keys, values)
 	if err != nil {
 		return ErrCantAddKeyAndValueToTree.WithErr(err)
 	}
-	log.Infof("added %d keys to census %x", len(keys), censusID)
 	if len(failed) > 0 {
-		log.Warnf("failed participants %v", failed)
+		log.Warnw("failed to add some participants to census",
+			"census", hex.EncodeToString(censusID), "count", len(failed))
 	}
 
 	return ctx.Send(deprecationMsg, apirest.HTTPstatusOK)
