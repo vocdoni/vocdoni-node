@@ -143,6 +143,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 // We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
 	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
+	app.isSynchronizing.Store(true)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
