@@ -348,7 +348,7 @@ func main() {
 
 	// Overwrite the default path to download the zksnarks circuits artifacts
 	// using the global datadir as parent folder.
-	circuit.BaseDir = filepath.Join(globalCfg.DataDir, circuit.BaseDir)
+	circuit.BaseDir = filepath.Join(globalCfg.DataDir, "zkCircuits")
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
