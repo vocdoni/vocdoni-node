@@ -193,6 +193,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	wg := sync.WaitGroup{}
 	wg.Add(1)
 	go func() {
+		log.Warnf("send transactions with nonce+1, should not be mined before the others")
 		// send 1 token to burn address with nonce + 1 (should be mined after the other txs)
 		if _, err = alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
 			log.Fatalf("cannot burn tokens: %v", err)
@@ -202,7 +203,8 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		}
 		wg.Done()
 	}()
-
+	log.Warnf("waiting 6 seconds to let the burn txs be sent")
+	time.Sleep(6 * time.Second)
 	var txhasha, txhashb []byte
 	wg.Add(1)
 	go func() {
