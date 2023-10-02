@@ -23,6 +23,8 @@ services:
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
     networks:
       - blockchain
+    ports:
+      - "26655:26656"
     volumes:
       - data-miner0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
