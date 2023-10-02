@@ -408,12 +408,8 @@ func (v *State) Save() ([]byte, error) {
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	err := func() error {
-		var err error
 		if err := v.tx.Commit(height); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
-		}
-		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
-			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
 		return nil
 	}()

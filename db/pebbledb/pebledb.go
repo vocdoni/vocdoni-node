@@ -2,15 +2,19 @@ package pebbledb
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"sync"
 
 	"github.com/cockroachdb/pebble"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/log"
 )
 
 // WriteTx implements the interface db.WriteTx
 type WriteTx struct {
 	batch *pebble.Batch
+	lock  *sync.RWMutex
 }
 
 // check that WriteTx implements the db.WriteTx interface
@@ -18,6 +22,13 @@ var _ db.WriteTx = (*WriteTx)(nil)
 
 func get(reader pebble.Reader, k []byte) ([]byte, error) {
 	v, closer, err := reader.Get(k)
+	defer func() {
+		if closer != nil {
+			if err := closer.Close(); err != nil {
+				log.Warnf("failed to close pebble iterator: %v", err)
+			}
+		}
+	}()
 	if errors.Is(err, pebble.ErrNotFound) {
 		return nil, db.ErrKeyNotFound
 	}
@@ -31,9 +42,6 @@ func get(reader pebble.Reader, k []byte) ([]byte, error) {
 	v2 := make([]byte, len(v))
 	copy(v2, v)
 
-	if err := closer.Close(); err != nil {
-		return nil, err
-	}
 	return v2, nil
 }
 
@@ -42,7 +50,10 @@ func iterate(reader pebble.Reader, prefix []byte, callback func(k, v []byte) boo
 		LowerBound: prefix,
 		UpperBound: keyUpperBound(prefix),
 	}
-	iter := reader.NewIter(iterOptions)
+	iter, err := reader.NewIter(iterOptions)
+	if err != nil {
+		return fmt.Errorf("failed to create pebble iterator: %w", err)
+	}
 	defer func() {
 		errC := iter.Close()
 		if err != nil {
@@ -62,42 +73,59 @@ func iterate(reader pebble.Reader, prefix []byte, callback func(k, v []byte) boo
 
 // Get implements the db.WriteTx.Get interface method
 func (tx WriteTx) Get(k []byte) ([]byte, error) {
+	tx.lock.RLock()
+	defer tx.lock.RUnlock()
 	return get(tx.batch, k)
 }
 
 func (tx WriteTx) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
+	tx.lock.RLock()
+	defer tx.lock.RUnlock()
 	return iterate(tx.batch, prefix, callback)
 }
 
 // Set implements the db.WriteTx.Set interface method
 func (tx WriteTx) Set(k, v []byte) error {
+	tx.lock.Lock()
+	defer tx.lock.Unlock()
 	return tx.batch.Set(k, v, nil)
 }
 
 // Delete implements the db.WriteTx.Delete interface method
 func (tx WriteTx) Delete(k []byte) error {
+	tx.lock.Lock()
+	defer tx.lock.Unlock()
 	return tx.batch.Delete(k, nil)
 }
 
 // Apply implements the db.WriteTx.Apply interface method
 func (tx WriteTx) Apply(other db.WriteTx) (err error) {
+	tx.lock.Lock()
+	defer tx.lock.Unlock()
 	otherPebble := db.UnwrapWriteTx(other).(WriteTx)
 	return tx.batch.Apply(otherPebble.batch, nil)
 }
 
 // Commit implements the db.WriteTx.Commit interface method
 func (tx WriteTx) Commit() error {
+	tx.lock.Lock()
+	defer tx.lock.Unlock()
 	return tx.batch.Commit(nil)
 }
 
 // Discard implements the db.WriteTx.Discard interface method
 func (tx WriteTx) Discard() {
+	tx.lock.Lock()
+	defer tx.lock.Unlock()
 	// Close returns an error, but here in the Discard context is omitted
-	tx.batch.Close()
+	if err := tx.batch.Close(); err != nil {
+		panic(err)
+	}
 }
 
 // PebbleDB implements db.Database interface
 type PebbleDB struct {
+	sync.RWMutex
 	db *pebble.DB
 }
 
@@ -129,18 +157,25 @@ func New(opts db.Options) (*PebbleDB, error) {
 
 // Get implements the db.WriteTx.Get interface method
 func (db *PebbleDB) Get(k []byte) ([]byte, error) {
+	db.RWMutex.RLock()
+	defer db.RWMutex.RUnlock()
 	return get(db.db, k)
 }
 
 // WriteTx returns a db.WriteTx
 func (db *PebbleDB) WriteTx() db.WriteTx {
+	db.RWMutex.Lock()
+	defer db.RWMutex.Unlock()
 	return WriteTx{
 		batch: db.db.NewIndexedBatch(),
+		lock:  &db.RWMutex,
 	}
 }
 
 // Close closes the PebbleDB
 func (db *PebbleDB) Close() error {
+	db.RWMutex.Lock()
+	defer db.RWMutex.Unlock()
 	return db.db.Close()
 }
 
@@ -165,7 +200,10 @@ func (db *PebbleDB) Iterate(prefix []byte, callback func(k, v []byte) bool) (err
 // Compact implements the db.Database.Compact interface method
 func (db *PebbleDB) Compact() error {
 	// from https://github.com/cockroachdb/pebble/issues/1474#issuecomment-1022313365
-	iter := db.db.NewIter(nil)
+	iter, err := db.db.NewIter(nil)
+	if err != nil {
+		return err
+	}
 	var first, last []byte
 	if iter.First() {
 		first = append(first, iter.Key()...)
