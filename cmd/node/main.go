@@ -387,7 +387,6 @@ func main() {
 	}
 
 	var err error
-	var vochainKeykeeper *keykeeper.KeyKeeper
 	srv := service.VocdoniService{Config: globalCfg.Vochain}
 
 	if globalCfg.Mode == types.ModeGateway {
@@ -503,7 +502,7 @@ func main() {
 		} else {
 			// start keykeeper service (if key index specified)
 			if validator.KeyIndex > 0 {
-				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
+				srv.KeyKeeper, err = keykeeper.NewKeyKeeper(
 					path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
 					srv.App,
 					&signer,
@@ -511,7 +510,7 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				go vochainKeykeeper.RevealUnpublished()
+				go srv.KeyKeeper.RevealUnpublished()
 			} else {
 				log.Warnw("validator keyIndex disabled")
 			}
