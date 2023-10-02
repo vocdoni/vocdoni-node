@@ -74,7 +74,7 @@ func newConfig() (*config.Config, config.Error) {
 	// global
 	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.vocdoni",
 		"directory where data is stored")
-	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
+	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypeLevelDB,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
 	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
