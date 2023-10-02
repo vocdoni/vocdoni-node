@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -177,6 +178,10 @@ func main() {
 	log.Infow("starting "+filepath.Base(os.Args[0]), "version", internal.Version)
 
 	log.Infof("using data directory at %s", config.dir)
+
+	// Overwrite the default path to download the zksnarks circuits artifacts
+	// using the global datadir as parent folder.
+	circuit.BaseDir = filepath.Join(config.dir, "zkCircuits")
 
 	mngKey := ethereum.SignKeys{}
 	if err := mngKey.AddHexKey(config.keymanager); err != nil {
