@@ -149,7 +149,10 @@ func (app *BaseApplication) Info(_ context.Context,
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
 	app.State.SetHeight(lastHeight)
-	appHash := app.State.WorkingHash()
+	appHash, err := app.State.CommittedHash()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get State.CommittedHash: %w", err)
+	}
 	if err := app.State.SetElectionPriceCalc(); err != nil {
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
@@ -362,6 +365,10 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 	}
 	if app.State.TxCounter() > 0 {
 		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	} else {
+		log.Debugw("commit block", "height", app.Height(),
+			"txs", app.State.TxCounter(),
+			"hash", fmt.Sprintf("%x", app.State.WorkingHash()))
 	}
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
@@ -611,8 +618,9 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	app.State.Rollback()
 
 	if !valid {
+		log.Errorf("invalid proposal at height %d", app.Height())
 		return &abcitypes.ResponseProcessProposal{
-			Status: abcitypes.ResponseProcessProposal_REJECT,
+			Status: abcitypes.ResponseProcessProposal_ACCEPT,
 		}, nil
 	}
 	return &abcitypes.ResponseProcessProposal{

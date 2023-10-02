@@ -474,7 +474,12 @@ func (v *State) SetHeight(height uint32) {
 	v.currentHeight.Store(height)
 }
 
-// WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
+// CommittedHash returns the root hash of the last committed vochain state.
+func (v *State) CommittedHash() ([]byte, error) {
+	return v.store.Hash()
+}
+
+// WorkingHash returns the hash of the vochain state that is being built.
 func (v *State) WorkingHash() []byte {
 	v.tx.RLock()
 	defer v.tx.RUnlock()
