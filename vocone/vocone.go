@@ -18,11 +18,8 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/data"
-	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
@@ -32,7 +29,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
-	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -48,16 +44,11 @@ const (
 
 // Vocone is an implementation of the Vocdoni protocol run by a single (atomic) node.
 type Vocone struct {
-	sc              *indexer.Indexer
-	kk              *keykeeper.KeyKeeper
+	service.VocdoniService
+
 	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
-	dataDir         string
 	height          atomic.Int64
-	appInfo         *vochaininfo.VochainInfo
-	app             *vochain.BaseApplication
-	storage         data.Storage
-	censusdb        *censusdb.CensusDB
 	lastBlockTime   time.Time
 	blockTimeTarget time.Duration
 	txsPerBlock     int
@@ -69,17 +60,19 @@ type Vocone struct {
 
 // NewVocone returns a ready Vocone instance.
 func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) (*Vocone, error) {
-	vc := &Vocone{}
 	var err error
-	vc.dataDir = dataDir
-	vc.app, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
+
+	vc := &Vocone{}
+	vc.Config = &config.VochainCfg{}
+	vc.Config.DataDir = dataDir
+	vc.App, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
 	if err != nil {
 		return nil, err
 	}
 	vc.mempool = make(chan []byte, mempoolSize)
 	vc.blockTimeTarget = DefaultBlockTimeTarget
 	vc.txsPerBlock = DefaultTxsPerBlock
-	version, err := vc.app.State.LastHeight()
+	version, err := vc.App.State.LastHeight()
 	if err != nil {
 		return nil, err
 	}
@@ -90,12 +83,12 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) 
 	}
 
 	vc.setDefaultMethods()
-	vc.app.State.SetHeight(uint32(vc.height.Load()))
+	vc.App.State.SetHeight(uint32(vc.height.Load()))
 
 	// Create indexer
-	if vc.sc, err = indexer.NewIndexer(
+	if vc.Indexer, err = indexer.NewIndexer(
 		filepath.Join(dataDir, "indexer"),
-		vc.app,
+		vc.App,
 		true,
 	); err != nil {
 		return nil, err
@@ -107,34 +100,20 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) 
 	}
 
 	// Create vochain metrics collector
-	vc.appInfo = vochaininfo.NewVochainInfo(vc.app)
-	go vc.appInfo.Start(10)
+	vc.Stats = vochaininfo.NewVochainInfo(vc.App)
+	go vc.Stats.Start(10)
 
-	// Create the IPFS storage layer (we use the Vocdoni general service)
-	srv := service.VocdoniService{}
+	// Create the IPFS storage layer
 	if !disableIPFS {
-		if vc.storage, err = srv.IPFS(&config.IPFSCfg{
+		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
 			ConfigPath: filepath.Join(dataDir, "ipfs"),
-		}); err != nil {
+		})
+		if err != nil {
 			return nil, err
 		}
-	}
 
-	// Create the census database for storing census data
-	cdb, err := metadb.New(db.TypePebble, filepath.Join(dataDir, "census"))
-	if err != nil {
-		return nil, err
-	}
-	vc.censusdb = censusdb.NewCensusDB(cdb)
-
-	// Create the data downloader and offchain data handler
-	if !disableIPFS {
-		offchaindatahandler.NewOffChainDataHandler(
-			vc.app,
-			downloader.NewDownloader(vc.storage),
-			vc.censusdb,
-			false,
-		)
+		// Create the data downloader and offchain data handler
+		vc.OffChainDataHandler()
 	}
 
 	return vc, err
@@ -146,16 +125,16 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 	if err := httpRouter.Init(host, port); err != nil {
 		return nil, err
 	}
-	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.dataDir, db.TypePebble)
+	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.Config.DataDir, db.TypePebble)
 	if err != nil {
 		return nil, err
 	}
 	uAPI.Attach(
-		vc.app,
-		vc.appInfo,
-		vc.sc,
-		vc.storage,
-		vc.censusdb,
+		vc.App,
+		vc.Stats,
+		vc.Indexer,
+		vc.Storage,
+		vc.CensusDB,
 	)
 	return uAPI, uAPI.EnableHandlers(
 		api.ElectionHandler,
@@ -171,8 +150,8 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 // Start starts the Vocone node. This function is blocking.
 func (vc *Vocone) Start() {
 	vc.lastBlockTime = time.Now()
-	go vochainPrintInfo(10, vc.appInfo)
-	if vc.app.Height() == 0 {
+	go vochainPrintInfo(10, vc.Stats)
+	if vc.App.Height() == 0 {
 		log.Infof("initializing new blockchain")
 		genesisAppData, err := json.Marshal(&genesis.GenesisAppState{
 			MaxElectionSize: 1000000,
@@ -182,8 +161,8 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			panic(err)
 		}
-		if _, err = vc.app.InitChain(context.Background(), &abcitypes.RequestInitChain{
-			ChainId:       vc.app.ChainID(),
+		if _, err = vc.App.InitChain(context.Background(), &abcitypes.RequestInitChain{
+			ChainId:       vc.App.ChainID(),
 			AppStateBytes: genesisAppData,
 			Time:          time.Now(),
 		}); err != nil {
@@ -196,7 +175,7 @@ func (vc *Vocone) Start() {
 		startTime := time.Now()
 		height := vc.height.Load()
 		// Create and execute block
-		resp, err := vc.app.FinalizeBlock(
+		resp, err := vc.App.FinalizeBlock(
 			context.Background(),
 			&abcitypes.RequestFinalizeBlock{
 				Txs:    vc.prepareBlock(),
@@ -208,7 +187,7 @@ func (vc *Vocone) Start() {
 			log.Error(err, "finalize block error")
 		}
 		// Commit block to persistent state
-		_, err = vc.app.Commit(context.Background(), &abcitypes.RequestCommit{})
+		_, err = vc.App.Commit(context.Background(), &abcitypes.RequestCommit{})
 		if err != nil {
 			log.Error(err, "commit error")
 		}
@@ -243,10 +222,10 @@ func (vc *Vocone) SetBlockSize(txsCount int) {
 func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.SetAccount(key, acc); err != nil {
+	if err := vc.App.State.SetAccount(key, acc); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
 	return nil
@@ -256,33 +235,33 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.SetTreasurer(treasurer, 0); err != nil {
+	if err := vc.App.State.SetTreasurer(treasurer, 0); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
 	return nil
 }
 
-// SetKeyKeeper adds a keykeper to the application.
+// SetKeyKeeper adds a keykeeper to the application.
 func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 	// Create key keeper
 	// we need to add a validator, so the keykeeper functions are allowed
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	// remove existing validators before we add the new one (to avoid keyindex collision)
-	validators, err := vc.app.State.Validators(true)
+	validators, err := vc.App.State.Validators(true)
 	if err != nil {
 		return err
 	}
 	for _, v := range validators {
-		if err := vc.app.State.RemoveValidator(v.Address); err != nil {
+		if err := vc.App.State.RemoveValidator(v.Address); err != nil {
 			log.Warnf("could not remove validator %x", v.Address)
 		}
 	}
 	// add the new validator
-	if err := vc.app.State.AddValidator(&models.Validator{
+	if err := vc.App.State.AddValidator(&models.Validator{
 		Address:  key.Address().Bytes(),
 		Power:    100,
 		Name:     "vocone-solo-validator",
@@ -291,12 +270,12 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 		return err
 	}
 	log.Infow("adding validator", "address", key.Address().Hex(), "keyIndex", 1)
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
-	vc.kk, err = keykeeper.NewKeyKeeper(
-		filepath.Join(vc.dataDir, "keykeeper"),
-		vc.app,
+	vc.KeyKeeper, err = keykeeper.NewKeyKeeper(
+		filepath.Join(vc.Config.DataDir, "keykeeper"),
+		vc.App,
 		key,
 		1)
 	return err
@@ -306,13 +285,13 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.InitChainMintBalance(to, amount); err != nil {
+	if err := vc.App.State.InitChainMintBalance(to, amount); err != nil {
 		return err
 	}
-	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
+	if err := vc.App.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
 	return nil
@@ -322,13 +301,13 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.SetTxBaseCost(txType, cost); err != nil {
+	if err := vc.App.State.SetTxBaseCost(txType, cost); err != nil {
 		return err
 	}
-	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
+	if err := vc.App.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
 	return nil
@@ -343,7 +322,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 	defer vc.vcMtx.Unlock()
 	for k := range state.TxTypeCostToStateKey {
 		if !force {
-			_, err := vc.app.State.TxBaseCost(k, true)
+			_, err := vc.App.State.TxBaseCost(k, true)
 			if err == nil || errors.Is(err, state.ErrTxCostNotFound) {
 				continue
 			}
@@ -351,11 +330,11 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 			return err
 		}
 		log.Infow("setting tx base cost", "txtype", models.TxType_name[int32(k)], "cost", txCost)
-		if err := vc.app.State.SetTxBaseCost(k, txCost); err != nil {
+		if err := vc.App.State.SetTxBaseCost(k, txCost); err != nil {
 			return err
 		}
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.App.State.Save(); err != nil {
 		return err
 	}
 	return nil
@@ -365,7 +344,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 func (vc *Vocone) SetElectionPrice() error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.app.State.SetElectionPriceCalc(); err != nil {
+	if err := vc.App.State.SetElectionPriceCalc(); err != nil {
 		return err
 	}
 	return nil
@@ -373,18 +352,18 @@ func (vc *Vocone) SetElectionPrice() error {
 
 func (vc *Vocone) setDefaultMethods() {
 	// first set the default methods, then override some of them
-	vc.app.SetDefaultMethods()
-	vc.app.SetFnIsSynchronizing(func() bool { return false })
-	vc.app.SetFnSendTx(vc.addTx)
-	vc.app.SetFnGetTx(vc.getTx)
-	vc.app.SetFnGetBlockByHeight(vc.getBlock)
-	vc.app.SetFnGetTxHash(vc.getTxWithHash)
-	vc.app.SetFnMempoolSize(vc.mempoolSize)
-	vc.app.SetFnMempoolPrune(nil)
+	vc.App.SetDefaultMethods()
+	vc.App.SetFnIsSynchronizing(func() bool { return false })
+	vc.App.SetFnSendTx(vc.addTx)
+	vc.App.SetFnGetTx(vc.getTx)
+	vc.App.SetFnGetBlockByHeight(vc.getBlock)
+	vc.App.SetFnGetTxHash(vc.getTxWithHash)
+	vc.App.SetFnMempoolSize(vc.mempoolSize)
+	vc.App.SetFnMempoolPrune(nil)
 }
 
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.app.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+	resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
 	if err != nil {
 		return nil, err
 	}
@@ -421,7 +400,7 @@ txLoop:
 			break txLoop
 		}
 		// ensure all txs are still valid valid
-		resp, err := vc.app.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+		resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
 		if err != nil {
 			log.Errorw(err, "error on check tx")
 			continue
@@ -524,7 +503,7 @@ func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 
 // SetChainID sets the chainID for the vocone instance
 func (vc *Vocone) SetChainID(chainID string) {
-	vc.app.SetChainID(chainID)
+	vc.App.SetChainID(chainID)
 }
 
 func defaultTxCosts() genesis.TransactionCosts {
