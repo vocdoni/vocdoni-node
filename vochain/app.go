@@ -620,7 +620,7 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	if !valid {
 		log.Errorf("invalid proposal at height %d", app.Height())
 		return &abcitypes.ResponseProcessProposal{
-			Status: abcitypes.ResponseProcessProposal_ACCEPT,
+			Status: abcitypes.ResponseProcessProposal_REJECT,
 		}, nil
 	}
 	return &abcitypes.ResponseProcessProposal{
