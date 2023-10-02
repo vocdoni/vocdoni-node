@@ -112,6 +112,7 @@ e2etest_encryptedelection() {
 
 e2etest_anonelection() {
 	e2etest anonelection
+	e2etest anonelectionTempSIKs
 }
 
 e2etest_hysteresis() {

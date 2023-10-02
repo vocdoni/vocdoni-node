@@ -27,15 +27,10 @@ import (
 	"go.vocdoni.io/dvote/log"
 )
 
-var (
-	pluginOnce sync.Once
-	ConfigRoot string
-)
+var ConfigRoot string
 
-const (
-	// ChunkerTypeSize is the chunker type used by IPFS to calculate to build the DAG.
-	ChunkerTypeSize = "size-262144"
-)
+// ChunkerTypeSize is the chunker type used by IPFS to calculate to build the DAG.
+const ChunkerTypeSize = "size-262144"
 
 func init() {
 	// Initialize the DAG builder with offline exchange and the correct CID format
@@ -68,7 +63,9 @@ func initRepository() error {
 		return err
 	}
 
-	installDatabasePlugins()
+	if err := installDatabasePlugins(); err != nil {
+		return err
+	}
 	_, err = doInit(io.Discard, ConfigRoot, 2048)
 	return err
 }
@@ -169,22 +166,19 @@ func cmdCtx(node *ipfscore.IpfsNode, repoPath string) commands.Context {
 	}
 }
 
-func installDatabasePlugins() {
-	pluginOnce.Do(func() {
-		loader, err := loader.NewPluginLoader("")
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = loader.Initialize()
-		if err != nil {
-			log.Fatal(err)
-		}
-		err = loader.Inject()
-		if err != nil {
-			log.Fatal(err)
-		}
-	})
-}
+var installDatabasePlugins = sync.OnceValue(func() error {
+	loader, err := loader.NewPluginLoader("")
+	if err != nil {
+		return err
+	}
+	if err := loader.Initialize(); err != nil {
+		return err
+	}
+	if err := loader.Inject(); err != nil {
+		return err
+	}
+	return nil
+})
 
 func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config, error) {
 	log.Infow("initializing new IPFS repository", "root", repoRoot)

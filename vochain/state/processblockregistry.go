@@ -56,9 +56,7 @@ func (pbr *ProcessBlockRegistry) MaxEndBlock(fromBlock uint32) (uint32, error) {
 		if err != nil {
 			return false
 		}
-		if endBlock := p.StartBlock + p.BlockCount; endBlock > maxEndBlock {
-			maxEndBlock = endBlock
-		}
+		maxEndBlock = max(maxEndBlock, p.StartBlock+p.BlockCount)
 		return true
 	}); err != nil {
 		return 0, err

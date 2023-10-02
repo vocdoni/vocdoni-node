@@ -2,9 +2,9 @@ package prefixeddb
 
 import (
 	"bytes"
+	"slices"
 
 	"go.vocdoni.io/dvote/db"
-	"golang.org/x/exp/slices"
 )
 
 // PrefixedDatabase wraps a db.Database prefixing all keys with `prefix`.

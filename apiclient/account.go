@@ -330,7 +330,7 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 }
 
 // RegisterSIKForVote function performs the free RegisterSIKTx to the vochain
-// helping to non registered accounts to vote in a on going election, but only
+// helping to non registered accounts to vote in an ongoing election, but only
 // if the account is in the election census. The function returns the hash of
 // the sent transaction, and requires the election ID. The census proof and the
 // secret are optional. If no proof is provided, it will be generated.
