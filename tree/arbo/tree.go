@@ -104,9 +104,6 @@ type Tree struct {
 	emptyNode []byte
 
 	dbg *dbgStats
-
-	currentRoot     []byte
-	currentRootLock sync.RWMutex
 }
 
 // Config defines the configuration for calling NewTree & NewTreeWithTx methods
@@ -181,18 +178,10 @@ func (t *Tree) RootWithTx(rTx db.Reader) ([]byte, error) {
 		return t.snapshotRoot, nil
 	}
 	// get db root
-	t.currentRootLock.RLock()
-	defer t.currentRootLock.RUnlock()
-	if len(t.currentRoot) > 0 {
-		return t.currentRoot, nil
-	}
 	return rTx.Get(dbKeyRoot)
 }
 
 func (t *Tree) setRoot(wTx db.WriteTx, root []byte) error {
-	t.currentRootLock.Lock()
-	defer t.currentRootLock.Unlock()
-	t.currentRoot = root
 	return wTx.Set(dbKeyRoot, root)
 }
 
