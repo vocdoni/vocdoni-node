@@ -419,6 +419,7 @@ func (v *State) Save() ([]byte, error) {
 		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
+		v.txCounter.Store(0)
 		return nil
 	}()
 	if err != nil {

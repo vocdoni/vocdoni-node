@@ -345,6 +345,9 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
 	// save state
 	_, err := app.State.Save()
 	if err != nil {
@@ -359,9 +362,6 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
-	}
-	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
 	}
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
