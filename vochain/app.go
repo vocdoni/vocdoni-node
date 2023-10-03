@@ -337,22 +337,23 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(req.GetTime(), height)
+
+	// Commit the state and get the hash
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
+	hash, err := app.State.Save()
+	if err != nil {
+		return nil, fmt.Errorf("cannot save state: %w", err)
+	}
 	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   app.State.WorkingHash(),
+		AppHash:   hash,
 		TxResults: txResults,
 	}, nil
 }
 
 // Commit saves the current vochain state and returns a commit hash
 func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
-	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
-	}
-	// save state
-	_, err := app.State.Save()
-	if err != nil {
-		return nil, fmt.Errorf("cannot save state: %w", err)
-	}
 	// perform state snapshot (DISABLED)
 	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()

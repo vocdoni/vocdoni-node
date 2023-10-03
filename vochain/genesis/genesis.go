@@ -92,8 +92,12 @@ var devGenesis = GenesisDoc{
 			},
 		},
 		Accounts: []GenesisAccount{
-			{ // faucet
+			{ // faucet1
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
+				Balance: 100000000,
+			},
+			{ // faucet2
+				Address: types.HexStringToHexBytes("0x536Da9ecd65Fc0248625b0BBDbB305d0DD841893"),
 				Balance: 100000000,
 			},
 		},
