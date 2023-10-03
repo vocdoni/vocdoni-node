@@ -678,8 +678,8 @@ func (t *Tree) IterateWithTx(rTx db.Reader, fromRoot []byte, f func([]byte, []by
 			return err
 		}
 	}
-	t.Lock()
-	defer t.Unlock()
+	t.RLock()
+	defer t.RUnlock()
 	return t.iter(rTx, fromRoot, f)
 }
 
@@ -695,6 +695,8 @@ func (t *Tree) IterateWithStop(fromRoot []byte, f func(int, []byte, []byte) bool
 			return err
 		}
 	}
+	t.RLock()
+	defer t.RUnlock()
 	return t.iterWithStop(t.db, fromRoot, 0, f)
 }
 
@@ -709,6 +711,8 @@ func (t *Tree) IterateWithStopWithTx(rTx db.Reader, fromRoot []byte, f func(int,
 			return err
 		}
 	}
+	t.RLock()
+	defer t.RUnlock()
 	return t.iterWithStop(rTx, fromRoot, 0, f)
 }
 
