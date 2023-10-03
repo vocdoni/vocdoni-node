@@ -31,7 +31,7 @@ func TestVocone(t *testing.T) {
 	err = account.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng, false)
+	vc, err := NewVocone(dir, &keymng, false, "", nil)
 	qt.Assert(t, err, qt.IsNil)
 
 	vc.SetBlockTimeTarget(time.Millisecond * 500)

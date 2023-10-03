@@ -59,7 +59,7 @@ type Vocone struct {
 }
 
 // NewVocone returns a ready Vocone instance.
-func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) (*Vocone, error) {
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, connectKey string, connectPeers []string) (*Vocone, error) {
 	var err error
 
 	vc := &Vocone{}
@@ -106,7 +106,9 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool) 
 	// Create the IPFS storage layer
 	if !disableIPFS {
 		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
-			ConfigPath: filepath.Join(dataDir, "ipfs"),
+			ConfigPath:   filepath.Join(dataDir, "ipfs"),
+			ConnectKey:   connectKey,
+			ConnectPeers: connectPeers,
 		})
 		if err != nil {
 			return nil, err
