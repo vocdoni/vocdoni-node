@@ -270,9 +270,9 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	txReference := vochaintx.TxKey(req.Tx)
 	// store the initial height of the tx
-	initialTTLheight, isReferenced := app.txTTLReferences.LoadOrStore(txReference, app.Height())
+	initialTTLheight, _ := app.txTTLReferences.LoadOrStore(txReference, app.Height())
 	// check if the tx is referenced by a previous block and the TTL has expired
-	if isReferenced && app.Height() > initialTTLheight.(uint32)+transactionBlocksTTL {
+	if app.Height() > initialTTLheight.(uint32)+transactionBlocksTTL {
 		// remove tx reference and return checkTx error
 		log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
 		app.txTTLReferences.Delete(txReference)

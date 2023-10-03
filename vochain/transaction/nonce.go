@@ -5,6 +5,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -14,64 +15,38 @@ import (
 // the Ethereum address. The nonce is extracted based on the specific payload type of the transaction.
 // If the transaction does not contain signature or nonce, it returns the default values (nil and 0).
 func (t *TransactionHandler) ExtractNonceAndSender(vtx *vochaintx.Tx) (*common.Address, uint32, error) {
-	type txWithNonce interface {
+	var ptx interface {
 		GetNonce() uint32
 	}
-	var txNonce txWithNonce
-	var err error
+
 	switch payload := vtx.Tx.Payload.(type) {
 	case *models.Tx_NewProcess:
-		ptx := payload.NewProcess
-		if ptx == nil {
-			err = fmt.Errorf("new process payload is nil")
-			break
-		}
-		txNonce = txWithNonce(ptx)
+		ptx = payload.NewProcess
 	case *models.Tx_SetProcess:
-		ptx := payload.SetProcess
-		if ptx == nil {
-			err = fmt.Errorf("set process payload is nil")
-			break
-		}
-		txNonce = txWithNonce(ptx)
+		ptx = payload.SetProcess
 	case *models.Tx_SendTokens:
-		ptx := payload.SendTokens
-		if ptx == nil {
-			err = fmt.Errorf("send tokens payload is nil")
-			break
-		}
-		txNonce = txWithNonce(ptx)
+		ptx = payload.SendTokens
 	case *models.Tx_SetAccount:
-		ptx := payload.SetAccount
-		if ptx == nil {
-			err = fmt.Errorf("set account payload is nil")
-			break
-		}
-		if ptx.Txtype == models.TxType_CREATE_ACCOUNT {
+		if payload.SetAccount.Txtype == models.TxType_CREATE_ACCOUNT {
 			// create account tx is a special case where the nonce is not relevant
 			return nil, 0, nil
 		}
-		txNonce = txWithNonce(ptx)
+		ptx = payload.SetAccount
 	case *models.Tx_CollectFaucet:
-		ptx := payload.CollectFaucet
-		if ptx == nil {
-			err = fmt.Errorf("collect faucet payload is nil")
-			break
-		}
-		txNonce = txWithNonce(ptx)
+		ptx = payload.CollectFaucet
 	case *models.Tx_Vote, *models.Tx_Admin, *models.Tx_MintTokens, *models.Tx_SetKeykeeper,
 		*models.Tx_SetTransactionCosts, *models.Tx_DelSIK, *models.Tx_RegisterKey, *models.Tx_SetSIK,
 		*models.Tx_RegisterSIK:
 		// these tx does not have incremental nonce
 		return nil, 0, nil
 	default:
-		// force panic to detect new tx types
-		panic(fmt.Sprintf("unknown payload type on extract nonce: %T", payload))
+		log.Errorf("unknown payload type on extract nonce: %T", payload)
 	}
 
-	if err != nil {
-		return nil, 0, err
+	if ptx == nil {
+		return nil, 0, fmt.Errorf("payload is nil")
 	}
+
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return nil, 0, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
@@ -80,7 +55,8 @@ func (t *TransactionHandler) ExtractNonceAndSender(vtx *vochaintx.Tx) (*common.A
 	if err != nil {
 		return nil, 0, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	return &addr, txNonce.GetNonce(), nil
+
+	return &addr, ptx.GetNonce(), nil
 }
 
 // checkAccountNonce checks if the nonce of the given transaction matches the nonce of the sender account.
