@@ -58,7 +58,7 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 		return nil, nil, err
 	}
 	// save state
-	_, err := app.Commit(context.TODO(), nil)
+	_, err := app.CommitState()
 	return app, signers, err
 }
 
@@ -71,7 +71,7 @@ func TestSetAccountTx(t *testing.T) {
 			Account: models.Account{Balance: 10000, InfoURI: infoURI}}),
 		qt.IsNil,
 	)
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 
 	// CREATE ACCOUNT
 
@@ -331,7 +331,7 @@ func TestSetAccountTx(t *testing.T) {
 
 	// should ignore tx cost if tx cost is set to 0
 	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 0), qt.IsNil)
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[7].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
@@ -373,7 +373,7 @@ func TestSetAccountTx(t *testing.T) {
 
 	// should not work if tx cost is not 0 and no faucet package is provided
 	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 1), qt.IsNil)
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 	qt.Assert(t, testSetAccountTx(t,
 		signers[9], common.Address{}, nil, app, infoURI, 0, true),
 		qt.IsNotNil,
@@ -527,7 +527,7 @@ func testSetAccountTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 	return nil
 }
 
@@ -585,7 +585,7 @@ func testSetTransactionCostsTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 	return nil
 }
 
@@ -606,7 +606,7 @@ func TestMintTokensTx(t *testing.T) {
 	toAccAddr := common.HexToAddress(randomEthAccount)
 	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 
 	// should mint
 	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, 0); err != nil {
@@ -671,7 +671,7 @@ func testMintTokensTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 	return nil
 }
 
@@ -702,7 +702,7 @@ func TestSendTokensTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	app.Commit(context.TODO(), nil)
+	app.CommitState()
 
 	// should send
 	err = testSendTokensTx(t, &signer, app, toAccAddr, 100, 0)
@@ -757,7 +757,7 @@ func testSendTokensTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	return err
 }
 
@@ -800,7 +800,7 @@ func TestSetAccountDelegateTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	qt.Assert(t, err, qt.IsNil)
 
 	// should add delegate if owner
@@ -865,7 +865,7 @@ func testSetAccountDelegateTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	return err
 }
 
@@ -898,7 +898,7 @@ func TestCollectFaucetTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	qt.Assert(t, err, qt.IsNil)
 
 	randomIdentifier := uint64(util.RandomInt(0, 10000000))
@@ -1001,7 +1001,7 @@ func testCollectFaucetTx(t *testing.T,
 	if err := sendTx(app, to, stx); err != nil {
 		return err
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	return err
 }
 

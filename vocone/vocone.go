@@ -207,11 +207,6 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			log.Error(err, "finalize block error")
 		}
-		// Commit block to persistent state
-		_, err = vc.app.Commit(context.Background(), &abcitypes.RequestCommit{})
-		if err != nil {
-			log.Error(err, "commit error")
-		}
 		log.Debugw("block committed",
 			"height", height,
 			"hash", hex.EncodeToString(resp.GetAppHash()),

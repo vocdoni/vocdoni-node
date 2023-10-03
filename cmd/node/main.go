@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -572,6 +573,17 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
+	height, err := srv.App.State.LastHeight()
+	if err != nil {
+		log.Warn(err)
+	}
+	hash, err := srv.App.State.MainTreeView().Root()
+	if err != nil {
+		log.Warn(err)
+	}
+	tmBlock := srv.App.GetBlockByHeight(int64(height))
+	log.Infow("last block", "height", height, "appHash", hex.EncodeToString(hash),
+		"time", tmBlock.Time, "tmAppHash", tmBlock.AppHash.String(), "tmHeight", tmBlock.Height)
 	os.Exit(0)
 }
 

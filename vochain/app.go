@@ -337,7 +337,15 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(req.GetTime(), height)
+	// save state and get hash
+	hash, err := app.CommitState()
+	return &abcitypes.ResponseFinalizeBlock{
+		AppHash:   hash,
+		TxResults: txResults,
+	}, err
+}
 
+func (app *BaseApplication) CommitState() ([]byte, error) {
 	// Commit the state and get the hash
 	if app.State.TxCounter() > 0 {
 		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
@@ -346,24 +354,21 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   hash,
-		TxResults: txResults,
-	}, nil
-}
-
-// Commit saves the current vochain state and returns a commit hash
-func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
 	// perform state snapshot (DISABLED)
 	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
 		if _, err := app.State.Snapshot(); err != nil {
-			return nil, fmt.Errorf("cannot make state snapshot: %w", err)
+			return hash, fmt.Errorf("cannot make state snapshot: %w", err)
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
 	}
+	return hash, err
+}
+
+// Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
+func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil

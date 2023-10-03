@@ -138,7 +138,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 			t.Fatalf("deliverTx success, but expected result is fail")
 		}
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	if err != nil {
 		t.Fatal(err)
 	}

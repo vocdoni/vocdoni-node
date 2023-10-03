@@ -157,7 +157,7 @@ func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr comm
 			t.Fatalf("deliverTx uccess, but expected result is fail")
 		}
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	if err != nil {
 		t.Fatal(err)
 	}

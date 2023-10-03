@@ -105,7 +105,7 @@ func (app *BaseApplication) AdvanceTestBlock() {
 	// finalize block
 	app.endBlock(time.Now(), height)
 	// save the state
-	_, err := app.Commit(context.TODO(), nil)
+	_, err := app.CommitState()
 	if err != nil {
 		panic(err)
 	}
