@@ -506,6 +506,11 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		DecodedTx *vochaintx.Tx
 	}
 
+	// ensure the pending state is clean
+	if app.State.TxCounter() > 0 {
+		panic("found existing pending transactions on prepare proposal")
+	}
+
 	validTxInfos := []txInfo{}
 	for _, tx := range req.GetTxs() {
 		vtx := new(vochaintx.Tx)
@@ -583,6 +588,11 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	// ensure the pending state is clean
+	if app.State.TxCounter() > 0 {
+		panic("found existing pending transactions on process proposal")
+	}
+
 	valid := true
 	for _, tx := range req.Txs {
 		vtx := new(vochaintx.Tx)

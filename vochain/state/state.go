@@ -407,6 +407,10 @@ func (v *State) Save() ([]byte, error) {
 	// the listeners may need to get the previous (not committed) state.
 	v.tx.Lock()
 	defer v.tx.Unlock()
+	// Update the SIK merkle-tree roots
+	if err := v.UpdateSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
+	}
 	err := func() error {
 		var err error
 		if err := v.tx.Commit(height); err != nil {
@@ -427,9 +431,6 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-	if err := v.UpdateSIKRoots(); err != nil {
-		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
-	}
 	return v.store.Hash()
 }
 
@@ -441,6 +442,7 @@ func (v *State) Rollback() {
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	var err error
 	if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 		log.Errorf("cannot begin statedb tx: %s", err)
@@ -453,6 +455,7 @@ func (v *State) Rollback() {
 func (v *State) Close() error {
 	v.tx.Lock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	v.tx.Unlock()
 
 	return v.db.Close()
