@@ -337,12 +337,10 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(req.GetTime(), height)
-	// save state and get hash
-	hash, err := app.CommitState()
 	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   hash,
+		AppHash:   app.State.WorkingHash(),
 		TxResults: txResults,
-	}, err
+	}, nil
 }
 
 func (app *BaseApplication) CommitState() ([]byte, error) {
@@ -369,6 +367,11 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 
 // Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
 func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+	// save state and get hash
+	_, err := app.CommitState()
+	if err != nil {
+		return nil, err
+	}
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil

@@ -207,6 +207,9 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			log.Error(err, "finalize block error")
 		}
+		if _, err := vc.app.CommitState(); err != nil {
+			log.Fatalf("could not commit state: %v", err)
+		}
 		log.Debugw("block committed",
 			"height", height,
 			"hash", hex.EncodeToString(resp.GetAppHash()),
