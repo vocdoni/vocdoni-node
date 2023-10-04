@@ -432,7 +432,7 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-	return v.store.Hash()
+	return mainTreeView.Root()
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -482,7 +482,16 @@ func (v *State) SetHeight(height uint32) {
 func (v *State) WorkingHash() []byte {
 	v.tx.RLock()
 	defer v.tx.RUnlock()
-	hash, err := v.tx.Root()
+	hash, err := v.tx.AsTreeView().Root()
+	if err != nil {
+		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
+	}
+	return hash
+}
+
+// CommittedHash returns the hash of the last committed vochain StateDB
+func (v *State) CommittedHash() []byte {
+	hash, err := v.mainTreeViewer(true).Root()
 	if err != nil {
 		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
 	}

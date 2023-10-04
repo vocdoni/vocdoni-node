@@ -149,7 +149,7 @@ func (app *BaseApplication) Info(_ context.Context,
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
 	app.State.SetHeight(lastHeight)
-	appHash := app.State.WorkingHash()
+	appHash := app.State.CommittedHash()
 	if err := app.State.SetElectionPriceCalc(); err != nil {
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
@@ -337,6 +337,10 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(req.GetTime(), height)
+	log.Warnw("finalize block", "height", height,
+		"txs", len(req.Txs), "hash", hex.EncodeToString(app.State.WorkingHash()),
+		"elapsed", time.Since(req.GetTime()).Seconds(), "time", time.Now().String())
+
 	return &abcitypes.ResponseFinalizeBlock{
 		AppHash:   app.State.WorkingHash(),
 		TxResults: txResults,
@@ -367,11 +371,15 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 
 // Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
 func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+	app.prepareProposalLock.Lock()
+	defer app.prepareProposalLock.Unlock()
 	// save state and get hash
-	_, err := app.CommitState()
+	h, err := app.CommitState()
 	if err != nil {
 		return nil, err
 	}
+	log.Warnw("commit block", "height", app.Height(),
+		"hash", hex.EncodeToString(h), "time", time.Now().String())
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil
