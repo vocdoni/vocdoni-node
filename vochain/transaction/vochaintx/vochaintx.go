@@ -33,6 +33,7 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal transaction: %w", err)
 	}
+	fmt.Printf("TxSignedBody: %s\n", tx.SignedBody)
 	tx.TxModelType = string(tx.Tx.ProtoReflect().WhichOneof(tx.Tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
 	tx.Signature = stx.GetSignature()
 	tx.TxID = TxKey(content)
