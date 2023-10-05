@@ -242,6 +242,92 @@ func TestUpdate(t *testing.T) {
 	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(11)))
 }
 
+func TestRootOnTx(t *testing.T) {
+	c := qt.New(t)
+	database := metadb.NewTest(t)
+	tree, err := NewTree(Config{Database: database, MaxLevels: 256, HashFunction: HashFunctionBlake2b})
+	c.Assert(err, qt.IsNil)
+
+	bLen := 32
+	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
+	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
+	if err := tree.Add(k, v); err != nil {
+		t.Fatal(err)
+	}
+	rootInitial, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+
+	// Start a new transaction
+	tx := database.WriteTx()
+
+	// Update the value of the key
+	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
+	err = tree.UpdateWithTx(tx, k, v)
+	c.Assert(err, qt.IsNil)
+
+	// Check that the root has not been updated yet
+	rootBefore, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootBefore, qt.DeepEquals, rootInitial)
+
+	newRoot, err := tree.RootWithTx(tx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(newRoot, qt.Not(qt.DeepEquals), rootBefore)
+
+	// Commit the tx
+	c.Assert(tx.Commit(), qt.IsNil)
+	tx = database.WriteTx()
+
+	// Check the new root equals the one returned by Root()
+	rootAfter, err := tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootAfter, qt.DeepEquals, newRoot)
+
+	// Add a new key-value pair
+	k2 := BigIntToBytes(bLen, big.NewInt(int64(30)))
+	v2 := BigIntToBytes(bLen, big.NewInt(int64(40)))
+	if err := tree.AddWithTx(tx, k2, v2); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the tx root has been updated
+	newRoot, err = tree.RootWithTx(tx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootAfter, qt.Not(qt.DeepEquals), newRoot)
+
+	c.Assert(tx.Commit(), qt.IsNil)
+	tx = database.WriteTx()
+
+	// Check that the root has been updated after commit
+	rootInitial, err = tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootInitial, qt.DeepEquals, newRoot)
+
+	// Delete a key-value pair
+	if err := tree.DeleteWithTx(tx, k); err != nil {
+		t.Fatal(err)
+	}
+
+	// Check that the root has not been updated yet
+	rootBefore, err = tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootBefore, qt.DeepEquals, rootInitial)
+
+	// Check that the tx root is different from the tree root
+	newRoot, err = tree.RootWithTx(tx)
+	c.Assert(err, qt.IsNil)
+	c.Assert(newRoot, qt.Not(qt.DeepEquals), rootBefore)
+
+	// Commit the transaction
+	err = tx.Commit()
+	c.Assert(err, qt.IsNil)
+
+	// Check that the root has been updated
+	rootAfter, err = tree.Root()
+	c.Assert(err, qt.IsNil)
+	c.Assert(rootAfter, qt.DeepEquals, newRoot)
+}
+
 func TestAux(t *testing.T) { // TODO split in proper tests
 	c := qt.New(t)
 	database := metadb.NewTest(t)
