@@ -382,7 +382,18 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
+// PrepareCommit prepares the state for commit. It returns the new root hash.
+func (v *State) PrepareCommit() ([]byte, error) {
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	if err := v.tx.CommitOnTx(v.CurrentHeight()); err != nil {
+		return nil, err
+	}
+	return v.mainTreeViewer(false).Root()
+}
+
 // Save persistent save of vochain mem trees. It returns the new root hash. It also notifies the event listeners.
+// Save should usually be called after PrepareCommit().
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
 	var pidsStartNextBlock [][]byte
@@ -407,7 +418,7 @@ func (v *State) Save() ([]byte, error) {
 	defer v.tx.Unlock()
 	err := func() error {
 		var err error
-		if err := v.tx.Commit(height); err != nil {
+		if err := v.tx.SaveWithoutCommit(); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
 		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
@@ -425,8 +436,7 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-
-	return v.store.Hash()
+	return mainTreeView.Root()
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -470,11 +480,9 @@ func (v *State) SetHeight(height uint32) {
 	v.currentHeight.Store(height)
 }
 
-// WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
-func (v *State) WorkingHash() []byte {
-	v.tx.RLock()
-	defer v.tx.RUnlock()
-	hash, err := v.tx.Root()
+// CommittedHash returns the hash of the last committed vochain StateDB
+func (v *State) CommittedHash() []byte {
+	hash, err := v.mainTreeViewer(true).Root()
 	if err != nil {
 		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
 	}

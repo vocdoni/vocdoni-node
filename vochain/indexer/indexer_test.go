@@ -981,6 +981,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	}
 
 	// Save the current state with the 10 new votes
+	app.State.PrepareCommit()
 	app.State.Save()
 
 	// The results should not be up to date.

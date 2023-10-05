@@ -28,12 +28,13 @@ import (
 // We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
 	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
+	app.isSynchronizing.Store(true)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
 	app.State.SetHeight(lastHeight)
-	appHash := app.State.WorkingHash()
+	appHash := app.State.CommittedHash()
 	if err := app.State.SetElectionPriceCalc(); err != nil {
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
@@ -84,7 +85,6 @@ func (app *BaseApplication) InitChain(_ context.Context,
 			"name", genesisAppState.Validators[i].Name,
 			"keyIndex", genesisAppState.Validators[i].KeyIndex,
 		)
-
 		v := &models.Validator{
 			Address:  genesisAppState.Validators[i].Address,
 			PubKey:   genesisAppState.Validators[i].PubKey,
@@ -139,8 +139,11 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	}
 
 	// commit state and get hash
-	hash, err := app.State.Save()
+	hash, err := app.State.PrepareCommit()
 	if err != nil {
+		return nil, fmt.Errorf("cannot prepare commit: %w", err)
+	}
+	if _, err = app.State.Save(); err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
 	return &abcitypes.ResponseInitChain{
@@ -152,11 +155,13 @@ func (app *BaseApplication) InitChain(_ context.Context,
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
+	// execute recheck mempool every recheckTxHeightInterval blocks
 	if req.Type == abcitypes.CheckTxType_Recheck {
 		if app.Height()%recheckTxHeightInterval != 0 {
 			return &abcitypes.ResponseCheckTx{Code: 0}, nil
 		}
 	}
+	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
 		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
@@ -177,62 +182,47 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 	}, nil
 }
 
-// FinalizeBlock It delivers a decided block to the Application. The Application must execute
-// the transactions in the block deterministically and update its state accordingly.
+// FinalizeBlock is executed by cometBFT when a new block is decided.
 // Cryptographic commitments to the block and transaction results, returned via the corresponding
 // parameters in ResponseFinalizeBlock, are included in the header of the next block.
-// CometBFT calls it when a new block is decided.
 func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
+	start := time.Now()
 	height := uint32(req.GetHeight())
-	app.beginBlock(req.GetTime(), height)
+
+	resp, root, err := app.ExecuteBlock(req.Txs, height, req.GetTime())
+	if err != nil {
+		return nil, fmt.Errorf("cannot execute block: %w", err)
+	}
+
 	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
-	for i, tx := range req.Txs {
-		resp := app.deliverTx(tx)
-		if resp.Code != 0 {
-			log.Warnw("deliverTx failed",
-				"code", resp.Code,
-				"data", string(resp.Data),
-				"info", resp.Info,
-				"log", resp.Log)
-		}
+	for i, tx := range resp {
 		txResults[i] = &abcitypes.ExecTxResult{
-			Code: resp.Code,
-			Data: resp.Data,
-			Log:  resp.Log,
+			Code: tx.Code,
+			Data: tx.Data,
+			Log:  tx.Log,
+			Info: tx.Info,
 		}
 	}
-	// execute internal state transition commit
-	if err := app.Istc.Commit(height); err != nil {
-		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
-	}
-	app.endBlock(req.GetTime(), height)
+	log.Debugw("finalize block", "height", height,
+		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
+		"totalElapsedSeconds", time.Since(req.GetTime()).Seconds(),
+		"executionElapsedSeconds", time.Since(start).Seconds())
+
 	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   app.State.WorkingHash(),
-		TxResults: txResults, // TODO: check if we can remove this
+		AppHash:   root,
+		TxResults: txResults,
 	}, nil
 }
 
-// Commit saves the current vochain state and returns a commit hash
+// Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
 func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
-	// save state
-	_, err := app.State.Save()
+	// save state and get hash
+	h, err := app.CommitState()
 	if err != nil {
-		return nil, fmt.Errorf("cannot save state: %w", err)
+		return nil, err
 	}
-	// perform state snapshot (DISABLED)
-	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
-		startTime := time.Now()
-		log.Infof("performing a state snapshot on block %d", app.Height())
-		if _, err := app.State.Snapshot(); err != nil {
-			return nil, fmt.Errorf("cannot make state snapshot: %w", err)
-		}
-		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
-		log.Debugf("%+v", app.State.ListSnapshots())
-	}
-	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
-	}
+	log.Debugw("commit block", "height", app.Height(), "hash", hex.EncodeToString(h))
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil

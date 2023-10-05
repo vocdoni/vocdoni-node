@@ -117,6 +117,58 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
+// ExecuteBlock delivers a block of transactions to the Application.
+// It modifies the state according to the transactions and returns the resulting Merkle root hash.
+// It returns a list of ResponseDeliverTx, one for each transaction in the block.
+func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) ([]*DeliverTxResponse, []byte, error) {
+	result := []*DeliverTxResponse{}
+	app.beginBlock(blockTime, height)
+	for _, tx := range txs {
+		resp := app.deliverTx(tx)
+		if resp.Code != 0 {
+			log.Warnw("deliverTx failed",
+				"code", resp.Code,
+				"data", string(resp.Data),
+				"info", resp.Info,
+				"log", resp.Log)
+		}
+		result = append(result, resp)
+	}
+	// execute internal state transition commit
+	if err := app.Istc.Commit(height); err != nil {
+		return nil, nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
+	}
+	app.endBlock(blockTime, height)
+	root, err := app.State.PrepareCommit()
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot prepare commit: %w", err)
+	}
+	return result, root, nil
+}
+
+// CommitState saves the state to persistent storage and returns the hash.
+func (app *BaseApplication) CommitState() ([]byte, error) {
+	// Commit the state and get the hash
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
+	hash, err := app.State.Save()
+	if err != nil {
+		return nil, fmt.Errorf("cannot save state: %w", err)
+	}
+	// perform state snapshot (DISABLED)
+	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
+		startTime := time.Now()
+		log.Infof("performing a state snapshot on block %d", app.Height())
+		if _, err := app.State.Snapshot(); err != nil {
+			return nil, fmt.Errorf("cannot make state snapshot: %w", err)
+		}
+		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
+		log.Debugf("%+v", app.State.ListSnapshots())
+	}
+	return hash, err
+}
+
 // deliverTx unmarshals req.Tx and adds it to the State if it is valid
 func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 	// Increase Tx counter on return since the index 0 is valid
@@ -168,7 +220,6 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
 		Time:   t,
-		// TODO: remove data hash from this event call
 	})
 }
 

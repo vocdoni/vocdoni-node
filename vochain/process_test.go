@@ -417,12 +417,11 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
 
 	}
-	_, err := app.Commit(context.TODO(), nil)
-	qt.Assert(t, err, qt.IsNil)
+	testCommitState(t, app)
 	return app, keys
 }
 
-func testCheckTxDeliverTxCommit(_ *testing.T, app *BaseApplication, stx *models.SignedTx) error {
+func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
 	cktx := new(abcitypes.RequestCheckTx)
 	var err error
 	// checkTx()
@@ -444,8 +443,8 @@ func testCheckTxDeliverTxCommit(_ *testing.T, app *BaseApplication, stx *models.
 		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
 	}
 	// commit()
-	_, err = app.Commit(context.TODO(), nil)
-	return err
+	testCommitState(t, app)
+	return nil
 }
 
 func TestGlobalMaxProcessSize(t *testing.T) {
