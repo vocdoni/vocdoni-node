@@ -25,15 +25,18 @@ const (
 )
 
 // BuildVocdoniProtoTxMessage builds the message to be signed for a vocdoni transaction.
+// It takes an optional transaction hash, if it is not provided it will be computed.
 // It returns the payload that needs to be signed.
-func BuildVocdoniProtoTxMessage(tx *models.Tx, chainID string) ([]byte, error) {
+func BuildVocdoniProtoTxMessage(tx *models.Tx, chainID string, hash []byte) ([]byte, error) {
 	var msg string
 
 	marshaledTx, err := proto.Marshal(tx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal Tx: %v", err)
 	}
-	hash := HashRaw(marshaledTx)
+	if hash == nil {
+		hash = HashRaw(marshaledTx)
+	}
 
 	switch tx.Payload.(type) {
 	case *models.Tx_SendTokens:
@@ -109,7 +112,7 @@ func (k *SignKeys) SignVocdoniTx(txData []byte, chainID string) ([]byte, error) 
 		return nil, fmt.Errorf("failed to unmarshal Tx: %v", err)
 	}
 
-	payloadToSign, err := BuildVocdoniProtoTxMessage(tx, chainID)
+	payloadToSign, err := BuildVocdoniProtoTxMessage(tx, chainID, HashRaw(txData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to build transaction message: %v", err)
 	}
@@ -140,7 +143,7 @@ func BuildVocdoniTransaction(marshaledTx []byte, chainID string) ([]byte, *model
 	if err := proto.Unmarshal(marshaledTx, &tx); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal Tx: %v", err)
 	}
-	message, err := BuildVocdoniProtoTxMessage(&tx, chainID)
+	message, err := BuildVocdoniProtoTxMessage(&tx, chainID, HashRaw(marshaledTx))
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to build transaction message: %v", err)
 	}
