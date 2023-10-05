@@ -41,7 +41,7 @@ var Genesis = map[string]VochainGenesis{
 
 var devGenesis = GenesisDoc{
 	GenesisTime: time.Date(2023, time.October, 3, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-dev-22",
+	ChainID:     "vocdoni-dev-23",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
