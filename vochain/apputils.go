@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/cometbft/cometbft/crypto"
 	crypto25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	tmp2p "github.com/cometbft/cometbft/p2p"
@@ -61,6 +62,11 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmp2p.NodeKey, error) {
 	}
 	// Write nodeKey to disk
 	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
+}
+
+// NodeKeyToAddress returns the ethereum address of the given cometBFT node key
+func NodePvKeyToAddress(pubk crypto.PubKey) (ethcommon.Address, error) {
+	return ethereum.AddrFromPublicKey(pubk.Bytes())
 }
 
 // GenerateFaucetPackage generates a faucet package.

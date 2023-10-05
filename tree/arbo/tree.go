@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/log"
 )
 
 const (
@@ -180,12 +179,10 @@ func (t *Tree) RootWithTx(rTx db.Reader) ([]byte, error) {
 	}
 	// get db root
 	hash, err := rTx.Get(dbKeyRoot)
-	log.Warnf("arbo RootWithTx: %x", hash)
 	return hash, err
 }
 
 func (t *Tree) setRoot(wTx db.WriteTx, root []byte) error {
-	log.Warnf("arbo setRoot: %x", root)
 	return wTx.Set(dbKeyRoot, root)
 }
 

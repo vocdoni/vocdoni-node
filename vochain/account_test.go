@@ -26,6 +26,15 @@ const (
 		"0x52bc44d5378309ee2abf1539bf71de1b7d7be3b5"
 )
 
+func testCommitState(t *testing.T, app *BaseApplication) {
+	if _, err := app.State.PrepareCommit(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := app.CommitState(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func setupTestBaseApplicationAndSigners(t *testing.T,
 	numberSigners int) (*BaseApplication, []*ethereum.SignKeys, error) {
 	app := TestBaseApplication(t)
@@ -58,8 +67,8 @@ func setupTestBaseApplicationAndSigners(t *testing.T,
 		return nil, nil, err
 	}
 	// save state
-	_, err := app.CommitState()
-	return app, signers, err
+	testCommitState(t, app)
+	return app, signers, nil
 }
 
 func TestSetAccountTx(t *testing.T) {
@@ -71,7 +80,7 @@ func TestSetAccountTx(t *testing.T) {
 			Account: models.Account{Balance: 10000, InfoURI: infoURI}}),
 		qt.IsNil,
 	)
-	app.CommitState()
+	testCommitState(t, app)
 
 	// CREATE ACCOUNT
 
@@ -331,7 +340,7 @@ func TestSetAccountTx(t *testing.T) {
 
 	// should ignore tx cost if tx cost is set to 0
 	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 0), qt.IsNil)
-	app.CommitState()
+	testCommitState(t, app)
 	faucetPkg, err = GenerateFaucetPackage(signers[0], signers[7].Address(), 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, testSetAccountTx(t,
@@ -373,7 +382,7 @@ func TestSetAccountTx(t *testing.T) {
 
 	// should not work if tx cost is not 0 and no faucet package is provided
 	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_CREATE_ACCOUNT, 1), qt.IsNil)
-	app.CommitState()
+	testCommitState(t, app)
 	qt.Assert(t, testSetAccountTx(t,
 		signers[9], common.Address{}, nil, app, infoURI, 0, true),
 		qt.IsNotNil,
@@ -527,7 +536,7 @@ func testSetAccountTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.CommitState()
+	testCommitState(t, app)
 	return nil
 }
 
@@ -585,7 +594,7 @@ func testSetTransactionCostsTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.CommitState()
+	testCommitState(t, app)
 	return nil
 }
 
@@ -606,7 +615,7 @@ func TestMintTokensTx(t *testing.T) {
 	toAccAddr := common.HexToAddress(randomEthAccount)
 	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
-	app.CommitState()
+	testCommitState(t, app)
 
 	// should mint
 	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, 0); err != nil {
@@ -671,7 +680,7 @@ func testMintTokensTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	app.CommitState()
+	testCommitState(t, app)
 	return nil
 }
 
@@ -702,7 +711,7 @@ func TestSendTokensTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	app.CommitState()
+	testCommitState(t, app)
 
 	// should send
 	err = testSendTokensTx(t, &signer, app, toAccAddr, 100, 0)
@@ -757,8 +766,8 @@ func testSendTokensTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	_, err = app.CommitState()
-	return err
+	testCommitState(t, app)
+	return nil
 }
 
 func TestSetAccountDelegateTx(t *testing.T) {
@@ -800,8 +809,8 @@ func TestSetAccountDelegateTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	_, err = app.CommitState()
-	qt.Assert(t, err, qt.IsNil)
+
+	testCommitState(t, app)
 
 	// should add delegate if owner
 	err = testSetAccountDelegateTx(t, &signer, app, toAccAddr, true, 0)
@@ -865,8 +874,8 @@ func testSetAccountDelegateTx(t *testing.T,
 	if err := sendTx(app, signer, stx); err != nil {
 		return err
 	}
-	_, err = app.CommitState()
-	return err
+	testCommitState(t, app)
+	return nil
 }
 
 func TestCollectFaucetTx(t *testing.T) {
@@ -898,8 +907,8 @@ func TestCollectFaucetTx(t *testing.T) {
 		Amount:    1000,
 	})
 	qt.Assert(t, err, qt.IsNil)
-	_, err = app.CommitState()
-	qt.Assert(t, err, qt.IsNil)
+
+	testCommitState(t, app)
 
 	randomIdentifier := uint64(util.RandomInt(0, 10000000))
 	// should work if all data and tx are valid
@@ -1001,8 +1010,8 @@ func testCollectFaucetTx(t *testing.T,
 	if err := sendTx(app, to, stx); err != nil {
 		return err
 	}
-	_, err = app.CommitState()
-	return err
+	testCommitState(t, app)
+	return nil
 }
 
 // sendTx signs and sends a vochain transaction

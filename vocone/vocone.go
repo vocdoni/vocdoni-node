@@ -195,24 +195,18 @@ func (vc *Vocone) Start() {
 		vc.vcMtx.Lock()
 		startTime := time.Now()
 		height := vc.height.Load()
+
 		// Create and execute block
-		resp, err := vc.app.FinalizeBlock(
-			context.Background(),
-			&abcitypes.RequestFinalizeBlock{
-				Txs:    vc.prepareBlock(),
-				Height: height,
-				Time:   time.Now(),
-			},
-		)
+		_, root, err := vc.app.ExecuteBlock(vc.prepareBlock(), uint32(height), time.Now())
 		if err != nil {
-			log.Error(err, "finalize block error")
+			log.Error(err, "execute block error")
 		}
 		if _, err := vc.app.CommitState(); err != nil {
 			log.Fatalf("could not commit state: %v", err)
 		}
 		log.Debugw("block committed",
 			"height", height,
-			"hash", hex.EncodeToString(resp.GetAppHash()),
+			"hash", hex.EncodeToString(root),
 			"took", time.Since(startTime),
 		)
 		vc.vcMtx.Unlock()
@@ -244,10 +238,22 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 	if err := vc.app.State.SetAccount(key, acc); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	return nil
+}
+
+// Commit saves the current state and returns the hash.
+func (vc *Vocone) Commit() ([]byte, error) {
+	hash, err := vc.app.State.PrepareCommit()
+	if err != nil {
+		return nil, err
+	}
+	if _, err := vc.app.State.Save(); err != nil {
+		return nil, err
+	}
+	return hash, nil
 }
 
 // SetTreasurer configures the vocone treasurer account address
@@ -257,7 +263,7 @@ func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
 	if err := vc.app.State.SetTreasurer(treasurer, 0); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	return nil
@@ -289,7 +295,7 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 		return err
 	}
 	log.Infow("adding validator", "address", key.Address().Hex(), "keyIndex", 1)
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	vc.kk, err = keykeeper.NewKeyKeeper(
@@ -310,7 +316,7 @@ func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	return nil
@@ -326,7 +332,7 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	if err := vc.app.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	return nil
@@ -353,7 +359,7 @@ func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 			return err
 		}
 	}
-	if _, err := vc.app.State.Save(); err != nil {
+	if _, err := vc.Commit(); err != nil {
 		return err
 	}
 	return nil

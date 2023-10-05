@@ -150,32 +150,12 @@ func (u *TreeUpdate) SubTree(cfg TreeConfig) (treeUpdate *TreeUpdate, err error)
 	if treeUpdate, ok := u.openSubs.Load(cfg.prefix); ok {
 		return treeUpdate.(*TreeUpdate), nil
 	}
-	parentLeaf, err := u.tree.Get(u.tree.tx, cfg.parentLeafKey)
-	if err != nil {
-		return nil, err
-	}
-	root, err := cfg.parentLeafGetRoot(parentLeaf)
-	if err != nil {
-		return nil, err
-	}
 	tx := subWriteTx(u.tx, path.Join(subKeySubTree, cfg.prefix))
 	txTree := subWriteTx(tx, subKeyTree)
 	tree, err := tree.New(txTree,
 		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
 	if err != nil {
 		return nil, err
-	}
-	lastRoot, err := tree.Root(txTree)
-	if err != nil {
-		return nil, err
-	}
-	if !bytes.Equal(root, lastRoot) {
-		panic(fmt.Sprintf("root for %s mismatch: %x != %x", cfg.kindID, root, lastRoot))
-		// Note (Pau): since we modified arbo to remove all unecessary intermediate nodes,
-		// we cannot set a past root.We should probably remove this code.
-		//if err := tree.SetRoot(txTree, root); err != nil {
-		//	return nil, err
-		//}
 	}
 	treeUpdate = &TreeUpdate{
 		tx: tx,
@@ -331,6 +311,15 @@ func propagateRoot(treeUpdate *TreeUpdate) ([]byte, error) {
 // version numbers, but overwriting an existing version can be useful in some
 // cases (for example, overwriting version 0 to setup a genesis state).
 func (t *TreeTx) Commit(version uint32) error {
+	if err := t.CommitOnTx(version); err != nil {
+		return err
+	}
+	return t.tx.Commit()
+}
+
+// CommitOnTx do as Commit but without committing the transaction to database.
+// After CommitOnTx(), caller should call SaveWithoutCommit() to commit the transaction.
+func (t *TreeTx) CommitOnTx(version uint32) error {
 	root, err := propagateRoot(&t.TreeUpdate)
 	if err != nil {
 		return fmt.Errorf("could not propagate root: %w", err)
@@ -350,7 +339,7 @@ func (t *TreeTx) Commit(version uint32) error {
 	if err := setVersionRoot(t.tx, version, root); err != nil {
 		return fmt.Errorf("could not set version root: %w", err)
 	}
-	return t.tx.Commit()
+	return nil
 }
 
 // Discard all the changes that have been made from the TreeTx.  After calling

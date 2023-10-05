@@ -155,6 +155,8 @@ func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller) {
 	height := s.CurrentHeight()
 	err := istc.Commit(height)
 	qt.Assert(t, err, qt.IsNil)
+	_, err = s.PrepareCommit()
+	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Save()
 	qt.Assert(t, err, qt.IsNil)
 	s.SetHeight(height + 1)

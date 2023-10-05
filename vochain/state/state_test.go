@@ -16,11 +16,19 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+func testSaveState(t *testing.T, s *State) []byte {
+	_, err := s.PrepareCommit()
+	qt.Assert(t, err, qt.IsNil)
+	hash, err := s.Save()
+	qt.Assert(t, err, qt.IsNil)
+	return hash
+}
+
 func TestStateReopen(t *testing.T) {
 	dir := t.TempDir()
 	s, err := NewState(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
-	hash1Before, err := s.Save()
+	hash1Before := testSaveState(t, s)
 	qt.Assert(t, err, qt.IsNil)
 
 	s.Close()
@@ -70,7 +78,7 @@ func TestStateBasic(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, totalVotes, qt.Equals, uint64(10*(i+1)))
 	}
-	s.Save()
+	testSaveState(t, s)
 
 	p, err := s.Process(pids[10], false)
 	if err != nil {
@@ -122,7 +130,7 @@ func TestBalanceTransfer(t *testing.T) {
 	err = s.CreateAccount(addr2.Address(), "ipfs://", [][]byte{}, 0)
 	qt.Assert(t, err, qt.IsNil)
 
-	s.Save() // Save to test committed value on next call
+	testSaveState(t, s) // Save to test committed value on next call
 	b1, err := s.GetAccount(addr1.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(50))
@@ -163,7 +171,7 @@ func TestBalanceTransfer(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b1.Balance, qt.Equals, uint64(45))
 
-	s.Save()
+	testSaveState(t, s)
 	b2, err = s.GetAccount(addr2.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(5))
@@ -208,8 +216,7 @@ func TestOnProcessStart(t *testing.T) {
 		s.Rollback()
 		s.SetHeight(height)
 		fn()
-		_, err := s.Save()
-		qt.Assert(t, err, qt.IsNil)
+		testSaveState(t, s)
 	}
 
 	pid := rng.RandomBytes(32)
@@ -267,8 +274,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 	}
 	qt.Assert(t, s.AddProcess(p), qt.IsNil)
 
-	_, err = s.Save()
-	qt.Assert(t, err, qt.IsNil)
+	testSaveState(t, s)
 
 	// block 2
 	height = 2
@@ -293,8 +299,7 @@ func TestBlockMemoryUsage(t *testing.T) {
 		}
 	}
 
-	_, err = s.Save()
-	qt.Assert(t, err, qt.IsNil)
+	testSaveState(t, s)
 }
 
 func TestStateTreasurer(t *testing.T) {
@@ -323,8 +328,7 @@ func TestStateTreasurer(t *testing.T) {
 	// key does not exist yet
 	qt.Assert(t, err, qt.IsNotNil)
 
-	_, err = s.Save()
-	qt.Assert(t, err, qt.IsNil)
+	testSaveState(t, s)
 
 	fetchedTreasurer, err = s.Treasurer(true)
 	qt.Assert(t, err, qt.IsNil)
@@ -403,9 +407,7 @@ func TestNoState(t *testing.T) {
 		s.Rollback()
 		s.SetHeight(height)
 		fn()
-		h, err := s.Save()
-		qt.Assert(t, err, qt.IsNil)
-		return h
+		return testSaveState(t, s)
 	}
 
 	ns := s.NoState(true)
