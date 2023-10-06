@@ -197,7 +197,7 @@ func (vc *Vocone) Start() {
 		height := vc.height.Load()
 
 		// Create and execute block
-		_, root, err := vc.app.ExecuteBlock(vc.prepareBlock(), uint32(height), time.Now())
+		resp, err := vc.app.ExecuteBlock(vc.prepareBlock(), uint32(height), time.Now())
 		if err != nil {
 			log.Error(err, "execute block error")
 		}
@@ -206,7 +206,7 @@ func (vc *Vocone) Start() {
 		}
 		log.Debugw("block committed",
 			"height", height,
-			"hash", hex.EncodeToString(root),
+			"hash", hex.EncodeToString(resp.Root),
 			"took", time.Since(startTime),
 		)
 		vc.vcMtx.Unlock()

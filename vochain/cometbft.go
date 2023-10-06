@@ -216,9 +216,20 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	start := time.Now()
 	height := uint32(req.GetHeight())
 
-	resp, root, err := app.ExecuteBlock(req.Txs, height, req.GetTime())
-	if err != nil {
-		return nil, fmt.Errorf("cannot execute block: %w", err)
+	var root []byte
+	var resp []*DeliverTxResponse
+	// skip execution if we already have the results and root (from ProcessProposal)
+	if app.lastRootHash == nil {
+		result, err := app.ExecuteBlock(req.Txs, height, req.GetTime())
+		if err != nil {
+			return nil, fmt.Errorf("cannot execute block: %w", err)
+		}
+		root = result.Root
+		resp = result.Responses
+	} else {
+		root = make([]byte, len(app.lastRootHash))
+		copy(root, app.lastRootHash[:])
+		resp = app.lastDeliverTxResponse
 	}
 
 	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
@@ -232,9 +243,9 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	}
 	log.Debugw("finalize block", "height", height,
 		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-		"totalElapsedSeconds", time.Since(req.GetTime()).Seconds(),
-		"executionElapsedSeconds", time.Since(start).Seconds())
-
+		"blockSeconds", time.Since(req.GetTime()).Seconds(),
+		"elapsedSeconds", time.Since(start).Seconds(),
+		"proposer", hex.EncodeToString(req.GetProposerAddress()))
 	return &abcitypes.ResponseFinalizeBlock{
 		AppHash:   root,
 		TxResults: txResults,
@@ -269,6 +280,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	startTime := time.Now()
+
 	type txInfo struct {
 		Data      []byte
 		Addr      *ethcommon.Address
@@ -341,6 +354,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	}
 	// Rollback the state to discard the changes made by CheckTx
 	app.State.Rollback()
+	log.Debugw("prepare proposal", "height", app.Height(), "txs", len(validTxs),
+		"elapsedSeconds", time.Since(startTime).Seconds())
 	return &abcitypes.ResponsePrepareProposal{
 		Txs: validTxs,
 	}, nil
@@ -362,47 +377,36 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 		return nil, fmt.Errorf("cannot get node validator info: %w", err)
 	}
 	if validator == nil {
+		// we reset the last deliver tx response and root hash to avoid using them at finalize block
+		app.lastDeliverTxResponse = nil
+		app.lastRootHash = nil
 		return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
 	}
+
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	startTime := time.Now()
+
 	// ensure the pending state is clean
 	if app.State.TxCounter() > 0 {
 		panic("found existing pending transactions on process proposal")
 	}
 
-	valid := true
-	for _, tx := range req.Txs {
-		vtx := new(vochaintx.Tx)
-		if err := vtx.Unmarshal(tx, app.ChainID()); err != nil {
-			// invalid transaction
-			log.Warnw("could not unmarshal transaction", "err", err)
-			valid = false
-			break
-		}
-		// Check the validity of the transaction using forCommit true
-		resp, err := app.TransactionHandler.CheckTx(vtx, true)
-		if err != nil {
-			log.Warnw("discard invalid tx on process proposal",
-				"err", err,
-				"data", func() string {
-					if resp != nil {
-						return string(resp.Data)
-					}
-					return ""
-				}())
-			valid = false
-			break
-		}
+	resp, err := app.ExecuteBlock(req.Txs, uint32(req.GetHeight()), req.GetTime())
+	if err != nil {
+		return nil, fmt.Errorf("cannot execute block on process proposal: %w", err)
 	}
-	// Rollback the state to discard the changes made by CheckTx
-	app.State.Rollback()
-
-	if !valid {
+	if resp.InvalidTransactions {
+		log.Warnw("invalid transactions on process proposal", "height", app.Height(),
+			"proposer", hex.EncodeToString(req.ProposerAddress), "action", "reject")
 		return &abcitypes.ResponseProcessProposal{
 			Status: abcitypes.ResponseProcessProposal_REJECT,
 		}, nil
 	}
+	app.lastDeliverTxResponse = resp.Responses
+	app.lastRootHash = resp.Root
+	log.Debugw("process proposal", "height", app.Height(), "txs", len(req.Txs), "action", "accept",
+		"hash", hex.EncodeToString(resp.Root), "elapsedSeconds", time.Since(startTime).Seconds())
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
 	}, nil

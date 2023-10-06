@@ -74,7 +74,12 @@ type BaseApplication struct {
 	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
-
+	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
+	// can skip block re-execution on FinalizeBlock call.
+	lastDeliverTxResponse []*DeliverTxResponse
+	// lastRootHash is used to store the last root hash of the current on-going state,
+	// it is used by validators to skip block re-execution on FinalizeBlock call.
+	lastRootHash []byte
 	// prepareProposalLock is used to avoid concurrent calls between Prepare/Process Proposal and FinalizeBlock
 	prepareProposalLock sync.Mutex
 
@@ -88,6 +93,14 @@ type DeliverTxResponse struct {
 	Log  string
 	Info string
 	Data []byte
+}
+
+// ExecuteBlockResponse is the response returned by ExecuteBlock after executing the block.
+// If InvalidTransactions is true, it means that at least one transaction in the block was invalid.
+type ExecuteBlockResponse struct {
+	Responses           []*DeliverTxResponse
+	Root                []byte
+	InvalidTransactions bool
 }
 
 // NewBaseApplication creates a new BaseApplication given a name and a DB backend.
@@ -131,9 +144,10 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 // ExecuteBlock delivers a block of transactions to the Application.
 // It modifies the state according to the transactions and returns the resulting Merkle root hash.
 // It returns a list of ResponseDeliverTx, one for each transaction in the block.
-func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) ([]*DeliverTxResponse, []byte, error) {
+func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) (*ExecuteBlockResponse, error) {
 	result := []*DeliverTxResponse{}
 	app.beginBlock(blockTime, height)
+	invalidTxs := false
 	for _, tx := range txs {
 		resp := app.deliverTx(tx)
 		if resp.Code != 0 {
@@ -142,22 +156,28 @@ func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime 
 				"data", string(resp.Data),
 				"info", resp.Info,
 				"log", resp.Log)
+			invalidTxs = true
 		}
 		result = append(result, resp)
 	}
 	// execute internal state transition commit
 	if err := app.Istc.Commit(height); err != nil {
-		return nil, nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
+		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(blockTime, height)
 	root, err := app.State.PrepareCommit()
 	if err != nil {
-		return nil, nil, fmt.Errorf("cannot prepare commit: %w", err)
+		return nil, fmt.Errorf("cannot prepare commit: %w", err)
 	}
-	return result, root, nil
+	return &ExecuteBlockResponse{
+		Responses:           result,
+		Root:                root,
+		InvalidTransactions: invalidTxs,
+	}, nil
 }
 
 // CommitState saves the state to persistent storage and returns the hash.
+// Before save the state, app.State.PrepareCommit() should be called.
 func (app *BaseApplication) CommitState() ([]byte, error) {
 	// Commit the state and get the hash
 	if app.State.TxCounter() > 0 {
