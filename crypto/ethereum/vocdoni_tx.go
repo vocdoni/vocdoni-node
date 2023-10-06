@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"strings"
 
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/proto/build/go/models"
@@ -12,14 +13,22 @@ import (
 
 const (
 	sendTokensTemplate    = "Signing a Vocdoni transaction of type SEND_TOKENS for an amount of %d VOC tokens to destination address %x. The hash of the transaction is %x and the destination chainID is %s."
-	setProcessTemplate    = "Signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x. The hash of the transaction is %x and the destination chainID is %s."
 	voteTemplate          = "Signing a Vocdoni transaction of type VOTE for process ID %x. The hash of the transaction is %x and the destination chainID is %s."
 	newProcessTemplate    = "Signing a Vocdoni transaction of type NEW_PROCESS. The hash of the transaction is %x and the destination chainID is %s."
-	setAccountTemplate    = "Signing a Vocdoni transaction of type SET_ACCOUNT/%s. The hash of the transaction is %x and the destination chainID is %s."
 	collectFaucetTemplate = "Signing a Vocdoni transaction of type COLLECT_FAUCET. The hash of the transaction is %x and the destination chainID is %s."
 	setSIKTemplate        = "Signing a Vocdoni transaction of type SET_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
 	delSIKTemplate        = "Signing a Vocdoni transaction of type DEL_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
 	registerSIKTemplate   = "Signing a Vocdoni transaction of type REGISTER_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
+
+	setAccountDefaultTemplate  = "Signing a Vocdoni transaction of type SET_ACCOUNT/%s. The hash of the transaction is %x and the destination chainID is %s."
+	createAccountTemplate      = "Signing a Vocdoni transaction of type CREATE_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
+	setAccountInfoURITemplate  = "Signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s. The hash of the transaction is %x and the destination chainID is %s."
+	addDelegateAccountTemplate = "Signing a Vocdoni transaction of type ADD_DELEGATE_FOR_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
+	delDelegateAccountTemplte  = "Signing a Vocdoni transaction of type DEL_DELEGATE_FOR_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
+
+	setProcessDefaultTemplate = "Signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x. The hash of the transaction is %x and the destination chainID is %s."
+	setProcessCensusTemplate  = "Signing a Vocdoni transaction of type SET_PROCESS_CENSUS for process ID %x and census %x. The hash of the transaction is %x and the destination chainID is %s."
+	setProcessStatusTemplate  = "Signing a Vocdoni transaction of type SET_PROCESS_STATUS for process ID %x and status %s. The hash of the transaction is %x and the destination chainID is %s."
 
 	defaultTemplate = "Vocdoni signed transaction:\n%s\n%x"
 )
@@ -50,7 +59,14 @@ func BuildVocdoniProtoTxMessage(tx *models.Tx, chainID string, hash []byte) ([]b
 		if t == nil {
 			return nil, fmt.Errorf("set process payload is nil")
 		}
-		msg = fmt.Sprintf(setProcessTemplate, t.Txtype.String(), t.ProcessId, hash, chainID)
+		switch t.Txtype {
+		case models.TxType_SET_PROCESS_CENSUS:
+			msg = fmt.Sprintf(setProcessCensusTemplate, t.ProcessId, t.GetCensusRoot(), hash, chainID)
+		case models.TxType_SET_PROCESS_STATUS:
+			msg = fmt.Sprintf(setProcessStatusTemplate, t.ProcessId, strings.ToLower(t.GetStatus().String()), hash, chainID)
+		default:
+			msg = fmt.Sprintf(setProcessDefaultTemplate, t.Txtype.String(), t.ProcessId, hash, chainID)
+		}
 	case *models.Tx_Vote:
 		t := tx.GetVote()
 		if t == nil {
@@ -68,7 +84,18 @@ func BuildVocdoniProtoTxMessage(tx *models.Tx, chainID string, hash []byte) ([]b
 		if t == nil {
 			return nil, fmt.Errorf("set account payload is nil")
 		}
-		msg = fmt.Sprintf(setAccountTemplate, t.Txtype.String(), hash, chainID)
+		switch t.Txtype {
+		case models.TxType_CREATE_ACCOUNT:
+			msg = fmt.Sprintf(createAccountTemplate, t.Account, hash, chainID)
+		case models.TxType_SET_ACCOUNT_INFO_URI:
+			msg = fmt.Sprintf(setAccountInfoURITemplate, t.Account, t.GetInfoURI(), hash, chainID)
+		case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
+			msg = fmt.Sprintf(addDelegateAccountTemplate, t.Account, hash, chainID)
+		case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
+			msg = fmt.Sprintf(delDelegateAccountTemplte, t.Account, hash, chainID)
+		default:
+			msg = fmt.Sprintf(setAccountDefaultTemplate, t.Txtype.String(), hash, chainID)
+		}
 	case *models.Tx_CollectFaucet:
 		t := tx.GetCollectFaucet()
 		if t == nil {
