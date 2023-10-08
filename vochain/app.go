@@ -97,14 +97,11 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	istc := ist.NewISTC(state)
 
 	// Create the transaction handler for checking and processing transactions
-	transactionHandler, err := transaction.NewTransactionHandler(
+	transactionHandler := transaction.NewTransactionHandler(
 		state,
 		istc,
 		filepath.Join(dbpath, "txHandler"),
 	)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create transaction handler: (%v)", err)
-	}
 	// Load or download the zk verification keys
 	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
