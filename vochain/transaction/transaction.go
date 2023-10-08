@@ -48,12 +48,12 @@ type TransactionHandler struct {
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
-func NewTransactionHandler(state *vstate.State, istc *ist.Controller, dataDir string) (*TransactionHandler, error) {
+func NewTransactionHandler(state *vstate.State, istc *ist.Controller, dataDir string) *TransactionHandler {
 	return &TransactionHandler{
 		state:   state,
 		dataDir: dataDir,
 		istc:    istc,
-	}, nil
+	}
 }
 
 func (t *TransactionHandler) LoadZkCircuit(configTag string) error {

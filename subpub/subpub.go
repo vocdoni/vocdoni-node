@@ -117,16 +117,14 @@ func (s *SubPub) listen(receiver chan<- *Message) {
 }
 
 // Close terminates the subpub networking stack
-func (s *SubPub) Close() error {
+func (s *SubPub) Close() {
 	log.Debug("received close signal")
 	select {
 	case <-s.close:
 		// already closed
-		return nil
 	default:
 		close(s.close)
 		close(s.messages)
-		return nil
 	}
 }
 
