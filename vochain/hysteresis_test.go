@@ -3,6 +3,7 @@ package vochain
 import (
 	"encoding/json"
 	"math/big"
+	"sync"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -28,7 +29,7 @@ func TestHysteresis(t *testing.T) {
 
 	// initial accounts
 	testWeight := big.NewInt(10)
-	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 10, testWeight)
+	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 3, testWeight)
 
 	// add the test accounts siks to the test app
 	for _, account := range accounts {
@@ -64,38 +65,47 @@ func TestHysteresis(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	sikRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
-	for i, account := range accounts {
-		_, sikProof, err := sikTree.GenProof(account.Address().Bytes())
-		c.Assert(err, qt.IsNil)
+	wg := sync.WaitGroup{}
+	mtx := sync.Mutex{}
+	for i := range accounts {
+		wg.Add(1)
+		i := i
+		go func() {
+			_, sikProof, err := sikTree.GenProof(accounts[i].Address().Bytes())
+			c.Assert(err, qt.IsNil)
 
-		sikSiblings, err := zk.ProofToCircomSiblings(sikProof)
-		c.Assert(err, qt.IsNil)
+			sikSiblings, err := zk.ProofToCircomSiblings(sikProof)
+			c.Assert(err, qt.IsNil)
 
-		censusSiblings, err := zk.ProofToCircomSiblings(proofs[i])
-		c.Assert(err, qt.IsNil)
+			censusSiblings, err := zk.ProofToCircomSiblings(proofs[i])
+			c.Assert(err, qt.IsNil)
 
-		// get zkproof
-		inputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
-			Account:         account,
-			ElectionId:      pid,
-			CensusRoot:      censusRoot,
-			SIKRoot:         sikRoot,
-			CensusSiblings:  censusSiblings,
-			SIKSiblings:     sikSiblings,
-			AvailableWeight: testWeight,
-		})
-		c.Assert(err, qt.IsNil)
-		encInputs, err := json.Marshal(inputs)
-		c.Assert(err, qt.IsNil)
+			// get zkproof
+			inputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
+				Account:         accounts[i],
+				ElectionId:      pid,
+				CensusRoot:      censusRoot,
+				SIKRoot:         sikRoot,
+				CensusSiblings:  censusSiblings,
+				SIKSiblings:     sikSiblings,
+				AvailableWeight: testWeight,
+			})
+			c.Assert(err, qt.IsNil)
+			encInputs, err := json.Marshal(inputs)
+			c.Assert(err, qt.IsNil)
 
-		zkProof, err := prover.Prove(devCircuit.ProvingKey, devCircuit.Wasm, encInputs)
-		c.Assert(err, qt.IsNil)
+			zkProof, err := prover.Prove(devCircuit.ProvingKey, devCircuit.Wasm, encInputs)
+			c.Assert(err, qt.IsNil)
 
-		protoZkProof, err := zk.ProverProofToProtobufZKProof(zkProof, nil, nil, nil, nil, nil)
-		c.Assert(err, qt.IsNil)
-
-		zkProofs = append(zkProofs, protoZkProof)
+			protoZkProof, err := zk.ProverProofToProtobufZKProof(zkProof, nil, nil, nil, nil, nil)
+			c.Assert(err, qt.IsNil)
+			mtx.Lock()
+			zkProofs = append(zkProofs, protoZkProof)
+			mtx.Unlock()
+			wg.Done()
+		}()
 	}
+	wg.Wait()
 
 	validVotes := len(accounts) / 2
 	for i, account := range accounts[:validVotes] {
@@ -131,14 +141,14 @@ func TestHysteresis(t *testing.T) {
 	}
 
 	for i := 0; i < state.SIKROOT_HYSTERESIS_BLOCKS; i++ {
+		mockNewSIK()
 		app.AdvanceTestBlock()
 	}
-	mockNewSIK()
 
 	for i := 0; i < state.SIKROOT_HYSTERESIS_BLOCKS; i++ {
+		mockNewSIK()
 		app.AdvanceTestBlock()
 	}
-	mockNewSIK()
 
 	for i, account := range accounts[validVotes:] {
 		nullifier, err := account.AccountSIKnullifier(pid, nil)

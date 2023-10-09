@@ -23,7 +23,7 @@ var (
 	ErrInvalidURILength = fmt.Errorf("invalid URI length")
 	// ErrorAlreadyExistInCache is returned if the transaction has been already processed
 	// and stored in the vote cache.
-	ErrorAlreadyExistInCache = fmt.Errorf("vote already exist in cache")
+	ErrorAlreadyExistInCache = fmt.Errorf("transaction already exist in cache")
 )
 
 // TransactionResponse is the response of a transaction check.
@@ -76,6 +76,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 	}
 	response := &TransactionResponse{
 		TxHash: vtx.TxID[:],
+	}
+	if forCommit {
+		if err := t.checkAccountNonce(vtx); err != nil {
+			return nil, fmt.Errorf("checkAccountNonce: %w", err)
+		}
 	}
 	switch vtx.Tx.Payload.(type) {
 	case *models.Tx_Vote:

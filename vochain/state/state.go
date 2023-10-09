@@ -144,8 +144,10 @@ func NewState(dbType, dataDir string) (*State, error) {
 		db:    s.NoState(true),
 		state: s,
 	}
-	s.validSIKRoots = [][]byte{}
 	s.mtxValidSIKRoots = &sync.Mutex{}
+	if err := s.FetchValidSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
+	}
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
 }
 
@@ -405,6 +407,10 @@ func (v *State) Save() ([]byte, error) {
 	// the listeners may need to get the previous (not committed) state.
 	v.tx.Lock()
 	defer v.tx.Unlock()
+	// Update the SIK merkle-tree roots
+	if err := v.UpdateSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
+	}
 	err := func() error {
 		var err error
 		if err := v.tx.Commit(height); err != nil {
@@ -413,6 +419,7 @@ func (v *State) Save() ([]byte, error) {
 		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
+		v.txCounter.Store(0)
 		return nil
 	}()
 	if err != nil {
@@ -425,7 +432,6 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-
 	return v.store.Hash()
 }
 
@@ -437,6 +443,7 @@ func (v *State) Rollback() {
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	var err error
 	if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 		log.Errorf("cannot begin statedb tx: %s", err)
@@ -449,6 +456,7 @@ func (v *State) Rollback() {
 func (v *State) Close() error {
 	v.tx.Lock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	v.tx.Unlock()
 
 	return v.db.Close()

@@ -57,20 +57,8 @@
     ],
     "accounts":[
         {
-           "address":"0xccEc2c2D658261Fbdc40b04FEc06d49057242D39",
-           "balance":10000000
-         },
-         {
-           "address":"0x776d858D17C8018F07899dB535866EBf805a32E0",
-           "balance":10000000
-         },
-         {
-           "address":"0x074fcAacb8B01850539eaE7E9fEE8dc94549db96",
-           "balance":10000000
-         },
-	       {
            "address":"0x88a499cEf9D1330111b41360173967c9C1bf703f",
-           "balance":10000000
+           "balance":1000000000000
          }	
       ],
     "treasurer": "0xfe10DAB06D636647f4E40dFd56599da9eF66Db1c",

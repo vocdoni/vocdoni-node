@@ -94,16 +94,11 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if acc.Balance < cost {
 		return nil, ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
 	}
-	if acc.Nonce != tx.Nonce {
-		return nil, ethereum.Address{}, fmt.Errorf("%w: expected %d, got %d", vstate.ErrAccountNonceInvalid, acc.Nonce, tx.Nonce)
-	}
 
 	// if organization ID is not set, use the sender address
 	if tx.Process.EntityId == nil {
 		tx.Process.EntityId = addr.Bytes()
-
 	} else if !bytes.Equal(tx.Process.EntityId, addr.Bytes()) { // check if process entityID matches tx sender
-
 		// check for a delegate
 		entityAddress := ethereum.AddrFromBytes(tx.Process.EntityId)
 		entityAccount, err := t.state.GetAccount(entityAddress, false)
@@ -162,9 +157,6 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	// check balance and nonce
 	if acc.Balance < cost {
 		return ethereum.Address{}, vstate.ErrNotEnoughBalance
-	}
-	if acc.Nonce != tx.Nonce {
-		return ethereum.Address{}, vstate.ErrAccountNonceInvalid
 	}
 	// get process
 	process, err := t.state.Process(tx.ProcessId, false)

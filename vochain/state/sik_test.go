@@ -98,6 +98,7 @@ func Test_sikRoots(t *testing.T) {
 	sik1, _ := hex.DecodeString("3a7806f4e0b5bda625d465abf5639ba42ac9b91bafea3b800a4a")
 	s.SetHeight(1)
 	c.Assert(s.SetAddressSIK(address1, sik1), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
 	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
 	validSIKs := s.ValidSIKRoots()
@@ -113,6 +114,7 @@ func Test_sikRoots(t *testing.T) {
 	sik2, _ := hex.DecodeString("5fb53c1f9b53fba0296f4e8306802d44235c1a11becc4e6853d0")
 	s.SetHeight(33)
 	c.Assert(s.SetAddressSIK(address2, sik2), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
 	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
 	validSIKs = s.ValidSIKRoots()
@@ -127,6 +129,7 @@ func Test_sikRoots(t *testing.T) {
 	sik3, _ := hex.DecodeString("7ccbc0da9e8d7e469ba60cd898a5b881c99a960c1e69990a3196")
 	s.SetHeight(66)
 	c.Assert(s.SetAddressSIK(address3, sik3), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
 	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
 	validSIKs = s.ValidSIKRoots()

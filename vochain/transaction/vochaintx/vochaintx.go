@@ -20,9 +20,12 @@ type Tx struct {
 	TxModelType string
 }
 
-// Unmarshal unarshal the content of a bytes serialized transaction.
-// Returns the transaction struct, the original bytes and the signature
-// of those bytes.
+// Unmarshal decodes the content of a serialized transaction into the Tx struct.
+//
+// The function determines the type of the transaction using Protocol Buffers
+// reflection and sets it to the TxModelType field.
+// Extracts the signature. Prepares the signed body (ready to be checked) and
+// computes the transaction ID (a hash of the data).
 func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	stx := new(models.SignedTx)
 	if err := proto.Unmarshal(content, stx); err != nil {

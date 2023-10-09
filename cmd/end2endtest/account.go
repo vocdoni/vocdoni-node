@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -150,6 +151,8 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	// both pay 2 for each tx
 	// resulting in balance 52 for alice
 	// and 44 for bob
+	// In addition, we send a couple of token txs to burn address to increase the nonce,
+	// without waiting for them to be mined (this tests that the mempool transactions are properly ordered).
 
 	txCost, err := api.TransactionCost(models.TxType_SEND_TOKENS)
 	if err != nil {
@@ -181,23 +184,47 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	// try to send tokens at the same time:
 	// alice sends 1/4 of her balance to bob
 	// sends 1/3 of his balance to alice
-	amountAtoB := aliceAcc.Balance / 4
-	amountBtoA := bobAcc.Balance / 3
+	// Subtract 1 + txCost from each since we are sending an extra tx to increase the nonce to the burn address
+	amountAtoB := (aliceAcc.Balance) / 4
+	amountBtoA := (bobAcc.Balance) / 3
 
-	txhasha, err := alice.Transfer(bobKeys.Address(), amountAtoB)
-	if err != nil {
-		return fmt.Errorf("cannot send tokens: %v", err)
-	}
-	log.Infof("alice sent %d tokens to bob", amountAtoB)
-	log.Debugf("tx hash is %x", txhasha)
+	// send a couple of token txs to increase the nonce, without waiting for them to be mined
+	// this tests that the mempool transactions are properly ordered.
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+	go func() {
+		log.Warnf("send transactions with nonce+1, should not be mined before the others")
+		// send 1 token to burn address with nonce + 1 (should be mined after the other txs)
+		if _, err = alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
+			log.Fatalf("cannot burn tokens: %v", err)
+		}
+		if _, err = bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1); err != nil {
+			log.Fatalf("cannot burn tokens: %v", err)
+		}
+		wg.Done()
+	}()
+	log.Warnf("waiting 6 seconds to let the burn txs be sent")
+	time.Sleep(6 * time.Second)
+	var txhasha, txhashb []byte
+	wg.Add(1)
+	go func() {
+		txhasha, err = alice.TransferWithNonce(bobKeys.Address(), amountAtoB, aliceAcc.Nonce)
+		if err != nil {
+			log.Fatalf("cannot send tokens: %v", err)
+		}
+		log.Infof("alice sent %d tokens to bob", amountAtoB)
+		log.Debugf("tx hash is %x", txhasha)
 
-	txhashb, err := bob.Transfer(aliceKeys.Address(), amountBtoA)
-	if err != nil {
-		return fmt.Errorf("cannot send tokens: %v", err)
-	}
-	log.Infof("bob sent %d tokens to alice", amountBtoA)
-	log.Debugf("tx hash is %x", txhashb)
+		txhashb, err = bob.TransferWithNonce(aliceKeys.Address(), amountBtoA, bobAcc.Nonce)
+		if err != nil {
+			log.Fatalf("cannot send tokens: %v", err)
+		}
+		log.Infof("bob sent %d tokens to alice", amountBtoA)
+		log.Debugf("tx hash is %x", txhashb)
+		wg.Done()
+	}()
 
+	wg.Wait()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
 	defer cancel()
 	txrefa, err := api.WaitUntilTxIsMined(ctx, txhasha)
@@ -216,12 +243,12 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	_ = api.WaitUntilNextBlock()
 
 	// now check the resulting state
-	if err := checkAccountNonceAndBalance(alice, aliceAcc.Nonce+1,
-		aliceAcc.Balance-amountAtoB-txCost+amountBtoA); err != nil {
+	if err := checkAccountNonceAndBalance(alice, aliceAcc.Nonce+2,
+		aliceAcc.Balance-amountAtoB-(2*txCost+1)+amountBtoA); err != nil {
 		return err
 	}
-	if err := checkAccountNonceAndBalance(bob, bobAcc.Nonce+1,
-		bobAcc.Balance-amountBtoA-txCost+amountAtoB); err != nil {
+	if err := checkAccountNonceAndBalance(bob, bobAcc.Nonce+2,
+		bobAcc.Balance-amountBtoA-(2*txCost+1)+amountAtoB); err != nil {
 		return err
 	}
 

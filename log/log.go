@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -89,11 +90,9 @@ func (*invalidCharChecker) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// Init initializes the logger. Output can be either "stdout/stderr/<filePath>".
-// Log level can be "debug/info/warn/error".
-// errorOutput is an optional filename which only receives Warning and Error messages.
 func Init(level, output string, errorOutput io.Writer) {
 	var out io.Writer
+	outputs := []io.Writer{}
 	switch output {
 	case "stdout":
 		out = os.Stdout
@@ -107,12 +106,16 @@ func Init(level, output string, errorOutput io.Writer) {
 			panic(fmt.Sprintf("cannot create log output: %v", err))
 		}
 		out = f
+		if strings.HasSuffix(output, ".json") {
+			outputs = append(outputs, f)
+			out = os.Stdout
+		}
 	}
 	out = zerolog.ConsoleWriter{
 		Out:        out,
 		TimeFormat: time.RFC3339Nano,
 	}
-	outputs := []io.Writer{out}
+	outputs = append(outputs, out)
 
 	if errorOutput != nil {
 		outputs = append(outputs, &errorLevelWriter{zerolog.ConsoleWriter{

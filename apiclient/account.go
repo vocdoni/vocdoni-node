@@ -69,18 +69,26 @@ func (c *HTTPclient) Account(address string) (*api.Account, error) {
 }
 
 // Transfer sends tokens from the account associated with the client to the given address.
+// The nonce is automatically calculated from the account information.
 // Returns the transaction hash.
 func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes, error) {
 	acc, err := c.Account("")
 	if err != nil {
 		return nil, err
 	}
+	return c.TransferWithNonce(to, amount, acc.Nonce)
+}
+
+// TransferWithNonce sends tokens from the account associated with the client to the given address.
+// Returns the transaction hash.
+func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce uint32) (types.HexBytes, error) {
+	var err error
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
 				Txtype: models.TxType_SET_ACCOUNT_INFO_URI,
-				Nonce:  acc.Nonce,
+				Nonce:  nonce,
 				From:   c.account.Address().Bytes(),
 				To:     to.Bytes(),
 				Value:  amount,
