@@ -24,15 +24,16 @@ import (
 	"github.com/ipfs/kubo/core/corehttp"
 	"github.com/ipfs/kubo/core/corerepo"
 	"github.com/ipfs/kubo/core/coreunix"
-	"github.com/ipfs/kubo/repo/fsrepo"
 	ipfscrypto "github.com/libp2p/go-libp2p/core/crypto"
 	ma "github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 )
+
+var _ data.Storage = &Handler{}
 
 const (
 	// MaxFileSizeBytes is the maximum size of a file to be published to IPFS
@@ -48,6 +49,9 @@ type Handler struct {
 	DataDir  string
 	LogLevel string
 
+	EnableLocalDiscovery bool
+	// TODO: Replace DataDir, LogLevel and EnableLocalDiscovery with a config.IPFSCfg?
+
 	retrieveCache *lru.Cache[string, []byte]
 
 	// cancel helps us stop extra goroutines and listeners which complement
@@ -56,8 +60,13 @@ type Handler struct {
 	maddr  ma.Multiaddr
 }
 
+// New returns a Handler
+func New() *Handler {
+	return &Handler{}
+}
+
 // Init initializes the IPFS node handler and repository.
-func (i *Handler) Init(d *types.DataStore) error {
+func (i *Handler) Init() error {
 	if i.LogLevel == "" {
 		i.LogLevel = "ERROR"
 	}
@@ -65,16 +74,10 @@ func (i *Handler) Init(d *types.DataStore) error {
 	if err := installDatabasePlugins(); err != nil {
 		return err
 	}
-	ConfigRoot = d.Datadir
+	ConfigRoot = i.DataDir
 	os.Setenv("IPFS_FD_MAX", "4096")
 
-	// check if needs init
-	if !fsrepo.IsInitialized(ConfigRoot) {
-		if err := initRepository(d.EnableLocalDiscovery); err != nil {
-			return err
-		}
-	}
-	node, coreAPI, err := startNode()
+	node, coreAPI, err := i.startNode()
 	if err != nil {
 		return err
 	}
@@ -93,7 +96,7 @@ func (i *Handler) Init(d *types.DataStore) error {
 		"pubKey", node.PrivateKey.GetPublic(),
 	)
 	// start http
-	cctx := cmdCtx(node, d.Datadir)
+	cctx := cmdCtx(node, i.DataDir)
 	cctx.ReqLog = &ipfscmds.ReqLog{}
 
 	gatewayOpt := corehttp.GatewayOption(corehttp.WebUIPaths...)
@@ -126,7 +129,6 @@ func (i *Handler) Init(d *types.DataStore) error {
 
 	i.Node = node
 	i.CoreAPI = coreAPI
-	i.DataDir = d.Datadir
 	i.retrieveCache, err = lru.New[string, []byte](RetrievedFileCacheSize)
 	if err != nil {
 		return err

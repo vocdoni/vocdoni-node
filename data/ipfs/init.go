@@ -71,8 +71,16 @@ func initRepository(enableLocalDiscovery bool) error {
 }
 
 // StartNode starts the IPFS node.
-func startNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
+func (i *Handler) startNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	log.Infow("starting IPFS node", "config", ConfigRoot)
+
+	// check if needs init
+	if !fsrepo.IsInitialized(ConfigRoot) {
+		if err := initRepository(i.EnableLocalDiscovery); err != nil {
+			return nil, nil, err
+		}
+	}
+
 	r, err := fsrepo.Open(ConfigRoot)
 	if errors.Is(err, fsrepo.ErrNeedMigration) {
 		log.Warn("Found outdated ipfs repo, migrations need to be run.")

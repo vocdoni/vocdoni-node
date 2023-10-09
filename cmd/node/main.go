@@ -524,7 +524,7 @@ func main() {
 
 	// Storage service for Gateway
 	if conf.Mode == types.ModeGateway || conf.Mode == types.ModeCensus {
-		srv.Storage, err = srv.IPFS(conf.Ipfs)
+		srv.Storage, err = service.IPFS(conf.Ipfs)
 		if err != nil {
 			log.Fatal(err)
 		}

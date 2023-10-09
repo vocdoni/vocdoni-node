@@ -4,12 +4,12 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/datamock"
 )
 
 func TestDownloader(t *testing.T) {
-	stg := data.DataMockTest{}
-	stg.Init(nil)
+	stg := datamock.DataMockTest{}
+	stg.Init()
 	d := NewDownloader(&stg)
 	d.Start()
 	qt.Assert(t, d.QueueSize(), qt.Equals, int32(0))

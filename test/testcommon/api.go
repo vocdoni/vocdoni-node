@@ -9,10 +9,10 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/datamock"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -44,8 +44,8 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	}
 
 	// create the IPFS storage
-	d.Storage = &data.DataMockTest{}
-	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
+	d.Storage = &datamock.DataMockTest{}
+	d.Storage.Init()
 
 	// create the API router
 	router := httprouter.HTTProuter{}
