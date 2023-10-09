@@ -13,7 +13,7 @@ import (
 
 const (
 	createAccountTemplate     = "You are signing a Vocdoni transaction of type CREATE_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
-	setAccountInfoURITemplate = "You are signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s.\n\nThe hash of the transaction is %x and the destination chain is %s."
+	setAccountInfoURITemplate = "You are signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s.\n\nThe hash of this transaction is %x and the destination chain is %s."
 	setAccountDefaultTemplate = "You are signing a Vocdoni transaction of type SET_ACCOUNT/%s.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
 	sendTokensTemplate    = "You are signing a Vocdoni transaction of type SEND_TOKENS for an amount of %d VOC tokens to destination address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
