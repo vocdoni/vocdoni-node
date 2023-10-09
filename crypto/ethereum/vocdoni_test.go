@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -23,6 +24,7 @@ func TestVocdoniSignature(t *testing.T) {
 	signer2.Generate()
 	toAddr := signer2.Address().Bytes()
 	value := uint64(100)
+	nonce := uint32(123)
 
 	tx := &models.Tx{Payload: &models.Tx_SendTokens{
 		SendTokens: &models.SendTokensTx{
@@ -35,44 +37,43 @@ func TestVocdoniSignature(t *testing.T) {
 
 	message, err := proto.Marshal(tx)
 	qt.Assert(t, err, qt.IsNil)
+	t.Logf("Proto to sign: %s", log.FormatProto(tx))
 
-	t.Logf("Message to sign: %s", message)
-	signature, err := s.SignVocdoniMsg(message)
+	msgToSign, _, err := BuildVocdoniTransaction(message, "chain-123")
 	qt.Assert(t, err, qt.IsNil)
-	t.Logf("Signature for message is %x", signature)
+	t.Logf("Message to sign: %s", msgToSign)
 
-	extractedPubKey, err := PubKeyFromSignature(BuildVocdoniMessage(message), signature)
+	signature, err := s.SignVocdoniTx(message, "chain-123")
+	qt.Assert(t, err, qt.IsNil)
+	t.Logf("Signature for transaction is %x", signature)
+
+	extractedPubKey, err := PubKeyFromSignature(msgToSign, signature)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, fmt.Sprintf("%x", extractedPubKey), qt.DeepEquals, pub)
+
+	infoUri := "ipfs://vocdoni.io"
+
+	tx = &models.Tx{Payload: &models.Tx_SetAccount{
+		SetAccount: &models.SetAccountTx{
+			Txtype:  models.TxType_SET_ACCOUNT_INFO_URI,
+			InfoURI: &infoUri,
+			Account: s.Address().Bytes(),
+			Nonce:   &nonce,
+		}}}
+
+	message, err = proto.Marshal(tx)
+	qt.Assert(t, err, qt.IsNil)
+	t.Logf("Proto to sign: %s", log.FormatProto(tx))
+
+	msgToSign, _, err = BuildVocdoniTransaction(message, "chain-123")
+	qt.Assert(t, err, qt.IsNil)
+	t.Logf("Message to sign: %s", msgToSign)
 
 	signature, err = s.SignVocdoniTx(message, "chain-123")
 	qt.Assert(t, err, qt.IsNil)
 	t.Logf("Signature for transaction is %x", signature)
 
-	msgToSign, _, err := BuildVocdoniTransaction(message, "chain-123")
-	qt.Assert(t, err, qt.IsNil)
-
 	extractedPubKey, err = PubKeyFromSignature(msgToSign, signature)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, fmt.Sprintf("%x", extractedPubKey), qt.DeepEquals, pub)
-
-	// Test compatibility with JS (message)
-	//msg = testVocdoniSignatureMessage{Method: "getVisibility", Timestamp: 1582196988554}
-	//message, err = json.Marshal(msg)
-	//qt.Assert(t, err, qt.IsNil)
-	//signature, err = hex.DecodeString("2aab382d8cf025f55d8c3f7597e83dc878939ef63f1a27b818fa0814d79e91d66dc8d8112fbdcc89d2355d58a74ad227a2a9603ef7eb2321283a8ea93fb90ee11b")
-	//qt.Assert(t, err, qt.IsNil)
-
-	//extractedPubKey, err = PubKeyFromSignature(BuildVocdoniMessage(message), signature)
-	//qt.Assert(t, err, qt.IsNil)
-	//qt.Assert(t, fmt.Sprintf("%x", extractedPubKey), qt.DeepEquals, "02cb3cabb521d84fc998b5649d6b59e27a3e27633d31cc0ca6083a00d68833d5ca")
-
-	// Test compatibility with JS (transaction)
-	//signature, err = hex.DecodeString("44d31937862e1f835f92d8b3f93858636bad075bd2429cf79404a81e42bd3d00196613c37a99b054c32339dde53ce3c25932c5d5f89483ccdf93234d3c4808b81b")
-	//qt.Assert(t, err, qt.IsNil)
-
-	//extractedPubKey, err = PubKeyFromSignature(BuildVocdoniTransaction(message, "production"), signature)
-	//qt.Assert(t, err, qt.IsNil)
-	//qt.Assert(t, fmt.Sprintf("%x", extractedPubKey), qt.DeepEquals, "02cb3cabb521d84fc998b5649d6b59e27a3e27633d31cc0ca6083a00d68833d5ca")
-
 }
