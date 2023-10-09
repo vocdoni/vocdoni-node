@@ -12,23 +12,28 @@ import (
 )
 
 const (
-	sendTokensTemplate    = "Signing a Vocdoni transaction of type SEND_TOKENS for an amount of %d VOC tokens to destination address %x. The hash of the transaction is %x and the destination chainID is %s."
-	voteTemplate          = "Signing a Vocdoni transaction of type VOTE for process ID %x. The hash of the transaction is %x and the destination chainID is %s."
-	newProcessTemplate    = "Signing a Vocdoni transaction of type NEW_PROCESS. The hash of the transaction is %x and the destination chainID is %s."
-	collectFaucetTemplate = "Signing a Vocdoni transaction of type COLLECT_FAUCET. The hash of the transaction is %x and the destination chainID is %s."
-	setSIKTemplate        = "Signing a Vocdoni transaction of type SET_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
-	delSIKTemplate        = "Signing a Vocdoni transaction of type DEL_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
-	registerSIKTemplate   = "Signing a Vocdoni transaction of type REGISTER_SIK for secret identity key %x. The hash of the transaction is %x and the destination chainID is %s."
+	setAccountTemplate        = "You are signing a Vocdoni transaction of type SET_ACCOUNT/%s.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	createAccountTemplate     = "You are signing a Vocdoni transaction of type CREATE_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	updateAccountTemplate     = "You are signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setAccountInfoURITemplate = "You are signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s.\n\nThe hash of the transaction is %x and the destination chain is %s."
+	setAccountDefaultTemplate = "You are signing a Vocdoni transaction of type SET_ACCOUNT/%s.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
-	setAccountDefaultTemplate  = "Signing a Vocdoni transaction of type SET_ACCOUNT/%s. The hash of the transaction is %x and the destination chainID is %s."
-	createAccountTemplate      = "Signing a Vocdoni transaction of type CREATE_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
-	setAccountInfoURITemplate  = "Signing a Vocdoni transaction of type SET_ACCOUNT_INFO_URI for address %x with URI %s. The hash of the transaction is %x and the destination chainID is %s."
-	addDelegateAccountTemplate = "Signing a Vocdoni transaction of type ADD_DELEGATE_FOR_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
-	delDelegateAccountTemplte  = "Signing a Vocdoni transaction of type DEL_DELEGATE_FOR_ACCOUNT for address %x. The hash of the transaction is %x and the destination chainID is %s."
+	sendTokensTemplate    = "You are signing a Vocdoni transaction of type SEND_TOKENS for an amount of %d VOC tokens to destination address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	voteTemplate          = "You are signing a Vocdoni transaction of type VOTE for process ID %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	collectFaucetTemplate = "You are signing a Vocdoni transaction of type COLLECT_FAUCET.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
-	setProcessDefaultTemplate = "Signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x. The hash of the transaction is %x and the destination chainID is %s."
-	setProcessCensusTemplate  = "Signing a Vocdoni transaction of type SET_PROCESS_CENSUS for process ID %x and census %x. The hash of the transaction is %x and the destination chainID is %s."
-	setProcessStatusTemplate  = "Signing a Vocdoni transaction of type SET_PROCESS_STATUS for process ID %x and status %s. The hash of the transaction is %x and the destination chainID is %s."
+	newProcessTemplate        = "You are signing a Vocdoni transaction of type NEW_PROCESS.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setProcessTemplate        = "You are signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setProcessCensusTemplate  = "You are signing a Vocdoni transaction of type SET_PROCESS_CENSUS for process ID %x and census %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setProcessStatusTemplate  = "You are signing a Vocdoni transaction of type SET_PROCESS_STATUS for process ID %x and status %s.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setProcessDefaultTemplate = "You are signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+
+	registerSIKTemplate = "You are signing a Vocdoni transaction of type REGISTER_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	setSIKTemplate      = "You are signing a Vocdoni transaction of type SET_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	delSIKTemplate      = "You are signing a Vocdoni transaction of type DEL_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+
+	addDelegateAccountTemplate = "You are signing a Vocdoni transaction of type ADD_DELEGATE_FOR_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
+	delDelegateAccountTemplte  = "You are signing a Vocdoni transaction of type DEL_DELEGATE_FOR_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
 	defaultTemplate = "Vocdoni signed transaction:\n%s\n%x"
 )
