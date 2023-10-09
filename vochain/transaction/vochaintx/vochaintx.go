@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -36,6 +37,7 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	tx.TxModelType = string(tx.Tx.ProtoReflect().WhichOneof(tx.Tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
 	tx.Signature = stx.GetSignature()
 	tx.TxID = TxKey(content)
+	log.Warnf("Type %s, Message to sign: %s\n", tx.TxModelType, tx.SignedBody)
 	return nil
 }
 
