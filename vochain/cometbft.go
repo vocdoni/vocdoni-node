@@ -289,11 +289,10 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		Nonce     uint32
 		DecodedTx *vochaintx.Tx
 	}
-	// ensure the pending state is clean
-	if app.State.TxCounter() > 0 {
-		panic("found existing pending transactions on prepare proposal")
-	}
+	// Rollback the state to discard previous non saved changes
+	app.State.Rollback()
 
+	// Get and execute transactions from the mempool
 	validTxInfos := []txInfo{}
 	for _, tx := range req.GetTxs() {
 		vtx := new(vochaintx.Tx)
@@ -352,7 +351,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		}
 		validTxs = append(validTxs, txInfo.Data)
 	}
-	// Rollback the state to discard the changes made by CheckTx
+
+	// Rollback the state to discard the changes made
 	app.State.Rollback()
 	log.Debugw("prepare proposal", "height", app.Height(), "txs", len(validTxs),
 		"elapsedSeconds", time.Since(startTime).Seconds())
