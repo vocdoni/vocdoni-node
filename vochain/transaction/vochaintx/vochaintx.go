@@ -26,20 +26,16 @@ type Tx struct {
 func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	stx := new(models.SignedTx)
 	if err := proto.Unmarshal(content, stx); err != nil {
-		return err
+		return fmt.Errorf("failed to unmarshal signed transaction: %w", err)
 	}
-	tx.Tx = new(models.Tx)
-	if stx.GetTx() == nil {
-		return fmt.Errorf("nil transaction")
+	var err error
+	tx.SignedBody, tx.Tx, err = ethereum.BuildVocdoniTransaction(stx.GetTx(), chainID)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal transaction: %w", err)
 	}
-	if err := proto.Unmarshal(stx.GetTx(), tx.Tx); err != nil {
-		return err
-	}
-
 	tx.TxModelType = string(tx.Tx.ProtoReflect().WhichOneof(tx.Tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
 	tx.Signature = stx.GetSignature()
 	tx.TxID = TxKey(content)
-	tx.SignedBody = ethereum.BuildVocdoniTransaction(stx.GetTx(), chainID)
 	return nil
 }
 
