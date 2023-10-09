@@ -10,6 +10,12 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+type Account struct {
+	Account types.AccountID
+	Balance int64
+	Nonce   int64
+}
+
 type Block struct {
 	Height   int64
 	Time     time.Time

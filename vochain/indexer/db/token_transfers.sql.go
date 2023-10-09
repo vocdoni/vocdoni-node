@@ -13,6 +13,22 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+const countTokenTransfersByAccount = `-- name: CountTokenTransfersByAccount :one
+;
+
+
+SELECT COUNT(*) FROM token_transfers
+WHERE to_account = ?1 OR
+	  from_account = ?1
+`
+
+func (q *Queries) CountTokenTransfersByAccount(ctx context.Context, account types.AccountID) (int64, error) {
+	row := q.queryRow(ctx, q.countTokenTransfersByAccountStmt, countTokenTransfersByAccount, account)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTokenTransfer = `-- name: CreateTokenTransfer :execresult
 INSERT INTO token_transfers (
 	tx_hash, block_height, from_account,
@@ -79,6 +95,52 @@ type GetTokenTransfersByFromAccountParams struct {
 
 func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTokenTransfersByFromAccountParams) ([]TokenTransfer, error) {
 	rows, err := q.query(ctx, q.getTokenTransfersByFromAccountStmt, getTokenTransfersByFromAccount, arg.FromAccount, arg.Offset, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []TokenTransfer
+	for rows.Next() {
+		var i TokenTransfer
+		if err := rows.Scan(
+			&i.TxHash,
+			&i.BlockHeight,
+			&i.FromAccount,
+			&i.ToAccount,
+			&i.Amount,
+			&i.TransferTime,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getTokenTransfersByToAccount = `-- name: GetTokenTransfersByToAccount :many
+;
+
+SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time FROM token_transfers
+WHERE to_account = ?1
+ORDER BY transfer_time DESC
+LIMIT ?3
+OFFSET ?2
+`
+
+type GetTokenTransfersByToAccountParams struct {
+	ToAccount types.AccountID
+	Offset    int64
+	Limit     int64
+}
+
+func (q *Queries) GetTokenTransfersByToAccount(ctx context.Context, arg GetTokenTransfersByToAccountParams) ([]TokenTransfer, error) {
+	rows, err := q.query(ctx, q.getTokenTransfersByToAccountStmt, getTokenTransfersByToAccount, arg.ToAccount, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}

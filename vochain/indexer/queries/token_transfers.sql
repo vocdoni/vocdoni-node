@@ -19,3 +19,17 @@ ORDER BY transfer_time DESC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset)
 ;
+
+-- name: GetTokenTransfersByToAccount :many
+SELECT * FROM token_transfers
+WHERE to_account = sqlc.arg(to_account)
+ORDER BY transfer_time DESC
+LIMIT sqlc.arg(limit)
+OFFSET sqlc.arg(offset)
+;
+
+
+-- name: CountTokenTransfersByAccount :one
+SELECT COUNT(*) FROM token_transfers
+WHERE to_account = sqlc.arg(account) OR
+	  from_account = sqlc.arg(account);

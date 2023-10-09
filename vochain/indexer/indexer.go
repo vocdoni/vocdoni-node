@@ -558,8 +558,18 @@ func (idx *Indexer) OnProcessesStart(pids [][]byte) {
 	}
 }
 
-// OnSetAccount NOT USED but required for implementing the vochain.EventListener interface
-func (*Indexer) OnSetAccount(_ []byte, _ *state.Account) {}
+func (idx *Indexer) OnSetAccount(accountAddress []byte, account *state.Account) {
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+	queries := idx.blockTxQueries()
+	if _, err := queries.CreateAccount(context.TODO(), indexerdb.CreateAccountParams{
+		Account: accountAddress,
+		Balance: int64(account.Balance),
+		Nonce:   int64(account.Nonce),
+	}); err != nil {
+		log.Errorw(err, "cannot index new account")
+	}
+}
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 	t := time.Now()
@@ -723,6 +733,79 @@ func (idx *Indexer) GetTokenFeesByType(txType string, offset, maxItems int32) ([
 			Height:    uint64(t.BlockHeight),
 			Reference: t.Reference,
 			Timestamp: t.SpendTime,
+		})
+	}
+	return tt, nil
+}
+
+// GetTokenTransfersByToAccount returns all the token transfers made to a given account
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenTransfersByToAccount(to []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
+	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByToAccount(context.TODO(), indexerdb.GetTokenTransfersByToAccountParams{
+		ToAccount: to,
+		Limit:     int64(maxItems),
+		Offset:    int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []*indexertypes.TokenTransferMeta{}
+	for _, t := range ttFromDB {
+		tt = append(tt, &indexertypes.TokenTransferMeta{
+			Amount:    uint64(t.Amount),
+			From:      t.FromAccount,
+			To:        t.ToAccount,
+			Height:    uint64(t.BlockHeight),
+			TxHash:    t.TxHash,
+			Timestamp: t.TransferTime,
+		})
+	}
+	return tt, nil
+}
+
+// GetTokenTransfersByAccount returns all the token transfers made to and from a given account
+// from the database, ordered by timestamp and paginated by maxItems and offset
+func (idx *Indexer) GetTokenTransfersByAccount(acc []byte, offset, maxItems int32) (indexertypes.TokenTransfersAccount, error) {
+	transfersTo, err := idx.GetTokenTransfersByToAccount(acc, offset, maxItems)
+	if err != nil {
+		return indexertypes.TokenTransfersAccount{}, err
+	}
+	transfersFrom, err := idx.GetTokenTransfersByFromAccount(acc, offset, maxItems)
+	if err != nil {
+		return indexertypes.TokenTransfersAccount{}, err
+	}
+
+	return indexertypes.TokenTransfersAccount{
+		Received: transfersTo,
+		Sent:     transfersFrom}, nil
+}
+
+// CountTokenTransfersByAccount returns the count all the token transfers made from a given account
+func (idx *Indexer) CountTokenTransfersByAccount(acc []byte) (uint64, error) {
+	count, err := idx.readOnlyQuery.CountTokenTransfersByAccount(context.TODO(), acc)
+	return uint64(count), err
+}
+
+// CountTotalAccounts returns the total number of accounts indexed.
+func (idx *Indexer) CountTotalAccounts() (uint64, error) {
+	count, err := idx.readOnlyQuery.CountAccounts(context.TODO())
+	return uint64(count), err
+}
+
+func (idx *Indexer) GetListAccounts(offset, maxItems int32) ([]indexertypes.Account, error) {
+	accsFromDB, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
+		Limit:  int64(maxItems),
+		Offset: int64(offset),
+	})
+	if err != nil {
+		return nil, err
+	}
+	tt := []indexertypes.Account{}
+	for _, acc := range accsFromDB {
+		tt = append(tt, indexertypes.Account{
+			Address: acc.Account,
+			Balance: uint64(acc.Balance),
+			Nonce:   uint32(acc.Nonce),
 		})
 	}
 	return tt, nil

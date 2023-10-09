@@ -1416,6 +1416,139 @@ func TestEndBlock(t *testing.T) {
 	qt.Assert(t, proc.BlockCount, qt.Equals, uint32(100))
 }
 
+func TestAccountsList(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+
+	keys := make([]*ethereum.SignKeys, 0)
+	for i := 0; i < 25; i++ {
+		key := &ethereum.SignKeys{}
+		qt.Assert(t, key.Generate(), qt.IsNil)
+		keys = append(keys, key)
+
+		err := app.State.SetAccount(key.Address(), &state.Account{
+			Account: models.Account{
+				Balance: 500,
+				Nonce:   uint32(0),
+				InfoURI: "ipfs://vocdoni.io",
+			},
+		})
+		qt.Assert(t, err, qt.IsNil)
+
+		app.AdvanceTestBlock()
+	}
+
+	// Test total count accounts
+	totalAccs, err := idx.CountTotalAccounts()
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, totalAccs, qt.CmpEquals(), uint64(25))
+
+	last := 0
+	for i := 0; i < int(totalAccs); i++ {
+		accts, err := idx.GetListAccounts(int32(last), 10)
+		qt.Assert(t, err, qt.IsNil)
+
+		for j, acc := range accts {
+			qt.Assert(t, acc.Address.String(), qt.Equals, hex.EncodeToString(keys[j+last].Address().Bytes()))
+			qt.Assert(t, acc.Nonce, qt.Equals, uint32(0))
+			qt.Assert(t, acc.Balance, qt.Equals, uint64(500))
+		}
+		last += 10
+	}
+
+	// update an existing account
+	err = app.State.SetAccount(keys[0].Address(), &state.Account{
+		Account: models.Account{
+			Balance: 600,
+			Nonce:   uint32(1),
+			InfoURI: "ipfs://vocdoni.io",
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// verify the updated balance and nonce
+	accts, err := idx.GetListAccounts(int32(0), 5)
+	qt.Assert(t, err, qt.IsNil)
+	// the account in the position 0 must be the updated account balance due it has the major balance
+	// indexer query has order BY balance DESC
+	qt.Assert(t, accts[0].Address.String(), qt.Equals, hex.EncodeToString(keys[0].Address().Bytes()))
+	qt.Assert(t, accts[0].Nonce, qt.Equals, uint32(1))
+	qt.Assert(t, accts[0].Balance, qt.Equals, uint64(600))
+}
+
+func TestTokenTransfers(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app, true)
+
+	keys := make([]*ethereum.SignKeys, 0)
+	// create 3 accounts
+	for i := 0; i < 3; i++ {
+		key := &ethereum.SignKeys{}
+		qt.Assert(t, key.Generate(), qt.IsNil)
+		keys = append(keys, key)
+
+		err := app.State.SetAccount(key.Address(), &state.Account{
+			Account: models.Account{
+				Balance: 500,
+				Nonce:   uint32(0),
+				InfoURI: "ipfs://vocdoni.io",
+			},
+		})
+		qt.Assert(t, err, qt.IsNil)
+
+		app.AdvanceTestBlock()
+	}
+
+	err := app.State.TransferBalance(&vochaintx.TokenTransfer{
+		FromAddress: keys[0].Address(),
+		ToAddress:   keys[2].Address(),
+		Amount:      18,
+		TxHash:      util.RandomBytes(32),
+	}, false)
+	qt.Assert(t, err, qt.IsNil)
+
+	app.AdvanceTestBlock()
+
+	err = app.State.TransferBalance(&vochaintx.TokenTransfer{
+		FromAddress: keys[1].Address(),
+		ToAddress:   keys[2].Address(),
+		Amount:      95,
+		TxHash:      util.RandomBytes(32),
+	}, false)
+	qt.Assert(t, err, qt.IsNil)
+
+	app.AdvanceTestBlock()
+
+	err = app.State.TransferBalance(&vochaintx.TokenTransfer{
+		FromAddress: keys[2].Address(),
+		ToAddress:   keys[1].Address(),
+		Amount:      5,
+		TxHash:      util.RandomBytes(32),
+	}, false)
+	qt.Assert(t, err, qt.IsNil)
+
+	app.AdvanceTestBlock()
+
+	// acct 1 must have only one token transfer received
+	acc1Tokentx, err := idx.GetTokenTransfersByToAccount(keys[1].Address().Bytes(), 0, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, len(acc1Tokentx), qt.Equals, 1)
+	qt.Assert(t, acc1Tokentx[0].Amount, qt.Equals, uint64(5))
+
+	// acct 2 must two token transfers received
+	acc2Tokentx, err := idx.GetTokenTransfersByToAccount(keys[2].Address().Bytes(), 0, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, len(acc2Tokentx), qt.Equals, 2)
+	qt.Assert(t, acc2Tokentx[0].Amount, qt.Equals, uint64(95))
+	qt.Assert(t, acc2Tokentx[1].Amount, qt.Equals, uint64(18))
+
+	// acct 0 must zero token transfers received
+	acc0Tokentx, err := idx.GetTokenTransfersByToAccount(keys[0].Address().Bytes(), 0, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, len(acc0Tokentx), qt.Equals, 0)
+}
+
 // friendlyResults translates votes into a matrix of strings
 func friendlyResults(votes [][]*types.BigInt) [][]string {
 	r := [][]string{}

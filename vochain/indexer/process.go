@@ -193,7 +193,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	return nil
 }
 
-// updateProcess synchronize those fields that can be updated on a existing process
+// updateProcess synchronize those fields that can be updated on an existing process
 // with the information obtained from the Vochain state
 func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Queries, pid []byte) error {
 	p, err := idx.App.State.Process(pid, false)

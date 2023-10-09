@@ -71,7 +71,7 @@ func (a *API) enableAccountHandlers() error {
 		"/accounts/{accountID}/transfers/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.tokenTransfersHandler,
+		a.tokenTransfersListHandler,
 	); err != nil {
 		return err
 	}
@@ -80,6 +80,30 @@ func (a *API) enableAccountHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenFeesHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts/{accountID}/transfers/count",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.tokenTransfersCountHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts/count",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.accountCountHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.accountListHandler,
 	); err != nil {
 		return err
 	}
@@ -125,7 +149,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 
 	sik, err := a.vocapp.State.SIKFromAddress(addr)
 	if err != nil && !errors.Is(err, state.ErrSIKNotFound) {
-		log.Warnf("uknown error getting SIK: %v", err)
+		log.Warnf("unknown error getting SIK: %v", err)
 		return ErrGettingSIK.WithErr(err)
 	}
 
@@ -232,6 +256,33 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// accountCountHandler
+//
+//	@Summary		Total number of accounts
+//	@Description	Returns the count of total number of existing accounts
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{count=int}
+//	@Router			/accounts/count [get]
+func (a *API) accountCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	count, err := a.indexer.CountTotalAccounts()
+	if err != nil {
+		return err
+	}
+
+	data, err := json.Marshal(
+		struct {
+			Count uint64 `json:"count"`
+		}{Count: count},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
@@ -349,18 +400,18 @@ func (a *API) electionCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// tokenTransfersHandler
+// tokenTransfersListHandler
 //
-//	@Summary		List account transfers
+//	@Summary		List account received and sent token transfers
 //	@Description	Returns the token transfers for an account. A transfer is a token transference from one account to other (excepting the burn address).
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
 //	@Param			accountID	path		string	true	"Specific accountID"
 //	@Param			page		path		string	true	"Paginator page"
-//	@Success		200			{object}	object{transfers=[]indexertypes.TokenTransferMeta}
+//	@Success		200			{object}	object{transfers=indexertypes.TokenTransfersAccount}
 //	@Router			/accounts/{accountID}/transfers/page/{page} [get]
-func (a *API) tokenTransfersHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
 	if err != nil || accountID == nil {
 		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
@@ -380,13 +431,13 @@ func (a *API) tokenTransfersHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 		}
 	}
 	page = page * MaxPageSize
-	transfers, err := a.indexer.GetTokenTransfersByFromAccount(accountID, int32(page), MaxPageSize)
+	transfers, err := a.indexer.GetTokenTransfersByAccount(accountID, int32(page), MaxPageSize)
 	if err != nil {
 		return ErrCantFetchTokenTransfers.WithErr(err)
 	}
 	data, err := json.Marshal(
 		struct {
-			Transfers []*indexertypes.TokenTransferMeta `json:"transfers"`
+			Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
 		}{Transfers: transfers},
 	)
 	if err != nil {
@@ -435,6 +486,80 @@ func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		struct {
 			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
 		}{Fees: fees},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// tokenTransfersCountHandler
+//
+//	@Summary		Total number of sent and received transactions
+//	@Description	Returns the count of total number of sent and received transactions for an account. A transaction is a token transfer from one account to another existing account
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			accountID	path		string				true	"Specific accountID"
+//	@Success		200			{object}	object{count=int}	"Number of transaction sent and received for the account"
+//	@Router			/accounts/{accountID}/transfers/count [get]
+func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	if err != nil || accountID == nil {
+		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
+	}
+	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
+	if acc == nil {
+		return ErrAccountNotFound
+	}
+	if err != nil {
+		return err
+	}
+
+	count, err := a.indexer.CountTokenTransfersByAccount(accountID)
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(
+		struct {
+			Count uint64 `json:"count"`
+		}{Count: count},
+	)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// accountListHandler
+//
+//	@Summary		List of the existing accounts
+//	@Description	Returns information (address, balance and nonce) of the existing accounts
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		string	true	"Paginator page"
+//	@Success		200		{object}	object{accounts=[]indexertypes.Account}
+//	@Router			/accounts/page/{page} [get]
+func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	var err error
+	page := 0
+	if ctx.URLParam("page") != "" {
+		page, err = strconv.Atoi(ctx.URLParam("page"))
+		if err != nil {
+			return ErrCantParsePageNumber
+		}
+	}
+	page = page * MaxPageSize
+	accounts, err := a.indexer.GetListAccounts(int32(page), MaxPageSize)
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+	data, err := json.Marshal(
+		struct {
+			Accounts []indexertypes.Account `json:"accounts"`
+		}{Accounts: accounts},
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)

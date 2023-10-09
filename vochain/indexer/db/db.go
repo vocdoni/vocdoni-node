@@ -24,6 +24,12 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.countAccountsStmt, err = db.PrepareContext(ctx, countAccounts); err != nil {
+		return nil, fmt.Errorf("error preparing query CountAccounts: %w", err)
+	}
+	if q.countTokenTransfersByAccountStmt, err = db.PrepareContext(ctx, countTokenTransfersByAccount); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTokenTransfersByAccount: %w", err)
+	}
 	if q.countTransactionsStmt, err = db.PrepareContext(ctx, countTransactions); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactions: %w", err)
 	}
@@ -32,6 +38,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.countVotesByProcessIDStmt, err = db.PrepareContext(ctx, countVotesByProcessID); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotesByProcessID: %w", err)
+	}
+	if q.createAccountStmt, err = db.PrepareContext(ctx, createAccount); err != nil {
+		return nil, fmt.Errorf("error preparing query CreateAccount: %w", err)
 	}
 	if q.createBlockStmt, err = db.PrepareContext(ctx, createBlock); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateBlock: %w", err)
@@ -59,6 +68,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getLastTransactionsStmt, err = db.PrepareContext(ctx, getLastTransactions); err != nil {
 		return nil, fmt.Errorf("error preparing query GetLastTransactions: %w", err)
+	}
+	if q.getListAccountsStmt, err = db.PrepareContext(ctx, getListAccounts); err != nil {
+		return nil, fmt.Errorf("error preparing query GetListAccounts: %w", err)
 	}
 	if q.getProcessStmt, err = db.PrepareContext(ctx, getProcess); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcess: %w", err)
@@ -89,6 +101,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getTokenTransfersByFromAccountStmt, err = db.PrepareContext(ctx, getTokenTransfersByFromAccount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTokenTransfersByFromAccount: %w", err)
+	}
+	if q.getTokenTransfersByToAccountStmt, err = db.PrepareContext(ctx, getTokenTransfersByToAccount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetTokenTransfersByToAccount: %w", err)
 	}
 	if q.getTransactionStmt, err = db.PrepareContext(ctx, getTransaction); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTransaction: %w", err)
@@ -137,6 +152,16 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.countAccountsStmt != nil {
+		if cerr := q.countAccountsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countAccountsStmt: %w", cerr)
+		}
+	}
+	if q.countTokenTransfersByAccountStmt != nil {
+		if cerr := q.countTokenTransfersByAccountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTokenTransfersByAccountStmt: %w", cerr)
+		}
+	}
 	if q.countTransactionsStmt != nil {
 		if cerr := q.countTransactionsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTransactionsStmt: %w", cerr)
@@ -150,6 +175,11 @@ func (q *Queries) Close() error {
 	if q.countVotesByProcessIDStmt != nil {
 		if cerr := q.countVotesByProcessIDStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countVotesByProcessIDStmt: %w", cerr)
+		}
+	}
+	if q.createAccountStmt != nil {
+		if cerr := q.createAccountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing createAccountStmt: %w", cerr)
 		}
 	}
 	if q.createBlockStmt != nil {
@@ -195,6 +225,11 @@ func (q *Queries) Close() error {
 	if q.getLastTransactionsStmt != nil {
 		if cerr := q.getLastTransactionsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getLastTransactionsStmt: %w", cerr)
+		}
+	}
+	if q.getListAccountsStmt != nil {
+		if cerr := q.getListAccountsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getListAccountsStmt: %w", cerr)
 		}
 	}
 	if q.getProcessStmt != nil {
@@ -245,6 +280,11 @@ func (q *Queries) Close() error {
 	if q.getTokenTransfersByFromAccountStmt != nil {
 		if cerr := q.getTokenTransfersByFromAccountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getTokenTransfersByFromAccountStmt: %w", cerr)
+		}
+	}
+	if q.getTokenTransfersByToAccountStmt != nil {
+		if cerr := q.getTokenTransfersByToAccountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getTokenTransfersByToAccountStmt: %w", cerr)
 		}
 	}
 	if q.getTransactionStmt != nil {
@@ -356,9 +396,12 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 type Queries struct {
 	db                                           DBTX
 	tx                                           *sql.Tx
+	countAccountsStmt                            *sql.Stmt
+	countTokenTransfersByAccountStmt             *sql.Stmt
 	countTransactionsStmt                        *sql.Stmt
 	countVotesStmt                               *sql.Stmt
 	countVotesByProcessIDStmt                    *sql.Stmt
+	createAccountStmt                            *sql.Stmt
 	createBlockStmt                              *sql.Stmt
 	createProcessStmt                            *sql.Stmt
 	createTokenFeeStmt                           *sql.Stmt
@@ -368,6 +411,7 @@ type Queries struct {
 	getBlockStmt                                 *sql.Stmt
 	getEntityCountStmt                           *sql.Stmt
 	getLastTransactionsStmt                      *sql.Stmt
+	getListAccountsStmt                          *sql.Stmt
 	getProcessStmt                               *sql.Stmt
 	getProcessCountStmt                          *sql.Stmt
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
@@ -378,6 +422,7 @@ type Queries struct {
 	getTokenFeesByTxTypeStmt                     *sql.Stmt
 	getTokenTransferStmt                         *sql.Stmt
 	getTokenTransfersByFromAccountStmt           *sql.Stmt
+	getTokenTransfersByToAccountStmt             *sql.Stmt
 	getTransactionStmt                           *sql.Stmt
 	getTransactionByHashStmt                     *sql.Stmt
 	getTxReferenceByBlockHeightAndBlockIndexStmt *sql.Stmt
@@ -398,9 +443,12 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                                 tx,
 		tx:                                 tx,
+		countAccountsStmt:                  q.countAccountsStmt,
+		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
 		countTransactionsStmt:              q.countTransactionsStmt,
 		countVotesStmt:                     q.countVotesStmt,
 		countVotesByProcessIDStmt:          q.countVotesByProcessIDStmt,
+		createAccountStmt:                  q.createAccountStmt,
 		createBlockStmt:                    q.createBlockStmt,
 		createProcessStmt:                  q.createProcessStmt,
 		createTokenFeeStmt:                 q.createTokenFeeStmt,
@@ -410,6 +458,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getBlockStmt:                       q.getBlockStmt,
 		getEntityCountStmt:                 q.getEntityCountStmt,
 		getLastTransactionsStmt:            q.getLastTransactionsStmt,
+		getListAccountsStmt:                q.getListAccountsStmt,
 		getProcessStmt:                     q.getProcessStmt,
 		getProcessCountStmt:                q.getProcessCountStmt,
 		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
@@ -420,6 +469,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTokenFeesByTxTypeStmt:           q.getTokenFeesByTxTypeStmt,
 		getTokenTransferStmt:               q.getTokenTransferStmt,
 		getTokenTransfersByFromAccountStmt: q.getTokenTransfersByFromAccountStmt,
+		getTokenTransfersByToAccountStmt:   q.getTokenTransfersByToAccountStmt,
 		getTransactionStmt:                 q.getTransactionStmt,
 		getTransactionByHashStmt:           q.getTransactionByHashStmt,
 		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
