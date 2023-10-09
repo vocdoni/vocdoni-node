@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
@@ -215,11 +216,11 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	defer app.prepareProposalLock.Unlock()
 	start := time.Now()
 	height := uint32(req.GetHeight())
-
 	var root []byte
 	var resp []*DeliverTxResponse
 	// skip execution if we already have the results and root (from ProcessProposal)
-	if app.lastRootHash == nil {
+	// or if the stored lastBlockHash is different from the one requested.
+	if app.lastRootHash == nil || !bytes.Equal(app.lastBlockHash, req.GetHash()) {
 		result, err := app.ExecuteBlock(req.Txs, height, req.GetTime())
 		if err != nil {
 			return nil, fmt.Errorf("cannot execute block: %w", err)
@@ -288,7 +289,6 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		Nonce     uint32
 		DecodedTx *vochaintx.Tx
 	}
-
 	// ensure the pending state is clean
 	if app.State.TxCounter() > 0 {
 		panic("found existing pending transactions on prepare proposal")
@@ -371,6 +371,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
 func (app *BaseApplication) ProcessProposal(_ context.Context,
 	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+	app.prepareProposalLock.Lock()
+	defer app.prepareProposalLock.Unlock()
 	// Check if the node is a validator, if not, just accept the proposal and return (nothing to say)
 	validator, err := app.State.Validator(app.NodeAddress, true)
 	if err != nil {
@@ -380,18 +382,11 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 		// we reset the last deliver tx response and root hash to avoid using them at finalize block
 		app.lastDeliverTxResponse = nil
 		app.lastRootHash = nil
+		app.lastBlockHash = nil
 		return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
 	}
 
-	app.prepareProposalLock.Lock()
-	defer app.prepareProposalLock.Unlock()
 	startTime := time.Now()
-
-	// ensure the pending state is clean
-	if app.State.TxCounter() > 0 {
-		panic("found existing pending transactions on process proposal")
-	}
-
 	resp, err := app.ExecuteBlock(req.Txs, uint32(req.GetHeight()), req.GetTime())
 	if err != nil {
 		return nil, fmt.Errorf("cannot execute block on process proposal: %w", err)
@@ -405,7 +400,9 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	}
 	app.lastDeliverTxResponse = resp.Responses
 	app.lastRootHash = resp.Root
+	app.lastBlockHash = req.GetHash()
 	log.Debugw("process proposal", "height", app.Height(), "txs", len(req.Txs), "action", "accept",
+		"blockHash", hex.EncodeToString(app.lastBlockHash),
 		"hash", hex.EncodeToString(resp.Root), "elapsedSeconds", time.Since(startTime).Seconds())
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,

@@ -176,7 +176,7 @@ func newTendermint(app *BaseApplication,
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = true
-	tconfig.Mempool.KeepInvalidTxsInCache = false
+	tconfig.Mempool.KeepInvalidTxsInCache = true
 	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000

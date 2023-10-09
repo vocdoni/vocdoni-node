@@ -74,12 +74,15 @@ type BaseApplication struct {
 	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
+
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
 	// can skip block re-execution on FinalizeBlock call.
 	lastDeliverTxResponse []*DeliverTxResponse
 	// lastRootHash is used to store the last root hash of the current on-going state,
 	// it is used by validators to skip block re-execution on FinalizeBlock call.
 	lastRootHash []byte
+	// lastBlockHash stores the last cometBFT block hash
+	lastBlockHash []byte
 	// prepareProposalLock is used to avoid concurrent calls between Prepare/Process Proposal and FinalizeBlock
 	prepareProposalLock sync.Mutex
 
@@ -144,6 +147,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 // ExecuteBlock delivers a block of transactions to the Application.
 // It modifies the state according to the transactions and returns the resulting Merkle root hash.
 // It returns a list of ResponseDeliverTx, one for each transaction in the block.
+// This call rollbacks the current state.
 func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) (*ExecuteBlockResponse, error) {
 	result := []*DeliverTxResponse{}
 	app.beginBlock(blockTime, height)
