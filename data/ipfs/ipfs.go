@@ -70,7 +70,7 @@ func (i *Handler) Init(d *types.DataStore) error {
 
 	// check if needs init
 	if !fsrepo.IsInitialized(ConfigRoot) {
-		if err := initRepository(); err != nil {
+		if err := initRepository(d.EnableLocalDiscovery); err != nil {
 			return err
 		}
 	}

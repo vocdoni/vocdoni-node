@@ -108,9 +108,10 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 	// Create the IPFS storage layer
 	if !disableIPFS {
 		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
-			ConfigPath:   filepath.Join(dataDir, "ipfs"),
-			ConnectKey:   connectKey,
-			ConnectPeers: connectPeers,
+			ConfigPath:     filepath.Join(dataDir, "ipfs"),
+			ConnectKey:     connectKey,
+			ConnectPeers:   connectPeers,
+			LocalDiscovery: true, // vocone is not intended to be deployed in server env. if needed we could turn this into a flag
 		})
 		if err != nil {
 			return nil, err

@@ -48,7 +48,7 @@ func init() {
 }
 
 // Init initializes the IPFS node and repository.
-func initRepository() error {
+func initRepository(enableLocalDiscovery bool) error {
 	daemonLocked, err := fsrepo.LockedByOtherProcess(ConfigRoot)
 	if err != nil {
 		return err
@@ -66,7 +66,7 @@ func initRepository() error {
 	if err := installDatabasePlugins(); err != nil {
 		return err
 	}
-	_, err = doInit(io.Discard, ConfigRoot, 2048)
+	_, err = doInit(io.Discard, ConfigRoot, 2048, enableLocalDiscovery)
 	return err
 }
 
@@ -180,7 +180,7 @@ var installDatabasePlugins = sync.OnceValue(func() error {
 	return nil
 })
 
-func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config, error) {
+func doInit(out io.Writer, repoRoot string, nBitsForKeypair int, enableLocalDiscovery bool) (*config.Config, error) {
 	log.Infow("initializing new IPFS repository", "root", repoRoot)
 	if err := checkWritable(repoRoot); err != nil {
 		return nil, err
@@ -195,10 +195,12 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 		return nil, err
 	}
 
-	conf.Discovery.MDNS.Enabled = false
-
+	// Apply `server` configuration profile:
+	// Disables local host discovery, recommended when running IPFS on machines with public IPv4 addresses
 	// Prevent from scanning local networks which can trigger netscan alerts.
 	// See: https://github.com/ipfs/kubo/issues/7985
+	conf.Discovery.MDNS.Enabled = false
+	conf.Swarm.DisableNatPortMap = true
 	conf.Swarm.AddrFilters = []string{
 		"/ip4/10.0.0.0/ipcidr/8",
 		"/ip4/100.64.0.0/ipcidr/10",
@@ -216,6 +218,14 @@ func doInit(out io.Writer, repoRoot string, nBitsForKeypair int) (*config.Config
 		"/ip6/2001:db8::/ipcidr/32",
 		"/ip6/fc00::/ipcidr/7",
 		"/ip6/fe80::/ipcidr/10",
+	}
+	conf.Addresses.NoAnnounce = conf.Swarm.AddrFilters
+
+	if enableLocalDiscovery {
+		conf.Discovery.MDNS.Enabled = true
+		conf.Swarm.DisableNatPortMap = false
+		conf.Swarm.AddrFilters = []string{}
+		conf.Addresses.NoAnnounce = []string{}
 	}
 
 	if err := fsrepo.Init(repoRoot, conf); err != nil {
