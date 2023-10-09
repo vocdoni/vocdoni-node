@@ -160,7 +160,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
-	var genesisAppState genesis.GenesisAppState
+	var genesisAppState genesis.AppState
 	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
@@ -583,7 +583,7 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 	return app.circuitConfigTag
 }
 
-// IsSynchronizing informes if the blockchain is synchronizing or not.
+// IsSynchronizing informs if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
 	if app.Node == nil {
 		return true
@@ -591,7 +591,7 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	return app.Node.ConsensusReactor().WaitSync()
 }
 
-// IsSynchronizing informes if the blockchain is synchronizing or not.
+// IsSynchronizing informs if the blockchain is synchronizing or not.
 // The value is updated every new block.
 func (app *BaseApplication) IsSynchronizing() bool {
 	return app.isSynchronizing.Load()

@@ -54,7 +54,7 @@ type Account struct {
 	PublicKey types.HexBytes `json:"pubKey"`
 }
 
-type vocdoniCLI struct {
+type VocdoniCLI struct {
 	filepath string
 	config   *Config
 	api      *apiclient.HTTPclient
@@ -63,7 +63,7 @@ type vocdoniCLI struct {
 	currentAccount int
 }
 
-func NewVocdoniCLI(configFile, host string) (*vocdoniCLI, error) {
+func NewVocdoniCLI(configFile, host string) (*VocdoniCLI, error) {
 	cfg := Config{}
 	if err := cfg.Load(configFile); err != nil {
 		return nil, err
@@ -101,7 +101,7 @@ func NewVocdoniCLI(configFile, host string) (*vocdoniCLI, error) {
 			return nil, err
 		}
 	}
-	return &vocdoniCLI{
+	return &VocdoniCLI{
 		filepath:       configFile,
 		config:         &cfg,
 		api:            api,
@@ -110,7 +110,7 @@ func NewVocdoniCLI(configFile, host string) (*vocdoniCLI, error) {
 	}, nil
 }
 
-func (v *vocdoniCLI) setHost(host string) error {
+func (v *VocdoniCLI) setHost(host string) error {
 	u, err := url.Parse(host)
 	if err != nil {
 		return err
@@ -127,7 +127,7 @@ func (v *vocdoniCLI) setHost(host string) error {
 	return v.save()
 }
 
-func (v *vocdoniCLI) setAuthToken(token string) error {
+func (v *VocdoniCLI) setAuthToken(token string) error {
 	t, err := uuid.Parse(token)
 	if err != nil {
 		return err
@@ -137,7 +137,7 @@ func (v *vocdoniCLI) setAuthToken(token string) error {
 	return v.save()
 }
 
-func (v *vocdoniCLI) useAccount(index int) error {
+func (v *VocdoniCLI) useAccount(index int) error {
 	if index >= len(v.config.Accounts) {
 		return fmt.Errorf("account %d does not exist", index)
 	}
@@ -149,21 +149,21 @@ func (v *vocdoniCLI) useAccount(index int) error {
 	return v.api.SetAccount(v.config.Accounts[index].PrivKey.String())
 }
 
-func (v *vocdoniCLI) getAccount(index int) (*Account, error) {
+func (v *VocdoniCLI) getAccount(index int) (*Account, error) {
 	if index >= len(v.config.Accounts) {
 		return nil, fmt.Errorf("account %d does not exist", index)
 	}
 	return &v.config.Accounts[index], nil
 }
 
-func (v *vocdoniCLI) getCurrentAccount() *Account {
+func (v *VocdoniCLI) getCurrentAccount() *Account {
 	if v.currentAccount < 0 {
 		return nil
 	}
 	return &v.config.Accounts[v.currentAccount]
 }
 
-func (v *vocdoniCLI) setAPIaccount(key, memo string) error {
+func (v *VocdoniCLI) setAPIaccount(key, memo string) error {
 	if err := v.api.SetAccount(key); err != nil {
 		return err
 	}
@@ -198,7 +198,7 @@ func (v *vocdoniCLI) setAPIaccount(key, memo string) error {
 }
 
 // listAccounts list the memo notes of all stored accounts
-func (v *vocdoniCLI) listAccounts() []string {
+func (v *VocdoniCLI) listAccounts() []string {
 	accounts := []string{}
 	for _, a := range v.config.Accounts {
 		accounts = append(accounts, a.Memo)
@@ -206,12 +206,12 @@ func (v *vocdoniCLI) listAccounts() []string {
 	return accounts
 }
 
-func (v *vocdoniCLI) transactionMined(txHash types.HexBytes) bool {
+func (v *VocdoniCLI) transactionMined(txHash types.HexBytes) bool {
 	_, err := v.api.TransactionReference(txHash)
 	return err == nil
 }
 
-func (v *vocdoniCLI) waitForTransaction(txHash types.HexBytes) bool {
+func (v *VocdoniCLI) waitForTransaction(txHash types.HexBytes) bool {
 	startTime := time.Now()
 	for time.Now().Before(startTime.Add(transactionConfirmationThreshold)) {
 		if v.transactionMined(txHash) {
@@ -222,6 +222,6 @@ func (v *vocdoniCLI) waitForTransaction(txHash types.HexBytes) bool {
 	return false
 }
 
-func (v *vocdoniCLI) save() error {
+func (v *VocdoniCLI) save() error {
 	return v.config.Save(v.filepath)
 }

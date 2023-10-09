@@ -136,7 +136,7 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 }
 
 // OnProcessesStart is triggered when a process starts. Does nothing.
-func (d *OffChainDataHandler) OnProcessesStart(_ [][]byte) {
+func (*OffChainDataHandler) OnProcessesStart(_ [][]byte) {
 }
 
 // OnSetAccount is triggered when a new account is created or modified. If metadata info is present, it is enqueued.

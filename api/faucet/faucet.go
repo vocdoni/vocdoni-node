@@ -17,7 +17,7 @@ const (
 	FaucetHandler = "faucet"
 )
 
-// FaucetAPI is an httprouter/apirest handler for the faucet.
+// FaucetAPI is a httprouter/apirest handler for the faucet.
 // It generates a signed package that can be used to request tokens from the faucet.
 type FaucetAPI struct {
 	signingKey *ethereum.SignKeys

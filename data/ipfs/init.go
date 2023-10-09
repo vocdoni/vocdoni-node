@@ -13,7 +13,7 @@ import (
 	ihelper "github.com/ipfs/boxo/ipld/unixfs/importer/helpers"
 	ipfscid "github.com/ipfs/go-cid"
 	"github.com/ipfs/kubo/commands"
-	config "github.com/ipfs/kubo/config"
+	"github.com/ipfs/kubo/config"
 	ipfscore "github.com/ipfs/kubo/core"
 	ipfsapi "github.com/ipfs/kubo/core/coreapi"
 	"github.com/ipfs/kubo/plugin/loader"
@@ -236,7 +236,9 @@ func checkWritable(dir string) error {
 			}
 			return fmt.Errorf("unexpected error while checking writeablility of repo root: %s", err)
 		}
-		fi.Close()
+		if err := fi.Close(); err != nil {
+			return err
+		}
 		return os.Remove(testfile)
 	}
 

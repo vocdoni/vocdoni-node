@@ -22,6 +22,8 @@ func PublicIP(ipversion uint) (net.IP, error) {
 	config := externalip.DefaultConsensusConfig().WithTimeout(publicIPTimeout)
 
 	consensus := externalip.DefaultConsensus(config, nil)
-	consensus.UseIPProtocol(ipversion)
+	if err := consensus.UseIPProtocol(ipversion); err != nil {
+		return nil, err
+	}
 	return consensus.ExternalIP()
 }

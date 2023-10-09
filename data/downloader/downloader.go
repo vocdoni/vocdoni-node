@@ -21,7 +21,7 @@ const (
 	// ImportRetrieveTimeout the maximum duration the import queue will wait
 	// for retrieving a remote file.
 	ImportRetrieveTimeout = 5 * time.Minute
-	// ImportQueueTimeout is the maximum duration the import queue will wait
+	// ImportPinTimeout is the maximum duration the import queue will wait
 	// for pinning a remote file.
 	ImportPinTimeout = 3 * time.Minute
 	// MaxFileSize is the maximum size of a file that can be imported.
