@@ -2,7 +2,6 @@ package vochain
 
 import (
 	"context"
-	"encoding/hex"
 	"testing"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
@@ -83,6 +82,11 @@ func TestTransactionsSorted(t *testing.T) {
 		Txs: txs,
 	}
 
+	_, err := app.State.PrepareCommit()
+	qt.Assert(err, quicktest.IsNil)
+	_, err = app.CommitState()
+	qt.Assert(err, quicktest.IsNil)
+
 	resp, err := app.PrepareProposal(context.Background(), req)
 	qt.Assert(err, quicktest.IsNil)
 
@@ -97,7 +101,6 @@ func TestTransactionsSorted(t *testing.T) {
 			qt.Errorf("nonce is not sorted: %d, %d", nonce, txSendTokens.Nonce)
 		}
 		txAddresses[string(txSendTokens.From)] = txSendTokens.Nonce
-		t.Logf("Address: %s Nonce: %d\n", hex.EncodeToString(txSendTokens.From), txSendTokens.Nonce)
 	}
 	qt.Assert(len(txs), quicktest.Equals, len(resp.Txs))
 }
