@@ -45,18 +45,18 @@ log() { echo $(date --rfc-3339=s) "$@" ; }
 ### newtest() { whatever ; }
 
 tests_to_run=(
-	"e2etest_raceDuringCommit"
-	"e2etest_plaintextelection_empty"
-	"e2etest_plaintextelection"
-	"e2etest_encryptedelection"
-	"e2etest_anonelection"
-	"e2etest_overwritelection"
-	"e2etest_censusizelection"
-	"e2etest_ballotelection"
-	"e2etest_tokentxs"
-	"e2etest_lifecyclelection"
-	"e2etest_cspelection"
-	"e2etest_dynamicensuselection"
+		"e2etest_raceDuringCommit"
+  	"e2etest_plaintextelection_empty"
+  	"e2etest_plaintextelection"
+  	"e2etest_encryptedelection"
+  	"e2etest_anonelection"
+  	"e2etest_overwritelection"
+  	"e2etest_censusizelection"
+  	"e2etest_ballotelection"
+  	"e2etest_tokentxs"
+  	"e2etest_lifecyclelection"
+  	"e2etest_cspelection"
+  	"e2etest_dynamicensuselection"
 )
 
 # print help

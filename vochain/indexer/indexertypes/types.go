@@ -220,3 +220,15 @@ type TokenFeeMeta struct {
 	Timestamp time.Time       `json:"timestamp"`
 	TxType    string          `json:"txType"`
 }
+
+type Account struct {
+	Address types.AccountID `json:"address"`
+	Balance uint64          `json:"balance"`
+	Nonce   uint32          `json:"nonce"`
+}
+
+// TokenTransfersAccount contains the tokes transfers received and sent information in an account
+type TokenTransfersAccount struct {
+	Received []*TokenTransferMeta
+	Sent     []*TokenTransferMeta
+}

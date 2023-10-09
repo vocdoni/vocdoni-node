@@ -499,7 +499,7 @@ func (a *API) chainTxListPaginated(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 		}
 		return err
 	}
-	// wrap list in a struct to consistently return list in a object, return empty
+	// wrap list in a struct to consistently return list in an object, return empty
 	// object if the list does not contains any result
 	type response struct {
 		Txs []*indexertypes.Transaction `json:"transactions"`

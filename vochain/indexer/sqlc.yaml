@@ -31,3 +31,5 @@ sql:
         go_type: "go.vocdoni.io/dvote/types.AccountID"
       - column: "token_transfers.tx_hash"
         go_type: "go.vocdoni.io/dvote/types.Hash"
+      - column: "accounts.account"
+        go_type: "go.vocdoni.io/dvote/types.AccountID"

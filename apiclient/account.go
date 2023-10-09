@@ -10,7 +10,7 @@ import (
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
-	indexertypes "go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -260,20 +260,22 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	return accv.TxHash, nil
 }
 
-// GetTransfers returns the list of token transfers associated with an account
-func (c *HTTPclient) GetTransfers(from common.Address, page int) ([]*indexertypes.TokenTransferMeta, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", from.Hex(), "transfers", "page", strconv.Itoa(page))
+// ListTokenTransfers returns the list of sent and received token transfers associated with an account
+func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (indexertypes.TokenTransfersAccount, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", account.Hex(), "transfers", "page", strconv.Itoa(page))
 	if err != nil {
-		return nil, err
+		return indexertypes.TokenTransfersAccount{}, err
 	}
 	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+		return indexertypes.TokenTransfersAccount{}, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	var transfers []*indexertypes.TokenTransferMeta
-	if err := json.Unmarshal(resp, &transfers); err != nil {
-		return nil, err
+	tokenTxs := new(struct {
+		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
+	})
+	if err := json.Unmarshal(resp, &tokenTxs); err != nil {
+		return indexertypes.TokenTransfersAccount{}, err
 	}
-	return transfers, nil
+	return tokenTxs.Transfers, nil
 }
 
 // SetSIK function allows to update the Secret Identity Key for the current
@@ -416,4 +418,62 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		return nil, fmt.Errorf("error signing or sending the Tx: %w", err)
 	}
 	return hash, nil
+}
+
+// ListAccounts return the account list information (address, balance and nonce)
+func (c *HTTPclient) ListAccounts(page int) ([]indexertypes.Account, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", "page", strconv.Itoa(page))
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accts := new(struct {
+		Accounts []indexertypes.Account `json:"accounts"`
+	})
+
+	if err := json.Unmarshal(resp, &accts); err != nil {
+		return nil, err
+	}
+
+	return accts.Accounts, nil
+}
+
+// CountAccounts returns the total count of exiting accounts
+func (c *HTTPclient) CountAccounts() (uint64, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accts := new(struct {
+		Count uint64 `json:"count"`
+	})
+
+	if err := json.Unmarshal(resp, accts); err != nil {
+		return 0, err
+	}
+	return accts.Count, nil
+}
+
+// CountTokenTransfers returns the total count of transfers sent and received for an account
+func (c *HTTPclient) CountTokenTransfers(accountID common.Address) (uint64, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", accountID.Hex(), "transfers", "count")
+	if err != nil {
+		return 0, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	tokentxs := new(struct {
+		Count uint64 `json:"count"`
+	})
+
+	if err := json.Unmarshal(resp, tokentxs); err != nil {
+		return 0, err
+	}
+	return tokentxs.Count, nil
 }

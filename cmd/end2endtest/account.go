@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
 	apipkg "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
@@ -230,6 +231,13 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		return err
 	}
 
+	if err := checkTokenTransfersCount(alice, aliceKeys.Address()); err != nil {
+		return err
+	}
+	if err := checkTokenTransfersCount(bob, bobKeys.Address()); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -245,6 +253,23 @@ func checkAccountNonceAndBalance(api *apiclient.HTTPclient, expNonce uint32, exp
 	}
 	if expNonce != acc.Nonce {
 		return fmt.Errorf("expected %s to have nonce %d got %d", acc.Address.String(), expNonce, acc.Nonce)
+	}
+	return nil
+}
+
+func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address) error {
+	tokenTxs, err := api.ListTokenTransfers(address, 0)
+	if err != nil {
+		return err
+	}
+	countTokenTxs := uint64(len(tokenTxs.Received) + len(tokenTxs.Sent))
+
+	count, err := api.CountTokenTransfers(address)
+	if err != nil {
+		return err
+	}
+	if count != countTokenTxs {
+		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, countTokenTxs)
 	}
 	return nil
 }

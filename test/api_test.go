@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -17,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
@@ -182,9 +184,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, v2.VoteID.String(), qt.Equals, v.VoteID.String())
 	qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(2))
 	qt.Assert(t, *v2.TransactionIndex, qt.Equals, int32(0))
-
-	// TODO (painan): check why the voterID is not present on the reply
-	//qt.Assert(t, v2.VoterID.String(), qt.Equals, voterKey.AddressString())
+	qt.Assert(t, v2.VoterID.String(), qt.Equals, hex.EncodeToString(voterKey.Address().Bytes()))
 }
 
 func TestAPIaccount(t *testing.T) {
@@ -205,54 +205,53 @@ func TestAPIaccount(t *testing.T) {
 	waitUntilHeight(t, c, 1)
 
 	// create a new account
-	signer := ethereum.SignKeys{}
-	qt.Assert(t, signer.Generate(), qt.IsNil)
-
-	// metdata
-	meta := &api.AccountMetadata{
-		Version: "1.0",
-	}
-	metaData, err := json.Marshal(meta)
-	qt.Assert(t, err, qt.IsNil)
-
-	// transaction
-	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), 50)
-	qt.Assert(t, err, qt.IsNil)
-	stx := models.SignedTx{}
-	infoURI := server.Storage.URIprefix() + ipfs.CalculateCIDv1json(metaData)
-	sik, err := signer.AccountSIK(nil)
-	qt.Assert(t, err, qt.IsNil)
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
-		SetAccount: &models.SetAccountTx{
-			Txtype:        models.TxType_CREATE_ACCOUNT,
-			Nonce:         new(uint32),
-			InfoURI:       &infoURI,
-			Account:       signer.Address().Bytes(),
-			FaucetPackage: fp,
-			SIK:           sik,
-		},
-	}})
-	qt.Assert(t, err, qt.IsNil)
-	stx.Signature, err = signer.SignVocdoniTx(stx.Tx, server.VochainAPP.ChainID())
-	qt.Assert(t, err, qt.IsNil)
-	stxb, err := proto.Marshal(&stx)
-	qt.Assert(t, err, qt.IsNil)
-
-	// send the transaction and metadata
-	accSet := api.AccountSet{
-		Metadata:  metaData,
-		TxPayload: stxb,
-	}
-	resp, code := c.Request("POST", &accSet, "accounts")
-	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+	initBalance := uint64(80)
+	signer := createAccount(t, c, server, initBalance)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
 	// check the account exist
-	resp, code = c.Request("GET", nil, "accounts", signer.Address().String())
+	resp, code := c.Request("GET", nil, "accounts", signer.Address().String())
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	// get accounts count
+	resp, code = c.Request("GET", nil, "accounts", "count")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	countAccts := struct {
+		Count uint64 `json:"count"`
+	}{}
+
+	err := json.Unmarshal(resp, &countAccts)
+	qt.Assert(t, err, qt.IsNil)
+
+	// 2 accounts must exist: the previously new created account and the auxiliary
+	// account used to transfer to the new account
+	qt.Assert(t, countAccts.Count, qt.Equals, uint64(2))
+
+	// get the accounts info
+	resp, code = c.Request("GET", nil, "accounts", "page", "0")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	accts := struct {
+		Accounts []indexertypes.Account `json:"accounts"`
+	}{}
+
+	err = json.Unmarshal(resp, &accts)
+	qt.Assert(t, err, qt.IsNil)
+
+	// the second account must be the account created in the test
+	// due 'ORDER BY balance DESC' in the sql query
+	gotAcct := accts.Accounts[1]
+
+	// compare the address in list of accounts with the account address previously created
+	qt.Assert(t, gotAcct.Address.String(), qt.Equals, hex.EncodeToString(signer.Address().Bytes()))
+
+	// compare the balance expected for the new account in the account list
+	qt.Assert(t, gotAcct.Balance, qt.Equals, initBalance)
+
 }
 
 func TestAPIElectionCost(t *testing.T) {
@@ -294,6 +293,143 @@ func TestAPIElectionCost(t *testing.T) {
 		100000, 700000,
 		10, 100,
 		547026)
+}
+
+func TestAPIAccountTokentxs(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+
+	// create a new account
+	initBalance := uint64(80)
+	signer := createAccount(t, c, server, initBalance)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// create another new account
+	signer2 := createAccount(t, c, server, initBalance)
+
+	// Block 3
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	// check the account1 exists
+	resp, code := c.Request("GET", nil, "accounts", signer.Address().String())
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	// check the account2 exists
+	resp, code = c.Request("GET", nil, "accounts", signer2.Address().String())
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	// transaction send token from account 1 to account 2
+	amountAcc1toAcct2 := uint64(25)
+	sendTokensTx(t, c, signer, signer2, server.VochainAPP.ChainID(), 0, amountAcc1toAcct2)
+
+	// Block 4
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 4)
+
+	// transaction send token from account 2 to account 1
+	amountAcc2toAcct1 := uint64(10)
+	sendTokensTx(t, c, signer2, signer, server.VochainAPP.ChainID(), 0, amountAcc2toAcct1)
+
+	// Block 5
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 5)
+
+	// get the token transfers received and sent for account 1
+	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "page", "0")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	tokenTxs := new(struct {
+		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
+	})
+	err := json.Unmarshal(resp, tokenTxs)
+	qt.Assert(t, err, qt.IsNil)
+
+	// get the total token transfers count for account 1
+	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "count")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	countTnsAcc := struct {
+		Count uint64 `json:"count"`
+	}{}
+	err = json.Unmarshal(resp, &countTnsAcc)
+	qt.Assert(t, err, qt.IsNil)
+
+	totalTokenTxs := uint64(len(tokenTxs.Transfers.Received) + len(tokenTxs.Transfers.Sent))
+
+	// compare count of total token transfers for the account 1 using the two response
+	qt.Assert(t, totalTokenTxs, qt.Equals, countTnsAcc.Count)
+
+	// get the token transfers received and sent for account 2
+	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "page", "0")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	tokenTxs2 := new(struct {
+		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
+	})
+	err = json.Unmarshal(resp, tokenTxs2)
+	qt.Assert(t, err, qt.IsNil)
+
+	// get the total token transfers count for account 2
+	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "count")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	countTnsAcc2 := struct {
+		Count uint64 `json:"count"`
+	}{}
+	err = json.Unmarshal(resp, &countTnsAcc2)
+	qt.Assert(t, err, qt.IsNil)
+
+	totalTokenTxs2 := uint64(len(tokenTxs2.Transfers.Received) + len(tokenTxs2.Transfers.Sent))
+	// compare count of total token transfers for the account 2 using the two response
+	qt.Assert(t, totalTokenTxs2, qt.Equals, countTnsAcc2.Count)
+
+	resp, code = c.Request("GET", nil, "accounts", "page", "0")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	accts := struct {
+		Accounts []indexertypes.Account `json:"accounts"`
+	}{}
+
+	err = json.Unmarshal(resp, &accts)
+	qt.Assert(t, err, qt.IsNil)
+
+	// the second account must be the account 2 created in the test
+	// due 'ORDER BY balance DESC' in the sql query. For this account
+	// was transfer an initial balance: 80, received from the account: 25 and
+	// sent to the account 1: 10 tokens
+	gotAcct2 := accts.Accounts[1]
+
+	// compare the address in list of accounts with the account2 address previously created
+	qt.Assert(t, gotAcct2.Address.String(), qt.Equals, hex.EncodeToString(signer2.Address().Bytes()))
+
+	// compare the balance expected for the account 2 in the account list
+	qt.Assert(t, gotAcct2.Balance, qt.Equals, initBalance+amountAcc1toAcct2-amountAcc2toAcct1)
+
+	gotAcct1 := accts.Accounts[2]
+
+	// compare the address in list of accounts with the account1 address previously created
+	qt.Assert(t, gotAcct1.Address.String(), qt.Equals, hex.EncodeToString(signer.Address().Bytes()))
+
+	// compare the balance expected for the account 1 in the account list
+	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2)
+
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
@@ -524,4 +660,32 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	return &signer
+}
+
+func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
+	signerFrom, signerTo *ethereum.SignKeys, chainID string, nonce uint32, amount uint64) {
+	var err error
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SendTokens{
+			SendTokens: &models.SendTokensTx{
+				Txtype: models.TxType_SET_ACCOUNT_INFO_URI,
+				Nonce:  nonce,
+				From:   signerFrom.Address().Bytes(),
+				To:     signerTo.Address().Bytes(),
+				Value:  amount,
+			},
+		}})
+	qt.Assert(t, err, qt.IsNil)
+
+	stx.Signature, err = signerFrom.SignVocdoniTx(stx.Tx, chainID)
+	qt.Assert(t, err, qt.IsNil)
+
+	txData, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
+	tx := &api.Transaction{Payload: txData}
+
+	resp, code := c.Request("POST", tx, "chain", "transactions")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
