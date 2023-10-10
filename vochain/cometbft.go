@@ -171,17 +171,21 @@ func (app *BaseApplication) InitChain(_ context.Context,
 func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
 	txReference := vochaintx.TxKey(req.Tx)
-	// store the initial height of the tx
-	initialTTLheight, _ := app.txTTLReferences.LoadOrStore(txReference, app.Height())
-	// check if the tx is referenced by a previous block and the TTL has expired
-	if app.Height() > initialTTLheight.(uint32)+transactionBlocksTTL {
-		// remove tx reference and return checkTx error
-		log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
-		if err := app.MempoolDeleteTx(txReference); err != nil {
-			log.Warnw("could not remove tx from mempool", "error", err.Error(), "txID", hex.EncodeToString(txReference[:]))
+	ref, ok := app.txReferences.Load(txReference)
+	if !ok {
+		// store the initial height of the tx if its the first time we see it
+		app.txReferences.Store(txReference, &pendingTxReference{
+			height: app.Height(),
+		})
+	} else {
+		height := ref.(*pendingTxReference).height
+		// check if the tx is referenced by a previous block and the TTL has expired
+		if app.Height() > height+transactionBlocksTTL {
+			// remove tx reference and return checkTx error
+			log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
+			app.txReferences.Delete(txReference)
+			return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
 		}
-		app.txTTLReferences.Delete(txReference)
-		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
 	}
 	// execute recheck mempool every recheckTxHeightInterval blocks
 	if req.Type == abcitypes.CheckTxType_Recheck {
@@ -302,6 +306,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		vtx := new(vochaintx.Tx)
 		if err := vtx.Unmarshal(tx, app.ChainID()); err != nil {
 			// invalid transaction
+			app.MempoolDeleteTx(vochaintx.TxKey(tx))
 			log.Warnw("could not unmarshal transaction", "err", err)
 			continue
 		}
@@ -351,6 +356,16 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 					}
 					return ""
 				}())
+			// remove transaction from mempool if max attempts reached
+			val, ok := app.txReferences.Load(txInfo.DecodedTx.TxID)
+			if ok {
+				val.(*pendingTxReference).failedCount++
+				if val.(*pendingTxReference).failedCount > maxPendingTxAttempts {
+					log.Debugf("transaction %x has reached max attempts, remove from mempool", txInfo.DecodedTx.TxID)
+					app.MempoolDeleteTx(txInfo.DecodedTx.TxID)
+					app.txReferences.Delete(txInfo.DecodedTx.TxID)
+				}
+			}
 			continue
 		}
 		validTxs = append(validTxs, txInfo.Data)
@@ -395,8 +410,9 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot execute block on process proposal: %w", err)
 	}
-	if resp.InvalidTransactions {
-		log.Warnw("invalid transactions on process proposal", "height", app.Height(),
+	// invalid txx on a proposed block, should actually never happened if proposer acts honestly
+	if len(resp.InvalidTransactions) > 0 {
+		log.Warnw("invalid transactions on process proposal", "height", app.Height(), "count", len(resp.InvalidTransactions),
 			"proposer", hex.EncodeToString(req.ProposerAddress), "action", "reject")
 		return &abcitypes.ResponseProcessProposal{
 			Status: abcitypes.ResponseProcessProposal_REJECT,

@@ -1,6 +1,7 @@
 package vochain
 
 import (
+	"encoding/hex"
 	"fmt"
 	"path/filepath"
 	"sync"
@@ -32,6 +33,9 @@ const (
 	// transactionBlocksTTL is the number of blocks after which a transaction is
 	// removed from the mempool.
 	transactionBlocksTTL = 6 * 10 // 10 minutes
+	// maxPendingTxAttempts is the number of times a transaction can be included in a block
+	// and fail before being removed from the mempool.
+	maxPendingTxAttempts = 3
 )
 
 var (
@@ -64,7 +68,8 @@ type BaseApplication struct {
 	fnMempoolPrune     func(txKey [32]byte) error
 	blockCache         *lru.Cache[int64, *tmtypes.Block]
 	// txTTLReferences is a map of tx hashes to the block height where they failed.
-	txTTLReferences sync.Map
+	txReferences sync.Map
+
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
@@ -90,6 +95,13 @@ type BaseApplication struct {
 	testMockBlockStore *testutil.MockBlockStore
 }
 
+// pendingTxReference is used to store the block height where the transaction was accepted by the mempool, and the number
+// of times it has been included in a block but failed.
+type pendingTxReference struct {
+	height      uint32
+	failedCount int
+}
+
 // DeliverTxResponse is the response returned by DeliverTx after executing the transaction.
 type DeliverTxResponse struct {
 	Code uint32
@@ -103,7 +115,7 @@ type DeliverTxResponse struct {
 type ExecuteBlockResponse struct {
 	Responses           []*DeliverTxResponse
 	Root                []byte
-	InvalidTransactions bool
+	InvalidTransactions [][32]byte
 }
 
 // NewBaseApplication creates a new BaseApplication given a name and a DB backend.
@@ -151,7 +163,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) (*ExecuteBlockResponse, error) {
 	result := []*DeliverTxResponse{}
 	app.beginBlock(blockTime, height)
-	invalidTxs := false
+	invalidTxs := [][32]byte{}
 	for _, tx := range txs {
 		resp := app.deliverTx(tx)
 		if resp.Code != 0 {
@@ -160,7 +172,7 @@ func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime 
 				"data", string(resp.Data),
 				"info", resp.Info,
 				"log", resp.Log)
-			invalidTxs = true
+			invalidTxs = append(invalidTxs, [32]byte{})
 		}
 		result = append(result, resp)
 	}
@@ -224,7 +236,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 		log.Errorw(err, "rejected tx")
 		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
 	}
-	app.txTTLReferences.Delete(tx.TxID)
+	app.txReferences.Delete(tx.TxID)
 	// call event listeners
 	for _, e := range app.State.EventListeners() {
 		e.OnNewTx(tx, app.Height(), app.State.TxCounter())
@@ -327,12 +339,13 @@ func (app *BaseApplication) SetChainID(chainID string) {
 }
 
 // MempoolDeleteTx removes a transaction from the mempool. If the mempool implementation does not allow it,
-// it just returns nil.
-func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) error {
+// its a no-op function. Errors are logged but not returned.
+func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 	if app.fnMempoolPrune != nil {
-		return app.fnMempoolPrune(txID)
+		if err := app.fnMempoolPrune(txID); err != nil {
+			log.Warnw("could not remove mempool tx", "txID", hex.EncodeToString(txID[:]), "err", err)
+		}
 	}
-	return nil
 }
 
 // Genesis returns the tendermint genesis information
