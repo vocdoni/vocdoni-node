@@ -144,8 +144,10 @@ func NewState(dbType, dataDir string) (*State, error) {
 		db:    s.NoState(true),
 		state: s,
 	}
-	s.validSIKRoots = [][]byte{}
 	s.mtxValidSIKRoots = &sync.Mutex{}
+	if err := s.FetchValidSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
+	}
 	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
 }
 
@@ -382,7 +384,18 @@ func (v *State) RevealProcessKeys(tx *models.AdminTx) error {
 	return nil
 }
 
+// PrepareCommit prepares the state for commit. It returns the new root hash.
+func (v *State) PrepareCommit() ([]byte, error) {
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	if err := v.tx.CommitOnTx(v.CurrentHeight()); err != nil {
+		return nil, err
+	}
+	return v.mainTreeViewer(false).Root()
+}
+
 // Save persistent save of vochain mem trees. It returns the new root hash. It also notifies the event listeners.
+// Save should usually be called after PrepareCommit().
 func (v *State) Save() ([]byte, error) {
 	height := v.CurrentHeight()
 	var pidsStartNextBlock [][]byte
@@ -405,14 +418,19 @@ func (v *State) Save() ([]byte, error) {
 	// the listeners may need to get the previous (not committed) state.
 	v.tx.Lock()
 	defer v.tx.Unlock()
+	// Update the SIK merkle-tree roots
+	if err := v.UpdateSIKRoots(); err != nil {
+		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
+	}
 	err := func() error {
 		var err error
-		if err := v.tx.Commit(height); err != nil {
+		if err := v.tx.SaveWithoutCommit(); err != nil {
 			return fmt.Errorf("cannot commit statedb tx: %w", err)
 		}
 		if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 			return fmt.Errorf("cannot begin statedb tx: %w", err)
 		}
+		v.txCounter.Store(0)
 		return nil
 	}()
 	if err != nil {
@@ -425,8 +443,7 @@ func (v *State) Save() ([]byte, error) {
 		return nil, fmt.Errorf("cannot get statedb mainTreeView: %w", err)
 	}
 	v.setMainTreeView(mainTreeView)
-
-	return v.store.Hash()
+	return mainTreeView.Root()
 }
 
 // Rollback rollbacks to the last persistent db data version
@@ -437,6 +454,7 @@ func (v *State) Rollback() {
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	var err error
 	if v.tx.TreeTx, err = v.store.BeginTx(); err != nil {
 		log.Errorf("cannot begin statedb tx: %s", err)
@@ -449,6 +467,7 @@ func (v *State) Rollback() {
 func (v *State) Close() error {
 	v.tx.Lock()
 	v.tx.Discard()
+	v.store.NoStateWriteTx.Discard()
 	v.tx.Unlock()
 
 	return v.db.Close()
@@ -470,11 +489,9 @@ func (v *State) SetHeight(height uint32) {
 	v.currentHeight.Store(height)
 }
 
-// WorkingHash returns the hash of the vochain StateDB (mainTree.Root)
-func (v *State) WorkingHash() []byte {
-	v.tx.RLock()
-	defer v.tx.RUnlock()
-	hash, err := v.tx.Root()
+// CommittedHash returns the hash of the last committed vochain StateDB
+func (v *State) CommittedHash() []byte {
+	hash, err := v.mainTreeViewer(true).Root()
 	if err != nil {
 		panic(fmt.Sprintf("cannot get statedb mainTree root: %s", err))
 	}

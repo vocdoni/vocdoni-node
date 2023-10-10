@@ -1,17 +1,14 @@
 package vochain
 
 import (
-	"context"
 	"encoding/hex"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
-	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	tmnode "github.com/cometbft/cometbft/node"
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -20,7 +17,6 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
@@ -33,7 +29,13 @@ import (
 const (
 	// recheckTxHeightInterval is the number of blocks after which the mempool is
 	// checked for transactions to be rechecked.
-	recheckTxHeightInterval = 12
+	recheckTxHeightInterval = 6 * 5 // 5 minutes
+	// transactionBlocksTTL is the number of blocks after which a transaction is
+	// removed from the mempool.
+	transactionBlocksTTL = 6 * 10 // 10 minutes
+	// maxPendingTxAttempts is the number of times a transaction can be included in a block
+	// and fail before being removed from the mempool.
+	maxPendingTxAttempts = 3
 )
 
 var (
@@ -49,6 +51,7 @@ type BaseApplication struct {
 	Istc               *ist.Controller
 	Node               *tmnode.Node
 	NodeClient         *tmcli.Local
+	NodeAddress        ethcommon.Address
 	TransactionHandler *transaction.TransactionHandler
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
@@ -64,6 +67,9 @@ type BaseApplication struct {
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
 	blockCache         *lru.Cache[int64, *tmtypes.Block]
+	// txTTLReferences is a map of tx hashes to the block height where they failed.
+	txReferences sync.Map
+
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
@@ -74,8 +80,26 @@ type BaseApplication struct {
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
 
+	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
+	// can skip block re-execution on FinalizeBlock call.
+	lastDeliverTxResponse []*DeliverTxResponse
+	// lastRootHash is used to store the last root hash of the current on-going state,
+	// it is used by validators to skip block re-execution on FinalizeBlock call.
+	lastRootHash []byte
+	// lastBlockHash stores the last cometBFT block hash
+	lastBlockHash []byte
+	// prepareProposalLock is used to avoid concurrent calls between Prepare/Process Proposal and FinalizeBlock
+	prepareProposalLock sync.Mutex
+
 	// testMockBlockStore is used for testing purposes only
 	testMockBlockStore *testutil.MockBlockStore
+}
+
+// pendingTxReference is used to store the block height where the transaction was accepted by the mempool, and the number
+// of times it has been included in a block but failed.
+type pendingTxReference struct {
+	height      uint32
+	failedCount int
 }
 
 // DeliverTxResponse is the response returned by DeliverTx after executing the transaction.
@@ -84,6 +108,14 @@ type DeliverTxResponse struct {
 	Log  string
 	Info string
 	Data []byte
+}
+
+// ExecuteBlockResponse is the response returned by ExecuteBlock after executing the block.
+// If InvalidTransactions is true, it means that at least one transaction in the block was invalid.
+type ExecuteBlockResponse struct {
+	Responses           []*DeliverTxResponse
+	Root                []byte
+	InvalidTransactions [][32]byte
 }
 
 // NewBaseApplication creates a new BaseApplication given a name and a DB backend.
@@ -124,175 +156,15 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	}, nil
 }
 
-// Info Return information about the application state.
-// Used to sync Tendermint with the application during a handshake that happens on startup.
-// The returned AppVersion will be included in the Header of every block.
-// Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
-// ensuring that Commit is never called twice for the same block height.
-//
-// We use this method to initialize some state variables.
-func (app *BaseApplication) Info(_ context.Context,
-	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
-	lastHeight, err := app.State.LastHeight()
-	if err != nil {
-		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
-	}
-	app.State.SetHeight(lastHeight)
-	appHash := app.State.WorkingHash()
-	if err := app.State.SetElectionPriceCalc(); err != nil {
-		return nil, fmt.Errorf("cannot set election price calc: %w", err)
-	}
-	// print some basic version info about tendermint components
-	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
-		req.P2PVersion, "blockVersion", req.BlockVersion, "lastHeight",
-		lastHeight, "appHash", hex.EncodeToString(appHash))
-
-	return &abcitypes.ResponseInfo{
-		LastBlockHeight:  int64(lastHeight),
-		LastBlockAppHash: appHash,
-	}, nil
-}
-
-// InitChain called once upon genesis
-// ResponseInitChain can return a list of validators. If the list is empty,
-// Tendermint will use the validators loaded in the genesis file.
-func (app *BaseApplication) InitChain(_ context.Context,
-	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
-	// setting the app initial state with validators, height = 0 and empty apphash
-	// unmarshal app state from genesis
-	var genesisAppState genesis.AppState
-	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
-	if err != nil {
-		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
-	}
-	// create accounts
-	for _, acc := range genesisAppState.Accounts {
-		addr := ethcommon.BytesToAddress(acc.Address)
-		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
-			if err != vstate.ErrAccountAlreadyExists {
-				return nil, fmt.Errorf("cannot create acount %x: %w", addr, err)
-			}
-			if err := app.State.InitChainMintBalance(addr, acc.Balance); err != nil {
-				return nil, fmt.Errorf("cannot initialize chain minintg balance: %w", err)
-			}
-		}
-		log.Infow("created account", "addr", addr.Hex(), "tokens", acc.Balance)
-	}
-	// get validators
-	// TODO pau: unify this code with the one on apputils.go that essentially does the same
-	tendermintValidators := []abcitypes.ValidatorUpdate{}
-	for i := 0; i < len(genesisAppState.Validators); i++ {
-		log.Infow("add genesis validator",
-			"signingAddress", genesisAppState.Validators[i].Address.String(),
-			"consensusPubKey", genesisAppState.Validators[i].PubKey.String(),
-			"power", genesisAppState.Validators[i].Power,
-			"name", genesisAppState.Validators[i].Name,
-			"keyIndex", genesisAppState.Validators[i].KeyIndex,
-		)
-
-		v := &models.Validator{
-			Address:  genesisAppState.Validators[i].Address,
-			PubKey:   genesisAppState.Validators[i].PubKey,
-			Power:    genesisAppState.Validators[i].Power,
-			KeyIndex: uint32(genesisAppState.Validators[i].KeyIndex),
-		}
-		if err = app.State.AddValidator(v); err != nil {
-			return nil, fmt.Errorf("cannot add validator %s: %w", log.FormatProto(v), err)
-		}
-		tendermintValidators = append(tendermintValidators,
-			abcitypes.UpdateValidator(
-				genesisAppState.Validators[i].PubKey,
-				int64(genesisAppState.Validators[i].Power),
-				crypto256k1.KeyType,
-			))
-	}
-
-	// set treasurer address
-	if genesisAppState.Treasurer != nil {
-		log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
-		if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
-			return nil, fmt.Errorf("could not set State.Treasurer from genesis file: %w", err)
-		}
-	}
-
-	// add tx costs
-	for k, v := range genesisAppState.TxCost.AsMap() {
-		err = app.State.SetTxBaseCost(k, v)
-		if err != nil {
-			return nil, fmt.Errorf("could not set tx cost %q to value %q from genesis file to the State", k, v)
-		}
-	}
-
-	// create burn account
-	if err := app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}); err != nil {
-		return nil, fmt.Errorf("unable to set burn address")
-	}
-
-	// set max election size
-	if err := app.State.SetMaxProcessSize(genesisAppState.MaxElectionSize); err != nil {
-		return nil, fmt.Errorf("unable to set max election size")
-	}
-
-	// set network capacity
-	if err := app.State.SetNetworkCapacity(genesisAppState.NetworkCapacity); err != nil {
-		return nil, fmt.Errorf("unable to set  network capacity")
-	}
-
-	// initialize election price calc
-	if err := app.State.SetElectionPriceCalc(); err != nil {
-		return nil, fmt.Errorf("cannot set election price calc: %w", err)
-	}
-
-	// commit state and get hash
-	hash, err := app.State.Save()
-	if err != nil {
-		return nil, fmt.Errorf("cannot save state: %w", err)
-	}
-	return &abcitypes.ResponseInitChain{
-		Validators: tendermintValidators,
-		AppHash:    hash,
-	}, nil
-}
-
-// CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(_ context.Context,
-	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
-	if req.Type == abcitypes.CheckTxType_Recheck {
-		if app.Height()%recheckTxHeightInterval != 0 {
-			return &abcitypes.ResponseCheckTx{Code: 0}, nil
-		}
-	}
-	tx := new(vochaintx.Tx)
-	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
-	}
-	response, err := app.TransactionHandler.CheckTx(tx, false)
-	if err != nil {
-		if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
-			return &abcitypes.ResponseCheckTx{Code: 0}, nil
-		}
-		log.Errorw(err, "checkTx")
-		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}, err
-	}
-	return &abcitypes.ResponseCheckTx{
-		Code: 0,
-		Data: response.Data,
-		Info: fmt.Sprintf("%x", response.TxHash),
-		Log:  response.Log,
-	}, nil
-}
-
-// FinalizeBlock It delivers a decided block to the Application. The Application must execute
-// the transactions in the block deterministically and update its state accordingly.
-// Cryptographic commitments to the block and transaction results, returned via the corresponding
-// parameters in ResponseFinalizeBlock, are included in the header of the next block.
-// CometBFT calls it when a new block is decided.
-func (app *BaseApplication) FinalizeBlock(_ context.Context,
-	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
-	height := uint32(req.GetHeight())
-	app.beginBlock(req.GetTime(), height)
-	txResults := make([]*abcitypes.ExecTxResult, len(req.Txs))
-	for i, tx := range req.Txs {
+// ExecuteBlock delivers a block of transactions to the Application.
+// It modifies the state according to the transactions and returns the resulting Merkle root hash.
+// It returns a list of ResponseDeliverTx, one for each transaction in the block.
+// This call rollbacks the current state.
+func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime time.Time) (*ExecuteBlockResponse, error) {
+	result := []*DeliverTxResponse{}
+	app.beginBlock(blockTime, height)
+	invalidTxs := [][32]byte{}
+	for _, tx := range txs {
 		resp := app.deliverTx(tx)
 		if resp.Code != 0 {
 			log.Warnw("deliverTx failed",
@@ -300,28 +172,34 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 				"data", string(resp.Data),
 				"info", resp.Info,
 				"log", resp.Log)
+			invalidTxs = append(invalidTxs, [32]byte{})
 		}
-		txResults[i] = &abcitypes.ExecTxResult{
-			Code: resp.Code,
-			Data: resp.Data,
-			Log:  resp.Log,
-		}
+		result = append(result, resp)
 	}
 	// execute internal state transition commit
 	if err := app.Istc.Commit(height); err != nil {
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
-	app.endBlock(req.GetTime(), height)
-	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   app.State.WorkingHash(),
-		TxResults: txResults, // TODO: check if we can remove this
+	app.endBlock(blockTime, height)
+	root, err := app.State.PrepareCommit()
+	if err != nil {
+		return nil, fmt.Errorf("cannot prepare commit: %w", err)
+	}
+	return &ExecuteBlockResponse{
+		Responses:           result,
+		Root:                root,
+		InvalidTransactions: invalidTxs,
 	}, nil
 }
 
-// Commit saves the current vochain state and returns a commit hash
-func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
-	// save state
-	_, err := app.State.Save()
+// CommitState saves the state to persistent storage and returns the hash.
+// Before save the state, app.State.PrepareCommit() should be called.
+func (app *BaseApplication) CommitState() ([]byte, error) {
+	// Commit the state and get the hash
+	if app.State.TxCounter() > 0 {
+		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+	}
+	hash, err := app.State.Save()
 	if err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
@@ -330,17 +208,12 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 		startTime := time.Now()
 		log.Infof("performing a state snapshot on block %d", app.Height())
 		if _, err := app.State.Snapshot(); err != nil {
-			return nil, fmt.Errorf("cannot make state snapshot: %w", err)
+			return hash, fmt.Errorf("cannot make state snapshot: %w", err)
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
 		log.Debugf("%+v", app.State.ListSnapshots())
 	}
-	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
-	}
-	return &abcitypes.ResponseCommit{
-		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
-	}, nil
+	return hash, err
 }
 
 // deliverTx unmarshals req.Tx and adds it to the State if it is valid
@@ -363,6 +236,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 		log.Errorw(err, "rejected tx")
 		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
 	}
+	app.txReferences.Delete(tx.TxID)
 	// call event listeners
 	for _, e := range app.State.EventListeners() {
 		e.OnNewTx(tx, app.Height(), app.State.TxCounter())
@@ -388,18 +262,14 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.startBlockTimestamp.Store(t.Unix())
 	app.State.SetHeight(height)
 	go app.State.CachePurge(height)
-	if err := app.State.FetchValidSIKRoots(); err != nil {
-		log.Errorw(err, "error fetching valid SIK roots")
-	}
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
 		Time:   t,
-		// TODO: remove data hash from this event call
 	})
 }
 
 // endBlock is called at the end of every block.
-func (app *BaseApplication) endBlock(t time.Time, _ uint32) {
+func (app *BaseApplication) endBlock(t time.Time, h uint32) {
 	app.endBlockTimestamp.Store(t.Unix())
 }
 
@@ -457,98 +327,6 @@ func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error)
 	return app.fnSendTx(tx)
 }
 
-// Query does nothing
-func (*BaseApplication) Query(_ context.Context,
-	_ *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
-	return &abcitypes.ResponseQuery{}, nil
-}
-
-// PrepareProposal allows the block proposer to perform application-dependent work in a block before
-// proposing it. This enables, for instance, batch optimizations to a block, which has been empirically
-// demonstrated to be a key component for improved performance. Method PrepareProposal is called every
-// time CometBFT is about to broadcast a Proposal message and validValue is nil. CometBFT gathers
-// outstanding transactions from the mempool, generates a block header, and uses them to create a block
-// to propose. Then, it calls RequestPrepareProposal with the newly created proposal, called raw proposal.
-// The Application can make changes to the raw proposal, such as modifying the set of transactions or the
-// order in which they appear, and returns the (potentially) modified proposal, called prepared proposal in
-// the ResponsePrepareProposal call. The logic modifying the raw proposal MAY be non-deterministic.
-func (app *BaseApplication) PrepareProposal(ctx context.Context,
-	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
-	// TODO: Prepare Proposal should check the validity of the transactions for the next block.
-	// Currently they are executed by CheckTx, but it does not allow height to be passed in.
-	validTxs := [][]byte{}
-	for _, tx := range req.GetTxs() {
-		resp, err := app.CheckTx(ctx, &abcitypes.RequestCheckTx{
-			Tx: tx, Type: abcitypes.CheckTxType_New,
-		})
-		if err != nil || resp.Code != 0 {
-			log.Warnw("discard invalid tx on prepare proposal",
-				"err", err,
-				"code", resp.Code,
-				"data", string(resp.Data),
-				"info", resp.Info,
-				"log", resp.Log)
-			continue
-		}
-		validTxs = append(validTxs, tx)
-	}
-
-	return &abcitypes.ResponsePrepareProposal{
-		Txs: validTxs,
-	}, nil
-}
-
-// ProcessProposal allows a validator to perform application-dependent work in a proposed block. This enables
-// features such as immediate block execution, and allows the Application to reject invalid blocks.
-// CometBFT calls it when it receives a proposal and validValue is nil. The Application cannot modify the
-// proposal at this point but can reject it if invalid. If that is the case, the consensus algorithm will
-// prevote nil on the proposal, which has strong liveness implications for CometBFT. As a general rule, the
-// Application SHOULD accept a prepared proposal passed via ProcessProposal, even if a part of the proposal
-// is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
-// proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
-func (*BaseApplication) ProcessProposal(_ context.Context,
-	_ *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
-	return &abcitypes.ResponseProcessProposal{
-		Status: abcitypes.ResponseProcessProposal_ACCEPT,
-	}, nil
-}
-
-// ListSnapshots returns a list of available snapshots.
-func (*BaseApplication) ListSnapshots(context.Context,
-	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
-	return &abcitypes.ResponseListSnapshots{}, nil
-}
-
-// OfferSnapshot returns the response to a snapshot offer.
-func (*BaseApplication) OfferSnapshot(context.Context,
-	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
-	return &abcitypes.ResponseOfferSnapshot{}, nil
-}
-
-// LoadSnapshotChunk returns the response to a snapshot chunk loading request.
-func (*BaseApplication) LoadSnapshotChunk(context.Context,
-	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
-	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
-}
-
-// ApplySnapshotChunk returns the response to a snapshot chunk applying request.
-func (*BaseApplication) ApplySnapshotChunk(context.Context,
-	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
-	return &abcitypes.ResponseApplySnapshotChunk{}, nil
-}
-
-// ExtendVote creates application specific vote extension
-func (*BaseApplication) ExtendVote(context.Context,
-	*abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
-	return &abcitypes.ResponseExtendVote{}, nil
-}
-
-// VerifyVoteExtension verifies application's vote extension data
-func (*BaseApplication) VerifyVoteExtension(context.Context,
-	*abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
-	return &abcitypes.ResponseVerifyVoteExtension{}, nil
-}
-
 // ChainID returns the Node ChainID
 func (app *BaseApplication) ChainID() string {
 	return app.chainID
@@ -558,6 +336,16 @@ func (app *BaseApplication) ChainID() string {
 func (app *BaseApplication) SetChainID(chainID string) {
 	app.chainID = chainID
 	app.State.SetChainID(chainID)
+}
+
+// MempoolDeleteTx removes a transaction from the mempool. If the mempool implementation does not allow it,
+// its a no-op function. Errors are logged but not returned.
+func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
+	if app.fnMempoolPrune != nil {
+		if err := app.fnMempoolPrune(txID); err != nil {
+			log.Warnw("could not remove mempool tx", "txID", hex.EncodeToString(txID[:]), "err", err)
+		}
+	}
 }
 
 // Genesis returns the tendermint genesis information

@@ -64,7 +64,7 @@ func TestMerkleTreeProof(t *testing.T) {
 		qt.Assert(t, detxresp.Code, qt.Equals, uint32(0))
 
 		if i%5 == 0 {
-			_, err = app.Commit(context.TODO(), nil)
+			_, err = app.CommitState()
 			qt.Assert(t, err, qt.IsNil)
 			app.AdvanceTestBlock()
 		}
@@ -243,6 +243,6 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 			t.Fatalf("deliverTx success, but expected result is fail")
 		}
 	}
-	_, err = app.Commit(context.TODO(), nil)
+	_, err = app.CommitState()
 	qt.Assert(t, err, qt.IsNil)
 }

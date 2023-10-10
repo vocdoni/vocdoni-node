@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
 	tmcfg "github.com/cometbft/cometbft/config"
@@ -175,7 +176,7 @@ func newTendermint(app *BaseApplication,
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = true
-	tconfig.Mempool.KeepInvalidTxsInCache = false
+	tconfig.Mempool.KeepInvalidTxsInCache = true
 	tconfig.Mempool.MaxTxBytes = 1024 * 100 // 100 KiB
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
@@ -204,6 +205,17 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
 	}
 	pv.Save()
+	if pv.Key.PrivKey.Bytes() != nil {
+		fmt.Printf("privkey: %s\n", hex.EncodeToString(pv.Key.PrivKey.Bytes()))
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
+			return nil, fmt.Errorf("cannot add private validator key: %w", err)
+		}
+		app.NodeAddress, err = NodePvKeyToAddress(pv.Key.PubKey)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create node address from pubkey: %w", err)
+		}
+	}
 
 	// nodekey is used for the p2p transport layer
 	nodeKey := new(p2p.NodeKey)

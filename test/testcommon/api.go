@@ -1,7 +1,6 @@
 package testcommon
 
 import (
-	"context"
 	"net/url"
 	"testing"
 
@@ -60,7 +59,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	// create and add balance for the pre-created Account
 	err = d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 100000)
 	qt.Assert(t, err, qt.IsNil)
-	d.VochainAPP.Commit(context.TODO(), nil)
+	d.VochainAPP.CommitState()
 
 	// create vochain info (we do not start since it is not required)
 	d.VochainInfo = vochaininfo.NewVochainInfo(d.VochainAPP)

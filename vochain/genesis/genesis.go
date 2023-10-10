@@ -39,8 +39,8 @@ var Genesis = map[string]Vochain{
 }
 
 var devGenesis = Doc{
-	GenesisTime: time.Date(2023, time.September, 21, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-dev-20",
+	GenesisTime: time.Date(2023, time.October, 10, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-dev-24",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -93,6 +93,10 @@ var devGenesis = Doc{
 		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
+				Balance: 100000000,
+			},
+			{ // faucet2
+				Address: types.HexStringToHexBytes("0x536Da9ecd65Fc0248625b0BBDbB305d0DD841893"),
 				Balance: 100000000,
 			},
 		},

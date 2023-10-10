@@ -195,7 +195,7 @@ func (vi *VochainInfo) SIKTreeSize() uint64 {
 // TokensBurned returns the current balance of the burn address
 func (vi *VochainInfo) TokensBurned() uint64 {
 	acc, err := vi.vnode.State.GetAccount(state.BurnAddress, true)
-	if err != nil {
+	if err != nil || acc == nil {
 		return 0
 	}
 	return acc.Balance

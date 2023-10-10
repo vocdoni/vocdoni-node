@@ -122,9 +122,6 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 		tx.Txtype != models.TxType_DEL_DELEGATE_FOR_ACCOUNT {
 		return fmt.Errorf("invalid tx type")
 	}
-	if tx.Nonce == nil {
-		return fmt.Errorf("invalid nonce")
-	}
 	if len(tx.Delegates) == 0 {
 		return fmt.Errorf("invalid delegates")
 	}
@@ -134,9 +131,6 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 	}
 	if err := vstate.CheckDuplicateDelegates(tx.Delegates, txSenderAddress); err != nil {
 		return fmt.Errorf("checkDuplicateDelegates: %w", err)
-	}
-	if tx.GetNonce() != txSenderAccount.Nonce {
-		return fmt.Errorf("invalid nonce, expected %d got %d", txSenderAccount.Nonce, tx.Nonce)
 	}
 	cost, err := t.state.TxBaseCost(tx.Txtype, false)
 	if err != nil {
@@ -195,14 +189,6 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	}
 	if txSenderAccount == nil {
 		return vstate.ErrAccountNotExist
-	}
-	// check txSender nonce
-	if tx.GetNonce() != txSenderAccount.Nonce {
-		return fmt.Errorf(
-			"invalid nonce, expected %d got %d",
-			txSenderAccount.Nonce,
-			tx.GetNonce(),
-		)
 	}
 	// get setAccount tx cost
 	costSetAccountInfoURI, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, false)

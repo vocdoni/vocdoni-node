@@ -82,7 +82,7 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 		if err != nil {
 			return fmt.Errorf("%w: %w", ErrSIKSet, err)
 		}
-		return v.UpdateSIKRoots()
+		return nil
 	}
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKGet, err)
@@ -101,7 +101,7 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSet, err)
 	}
-	return v.UpdateSIKRoots()
+	return nil
 }
 
 // InvalidateSIK function removes logically the registered SIK for the address
@@ -126,7 +126,7 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
 	}
-	return v.UpdateSIKRoots()
+	return nil
 }
 
 // ValidSIKRoots method returns the current valid SIK roots that are cached in
@@ -181,8 +181,28 @@ func (v *State) ExpiredSIKRoot(candidateRoot []byte) bool {
 func (v *State) UpdateSIKRoots() error {
 	// instance the SIK's key-value DB and set the current block to the current
 	// network height.
+	v.mtxValidSIKRoots.Lock()
+	defer v.mtxValidSIKRoots.Unlock()
 	sikNoStateDB := v.NoState(false)
 	currentBlock := v.CurrentHeight()
+
+	// get sik roots key-value database associated to the siks tree
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	// get new sik tree root hash
+	newSikRoot, err := siksTree.Root()
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
+	}
+	// check if the new sik root is already in the list of valid roots, if so return
+	for _, sikRoot := range v.validSIKRoots {
+		if bytes.Equal(sikRoot, newSikRoot) {
+			return nil
+		}
+	}
+	// purge the oldest sikRoots if the hysteresis is reached
 	if currentBlock > SIKROOT_HYSTERESIS_BLOCKS {
 		// calculate the current minimun block to purge useless sik roots
 		minBlock := currentBlock - SIKROOT_HYSTERESIS_BLOCKS
@@ -219,18 +239,6 @@ func (v *State) UpdateSIKRoots() error {
 				"blockNumber", binary.LittleEndian.Uint32(blockToDelete))
 		}
 	}
-	// get sik roots key-value database associated to the siks tree
-	v.tx.Lock()
-	defer v.tx.Unlock()
-	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
-	}
-	// get new sik tree root hash
-	newSikRoot, err := siksTree.Root()
-	if err != nil {
-		return fmt.Errorf("%w: %w", ErrSIKRootsGet, err)
-	}
 	// encode current blockNumber as key
 	blockKey := make([]byte, 32)
 	binary.LittleEndian.PutUint32(blockKey, currentBlock)
@@ -240,9 +248,7 @@ func (v *State) UpdateSIKRoots() error {
 		return fmt.Errorf("%w: %w", ErrSIKRootsSet, err)
 	}
 	// include the new root into the cached list
-	v.mtxValidSIKRoots.Lock()
 	v.validSIKRoots = append(v.validSIKRoots, newSikRoot)
-	v.mtxValidSIKRoots.Unlock()
 	log.Debugw("updateSIKRoots (created)",
 		"newSikRoot", hex.EncodeToString(newSikRoot),
 		"blockNumber", currentBlock)

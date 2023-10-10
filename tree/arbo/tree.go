@@ -53,8 +53,8 @@ var (
 	// in disk.
 	DefaultThresholdNLeafs = 65536
 
-	dbKeyRoot   = []byte("root")
-	dbKeyNLeafs = []byte("nleafs")
+	dbKeyRoot   = []byte("arbo/root/")
+	dbKeyNLeafs = []byte("arbo/nleafs/")
 	emptyValue  = []byte{0}
 
 	// ErrKeyNotFound is used when a key is not found in the db neither in
@@ -178,10 +178,11 @@ func (t *Tree) RootWithTx(rTx db.Reader) ([]byte, error) {
 		return t.snapshotRoot, nil
 	}
 	// get db root
-	return rTx.Get(dbKeyRoot)
+	hash, err := rTx.Get(dbKeyRoot)
+	return hash, err
 }
 
-func (*Tree) setRoot(wTx db.WriteTx, root []byte) error {
+func (t *Tree) setRoot(wTx db.WriteTx, root []byte) error {
 	return wTx.Set(dbKeyRoot, root)
 }
 
@@ -325,7 +326,6 @@ func (t *Tree) Update(k, v []byte) error {
 func (t *Tree) UpdateWithTx(wTx db.WriteTx, k, v []byte) error {
 	t.Lock()
 	defer t.Unlock()
-
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
@@ -484,14 +484,14 @@ func (t *Tree) deleteWithTx(wTx db.WriteTx, k []byte) error {
 		return err
 	}
 
-	// Update the root of the tree.
-	if err := t.setRoot(wTx, newRoot); err != nil {
-		return err
-	}
-
 	// Delete the orphan intermediate nodes.
 	if err := deleteNodes(wTx, intermediates); err != nil {
 		return fmt.Errorf("error deleting orphan intermediate nodes: %v", err)
+	}
+
+	// Update the root of the tree.
+	if err := t.setRoot(wTx, newRoot); err != nil {
+		return err
 	}
 
 	// Delete the neighbour's childs and add them back to the tree in the right place.
@@ -521,6 +521,9 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 // ErrKeyNotFound, and in the leafK & leafV parameters will be placed the data
 // found in the tree in the leaf that was on the path going to the input key.
 func (t *Tree) GetWithTx(rTx db.Reader, k []byte) ([]byte, []byte, error) {
+	t.Lock()
+	defer t.Unlock()
+
 	keyPath, err := keyPathFromKey(t.maxLevels, k)
 	if err != nil {
 		return nil, nil, err
@@ -602,6 +605,8 @@ func (t *Tree) SetRoot(root []byte) error {
 
 // SetRootWithTx sets the root to the given root using the given db.WriteTx
 func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
+	t.Lock()
+	defer t.Unlock()
 	if !t.editable() {
 		return ErrSnapshotNotEditable
 	}
@@ -620,6 +625,8 @@ func (t *Tree) SetRootWithTx(wTx db.WriteTx, root []byte) error {
 // The provided root must be a valid existing intermediate node in the tree.
 // The list of roots for a level can be obtained using tree.RootsFromLevel().
 func (t *Tree) Snapshot(fromRoot []byte) (*Tree, error) {
+	t.Lock()
+	defer t.Unlock()
 	// allow to define which root to use
 	if fromRoot == nil {
 		var err error
@@ -672,6 +679,8 @@ func (t *Tree) IterateWithTx(rTx db.Reader, fromRoot []byte, f func([]byte, []by
 			return err
 		}
 	}
+	t.Lock()
+	defer t.Unlock()
 	return t.iter(rTx, fromRoot, f)
 }
 

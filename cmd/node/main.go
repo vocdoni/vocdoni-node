@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"io"
 	"net"
@@ -174,13 +175,29 @@ func newConfig() (*config.Config, config.Error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// set FlagVars first
-	viper.BindPFlag("dataDir", flag.Lookup("dataDir"))
+	if err = viper.BindPFlag("dataDir", flag.Lookup("dataDir")); err != nil {
+		log.Fatalf("failed to bind dataDir flag to viper: %v", err)
+	}
 	globalCfg.DataDir = viper.GetString("dataDir")
-	viper.BindPFlag("chain", flag.Lookup("chain"))
+
+	if err = viper.BindPFlag("chain", flag.Lookup("chain")); err != nil {
+		log.Fatalf("failed to bind chain flag to viper: %v", err)
+	}
 	globalCfg.Vochain.Chain = viper.GetString("chain")
-	viper.BindPFlag("dev", flag.Lookup("dev"))
+
+	if err = viper.BindPFlag("dev", flag.Lookup("dev")); err != nil {
+		log.Fatalf("failed to bind dev flag to viper: %v", err)
+	}
 	globalCfg.Dev = viper.GetBool("dev")
-	viper.BindPFlag("pprofPort", flag.Lookup("pprof"))
+
+	if err = viper.BindPFlag("pprofPort", flag.Lookup("pprof")); err != nil {
+		log.Fatalf("failed to bind pprof flag to viper: %v", err)
+	}
+
+	if err = viper.BindPFlag("dbType", flag.Lookup("dbType")); err != nil {
+		log.Fatalf("failed to bind dbType flag to viper: %v", err)
+	}
+	globalCfg.Vochain.DBType = viper.GetString("dbType")
 
 	// use different datadirs for different chains
 	globalCfg.DataDir = filepath.Join(globalCfg.DataDir, globalCfg.Vochain.Chain)
@@ -267,7 +284,7 @@ func newConfig() (*config.Config, config.Error) {
 		}
 	}
 
-	if len(globalCfg.SigningKey) < 32 {
+	if globalCfg.SigningKey == "" {
 		fmt.Println("no signing key, generating one...")
 		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
@@ -281,6 +298,10 @@ func newConfig() (*config.Config, config.Error) {
 		viper.Set("signingKey", priv)
 		globalCfg.SigningKey = priv
 		globalCfg.SaveConfig = true
+	}
+
+	if globalCfg.Vochain.MinerKey == "" {
+		globalCfg.Vochain.MinerKey = globalCfg.SigningKey
 	}
 
 	if globalCfg.SaveConfig {
@@ -381,7 +402,8 @@ func main() {
 			log.Error(http.Serve(ln, nil))
 		}()
 	}
-	log.Infow("starting vocdoni node", "version", internal.Version, "mode", globalCfg.Mode)
+	log.Infow("starting vocdoni node", "version", internal.Version, "mode", globalCfg.Mode,
+		"chain", globalCfg.Vochain.Chain, "dbType", globalCfg.Vochain.DBType)
 	if globalCfg.Dev {
 		log.Warn("developer mode is enabled!")
 	}
@@ -497,9 +519,7 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-		if validator == nil {
-			log.Warnw("node is not a validator", "address", signer.Address().Hex())
-		} else {
+		if validator != nil {
 			// start keykeeper service (if key index specified)
 			if validator.KeyIndex > 0 {
 				srv.KeyKeeper, err = keykeeper.NewKeyKeeper(
@@ -511,12 +531,10 @@ func main() {
 					log.Fatal(err)
 				}
 				go srv.KeyKeeper.RevealUnpublished()
-			} else {
-				log.Warnw("validator keyIndex disabled")
+				log.Infow("configured keykeeper validator",
+					"address", signer.Address().Hex(),
+					"keyIndex", validator.KeyIndex)
 			}
-			log.Infow("configured vochain validator",
-				"address", signer.Address().Hex(),
-				"keyIndex", validator.KeyIndex)
 		}
 	}
 
@@ -571,6 +589,17 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
+	height, err := srv.App.State.LastHeight()
+	if err != nil {
+		log.Warn(err)
+	}
+	hash, err := srv.App.State.MainTreeView().Root()
+	if err != nil {
+		log.Warn(err)
+	}
+	tmBlock := srv.App.GetBlockByHeight(int64(height))
+	log.Infow("last block", "height", height, "appHash", hex.EncodeToString(hash),
+		"time", tmBlock.Time, "tmAppHash", tmBlock.AppHash.String(), "tmHeight", tmBlock.Height)
 	os.Exit(0)
 }
 

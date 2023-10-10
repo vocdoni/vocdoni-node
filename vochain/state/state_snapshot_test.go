@@ -34,6 +34,8 @@ func TestSnapshot(t *testing.T) {
 	err = nostate.Set([]byte("nostate2"), []byte("value2"))
 	qt.Assert(t, err, qt.IsNil)
 
+	_, err = st.PrepareCommit()
+	qt.Assert(t, err, qt.IsNil)
 	hash, err := st.Save()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, hash, qt.Not(qt.IsNil))
