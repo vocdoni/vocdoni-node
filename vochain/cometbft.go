@@ -177,6 +177,9 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 	if app.Height() > initialTTLheight.(uint32)+transactionBlocksTTL {
 		// remove tx reference and return checkTx error
 		log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
+		if err := app.MempoolDeleteTx(txReference); err != nil {
+			log.Warnw("could not remove tx from mempool", "error", err.Error(), "txID", hex.EncodeToString(txReference[:]))
+		}
 		app.txTTLReferences.Delete(txReference)
 		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
 	}

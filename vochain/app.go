@@ -326,6 +326,15 @@ func (app *BaseApplication) SetChainID(chainID string) {
 	app.State.SetChainID(chainID)
 }
 
+// MempoolDeleteTx removes a transaction from the mempool. If the mempool implementation does not allow it,
+// it just returns nil.
+func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) error {
+	if app.fnMempoolPrune != nil {
+		return app.fnMempoolPrune(txID)
+	}
+	return nil
+}
+
 // Genesis returns the tendermint genesis information
 func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
 	return app.genesisInfo
