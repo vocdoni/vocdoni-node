@@ -84,7 +84,7 @@ var (
 
 // Tree defines the struct that implements the MerkleTree functionalities
 type Tree struct {
-	sync.RWMutex
+	sync.Mutex
 
 	db        db.Database
 	maxLevels int
@@ -521,8 +521,8 @@ func (t *Tree) Get(k []byte) ([]byte, []byte, error) {
 // ErrKeyNotFound, and in the leafK & leafV parameters will be placed the data
 // found in the tree in the leaf that was on the path going to the input key.
 func (t *Tree) GetWithTx(rTx db.Reader, k []byte) ([]byte, []byte, error) {
-	t.RLock()
-	defer t.RUnlock()
+	t.Lock()
+	defer t.Unlock()
 
 	keyPath, err := keyPathFromKey(t.maxLevels, k)
 	if err != nil {

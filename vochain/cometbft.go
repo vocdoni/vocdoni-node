@@ -289,7 +289,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		Nonce     uint32
 		DecodedTx *vochaintx.Tx
 	}
-	// Rollback the state to discard previous non saved changes
+	// Rollback the state to discard previous non saved changes.
+	// It might happen if ProcessProposal fails and then this node is selected for preparing the next proposal.
 	app.State.Rollback()
 
 	// Get and execute transactions from the mempool
@@ -324,10 +325,10 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 			return false
 		}
 		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr != nil {
-			if validTxInfos[i].Addr.String() == validTxInfos[j].Addr.String() {
+			if bytes.Equal(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) {
 				return validTxInfos[i].Nonce < validTxInfos[j].Nonce
 			}
-			return validTxInfos[i].Addr.String() < validTxInfos[j].Addr.String()
+			return bytes.Compare(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) == -1
 		}
 		return false
 	})
