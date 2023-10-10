@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -254,6 +255,107 @@ func TestAPIaccount(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
 
+func TestAPIElectionCost(t *testing.T) {
+	// cheap election
+	runAPIElectionCostWithParams(t,
+		electionprice.ElectionParameters{
+			MaxCensusSize:    100,
+			ElectionDuration: 2000,
+			EncryptedVotes:   false,
+			AnonymousVotes:   false,
+			MaxVoteOverwrite: 1,
+		},
+		10000, 5000,
+		5, 1000,
+		6)
+
+	// bigger census size, duration, reduced network capacity, etc
+	runAPIElectionCostWithParams(t,
+		electionprice.ElectionParameters{
+			MaxCensusSize:    5000,
+			ElectionDuration: 10000,
+			EncryptedVotes:   false,
+			AnonymousVotes:   false,
+			MaxVoteOverwrite: 3,
+		},
+		200000, 6000,
+		10, 100,
+		762)
+
+	// very expensive election
+	runAPIElectionCostWithParams(t,
+		electionprice.ElectionParameters{
+			MaxCensusSize:    100000,
+			ElectionDuration: 1000000,
+			EncryptedVotes:   true,
+			AnonymousVotes:   true,
+			MaxVoteOverwrite: 10,
+		},
+		100000, 700000,
+		10, 100,
+		547026)
+}
+
+func runAPIElectionCostWithParams(t *testing.T,
+	electionParams electionprice.ElectionParameters,
+	startBlock uint32, initialBalance uint64,
+	txCostNewProcess, networkCapacity uint64,
+	expectedPrice uint64,
+) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	err := server.VochainAPP.State.SetTxBaseCost(models.TxType_NEW_PROCESS, txCostNewProcess)
+	qt.Assert(t, err, qt.IsNil)
+	err = server.VochainAPP.State.SetElectionPriceCalc()
+	qt.Assert(t, err, qt.IsNil)
+	server.VochainAPP.State.ElectionPriceCalc.SetCapacity(networkCapacity)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+
+	signer := createAccount(t, c, server, initialBalance)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	censusRoot := createCensus(t, c)
+
+	// first check predictedPrice equals the hardcoded expected
+
+	predictedPrice := predictPriceForElection(t, c, electionParams)
+	qt.Assert(t, predictedPrice, qt.Equals, expectedPrice)
+
+	// now check balance before creating election and then after creating,
+	// and confirm the balance decreased exactly the expected amount
+
+	qt.Assert(t, requestAccount(t, c, signer.Address().String()).Balance,
+		qt.Equals, initialBalance)
+
+	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID())
+
+	// Block 3
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	balance := requestAccount(t, c, signer.Address().String()).Balance
+	qt.Assert(t, balance,
+		qt.Equals, initialBalance-predictedPrice,
+		qt.Commentf("endpoint /elections/price predicted cost %d, "+
+			"but actual election creation costed %d", predictedPrice, initialBalance-balance))
+}
+
 func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 	for {
 		resp, code := c.Request("GET", nil, "chain", "info")
@@ -275,4 +377,151 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 		}
 		time.Sleep(time.Second * 1)
 	}
+}
+
+func requestAccount(t testing.TB, c *testutil.TestHTTPclient, address string) api.Account {
+	resp, code := c.Request("GET", nil, "accounts", address)
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+	acct := api.Account{}
+	err := json.Unmarshal(resp, &acct)
+	qt.Assert(t, err, qt.IsNil)
+	return acct
+}
+
+func createCensus(t testing.TB, c *testutil.TestHTTPclient) (root types.HexBytes) {
+	resp, code := c.Request("POST", nil, "censuses", "weighted")
+	qt.Assert(t, code, qt.Equals, 200)
+	censusData := &api.Census{}
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+
+	id1 := censusData.CensusID.String()
+	resp, code = c.Request("POST", nil, "censuses", id1, "publish")
+	qt.Assert(t, code, qt.Equals, 200)
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
+	return censusData.CensusID
+}
+
+func createElection(t testing.TB, c *testutil.TestHTTPclient,
+	signer *ethereum.SignKeys,
+	electionParams electionprice.ElectionParameters,
+	censusRoot types.HexBytes,
+	startBlock uint32,
+	chainID string,
+) api.ElectionCreate {
+	metadataBytes, err := json.Marshal(
+		&api.ElectionMetadata{
+			Title:       map[string]string{"default": "test election"},
+			Description: map[string]string{"default": "test election description"},
+			Version:     "1.0",
+		})
+
+	qt.Assert(t, err, qt.IsNil)
+	metadataURI := ipfs.CalculateCIDv1json(metadataBytes)
+
+	tx := models.Tx_NewProcess{
+		NewProcess: &models.NewProcessTx{
+			Txtype: models.TxType_NEW_PROCESS,
+			Nonce:  0,
+			Process: &models.Process{
+				StartBlock:   startBlock,
+				BlockCount:   electionParams.ElectionDuration,
+				Status:       models.ProcessStatus_READY,
+				CensusRoot:   censusRoot,
+				CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+				Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
+				VoteOptions: &models.ProcessVoteOptions{
+					MaxCount:          1,
+					MaxValue:          1,
+					MaxVoteOverwrites: electionParams.MaxVoteOverwrite,
+				},
+				EnvelopeType: &models.EnvelopeType{
+					EncryptedVotes: electionParams.EncryptedVotes,
+					Anonymous:      electionParams.AnonymousVotes,
+				},
+				Metadata:      &metadataURI,
+				MaxCensusSize: electionParams.MaxCensusSize,
+			},
+		},
+	}
+
+	txb, err := proto.Marshal(&models.Tx{Payload: &tx})
+	qt.Assert(t, err, qt.IsNil)
+	signedTxb, err := signer.SignVocdoniTx(txb, chainID)
+	qt.Assert(t, err, qt.IsNil)
+	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
+	stxb, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
+	election := api.ElectionCreate{
+		TxPayload: stxb,
+		Metadata:  metadataBytes,
+	}
+	resp, code := c.Request("POST", election, "elections")
+	qt.Assert(t, code, qt.Equals, 200)
+	err = json.Unmarshal(resp, &election)
+	qt.Assert(t, err, qt.IsNil)
+
+	return election
+}
+
+func predictPriceForElection(t testing.TB, c *testutil.TestHTTPclient,
+	electionParams electionprice.ElectionParameters) uint64 {
+	predicted := struct {
+		Price uint64 `json:"price"`
+	}{}
+
+	resp, code := c.Request("POST", electionParams, "elections", "price")
+	qt.Assert(t, code, qt.Equals, 200)
+	err := json.Unmarshal(resp, &predicted)
+	qt.Assert(t, err, qt.IsNil)
+
+	return predicted.Price
+}
+
+func createAccount(t testing.TB, c *testutil.TestHTTPclient,
+	server testcommon.APIserver, initialBalance uint64) *ethereum.SignKeys {
+	signer := ethereum.SignKeys{}
+	qt.Assert(t, signer.Generate(), qt.IsNil)
+
+	// metadata
+	meta := &api.AccountMetadata{
+		Version: "1.0",
+	}
+	metaData, err := json.Marshal(meta)
+	qt.Assert(t, err, qt.IsNil)
+
+	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), initialBalance)
+	qt.Assert(t, err, qt.IsNil)
+
+	// transaction
+	stx := models.SignedTx{}
+	infoURI := "ipfs://" + ipfs.CalculateCIDv1json(metaData)
+	sik, err := signer.AccountSIK(nil)
+	qt.Assert(t, err, qt.IsNil)
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
+		SetAccount: &models.SetAccountTx{
+			Txtype:        models.TxType_CREATE_ACCOUNT,
+			Nonce:         new(uint32),
+			InfoURI:       &infoURI,
+			Account:       signer.Address().Bytes(),
+			FaucetPackage: fp,
+			SIK:           sik,
+		},
+	}})
+	qt.Assert(t, err, qt.IsNil)
+	stx.Signature, err = signer.SignVocdoniTx(stx.Tx, server.VochainAPP.ChainID())
+	qt.Assert(t, err, qt.IsNil)
+	stxb, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
+	// send the transaction and metadata
+	accSet := api.AccountSet{
+		Metadata:  metaData,
+		TxPayload: stxb,
+	}
+	resp, code := c.Request("POST", &accSet, "accounts")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	return &signer
 }
