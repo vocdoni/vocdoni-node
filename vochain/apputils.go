@@ -180,10 +180,10 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	}
 
 	// Build genesis app state and create genesis file
-	appState := genesis.GenesisAppState{
+	appState := genesis.AppState{
 		Validators: appStateValidators,
 		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
-		Accounts: []genesis.GenesisAccount{
+		Accounts: []genesis.Account{
 			{
 				Address: faucet.Address().Bytes(),
 				Balance: 100000,

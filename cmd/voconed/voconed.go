@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -31,6 +32,8 @@ type VoconeConfig struct {
 	disableIpfs                                         bool
 	fundedAccounts                                      []string
 	enableFaucetWithAmount                              uint64
+	ipfsConnectKey                                      string
+	ipfsConnectPeers                                    []string
 }
 
 func main() {
@@ -56,6 +59,11 @@ func main() {
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction costs for all types")
 	flag.Uint64Var(&config.enableFaucetWithAmount, "enableFaucet", 0, "enable faucet API service for the given amount")
 	flag.BoolVar(&config.disableIpfs, "disableIpfs", false, "disable built-in IPFS node")
+	flag.StringVarP(&config.ipfsConnectKey, "ipfsConnectKey", "i", "",
+		"enable IPFS group synchronization using the given secret key")
+	flag.StringSliceVar(&config.ipfsConnectPeers, "ipfsConnectPeers", []string{},
+		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
+
 	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
 		"list of pre-funded accounts (address:balance,address:balance,...)")
 	flag.CommandLine.SortFlags = false
@@ -127,6 +135,12 @@ func main() {
 	}
 	*setTxCosts = pviper.GetBool("setTxCosts")
 
+	pviper.BindPFlag("ipfsConnectKey", flag.Lookup("ipfsConnectKey"))
+	config.ipfsConnectKey = pviper.GetString("ipfsConnectKey")
+
+	pviper.BindPFlag("ipfsConnectPeers", flag.Lookup("ipfsConnectPeers"))
+	config.ipfsConnectPeers = pviper.GetStringSlice("ipfsConnectPeers")
+
 	_, err = os.Stat(filepath.Join(config.dir, "voconed.yml"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -165,12 +179,16 @@ func main() {
 
 	log.Infof("using data directory at %s", config.dir)
 
+	// Overwrite the default path to download the zksnarks circuits artifacts
+	// using the global datadir as parent folder.
+	circuit.BaseDir = filepath.Join(config.dir, "zkCircuits")
+
 	mngKey := ethereum.SignKeys{}
 	if err := mngKey.AddHexKey(config.keymanager); err != nil {
 		log.Fatal(err)
 	}
 
-	vc, err := vocone.NewVocone(config.dir, &mngKey, config.disableIpfs)
+	vc, err := vocone.NewVocone(config.dir, &mngKey, config.disableIpfs, config.ipfsConnectKey, config.ipfsConnectPeers)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -27,7 +27,7 @@ const (
 	// We use go-bare for export/import the trie. In order to support
 	// big census (up to 8 Million entries) we need to increase the maximums.
 	bareMaxArrayLength    uint64 = 1024 * 1014 * 8         // 8 Million entries
-	bareMaxUnmarshalBytes uint64 = bareMaxArrayLength * 32 // Assuming 32 bytes per entry
+	bareMaxUnmarshalBytes        = bareMaxArrayLength * 32 // Assuming 32 bytes per entry
 )
 
 // SubPub is a simplified PubSub protocol using libp2p.
@@ -90,7 +90,7 @@ func NewSubPub(groupKey [32]byte, node *core.IpfsNode) *SubPub {
 // Start connects the SubPub networking stack
 // and begins passing incoming messages to the receiver chan
 func (s *SubPub) Start(ctx context.Context, receiver chan *Message) {
-	if len(s.Topic) == 0 {
+	if s.Topic == "" {
 		log.Fatal("no group key provided")
 	}
 	ipfslog.SetLogLevel("*", "ERROR")

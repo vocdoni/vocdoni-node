@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 )
@@ -27,4 +28,5 @@ type VocdoniService struct {
 	Stats          *vochaininfo.VochainInfo
 	Storage        data.Storage
 	Signer         *ethereum.SignKeys
+	KeyKeeper      *keykeeper.KeyKeeper
 }

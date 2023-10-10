@@ -30,7 +30,7 @@ const (
 	// EthereumAddressSize is the size of an ethereum address
 	EthereumAddressSize = 20
 
-	// EntityIDsizeV2 legacy: in the past we used hash(addr)
+	// EntityIDsize V2 legacy: in the past we used hash(addr)
 	// this is a temporal work around to support both
 	EntityIDsize = 20
 	// KeyIndexSeparator is the default char used to split keys
@@ -41,52 +41,46 @@ const (
 
 	// ENS Domains
 
-	// ENTITY RESOLVER
-	// EntityResolverDomain is the default entity resolver ENS domain
+	// EntityResolverDomain default entity resolver ENS domain
 	EntityResolverDomain = "entities.voc.eth"
 	// EntityResolverStageDomain is the default entity resolver ENS domain
 	EntityResolverStageDomain = "entities.stg.voc.eth"
 	// EntityResolverDevelopmentDomain is the default entity resolver ENS domain
 	EntityResolverDevelopmentDomain = "entities.dev.voc.eth"
 
-	// PROCESSES
-	// ProcessesDomain
+	// ProcessesDomain default process domain
 	ProcessesDomain = "processes.voc.eth"
-	// ProcessesStageDomain
+	// ProcessesStageDomain stage process domain
 	ProcessesStageDomain = "processes.stg.voc.eth"
-	// ProcessesDevelopmentDomain
+	// ProcessesDevelopmentDomain dev process domain
 	ProcessesDevelopmentDomain = "processes.dev.voc.eth"
 
-	// NAMESPACES
-	// NamespacesDomain
+	// NamespacesDomain default namespace domain
 	NamespacesDomain = "namespaces.voc.eth"
-	// NamespacesStageDomain
+	// NamespacesStageDomain stage namespace domain
 	NamespacesStageDomain = "namespaces.stg.voc.eth"
-	// NamespacesDevelopmentDomain
+	// NamespacesDevelopmentDomain dev namespace domain
 	NamespacesDevelopmentDomain = "namespaces.dev.voc.eth"
 
-	// ERC20 PROOFS
-	// ERC20ProofsDomain
+	// ERC20ProofsDomain default domain for erc20 proofs
 	ERC20ProofsDomain = "erc20.proofs.voc.eth"
-	// ERC20ProofsStageDomain
+	// ERC20ProofsStageDomain domain for erc20 proofs stage
 	ERC20ProofsStageDomain = "erc20.proofs.stg.voc.eth"
-	// ERC20ProofsDevelopmentDomain
+	// ERC20ProofsDevelopmentDomain domain for erc20 proofs dev
 	ERC20ProofsDevelopmentDomain = "erc20.proofs.dev.voc.eth"
 
-	// GENESIS
-	// GenesisDomain
+	// GenesisDomain default genesis domain
 	GenesisDomain = "genesis.voc.eth"
-	// GenesisStageDomain
+	// GenesisStageDomain stage genesis domain
 	GenesisStageDomain = "genesis.stg.voc.eth"
-	// GenesisDevelopmentDomain
+	// GenesisDevelopmentDomain dev genesis domain
 	GenesisDevelopmentDomain = "genesis.dev.voc.eth"
 
-	// RESULTS
-	// ResultsDomain
+	// ResultsDomain default results domain
 	ResultsDomain = "results.voc.eth"
-	// ResultsStageDomain
+	// ResultsStageDomain stage results domain
 	ResultsStageDomain = "results.stg.voc.eth"
-	// ResultsDevelopmentDomain
+	// ResultsDevelopmentDomain dev results domain
 	ResultsDevelopmentDomain = "results.dev.voc.eth"
 
 	// EntityMetaKey is the key of an ENS text record for the entity metadata

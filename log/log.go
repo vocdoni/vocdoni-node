@@ -50,7 +50,7 @@ var logTestTime, _ = time.Parse(time.RFC3339, "2006-01-02T15:04:05Z")
 
 type testHook struct{}
 
-// To ensure that the log output in the test is deterministic.
+// Run ensure that the log output in the test is deterministic.
 func (*testHook) Run(e *zerolog.Event, _ zerolog.Level, _ string) {
 	e.Stringer("time", logTestTime)
 }

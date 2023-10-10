@@ -349,7 +349,7 @@ func (app *BaseApplication) CircuitConfigurationTag() string {
 	return app.circuitConfigTag
 }
 
-// IsSynchronizing informes if the blockchain is synchronizing or not.
+// IsSynchronizing informs if the blockchain is synchronizing or not.
 func (app *BaseApplication) isSynchronizingTendermint() bool {
 	if app.Node == nil {
 		return true
@@ -357,7 +357,7 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	return app.Node.ConsensusReactor().WaitSync()
 }
 
-// IsSynchronizing informes if the blockchain is synchronizing or not.
+// IsSynchronizing informs if the blockchain is synchronizing or not.
 // The value is updated every new block.
 func (app *BaseApplication) IsSynchronizing() bool {
 	return app.isSynchronizing.Load()

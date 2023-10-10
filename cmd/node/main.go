@@ -369,7 +369,7 @@ func main() {
 
 	// Overwrite the default path to download the zksnarks circuits artifacts
 	// using the global datadir as parent folder.
-	circuit.BaseDir = filepath.Join(globalCfg.DataDir, circuit.BaseDir)
+	circuit.BaseDir = filepath.Join(globalCfg.DataDir, "zkCircuits")
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
@@ -409,7 +409,6 @@ func main() {
 	}
 
 	var err error
-	var vochainKeykeeper *keykeeper.KeyKeeper
 	srv := service.VocdoniService{Config: globalCfg.Vochain}
 
 	if globalCfg.Mode == types.ModeGateway {
@@ -461,7 +460,7 @@ func main() {
 		// set IsSeedNode to true if seed mode configured
 		globalCfg.Vochain.IsSeedNode = types.ModeSeed == globalCfg.Mode
 		// do we need indexer?
-		globalCfg.Vochain.Indexer.Enabled = (globalCfg.Mode == types.ModeGateway)
+		globalCfg.Vochain.Indexer.Enabled = globalCfg.Mode == types.ModeGateway
 		// offchainDataDownloader is only needed for gateways
 		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
 			globalCfg.Mode == types.ModeGateway
@@ -523,7 +522,7 @@ func main() {
 		if validator != nil {
 			// start keykeeper service (if key index specified)
 			if validator.KeyIndex > 0 {
-				vochainKeykeeper, err = keykeeper.NewKeyKeeper(
+				srv.KeyKeeper, err = keykeeper.NewKeyKeeper(
 					path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
 					srv.App,
 					&signer,
@@ -531,11 +530,11 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				go vochainKeykeeper.RevealUnpublished()
+				go srv.KeyKeeper.RevealUnpublished()
+				log.Infow("configured keykeeper validator",
+					"address", signer.Address().Hex(),
+					"keyIndex", validator.KeyIndex)
 			}
-			log.Infow("configured keykeeper validator",
-				"address", signer.Address().Hex(),
-				"keyIndex", validator.KeyIndex)
 		}
 	}
 

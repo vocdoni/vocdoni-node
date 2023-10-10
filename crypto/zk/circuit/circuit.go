@@ -19,21 +19,17 @@ var downloadCircuitsTimeout = time.Minute * 5
 
 // BaseDir is where the artifact cache is expected to be found.
 // If the artifacts are not found there, they will be downloaded and stored.
-// If unset ("") it will default to ~/.cache/vocdoni/zkCircuits/
+//
+// Defaults to ~/.cache/vocdoni/zkCircuits/
 //
 // In any case, the LocalDir path associated with the circuit config will be appended at the end
-var BaseDir = ""
-
-func init() {
-	// if base dir is unset, default to ~/.cache/vocdoni/
-	if BaseDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			panic(err)
-		}
-		BaseDir = home + "/.cache/vocdoni/zkCircuits"
+var BaseDir = func() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		panic(err)
 	}
-}
+	return filepath.Join(home, ".cache", "vocdoni", "zkCircuits")
+}()
 
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)

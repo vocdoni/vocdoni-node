@@ -101,7 +101,7 @@ func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint64, error) {
 	// Multiply by 1000 because t is represented in seconds, not ms.
 	// Dividing t first can floor the integer, leading to divide-by-zero
 	currentHeight := uint64(vi.Height())
-	blockDiff := (uint64(absDiff*1000) / t)
+	blockDiff := uint64(absDiff*1000) / t
 	if inPast {
 		if blockDiff > currentHeight {
 			return 0, fmt.Errorf("target time %v is before origin", target)
@@ -244,11 +244,11 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 				n60++
 				n360++
 				n1440++
-				h1 += (height - pheight)
-				h10 += (height - pheight)
-				h60 += (height - pheight)
-				h360 += (height - pheight)
-				h1440 += (height - pheight)
+				h1 += height - pheight
+				h10 += height - pheight
+				h60 += height - pheight
+				h360 += height - pheight
+				h1440 += height - pheight
 
 				if sleepSecs*n1 >= 60 && h1 > 0 {
 					a1 = int32((n1 * sleepSecs * 1000) / h1)

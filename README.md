@@ -43,7 +43,7 @@ For running vocdoni-node in gateway mode, 8 GiB of ram memory is recommended (4 
 
 #### Compile and run
 
-Compile from source in a golang environment (Go>1.20 required):
+Compile from source in a golang environment (Go>1.21 required):
 
 ```bash
 git clone https://github.com/vocdoni/vocdoni-node.git
@@ -55,13 +55,13 @@ go build ./cmd/node
 
 #### Docker
 
-You can run vocdoni node as a standalone container with docker-compose (recommended).
+You can run vocdoni node as a standalone container with docker compose (recommended).
 It is recommended to also start `watchtower` to automatically update the container when a new version is released.
 
 ```bash
 cd dockerfiles/vocdoninode
 cp env.example env
-docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml up -d 
+COMPOSE_PROFILES=watchtower docker compose up -d
 ```
 
 All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090/v2`.
@@ -71,7 +71,7 @@ If the computer has the port 443 available and mapped to a public IP, you might 
 To stop the container: 
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.watchtower.yml down
+docker compose down
 ```
 
 #### Connecting

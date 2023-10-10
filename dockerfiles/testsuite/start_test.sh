@@ -14,7 +14,7 @@
 #  e2etest_dynamicensuselection: run dynamic census test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
-[ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker-compose build passes this to go 1.20 so that binaries collect code coverage
+[ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker compose build passes this to go 1.20 so that binaries collect code coverage
 
 COMPOSE_CMD=${COMPOSE_CMD:-"docker compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
@@ -112,6 +112,7 @@ e2etest_encryptedelection() {
 
 e2etest_anonelection() {
 	e2etest anonelection
+	e2etest anonelectionTempSIKs
 }
 
 e2etest_hysteresis() {
@@ -154,9 +155,6 @@ e2etest_ballotelection() {
 }
 
 ### end tests definition
-
-# useful for debugging bash flow
-# docker-compose() { echo "# would do: docker-compose $@" ; sleep 0.2 ;}
 
 log "### Starting test suite ###"
 $COMPOSE_CMD build

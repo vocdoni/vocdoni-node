@@ -360,7 +360,7 @@ func (*readOnlyWriteTx) Set(_ []byte, _ []byte) error {
 	return ErrReadOnly
 }
 
-// Set implements db.WriteTx.Delete but returns error always.
+// Delete implements db.WriteTx.Delete but returns error always.
 func (*readOnlyWriteTx) Delete(_ []byte) error {
 	return ErrReadOnly
 }
@@ -373,7 +373,7 @@ func (*readOnlyWriteTx) Apply(_ db.WriteTx) error {
 // Commit implements db.WriteTx.Commit but returns nil always.
 func (*readOnlyWriteTx) Commit() error { return nil }
 
-// Commit implements db.WriteTx.Discard as a no-op.
+// Discard implements db.WriteTx.Discard as a no-op.
 func (*readOnlyWriteTx) Discard() {}
 
 // TreeView returns the mainTree opened at root as a TreeView for read-only.

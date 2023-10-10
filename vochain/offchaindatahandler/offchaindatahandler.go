@@ -76,7 +76,7 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 			// AddToQueue() writes to a channel that might be full, so we don't want to block the main thread.
 			go d.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
-			log.Infow("importing data", "type", "election metadata", "uri", item.uri)
+			log.Infow("importing metadata", "type", item.itemType, "uri", item.uri)
 			go d.enqueueMetadata(item.uri)
 		default:
 			log.Errorf("unknown item %d", item.itemType)
@@ -136,7 +136,7 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 }
 
 // OnProcessesStart is triggered when a process starts. Does nothing.
-func (d *OffChainDataHandler) OnProcessesStart(_ [][]byte) {
+func (*OffChainDataHandler) OnProcessesStart(_ [][]byte) {
 }
 
 // OnSetAccount is triggered when a new account is created or modified. If metadata info is present, it is enqueued.

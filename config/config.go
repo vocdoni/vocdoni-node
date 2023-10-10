@@ -8,7 +8,7 @@ import (
 type Config struct {
 	// Vochain config options
 	Vochain *VochainCfg
-	// Ipfs ipfs config options
+	// Ipfs config options
 	Ipfs *IPFSCfg
 	// Metrics config options
 	Metrics *MetricsCfg

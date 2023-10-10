@@ -158,11 +158,11 @@ func main() {
 
 }
 
-func accountIsSet(c *vocdoniCLI) bool {
+func accountIsSet(c *VocdoniCLI) bool {
 	return c.currentAccount >= 0
 }
 
-func accountHandler(c *vocdoniCLI) error {
+func accountHandler(c *VocdoniCLI) error {
 	accountAddNewStr := "-> import an account (from hexadecimal private key)"
 	accountGenerateStr := "-> generate a new account"
 	p := ui.Select{
@@ -193,7 +193,7 @@ func accountHandler(c *vocdoniCLI) error {
 	return nil
 }
 
-func accountSet(c *vocdoniCLI) error {
+func accountSet(c *VocdoniCLI) error {
 	p := ui.Prompt{
 		Label: "Account private key",
 	}
@@ -212,7 +212,7 @@ func accountSet(c *vocdoniCLI) error {
 	return c.setAPIaccount(key, memo)
 }
 
-func accountGen(c *vocdoniCLI) error {
+func accountGen(c *VocdoniCLI) error {
 	p := ui.Prompt{
 		Label: "Account memo note",
 	}
@@ -225,7 +225,7 @@ func accountGen(c *vocdoniCLI) error {
 	return c.setAPIaccount(key, memo)
 }
 
-func accountInfo(c *vocdoniCLI) error {
+func accountInfo(c *VocdoniCLI) error {
 	acc, err := c.api.Account("")
 	if err != nil {
 		return err
@@ -243,7 +243,7 @@ func accountInfo(c *vocdoniCLI) error {
 	if acc.Metadata != nil {
 		accMetadata, err := json.MarshalIndent(acc.Metadata, "", "  ")
 		if err != nil {
-			log.Debug("account metadta cannot be unmarshal")
+			log.Debug("account metadata cannot be unmarshal")
 		} else {
 			fmt.Printf("%s:\n%s\n", keysPrint.Sprintf(" ➥ metadata"), valuesPrint.Sprintf("%s", accMetadata))
 		}
@@ -252,7 +252,7 @@ func accountInfo(c *vocdoniCLI) error {
 	return nil
 }
 
-func networkInfo(cli *vocdoniCLI) error {
+func networkInfo(cli *VocdoniCLI) error {
 	info, err := cli.api.ChainInfo()
 	if err != nil {
 		return err
@@ -265,7 +265,7 @@ func networkInfo(cli *vocdoniCLI) error {
 	return nil
 }
 
-func bootStrapAccount(cli *vocdoniCLI) error {
+func bootStrapAccount(cli *VocdoniCLI) error {
 	var faucetPkg *models.FaucetPackage
 	p := ui.Prompt{
 		Label:   "Do you have a faucet package? [y,n]",
@@ -322,7 +322,7 @@ func bootStrapAccount(cli *vocdoniCLI) error {
 	return nil
 }
 
-func transfer(cli *vocdoniCLI) error {
+func transfer(cli *VocdoniCLI) error {
 	s := ui.Select{
 		Label: "Select a destination account",
 		Items: append(cli.listAccounts(), "to external account"),
@@ -397,10 +397,10 @@ func transfer(cli *vocdoniCLI) error {
 	return nil
 }
 
-func hostHandler(cli *vocdoniCLI) error {
+func hostHandler(cli *VocdoniCLI) error {
 	validateFunc := func(url string) error {
 		log.Debugf("performing ping test to %s", url)
-		_, err := http.NewRequest("GET", url+"/ping", nil)
+		_, err := http.NewRequest("GET", url+"/ping", http.NoBody)
 		return err
 	}
 	p := ui.Prompt{
@@ -431,7 +431,7 @@ func hostHandler(cli *vocdoniCLI) error {
 	return cli.setAuthToken(token)
 }
 
-func accountSetMetadata(cli *vocdoniCLI) error {
+func accountSetMetadata(cli *VocdoniCLI) error {
 	currentAccount, err := cli.api.Account("")
 	if err != nil {
 		return err
@@ -515,7 +515,7 @@ func accountSetMetadata(cli *vocdoniCLI) error {
 
 }
 
-func electionHandler(cli *vocdoniCLI) error {
+func electionHandler(cli *VocdoniCLI) error {
 	infoPrint.Printf("preparing the election template...\n")
 	description := api.ElectionDescription{
 		Title:        map[string]string{"default": "election title"},

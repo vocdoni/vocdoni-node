@@ -57,7 +57,7 @@ jobs:
         # staticcheck provides a github action, use it (https://staticcheck.io/docs/running-staticcheck/ci/github-actions/)
         # or use golangci-lint (github action) with staticcheck as enabled linter
         run: |
-          curl -L https://github.com/dominikh/go-tools/releases/download/2023.1.2/staticcheck_linux_amd64.tar.gz | tar -xzf -
+          curl -L https://github.com/dominikh/go-tools/releases/download/2023.1.6/staticcheck_linux_amd64.tar.gz | tar -xzf -
       - name: Run staticcheck
         run: |
           ./staticcheck/staticcheck ./... 2> staticcheck/stderr
@@ -109,7 +109,7 @@ jobs:
       - name: Run compose script
         env:
           TESTSUITE_BUILD_TAG: ${{ github.sha }}
-          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }} # unique name for docker-compose (needed for concurrent job runs)
+          COMPOSE_PROJECT_NAME: testsuite_${{ github.run_id }} # unique name for docker compose (needed for concurrent job runs)
           COMPOSE_DVOTE_PORT_MAPPING: "9090" # this binds gateway0 to a random available port on docker host (needed for concurrent job runs)
           COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)

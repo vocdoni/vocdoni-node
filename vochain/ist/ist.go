@@ -192,7 +192,7 @@ func (c *Controller) Commit(height uint32) error {
 	for id, action := range actions {
 		switch action.ID {
 		case ActionCommitResults:
-			// if the election is setted up with tempSIKs as true, purge the election
+			// if the election is set up with tempSIKs as true, purge the election
 			// related SIKs
 			process, err := c.state.Process(action.ElectionID, false)
 			if err != nil {

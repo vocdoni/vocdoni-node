@@ -61,7 +61,9 @@ func (i *Handler) Init(d *types.DataStore) error {
 		i.LogLevel = "ERROR"
 	}
 	ipfslog.SetLogLevel("*", i.LogLevel)
-	installDatabasePlugins()
+	if err := installDatabasePlugins(); err != nil {
+		return err
+	}
 	ConfigRoot = d.Datadir
 	os.Setenv("IPFS_FD_MAX", "4096")
 

@@ -13,7 +13,7 @@ services:
     volumes:
       - data-seed:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-seed:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -26,7 +26,7 @@ services:
     volumes:
       - data-miner0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -39,7 +39,7 @@ services:
     volumes:
       - data-miner1:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -52,7 +52,7 @@ services:
     volumes:
       - data-miner2:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -65,7 +65,7 @@ services:
     volumes:
       - data-miner3:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -80,7 +80,7 @@ services:
     volumes:
       - data-gateway0:/app/run/
       - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/root/.cache/vocdoni/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/zkCircuits/
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -99,6 +99,8 @@ services:
     environment:
       - GOCOVERDIR=/app/run/gocoverage
     command: "true"
+    profiles:
+      - tools # this container is only intended to be `docker compose run`, no need to start on `docker compose up`
 
   gocoverage:
     image: golang:1.21
@@ -110,6 +112,8 @@ services:
       - gocoverage-miner3:/app/run/gocoverage/miner3
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
       - gocoverage-test:/app/run/gocoverage/test
+    profiles:
+      - tools # this container is only intended to be `docker compose run`, no need to start on `docker compose up`
 
   prometheus:
     image: prom/prometheus:v2.26.0
@@ -124,6 +128,8 @@ services:
       - "--log.level=debug"
     networks:
       - blockchain
+    profiles:
+      - grafana
 
   grafana:
     image: grafana/grafana
@@ -142,6 +148,8 @@ services:
     environment:
       - GF_AUTH_ANONYMOUS_ENABLED=true
       - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+    profiles:
+      - grafana
 
 networks:
   blockchain:
