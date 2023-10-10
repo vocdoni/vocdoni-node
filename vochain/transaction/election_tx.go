@@ -16,6 +16,9 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// Fork20231016Block fixes txElectionCostFromProcess starting on this block
+const Fork20231016Block = 208000
+
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Process, ethereum.Address, error) {
 	if vtx.Tx == nil || vtx.Signature == nil || vtx.SignedBody == nil {
@@ -256,6 +259,19 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 }
 
 func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) uint64 {
+	if t.isBeforeFork20231016() {
+		return t.txElectionCostFromProcessPreFork20231016(process)
+	}
+	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
+		MaxCensusSize:    process.GetMaxCensusSize(),
+		ElectionDuration: process.BlockCount,
+		EncryptedVotes:   process.GetEnvelopeType().EncryptedVotes,
+		AnonymousVotes:   process.GetEnvelopeType().Anonymous,
+		MaxVoteOverwrite: process.GetVoteOptions().MaxVoteOverwrites,
+	})
+}
+
+func (t *TransactionHandler) txElectionCostFromProcessPreFork20231016(process *models.Process) uint64 {
 	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
 		MaxCensusSize:    process.GetMaxCensusSize(),
 		ElectionDuration: process.BlockCount + process.StartBlock,
@@ -263,4 +279,12 @@ func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) 
 		AnonymousVotes:   process.GetEnvelopeType().Anonymous,
 		MaxVoteOverwrite: process.GetVoteOptions().MaxVoteOverwrites,
 	})
+}
+
+// isBeforeFork20231016 returns true during the first 207999 blocks of vocdoni-stage-8,
+// starts returning false as soon as block 207999 is committed
+func (t *TransactionHandler) isBeforeFork20231016() bool {
+	// when vocdoni-stage-8 was ~200000 blocks old, we found a bug in txElectionCostFromProcess
+	// that needed a soft-fork. we agreed on fixing it (changing the behavior) at block 208000
+	return t.state.ChainID() == "vocdoni-stage-8" && t.state.CurrentHeight() < Fork20231016Block
 }
