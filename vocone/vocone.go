@@ -123,11 +123,11 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 
 // EnableAPI starts the HTTP API server. It is not enabled by default.
 func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, error) {
-	var httpRouter httprouter.HTTProuter
-	if err := httpRouter.Init(host, port); err != nil {
+	vc.Router = new(httprouter.HTTProuter)
+	if err := vc.Router.Init(host, port); err != nil {
 		return nil, err
 	}
-	uAPI, err := api.NewAPI(&httpRouter, URLpath, vc.Config.DataDir, db.TypePebble)
+	uAPI, err := api.NewAPI(vc.Router, URLpath, vc.Config.DataDir, db.TypePebble)
 	if err != nil {
 		return nil, err
 	}
@@ -499,10 +499,15 @@ func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 		m = vi.MempoolSize()
 		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
-		log.Infof("[vochain info] height:%d mempool:%d "+
-			"processes:%d votes:%d vxm:%d voteCache:%d blockTime:{%s}",
-			h, m, p, v, vxm, vc, b.String(),
-		)
+		log.Monitor("[vochain info]", map[string]any{
+			"height":    h,
+			"mempool":   m,
+			"processes": p,
+			"votes":     v,
+			"vxm":       vxm,
+			"voteCache": vc,
+			"blockTime": b.String(),
+		})
 		time.Sleep(time.Duration(sleepSecs) * time.Second)
 	}
 }

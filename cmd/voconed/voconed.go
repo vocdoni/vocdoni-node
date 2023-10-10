@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vocone"
 	"go.vocdoni.io/proto/build/go/models"
@@ -246,6 +247,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	vc.MetricsAgent = metrics.NewAgent("/metrics",
+		time.Duration(10)*time.Second, vc.Router)
 
 	// enable faucet if requested, this will create a new account and attach the faucet API to the vocone API
 	if config.enableFaucetWithAmount > 0 {
