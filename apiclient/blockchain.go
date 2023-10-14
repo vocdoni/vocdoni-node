@@ -159,7 +159,7 @@ func (c *HTTPclient) TransactionSetCensus(electionID types.HexBytes, census api.
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
 	}
 
 	tx := &models.SetProcessTx{

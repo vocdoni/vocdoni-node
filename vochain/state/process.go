@@ -206,7 +206,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 	switch newstatus {
 	case models.ProcessStatus_READY:
 		if currentStatus != models.ProcessStatus_PAUSED {
-			return fmt.Errorf("cannot set process status from %s to ready", currentStatus.String())
+			return fmt.Errorf("cannot set process status from %s to ready", currentStatus)
 		}
 		if currentStatus == models.ProcessStatus_READY {
 			return fmt.Errorf("process %x already in ready state", pid)
@@ -234,7 +234,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		}
 	case models.ProcessStatus_PAUSED:
 		if currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("cannot set process status from %s to paused", currentStatus.String())
+			return fmt.Errorf("cannot set process status from %s to paused", currentStatus)
 		}
 		if currentStatus == models.ProcessStatus_PAUSED {
 			return fmt.Errorf("process %x already in paused state", pid)
@@ -247,7 +247,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return fmt.Errorf("process %x already in results state", pid)
 		}
 		if currentStatus != models.ProcessStatus_ENDED && currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("cannot set state to results from %s", currentStatus.String())
+			return fmt.Errorf("cannot set state to results from %s", currentStatus)
 		}
 		if currentStatus == models.ProcessStatus_READY &&
 			process.StartBlock+process.BlockCount < v.CurrentHeight() {
@@ -255,7 +255,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 				currentStatus.String())
 		}
 	default:
-		return fmt.Errorf("process status %s unknown", newstatus.String())
+		return fmt.Errorf("process status %s unknown", newstatus)
 	}
 
 	if commit {
@@ -327,7 +327,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 	// census origin
 	if !CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
 		return fmt.Errorf(
-			"cannot update census, invalid census origin: %s", process.CensusOrigin.String())
+			"cannot update census, invalid census origin: %s", process.CensusOrigin)
 	}
 	// status
 	if !(process.Status == models.ProcessStatus_READY) &&

@@ -205,7 +205,7 @@ func (i *Handler) Unpin(ctx context.Context, path string) error {
 	if err := cpath.IsValid(); err != nil {
 		return fmt.Errorf("invalid path %s: %w", path, err)
 	}
-	log.Debugf("removing pin %s", cpath.String())
+	log.Debugf("removing pin %s", cpath)
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
 }
 

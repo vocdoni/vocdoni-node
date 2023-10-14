@@ -133,7 +133,7 @@ func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {
 	}
 	v.tx.Lock()
 	defer v.tx.Unlock()
-	log.Debugf("setting tx cost %d for tx %s", cost, txType.String())
+	log.Debugf("setting tx cost %d for tx %s", cost, txType)
 	costBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(costBytes, cost)
 	return v.tx.DeepSet([]byte(key), costBytes, StateTreeCfg(TreeExtra))
@@ -286,7 +286,7 @@ func (v *State) MintBalance(tx *vochaintx.TokenTransfer) error {
 		"to", fmt.Sprintf("%x", tx.ToAddress),
 		"amount", fmt.Sprintf("%d", tx.Amount),
 	)
-	log.Debugf("minting %d tokens to account %s", tx.Amount, tx.ToAddress.String())
+	log.Debugf("minting %d tokens to account %s", tx.Amount, tx.ToAddress)
 	if err := v.SetAccount(tx.ToAddress, acc); err != nil {
 		return err
 	}
@@ -316,7 +316,7 @@ func (v *State) InitChainMintBalance(to common.Address, amount uint64) error {
 		return ErrBalanceOverflow
 	}
 	acc.Balance += amount
-	log.Debugf("minting %d tokens to account %s", amount, to.String())
+	log.Debugf("minting %d tokens to account %s", amount, to)
 	return v.SetAccount(to, acc)
 }
 

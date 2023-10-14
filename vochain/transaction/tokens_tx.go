@@ -42,7 +42,7 @@ func (t *TransactionHandler) SetTransactionCostsTxCheck(vtx *vochaintx.Tx) (uint
 	}
 	// check vtx.Signature recovered address
 	if common.BytesToAddress(treasurer.Address) != sigAddress {
-		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", common.BytesToAddress(treasurer.Address), sigAddress.String())
+		return 0, fmt.Errorf("address recovered not treasurer: expected %s got %s", common.BytesToAddress(treasurer.Address), sigAddress)
 	}
 	return tx.Value, nil
 }
@@ -197,7 +197,7 @@ func (t *TransactionHandler) CollectFaucetTxCheck(vtx *vochaintx.Tx) error {
 	}
 	txSenderAccount, err := t.state.GetAccount(txSenderAddress, false)
 	if err != nil {
-		return fmt.Errorf("cannot check if account %s exists: %w", txSenderAddress.String(), err)
+		return fmt.Errorf("cannot check if account %s exists: %w", txSenderAddress, err)
 	}
 	if txSenderAccount == nil {
 		return vstate.ErrAccountNotExist

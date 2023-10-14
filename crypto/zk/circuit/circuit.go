@@ -117,7 +117,7 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	remotePath := fmt.Sprintf("%s/%s", baseUri.String(), circuit.Config.CircuitPath)
+	remoteUri := baseUri.JoinPath(circuit.Config.CircuitPath)
 	localPath := filepath.Join(BaseDir, circuit.Config.CircuitPath)
 	if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
 		return err
@@ -129,7 +129,7 @@ func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	}
 	for filename := range files {
 		// Compose the artifact uri and download it
-		file, err := downloadFile(ctx, fmt.Sprintf("%s/%s", remotePath, filename))
+		file, err := downloadFile(ctx, remoteUri.JoinPath(filename).String())
 		if err != nil {
 			return fmt.Errorf("error downloading '%s' artifact: %w", filename, err)
 		}
