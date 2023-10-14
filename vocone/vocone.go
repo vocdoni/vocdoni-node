@@ -152,7 +152,7 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 // Start starts the Vocone node. This function is blocking.
 func (vc *Vocone) Start() {
 	vc.lastBlockTime = time.Now()
-	go vochainPrintInfo(10, vc.Stats)
+	go vochainPrintInfo(10*time.Second, vc.Stats)
 	if vc.App.Height() == 0 {
 		log.Infof("initializing new blockchain")
 		genesisAppData, err := json.Marshal(&genesis.AppState{
@@ -471,7 +471,7 @@ func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx,
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection
-func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
+func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 	var a *[5]int32
 	var h int64
 	var p, v uint64
@@ -508,7 +508,7 @@ func vochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 			"voteCache": vc,
 			"blockTime": b.String(),
 		})
-		time.Sleep(time.Duration(sleepSecs) * time.Second)
+		time.Sleep(interval)
 	}
 }
 

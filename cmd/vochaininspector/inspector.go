@@ -92,7 +92,7 @@ func main() {
 		vnode := newVochain(chain, dataDir)
 		vi := vochaininfo.NewVochainInfo(vnode)
 		go vi.Start(10)
-		go service.VochainPrintInfo(20, vi)
+		go service.VochainPrintInfo(20*time.Second, vi)
 
 		defer func() {
 			vnode.NodeClient.Stop()

@@ -3,6 +3,7 @@ package faucet
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
@@ -36,7 +37,7 @@ func AttachFaucetAPI(signingKey *ethereum.SignKeys, networks map[string]uint64,
 		networks:   networks,
 	}
 	return api.RegisterMethod(
-		fmt.Sprintf("%s/{network}/{to}", pathPrefix),
+		path.Join(pathPrefix, "{network}/{to}"),
 		"GET",
 		apirest.MethodAccessTypePublic,
 		f.faucetHandler,
@@ -58,7 +59,7 @@ func (f *FaucetAPI) faucetHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	to := common.HexToAddress(toStr)
 
 	// generate faucet package
-	log.Debugf("faucet request from %s for network %s", to.String(), network)
+	log.Debugf("faucet request from %s for network %s", to, network)
 	fpackage, err := vochain.GenerateFaucetPackage(f.signingKey, to, amount)
 	if err != nil {
 		return api.ErrCantGenerateFaucetPkg.WithErr(err)

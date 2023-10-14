@@ -49,7 +49,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	addr, err := url.Parse("http://" + router.Address().String() + "/")
 	qt.Assert(t, err, qt.IsNil)
 	d.ListenAddr = addr
-	t.Logf("address: %s", addr.String())
+	t.Logf("address: %s", addr)
 	api, err := api.NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	qt.Assert(t, err, qt.IsNil)
 

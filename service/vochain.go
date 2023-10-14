@@ -161,7 +161,7 @@ func (vs *VocdoniService) Start() error {
 		}
 		log.Infow("vochain fastsync completed", "height", vs.Stats.Height(), "time", time.Since(timeSyncCounter))
 	}
-	go VochainPrintInfo(20, vs.Stats)
+	go VochainPrintInfo(20*time.Second, vs.Stats)
 
 	if vs.Config.LogLevel == "debug" {
 		go vochainPrintPeers(20*time.Second, vs.Stats)
@@ -170,7 +170,7 @@ func (vs *VocdoniService) Start() error {
 }
 
 // VochainPrintInfo initializes the Vochain statistics recollection.
-func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
+func VochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 	var a *[5]int32
 	var h int64
 	var p, v uint64
@@ -210,7 +210,7 @@ func VochainPrintInfo(sleepSecs int64, vi *vochaininfo.VochainInfo) {
 				"blockTime": b.String(),
 			})
 
-		time.Sleep(time.Duration(sleepSecs) * time.Second)
+		time.Sleep(interval)
 	}
 }
 

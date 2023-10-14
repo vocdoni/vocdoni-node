@@ -64,7 +64,7 @@ func (a *Account) IsDelegate(addr common.Address) bool {
 // AddDelegate adds an address to the list of delegates for an account
 func (a *Account) AddDelegate(addr common.Address) error {
 	if a.IsDelegate(addr) {
-		return fmt.Errorf("address %s is already a delegate", addr.String())
+		return fmt.Errorf("address %s is already a delegate", addr)
 	}
 	a.DelegateAddrs = append(a.DelegateAddrs, addr.Bytes())
 	return nil
@@ -74,7 +74,7 @@ func (a *Account) AddDelegate(addr common.Address) error {
 func (a *Account) DelDelegate(addr common.Address) error {
 	for i, d := range a.DelegateAddrs {
 		if !a.IsDelegate(addr) {
-			return fmt.Errorf("address %s is not a delegate", addr.String())
+			return fmt.Errorf("address %s is not a delegate", addr)
 		}
 		if bytes.Equal(addr.Bytes(), d) {
 			a.DelegateAddrs[i] = a.DelegateAddrs[len(a.DelegateAddrs)-1]
@@ -152,7 +152,7 @@ func (v *State) SetAccountInfoURI(accountAddress common.Address, infoURI string)
 		return fmt.Errorf("invalid infoURI")
 	}
 	acc.InfoURI = infoURI
-	log.Debugf("setting account %s infoURI %s", accountAddress.String(), infoURI)
+	log.Debugf("setting account %s infoURI %s", accountAddress, infoURI)
 	return v.SetAccount(accountAddress, acc)
 }
 
@@ -170,7 +170,7 @@ func (v *State) IncrementAccountProcessIndex(accountAddress common.Address) erro
 		acc.ProcessIndex = 0
 	}
 	acc.ProcessIndex++
-	log.Debugf("setting account %s process index to %d", accountAddress.String(), acc.ProcessIndex)
+	log.Debugf("setting account %s process index to %d", accountAddress, acc.ProcessIndex)
 	return v.SetAccount(accountAddress, acc)
 }
 
@@ -255,7 +255,7 @@ func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType m
 		if err := acc.Transfer(burnAcc, cost); err != nil {
 			return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
 		}
-		log.Debugf("burning fee for tx %s with cost %d from account %s", txType.String(), cost, accountAddress.String())
+		log.Debugf("burning fee for tx %s with cost %d from account %s", txType, cost, accountAddress)
 		if err := v.SetAccount(BurnAddress, burnAcc); err != nil {
 			return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
 		}
@@ -286,7 +286,7 @@ func (v *State) SetAccountDelegate(accountAddr common.Address,
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		log.Debugf("adding delegates %+v for account %s", delegateAddrs, accountAddr.String())
+		log.Debugf("adding delegates %+v for account %s", delegateAddrs, accountAddr)
 		for _, delegate := range delegateAddrs {
 			if err := acc.AddDelegate(common.BytesToAddress(delegate)); err != nil {
 				return fmt.Errorf("cannot add delegate, AddDelegate: %w", err)
@@ -294,7 +294,7 @@ func (v *State) SetAccountDelegate(accountAddr common.Address,
 		}
 		return v.SetAccount(accountAddr, acc)
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		log.Debugf("deleting delegates %+v for account %s", delegateAddrs, accountAddr.String())
+		log.Debugf("deleting delegates %+v for account %s", delegateAddrs, accountAddr)
 		for _, delegate := range delegateAddrs {
 			if err := acc.DelDelegate(common.BytesToAddress(delegate)); err != nil {
 				return fmt.Errorf("cannot delete delegate, DelDelegate: %w", err)

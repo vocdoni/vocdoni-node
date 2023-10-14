@@ -148,7 +148,7 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	// get tx cost
 	cost, err := t.state.TxBaseCost(tx.Txtype, false)
 	if err != nil {
-		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype.String(), err)
+		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
 	}
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {

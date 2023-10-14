@@ -87,7 +87,7 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 		return fmt.Errorf("cannot get faucet issuer address account: %w", err)
 	}
 	if issuerAcc == nil {
-		return fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress.String())
+		return fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress)
 	}
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
@@ -144,7 +144,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 		for _, delegate := range tx.Delegates {
 			delegateAddress := common.BytesToAddress(delegate)
 			if txSenderAccount.IsDelegate(delegateAddress) {
-				return fmt.Errorf("delegate %s already exists", delegateAddress.String())
+				return fmt.Errorf("delegate %s already exists", delegateAddress)
 			}
 		}
 		return nil
@@ -152,7 +152,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 		for _, delegate := range tx.Delegates {
 			delegateAddress := common.BytesToAddress(delegate)
 			if !txSenderAccount.IsDelegate(delegateAddress) {
-				return fmt.Errorf("delegate %s does not exist", delegateAddress.String())
+				return fmt.Errorf("delegate %s does not exist", delegateAddress)
 			}
 		}
 		return nil

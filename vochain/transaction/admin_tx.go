@@ -84,7 +84,7 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.Tx) (ethereum.Address, 
 			// endblock is always greater than start block so that case is also included here
 			if height > process.StartBlock {
 				return ethereum.Address{}, fmt.Errorf(
-					"cannot add keys to a process that has started or finished (%s)", process.Status.String())
+					"cannot add keys to a process that has started or finished (%s)", process.Status)
 			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED ||
