@@ -20,6 +20,14 @@ import (
 // Once the application is create, it is the caller's responsibility to call
 // app.AdvanceTestBlock() to advance the block height and commit the state.
 func TestBaseApplication(tb testing.TB) *BaseApplication {
+	return TestBaseApplicationWithChainID(tb, "test")
+}
+
+// TestBaseApplicationWithChainID creates a new BaseApplication for testing purposes.
+// It initializes the State, TransactionHandler and all the callback functions.
+// Once the application is create, it is the caller's responsibility to call
+// app.AdvanceTestBlock() to advance the block height and commit the state.
+func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplication {
 	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
@@ -31,7 +39,7 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 	}
 	_, err = app.InitChain(context.TODO(), &abcitypes.RequestInitChain{
 		Time:          time.Now(),
-		ChainId:       "test",
+		ChainId:       chainID,
 		Validators:    []abcitypes.ValidatorUpdate{},
 		AppStateBytes: genesisDoc.AppState,
 	})
