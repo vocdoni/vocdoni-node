@@ -17,7 +17,7 @@ import (
 )
 
 // Fork20231016Block fixes txElectionCostFromProcess starting on this block
-const Fork20231016Block = 208000
+const Fork20231016Block = 209000
 
 // NewProcessTxCheck is an abstraction of ABCI checkTx for creating a new process
 func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Process, ethereum.Address, error) {
@@ -281,10 +281,10 @@ func (t *TransactionHandler) txElectionCostFromProcessPreFork20231016(process *m
 	})
 }
 
-// isBeforeFork20231016 returns true during the first 207999 blocks of vocdoni-stage-8,
-// starts returning false as soon as block 207999 is committed
+// isBeforeFork20231016 returns true during the first 208999 blocks of vocdoni-stage-8,
+// starts returning false as soon as block 208999 is committed
 func (t *TransactionHandler) isBeforeFork20231016() bool {
 	// when vocdoni-stage-8 was ~200000 blocks old, we found a bug in txElectionCostFromProcess
-	// that needed a soft-fork. we agreed on fixing it (changing the behavior) at block 208000
+	// that needed a soft-fork. we agreed on fixing it (changing the behavior) at block 209000
 	return t.state.ChainID() == "vocdoni-stage-8" && t.state.CurrentHeight() < Fork20231016Block
 }
