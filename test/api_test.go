@@ -19,6 +19,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
+	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -265,9 +266,10 @@ func TestAPIElectionCost(t *testing.T) {
 			AnonymousVotes:   false,
 			MaxVoteOverwrite: 1,
 		},
-		10000, 5000,
+		5, 10000,
+		5000,
 		5, 1000,
-		6)
+		6, 11)
 
 	// bigger census size, duration, reduced network capacity, etc
 	runAPIElectionCostWithParams(t,
@@ -278,9 +280,10 @@ func TestAPIElectionCost(t *testing.T) {
 			AnonymousVotes:   false,
 			MaxVoteOverwrite: 3,
 		},
-		200000, 6000,
+		5, 200000,
+		6000,
 		10, 100,
-		762)
+		762, 5862)
 
 	// very expensive election
 	runAPIElectionCostWithParams(t,
@@ -291,18 +294,48 @@ func TestAPIElectionCost(t *testing.T) {
 			AnonymousVotes:   true,
 			MaxVoteOverwrite: 10,
 		},
-		100000, 700000,
+		5, 100000,
+		700000,
 		10, 100,
-		547026)
+		547026, 597076)
+
+	// medium election, created on last block before Fork20231016
+	runAPIElectionCostWithParams(t,
+		electionprice.ElectionParameters{
+			MaxCensusSize:    5000,
+			ElectionDuration: 10000,
+			EncryptedVotes:   false,
+			AnonymousVotes:   false,
+			MaxVoteOverwrite: 3,
+		},
+		transaction.Fork20231016Block-1, transaction.Fork20231016Block+1000,
+		7000,
+		10, 100,
+		762, 6091)
+
+	// medium election, created on first block of Fork20231016
+	runAPIElectionCostWithParams(t,
+		electionprice.ElectionParameters{
+			MaxCensusSize:    5000,
+			ElectionDuration: 10000,
+			EncryptedVotes:   false,
+			AnonymousVotes:   false,
+			MaxVoteOverwrite: 3,
+		},
+		transaction.Fork20231016Block, transaction.Fork20231016Block+1000,
+		7000,
+		10, 100,
+		762, 762)
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
 	electionParams electionprice.ElectionParameters,
-	startBlock uint32, initialBalance uint64,
+	createAtHeight uint32, startBlock uint32,
+	initialBalance uint64,
 	txCostNewProcess, networkCapacity uint64,
-	expectedPrice uint64,
+	expectedPredictedPrice, expectedActualPrice uint64,
 ) {
-	server := testcommon.APIserver{}
+	server := testcommon.APIserver{ChainID: "vocdoni-stage-8"}
 	server.Start(t,
 		api.ChainHandler,
 		api.CensusHandler,
@@ -325,17 +358,19 @@ func runAPIElectionCostWithParams(t *testing.T,
 	server.VochainAPP.AdvanceTestBlock()
 
 	signer := createAccount(t, c, server, initialBalance)
+	t.Logf("account created at chain %s block %d", server.VochainAPP.ChainID(), server.VochainAPP.Height())
 
-	// Block 2
-	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 2)
+	// Block 2..N
+	server.VochainAPP.AdvanceTestBlocksUntilHeight(createAtHeight)
+	waitUntilHeight(t, c, createAtHeight)
+	t.Logf("advanced chain %s to block %d", server.VochainAPP.ChainID(), server.VochainAPP.Height())
 
 	censusRoot := createCensus(t, c)
 
 	// first check predictedPrice equals the hardcoded expected
 
 	predictedPrice := predictPriceForElection(t, c, electionParams)
-	qt.Assert(t, predictedPrice, qt.Equals, expectedPrice)
+	qt.Assert(t, predictedPrice, qt.Equals, expectedPredictedPrice)
 
 	// now check balance before creating election and then after creating,
 	// and confirm the balance decreased exactly the expected amount
@@ -344,16 +379,19 @@ func runAPIElectionCostWithParams(t *testing.T,
 		qt.Equals, initialBalance)
 
 	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID())
+	t.Logf("election created at chain %s block %d", server.VochainAPP.ChainID(), server.VochainAPP.Height())
 
-	// Block 3
+	// Block N+1
 	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 3)
+	waitUntilHeight(t, c, createAtHeight+1)
 
-	balance := requestAccount(t, c, signer.Address().String()).Balance
-	qt.Assert(t, balance,
-		qt.Equals, initialBalance-predictedPrice,
-		qt.Commentf("endpoint /elections/price predicted cost %d, "+
-			"but actual election creation costed %d", predictedPrice, initialBalance-balance))
+	finalBalance := requestAccount(t, c, signer.Address().String()).Balance
+	qt.Assert(t, initialBalance-finalBalance, qt.Equals, expectedActualPrice)
+
+	if predictedPrice != initialBalance-finalBalance {
+		t.Logf("predicted price (%d) doesn't match actual price (%d) but that's expected (created at height %d)",
+			predictedPrice, initialBalance-finalBalance, createAtHeight)
+	}
 }
 
 func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
