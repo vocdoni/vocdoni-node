@@ -115,6 +115,7 @@ var devGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
+			SetAccountValidator:     10000,
 		},
 	},
 }
@@ -234,6 +235,7 @@ var stageGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
+			SetAccountValidator:     100000,
 		},
 	},
 }

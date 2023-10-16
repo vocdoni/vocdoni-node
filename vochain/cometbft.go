@@ -12,9 +12,11 @@ import (
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
+	"github.com/cometbft/cometbft/proto/tendermint/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/genesis"
+	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -88,10 +90,12 @@ func (app *BaseApplication) InitChain(_ context.Context,
 			"keyIndex", genesisAppState.Validators[i].KeyIndex,
 		)
 		v := &models.Validator{
-			Address:  genesisAppState.Validators[i].Address,
-			PubKey:   genesisAppState.Validators[i].PubKey,
-			Power:    genesisAppState.Validators[i].Power,
-			KeyIndex: uint32(genesisAppState.Validators[i].KeyIndex),
+			Address:          genesisAppState.Validators[i].Address,
+			PubKey:           genesisAppState.Validators[i].PubKey,
+			Power:            genesisAppState.Validators[i].Power,
+			KeyIndex:         uint32(genesisAppState.Validators[i].KeyIndex),
+			Name:             genesisAppState.Validators[i].Name,
+			ValidatorAddress: crypto256k1.PubKey(genesisAppState.Validators[i].PubKey).Address().Bytes(),
 		}
 		if err = app.State.AddValidator(v); err != nil {
 			return nil, fmt.Errorf("cannot add validator %s: %w", log.FormatProto(v), err)
@@ -114,10 +118,12 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		return nil, fmt.Errorf("cannot get node validator: %w", err)
 	}
 	if myValidator != nil {
-		log.Infow("node is a validator!", "power", myValidator.Power, "name", myValidator.Name)
+		log.Infow("node is a validator!", "power", myValidator.Power, "name", myValidator.Name,
+			"address", hex.EncodeToString(myValidator.Address), "pubKey", hex.EncodeToString(myValidator.PubKey),
+			"validatorAddr", hex.EncodeToString(myValidator.ValidatorAddress))
 	}
 
-	// set treasurer address
+	// set treasurer address // TODO: Remove
 	if genesisAppState.Treasurer != nil {
 		log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
 		if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
@@ -223,6 +229,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	defer app.prepareProposalLock.Unlock()
 	start := time.Now()
 	height := uint32(req.GetHeight())
+
 	var root []byte
 	var resp []*DeliverTxResponse
 	// skip execution if we already have the results and root (from ProcessProposal)
@@ -254,10 +261,49 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		"blockSeconds", time.Since(req.GetTime()).Seconds(),
 		"elapsedSeconds", time.Since(start).Seconds(),
 		"proposer", hex.EncodeToString(req.GetProposerAddress()))
+
+	// update validator score as an IST action for the next block. Note that at this point,
+	// we cannot modify the state or we would break ProcessProposal optimistic execution
+	proposalVotes := [][]byte{}
+	for _, v := range req.GetDecidedLastCommit().Votes {
+		if idFlag := v.GetBlockIdFlag(); idFlag == types.BlockIDFlagAbsent || idFlag == types.BlockIDFlagUnknown {
+			// skip invalid votes
+			continue
+		}
+		proposalVotes = append(proposalVotes, v.GetValidator().Address)
+	}
+	if err := app.Istc.Schedule(height+1, []byte(fmt.Sprintf("validators-update-score-%d", height)), ist.Action{
+		ID:                ist.ActionUpdateValidatorScore,
+		ValidatorVotes:    proposalVotes,
+		ValidatorProposer: req.GetProposerAddress(),
+	}); err != nil {
+		return nil, fmt.Errorf("finalize block: could not schedule IST action: %w", err)
+	}
+
+	// update current validators
+	validators, err := app.State.Validators(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get validators: %w", err)
+	}
 	return &abcitypes.ResponseFinalizeBlock{
-		AppHash:   root,
-		TxResults: txResults,
+		AppHash:          root,
+		TxResults:        txResults,
+		ValidatorUpdates: validatorUpdate(validators),
 	}, nil
+}
+
+func validatorUpdate(validators map[string]*models.Validator) abcitypes.ValidatorUpdates {
+	validatorUpdate := []abcitypes.ValidatorUpdate{}
+	for _, v := range validators {
+		pubKey := make([]byte, len(v.PubKey))
+		copy(pubKey, v.PubKey)
+		validatorUpdate = append(validatorUpdate, abcitypes.UpdateValidator(
+			pubKey,
+			int64(v.Power),
+			crypto256k1.KeyType,
+		))
+	}
+	return validatorUpdate
 }
 
 // Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
@@ -460,8 +506,8 @@ func (*BaseApplication) Query(_ context.Context,
 }
 
 // ExtendVote creates application specific vote extension
-func (*BaseApplication) ExtendVote(context.Context,
-	*abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
+func (*BaseApplication) ExtendVote(_ context.Context,
+	req *abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
 	return &abcitypes.ResponseExtendVote{}, nil
 }
 

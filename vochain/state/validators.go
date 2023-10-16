@@ -5,7 +5,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// AddValidator adds a tendemint validator if it is not already added
+// AddValidator adds a tendemint validator. If it exists, it will be updated.
 func (v *State) AddValidator(validator *models.Validator) error {
 	v.tx.Lock()
 	defer v.tx.Unlock()

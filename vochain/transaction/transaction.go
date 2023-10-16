@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -14,6 +15,11 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	// newValidatorPower is the default power of a new validator
+	newValidatorPower = 5
 )
 
 var (
@@ -209,7 +215,10 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			if err := t.SetAccountDelegateTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
 			}
-
+		case models.TxType_SET_ACCOUNT_VALIDATOR:
+			if err := t.SetAccountValidatorTxCheck(vtx); err != nil {
+				return nil, fmt.Errorf("setAccountValidatorTx: %w", err)
+			}
 		default:
 			return nil, fmt.Errorf("setAccount: invalid transaction type")
 		}
@@ -275,7 +284,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			case models.TxType_SET_ACCOUNT_INFO_URI:
 				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
 				if err != nil {
-					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
+					return nil, fmt.Errorf("setAccountInfo: txSenderAddress %w", err)
 				}
 				// consume cost for setAccount
 				if err := t.state.BurnTxCostIncrementNonce(
@@ -284,7 +293,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 					tx.GetInfoURI(),
 				); err != nil {
-					return nil, fmt.Errorf("setAccountTx: burnCostIncrementNonce %w", err)
+					return nil, fmt.Errorf("setAccountInfo: burnCostIncrementNonce %w", err)
 				}
 				txAccount := common.BytesToAddress(tx.GetAccount())
 				if txAccount != (common.Address{}) {
@@ -301,7 +310,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
 				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
 				if err != nil {
-					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
+					return nil, fmt.Errorf("addDelegate: txSenderAddress %w", err)
 				}
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
@@ -309,19 +318,19 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 					"",
 				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegateTx: burnTxCostIncrementNonce %w", err)
+					return nil, fmt.Errorf("addDelegate: burnTxCostIncrementNonce %w", err)
 				}
 				if err := t.state.SetAccountDelegate(
 					txSenderAddress,
 					tx.Delegates,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
+					return nil, fmt.Errorf("addDelegate: %w", err)
 				}
 			case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
 				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
 				if err != nil {
-					return nil, fmt.Errorf("createAccountTx: txSenderAddress %w", err)
+					return nil, fmt.Errorf("delDelegate: txSenderAddress %w", err)
 				}
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
@@ -329,14 +338,41 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 					"",
 				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegate: burnTxCostIncrementNonce %w", err)
+					return nil, fmt.Errorf("delDelegate: burnTxCostIncrementNonce %w", err)
 				}
 				if err := t.state.SetAccountDelegate(
 					txSenderAddress,
 					tx.Delegates,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
 				); err != nil {
-					return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
+					return nil, fmt.Errorf("delDelegate: %w", err)
+				}
+			case models.TxType_SET_ACCOUNT_VALIDATOR:
+				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
+				if err != nil {
+					return nil, fmt.Errorf("setValidator: txSenderAddress %w", err)
+				}
+				validatorAddr, err := ethereum.AddrFromPublicKey(tx.GetPublicKey())
+				if err != nil {
+					return nil, fmt.Errorf("setValidator: %w", err)
+				}
+				if err := t.state.BurnTxCostIncrementNonce(
+					txSenderAddress,
+					models.TxType_SET_ACCOUNT_VALIDATOR,
+					0,
+					validatorAddr.Hex(),
+				); err != nil {
+					return nil, fmt.Errorf("setValidator: burnTxCostIncrementNonce %w", err)
+				}
+				if err := t.state.AddValidator(&models.Validator{
+					Address:          validatorAddr.Bytes(),
+					PubKey:           tx.GetPublicKey(),
+					Name:             tx.GetName(),
+					Power:            newValidatorPower,
+					ValidatorAddress: cometCrypto256k1.PubKey(tx.GetPublicKey()).Address().Bytes(),
+					Height:           uint64(t.state.CurrentHeight()),
+				}); err != nil {
+					return nil, fmt.Errorf("setValidator: %w", err)
 				}
 			default:
 				return nil, fmt.Errorf("setAccount: invalid transaction type")
@@ -507,4 +543,35 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 	}
 
 	return response, nil
+}
+
+// checkAccountCanPayCost checks if the account can pay the cost of the transaction.
+// It returns the account and the address of the sender.
+func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *vochaintx.Tx) (*vstate.Account, *common.Address, error) {
+	// extract sender address from signature
+	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+	}
+	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	txSenderAcc, err := t.state.GetAccount(txSenderAddress, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get account: %w", err)
+	}
+	if txSenderAcc == nil {
+		return nil, nil, vstate.ErrAccountNotExist
+	}
+	// get setAccount tx cost
+	cost, err := t.state.TxBaseCost(txType, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get tx cost for %s: %w", txType.String(), err)
+	}
+	// check tx sender balance
+	if txSenderAcc.Balance < cost {
+		return nil, nil, fmt.Errorf("unauthorized: %s", vstate.ErrNotEnoughBalance)
+	}
+	return txSenderAcc, &txSenderAddress, nil
 }

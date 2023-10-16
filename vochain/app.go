@@ -67,7 +67,8 @@ type BaseApplication struct {
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
 	blockCache         *lru.Cache[int64, *tmtypes.Block]
-	// txTTLReferences is a map of tx hashes to the block height where they failed.
+	// txLReferences is a map indexed by hashed transactions and storing the height where the transaction
+	// was seen frist time and the number of attempts failed for including it into a block.
 	txReferences sync.Map
 
 	// endBlockTimestamp is the last block end timestamp calculated from local time.

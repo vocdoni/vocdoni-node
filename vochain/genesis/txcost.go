@@ -15,6 +15,7 @@ type TransactionCosts struct {
 	NewProcess              uint32 `json:"Tx_NewProcess"`
 	SendTokens              uint32 `json:"Tx_SendTokens"`
 	SetAccountInfoURI       uint32 `json:"Tx_SetAccountInfoURI"`
+	SetAccountValidator     uint32 `json:"Tx_SetAccountValidator"`
 	CreateAccount           uint32 `json:"Tx_CreateAccount"`
 	AddDelegateForAccount   uint32 `json:"Tx_AddDelegateForAccount"`
 	DelDelegateForAccount   uint32 `json:"Tx_DelDelegateForAccount"`
@@ -45,6 +46,7 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 	"SendTokens":              models.TxType_SEND_TOKENS,
 	"SetAccountInfoURI":       models.TxType_SET_ACCOUNT_INFO_URI,
+	"SetAccountValidator":     models.TxType_SET_ACCOUNT_VALIDATOR,
 	"CreateAccount":           models.TxType_CREATE_ACCOUNT,
 	"RegisterKey":             models.TxType_REGISTER_VOTER_KEY,
 	"NewProcess":              models.TxType_NEW_PROCESS,
@@ -70,6 +72,7 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_QUESTION_INDEX: "SetProcessQuestionIndex",
 	models.TxType_SEND_TOKENS:                "SendTokens",
 	models.TxType_SET_ACCOUNT_INFO_URI:       "SetAccountInfoURI",
+	models.TxType_SET_ACCOUNT_VALIDATOR:      "SetAccountValidator",
 	models.TxType_CREATE_ACCOUNT:             "CreateAccount",
 	models.TxType_REGISTER_VOTER_KEY:         "RegisterKey",
 	models.TxType_NEW_PROCESS:                "NewProcess",

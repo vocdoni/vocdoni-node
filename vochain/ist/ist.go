@@ -74,12 +74,15 @@ const (
 	ActionCommitResults ActionID = iota
 	// ActionEndProcess sets a process as ended. It schedules ActionComputeResults.
 	ActionEndProcess
+	// ActionUpdateValidatorScore updates the validator score (votes and proposer) in the state.
+	ActionUpdateValidatorScore
 )
 
 // ActionsToString translates the action identifiers to its corresponding human friendly string.
 var ActionsToString = map[ActionID]string{
-	ActionCommitResults: "commit-results",
-	ActionEndProcess:    "end-process",
+	ActionCommitResults:        "commit-results",
+	ActionEndProcess:           "end-process",
+	ActionUpdateValidatorScore: "update-validator-score",
 }
 
 // Actions is the model used to store the list of IST actions for
@@ -88,9 +91,11 @@ type Actions map[string]Action
 
 // Action is the model used to store the IST actions into state.
 type Action struct {
-	ID         ActionID
-	ElectionID []byte
-	Attempts   uint32
+	ID                ActionID
+	ElectionID        []byte
+	Attempts          uint32
+	ValidatorVotes    [][]byte
+	ValidatorProposer []byte
 }
 
 // encode performs the encoding of the IST action using Gob.
@@ -229,6 +234,11 @@ func (c *Controller) Commit(height uint32) error {
 			if err := c.endElection(action.ElectionID); err != nil {
 				return fmt.Errorf("cannot end election %x: %w",
 					action.ElectionID, err)
+			}
+		case ActionUpdateValidatorScore:
+			log.Debugw("update validator score", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
+			if err := c.updateValidatorScore(action.ValidatorVotes, action.ValidatorProposer); err != nil {
+				return fmt.Errorf("cannot update validator score: %w", err)
 			}
 		default:
 			return fmt.Errorf("unknown IST action %d", action.ID)

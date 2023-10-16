@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -80,7 +81,7 @@ func main() {
 				items.Sprint("🕸️\tNetwork info"),            // 5
 				items.Sprint("📝\tBuild a new census"),       // 6
 				items.Sprint("🗳️\tCreate an election"),      // 7
-				items.Sprint("☑️\tVote"),                    // 8
+				items.Sprint("☑️\tSet validator"),           // 8
 				items.Sprint("🖧\tChange API endpoint host"), // 9
 				items.Sprint("💾\tSave config to file"),      // 10
 				items.Sprint("❌\tQuit"),                     // 11
@@ -139,6 +140,10 @@ func main() {
 				break
 			}
 			if err := electionHandler(cli); err != nil {
+				errorp.Println(err)
+			}
+		case 8:
+			if err := accountSetValidator(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 9:
@@ -342,7 +347,6 @@ func transfer(cli *VocdoniCLI) error {
 		}
 		dstAddress = account.Address
 	} else {
-
 		p := ui.Prompt{
 			Label: "destination address",
 		}
@@ -431,6 +435,50 @@ func hostHandler(cli *VocdoniCLI) error {
 	return cli.setAuthToken(token)
 }
 
+func accountSetValidator(cli *VocdoniCLI) error {
+	infoPrint.Printf("enter the name and a public key of the validator, leave it bank for using the selected account\n")
+
+	n := ui.Prompt{
+		Label: "name",
+	}
+	name, err := n.Run()
+	if err != nil {
+		return err
+	}
+
+	p := ui.Prompt{
+		Label: "public key",
+	}
+	pubKeyStr, err := p.Run()
+	if err != nil {
+		return err
+	}
+	pubKey := []byte{}
+	if pubKeyStr != "" {
+		pubKey, err = hex.DecodeString(pubKeyStr)
+		if err != nil {
+			return err
+		}
+	} else {
+		pubKey = cli.getCurrentAccount().PublicKey
+	}
+
+	hash, err := cli.api.AccountSetValidator(pubKey, name)
+	if err != nil {
+		return err
+	}
+
+	infoPrint.Printf("transaction sent! hash %s\n", hash.String())
+	infoPrint.Printf("waiting for confirmation...")
+	ok := cli.waitForTransaction(hash)
+	if !ok {
+		return fmt.Errorf("transaction was not included")
+	}
+	infoPrint.Printf(" transaction confirmed!\n")
+
+	return nil
+}
+
 func accountSetMetadata(cli *VocdoniCLI) error {
 	currentAccount, err := cli.api.Account("")
 	if err != nil {
@@ -512,7 +560,6 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 		return fmt.Errorf("transaction was not included")
 	}
 	return nil
-
 }
 
 func electionHandler(cli *VocdoniCLI) error {
