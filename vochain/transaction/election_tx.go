@@ -250,7 +250,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) uint64 {
 	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
 		MaxCensusSize:    process.GetMaxCensusSize(),
-		ElectionDuration: process.BlockCount + process.StartBlock,
+		ElectionDuration: process.BlockCount,
 		EncryptedVotes:   process.GetEnvelopeType().EncryptedVotes,
 		AnonymousVotes:   process.GetEnvelopeType().Anonymous,
 		MaxVoteOverwrite: process.GetVoteOptions().MaxVoteOverwrites,

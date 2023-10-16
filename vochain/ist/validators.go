@@ -12,6 +12,10 @@ import (
 This mechanism is responsible for the management and updating of validator power based on their voting and proposing performance over time.
 It operates by evaluating the performance of validators in terms of votes on proposals they have accrued.
 
+As a general idea, when a validator does not participate on the block production, their power will decay over time.
+On the other hand, if a validator participates in the block production, their power will increase over time until it reaches the maximum power.
+When a new validator joins the validator set, it starts with the minimum power (currently 5).
+
 The mechanism is based on the following parameters:
 
 1. `maxPower`: This represents the maximum power that any validator can achieve. Currently set to 100.
@@ -50,7 +54,7 @@ const (
 	maxPower               = 100  // maximum power of a validator
 	updatePowerPeriod      = 10   // number of blocks to wait before updating validators power
 	positiveScoreThreshold = 80   // if this minimum score is kept, the validator power will be increased
-	powerDecayRate         = 0.05 // 10% decay rate
+	powerDecayRate         = 0.05 // 5% decay rate
 )
 
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
@@ -93,14 +97,19 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			validators[idx].Score = newScore
 		}
 		// update or remove the validator
-		if validators[idx].Power <= 0 && len(validators) > 3 {
-			if err := c.state.RemoveValidator(validators[idx].Address); err != nil {
-				return fmt.Errorf("cannot remove validator: %w", err)
+		if validators[idx].Power <= 0 {
+			if len(validators) <= 3 {
+				// cannot remove the last 3 validators
+				validators[idx].Power = 1
+			} else {
+				if err := c.state.RemoveValidator(validators[idx].Address); err != nil {
+					return fmt.Errorf("cannot remove validator: %w", err)
+				}
+				continue
 			}
-		} else {
-			if err := c.state.AddValidator(validators[idx]); err != nil {
-				return fmt.Errorf("cannot update validator score: %w", err)
-			}
+		}
+		if err := c.state.AddValidator(validators[idx]); err != nil {
+			return fmt.Errorf("cannot update validator score: %w", err)
 		}
 	}
 	return nil

@@ -14,7 +14,7 @@
 #  e2etest_dynamicensuselection: run dynamic census test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
-[ -n "$GOCOVERDIR" ] && export BUILDARGS="-cover" # docker compose build passes this to go 1.20 so that binaries collect code coverage
+[ -n "$GOCOVERDIR" ] && export BUILDARGS="$BUILDARGS -cover" # docker compose build passes this to go 1.20 so that binaries collect code coverage
 
 COMPOSE_CMD=${COMPOSE_CMD:-"docker compose"}
 COMPOSE_CMD_RUN="$COMPOSE_CMD run"
@@ -172,7 +172,14 @@ log "### Waiting for test suite to be ready ###"
 for i in {1..20}; do
 	check_gw_is_up && break || sleep 2
 done
-log "### Test suite ready ###"
+
+if [ i == 20 ] ; then
+	log "### Timed out waiting! Abort, don't even try running tests ###"
+	tests_to_run=()
+	GOCOVERDIR=
+else
+	log "### Test suite ready ###"
+fi
 
 # create temp dir
 results="/tmp/.vocdoni-test$RANDOM"
@@ -208,15 +215,20 @@ done
 
 if [ -n "$GOCOVERDIR" ] ; then
 	log "### Collect all coverage files in $GOCOVERDIR ###"
-	mkdir -p $GOCOVERDIR
-	$COMPOSE_CMD down
+	rm -rf "$GOCOVERDIR"
+	mkdir -p "$GOCOVERDIR"
+	$COMPOSE_CMD stop
 	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
 		cp -rf /app/run/gocoverage/. /wd/$GOCOVERDIR
 		go tool covdata textfmt \
 			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
-			-o=/wd/$GOCOVERDIR/covdata.txt
+			-o=/wd/$GOCOVERDIR/gocoverage-integration.txt
+		go tool covdata merge \
+			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/wd/$GOCOVERDIR/
 		"
-	log "### Coverage data in textfmt left in $GOCOVERDIR/covdata.txt ###"
+	log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
+	log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
 fi
 
 [ $CLEAN -eq 1 ] && {
@@ -231,5 +243,7 @@ fi
 
 # remove temp dir
 rm -rf $results
+
+if [ "$RET" == "66" ] ; then log "### Race detected! Look for WARNING: DATA RACE in the logs above ###"; fi
 
 exit $RET

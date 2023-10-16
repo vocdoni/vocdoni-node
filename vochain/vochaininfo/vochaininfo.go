@@ -222,6 +222,7 @@ func (vi *VochainInfo) NPeers() int {
 // TODO: use time.Duration instead of int64
 func (vi *VochainInfo) Start(sleepSecs int64) {
 	log.Infof("starting vochain info service every %d seconds", sleepSecs)
+	vi.registerMetrics()
 	var duration time.Duration
 	var pheight, height int64
 	var h1, h10, h60, h360, h1440 int64

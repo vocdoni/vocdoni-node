@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"os"
 	"time"
 
@@ -25,13 +24,9 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 	go func() {
 		for {
 			time.Sleep(time.Second * 120)
-			tctx, cancel := context.WithTimeout(context.Background(), time.Minute)
-			log.Monitor("ipfs storage", storage.Stats(tctx))
-			cancel()
+			log.Monitor("ipfs storage", storage.Stats())
 		}
 	}()
-
-	go storage.CollectMetrics(context.Background(), vs.MetricsAgent)
 
 	if len(ipfsconfig.ConnectKey) > 0 {
 		log.Infow("starting ipfsconnect service", "key", ipfsconfig.ConnectKey)

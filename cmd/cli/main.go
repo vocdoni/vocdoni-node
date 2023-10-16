@@ -453,14 +453,12 @@ func accountSetValidator(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	pubKey := []byte{}
+	pubKey := cli.getCurrentAccount().PublicKey
 	if pubKeyStr != "" {
 		pubKey, err = hex.DecodeString(pubKeyStr)
 		if err != nil {
 			return err
 		}
-	} else {
-		pubKey = cli.getCurrentAccount().PublicKey
 	}
 
 	hash, err := cli.api.AccountSetValidator(pubKey, name)

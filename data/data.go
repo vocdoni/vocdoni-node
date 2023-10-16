@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"go.vocdoni.io/dvote/data/ipfs"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -19,8 +18,7 @@ type Storage interface {
 	Unpin(ctx context.Context, path string) error
 	ListPins(ctx context.Context) (map[string]string, error)
 	URIprefix() string
-	Stats(ctx context.Context) map[string]any
-	CollectMetrics(ctx context.Context, ma *metrics.Agent) error
+	Stats() map[string]any
 	Stop() error
 }
 

@@ -190,15 +190,15 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 
 	// send a couple of token txs to increase the nonce, without waiting for them to be mined
 	// this tests that the mempool transactions are properly ordered.
-	wg := sync.WaitGroup{}
+	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		log.Warnf("send transactions with nonce+1, should not be mined before the others")
 		// send 1 token to burn address with nonce + 1 (should be mined after the other txs)
-		if _, err = alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
+		if _, err := alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
 			log.Fatalf("cannot burn tokens: %v", err)
 		}
-		if _, err = bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1); err != nil {
+		if _, err := bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1); err != nil {
 			log.Fatalf("cannot burn tokens: %v", err)
 		}
 		wg.Done()
@@ -208,6 +208,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	var txhasha, txhashb []byte
 	wg.Add(1)
 	go func() {
+		var err error
 		txhasha, err = alice.TransferWithNonce(bobKeys.Address(), amountAtoB, aliceAcc.Nonce)
 		if err != nil {
 			log.Fatalf("cannot send tokens: %v", err)

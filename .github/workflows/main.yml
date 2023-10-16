@@ -81,31 +81,39 @@ jobs:
     env:
       LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up Go environment
-        uses: actions/setup-go@v4
+      - uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
+      - run: mkdir -p "$PWD/gocoverage-unit/"
       - name: Run Go test (and collect code coverage)
-        if: github.event_name == 'pull_request' || github.ref == 'refs/heads/dev' # quicker, non-race test in case it's a PR or push to dev
-        run: go test -coverprofile=unit.covdata.txt ./...
+        # quicker, non-race test in case it's a PR or push to dev
+        if: github.event_name == 'pull_request' ||
+            github.ref == 'refs/heads/dev'
+        run: go test ./...
+          -cover -coverpkg=./... -covermode=count -args -test.gocoverdir="$PWD/gocoverage-unit/"
       - name: Run Go test -race (and collect code coverage)
-        if: github.event_name == 'push' && github.ref != 'refs/heads/dev' # this is further limited to selected branches at the beginning of this file
+        # note that -race can easily make the crypto stuff 10x slower
+        # this is further limited to selected branches at the beginning of this file
+        if: github.event_name == 'push' &&
+            github.ref != 'refs/heads/dev'
         env:
           GORACE: atexit_sleep_ms=10 # the default of 1000 makes every Go package test sleep for 1s; see https://go.dev/issues/20364
-        run: go test -coverprofile=unit.covdata.txt -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
-      - name: Store code coverage artifact
+        run: go test ./...
+          -race -timeout=15m -vet=off
+          -cover -coverpkg=./... -covermode=atomic -args -test.gocoverdir="$PWD/gocoverage-unit/"
+      - name: Store code coverage artifact (unit)
         uses: actions/upload-artifact@v3
         with:
-          name: unit-covdata
-          path: unit.covdata.txt
+          name: gocoverage-unit@${{ env.SHA }}
+          path: gocoverage-unit/
 
   job_compose_test:
     runs-on: [self-hosted, ci2-1]
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
       - name: Run compose script
         env:
           TESTSUITE_BUILD_TAG: ${{ github.sha }}
@@ -113,24 +121,23 @@ jobs:
           COMPOSE_DVOTE_PORT_MAPPING: "9090" # this binds gateway0 to a random available port on docker host (needed for concurrent job runs)
           COMPOSE_HOST_PATH: ${{ github.workspace }}/dockerfiles/testsuite
           LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
-          GOCOVERDIR: "./gocoverage/" # collect code coverage when running binaries
+          GOCOVERDIR: "./gocoverage-integration/" # collect code coverage when running binaries
           CONCURRENT: 1 # run all the start_test.sh tests concurrently
+          BUILDARGS: "-race" # this makes the integration test only slightly slower (around +10%) unlike the abismal effect in unit test (10x)
         run: |
           cd dockerfiles/testsuite && ./start_test.sh
-      - name: Store code coverage artifact
+      - name: Store code coverage artifact (integration)
         uses: actions/upload-artifact@v3
         with:
-          name: integration-covdata
-          path: dockerfiles/testsuite/gocoverage/covdata.txt
+          name: gocoverage-integration@${{ env.SHA }}
+          path: dockerfiles/testsuite/gocoverage-integration/
 
   job_go_build_for_mac:
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release')
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Set up Go environment
-        uses: actions/setup-go@v4
+      - uses: actions/checkout@v3
+      - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
       - name: Run go build for Mac
@@ -138,39 +145,6 @@ jobs:
           # Some of our devs are on Mac. Ensure it builds.
           # It's surprisingly hard with some deps like bazil.org/fuse.
           GOOS=darwin go build ./...
-
-  job_upload_coverage:
-    name: Publish code coverage
-    runs-on: ubuntu-latest
-    needs: [job_go_test, job_compose_test]
-    steps:
-      - uses: actions/checkout@v3
-      - name: Fetch coverage (unit)
-        uses: actions/download-artifact@v3
-        with:
-          name: unit-covdata
-      - name: Fetch coverage (integration)
-        uses: actions/download-artifact@v3
-        with:
-          name: integration-covdata
-  
-      - name: Send coverage to coveralls.io (unit)
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          path-to-profile: unit.covdata.txt
-          flag-name: unit
-          parallel: true
-      - name: Send coverage to coveralls.io (integration)
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          path-to-profile: covdata.txt
-          flag-name: integration
-          parallel: true
-      - name: Tell coveralls.io we're done
-        if: ${{ always() }}
-        uses: shogo82148/actions-goveralls@v1
-        with:
-          parallel-finished: true
 
   call-docker-release:
     name: Docker
@@ -180,3 +154,92 @@ jobs:
     secrets: inherit
     with:
       image-tag: ${{ github.ref_name }}
+
+  job_gocoverage_textfmt:
+    name: Convert coverage (bin->txt)
+    continue-on-error: true # never mark the whole CI as failed because of this job
+    needs: [job_go_test, job_compose_test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: actions/download-artifact@v3
+      - uses: actions/setup-go@v4
+        with:
+          go-version: '1.20'
+          cache: false
+      - name: Convert gocoverage format
+        run: |
+          go tool covdata textfmt -i=gocoverage-unit@${{ env.SHA }}/ \
+                                  -o gocoverage-unit@${{ env.SHA }}.txt
+          go tool covdata textfmt -i=gocoverage-integration@${{ env.SHA }}/ \
+                                  -o gocoverage-integration@${{ env.SHA }}.txt
+      - name: Merge both files
+        run: |
+          go install github.com/wadey/gocovmerge@latest
+          # dirty hack since integration is mode atomic and unit mode count, which are perfectly mergeable
+          # but gocovmerge doesn't recognize this: "cannot merge profiles with different modes"
+          sed 's/mode: count/mode: atomic/' gocoverage-unit@${{ env.SHA }}.txt \
+                                          > gocoverage-unit@${{ env.SHA }}.tmp
+          gocovmerge gocoverage-unit@${{ env.SHA }}.tmp \
+                     gocoverage-integration@${{ env.SHA }}.txt \
+                  >  gocoverage-merged@${{ env.SHA }}.txt
+          rm -f gocoverage-unit@${{ env.SHA }}.tmp
+      - name: Store code coverage artifact (all, textfmt)
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v3
+        with:
+          name: gocoverage-all-textfmt@${{ env.SHA }}
+          path: gocoverage-*.txt
+
+  job_gocoverage_coveralls:
+    name: Publish coverage (Coveralls)
+    runs-on: ubuntu-latest
+    needs: [job_gocoverage_textfmt]
+    continue-on-error: true # never mark the whole CI as failed because of this job
+    steps:
+      - uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: actions/download-artifact@v3
+        with:
+          name: gocoverage-all-textfmt@${{ env.SHA }}
+      - name: Send coverage to coveralls.io (unit)
+        if: ${{ always() }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: gocoverage-unit@${{ env.SHA }}.txt
+          flag-name: unit
+          parallel: true
+      - name: Send coverage to coveralls.io (integration)
+        if: ${{ always() }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          path-to-profile: gocoverage-integration@${{ env.SHA }}.txt
+          flag-name: integration
+          parallel: true
+      - name: Tell coveralls.io we're done
+        if: ${{ always() }}
+        uses: shogo82148/actions-goveralls@v1
+        with:
+          parallel-finished: true
+
+  job_gocoverage_deepsource:
+    name: Publish coverage (DeepSource)
+    runs-on: ubuntu-latest
+    needs: [job_gocoverage_textfmt]
+    continue-on-error: true # never mark the whole CI as failed because of this job
+    steps:
+      - uses: actions/checkout@v3
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: actions/download-artifact@v3
+        with:
+          name: gocoverage-all-textfmt@${{ env.SHA }}
+      - name: Send coverage to DeepSource
+        env: 
+          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+        run: |
+          # Install the CLI
+          curl https://deepsource.io/cli | sh
+
+          # Send the report to DeepSource
+          ./bin/deepsource report --analyzer test-coverage --key go --value-file gocoverage-merged@${{ env.SHA }}.txt

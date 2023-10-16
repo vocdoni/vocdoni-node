@@ -131,6 +131,9 @@ func (i *Handler) Init(d *types.DataStore) error {
 		return err
 	}
 
+	go i.updateStats(time.Minute)
+	i.registerMetrics()
+
 	return nil
 }
 
@@ -207,20 +210,8 @@ func (i *Handler) Unpin(ctx context.Context, path string) error {
 }
 
 // Stats returns stats about the IPFS node.
-func (i *Handler) Stats(ctx context.Context) map[string]any {
-	peers, err := i.CoreAPI.Swarm().Peers(ctx)
-	if err != nil {
-		return map[string]any{"error": err.Error()}
-	}
-	addresses, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
-	if err != nil {
-		return map[string]any{"error": err.Error()}
-	}
-	pins, err := i.countPins(ctx)
-	if err != nil {
-		return map[string]any{"error": err.Error()}
-	}
-	return map[string]any{"peers": len(peers), "addresses": len(addresses), "pins": pins}
+func (i *Handler) Stats() map[string]any {
+	return map[string]any{"peers": stats.Peers.Load(), "addresses": stats.KnownAddrs.Load(), "pins": stats.Pins.Load()}
 }
 
 func (i *Handler) countPins(ctx context.Context) (int, error) {

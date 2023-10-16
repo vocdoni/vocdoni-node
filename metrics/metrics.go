@@ -23,8 +23,8 @@ func NewAgent(path string, interval time.Duration, router *httprouter.HTTProuter
 	return &ma
 }
 
-// Register adds a prometheus collector
-func (*Agent) Register(c prometheus.Collector) {
+// Register the provided prometheus collector, ignoring any error returned (simply logs a Warn)
+func Register(c prometheus.Collector) {
 	err := prometheus.Register(c)
 	if err != nil {
 		log.Warnf("cannot register metrics: (%s) (%+v)", err, c)

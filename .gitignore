@@ -16,6 +16,7 @@ zkCircuits
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
+gocoverage*
 
 # Docker files and dirs
 env.local
