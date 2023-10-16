@@ -29,6 +29,7 @@ type APIserver struct {
 	VochainAPP  *vochain.BaseApplication
 	Indexer     *indexer.Indexer
 	VochainInfo *vochaininfo.VochainInfo
+	ChainID     string
 }
 
 // Start starts a basic URL API server for testing
@@ -37,6 +38,9 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	d.Account = ethereum.NewSignKeys()
 	if err := d.Account.Generate(); err != nil {
 		t.Fatal(err)
+	}
+	if d.ChainID == "" {
+		d.ChainID = "test"
 	}
 
 	// create the IPFS storage
@@ -54,7 +58,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// create vochain application
-	d.VochainAPP = vochain.TestBaseApplication(t)
+	d.VochainAPP = vochain.TestBaseApplicationWithChainID(t, d.ChainID)
 
 	// create and add balance for the pre-created Account
 	err = d.VochainAPP.State.CreateAccount(d.Account.Address(), "", nil, 1000000)
