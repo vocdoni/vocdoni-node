@@ -286,5 +286,8 @@ func (t *TransactionHandler) txElectionCostFromProcessPreFork20231016(process *m
 func (t *TransactionHandler) isBeforeFork20231016() bool {
 	// when vocdoni-stage-8 was ~200000 blocks old, we found a bug in txElectionCostFromProcess
 	// that needed a soft-fork. we agreed on fixing it (changing the behavior) at block 212000
-	return t.state.ChainID() == "vocdoni-stage-8" && t.state.CurrentHeight() < Fork20231016Block
+	//
+	// this should also check for t.state.ChainID() == "vocdoni-stage-8"
+	// but that doesn't work due to https://github.com/vocdoni/vocdoni-node/issues/1149
+	return t.state.CurrentHeight() < Fork20231016Block
 }
