@@ -87,22 +87,23 @@ jobs:
         with:
           go-version: '1.21'
       - run: mkdir -p "$PWD/gocoverage-unit/"
-      - name: Run Go test (and collect code coverage)
-        # quicker, non-race test in case it's a PR or push to dev
-        if: github.event_name == 'pull_request' ||
-            github.ref == 'refs/heads/dev'
-        run: go test ./...
-          -cover -coverpkg=./... -covermode=count -args -test.gocoverdir="$PWD/gocoverage-unit/"
-      - name: Run Go test -race (and collect code coverage)
+      - name: Run Go test -race
+        id: go-test-race
         # note that -race can easily make the crypto stuff 10x slower
         # this is further limited to selected branches at the beginning of this file
-        if: github.event_name == 'push' &&
+        if: runner.debug ||
+            github.event_name == 'push' &&
             github.ref != 'refs/heads/dev'
         env:
           GORACE: atexit_sleep_ms=10 # the default of 1000 makes every Go package test sleep for 1s; see https://go.dev/issues/20364
         run: go test ./...
           -race -timeout=15m -vet=off
           -cover -coverpkg=./... -covermode=atomic -args -test.gocoverdir="$PWD/gocoverage-unit/"
+      - name: Run Go test
+        if: steps.go-test-race.outcome == 'skipped'
+        # quicker, non-race test in case it's a PR or push to dev
+        run: go test ./...
+          -cover -coverpkg=./... -covermode=count -args -test.gocoverdir="$PWD/gocoverage-unit/"
       - name: Store code coverage artifact (unit)
         uses: actions/upload-artifact@v3
         with:
