@@ -82,7 +82,19 @@ func (conf *ZkCircuitConfig) SupportsCensusSize(maxCensusSize uint64) bool {
 var CircuitsConfigurations = map[string]*ZkCircuitConfig{
 	"dev": {
 		URI: "https://raw.githubusercontent.com/vocdoni/" +
-			"zk-franchise-proof-circuit/feature/new-circuit",
+			"zk-franchise-proof-circuit/master",
+		CircuitPath:             "artifacts/zkCensus/dev/160",
+		Levels:                  160, // ZkCircuit number of levels
+		ProvingKeyHash:          hexToBytes("0xe359b256e5e3c78acaccf8dab5dc4bea99a2f07b2a05e935b5ca658c714dea4a"),
+		ProvingKeyFilename:      "proving_key.zkey",
+		VerificationKeyHash:     hexToBytes("0x235e55571812f8e324e73e37e53829db0c4ac8f68469b9b953876127c97b425f"),
+		VerificationKeyFilename: "verification_key.json",
+		WasmHash:                hexToBytes("0x80a73567f6a4655d4332301efcff4bc5711bb48176d1c71fdb1e48df222ac139"),
+		WasmFilename:            "circuit.wasm",
+	},
+	"prod": {
+		URI: "https://raw.githubusercontent.com/vocdoni/" +
+			"zk-franchise-proof-circuit/master",
 		CircuitPath:             "artifacts/zkCensus/dev/160",
 		Levels:                  160, // ZkCircuit number of levels
 		ProvingKeyHash:          hexToBytes("0xe359b256e5e3c78acaccf8dab5dc4bea99a2f07b2a05e935b5ca658c714dea4a"),
