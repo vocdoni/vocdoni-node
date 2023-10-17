@@ -311,7 +311,7 @@ func TestAPIElectionCost(t *testing.T) {
 		transaction.Fork20231016Block-1, transaction.Fork20231016Block+1000,
 		7000,
 		10, 100,
-		762, 6091)
+		762, 6193)
 
 	// medium election, created on first block of Fork20231016
 	runAPIElectionCostWithParams(t,
