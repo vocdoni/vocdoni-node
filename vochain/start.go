@@ -272,7 +272,7 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
 	}
 	log.Infow("genesis file", "genesis", tconfig.GenesisFile(), "chainID", genesisCID.ChainID)
-	app.chainID = genesisCID.ChainID
+	app.SetChainID(genesisCID.ChainID)
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
