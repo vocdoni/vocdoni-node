@@ -231,12 +231,12 @@ func (v *State) EventListeners() []EventListener {
 	return v.eventListeners
 }
 
-// SetChainID sets the blockchain identifier.
+// SetChainID sets the state chainID (blockchain identifier)
 func (v *State) SetChainID(chID string) {
 	v.chainID = chID
 }
 
-// ChainID gets the blockchain identifier.
+// ChainID gets the state chainID (blockchain identifier)
 func (v *State) ChainID() string {
 	return v.chainID
 }

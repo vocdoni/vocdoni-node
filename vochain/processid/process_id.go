@@ -102,12 +102,12 @@ func (p *ProcessID) String() string {
 
 }
 
-// SetChainID sets the blockchain identifier
+// SetChainID sets the process blockchain identifier
 func (p *ProcessID) SetChainID(chID string) {
 	p.chainID = chID
 }
 
-// ChainID returns blockchain identifier
+// ChainID returns the process blockchain identifier
 func (p *ProcessID) ChainID() string {
 	return p.chainID
 }
@@ -181,6 +181,7 @@ func (p *ProcessID) EnvelopeType() *models.EnvelopeType {
 	}
 }
 
+// BuildProcessID returns a ProcessID constructed in a deterministic way
 func BuildProcessID(proc *models.Process, state *state.State) (*ProcessID, error) {
 	pid := new(ProcessID)
 	pid.SetChainID(state.ChainID())

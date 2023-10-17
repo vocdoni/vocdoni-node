@@ -512,11 +512,6 @@ func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 	}
 }
 
-// SetChainID sets the chainID for the vocone instance
-func (vc *Vocone) SetChainID(chainID string) {
-	vc.App.SetChainID(chainID)
-}
-
 func defaultTxCosts() genesis.TransactionCosts {
 	return genesis.TransactionCosts{
 		SetProcessStatus:        1,
