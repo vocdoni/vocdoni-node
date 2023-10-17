@@ -121,10 +121,21 @@ func (app *BaseApplication) AdvanceTestBlock() {
 	if err != nil {
 		panic(err)
 	}
-	// The next block begins 50ms later
+	// The next block begins 0.00005 seconds later
 	newHeight := app.testMockBlockStore.EndBlock()
-	time.Sleep(time.Millisecond * 50)
+	time.Sleep(time.Microsecond * 50)
 	nextStartTime := time.Now()
 	app.testMockBlockStore.NewBlock(newHeight)
 	app.beginBlock(nextStartTime, uint32(newHeight))
+}
+
+// AdvanceTestBlocksUntilHeight loops over AdvanceTestBlock
+// until reaching height n
+func (app *BaseApplication) AdvanceTestBlocksUntilHeight(n uint32) {
+	for {
+		if uint32(app.testMockBlockStore.Height()) >= n {
+			return
+		}
+		app.AdvanceTestBlock()
+	}
 }
