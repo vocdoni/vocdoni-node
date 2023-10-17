@@ -165,8 +165,6 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
 	}
-	// set ChainID for app & state
-	app.SetChainID(req.ChainId)
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
