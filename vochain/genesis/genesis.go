@@ -330,7 +330,7 @@ var ltsGenesis = Doc{
 		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("863a75f41025f0c8878d3a100c8c16576fe8fe4f"),
-				Balance: 10000000,
+				Balance: 1000000000,
 			},
 		},
 		Treasurer: types.HexStringToHexBytes("13987a54c434d33ec810eeedba4ed7a542e3df24"),
@@ -348,6 +348,7 @@ var ltsGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
+			SetAccountValidator:     200000,
 		},
 	},
 }
