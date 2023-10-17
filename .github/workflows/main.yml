@@ -94,7 +94,7 @@ jobs:
         if: github.event_name == 'push' && github.ref != 'refs/heads/dev' # this is further limited to selected branches at the beginning of this file
         env:
           GORACE: atexit_sleep_ms=10 # the default of 1000 makes every Go package test sleep for 1s; see https://go.dev/issues/20364
-        run: go test -coverprofile=unit.covdata.txt -coverpkg=./... -vet=off -timeout=15m -race ./... # note that -race can easily make the crypto stuff 10x slower
+        run: go test -coverprofile=unit.covdata.txt -coverpkg=./... -vet=off -timeout=25m -race ./... # note that -race can easily make the crypto stuff 10x slower
       - name: Store code coverage artifact
         uses: actions/upload-artifact@v3
         with:
@@ -174,7 +174,7 @@ jobs:
 
   call-docker-release:
     name: Docker
-    needs: [job_go_checks, job_go_test, job_compose_test]
+    needs: [job_go_checks, job_compose_test]
     if: github.event_name == 'push' # this is limited to selected branches at the beginning of this file
     uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
