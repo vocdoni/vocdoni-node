@@ -285,7 +285,7 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address.String())
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
 	}
 
 	// build the set process transaction

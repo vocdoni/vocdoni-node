@@ -193,7 +193,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	vc.SetChainID(config.chainID)
+	vc.App.SetChainID(config.chainID)
 	log.Infof("using chainID: %s", config.chainID)
 
 	// set treasurer address if provided

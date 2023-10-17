@@ -113,7 +113,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 				crypto256k1.KeyType,
 			))
 	}
-	myValidator, err := app.State.Validator(ethcommon.Address(app.NodeAddress), false)
+	myValidator, err := app.State.Validator(app.NodeAddress, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get node validator: %w", err)
 	}

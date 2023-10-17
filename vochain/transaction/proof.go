@@ -218,7 +218,7 @@ func VerifyProofOffChainCSP(_ *models.Process, proof *models.Proof,
 				processID, rootPub.Bytes(), cspbundleDec.ProcessId, cspbundleDec.Address, signature.Bytes())
 		}
 	default:
-		return false, nil, fmt.Errorf("CSP proof %s type not supported", p.Type.String())
+		return false, nil, fmt.Errorf("CSP proof %s type not supported", p.Type)
 	}
 	return true, bigOne, nil
 }

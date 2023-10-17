@@ -26,15 +26,15 @@ var Genesis = map[string]Vochain{
 		Genesis:           &stageGenesis,
 	},
 
-	// Apex production network
-	"apex": {
+	// LTS production network
+	"lts": {
 		AutoUpdateGenesis: false,
 		SeedNodes: []string{
-			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.apex.vocdoni.net:26656",
-			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.apex.vocdoni.net:26656",
+			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
+			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
 		},
-		CircuitsConfigTag: "dev",
-		Genesis:           &apexGenesis,
+		CircuitsConfigTag: "prod",
+		Genesis:           &ltsGenesis,
 	},
 }
 
@@ -240,9 +240,9 @@ var stageGenesis = Doc{
 	},
 }
 
-var apexGenesis = Doc{
-	GenesisTime: time.Date(2023, time.May, 24, 9, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-apex-v1",
+var ltsGenesis = Doc{
+	GenesisTime: time.Date(2023, time.October, 17, 17, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-lts-v1",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -346,6 +346,8 @@ var apexGenesis = Doc{
 			AddDelegateForAccount:   1,
 			DelDelegateForAccount:   1,
 			CollectFaucet:           1,
+			SetAccountSIK:           1,
+			DelAccountSIK:           1,
 		},
 	},
 }
