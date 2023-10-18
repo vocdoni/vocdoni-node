@@ -17,10 +17,12 @@ import (
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -82,9 +84,10 @@ func main() {
 				items.Sprint("📝\tBuild a new census"),       // 6
 				items.Sprint("🗳️\tCreate an election"),      // 7
 				items.Sprint("☑️\tSet validator"),           // 8
-				items.Sprint("🖧\tChange API endpoint host"), // 9
-				items.Sprint("💾\tSave config to file"),      // 10
-				items.Sprint("❌\tQuit"),                     // 11
+				items.Sprint("📝 Generate faucet package"),   // 9
+				items.Sprint("🖧\tChange API endpoint host"), // 10
+				items.Sprint("💾\tSave config to file"),      // 11
+				items.Sprint("❌\tQuit"),                     // 12
 			},
 		}
 
@@ -147,14 +150,18 @@ func main() {
 				errorp.Println(err)
 			}
 		case 9:
-			if err := hostHandler(cli); err != nil {
+			if err := faucetPkg(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 10:
-			if err := cli.save(); err != nil {
+			if err := hostHandler(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 11:
+			if err := cli.save(); err != nil {
+				errorp.Println(err)
+			}
+		case 12:
 			os.Exit(0)
 		default:
 			errorp.Println("unknown option or not yet implemented")
@@ -398,6 +405,52 @@ func transfer(cli *VocdoniCLI) error {
 		return fmt.Errorf("transaction was not included")
 	}
 	infoPrint.Printf(" transaction confirmed!\n")
+	return nil
+}
+
+func faucetPkg(cli *VocdoniCLI) error {
+	// FaucetPackage represents the data of a faucet package
+	type FaucetPackage struct {
+		// FaucetPackagePayload is the Vocdoni faucet package payload
+		FaucetPayload []byte `json:"faucetPayload"`
+		// Signature is the signature for the vocdoni faucet payload
+		Signature []byte `json:"signature"`
+	}
+	signer := ethereum.SignKeys{}
+	if err := signer.AddHexKey(cli.getCurrentAccount().PrivKey.String()); err != nil {
+		return err
+	}
+	a := ui.Prompt{
+		Label: "destination address",
+	}
+	addrString, err := a.Run()
+	if err != nil {
+		return err
+	}
+	to := common.HexToAddress(addrString)
+	n := ui.Prompt{
+		Label: "amount",
+	}
+	amountString, err := n.Run()
+	if err != nil {
+		return err
+	}
+	amount, err := strconv.Atoi(amountString)
+	if err != nil {
+		return err
+	}
+	fpackage, err := vochain.GenerateFaucetPackage(&signer, to, uint64(amount))
+	if err != nil {
+		return err
+	}
+	fpackageBytes, err := json.Marshal(FaucetPackage{
+		FaucetPayload: fpackage.Payload,
+		Signature:     fpackage.Signature,
+	})
+	if err != nil {
+		return err
+	}
+	infoPrint.Printf("faucet package for %s with amount %d: [ %s ]\n", to.Hex(), amount, base64.StdEncoding.EncodeToString(fpackageBytes))
 	return nil
 }
 
