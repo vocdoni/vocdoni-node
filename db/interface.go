@@ -73,12 +73,12 @@ type WriteTx interface {
 	// Apply internally needs type assertions, revisit this once generics
 	// are ready.
 	Apply(WriteTx) error
-	// Commit commits the transaction into the db
+	// Commit commits the transaction into the db.
+	// Calling Commit more than once, or after Discard, is an error.
 	Commit() error
-	// Discard discards the transaction. This method can be called always,
-	// even if previously the Tx has been committed (for the WriteTx case).
-	// So it's a good practice to `defer tx.Discard()` just after creating
-	// the tx.
+	// Discard releases the transaction's resources as they don't need to be committed.
+	// This method can be safely called after any previous Commit or Discard call,
+	// for the sake of allowing deferred Discard calls.
 	Discard()
 }
 

@@ -2,6 +2,7 @@ package pebbledb
 
 import (
 	"errors"
+	"fmt"
 	"os"
 
 	"github.com/cockroachdb/pebble"
@@ -61,39 +62,53 @@ func iterate(reader pebble.Reader, prefix []byte, callback func(k, v []byte) boo
 }
 
 // Get implements the db.WriteTx.Get interface method
-func (tx WriteTx) Get(k []byte) ([]byte, error) {
+func (tx *WriteTx) Get(k []byte) ([]byte, error) {
 	return get(tx.batch, k)
 }
 
-func (tx WriteTx) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
+func (tx *WriteTx) Iterate(prefix []byte, callback func(k, v []byte) bool) (err error) {
 	return iterate(tx.batch, prefix, callback)
 }
 
 // Set implements the db.WriteTx.Set interface method
-func (tx WriteTx) Set(k, v []byte) error {
+func (tx *WriteTx) Set(k, v []byte) error {
 	return tx.batch.Set(k, v, nil)
 }
 
 // Delete implements the db.WriteTx.Delete interface method
-func (tx WriteTx) Delete(k []byte) error {
+func (tx *WriteTx) Delete(k []byte) error {
 	return tx.batch.Delete(k, nil)
 }
 
 // Apply implements the db.WriteTx.Apply interface method
-func (tx WriteTx) Apply(other db.WriteTx) (err error) {
-	otherPebble := db.UnwrapWriteTx(other).(WriteTx)
+func (tx *WriteTx) Apply(other db.WriteTx) (err error) {
+	otherPebble := db.UnwrapWriteTx(other).(*WriteTx)
 	return tx.batch.Apply(otherPebble.batch, nil)
 }
 
 // Commit implements the db.WriteTx.Commit interface method
-func (tx WriteTx) Commit() error {
-	return tx.batch.Commit(nil)
+func (tx *WriteTx) Commit() error {
+	if tx.batch == nil {
+		return fmt.Errorf("cannot commit pebble tx: already committed or discarded")
+	}
+	err := tx.batch.Commit(nil)
+	tx.batch = nil
+	return err
 }
 
 // Discard implements the db.WriteTx.Discard interface method
-func (tx WriteTx) Discard() {
+func (tx *WriteTx) Discard() {
+	if tx.batch == nil {
+		// Silently allow discarding twice or after a commit,
+		// since it can help for the sake of defers.
+		// Note that upstream pebbledb doesn't really allow calling Close twice;
+		// the object gets put in a shared pool, so a later call to Close races
+		// with another goroutine having already reused the same object from the pool.
+		return
+	}
 	// Close returns an error, but here in the Discard context is omitted
 	tx.batch.Close()
+	tx.batch = nil
 }
 
 // PebbleDB implements db.Database interface
@@ -134,7 +149,7 @@ func (db *PebbleDB) Get(k []byte) ([]byte, error) {
 
 // WriteTx returns a db.WriteTx
 func (db *PebbleDB) WriteTx() db.WriteTx {
-	return WriteTx{
+	return &WriteTx{
 		batch: db.db.NewIndexedBatch(),
 	}
 }
