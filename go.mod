@@ -59,7 +59,7 @@ require (
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.mongodb.org/mongo-driver v1.12.1
 	go.uber.org/atomic v1.11.0
-	go.vocdoni.io/proto v1.14.6-0.20230802094125-e07a41fda290
+	go.vocdoni.io/proto v1.15.4-0.20231017174559-1d9ea54cd9ad
 	golang.org/x/crypto v0.14.0
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9
 	golang.org/x/net v0.16.0

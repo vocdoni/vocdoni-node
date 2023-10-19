@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,10 +17,12 @@ import (
 	flag "github.com/spf13/pflag"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -80,10 +83,11 @@ func main() {
 				items.Sprint("🕸️\tNetwork info"),            // 5
 				items.Sprint("📝\tBuild a new census"),       // 6
 				items.Sprint("🗳️\tCreate an election"),      // 7
-				items.Sprint("☑️\tVote"),                    // 8
-				items.Sprint("🖧\tChange API endpoint host"), // 9
-				items.Sprint("💾\tSave config to file"),      // 10
-				items.Sprint("❌\tQuit"),                     // 11
+				items.Sprint("☑️\tSet validator"),           // 8
+				items.Sprint("📝 Generate faucet package"),   // 9
+				items.Sprint("🖧\tChange API endpoint host"), // 10
+				items.Sprint("💾\tSave config to file"),      // 11
+				items.Sprint("❌\tQuit"),                     // 12
 			},
 		}
 
@@ -141,15 +145,23 @@ func main() {
 			if err := electionHandler(cli); err != nil {
 				errorp.Println(err)
 			}
+		case 8:
+			if err := accountSetValidator(cli); err != nil {
+				errorp.Println(err)
+			}
 		case 9:
-			if err := hostHandler(cli); err != nil {
+			if err := faucetPkg(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 10:
-			if err := cli.save(); err != nil {
+			if err := hostHandler(cli); err != nil {
 				errorp.Println(err)
 			}
 		case 11:
+			if err := cli.save(); err != nil {
+				errorp.Println(err)
+			}
+		case 12:
 			os.Exit(0)
 		default:
 			errorp.Println("unknown option or not yet implemented")
@@ -342,7 +354,6 @@ func transfer(cli *VocdoniCLI) error {
 		}
 		dstAddress = account.Address
 	} else {
-
 		p := ui.Prompt{
 			Label: "destination address",
 		}
@@ -397,6 +408,52 @@ func transfer(cli *VocdoniCLI) error {
 	return nil
 }
 
+func faucetPkg(cli *VocdoniCLI) error {
+	// FaucetPackage represents the data of a faucet package
+	type FaucetPackage struct {
+		// FaucetPackagePayload is the Vocdoni faucet package payload
+		FaucetPayload []byte `json:"faucetPayload"`
+		// Signature is the signature for the vocdoni faucet payload
+		Signature []byte `json:"signature"`
+	}
+	signer := ethereum.SignKeys{}
+	if err := signer.AddHexKey(cli.getCurrentAccount().PrivKey.String()); err != nil {
+		return err
+	}
+	a := ui.Prompt{
+		Label: "destination address",
+	}
+	addrString, err := a.Run()
+	if err != nil {
+		return err
+	}
+	to := common.HexToAddress(addrString)
+	n := ui.Prompt{
+		Label: "amount",
+	}
+	amountString, err := n.Run()
+	if err != nil {
+		return err
+	}
+	amount, err := strconv.Atoi(amountString)
+	if err != nil {
+		return err
+	}
+	fpackage, err := vochain.GenerateFaucetPackage(&signer, to, uint64(amount))
+	if err != nil {
+		return err
+	}
+	fpackageBytes, err := json.Marshal(FaucetPackage{
+		FaucetPayload: fpackage.Payload,
+		Signature:     fpackage.Signature,
+	})
+	if err != nil {
+		return err
+	}
+	infoPrint.Printf("faucet package for %s with amount %d: [ %s ]\n", to.Hex(), amount, base64.StdEncoding.EncodeToString(fpackageBytes))
+	return nil
+}
+
 func hostHandler(cli *VocdoniCLI) error {
 	validateFunc := func(url string) error {
 		log.Debugf("performing ping test to %s", url)
@@ -429,6 +486,48 @@ func hostHandler(cli *VocdoniCLI) error {
 		return err
 	}
 	return cli.setAuthToken(token)
+}
+
+func accountSetValidator(cli *VocdoniCLI) error {
+	infoPrint.Printf("enter the name and a public key of the validator, leave it bank for using the selected account\n")
+
+	n := ui.Prompt{
+		Label: "name",
+	}
+	name, err := n.Run()
+	if err != nil {
+		return err
+	}
+
+	p := ui.Prompt{
+		Label: "public key",
+	}
+	pubKeyStr, err := p.Run()
+	if err != nil {
+		return err
+	}
+	pubKey := cli.getCurrentAccount().PublicKey
+	if pubKeyStr != "" {
+		pubKey, err = hex.DecodeString(pubKeyStr)
+		if err != nil {
+			return err
+		}
+	}
+
+	hash, err := cli.api.AccountSetValidator(pubKey, name)
+	if err != nil {
+		return err
+	}
+
+	infoPrint.Printf("transaction sent! hash %s\n", hash.String())
+	infoPrint.Printf("waiting for confirmation...")
+	ok := cli.waitForTransaction(hash)
+	if !ok {
+		return fmt.Errorf("transaction was not included")
+	}
+	infoPrint.Printf(" transaction confirmed!\n")
+
+	return nil
 }
 
 func accountSetMetadata(cli *VocdoniCLI) error {
@@ -512,7 +611,6 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 		return fmt.Errorf("transaction was not included")
 	}
 	return nil
-
 }
 
 func electionHandler(cli *VocdoniCLI) error {

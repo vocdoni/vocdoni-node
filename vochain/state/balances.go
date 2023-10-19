@@ -36,6 +36,7 @@ var (
 		models.TxType_SET_ACCOUNT_SIK:            "c_setAccountSIK",
 		models.TxType_DEL_ACCOUNT_SIK:            "c_delAccountSIK",
 		models.TxType_REGISTER_SIK:               "c_registerSIK",
+		models.TxType_SET_ACCOUNT_VALIDATOR:      "c_setAccountValidator",
 	}
 	ErrTxCostNotFound = fmt.Errorf("transaction cost is not set")
 )

@@ -254,11 +254,17 @@ type File struct {
 type ValidatorList struct {
 	Validators []Validator `json:"validators"`
 }
+
 type Validator struct {
-	Power   uint64         `json:"power"`
-	PubKey  types.HexBytes `json:"pubKey" `
-	Address types.HexBytes `json:"address" `
-	Name    string         `json:"name"`
+	Power            uint64         `json:"power"`
+	PubKey           types.HexBytes `json:"pubKey"`
+	AccountAddress   types.HexBytes `json:"address"`
+	Name             string         `json:"name"`
+	ValidatorAddress types.HexBytes `json:"validatorAddress"`
+	JoinHeight       uint64         `json:"joinHeight"`
+	Votes            uint64         `json:"votes"`
+	Proposals        uint64         `json:"proposals"`
+	Score            uint32         `json:"score"`
 }
 
 // Protobuf wrappers

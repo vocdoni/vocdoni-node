@@ -229,11 +229,11 @@ func newTendermint(app *BaseApplication,
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Debugf("tendermint p2p config: %+v", tconfig.P2P)
-
-	log.Infow("tendermint config",
+	log.Infow("vochain initialized",
 		"db-backend", tconfig.DBBackend,
-		"pubkey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
+		"publicKey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
+		"accountAddr", app.NodeAddress,
+		"validatorAddr", pv.Key.PubKey.Address(),
 		"external-address", tconfig.P2P.ExternalAddress,
 		"nodeId", nodeKey.ID(),
 		"seed", tconfig.P2P.SeedMode)

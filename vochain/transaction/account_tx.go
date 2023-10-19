@@ -29,6 +29,7 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if tx.Txtype != models.TxType_CREATE_ACCOUNT {
 		return fmt.Errorf("invalid tx type, expected %s, got %s", models.TxType_CREATE_ACCOUNT, tx.Txtype)
 	}
+	// check account does not exist
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
@@ -44,6 +45,7 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if txSenderAcc != nil {
 		return vstate.ErrAccountAlreadyExists
 	}
+
 	infoURI := tx.GetInfoURI()
 	if len(infoURI) > types.MaxURLLength {
 		return ErrInvalidURILength
@@ -125,20 +127,14 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 	if len(tx.Delegates) == 0 {
 		return fmt.Errorf("invalid delegates")
 	}
-	txSenderAddress, txSenderAccount, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
+	txSenderAccount, txSenderAddr, err := t.checkAccountCanPayCost(tx.Txtype, vtx)
 	if err != nil {
 		return err
 	}
-	if err := vstate.CheckDuplicateDelegates(tx.Delegates, txSenderAddress); err != nil {
+	if err := vstate.CheckDuplicateDelegates(tx.Delegates, txSenderAddr); err != nil {
 		return fmt.Errorf("checkDuplicateDelegates: %w", err)
 	}
-	cost, err := t.state.TxBaseCost(tx.Txtype, false)
-	if err != nil {
-		return fmt.Errorf("cannot get tx cost: %w", err)
-	}
-	if txSenderAccount.Balance < cost {
-		return vstate.ErrNotEnoughBalance
-	}
+
 	switch tx.Txtype {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
 		for _, delegate := range tx.Delegates {
@@ -171,40 +167,20 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	if tx == nil {
 		return fmt.Errorf("invalid transaction")
 	}
-	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	txSenderAccount, txSenderAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_INFO_URI, vtx)
 	if err != nil {
-		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
-	}
-	txSenderAddress, err := ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: %w", err)
+		return err
 	}
 	txAccountAddress := common.BytesToAddress(tx.GetAccount())
 	if txAccountAddress == (common.Address{}) {
-		txAccountAddress = txSenderAddress
-	}
-	txSenderAccount, err := t.state.GetAccount(txSenderAddress, false)
-	if err != nil {
-		return fmt.Errorf("cannot check if account %s exists: %w", txSenderAddress, err)
-	}
-	if txSenderAccount == nil {
-		return vstate.ErrAccountNotExist
-	}
-	// get setAccount tx cost
-	costSetAccountInfoURI, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, false)
-	if err != nil {
-		return fmt.Errorf("cannot get tx cost: %w", err)
-	}
-	// check tx sender balance
-	if txSenderAccount.Balance < costSetAccountInfoURI {
-		return fmt.Errorf("unauthorized: %s", vstate.ErrNotEnoughBalance)
+		txAccountAddress = *txSenderAddress
 	}
 	// check info URI
 	infoURI := tx.GetInfoURI()
 	if len(infoURI) == 0 || len(infoURI) > types.MaxURLLength {
 		return fmt.Errorf("invalid URI, cannot be empty")
 	}
-	if txSenderAddress == txAccountAddress {
+	if bytes.Equal(txSenderAddress.Bytes(), txAccountAddress.Bytes()) {
 		if infoURI == txSenderAccount.InfoURI {
 			return fmt.Errorf("invalid URI, must be different")
 		}
@@ -223,7 +199,7 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 		return fmt.Errorf("invalid URI, must be different")
 	}
 	// check if delegate
-	if !txAccountAccount.IsDelegate(txSenderAddress) {
+	if !txAccountAccount.IsDelegate(*txSenderAddress) {
 		return fmt.Errorf("tx sender is not a delegate")
 	}
 	return nil
@@ -275,38 +251,29 @@ func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, v
 	if tx == nil {
 		return common.Address{}, nil, fmt.Errorf("invalid transaction")
 	}
-	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
+	_, txAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_SIK, vtx)
 	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
+		return common.Address{}, nil, err
 	}
-	txAddress, err := ethereum.AddrFromPublicKey(pubKey)
-	if err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot extract address from public key: %w", err)
-	}
-
-	if _, err := t.state.GetAccount(txAddress, false); err != nil {
-		return common.Address{}, nil, fmt.Errorf("cannot get tx account: %w", err)
-	}
-
 	newSIK := vtx.Tx.GetSetSIK().GetSIK()
 	if newSIK == nil {
 		return common.Address{}, nil, fmt.Errorf("no sik value provided")
 	}
 	// check if the address already has invalidated sik to ensure that it is
 	// not updated after reach the correct height to avoid double voting
-	if currentSIK, err := t.state.SIKFromAddress(txAddress); err == nil {
+	if currentSIK, err := t.state.SIKFromAddress(*txAddress); err == nil {
 		maxEndBlock, err := t.state.ProcessBlockRegistry.MaxEndBlock(t.state.CurrentHeight())
 		if err != nil {
 			if errors.Is(err, arbo.ErrKeyNotFound) {
-				return txAddress, newSIK, nil
+				return *txAddress, newSIK, nil
 			}
 			return common.Address{}, nil, err
 		}
 		if height := currentSIK.DecodeInvalidatedHeight(); height >= maxEndBlock {
-			return txAddress, nil, fmt.Errorf("the sik could not be changed yet")
+			return *txAddress, nil, fmt.Errorf("the sik could not be changed yet")
 		}
 	}
-	return txAddress, newSIK, nil
+	return *txAddress, newSIK, nil
 }
 
 // RegisterSIKTxCheck checks if the provided RegisterSIKTx is valid ensuring
@@ -381,4 +348,31 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 		return common.Address{}, nil, nil, false, fmt.Errorf("proof not valid: %x", process.CensusRoot)
 	}
 	return txAddress, newSIK, pid, process.GetTempSIKs(), nil
+}
+
+// SetAccountValidatorTxCheck upgrades an account to a validator.
+func (t *TransactionHandler) SetAccountValidatorTxCheck(vtx *vochaintx.Tx) error {
+	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
+		return ErrNilTx
+	}
+	_, _, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_VALIDATOR, vtx)
+	if err != nil {
+		return err
+	}
+	validatorPubKey := vtx.Tx.GetSetAccount().GetPublicKey()
+	if validatorPubKey == nil {
+		return fmt.Errorf("invalid nil public key")
+	}
+	validatorAddress, err := ethereum.AddrFromPublicKey(validatorPubKey)
+	if err != nil {
+		return fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	validatorAccount, err := t.state.Validator(validatorAddress, false)
+	if err != nil {
+		return fmt.Errorf("cannot get validator: %w", err)
+	}
+	if validatorAccount != nil {
+		return fmt.Errorf("account is already a validator")
+	}
+	return nil
 }

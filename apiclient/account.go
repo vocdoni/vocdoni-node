@@ -166,6 +166,58 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	return acc.TxHash, nil
 }
 
+// AccountSetValidator upgrades to validator status the account associated with the public key provided.
+// If the public key is nil, the public key associated with the account client is used.
+// Returns the transaction hash.
+func (c *HTTPclient) AccountSetValidator(pubKey []byte, name string) (types.HexBytes, error) {
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("account not configured: %w", err)
+	}
+	if pubKey == nil {
+		pubKey = c.account.PublicKey()
+	}
+	// Build the transaction
+	stx := models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetAccount{
+			SetAccount: &models.SetAccountTx{
+				Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
+				Nonce:     &acc.Nonce,
+				PublicKey: pubKey,
+				Name:      &name,
+			},
+		},
+	},
+	)
+	if err != nil {
+		return nil, fmt.Errorf("could not marshal transaction: %w", err)
+	}
+	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
+	if err != nil {
+		return nil, err
+	}
+	stxb, err := proto.Marshal(&stx)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPOST, &api.Transaction{
+		Payload: stxb,
+	}, "chain", "transactions")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	accv := &api.Transaction{}
+	err = json.Unmarshal(resp, accv)
+	if err != nil {
+		return nil, err
+	}
+	return accv.Hash, nil
+}
+
 // AccountSetMetadata updates the metadata associated with the account associated with the client.
 func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.HexBytes, error) {
 	var err error
@@ -258,7 +310,9 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 				Txtype: models.TxType_SET_ACCOUNT_SIK,
 				SIK:    sik,
 			},
-		}})
+		},
+	},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -273,7 +327,7 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 	}
 	resp, code, err := c.Request(HTTPPOST, &api.Transaction{
 		Payload: stxb,
-	}, "chain", "transaction")
+	}, "chain", "transactions")
 	if err != nil {
 		return nil, err
 	}

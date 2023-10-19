@@ -708,10 +708,15 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 	validators := ValidatorList{}
 	for _, v := range stateValidators {
 		validators.Validators = append(validators.Validators, Validator{
-			Address: v.GetAddress(),
-			Power:   v.GetPower(),
-			Name:    v.GetName(),
-			PubKey:  v.GetPubKey(),
+			AccountAddress:   v.GetAddress(),
+			ValidatorAddress: v.GetValidatorAddress(),
+			Power:            v.GetPower(),
+			Name:             v.GetName(),
+			PubKey:           v.GetPubKey(),
+			JoinHeight:       v.GetHeight(),
+			Votes:            v.GetVotes(),
+			Proposals:        v.GetProposals(),
+			Score:            v.GetScore(),
 		})
 	}
 	data, err := json.Marshal(&validators)

@@ -26,15 +26,15 @@ var Genesis = map[string]Vochain{
 		Genesis:           &stageGenesis,
 	},
 
-	// Apex production network
-	"apex": {
+	// LTS production network
+	"lts": {
 		AutoUpdateGenesis: false,
 		SeedNodes: []string{
-			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.apex.vocdoni.net:26656",
-			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.apex.vocdoni.net:26656",
+			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
+			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
 		},
-		CircuitsConfigTag: "dev",
-		Genesis:           &apexGenesis,
+		CircuitsConfigTag: "prod",
+		Genesis:           &ltsGenesis,
 	},
 }
 
@@ -115,6 +115,7 @@ var devGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
+			SetAccountValidator:     10000,
 		},
 	},
 }
@@ -234,13 +235,14 @@ var stageGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
+			SetAccountValidator:     100000,
 		},
 	},
 }
 
-var apexGenesis = Doc{
-	GenesisTime: time.Date(2023, time.May, 24, 9, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-apex-v1",
+var ltsGenesis = Doc{
+	GenesisTime: time.Date(2023, time.October, 17, 17, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni-lts-v1",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -328,7 +330,7 @@ var apexGenesis = Doc{
 		Accounts: []Account{
 			{ // faucet
 				Address: types.HexStringToHexBytes("863a75f41025f0c8878d3a100c8c16576fe8fe4f"),
-				Balance: 10000000,
+				Balance: 1000000000,
 			},
 		},
 		Treasurer: types.HexStringToHexBytes("13987a54c434d33ec810eeedba4ed7a542e3df24"),
@@ -344,6 +346,9 @@ var apexGenesis = Doc{
 			AddDelegateForAccount:   1,
 			DelDelegateForAccount:   1,
 			CollectFaucet:           1,
+			SetAccountSIK:           1,
+			DelAccountSIK:           1,
+			SetAccountValidator:     200000,
 		},
 	},
 }
