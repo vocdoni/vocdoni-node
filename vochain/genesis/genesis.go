@@ -92,8 +92,8 @@ var devGenesis = Doc{
 		},
 		Accounts: []Account{
 			{ // faucet
-				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
-				Balance: 100000000,
+				Address: types.HexStringToHexBytes("0x7C3a4A5f142ed27C07966b7C7C3F085521154b40"),
+				Balance: 1000000000,
 			},
 			{ // faucet2
 				Address: types.HexStringToHexBytes("0x536Da9ecd65Fc0248625b0BBDbB305d0DD841893"),
