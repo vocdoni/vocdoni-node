@@ -228,7 +228,7 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 	e.voters.Range(func(key, value any) bool {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   e.election.ElectionID,
+				Election:     e.election,
 				ProofMkTree:  acctp.proof,
 				Choices:      choices[vcount],
 				VoterAccount: acctp.account,

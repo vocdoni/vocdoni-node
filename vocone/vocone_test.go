@@ -115,19 +115,20 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	}
 
 	// Wait until the process is ready
-	info, err := cli.ChainInfo()
+	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second*30)
+	defer cancel1()
+	election, err := cli.WaitUntilElectionStatus(ctx1, processID, "READY")
 	if err != nil {
 		return err
 	}
-	cli.WaitUntilHeight(context.Background(), info.Height+2)
 
 	// Send the votes
 	for i, k := range voterKeys {
 		c := cli.Clone(fmt.Sprintf("%x", k.PrivateKey()))
 		c.Vote(&apiclient.VoteData{
-			Choices:    []int{1},
-			ElectionID: processID,
-			ProofCSP:   proofs[i],
+			Choices:  []int{1},
+			Election: election,
+			ProofCSP: proofs[i],
 		})
 	}
 
@@ -136,7 +137,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
-	election, err := cli.WaitUntilElectionStatus(ctx, processID, "RESULTS")
+	election, err = cli.WaitUntilElectionStatus(ctx, processID, "RESULTS")
 	if err != nil {
 		return err
 	}

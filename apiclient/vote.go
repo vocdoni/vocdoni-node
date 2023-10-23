@@ -37,7 +37,7 @@ import (
 // (deprecated).
 type VoteData struct {
 	Choices    []int
-	ElectionID types.HexBytes
+	Election   *api.Election
 	VoteWeight *big.Int
 
 	ProofMkTree  *CensusProof
@@ -60,27 +60,25 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	if v.VoterAccount != nil {
 		c = cl.Clone(hex.EncodeToString(v.VoterAccount.PrivateKey()))
 	}
-	election, err := c.Election(v.ElectionID)
-	if err != nil {
-		return nil, err
-	}
 
 	var vote *models.VoteEnvelope
+	var err error
+
 	if v.Keys != nil {
-		vote, err = c.voteEnvelopeWithKeys(v.Choices, v.Keys, election)
+		vote, err = c.voteEnvelopeWithKeys(v.Choices, v.Keys, v.Election)
 	} else {
-		vote, err = c.prepareVoteEnvelope(v.Choices, election)
+		vote, err = c.prepareVoteEnvelope(v.Choices, v.Election)
 	}
 	if err != nil {
 		return nil, err
 	}
 
-	log.Debugw("generating a new vote", "electionId", v.ElectionID, "voter", c.account.AddressString())
+	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}
 	censusOriginCSP := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA)]
 	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]
 	switch {
-	case election.VoteMode.Anonymous:
+	case v.Election.VoteMode.Anonymous:
 		// support no vote weight provided
 		if v.VoteWeight == nil {
 			v.VoteWeight = v.ProofMkTree.LeafWeight
@@ -89,8 +87,8 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		// information and encode it into a json
 		rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
 			Account:         c.account,
-			ElectionId:      election.ElectionID,
-			CensusRoot:      election.Census.CensusRoot,
+			ElectionId:      v.Election.ElectionID,
+			CensusRoot:      v.Election.Census.CensusRoot,
 			SIKRoot:         v.ProofSIKTree.Root,
 			CensusSiblings:  v.ProofMkTree.Siblings,
 			SIKSiblings:     v.ProofSIKTree.Siblings,
@@ -136,7 +134,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not prepare vote transaction: %w", err)
 		}
-	case election.Census.CensusOrigin == censusOriginWeighted:
+	case v.Election.Census.CensusOrigin == censusOriginWeighted:
 		// support custom vote weight
 		var voteWeight []byte
 		if v.VoteWeight != nil {
@@ -160,7 +158,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, err
 		}
-	case election.Census.CensusOrigin == censusOriginCSP:
+	case v.Election.Census.CensusOrigin == censusOriginCSP:
 		// decode the CSP proof and include in a VoteEnvelope
 		p := models.ProofCA{}
 		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {

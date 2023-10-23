@@ -65,7 +65,7 @@ func (t *E2EAnonElection) Run() error {
 	t.voters.Range(func(key, value any) bool {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   t.election.ElectionID,
+				Election:     t.election,
 				ProofMkTree:  acctp.proof,
 				ProofSIKTree: acctp.proofSIK,
 				Choices:      []int{vcount % 2},
@@ -137,7 +137,7 @@ func (t *E2EAnonElectionTempSIKs) Run() error {
 	t.voters.Range(func(key, value any) bool {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   t.election.ElectionID,
+				Election:     t.election,
 				ProofMkTree:  acctp.proof,
 				ProofSIKTree: acctp.proofSIK,
 				Choices:      []int{vcount % 2},

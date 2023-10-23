@@ -58,7 +58,7 @@ func (t *E2ECSPElection) Run() error {
 	t.voters.Range(func(key, value any) bool {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   t.election.ElectionID,
+				Election:     t.election,
 				ProofCSP:     acctp.proof.Proof,
 				Choices:      []int{0},
 				VoterAccount: acctp.account,
