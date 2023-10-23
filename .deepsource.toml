@@ -10,9 +10,6 @@ name = "secrets"
 name = "docker"
 
 [[analyzers]]
-name = "test-coverage"
-
-[[analyzers]]
 name = "go"
 
   [analyzers.meta]
