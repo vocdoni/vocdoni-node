@@ -540,150 +540,6 @@ func testSetAccountTx(t *testing.T,
 	return nil
 }
 
-func TestSetTransactionsCosts(t *testing.T) {
-	app := TestBaseApplication(t)
-	signer := ethereum.SignKeys{}
-	if err := signer.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	// set tx cost for Tx
-	if err := app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 10); err != nil {
-		t.Fatal(err)
-	}
-	// set treasurer account (same as signer for testing purposes)
-	if err := app.State.SetTreasurer(signer.Address(), 0); err != nil {
-		t.Fatal(err)
-	}
-	// should change tx cost if treasurer
-	if err := testSetTransactionCostsTx(t, app, &signer, 0, 20); err != nil {
-		t.Fatal(err)
-	}
-	// should not change tx costs if not treasurer
-	notTreasurer := ethereum.SignKeys{}
-	if err := notTreasurer.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	if err := testSetTransactionCostsTx(t, app, &notTreasurer, 0, 30); err == nil {
-		t.Fatal("should not change tx costs if not treasurer")
-	}
-	if cost, err := app.State.TxBaseCost(models.TxType_COLLECT_FAUCET, false); err != nil {
-		t.Fatal(err)
-	} else {
-		qt.Assert(t, cost, qt.Equals, uint64(20))
-	}
-}
-
-func testSetTransactionCostsTx(t *testing.T,
-	app *BaseApplication,
-	signer *ethereum.SignKeys,
-	nonce uint32,
-	cost uint64) error {
-	var err error
-
-	// tx
-	tx := &models.SetTransactionCostsTx{
-		Txtype: models.TxType_COLLECT_FAUCET,
-		Nonce:  nonce,
-		Value:  cost,
-	}
-
-	stx := &models.SignedTx{}
-	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetTransactionCosts{SetTransactionCosts: tx}}); err != nil {
-		t.Fatal(err)
-	}
-	if err := sendTx(app, signer, stx); err != nil {
-		return err
-	}
-	testCommitState(t, app)
-	return nil
-}
-
-func TestMintTokensTx(t *testing.T) {
-	app := TestBaseApplication(t)
-	signer := ethereum.SignKeys{}
-	if err := signer.Generate(); err != nil {
-		t.Fatal(err)
-	}
-	notTreasurer := ethereum.SignKeys{}
-	if err := notTreasurer.Generate(); err != nil {
-		t.Fatal(err)
-	}
-
-	app.State.SetTreasurer(signer.Address(), 0)
-	err := app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
-	qt.Assert(t, err, qt.IsNil)
-	toAccAddr := common.HexToAddress(randomEthAccount)
-	err = app.State.CreateAccount(toAccAddr, "ipfs://", [][]byte{}, 0)
-	qt.Assert(t, err, qt.IsNil)
-	testCommitState(t, app)
-
-	// should mint
-	if err := testMintTokensTx(t, &signer, app, toAccAddr, 100, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	// should fail minting if invalid value
-	if err := testMintTokensTx(t, &signer, app, toAccAddr, 0, 0); err == nil {
-		t.Fatal(err)
-	}
-
-	// should fail minting if invalid account
-	if err := testMintTokensTx(t, &signer, app, common.HexToAddress("0x0"), 100, 1); err == nil {
-		t.Fatal(err)
-	}
-	// should fail minting if not treasurer
-	if err := testMintTokensTx(t, &notTreasurer, app, toAccAddr, 100, 1); err == nil {
-		t.Fatal(err)
-	}
-
-	// get account
-	toAcc, err := app.State.GetAccount(toAccAddr, false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if toAcc == nil {
-		t.Fatal("account not found")
-	}
-	if toAcc.Balance != 100 {
-		t.Fatalf("infoURI missmatch, got %d expected %d", toAcc.Balance, 100)
-	}
-	// get treasurer
-	treasurer, err := app.State.Treasurer(false)
-	if err != nil {
-		t.Fatal(err)
-	}
-	// check nonce incremented
-	qt.Assert(t, treasurer.Nonce, qt.Equals, uint32(1))
-}
-
-func testMintTokensTx(t *testing.T,
-	signer *ethereum.SignKeys,
-	app *BaseApplication,
-	toAddr common.Address,
-	value uint64,
-	nonce uint32) error {
-	var err error
-
-	// tx
-	tx := &models.MintTokensTx{
-		Txtype: models.TxType_MINT_TOKENS,
-		To:     toAddr.Bytes(),
-		Value:  value,
-		Nonce:  nonce,
-	}
-
-	stx := &models.SignedTx{}
-	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_MintTokens{MintTokens: tx}}); err != nil {
-		t.Fatal(err)
-	}
-
-	if err := sendTx(app, signer, stx); err != nil {
-		return err
-	}
-	testCommitState(t, app)
-	return nil
-}
-
 func TestSendTokensTx(t *testing.T) {
 	app := TestBaseApplication(t)
 
@@ -692,9 +548,6 @@ func TestSendTokensTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	app.State.SetAccount(state.BurnAddress, &state.Account{})
-
-	err = app.State.SetTreasurer(signer.Address(), 0)
-	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.SetTxBaseCost(models.TxType_SEND_TOKENS, 10)
 	qt.Assert(t, err, qt.IsNil)
@@ -782,9 +635,6 @@ func TestSetAccountDelegateTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	app.State.SetAccount(state.BurnAddress, &state.Account{})
-
-	err = app.State.SetTreasurer(signer.Address(), 0)
-	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.SetTxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, 10)
 	qt.Assert(t, err, qt.IsNil)
@@ -890,9 +740,6 @@ func TestCollectFaucetTx(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	app.State.SetAccount(state.BurnAddress, &state.Account{})
-
-	err = app.State.SetTreasurer(signer.Address(), 0)
-	qt.Assert(t, err, qt.IsNil)
 
 	err = app.State.SetTxBaseCost(models.TxType_COLLECT_FAUCET, 10)
 	qt.Assert(t, err, qt.IsNil)

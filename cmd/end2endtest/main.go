@@ -58,17 +58,16 @@ func opNames() (names []string) {
 }
 
 type config struct {
-	host             string
-	logLevel         string
-	operation        string
-	accountPrivKeys  []string
-	accountKeys      []*ethereum.SignKeys
-	treasurerPrivKey string
-	nvotes           int
-	parallelCount    int
-	faucet           string
-	faucetAuthToken  string
-	timeout          time.Duration
+	host            string
+	logLevel        string
+	operation       string
+	accountPrivKeys []string
+	accountKeys     []*ethereum.SignKeys
+	nvotes          int
+	parallelCount   int
+	faucet          string
+	faucetAuthToken string
+	timeout         time.Duration
 }
 
 func main() {
@@ -83,7 +82,6 @@ func main() {
 		fmt.Sprintf("set operation mode: %v", opNames()))
 	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{},
 		"account private key (optional)")
-	flag.StringVar(&c.treasurerPrivKey, "treasurerPrivKey", "", "treasurer private key")
 	flag.IntVar(&c.nvotes, "votes", 10, "number of votes to cast")
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
 	flag.StringVar(&c.faucet, "faucet", "dev",

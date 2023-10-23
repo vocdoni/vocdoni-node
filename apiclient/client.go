@@ -21,11 +21,11 @@ import (
 
 const (
 	// HTTPGET is the method string used for calling Request()
-	HTTPGET = "GET"
+	HTTPGET = http.MethodGet
 	// HTTPPOST is the method string used for calling Request()
-	HTTPPOST = "POST"
+	HTTPPOST = http.MethodPost
 	// HTTPDELETE is the method string used for calling
-	HTTPDELETE = "DELETE"
+	HTTPDELETE = http.MethodDelete
 
 	errCodeNot200 = "API error"
 

@@ -100,7 +100,6 @@ var devGenesis = Doc{
 				Balance: 100000000,
 			},
 		},
-		Treasurer: types.HexStringToHexBytes("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"),
 		TxCost: TransactionCosts{
 			SetProcessStatus:        2,
 			SetProcessCensus:        2,
@@ -220,7 +219,6 @@ var stageGenesis = Doc{
 				Balance: 1000000000,
 			},
 		},
-		Treasurer: types.HexStringToHexBytes("0x309Bd6959bf4289CDf9c7198cF9f4494e0244b7d"),
 		TxCost: TransactionCosts{
 			SetProcessStatus:        2,
 			SetProcessCensus:        50,
@@ -333,7 +331,6 @@ var ltsGenesis = Doc{
 				Balance: 1000000000,
 			},
 		},
-		Treasurer: types.HexStringToHexBytes("13987a54c434d33ec810eeedba4ed7a542e3df24"),
 		TxCost: TransactionCosts{
 			SetProcessStatus:        1,
 			SetProcessCensus:        5,

@@ -27,14 +27,14 @@ import (
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
-	logLevel, dir, keymanager, path, treasurer, chainID string
-	port, blockSeconds, blockSize                       int
-	txCosts                                             uint64
-	disableIpfs                                         bool
-	fundedAccounts                                      []string
-	enableFaucetWithAmount                              uint64
-	ipfsConnectKey                                      string
-	ipfsConnectPeers                                    []string
+	logLevel, dir, keymanager, path, chainID string
+	port, blockSeconds, blockSize            int
+	txCosts                                  uint64
+	disableIpfs                              bool
+	fundedAccounts                           []string
+	enableFaucetWithAmount                   uint64
+	ipfsConnectKey                           string
+	ipfsConnectPeers                         []string
 }
 
 func main() {
@@ -49,7 +49,6 @@ func main() {
 	}
 	flag.StringVar(&config.dir, "dir", filepath.Join(home, ".voconed"), "storage data directory")
 	flag.StringVar(&config.keymanager, "keymanager", "", "key manager private hexadecimal key")
-	flag.StringVar(&config.treasurer, "treasurer", "", "treasurer address")
 	flag.StringVar(&config.logLevel, "logLevel", "info", "log level (info, debug, warn, error)")
 	flag.StringVar(&config.chainID, "chainID", "vocone", "defines the chainID")
 	flag.IntVar(&config.port, "port", 9090, "network port for the HTTP API")
@@ -195,21 +194,6 @@ func main() {
 	}
 	vc.App.SetChainID(config.chainID)
 	log.Infof("using chainID: %s", config.chainID)
-
-	// set treasurer address if provided
-	if len(config.treasurer) > 0 {
-		log.Infof("setting treasurer %s", config.treasurer)
-		if err := vc.SetTreasurer(common.HexToAddress(config.treasurer)); err != nil {
-			log.Fatal(err)
-		}
-	}
-	// set transaction costs
-	if *setTxCosts {
-		log.Infof("setting tx costs to %d", config.txCosts)
-		if err := vc.SetBulkTxCosts(config.txCosts, true); err != nil {
-			log.Fatal(err)
-		}
-	}
 
 	// set election price calculator
 	if err := vc.SetElectionPrice(); err != nil {

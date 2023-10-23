@@ -237,19 +237,6 @@ func (vc *Vocone) Commit() ([]byte, error) {
 	return hash, nil
 }
 
-// SetTreasurer configures the vocone treasurer account address
-func (vc *Vocone) SetTreasurer(treasurer common.Address) error {
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
-	if err := vc.App.State.SetTreasurer(treasurer, 0); err != nil {
-		return err
-	}
-	if _, err := vc.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // SetKeyKeeper adds a keykeeper to the application.
 func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 	// Create key keeper
@@ -287,30 +274,11 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 	return err
 }
 
-// MintTokens mints tokens to the given account address
-func (vc *Vocone) MintTokens(to common.Address, amount uint64) error {
-	vc.vcMtx.Lock()
-	defer vc.vcMtx.Unlock()
-	if err := vc.App.State.InitChainMintBalance(to, amount); err != nil {
-		return err
-	}
-	if err := vc.App.State.IncrementTreasurerNonce(); err != nil {
-		return err
-	}
-	if _, err := vc.Commit(); err != nil {
-		return err
-	}
-	return nil
-}
-
 // SetTxCost configures the transaction cost for the given tx type.
 func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	if err := vc.App.State.SetTxBaseCost(txType, cost); err != nil {
-		return err
-	}
-	if err := vc.App.State.IncrementTreasurerNonce(); err != nil {
 		return err
 	}
 	if _, err := vc.Commit(); err != nil {

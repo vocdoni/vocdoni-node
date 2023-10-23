@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
@@ -94,7 +93,7 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount
 }
 
 // NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
-// Also includes treasurer and faucet account.
+// Also includes faucet account.
 // The genesis document is returned.
 func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, error) {
 	gd := tmtypes.GenesisDoc{}
@@ -140,15 +139,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 		})
 	}
 
-	// Generate treasurer and faucet accounts
-	treasurer := ethereum.SignKeys{}
-	if err := treasurer.Generate(); err != nil {
-		return nil, err
-	}
-	if err := os.WriteFile(filepath.Join(dir, "treasurer_hex_key"),
-		[]byte(fmt.Sprintf("%x", treasurer.PrivateKey())), 0o600); err != nil {
-		return nil, err
-	}
+	// Faucet
 	faucet := ethereum.SignKeys{}
 	if err := faucet.Generate(); err != nil {
 		return nil, err
@@ -182,7 +173,6 @@ func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, er
 	// Build genesis app state and create genesis file
 	appState := genesis.AppState{
 		Validators: appStateValidators,
-		Treasurer:  types.HexBytes(treasurer.Address().Bytes()),
 		Accounts: []genesis.Account{
 			{
 				Address: faucet.Address().Bytes(),

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/go-cmp/cmp"
 	apipkg "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
@@ -62,11 +61,6 @@ func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 		return err
 	}
 
-	// check transaction cost
-	if err := testGetTxCost(t.api); err != nil {
-		return fmt.Errorf("error in testGetTxCost: %w", err)
-	}
-
 	// check create and set account
 	if err := testCreateAndSetAccount(t.api, t.aliceFP, t.alice, t.bob); err != nil {
 		return fmt.Errorf("error in testCreateAndSetAccount: %w", err)
@@ -86,23 +80,6 @@ func (t *E2ETokenTxs) Run() error {
 		return fmt.Errorf("error in testSendTokens: %w", err)
 	}
 
-	return nil
-}
-
-func testGetTxCost(api *apiclient.HTTPclient) error {
-	// get treasurer nonce
-	treasurer, err := api.Treasurer()
-	if err != nil {
-		return err
-	}
-	log.Infof("treasurer is %s", common.BytesToAddress(treasurer.Address))
-
-	// get current tx cost
-	txCost, err := api.TransactionCost(models.TxType_SET_ACCOUNT_INFO_URI)
-	if err != nil {
-		return err
-	}
-	log.Infow("fetched tx cost", "type", models.TxType_SET_ACCOUNT_INFO_URI.String(), "cost", txCost)
 	return nil
 }
 

@@ -62,13 +62,13 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, delegateAcc.ProcessIndex, qt.Equals, uint32(0))
 
 	// create process with a non delegate to another entityID (should not work)
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[3], app, process), qt.IsNotNil)
+	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[2], app, process), qt.IsNotNil)
 	entityAcc, err = app.State.GetAccount(accounts[0].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
 	qt.Assert(t, entityAcc.Nonce, qt.Equals, uint32(1))
 	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(2))
-	randomAcc, err := app.State.GetAccount(accounts[3].Address(), false)
+	randomAcc, err := app.State.GetAccount(accounts[2].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, randomAcc.Balance, qt.Equals, uint64(10000))
 	qt.Assert(t, randomAcc.Nonce, qt.Equals, uint32(0))
@@ -330,7 +330,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, testSetProcessCensus(t, pid2, keys[0], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
 
 	// Set census  (should not work)
-	qt.Assert(t, testSetProcessCensus(t, pid3, keys[3], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
+	qt.Assert(t, testSetProcessCensus(t, pid3, keys[2], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
 }
 
 func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
@@ -374,7 +374,7 @@ func TestCount(t *testing.T) {
 }
 
 // creates a test vochain application and returns the following keys:
-// [entity, delegate, treasurer, random]
+// [entity, delegate, random]
 // the application will have the accounts of the keys already initialized, as well as
 // the burn account and all tx costs set to txCostNumber
 func createTestBaseApplicationAndAccounts(t *testing.T,
@@ -404,11 +404,8 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 		}},
 	), qt.IsNil)
 
-	// create treasurer
-	qt.Assert(t, app.State.SetTreasurer(keys[2].Address(), 0), qt.IsNil)
-
 	// create random account
-	qt.Assert(t, app.State.SetAccount(keys[3].Address(),
+	qt.Assert(t, app.State.SetAccount(keys[2].Address(),
 		&vstate.Account{Account: models.Account{Balance: 10000}},
 	), qt.IsNil)
 

@@ -10,12 +10,6 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
-)
-
-const (
-	// treasurerKey is the key representing the Treasurer entry on the Extra subtree
-	treasurerKey = "treasurer"
 )
 
 // TxTypeCostToStateKey translates models.TxType to a string which the State uses
@@ -40,91 +34,6 @@ var (
 	}
 	ErrTxCostNotFound = fmt.Errorf("transaction cost is not set")
 )
-
-// SetTreasurer saves the Treasurer address to the state
-func (v *State) SetTreasurer(address common.Address, nonce uint32) error {
-	tBytes, err := proto.Marshal(
-		&models.Treasurer{
-			Address: address.Bytes(),
-			Nonce:   nonce,
-		},
-	)
-	if err != nil {
-		return err
-	}
-	v.tx.Lock()
-	defer v.tx.Unlock()
-	return v.tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
-}
-
-// Treasurer returns the address and the Treasurer nonce
-// When committed is false, the operation is executed also on not yet committed
-// data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last committed version.
-func (v *State) Treasurer(committed bool) (*models.Treasurer, error) {
-	if !committed {
-		v.tx.RLock()
-		defer v.tx.RUnlock()
-	}
-	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
-	if err != nil {
-		return nil, err
-	}
-	var rawTreasurer []byte
-	if rawTreasurer, err = extraTree.Get([]byte(treasurerKey)); err != nil {
-		return nil, err
-	}
-	var t models.Treasurer
-	if err := proto.Unmarshal(rawTreasurer, &t); err != nil {
-		return nil, err
-	}
-	return &t, nil
-}
-
-// IsTreasurer returns true if the given address matches the Treasurer address
-func (v *State) IsTreasurer(addr common.Address) (bool, error) {
-	t, err := v.Treasurer(false)
-	if err != nil {
-		return false, err
-	}
-	return addr == common.BytesToAddress(t.Address), nil
-}
-
-// IncrementTreasurerNonce increments the treasurer nonce
-func (v *State) IncrementTreasurerNonce() error {
-	t, err := v.Treasurer(false)
-	if err != nil {
-		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
-	}
-	v.tx.Lock()
-	defer v.tx.Unlock()
-	t.Nonce++
-	tBytes, err := proto.Marshal(t)
-	if err != nil {
-		return fmt.Errorf("incrementTreasurerNonce(): %w", err)
-	}
-	log.Debugf("incrementing treasurer nonce, new nonce is %d", t.Nonce)
-	return v.tx.DeepSet([]byte(treasurerKey), tBytes, StateTreeCfg(TreeExtra))
-}
-
-// VerifyTreasurer checks is an address is the treasurer and the
-// nonce provided is the expected one
-func (v *State) VerifyTreasurer(addr common.Address, txNonce uint32) error {
-	// get treasurer
-	treasurer, err := v.Treasurer(false)
-	if err != nil {
-		return fmt.Errorf("cannot check authorization")
-	}
-	log.Debugf("got treasurer addr %x", treasurer.Address)
-	if !bytes.Equal(addr.Bytes(), treasurer.Address) {
-		return fmt.Errorf("not authorized for executing admin transactions")
-	}
-	// check treasurer account
-	if treasurer.Nonce != txNonce {
-		return ErrAccountNonceInvalid
-	}
-	return nil
-}
 
 // SetTxBaseCost sets the given transaction cost
 func (v *State) SetTxBaseCost(txType models.TxType, cost uint64) error {

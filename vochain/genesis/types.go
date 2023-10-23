@@ -119,7 +119,6 @@ type Account struct {
 type AppState struct {
 	Validators      []AppStateValidators `json:"validators"`
 	Accounts        []Account            `json:"accounts"`
-	Treasurer       types.HexBytes       `json:"treasurer"`
 	TxCost          TransactionCosts     `json:"tx_cost"`
 	MaxElectionSize uint64               `json:"max_election_size"`
 	NetworkCapacity uint64               `json:"network_capacity"`
