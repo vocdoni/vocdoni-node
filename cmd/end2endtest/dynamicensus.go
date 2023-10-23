@@ -85,7 +85,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		}
 
 		v := apiclient.VoteData{
-			ElectionID:   election.election.ElectionID,
+			Election:     election.election,
 			ProofMkTree:  proof,
 			VoterAccount: vAccts[0],
 			Choices:      []int{1},
@@ -116,7 +116,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		t.elections[0].voters.Range(func(key, value any) bool {
 			if acctp, ok := value.(acctProof); ok {
 				votes = append(votes, &apiclient.VoteData{
-					ElectionID:   t.elections[0].election.ElectionID,
+					Election:     t.elections[0].election,
 					ProofMkTree:  acctp.proof,
 					Choices:      []int{0},
 					VoterAccount: acctp.account,
@@ -225,7 +225,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		defer wg.Done()
 
 		api := t.elections[1].api
-		electionID := t.elections[1].election.ElectionID
+		election := t.elections[1].election
 
 		// Send the votes (parallelized)
 		startTime := time.Now()
@@ -236,7 +236,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		t.elections[1].voters.Range(func(key, value any) bool {
 			if acctp, ok := value.(acctProof); ok {
 				votes = append(votes, &apiclient.VoteData{
-					ElectionID:   electionID,
+					Election:     election,
 					ProofMkTree:  acctp.proof,
 					Choices:      []int{0},
 					VoterAccount: acctp.account,
@@ -247,7 +247,7 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		errs := t.elections[1].sendVotes(votes[1:])
 		if len(errs) > 0 {
-			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
+			errCh <- fmt.Errorf("error from electionID: %s, %+v", election.ElectionID, errs)
 			return
 		}
 
@@ -259,13 +259,13 @@ func (t *E2EDynamicensusElection) Run() error {
 		var err error
 
 		if censusRoot2, _, err = setupNewCensusAndVote(t.elections[1]); err != nil {
-			errCh <- fmt.Errorf("unexpected error from electionID: %s, error: %s", electionID, err)
+			errCh <- fmt.Errorf("unexpected error from electionID: %s, error: %s", election.ElectionID, err)
 			return
 		}
 
 		log.Debugf("election details before: %s %s %x", t.elections[1].election.Census.CensusOrigin, t.elections[1].election.Census.CensusURL, t.elections[1].election.Census.CensusRoot)
 
-		if _, err := api.TransactionSetCensus(electionID, vapi.ElectionCensus{
+		if _, err := api.TransactionSetCensus(election.ElectionID, vapi.ElectionCensus{
 			CensusOrigin: "OFF_CHAIN_TREE_WEIGHTED",
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",

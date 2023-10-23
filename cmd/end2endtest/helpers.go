@@ -504,8 +504,8 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
 		queues = append(queues, make(map[int]*apiclient.VoteData, len(votes)))
 	}
 	for i, v := range votes {
-		if v.ElectionID == nil {
-			v.ElectionID = t.election.ElectionID
+		if v.Election == nil {
+			v.Election = t.election
 		}
 		queues[i%t.config.parallelCount][i] = v
 	}

@@ -64,7 +64,7 @@ func (t *E2ERaceDuringCommit) Run() error {
 	t.voters.Range(func(key, value any) bool {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
-				ElectionID:   t.election.ElectionID,
+				Election:     t.election,
 				ProofMkTree:  acctp.proof,
 				Choices:      []int{vcount % 2},
 				VoterAccount: acctp.account,
