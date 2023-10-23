@@ -223,24 +223,3 @@ jobs:
         uses: shogo82148/actions-goveralls@v1
         with:
           parallel-finished: true
-
-  job_gocoverage_deepsource:
-    name: Publish coverage (DeepSource)
-    runs-on: ubuntu-latest
-    needs: [job_gocoverage_textfmt]
-    continue-on-error: true # never mark the whole CI as failed because of this job
-    steps:
-      - uses: actions/checkout@v3
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
-      - uses: actions/download-artifact@v3
-        with:
-          name: gocoverage-all-textfmt@${{ env.SHA }}
-      - name: Send coverage to DeepSource
-        env: 
-          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
-        run: |
-          # Install the CLI
-          curl https://deepsource.io/cli | sh
-
-          # Send the report to DeepSource
-          ./bin/deepsource report --analyzer test-coverage --key go --value-file gocoverage-merged@${{ env.SHA }}.txt
