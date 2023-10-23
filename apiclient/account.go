@@ -17,9 +17,7 @@ import (
 
 const (
 	// DefaultDevelopmentFaucetURL is the default URL for the development faucet which can be used freely.
-	DefaultDevelopmentFaucetURL = "https://faucet-azeno.vocdoni.net/faucet/vocdoni/dev/"
-	// DefaultDevelopmentFaucetToken is the default token for the development faucet which can be used freely.
-	DefaultDevelopmentFaucetToken = "158a58ba-bd3e-479e-b230-2814a34fae8f"
+	DefaultDevelopmentFaucetURL = "https://api-dev.faucet.vocdoni.net/v2/open/claim/"
 )
 
 var (

@@ -259,7 +259,7 @@ func (c *HTTPclient) EncryptionKeys(electionID types.HexBytes) ([]api.Key, error
 func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
 	return GetFaucetPackageFromRemoteService(
 		DefaultDevelopmentFaucetURL+account,
-		DefaultDevelopmentFaucetToken,
+		"",
 	)
 }
 
