@@ -166,7 +166,7 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 // WaitUntilElectionResults waits until the given election has published final results.
 func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
 	electionID types.HexBytes) (*api.ElectionResults, error) {
-	log.Infof("waiting for election %s to publish final results", electionID)
+	log.Infof("waiting for election %s to publish final results", electionID.String())
 	startTime := time.Now()
 	for {
 		election, err := c.ElectionResults(electionID)

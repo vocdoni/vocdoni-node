@@ -17,6 +17,7 @@ services:
       - gocoverage-seed:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   miner0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -30,6 +31,7 @@ services:
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   miner1:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -43,6 +45,7 @@ services:
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   miner2:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -56,6 +59,7 @@ services:
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   miner3:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -69,6 +73,7 @@ services:
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   gateway0:
     image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
@@ -84,6 +89,7 @@ services:
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
@@ -98,9 +104,8 @@ services:
       - gocoverage-test:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
     command: "true"
-    profiles:
-      - tools # this container is only intended to be `docker compose run`, no need to start on `docker compose up`
 
   gocoverage:
     image: golang:1.21
