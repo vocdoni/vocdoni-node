@@ -379,40 +379,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 		}
 
-	case *models.Tx_SetTransactionCosts:
-		cost, err := t.SetTransactionCostsTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("setTransactionCostsTx: %w", err)
-		}
-		if forCommit {
-			if err := t.state.SetTxBaseCost(vtx.Tx.GetSetTransactionCosts().Txtype, cost); err != nil {
-				return nil, fmt.Errorf("setTransactionCostsTx: %w", err)
-			}
-			return response, t.state.IncrementTreasurerNonce()
-		}
-
-	case *models.Tx_MintTokens:
-		err := t.MintTokensTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("mintTokensTx: %w", err)
-		}
-		if forCommit {
-			tx := vtx.Tx.GetMintTokens()
-			treasurer, err := t.state.Treasurer(true)
-			if err != nil {
-				return nil, fmt.Errorf("mintTokensTx: %w", err)
-			}
-			if err := t.state.MintBalance(&vochaintx.TokenTransfer{
-				FromAddress: common.BytesToAddress(treasurer.Address),
-				ToAddress:   common.BytesToAddress(tx.To),
-				Amount:      tx.Value,
-				TxHash:      vtx.TxID[:],
-			}); err != nil {
-				return nil, fmt.Errorf("mintTokensTx: %w", err)
-			}
-			return response, t.state.IncrementTreasurerNonce()
-		}
-
 	case *models.Tx_SendTokens:
 		err := t.SendTokensTxCheck(vtx)
 		if err != nil {

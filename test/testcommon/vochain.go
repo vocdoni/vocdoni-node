@@ -11,7 +11,6 @@ import (
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -48,37 +47,6 @@ var (
 	StateDBProcessHardcoded = &models.StateDBProcess{
 		Process:   ProcessHardcoded,
 		VotesRoot: make([]byte, 32),
-	}
-
-	// privKey e0aa6db5a833531da4d259fb5df210bae481b276dc4c2ab6ab9771569375aed5 for address 06d0d2c41f4560f8ffea1285f44ce0ffa2e19ef0
-	HardcodedNewProcessTx = &models.NewProcessTx{
-		Txtype:  models.TxType_NEW_PROCESS,
-		Process: ProcessHardcoded,
-		Nonce:   0,
-	}
-
-	HardcodedNewVoteTx = &models.VoteEnvelope{
-		Nonce:     util.RandomBytes(32),
-		Nullifier: testutil.Hex2byte(nil, "5592f1c18e2a15953f355c34b247d751da307338c994000b9a65db1dc14cc6c0"),
-		ProcessId: testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
-		Proof: &models.Proof{Payload: &models.Proof_Graviton{Graviton: &models.ProofGraviton{
-			Siblings: testutil.Hex2byte(nil, "00030000000000000000000000000000000000000000000000000000000000070ab34471caaefc9bb249cb178335f367988c159f3907530ef7daa1e1bf0c9c7a218f981be7c0c46ffa345d291abb36a17c22722814fb0110240b8640fd1484a6268dc2f0fc2152bf83c06566fbf155f38b8293033d4779a63bba6c7157fd10c8"),
-		}}},
-		VotePackage: testutil.B642byte(nil, "eyJ0eXBlIjoicG9sbC12b3RlIiwibm9uY2UiOiI1NTkyZjFjMThlMmExNTk1M2YzNTVjMzRiMjQ3ZDc1MWRhMzA3MzM4Yzk5NDAwMGI5YTY1ZGIxZGMxNGNjNmMwIiwidm90ZXMiOlsxLDIsMV19"),
-	}
-
-	power                        = uint64(10)
-	HardcodedAdminTxAddValidator = &models.AdminTx{
-		Txtype:  models.TxType_ADD_VALIDATOR,
-		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   0,
-		Power:   &power,
-	}
-
-	HardcodedAdminTxRemoveValidator = &models.AdminTx{
-		Txtype:  models.TxType_REMOVE_VALIDATOR,
-		Address: testutil.Hex2byte(nil, "5DC922017285EC24415F3E7ECD045665EADA8B5A"),
-		Nonce:   0,
 	}
 )
 

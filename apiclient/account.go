@@ -27,23 +27,6 @@ var (
 	ErrAccountNotConfigured = fmt.Errorf("account not configured")
 )
 
-// Treasurer returns the treasurer address.
-func (c *HTTPclient) Treasurer() (*api.Account, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", "treasurer")
-	if err != nil {
-		return nil, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	acc := &api.Account{}
-	err = json.Unmarshal(resp, acc)
-	if err != nil {
-		return nil, err
-	}
-	return acc, nil
-}
-
 // Account returns the information about a Vocdoni account. If address is empty, it returns the information
 // about the account associated with the client.
 func (c *HTTPclient) Account(address string) (*api.Account, error) {

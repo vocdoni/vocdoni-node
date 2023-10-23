@@ -123,14 +123,6 @@ func (app *BaseApplication) InitChain(_ context.Context,
 			"validatorAddr", hex.EncodeToString(myValidator.ValidatorAddress))
 	}
 
-	// set treasurer address // TODO: Remove
-	if genesisAppState.Treasurer != nil {
-		log.Infof("adding genesis treasurer %x", genesisAppState.Treasurer)
-		if err := app.State.SetTreasurer(ethcommon.BytesToAddress(genesisAppState.Treasurer), 0); err != nil {
-			return nil, fmt.Errorf("could not set State.Treasurer from genesis file: %w", err)
-		}
-	}
-
 	// add tx costs
 	for k, v := range genesisAppState.TxCost.AsMap() {
 		err = app.State.SetTxBaseCost(k, v)

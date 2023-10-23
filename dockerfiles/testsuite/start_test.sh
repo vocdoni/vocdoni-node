@@ -34,9 +34,6 @@ ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 APIHOST="http://gateway0:9090/v2"
 FAUCET="$APIHOST/faucet/dev/"
-. env.treasurerkey # contains var VOCDONI_SIGNINGKEY, import into current env
-TREASURER_KEY="$VOCDONI_SIGNINGKEY"
-[ -n "$TESTSUITE_TREASURER_KEY" ] && TREASURER_KEY="$TESTSUITE_TREASURER_KEY"
 TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
 
@@ -158,6 +155,7 @@ e2etest_ballotelection() {
 
 log "### Starting test suite ###"
 $COMPOSE_CMD build
+$COMPOSE_CMD build test
 $COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
 sleep 10
 $COMPOSE_CMD up -d

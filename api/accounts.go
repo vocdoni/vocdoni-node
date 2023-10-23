@@ -44,14 +44,6 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.endpoint.RegisterMethod(
-		"/accounts/treasurer",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.treasurerHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -238,33 +230,6 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// treasurerHandler
-//
-//	@Summary		Get treasurer address
-//	@Description	Get treasurer address. The treasurer is a new authority entity identified by its Ethereum address and is the only one that can Mint new tokens.
-//	@Tags			Accounts
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	object{address=string}
-//	@Router			/accounts/treasurer [get]
-func (a *API) treasurerHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	acc, err := a.vocapp.State.Treasurer(true)
-	if err != nil {
-		return err
-	}
-	if acc == nil {
-		return ErrTreasurerNotFound
-	}
-	data, err := json.Marshal(struct {
-		Address types.HexBytes `json:"address"`
-	}{Address: acc.GetAddress()})
-
-	if err != nil {
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)

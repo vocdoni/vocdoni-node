@@ -31,7 +31,6 @@ var (
 	ErrDstAccountUnknown                = apirest.APIerror{Code: 4002, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("destination account is unknown")}
 	ErrAccountNotFound                  = apirest.APIerror{Code: 4003, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("account not found")}
 	ErrAccountAlreadyExists             = apirest.APIerror{Code: 4004, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("account already exists")}
-	ErrTreasurerNotFound                = apirest.APIerror{Code: 4005, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("treasurer account not found")}
 	ErrOrgNotFound                      = apirest.APIerror{Code: 4006, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("organization not found")}
 	ErrTransactionNotFound              = apirest.APIerror{Code: 4007, HTTPstatus: apirest.HTTPstatusNoContent, Err: fmt.Errorf("transaction not found")}
 	ErrBlockNotFound                    = apirest.APIerror{Code: 4008, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("block not found")}

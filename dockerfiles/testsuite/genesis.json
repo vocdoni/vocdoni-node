@@ -61,7 +61,6 @@
            "balance":1000000000000
          }	
       ],
-    "treasurer": "0xfe10DAB06D636647f4E40dFd56599da9eF66Db1c",
     "tx_cost": {
         "Tx_SetProcessStatus": 1,
         "Tx_SetProcessCensus": 1,
