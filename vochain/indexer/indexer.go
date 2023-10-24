@@ -251,7 +251,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		indxR := &results.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:        results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Votes:        results.NewEmptyVotes(options),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.Envelope,
