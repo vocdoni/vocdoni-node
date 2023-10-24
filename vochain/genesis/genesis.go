@@ -28,7 +28,7 @@ var Genesis = map[string]Vochain{
 
 	// LTS production network
 	"lts": {
-		AutoUpdateGenesis: false,
+		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
 			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
@@ -240,7 +240,7 @@ var stageGenesis = Doc{
 
 var ltsGenesis = Doc{
 	GenesisTime: time.Date(2023, time.October, 24, 9, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-lts-v1",
+	ChainID:     "vocdoni/LTS/1.2",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
