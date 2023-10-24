@@ -184,7 +184,7 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 	// Add the Election weight (tells how much voting power have already been processed)
 	r.Weight.Add(r.Weight, (*types.BigInt)(weight))
 	if len(r.Votes) == 0 {
-		r.Votes = NewEmptyVotes(int(r.VoteOpts.MaxCount), int(r.VoteOpts.MaxValue)+1)
+		r.Votes = NewEmptyVotes(r.VoteOpts)
 	}
 
 	// If MaxValue is zero, consider discrete value couting. So for each questoin, the value
@@ -223,14 +223,16 @@ func (r *Results) AddVote(voteValues []int, weight *big.Int, mutex *sync.Mutex) 
 }
 
 // NewEmptyVotes creates a new results struct with the given number of questions and options
-func NewEmptyVotes(questions, options int) [][]*types.BigInt {
+func NewEmptyVotes(voteOpts *models.ProcessVoteOptions) [][]*types.BigInt {
+	questions := voteOpts.MaxCount
+	options := voteOpts.MaxValue + 1
 	if questions == 0 || options == 0 {
 		return nil
 	}
 	results := [][]*types.BigInt{}
-	for i := 0; i < questions; i++ {
+	for i := uint32(0); i < questions; i++ {
 		question := []*types.BigInt{}
-		for j := 0; j < options; j++ {
+		for j := uint32(0); j < options; j++ {
 			question = append(question, new(types.BigInt).SetUint64(0))
 		}
 		results = append(results, question)

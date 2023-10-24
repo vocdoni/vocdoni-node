@@ -34,7 +34,7 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		return nil, fmt.Errorf("maxCount overflow %d", p.VoteOptions.MaxCount)
 	}
 	results := &Results{
-		Votes:        NewEmptyVotes(int(p.VoteOptions.MaxCount), int(p.VoteOptions.MaxValue)+1),
+		Votes:        NewEmptyVotes(p.VoteOptions),
 		ProcessID:    electionID,
 		Weight:       new(types.BigInt).SetUint64(0),
 		VoteOpts:     p.VoteOptions,
