@@ -215,7 +215,7 @@ var stageGenesis = Doc{
 		},
 		Accounts: []Account{
 			{ // faucet
-				Address: types.HexStringToHexBytes("0xC7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
+				Address: types.HexStringToHexBytes("C7C6E17059801b6962cc144a374eCc3ba1b8A9e0"),
 				Balance: 1000000000,
 			},
 		},
@@ -239,7 +239,7 @@ var stageGenesis = Doc{
 }
 
 var ltsGenesis = Doc{
-	GenesisTime: time.Date(2023, time.October, 17, 17, 0, 0, 0, time.UTC),
+	GenesisTime: time.Date(2023, time.October, 24, 9, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni-lts-v1",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
@@ -326,9 +326,13 @@ var ltsGenesis = Doc{
 			},
 		},
 		Accounts: []Account{
-			{ // faucet
+			{ // treasury
 				Address: types.HexStringToHexBytes("863a75f41025f0c8878d3a100c8c16576fe8fe4f"),
 				Balance: 1000000000,
+			},
+			{ // faucet
+				Address: types.HexStringToHexBytes("4Ca9F2Dc015Df06BFE1ed19F96bCB92ECF612a76"),
+				Balance: 10000000,
 			},
 		},
 		TxCost: TransactionCosts{
@@ -345,7 +349,7 @@ var ltsGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
-			SetAccountValidator:     200000,
+			SetAccountValidator:     500000,
 		},
 	},
 }
