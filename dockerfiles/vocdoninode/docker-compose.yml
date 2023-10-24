@@ -9,19 +9,13 @@ services:
       - "run:/app/run"
       - "eth:/app/eth:ro"
     ports:
-      - "443:9090"
-      - "9090:9090"
-      - "9091:9091"
-      - "4001:4001"
-      - "4171:4171"
-      - "5001:5001"
-      - "30303:30303"
-      - "30303:30303/udp"
-      - "9096:9096"
-      - "26656:26656"
-      - "26657:26657"
-      - "26658:26658"
-      - "61000-61100:61000-61100"
+      - "443:9090"                      # REST API gateway
+      - "9090:9090"                     # REST API gateway
+      - "4001:4001"                     # IPFS swarm
+      - "[::1]:5001:5001"               # IPFS api, never expose outside localhost
+      - "26656:26656"                   # CometBFT p2p port (PublicAddr)
+      - "[::1]:26658:26658"             # CometBFT PrivValidatorListenAddr (disabled by default)
+      - "[::1]:61000-61100:61000-61100" # PprofPort (runtime profiling data, disabled by default)
     sysctls:
       net.core.somaxconn: 8128
     restart: ${RESTART:-no}
