@@ -117,8 +117,8 @@ services:
       - gocoverage-miner3:/app/run/gocoverage/miner3
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
       - gocoverage-test:/app/run/gocoverage/test
-    profiles:
-      - tools # this container is only intended to be `docker compose run`, no need to start on `docker compose up`
+    networks:
+      - blockchain
 
   prometheus:
     image: prom/prometheus:v2.26.0
@@ -144,7 +144,7 @@ services:
     networks:
       - blockchain
     ports:
-      - 3000:3000
+      - "[::1]:3000:3000"
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
