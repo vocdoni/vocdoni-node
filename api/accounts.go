@@ -27,7 +27,7 @@ const (
 )
 
 func (a *API) enableAccountHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{address}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -35,7 +35,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -43,7 +43,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -51,7 +51,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/status/{status}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -59,7 +59,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{organizationID}/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -67,7 +67,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{accountID}/transfers/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -75,7 +75,7 @@ func (a *API) enableAccountHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{accountID}/fees/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,

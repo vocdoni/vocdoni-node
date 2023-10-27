@@ -26,7 +26,7 @@ const (
 )
 
 func (a *API) enableChainHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -34,7 +34,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -42,7 +42,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/info",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -50,7 +50,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/info/circuit",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -58,7 +58,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/info/electionPriceFactors",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -66,7 +66,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/dateToBlock/{timestamp}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -74,7 +74,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/blockToDate/{height}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -82,7 +82,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/cost",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -90,7 +90,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/reference/{hash}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -98,7 +98,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/reference/index/{index}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -106,7 +106,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/blocks/{height}/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -114,7 +114,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/{height}/{index}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -122,7 +122,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -130,7 +130,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -138,7 +138,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/validators",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -146,7 +146,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/blocks/{height}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -154,7 +154,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/blocks/hash/{hash}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -162,7 +162,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -170,7 +170,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -178,7 +178,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/fees/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -186,7 +186,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/fees/reference/{reference}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -194,7 +194,7 @@ func (a *API) enableChainHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/fees/type/{type}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,

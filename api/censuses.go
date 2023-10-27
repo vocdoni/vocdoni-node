@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -35,7 +36,7 @@ const (
 )
 
 func (a *API) enableCensusHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{type}",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -43,7 +44,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/participants",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -51,7 +52,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/type",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -59,7 +60,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/root",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -67,7 +68,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/export",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -75,7 +76,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/import",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -83,7 +84,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/weight",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -91,7 +92,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/size",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -99,7 +100,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/publish",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -107,7 +108,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/publish/{root}",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -115,7 +116,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}",
 		"DELETE",
 		apirest.MethodAccessTypePublic,
@@ -123,7 +124,7 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/proof/{key}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -131,11 +132,27 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/{censusID}/verify",
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.censusVerifyHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/export",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.censusExportDBHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/import",
+		"POST",
+		apirest.MethodAccessTypeAdmin,
+		a.censusImportDBHandler,
 	); err != nil {
 		return err
 	}
@@ -164,7 +181,12 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return ErrCensusTypeUnknown
 	}
 
-	maxLevels := a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
+	// get census max levels from vochain app if available
+	maxLevels := circuit.CircuitsConfigurations[circuit.DefaultCircuitConfigurationTag].Levels
+	if a.vocapp != nil {
+		maxLevels = a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
+	}
+
 	censusID := util.RandomBytes(32)
 	_, err = a.censusdb.New(censusID, censusType, "", &token, maxLevels)
 	if err != nil {
@@ -799,4 +821,37 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// censusExportDBHandler
+//
+//	@Summary		Export census database
+//	@Description	Export the whole census database to a JSON file. Requires Admin Bearer token.
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Success		200			{object}	object{valid=bool}
+//	@Router			/censuses/export [get]
+func (a *API) censusExportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	buf := bytes.Buffer{}
+	if err := a.censusdb.ExportCensusDB(&buf); err != nil {
+		return err
+	}
+	return ctx.Send(buf.Bytes(), apirest.HTTPstatusOK)
+}
+
+// censusImportHandler
+//
+//	@Summary		Import census database
+//	@Description	Import the whole census database from a JSON file.
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Success		200			{object}	object{valid=bool}
+//	@Router			/censuses/import [post]
+func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
+		return err
+	}
+	return ctx.Send(nil, apirest.HTTPstatusOK)
 }

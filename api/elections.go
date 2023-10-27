@@ -30,7 +30,7 @@ const (
 )
 
 func (a *API) enableElectionHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -38,7 +38,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionID}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -46,7 +46,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionID}/keys",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -54,7 +54,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -62,7 +62,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionID}/votes/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -70,7 +70,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionID}/scrutiny",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -78,7 +78,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -86,7 +86,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/price",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -94,7 +94,7 @@ func (a *API) enableElectionHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/files/cid",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -103,7 +103,7 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,

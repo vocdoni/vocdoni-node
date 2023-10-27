@@ -14,7 +14,7 @@ func (d *OffChainDataHandler) importExternalCensus(uri string, data []byte) {
 		log.Warnf("cannot import empty census from %s", uri)
 		return
 	}
-	if err := d.census.ImportAsPublic(data); err != nil {
+	if err := d.census.ImportTreeAsPublic(data); err != nil {
 		if !errors.Is(err, censusdb.ErrCensusAlreadyExists) {
 			log.Warnf("cannot import census from %s: %v", uri, err)
 		}

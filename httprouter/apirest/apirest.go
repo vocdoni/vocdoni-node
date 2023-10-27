@@ -2,6 +2,7 @@ package apirest
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -24,8 +25,9 @@ const (
 	// MethodAccessTypeAdmin for admin requests
 	MethodAccessTypeAdmin = "admin"
 
-	namespace    = "bearerStd"
-	bearerPrefix = "Bearer "
+	namespace         = "bearerStd"
+	bearerPrefix      = "Bearer "
+	maxRequestBodyLog = 1024 // maximum request body size to log
 )
 
 // HTTPstatus* equal http.Status*, simple sugar to avoid importing http everywhere
@@ -175,24 +177,39 @@ func (a *API) AuthorizeRequest(data any, accessType httprouter.AuthAccessType) (
 	}
 }
 
-// ProcessData is a function for the RouterNamespace interface.
+// ProcessData processes the HTTP request and returns structured data.
 // The body of the http requests and the bearer auth token are readed.
 func (a *API) ProcessData(req *http.Request) (any, error) {
+	// Read and handle the request body
 	reqBody, err := io.ReadAll(req.Body)
 	if err != nil {
-		return nil, fmt.Errorf("HTTP connection closed: (%v)", err)
+		return nil, fmt.Errorf("error reading request body: %v", err)
 	}
+	// Log the request body if it exists
 	if len(reqBody) > 0 {
-		req := string(reqBody)
-		if len(req) > 1024 {
-			req = req[:1024] + "..." // truncate
+		displayReq := string(reqBody)
+		if len(displayReq) > maxRequestBodyLog {
+			displayReq = displayReq[:maxRequestBodyLog] + "..." // truncate for display
 		}
-		log.Debugf("request: %s", req)
+		// This assumes you have a configured logging method. Replace with your logger instance.
+		log.Debugf("request: %s", displayReq)
 	}
+	// Get and validate the Authorization header
+	token := ""
+	authHeader := req.Header.Get("Authorization")
+	if authHeader != "" {
+		if !strings.HasPrefix(authHeader, bearerPrefix) {
+			return nil, errors.New("authorization header is not a Bearer token")
+		}
+		// Extract the token
+		token = strings.TrimPrefix(authHeader, bearerPrefix)
+	}
+	// Prepare the structured data
 	msg := &APIdata{
 		Data:      reqBody,
-		AuthToken: strings.TrimPrefix(req.Header.Get("Authorization"), bearerPrefix),
+		AuthToken: token,
 	}
+	// If verbose logging is enabled, log the verbose authentication information
 	if a.verboseAuthLog && msg.AuthToken != "" {
 		fmt.Printf("[BearerAPI/%d/%s] %s {%s}\n", time.Now().Unix(), msg.AuthToken, req.URL.RequestURI(), reqBody)
 	}
@@ -203,8 +220,7 @@ func (a *API) ProcessData(req *http.Request) (any, error) {
 // The pattern URL can contain variable names by using braces, such as /send/{name}/hello
 // The pattern can also contain wildcard at the end of the path, such as /send/{name}/hello/*
 // The accessType can be of type private, public or admin.
-func (a *API) RegisterMethod(pattern, HTTPmethod string,
-	accessType string, handler APIhandler) error {
+func (a *API) RegisterMethod(pattern, HTTPmethod string, accessType string, handler APIhandler) error {
 	if pattern[0] != '/' {
 		panic("pattern must start with /")
 	}

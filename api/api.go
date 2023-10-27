@@ -64,9 +64,9 @@ type API struct {
 	PrivateCalls uint64
 	PublicCalls  uint64
 	BaseRoute    string
+	Endpoint     *apirest.API
 
 	router   *httprouter.HTTProuter
-	endpoint *apirest.API
 	indexer  *indexer.Indexer
 	vocapp   *vochain.BaseApplication
 	storage  data.Storage
@@ -95,7 +95,7 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 		router:    router,
 	}
 	var err error
-	api.endpoint, err = apirest.NewAPI(router, baseRoute)
+	api.Endpoint, err = apirest.NewAPI(router, baseRoute)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +120,7 @@ func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochainin
 
 // RouterHandler returns the API router handler which can be used to register new custom endpoints.
 func (a *API) RouterHandler() *apirest.API {
-	return a.endpoint
+	return a.Endpoint
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.
@@ -131,34 +131,48 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			if a.vocapp == nil || a.indexer == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-			a.enableVoteHandlers()
+			if err := a.enableVoteHandlers(); err != nil {
+				return err
+			}
 		case ElectionHandler:
 			if a.indexer == nil || a.vocinfo == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-			a.enableElectionHandlers()
+			if err := a.enableElectionHandlers(); err != nil {
+				return err
+			}
 		case ChainHandler:
 			if a.indexer == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-			a.enableChainHandlers()
+			if err := a.enableChainHandlers(); err != nil {
+				return err
+			}
 		case WalletHandler:
 			if a.vocapp == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-			a.enableWalletHandlers()
+			if err := a.enableWalletHandlers(); err != nil {
+				return err
+			}
 		case AccountHandler:
 			if a.vocapp == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-			a.enableAccountHandlers()
+			if err := a.enableAccountHandlers(); err != nil {
+				return err
+			}
 		case CensusHandler:
-			a.enableCensusHandlers()
+			if err := a.enableCensusHandlers(); err != nil {
+				return err
+			}
 			if a.censusdb == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
 		case SIKHandler:
-			a.enableSIKHandlers()
+			if err := a.enableSIKHandlers(); err != nil {
+				return err
+			}
 			if a.censusdb == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
