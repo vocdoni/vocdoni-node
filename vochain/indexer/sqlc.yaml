@@ -8,11 +8,8 @@ sql:
       package: "indexerdb"
       out: "db"
       emit_prepared_queries: true
+      omit_unused_structs: true
       overrides:
-      # Defaults to int32 for integers, which is a bit small.
-      - db_type: "int"
-        go_type: "int64"
-      
       # Force these blobs to be our "bytes" types.
       - column: "processes.id"
         go_type: "go.vocdoni.io/dvote/types.ProcessID"

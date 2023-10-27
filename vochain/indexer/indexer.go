@@ -33,16 +33,10 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.21.0 generate
+//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.23.0 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
-
-const (
-	// MaxEnvelopeListSize is the maximum number of envelopes a process can store.
-	// 8.3M seems enough for now
-	MaxEnvelopeListSize = 32 << 18
-)
 
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
@@ -257,7 +251,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		indxR := &results.Results{
 			ProcessID: p,
 			// MaxValue requires +1 since 0 is also an option
-			Votes:        results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1),
+			Votes:        results.NewEmptyVotes(options),
 			Weight:       new(types.BigInt).SetUint64(0),
 			VoteOpts:     options,
 			EnvelopeType: process.Envelope,

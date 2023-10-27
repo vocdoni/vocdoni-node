@@ -157,11 +157,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		p.StartBlock = idx.App.Height()
 	}
 
-	compResultsHeight := uint32(0)
-	if !p.EnvelopeType.EncryptedVotes { // like isOpenProcess, but on the state type
-		compResultsHeight = p.BlockCount + p.StartBlock + 1
-	}
-
 	// Create and store process in the indexer database
 	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
@@ -169,7 +164,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		BlockCount:        int64(p.BlockCount),
-		HaveResults:       compResultsHeight > 0,
+		HaveResults:       !p.EnvelopeType.EncryptedVotes, // like isOpenProcess, but on the state type
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),
 		CensusUri:         p.GetCensusURI(),
@@ -185,7 +180,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
-		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(int(options.MaxCount), int(options.MaxValue)+1)),
+		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(options)),
 	}
 
 	idx.blockMu.Lock()
