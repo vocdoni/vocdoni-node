@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/censustree"
@@ -14,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -59,11 +61,13 @@ func (cr *CensusRef) SetTree(tree *censustree.Tree) {
 // for import/export operations.
 type CensusDump struct {
 	Type     models.Census_Type `json:"type"`
-	RootHash []byte             `json:"rootHash"`
+	RootHash types.HexBytes     `json:"rootHash"`
 	Data     []byte             `json:"data"`
 	// MaxLevels is required to load the census with the original size because
 	// it could be different according to the election (and census) type.
-	MaxLevels int `json:"maxLevels"`
+	MaxLevels int            `json:"maxLevels"`
+	CensusID  types.HexBytes `json:"censusID,omitempty"`
+	Token     *uuid.UUID     `json:"token,omitempty"`
 }
 
 // CensusDB is a safe and persistent database of census trees.  It allows
@@ -131,7 +135,19 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 	if ref.URI != "" {
 		ref.tree.Publish()
 	}
-	log.Debugf("loaded tree %x of type %s", censusID, models.Census_Type_name[ref.CensusType])
+	root, err := ref.Tree().Root()
+	if err != nil {
+		return nil, err
+	}
+	size, err := ref.Tree().Size()
+	if err != nil {
+		return nil, err
+	}
+	log.Debugw("loaded census tree",
+		"id", hex.EncodeToString(censusID),
+		"type", models.Census_Type_name[ref.CensusType],
+		"size", size,
+		"root", hex.EncodeToString(root))
 	return ref, nil
 }
 
@@ -169,8 +185,8 @@ func BuildExportDump(root, data []byte, typ models.Census_Type, maxLevels int) (
 	return exportData, nil
 }
 
-// ImportAsPublic imports a census from a dump and makes it public.
-func (c *CensusDB) ImportAsPublic(data []byte) error {
+// ImportTreeAsPublic imports a census from a dump and makes it public.
+func (c *CensusDB) ImportTreeAsPublic(data []byte) error {
 	cdata := CensusDump{}
 	if err := json.Unmarshal(data, &cdata); err != nil {
 		return fmt.Errorf("could not unmarshal census: %w", err)
@@ -236,7 +252,7 @@ func (c *CensusDB) getCensusRefFromDB(censusID []byte) (*CensusRef, error) {
 		))
 	if err != nil {
 		if errors.Is(err, db.ErrKeyNotFound) {
-			return nil, ErrCensusNotFound
+			return nil, fmt.Errorf("%w: %x", ErrCensusNotFound, censusID)
 		}
 		return nil, err
 	}
@@ -248,4 +264,105 @@ func (c *CensusDB) getCensusRefFromDB(censusID []byte) (*CensusRef, error) {
 // censusName returns the name of the census tree in the database.
 func censusName(censusID []byte) string {
 	return fmt.Sprintf("%s%x", censusDBprefix, censusID)
+}
+
+// ExportCensusDB will create a memory buffer, iterate over all the censuses in the database, load each one,
+// create a dump of its data, and finally write this information into a JSON array inside the buffer.
+func (c *CensusDB) ExportCensusDB(buffer io.Writer) error {
+	var censusList []CensusDump
+
+	// Iterate through all census entries in the DB
+	err := c.db.Iterate([]byte(censusDBreferencePrefix), func(key []byte, data []byte) bool {
+		censusID := make([]byte, len(key))
+		copy(censusID, key)
+		dec := gob.NewDecoder(bytes.NewReader(data))
+		ref := CensusRef{}
+		if err := dec.Decode(&ref); err != nil {
+			log.Errorf("error decoding census reference: %s", err)
+			return true
+		}
+		// Load the census tree
+		var err error
+		ref.tree, err = censustree.New(censustree.Options{
+			Name:       censusName(censusID),
+			ParentDB:   c.db,
+			MaxLevels:  ref.MaxLevels,
+			CensusType: models.Census_Type(ref.CensusType),
+		})
+		if err != nil {
+			log.Errorf("error loading census tree: %s", err)
+			return true
+		}
+		// Gather the information needed for the dump.
+		root, err := ref.Tree().Root()
+		if err != nil {
+			log.Errorf("Error getting tree root: %s", err)
+			return false
+		}
+
+		// Assuming the tree's Dump method returns the data you want to store
+		treeData, err := ref.Tree().Dump()
+		if err != nil {
+			log.Errorf("Error dumping tree data: %s", err)
+			return false
+		}
+
+		dump := CensusDump{
+			Type:      models.Census_Type(ref.CensusType),
+			RootHash:  root,
+			Data:      treeData,
+			MaxLevels: ref.MaxLevels,
+			CensusID:  censusID,
+			Token:     ref.AuthToken,
+		}
+
+		censusList = append(censusList, dump)
+		return true // continue iteration
+	})
+	if err != nil {
+		return fmt.Errorf("error during database iteration: %w", err)
+	}
+
+	// Convert the accumulated censusList to JSON and write it to the buffer
+	err = json.NewEncoder(buffer).Encode(censusList)
+	if err != nil {
+		return fmt.Errorf("error encoding data to JSON: %w", err)
+	}
+	return nil
+}
+
+// ImportCensusDB takes a buffer with JSON data (as created by DumpCensusDB), decodes it,
+// and imports the data back into the database, effectively restoring the censuses.
+func (c *CensusDB) ImportCensusDB(buffer io.Reader) error {
+	var censusList []CensusDump
+	// Decode the JSON back to the list of census dumps
+	err := json.NewDecoder(buffer).Decode(&censusList)
+	if err != nil {
+		return fmt.Errorf("error decoding JSON data: %w", err)
+	}
+
+	// Iterate through the decoded list and import each census
+	for _, dump := range censusList {
+		// Check if the census already exists
+		if c.Exists(dump.CensusID) {
+			log.Warnw("census already exists, skiping", "root", dump.RootHash.String(),
+				"type", dump.Type.String(), "censusID", dump.CensusID.String())
+			continue
+		}
+
+		// Create a new census reference
+		ref, err := c.New(dump.CensusID, dump.Type, "", dump.Token, dump.MaxLevels)
+		if err != nil {
+			return err
+		}
+
+		// Import the tree data from the dump.
+		err = ref.Tree().ImportDump(dump.Data)
+		if err != nil {
+			return err
+		}
+		log.Infow("importing census", "id", dump.CensusID.String(), "token", dump.Token.String(), "size", len(dump.Data))
+	}
+
+	return nil
 }

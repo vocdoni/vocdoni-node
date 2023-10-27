@@ -17,6 +17,7 @@ import (
 	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -65,6 +66,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 	vc := &Vocone{}
 	vc.Config = &config.VochainCfg{}
 	vc.Config.DataDir = dataDir
+	vc.Config.DBType = db.TypePebble
 	vc.App, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
 	if err != nil {
 		return nil, err
@@ -115,7 +117,9 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 		}
 
 		// Create the data downloader and offchain data handler
-		vc.OffChainDataHandler()
+		if err := vc.OffChainDataHandler(); err != nil {
+			return nil, err
+		}
 	}
 
 	return vc, err
@@ -138,6 +142,10 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 		vc.Storage,
 		vc.CensusDB,
 	)
+	adminToken := uuid.New()
+	log.Warnw("new admin token generated", "token", adminToken.String())
+	uAPI.Endpoint.SetAdminToken(adminToken.String())
+
 	return uAPI, uAPI.EnableHandlers(
 		api.ElectionHandler,
 		api.VoteHandler,

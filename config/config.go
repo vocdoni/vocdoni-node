@@ -41,6 +41,8 @@ type Config struct {
 	}
 	// EnableAPI enables the HTTP API REST service
 	EnableAPI bool
+	// AdminAPIToken is the token used to authenticate admin API requests
+	AdminToken string
 	// EnableFaucet enables the faucet API service for the given amounts
 	EnableFaucetWithAmount uint64
 }
@@ -53,6 +55,8 @@ func (c *Config) ValidMode() bool {
 	case types.ModeMiner:
 
 	case types.ModeSeed:
+
+	case types.ModeCensus:
 
 	default:
 		return false

@@ -6,7 +6,6 @@ import (
 
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data/downloader"
-	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
@@ -21,7 +20,7 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 		go vs.DataDownloader.PrintLogInfo(time.Second * 120)
 	}
 	if vs.CensusDB == nil {
-		db, err := metadb.New(db.TypePebble, filepath.Join(vs.Config.DataDir, "censusdb"))
+		db, err := metadb.New(vs.Config.DBType, filepath.Join(vs.Config.DataDir, "censusdb"))
 		if err != nil {
 			return err
 		}

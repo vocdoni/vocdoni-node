@@ -16,7 +16,7 @@ import (
 const VoteHandler = "votes"
 
 func (a *API) enableVoteHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/votes",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -24,7 +24,7 @@ func (a *API) enableVoteHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/votes/{voteID}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -32,7 +32,7 @@ func (a *API) enableVoteHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/votes/verify/{electionID}/{voteID}",
 		"GET",
 		apirest.MethodAccessTypePublic,

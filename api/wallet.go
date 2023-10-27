@@ -30,7 +30,7 @@ const (
 )
 
 func (a *API) enableWalletHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/wallet/add/{privateKey}",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -38,7 +38,7 @@ func (a *API) enableWalletHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/wallet/bootstrap",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -46,7 +46,7 @@ func (a *API) enableWalletHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/wallet/transfer/{dstAddress}/{amount}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -54,7 +54,7 @@ func (a *API) enableWalletHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/wallet/election",
 		"POST",
 		apirest.MethodAccessTypePublic,

@@ -17,7 +17,7 @@ const (
 )
 
 func (a *API) enableSIKHandlers() error {
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/siks/{address}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -25,7 +25,7 @@ func (a *API) enableSIKHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/siks/roots",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -33,7 +33,7 @@ func (a *API) enableSIKHandlers() error {
 	); err != nil {
 		return err
 	}
-	if err := a.endpoint.RegisterMethod(
+	if err := a.Endpoint.RegisterMethod(
 		"/siks/proof/{address}",
 		"GET",
 		apirest.MethodAccessTypePublic,

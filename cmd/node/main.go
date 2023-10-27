@@ -16,14 +16,17 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	urlapi "go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
@@ -54,7 +57,6 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 
 // newConfig creates a new config object and loads the stored configuration file
 func newConfig() (*config.Config, config.Error) {
-	var err error
 	var cfgError config.Error
 	// create base config
 	globalCfg := config.NewConfig()
@@ -92,7 +94,7 @@ func newConfig() (*config.Config, config.Error) {
 	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
 	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
-		"global operation mode. Available options: [gateway, miner, seed]")
+		"global operation mode. Available options: [gateway, miner, seed, census]")
 	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
@@ -103,6 +105,8 @@ func newConfig() (*config.Config, config.Error) {
 		"API endpoint http port")
 	globalCfg.EnableAPI = *flag.Bool("enableAPI", true,
 		"enable HTTP API endpoints")
+	globalCfg.AdminToken = *flag.String("adminToken", "",
+		"bearer token for admin API endpoints (leave empty to autogenerate)")
 	globalCfg.TLS.Domain = *flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
 	globalCfg.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
@@ -157,13 +161,6 @@ func newConfig() (*config.Config, config.Error) {
 	// parse flags
 	flag.CommandLine.SortFlags = false
 	flag.CommandLine.SetNormalizeFunc(deprecatedFlagsFunc)
-	flag.Bool("enableRPC", false, "deprecated")
-	_ = flag.CommandLine.MarkDeprecated("enableRPC",
-		"JSON-RPC endpoint support was deprecated and removed, this flag is ignored")
-	flag.String("vochainRPCListen", "", "deprecated")
-	_ = flag.CommandLine.MarkDeprecated("vochainRPCListen",
-		"JSON-RPC endpoint support was deprecated and removed, this flag is ignored")
-
 	flag.Parse()
 
 	// setting up viper
@@ -206,48 +203,114 @@ func newConfig() (*config.Config, config.Error) {
 	viper.AddConfigPath(globalCfg.DataDir)
 
 	// binding flags to viper
-	viper.BindPFlag("mode", flag.Lookup("mode"))
-	viper.BindPFlag("logLevel", flag.Lookup("logLevel"))
-	viper.BindPFlag("logErrorFile", flag.Lookup("logErrorFile"))
-	viper.BindPFlag("logOutput", flag.Lookup("logOutput"))
-	viper.BindPFlag("saveConfig", flag.Lookup("saveConfig"))
-	viper.BindPFlag("signingKey", flag.Lookup("signingKey"))
-	viper.BindPFlag("listenHost", flag.Lookup("listenHost"))
-	viper.BindPFlag("listenPort", flag.Lookup("listenPort"))
-	viper.BindPFlag("enableAPI", flag.Lookup("enableAPI"))
-	viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount"))
+	if err = viper.BindPFlag("mode", flag.Lookup("mode")); err != nil {
+		log.Fatalf("failed to bind mode flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
+		log.Fatalf("failed to bind logLevel flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("logErrorFile", flag.Lookup("logErrorFile")); err != nil {
+		log.Fatalf("failed to bind logErrorFile flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("logOutput", flag.Lookup("logOutput")); err != nil {
+		log.Fatalf("failed to bind logOutput flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("saveConfig", flag.Lookup("saveConfig")); err != nil {
+		log.Fatalf("failed to bind saveConfig flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("signingKey", flag.Lookup("signingKey")); err != nil {
+		log.Fatalf("failed to bind signingKey flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("listenHost", flag.Lookup("listenHost")); err != nil {
+		log.Fatalf("failed to bind listenHost flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("listenPort", flag.Lookup("listenPort")); err != nil {
+		log.Fatalf("failed to bind listenPort flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("enableAPI", flag.Lookup("enableAPI")); err != nil {
+		log.Fatalf("failed to bind enableAPI flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("adminToken", flag.Lookup("adminToken")); err != nil {
+		log.Fatalf("failed to bind adminToken flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount")); err != nil {
+		log.Fatalf("failed to bind enableFaucetWithAmount flag to viper: %v", err)
+	}
 	viper.Set("TLS.DirCert", globalCfg.DataDir+"/tls")
-	viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain"))
+	if err = viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain")); err != nil {
+		log.Fatalf("failed to bind TLS.Domain flag to viper: %v", err)
+	}
 
 	// ipfs
 	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
-	viper.BindPFlag("ipfs.ConnectKey", flag.Lookup("ipfsConnectKey"))
-	viper.BindPFlag("ipfs.ConnectPeers", flag.Lookup("ipfsConnectPeers"))
+	if err = viper.BindPFlag("ipfs.ConnectKey", flag.Lookup("ipfsConnectKey")); err != nil {
+		log.Fatalf("failed to bind ipfsConnectKey flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("ipfs.ConnectPeers", flag.Lookup("ipfsConnectPeers")); err != nil {
+		log.Fatalf("failed to bind ipfsConnectPeers flag to viper: %v", err)
+	}
 
 	// vochain
 	viper.Set("vochain.DataDir", globalCfg.DataDir+"/vochain")
 	viper.Set("vochain.Dev", globalCfg.Dev)
-	viper.BindPFlag("vochain.P2PListen", flag.Lookup("vochainP2PListen"))
-	viper.BindPFlag("vochain.PublicAddr", flag.Lookup("vochainPublicAddr"))
-	viper.BindPFlag("vochain.LogLevel", flag.Lookup("vochainLogLevel"))
-	viper.BindPFlag("vochain.Peers", flag.Lookup("vochainPeers"))
-	viper.BindPFlag("vochain.Seeds", flag.Lookup("vochainSeeds"))
-	viper.BindPFlag("vochain.CreateGenesis", flag.Lookup("vochainCreateGenesis"))
-	viper.BindPFlag("vochain.Genesis", flag.Lookup("vochainGenesis"))
-	viper.BindPFlag("vochain.MinerKey", flag.Lookup("vochainMinerKey"))
-	viper.BindPFlag("vochain.NodeKey", flag.Lookup("vochainNodeKey"))
-	viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync"))
-	viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize"))
-	viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime"))
-	viper.BindPFlag("vochain.SkipPreviousOffchainData", flag.Lookup("skipPreviousOffchainData"))
+
+	if err = viper.BindPFlag("vochain.P2PListen", flag.Lookup("vochainP2PListen")); err != nil {
+		log.Fatalf("failed to bind vochainP2PListen flag to viper: %v", err)
+	}
+	if err = viper.BindPFlag("vochain.PublicAddr", flag.Lookup("vochainPublicAddr")); err != nil {
+		log.Fatalf("failed to bind vochainPublicAddr flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.LogLevel", flag.Lookup("vochainLogLevel")); err != nil {
+		log.Fatalf("failed to bind vochainLogLevel flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.Peers", flag.Lookup("vochainPeers")); err != nil {
+		log.Fatalf("failed to bind vochainPeers flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.Seeds", flag.Lookup("vochainSeeds")); err != nil {
+		log.Fatalf("failed to bind vochainSeeds flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.CreateGenesis", flag.Lookup("vochainCreateGenesis")); err != nil {
+		log.Fatalf("failed to bind vochainCreateGenesis flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.Genesis", flag.Lookup("vochainGenesis")); err != nil {
+		log.Fatalf("failed to bind vochainGenesis flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.MinerKey", flag.Lookup("vochainMinerKey")); err != nil {
+		log.Fatalf("failed to bind vochainMinerKey flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.NodeKey", flag.Lookup("vochainNodeKey")); err != nil {
+		log.Fatalf("failed to bind vochainNodeKey flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync")); err != nil {
+		log.Fatalf("failed to bind vochainNoWaitSync flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize")); err != nil {
+		log.Fatalf("failed to bind vochainMempoolSize flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime")); err != nil {
+		log.Fatalf("failed to bind vochainBlockTime flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.SkipPreviousOffchainData", flag.Lookup("skipPreviousOffchainData")); err != nil {
+		log.Fatalf("failed to bind skipPreviousOffchainData flag to viper: %v", err)
+	}
 	viper.Set("vochain.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
-	viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive"))
-	viper.BindPFlag("vochain.ProcessArchiveKey", flag.Lookup("processArchiveKey"))
-	viper.BindPFlag("vochain.OffChainDataDownload", flag.Lookup("offChainDataDownload"))
+	if err := viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive")); err != nil {
+		log.Fatalf("failed to bind processArchive flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.ProcessArchiveKey", flag.Lookup("processArchiveKey")); err != nil {
+		log.Fatalf("failed to bind processArchiveKey flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.OffChainDataDownload", flag.Lookup("offChainDataDownload")); err != nil {
+		log.Fatalf("failed to bind offChainDataDownload flag to viper: %v", err)
+	}
 
 	// metrics
-	viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled"))
-	viper.BindPFlag("metrics.RefreshInterval", flag.Lookup("metricsRefreshInterval"))
+	if err := viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled")); err != nil {
+		log.Fatalf("failed to bind metricsEnabled flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("metrics.RefreshInterval", flag.Lookup("metricsRefreshInterval")); err != nil {
+		log.Fatalf("failed to bind metricsRefreshInterval flag to viper: %v", err)
+	}
 
 	// check if config file exists
 	_, err = os.Stat(globalCfg.DataDir + "/vocdoni.yml")
@@ -277,6 +340,7 @@ func newConfig() (*config.Config, config.Error) {
 			}
 		}
 	}
+
 	err = viper.Unmarshal(&globalCfg)
 	if err != nil {
 		cfgError = config.Error{
@@ -302,6 +366,11 @@ func newConfig() (*config.Config, config.Error) {
 
 	if globalCfg.Vochain.MinerKey == "" {
 		globalCfg.Vochain.MinerKey = globalCfg.SigningKey
+	}
+
+	if globalCfg.AdminToken == "" {
+		globalCfg.AdminToken = uuid.New().String()
+		fmt.Println("created new admin API token", globalCfg.AdminToken)
 	}
 
 	if globalCfg.SaveConfig {
@@ -428,7 +497,7 @@ func main() {
 	}
 
 	// HTTP(s) router for Gateway or Prometheus metrics
-	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled {
+	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled || globalCfg.Mode == types.ModeCensus {
 		// Initialize the HTTP router
 		srv.Router = new(httprouter.HTTProuter)
 		srv.Router.TLSdomain = globalCfg.TLS.Domain
@@ -444,7 +513,7 @@ func main() {
 	}
 
 	// Storage service for Gateway
-	if globalCfg.Mode == types.ModeGateway {
+	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeCensus {
 		srv.Storage, err = srv.IPFS(globalCfg.Ipfs)
 		if err != nil {
 			log.Fatal(err)
@@ -556,6 +625,7 @@ func main() {
 				srv.Storage,
 				srv.CensusDB,
 			)
+			uAPI.Endpoint.SetAdminToken(globalCfg.AdminToken)
 			if err := uAPI.EnableHandlers(
 				urlapi.ElectionHandler,
 				urlapi.VoteHandler,
@@ -582,7 +652,33 @@ func main() {
 		}
 	}
 
-	log.Info("startup complete")
+	if globalCfg.Mode == types.ModeCensus {
+		log.Info("enabling API")
+		uAPI, err := urlapi.NewAPI(srv.Router, "/v2", globalCfg.DataDir, globalCfg.Vochain.DBType)
+		if err != nil {
+			log.Fatal(err)
+		}
+		db, err := metadb.New(globalCfg.Vochain.DBType, filepath.Join(globalCfg.DataDir, "censusdb"))
+		if err != nil {
+			log.Fatal(err)
+		}
+		censusDB := censusdb.NewCensusDB(db)
+		uAPI.Attach(
+			nil,
+			nil,
+			nil,
+			srv.Storage,
+			censusDB,
+		)
+		uAPI.Endpoint.SetAdminToken(globalCfg.AdminToken)
+		if err := uAPI.EnableHandlers(
+			urlapi.CensusHandler,
+		); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	log.Infof("startup complete at %s", time.Now().Format(time.RFC850))
 
 	// close if interrupt received
 	c := make(chan os.Signal, 1)
