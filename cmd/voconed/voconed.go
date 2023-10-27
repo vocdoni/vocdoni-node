@@ -250,11 +250,9 @@ func main() {
 		}
 		log.Infof("faucet account %s, faucet amount %d", faucetAccount.Address().Hex(), config.enableFaucetWithAmount)
 		if err := faucet.AttachFaucetAPI(&faucetAccount,
-			map[string]uint64{
-				config.chainID: config.enableFaucetWithAmount,
-			},
+			config.enableFaucetWithAmount,
 			uAPI.RouterHandler(),
-			"/faucet",
+			"/open/claim",
 		); err != nil {
 			log.Fatal(err)
 		}

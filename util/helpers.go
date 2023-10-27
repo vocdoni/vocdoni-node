@@ -4,6 +4,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"net/url"
+	"path"
+	"strings"
 )
 
 func TrimHex(s string) string {
@@ -38,4 +41,29 @@ func RandomInt(min, max int) int {
 		panic(err)
 	}
 	return int(num.Int64()) + min
+}
+
+// BuildURL constructs a URL from parts. It handles any irregularities like missing or extra slashes.
+func BuildURL(parts ...string) (string, error) {
+	if len(parts) == 0 {
+		return "", fmt.Errorf("no parts provided")
+	}
+
+	// Parse the base URL (the first part).
+	base, err := url.Parse(parts[0])
+	if err != nil {
+		return "", fmt.Errorf("could not parse base URL: %v", err)
+	}
+
+	// Create a path by joining all parts with a "/". This will also clean the path,
+	otherParts := parts[1:]
+	for i, part := range otherParts {
+		cleanPart := path.Clean("/" + part)
+		otherParts[i] = strings.TrimPrefix(cleanPart, "/") // Remove the leading slash added for cleaning.
+	}
+
+	// Now, construct the full path with the base path and the other parts.
+	fullPath := path.Join(base.Path, path.Join(otherParts...))
+	base.Path = fullPath
+	return base.String(), nil
 }

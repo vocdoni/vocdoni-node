@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -257,8 +258,12 @@ func (c *HTTPclient) EncryptionKeys(electionID types.HexBytes) ([]api.Key, error
 // GetFaucetPackageFromDevService returns a faucet package.
 // Needs just the destination wallet address, the URL and bearer token are hardcoded
 func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
+	url, err := util.BuildURL(DefaultDevelopmentFaucetURL, account)
+	if err != nil {
+		return nil, err
+	}
 	return GetFaucetPackageFromRemoteService(
-		DefaultDevelopmentFaucetURL+account,
+		url,
 		"",
 	)
 }
@@ -271,18 +276,22 @@ func GetFaucetPackageFromRemoteService(faucetURL, token string) (*models.FaucetP
 	if err != nil {
 		return nil, err
 	}
+	header := http.Header{
+		"User-Agent": []string{"Vocdoni API client / 1.0"},
+	}
+	if token != "" {
+		header.Add("Authorization", "Bearer "+token)
+	}
 	c := http.Client{}
 	resp, err := c.Do(&http.Request{
 		Method: HTTPGET,
 		URL:    u,
-		Header: http.Header{
-			"Authorization": []string{"Bearer " + token},
-			"User-Agent":    []string{"Vocdoni API client / 1.0"},
-		},
+		Header: header,
 	})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 	if resp.StatusCode != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("faucet request failed: %s", resp.Status)
 	}

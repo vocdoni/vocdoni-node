@@ -305,11 +305,8 @@ func bootStrapAccount(cli *VocdoniCLI) error {
 			return err
 		}
 	} else {
-		infoPrint.Printf("trying to fetch faucet package from remote service...\n")
-		faucetPkg, err = apiclient.GetFaucetPackageFromRemoteService(
-			apiclient.DefaultDevelopmentFaucetURL+cli.api.MyAddress().Hex(),
-			"",
-		)
+		infoPrint.Printf("trying to fetch faucet package from default remote service...\n")
+		faucetPkg, err = apiclient.GetFaucetPackageFromDevService(cli.api.MyAddress().Hex())
 		if err != nil {
 			return err
 		}

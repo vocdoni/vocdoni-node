@@ -640,11 +640,9 @@ func main() {
 			// attach faucet to the API if enabled
 			if conf.EnableFaucetWithAmount > 0 {
 				if err := faucet.AttachFaucetAPI(srv.Signer,
-					map[string]uint64{
-						conf.Vochain.Chain: conf.EnableFaucetWithAmount,
-					},
+					conf.EnableFaucetWithAmount,
 					uAPI.RouterHandler(),
-					"/faucet",
+					"/open/claim",
 				); err != nil {
 					log.Fatal(err)
 				}
