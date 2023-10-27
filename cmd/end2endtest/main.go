@@ -101,7 +101,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "\n")
 		}
 		fmt.Fprintf(os.Stderr, "If the network is deployed locally using the docker test suite, ")
-		fmt.Fprintf(os.Stderr, "the faucet URL might be configured as `--faucet=http://localhost:9090/v2/faucet/dev/`\n")
+		fmt.Fprintf(os.Stderr, "the faucet URL might be configured as `--faucet=http://localhost:9090/v2/open/claim`\n")
 	}
 
 	flag.CommandLine.SortFlags = false

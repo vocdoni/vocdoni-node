@@ -574,11 +574,15 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
 func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
 	switch faucet {
 	case "":
-		return nil, fmt.Errorf("need to pass a valid --faucet")
+		return nil, fmt.Errorf("need to pass a valid URL (--faucet)")
 	case "dev":
 		return apiclient.GetFaucetPackageFromDevService(myAddress)
 	default:
-		return apiclient.GetFaucetPackageFromRemoteService(faucet+myAddress, faucetAuthToken)
+		url, err := util.BuildURL(faucet, myAddress)
+		if err != nil {
+			return nil, err
+		}
+		return apiclient.GetFaucetPackageFromRemoteService(url, faucetAuthToken)
 	}
 }
 

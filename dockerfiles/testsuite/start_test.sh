@@ -33,7 +33,7 @@ cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d"
 ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
 GWHOST="http://gateway0:9090/dvote"
 APIHOST="http://gateway0:9090/v2"
-FAUCET="$APIHOST/faucet/dev/"
+FAUCET="$APIHOST/open/claim"
 TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
 
