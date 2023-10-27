@@ -59,7 +59,7 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 func newConfig() (*config.Config, config.Error) {
 	var cfgError config.Error
 	// create base config
-	globalCfg := config.NewConfig()
+	conf := config.NewConfig()
 	// get current user home dir
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -75,87 +75,87 @@ func newConfig() (*config.Config, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// global
-	flag.StringVarP(&globalCfg.DataDir, "dataDir", "d", home+"/.vocdoni",
+	flag.StringVarP(&conf.DataDir, "dataDir", "d", home+"/.vocdoni",
 		"directory where data is stored")
-	flag.StringVarP(&globalCfg.Vochain.DBType, "dbType", "t", db.TypePebble,
+	flag.StringVarP(&conf.Vochain.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
-	flag.StringVarP(&globalCfg.Vochain.Chain, "chain", "c", "dev",
+	flag.StringVarP(&conf.Vochain.Chain, "chain", "c", "dev",
 		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
-	flag.BoolVar(&globalCfg.Dev, "dev", false,
+	flag.BoolVar(&conf.Dev, "dev", false,
 		"use developer mode (less security)")
-	globalCfg.PprofPort = *flag.Int("pprof", 0,
+	conf.PprofPort = *flag.Int("pprof", 0,
 		"pprof port for runtime profiling data (zero is disabled)")
-	globalCfg.LogLevel = *flag.StringP("logLevel", "l", "info",
+	conf.LogLevel = *flag.StringP("logLevel", "l", "info",
 		"log level (debug, info, warn, error, fatal)")
-	globalCfg.LogOutput = *flag.String("logOutput", "stdout",
+	conf.LogOutput = *flag.String("logOutput", "stdout",
 		"log output (stdout, stderr or filepath)")
-	globalCfg.LogErrorFile = *flag.String("logErrorFile", "",
+	conf.LogErrorFile = *flag.String("logErrorFile", "",
 		"log errors and warnings to a file")
-	globalCfg.SaveConfig = *flag.Bool("saveConfig", false,
+	conf.SaveConfig = *flag.Bool("saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
-	globalCfg.Mode = *flag.StringP("mode", "m", types.ModeGateway,
+	conf.Mode = *flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway, miner, seed, census]")
-	globalCfg.SigningKey = *flag.StringP("signingKey", "k", "",
+	conf.SigningKey = *flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
 	// api
-	globalCfg.ListenHost = *flag.String("listenHost", "0.0.0.0",
+	conf.ListenHost = *flag.String("listenHost", "0.0.0.0",
 		"API endpoint listen address")
-	globalCfg.ListenPort = *flag.IntP("listenPort", "p", 9090,
+	conf.ListenPort = *flag.IntP("listenPort", "p", 9090,
 		"API endpoint http port")
-	globalCfg.EnableAPI = *flag.Bool("enableAPI", true,
+	conf.EnableAPI = *flag.Bool("enableAPI", true,
 		"enable HTTP API endpoints")
-	globalCfg.AdminToken = *flag.String("adminToken", "",
+	conf.AdminToken = *flag.String("adminToken", "",
 		"bearer token for admin API endpoints (leave empty to autogenerate)")
-	globalCfg.TLS.Domain = *flag.String("tlsDomain", "",
+	conf.TLS.Domain = *flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
-	globalCfg.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
+	conf.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
 		"enable faucet for the current network and the specified amount (testing purposes only)")
 
 	// ipfs
-	globalCfg.Ipfs.ConnectKey = *flag.StringP("ipfsConnectKey", "i", "",
+	conf.Ipfs.ConnectKey = *flag.StringP("ipfsConnectKey", "i", "",
 		"enable IPFS group synchronization using the given secret key")
-	globalCfg.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
+	conf.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
 
 	// vochain
-	globalCfg.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
+	conf.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
-	globalCfg.Vochain.PublicAddr = *flag.String("vochainPublicAddr", "",
+	conf.Vochain.PublicAddr = *flag.String("vochainPublicAddr", "",
 		"external address:port to announce to other peers (automatically guessed if empty)")
-	globalCfg.Vochain.Genesis = *flag.String("vochainGenesis", "",
+	conf.Vochain.Genesis = *flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
-	globalCfg.Vochain.LogLevel = *flag.String("vochainLogLevel", "disabled",
+	conf.Vochain.LogLevel = *flag.String("vochainLogLevel", "disabled",
 		"tendermint node log level (debug, info, error, disabled)")
-	globalCfg.Vochain.Peers = *flag.StringSlice("vochainPeers", []string{},
+	conf.Vochain.Peers = *flag.StringSlice("vochainPeers", []string{},
 		"comma-separated list of p2p peers")
-	globalCfg.Vochain.Seeds = *flag.StringSlice("vochainSeeds", []string{},
+	conf.Vochain.Seeds = *flag.StringSlice("vochainSeeds", []string{},
 		"comma-separated list of p2p seed nodes")
-	globalCfg.Vochain.MinerKey = *flag.String("vochainMinerKey", "",
+	conf.Vochain.MinerKey = *flag.String("vochainMinerKey", "",
 		"user alternative vochain miner private key (hexstring[64])")
-	globalCfg.Vochain.NodeKey = *flag.String("vochainNodeKey", "",
+	conf.Vochain.NodeKey = *flag.String("vochainNodeKey", "",
 		"user alternative vochain private key (hexstring[64])")
-	globalCfg.Vochain.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
+	conf.Vochain.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
-	globalCfg.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
+	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
-	globalCfg.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
+	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
-	globalCfg.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
+	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
-	globalCfg.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
+	conf.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
 		"enables the process archiver component")
-	globalCfg.Vochain.ProcessArchiveKey = *flag.String("processArchiveKey", "",
+	conf.Vochain.ProcessArchiveKey = *flag.String("processArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
-	globalCfg.Vochain.OffChainDataDownloader = *flag.Bool("offChainDataDownload", true,
+	conf.Vochain.OffChainDataDownloader = *flag.Bool("offChainDataDownload", true,
 		"enables the off-chain data downloader component")
 	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
 
 	// metrics
-	globalCfg.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
-	globalCfg.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5,
+	conf.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
+	conf.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5,
 		"metrics refresh interval in seconds")
 
 	// parse flags
@@ -175,17 +175,17 @@ func newConfig() (*config.Config, config.Error) {
 	if err = viper.BindPFlag("dataDir", flag.Lookup("dataDir")); err != nil {
 		log.Fatalf("failed to bind dataDir flag to viper: %v", err)
 	}
-	globalCfg.DataDir = viper.GetString("dataDir")
+	conf.DataDir = viper.GetString("dataDir")
 
 	if err = viper.BindPFlag("chain", flag.Lookup("chain")); err != nil {
 		log.Fatalf("failed to bind chain flag to viper: %v", err)
 	}
-	globalCfg.Vochain.Chain = viper.GetString("chain")
+	conf.Vochain.Chain = viper.GetString("chain")
 
 	if err = viper.BindPFlag("dev", flag.Lookup("dev")); err != nil {
 		log.Fatalf("failed to bind dev flag to viper: %v", err)
 	}
-	globalCfg.Dev = viper.GetBool("dev")
+	conf.Dev = viper.GetBool("dev")
 
 	if err = viper.BindPFlag("pprofPort", flag.Lookup("pprof")); err != nil {
 		log.Fatalf("failed to bind pprof flag to viper: %v", err)
@@ -194,13 +194,13 @@ func newConfig() (*config.Config, config.Error) {
 	if err = viper.BindPFlag("dbType", flag.Lookup("dbType")); err != nil {
 		log.Fatalf("failed to bind dbType flag to viper: %v", err)
 	}
-	globalCfg.Vochain.DBType = viper.GetString("dbType")
+	conf.Vochain.DBType = viper.GetString("dbType")
 
 	// use different datadirs for different chains
-	globalCfg.DataDir = filepath.Join(globalCfg.DataDir, globalCfg.Vochain.Chain)
+	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Chain)
 
 	// add viper config path (now we know it)
-	viper.AddConfigPath(globalCfg.DataDir)
+	viper.AddConfigPath(conf.DataDir)
 
 	// binding flags to viper
 	if err = viper.BindPFlag("mode", flag.Lookup("mode")); err != nil {
@@ -236,13 +236,13 @@ func newConfig() (*config.Config, config.Error) {
 	if err = viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount")); err != nil {
 		log.Fatalf("failed to bind enableFaucetWithAmount flag to viper: %v", err)
 	}
-	viper.Set("TLS.DirCert", globalCfg.DataDir+"/tls")
+	viper.Set("TLS.DirCert", conf.DataDir+"/tls")
 	if err = viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain")); err != nil {
 		log.Fatalf("failed to bind TLS.Domain flag to viper: %v", err)
 	}
 
 	// ipfs
-	viper.Set("ipfs.ConfigPath", globalCfg.DataDir+"/ipfs")
+	viper.Set("ipfs.ConfigPath", conf.DataDir+"/ipfs")
 	if err = viper.BindPFlag("ipfs.ConnectKey", flag.Lookup("ipfsConnectKey")); err != nil {
 		log.Fatalf("failed to bind ipfsConnectKey flag to viper: %v", err)
 	}
@@ -251,8 +251,8 @@ func newConfig() (*config.Config, config.Error) {
 	}
 
 	// vochain
-	viper.Set("vochain.DataDir", globalCfg.DataDir+"/vochain")
-	viper.Set("vochain.Dev", globalCfg.Dev)
+	viper.Set("vochain.DataDir", conf.DataDir+"/vochain")
+	viper.Set("vochain.Dev", conf.Dev)
 
 	if err = viper.BindPFlag("vochain.P2PListen", flag.Lookup("vochainP2PListen")); err != nil {
 		log.Fatalf("failed to bind vochainP2PListen flag to viper: %v", err)
@@ -293,7 +293,7 @@ func newConfig() (*config.Config, config.Error) {
 	if err := viper.BindPFlag("vochain.SkipPreviousOffchainData", flag.Lookup("skipPreviousOffchainData")); err != nil {
 		log.Fatalf("failed to bind skipPreviousOffchainData flag to viper: %v", err)
 	}
-	viper.Set("vochain.ProcessArchiveDataDir", globalCfg.DataDir+"/archive")
+	viper.Set("vochain.ProcessArchiveDataDir", conf.DataDir+"/archive")
 	if err := viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive")); err != nil {
 		log.Fatalf("failed to bind processArchive flag to viper: %v", err)
 	}
@@ -313,13 +313,13 @@ func newConfig() (*config.Config, config.Error) {
 	}
 
 	// check if config file exists
-	_, err = os.Stat(globalCfg.DataDir + "/vocdoni.yml")
+	_, err = os.Stat(conf.DataDir + "/vocdoni.yml")
 	if os.IsNotExist(err) {
 		cfgError = config.Error{
-			Message: fmt.Sprintf("creating new config file in %s", globalCfg.DataDir),
+			Message: fmt.Sprintf("creating new config file in %s", conf.DataDir),
 		}
 		// creating config folder if not exists
-		err = os.MkdirAll(globalCfg.DataDir, os.ModePerm)
+		err = os.MkdirAll(conf.DataDir, os.ModePerm)
 		if err != nil {
 			cfgError = config.Error{
 				Message: fmt.Sprintf("cannot create data directory: %s", err),
@@ -336,19 +336,19 @@ func newConfig() (*config.Config, config.Error) {
 		err = viper.ReadInConfig()
 		if err != nil {
 			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot read loaded config file in %s: %s", globalCfg.DataDir, err),
+				Message: fmt.Sprintf("cannot read loaded config file in %s: %s", conf.DataDir, err),
 			}
 		}
 	}
 
-	err = viper.Unmarshal(&globalCfg)
+	err = viper.Unmarshal(&conf)
 	if err != nil {
 		cfgError = config.Error{
 			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
 		}
 	}
 
-	if globalCfg.SigningKey == "" {
+	if conf.SigningKey == "" {
 		fmt.Println("no signing key, generating one...")
 		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
@@ -356,24 +356,24 @@ func newConfig() (*config.Config, config.Error) {
 			cfgError = config.Error{
 				Message: fmt.Sprintf("cannot generate signing key: %s", err),
 			}
-			return globalCfg, cfgError
+			return conf, cfgError
 		}
 		_, priv := signer.HexString()
 		viper.Set("signingKey", priv)
-		globalCfg.SigningKey = priv
-		globalCfg.SaveConfig = true
+		conf.SigningKey = priv
+		conf.SaveConfig = true
 	}
 
-	if globalCfg.Vochain.MinerKey == "" {
-		globalCfg.Vochain.MinerKey = globalCfg.SigningKey
+	if conf.Vochain.MinerKey == "" {
+		conf.Vochain.MinerKey = conf.SigningKey
 	}
 
-	if globalCfg.AdminToken == "" {
-		globalCfg.AdminToken = uuid.New().String()
-		fmt.Println("created new admin API token", globalCfg.AdminToken)
+	if conf.AdminToken == "" {
+		conf.AdminToken = uuid.New().String()
+		fmt.Println("created new admin API token", conf.AdminToken)
 	}
 
-	if globalCfg.SaveConfig {
+	if conf.SaveConfig {
 		viper.Set("saveConfig", false)
 		if err := viper.WriteConfig(); err != nil {
 			cfgError = config.Error{
@@ -382,7 +382,7 @@ func newConfig() (*config.Config, config.Error) {
 		}
 	}
 
-	return globalCfg, cfgError
+	return conf, cfgError
 }
 
 func main() {
@@ -391,20 +391,20 @@ func main() {
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
 	// creating config and init logger
-	globalCfg, cfgErr := newConfig()
-	if globalCfg == nil {
+	conf, cfgErr := newConfig()
+	if conf == nil {
 		log.Fatal("cannot read configuration")
 	}
 	var errorOutput io.Writer
-	if path := globalCfg.LogErrorFile; path != "" {
+	if path := conf.LogErrorFile; path != "" {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
 		if err != nil {
 			panic(fmt.Sprintf("cannot create error log output: %v", err))
 		}
 		errorOutput = f
 	}
-	log.Init(globalCfg.LogLevel, globalCfg.LogOutput, errorOutput)
-	if path := globalCfg.LogErrorFile; path != "" {
+	log.Init(conf.LogLevel, conf.LogOutput, errorOutput)
+	if path := conf.LogErrorFile; path != "" {
 		// Once the logger has been initialized.
 		log.Infof("using file %s for logging warning and errors", path)
 	}
@@ -427,7 +427,7 @@ func main() {
 	}
 
 	// Check if errors during config creation and determine if Critical.
-	log.Debugf("initializing config %+v", *globalCfg)
+	log.Debugf("initializing config %+v", *conf)
 	if cfgErr.Critical && cfgErr.Message != "" {
 		log.Fatalf("critical error loading config: %s", cfgErr.Message)
 	} else if !cfgErr.Critical && cfgErr.Message != "" {
@@ -438,7 +438,7 @@ func main() {
 
 	// Overwrite the default path to download the zksnarks circuits artifacts
 	// using the global datadir as parent folder.
-	circuit.BaseDir = filepath.Join(globalCfg.DataDir, "zkCircuits")
+	circuit.BaseDir = filepath.Join(conf.DataDir, "zkCircuits")
 
 	// Ensure we can have at least 8k open files. This is necessary, since
 	// many components like IPFS and Tendermint require keeping many active
@@ -449,8 +449,8 @@ func main() {
 	}
 
 	// Check the mode is valid
-	if !globalCfg.ValidMode() {
-		log.Fatalf("mode %s is invalid", globalCfg.Mode)
+	if !conf.ValidMode() {
+		log.Fatalf("mode %s is invalid", conf.Mode)
 	}
 
 	// If dev enabled, expose debugging profiles under an http server
@@ -458,12 +458,12 @@ func main() {
 	// We log what port is being used near the start of the logs, so it can
 	// be easily grabbed. Start this before the rest of the node, since it
 	// is helpful to debug if some other component hangs.
-	if globalCfg.Dev || globalCfg.PprofPort > 0 {
+	if conf.Dev || conf.PprofPort > 0 {
 		go func() {
-			if globalCfg.PprofPort == 0 {
-				globalCfg.PprofPort = int(time.Now().Unix()%100) + 61000
+			if conf.PprofPort == 0 {
+				conf.PprofPort = int(time.Now().Unix()%100) + 61000
 			}
-			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", globalCfg.PprofPort))
+			ln, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", conf.PprofPort))
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -471,22 +471,22 @@ func main() {
 			log.Error(http.Serve(ln, nil))
 		}()
 	}
-	log.Infow("starting vocdoni node", "version", internal.Version, "mode", globalCfg.Mode,
-		"chain", globalCfg.Vochain.Chain, "dbType", globalCfg.Vochain.DBType)
-	if globalCfg.Dev {
+	log.Infow("starting vocdoni node", "version", internal.Version, "mode", conf.Mode,
+		"chain", conf.Vochain.Chain, "dbType", conf.Vochain.DBType)
+	if conf.Dev {
 		log.Warn("developer mode is enabled!")
 	}
 
 	var err error
-	srv := service.VocdoniService{Config: globalCfg.Vochain}
+	srv := service.VocdoniService{Config: conf.Vochain}
 
-	if globalCfg.Mode == types.ModeGateway {
+	if conf.Mode == types.ModeGateway {
 		// Signing key
 		srv.Signer = ethereum.NewSignKeys()
 
 		// Add signing private key if exist in configuration or flags
-		if len(globalCfg.SigningKey) != 32 {
-			err := srv.Signer.AddHexKey(globalCfg.SigningKey)
+		if len(conf.SigningKey) != 32 {
+			err := srv.Signer.AddHexKey(conf.SigningKey)
 			if err != nil {
 				log.Fatalf("error adding hex key: (%s)", err)
 			}
@@ -497,24 +497,24 @@ func main() {
 	}
 
 	// HTTP(s) router for Gateway or Prometheus metrics
-	if globalCfg.Mode == types.ModeGateway || globalCfg.Metrics.Enabled || globalCfg.Mode == types.ModeCensus {
+	if conf.Mode == types.ModeGateway || conf.Metrics.Enabled || conf.Mode == types.ModeCensus {
 		// Initialize the HTTP router
 		srv.Router = new(httprouter.HTTProuter)
-		srv.Router.TLSdomain = globalCfg.TLS.Domain
-		srv.Router.TLSdirCert = globalCfg.TLS.DirCert
-		if err = srv.Router.Init(globalCfg.ListenHost, globalCfg.ListenPort); err != nil {
+		srv.Router.TLSdomain = conf.TLS.Domain
+		srv.Router.TLSdirCert = conf.TLS.DirCert
+		if err = srv.Router.Init(conf.ListenHost, conf.ListenPort); err != nil {
 			log.Fatal(err)
 		}
 		// Enable metrics via proxy
-		if globalCfg.Metrics.Enabled {
+		if conf.Metrics.Enabled {
 			srv.MetricsAgent = metrics.NewAgent("/metrics",
-				time.Duration(globalCfg.Metrics.RefreshInterval)*time.Second, srv.Router)
+				time.Duration(conf.Metrics.RefreshInterval)*time.Second, srv.Router)
 		}
 	}
 
 	// Storage service for Gateway
-	if globalCfg.Mode == types.ModeGateway || globalCfg.Mode == types.ModeCensus {
-		srv.Storage, err = srv.IPFS(globalCfg.Ipfs)
+	if conf.Mode == types.ModeGateway || conf.Mode == types.ModeCensus {
+		srv.Storage, err = srv.IPFS(conf.Ipfs)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -523,35 +523,35 @@ func main() {
 	//
 	// Vochain and Indexer
 	//
-	if globalCfg.Mode == types.ModeGateway ||
-		globalCfg.Mode == types.ModeMiner ||
-		globalCfg.Mode == types.ModeSeed {
+	if conf.Mode == types.ModeGateway ||
+		conf.Mode == types.ModeMiner ||
+		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
-		globalCfg.Vochain.IsSeedNode = types.ModeSeed == globalCfg.Mode
+		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
 		// do we need indexer?
-		globalCfg.Vochain.Indexer.Enabled = globalCfg.Mode == types.ModeGateway
+		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
 		// offchainDataDownloader is only needed for gateways
-		globalCfg.Vochain.OffChainDataDownloader = globalCfg.Vochain.OffChainDataDownloader &&
-			globalCfg.Mode == types.ModeGateway
+		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
+			conf.Mode == types.ModeGateway
 
 		// create the vochain service
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
 		// create the indexer service
-		if globalCfg.Vochain.Indexer.Enabled {
+		if conf.Vochain.Indexer.Enabled {
 			if err := srv.VochainIndexer(); err != nil {
 				log.Fatal(err)
 			}
 		}
 		// create the process archiver service
-		if globalCfg.Vochain.ProcessArchive {
+		if conf.Vochain.ProcessArchive {
 			if err := srv.ProcessArchiver(); err != nil {
 				log.Fatal(err)
 			}
 		}
 		// create the offchain data downloader service
-		if globalCfg.Vochain.OffChainDataDownloader {
+		if conf.Vochain.OffChainDataDownloader {
 			if err := srv.OffChainDataHandler(); err != nil {
 				log.Fatal(err)
 			}
@@ -577,10 +577,10 @@ func main() {
 	//
 	// Validator
 	//
-	if globalCfg.Mode == types.ModeMiner {
+	if conf.Mode == types.ModeMiner {
 		// create the key for the validator used to sign transactions
 		signer := ethereum.SignKeys{}
-		if err := signer.AddHexKey(globalCfg.Vochain.MinerKey); err != nil {
+		if err := signer.AddHexKey(conf.Vochain.MinerKey); err != nil {
 			log.Errorf("add hex key failed %v", err)
 			return
 		}
@@ -592,7 +592,7 @@ func main() {
 			// start keykeeper service (if key index specified)
 			if validator.KeyIndex > 0 {
 				srv.KeyKeeper, err = keykeeper.NewKeyKeeper(
-					path.Join(globalCfg.Vochain.DataDir, "keykeeper"),
+					path.Join(conf.Vochain.DataDir, "keykeeper"),
 					srv.App,
 					&signer,
 					int8(validator.KeyIndex))
@@ -610,11 +610,11 @@ func main() {
 	//
 	// Gateway API and RPC
 	//
-	if globalCfg.Mode == types.ModeGateway {
+	if conf.Mode == types.ModeGateway {
 		// HTTP API REST service
-		if globalCfg.EnableAPI {
+		if conf.EnableAPI {
 			log.Info("enabling API")
-			uAPI, err := urlapi.NewAPI(srv.Router, "/v2", globalCfg.DataDir, globalCfg.Vochain.DBType)
+			uAPI, err := urlapi.NewAPI(srv.Router, "/v2", conf.DataDir, conf.Vochain.DBType)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -625,7 +625,7 @@ func main() {
 				srv.Storage,
 				srv.CensusDB,
 			)
-			uAPI.Endpoint.SetAdminToken(globalCfg.AdminToken)
+			uAPI.Endpoint.SetAdminToken(conf.AdminToken)
 			if err := uAPI.EnableHandlers(
 				urlapi.ElectionHandler,
 				urlapi.VoteHandler,
@@ -638,10 +638,10 @@ func main() {
 				log.Fatal(err)
 			}
 			// attach faucet to the API if enabled
-			if globalCfg.EnableFaucetWithAmount > 0 {
+			if conf.EnableFaucetWithAmount > 0 {
 				if err := faucet.AttachFaucetAPI(srv.Signer,
 					map[string]uint64{
-						globalCfg.Vochain.Chain: globalCfg.EnableFaucetWithAmount,
+						conf.Vochain.Chain: conf.EnableFaucetWithAmount,
 					},
 					uAPI.RouterHandler(),
 					"/faucet",
@@ -652,13 +652,13 @@ func main() {
 		}
 	}
 
-	if globalCfg.Mode == types.ModeCensus {
+	if conf.Mode == types.ModeCensus {
 		log.Info("enabling API")
-		uAPI, err := urlapi.NewAPI(srv.Router, "/v2", globalCfg.DataDir, globalCfg.Vochain.DBType)
+		uAPI, err := urlapi.NewAPI(srv.Router, "/v2", conf.DataDir, conf.Vochain.DBType)
 		if err != nil {
 			log.Fatal(err)
 		}
-		db, err := metadb.New(globalCfg.Vochain.DBType, filepath.Join(globalCfg.DataDir, "censusdb"))
+		db, err := metadb.New(conf.Vochain.DBType, filepath.Join(conf.DataDir, "censusdb"))
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -670,7 +670,7 @@ func main() {
 			srv.Storage,
 			censusDB,
 		)
-		uAPI.Endpoint.SetAdminToken(globalCfg.AdminToken)
+		uAPI.Endpoint.SetAdminToken(conf.AdminToken)
 		if err := uAPI.EnableHandlers(
 			urlapi.CensusHandler,
 		); err != nil {

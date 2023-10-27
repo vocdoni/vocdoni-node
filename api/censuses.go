@@ -830,7 +830,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Success		200			{object}	object{valid=bool}
+//	@Success		200	{object}	object{valid=bool}
 //	@Router			/censuses/export [get]
 func (a *API) censusExportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	buf := bytes.Buffer{}
@@ -847,7 +847,7 @@ func (a *API) censusExportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Success		200			{object}	object{valid=bool}
+//	@Success		200	{object}	object{valid=bool}
 //	@Router			/censuses/import [post]
 func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
