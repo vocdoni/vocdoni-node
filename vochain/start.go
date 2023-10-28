@@ -206,7 +206,6 @@ func newTendermint(app *BaseApplication,
 	}
 	pv.Save()
 	if pv.Key.PrivKey.Bytes() != nil {
-		fmt.Printf("privkey: %s\n", hex.EncodeToString(pv.Key.PrivKey.Bytes()))
 		signer := ethereum.SignKeys{}
 		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
 			return nil, fmt.Errorf("cannot add private validator key: %w", err)

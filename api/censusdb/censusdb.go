@@ -361,7 +361,7 @@ func (c *CensusDB) ImportCensusDB(buffer io.Reader) error {
 		if err != nil {
 			return err
 		}
-		log.Infow("importing census", "id", dump.CensusID.String(), "token", dump.Token.String(), "size", len(dump.Data))
+		log.Infow("importing census", "id", dump.CensusID.String(), "size", len(dump.Data))
 	}
 
 	return nil

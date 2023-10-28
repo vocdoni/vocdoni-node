@@ -64,7 +64,8 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		return nil, err
 	}
 	if status != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, status, data)
+		log.Warnw("cannot get chain info from API server", "status", status, "data", data)
+		return c, nil
 	}
 	info := &api.ChainInfo{}
 	if err := json.Unmarshal(data, info); err != nil {
