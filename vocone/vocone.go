@@ -257,7 +257,7 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 		return err
 	}
 	for _, v := range validators {
-		if err := vc.App.State.RemoveValidator(v.Address); err != nil {
+		if err := vc.App.State.RemoveValidator(v); err != nil {
 			log.Warnf("could not remove validator %x", v.Address)
 		}
 	}

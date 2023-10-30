@@ -102,7 +102,7 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				// cannot remove the last 3 validators
 				validators[idx].Power = 1
 			} else {
-				if err := c.state.RemoveValidator(validators[idx].Address); err != nil {
+				if err := c.state.RemoveValidator(validators[idx]); err != nil {
 					return fmt.Errorf("cannot remove validator: %w", err)
 				}
 				continue
