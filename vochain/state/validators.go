@@ -5,11 +5,31 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
+
+func labelsFrom(v *models.Validator) string {
+	return fmt.Sprintf(`{address="%x",validator_address="%X",name=%q}`,
+		v.GetAddress(), v.GetValidatorAddress(), v.GetName())
+}
+
+func metricsUpdateValidator(validator *models.Validator) {
+	metrics.GetOrCreateCounter("vochain_validator_power" + labelsFrom(validator)).Set(validator.GetPower())
+	metrics.GetOrCreateCounter("vochain_validator_proposals" + labelsFrom(validator)).Set(validator.GetProposals())
+	metrics.GetOrCreateCounter("vochain_validator_score" + labelsFrom(validator)).Set(uint64(validator.GetScore()))
+	metrics.GetOrCreateCounter("vochain_validator_votes" + labelsFrom(validator)).Set(validator.GetVotes())
+}
+
+func metricsDeleteValidator(validator *models.Validator) {
+	metrics.UnregisterMetric("vochain_validator_power" + labelsFrom(validator))
+	metrics.UnregisterMetric("vochain_validator_proposals" + labelsFrom(validator))
+	metrics.UnregisterMetric("vochain_validator_score" + labelsFrom(validator))
+	metrics.UnregisterMetric("vochain_validator_votes" + labelsFrom(validator))
+}
 
 // AddValidator adds a tendemint validator. If it exists, it will be updated.
 func (v *State) AddValidator(validator *models.Validator) error {
@@ -19,23 +39,31 @@ func (v *State) AddValidator(validator *models.Validator) error {
 	if err != nil {
 		return err
 	}
-	return v.tx.DeepSet(validator.Address, validatorBytes, StateTreeCfg(TreeValidators))
+	if err := v.tx.DeepSet(validator.GetAddress(), validatorBytes, StateTreeCfg(TreeValidators)); err != nil {
+		return err
+	}
+	go metricsUpdateValidator(validator)
+	return nil
 }
 
-// RemoveValidator removes a tendermint validator identified by its address
-func (v *State) RemoveValidator(address []byte) error {
+// RemoveValidator removes a tendermint validator identified by its validator.Address
+func (v *State) RemoveValidator(validator *models.Validator) error {
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	validators, err := v.tx.SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
 		return err
 	}
-	if _, err := validators.Get(address); errors.Is(err, arbo.ErrKeyNotFound) {
+	if _, err := validators.Get(validator.GetAddress()); errors.Is(err, arbo.ErrKeyNotFound) {
 		return fmt.Errorf("validator not found: %w", err)
 	} else if err != nil {
 		return err
 	}
-	return validators.Set(address, nil)
+	if err := validators.Set(validator.GetAddress(), nil); err != nil {
+		return err
+	}
+	go metricsDeleteValidator(validator)
+	return nil
 }
 
 // Validators returns a list of the chain validators
