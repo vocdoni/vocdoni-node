@@ -163,8 +163,7 @@ func BuildIndex(datadir string) (*Index, error) {
 // The key parameter must be either a valid IPFS base64 encoded private key
 // or empty (a new key will be generated).
 // If ipfs is nil, only JSON archive storage will be performed.
-func NewProcessArchive(s *indexer.Indexer, ipfs *ipfs.Handler,
-	datadir, key string) (*ProcessArchive, error) {
+func NewProcessArchive(s *indexer.Indexer, ipfs *ipfs.Handler, datadir, key string) (*ProcessArchive, error) {
 	js, err := NewJsonStorage(datadir)
 	if err != nil {
 		return nil, fmt.Errorf("could not create process archive: %w", err)

@@ -57,6 +57,11 @@ func (d *DataMockTest) Retrieve(_ context.Context, id string, _ int64) ([]byte, 
 	return d.rnd.RandomBytes(256), nil
 }
 
+func (d *DataMockTest) RetrieveDir(_ context.Context, id string, _ int64) (map[string][]byte, error) {
+	// TODO: Implement
+	return nil, nil
+}
+
 func (d *DataMockTest) Pin(_ context.Context, path string) error {
 	d.filesMu.Lock()
 	defer d.filesMu.Unlock()

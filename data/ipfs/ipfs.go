@@ -260,6 +260,41 @@ func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
 	return pinMap, nil
 }
 
+// RetrieveDir gets an IPFS directory and returns a map of all files and their content.
+// It only supports 1 level of directory depth, so subdirectories are ignored.
+func (i *Handler) RetrieveDir(ctx context.Context, path string, maxSize int64) (map[string][]byte, error) {
+	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+
+	// first resolve the path
+	cpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
+	if err != nil {
+		return nil, fmt.Errorf("could not resolve path %s", path)
+	}
+	// then get the file
+	f, err := i.CoreAPI.Unixfs().Get(ctx, cpath)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve unixfs file: %w", err)
+	}
+
+	dirMap := make(map[string][]byte)
+	if dir := files.ToDir(f); dir != nil {
+		if err := files.Walk(dir, func(path string, node files.Node) error {
+			if file := files.ToFile(node); file != nil {
+				content, err := fetchFileContent(file)
+				if err != nil {
+					log.Warnw("could not retrieve file from directory", "path", path, "error", err)
+					return nil
+				}
+				dirMap[path] = content
+			}
+			return nil
+		}); err != nil {
+			return nil, err
+		}
+	}
+	return dirMap, nil
+}
+
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache).
 // If maxSize is 0, it is set to the hardcoded maximum of MaxFileSizeBytes.
 func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
@@ -277,32 +312,13 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve path %s", path)
 	}
-
 	// then get the file
 	f, err := i.CoreAPI.Unixfs().Get(ctx, cpath)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve unixfs file: %w", err)
 	}
-	file := files.ToFile(f)
-	if file == nil {
-		return nil, fmt.Errorf("object is not a file")
-	}
-	defer file.Close()
 
-	fsize, err := file.Size()
-	if err != nil {
-		return nil, err
-	}
-
-	if maxSize == 0 {
-		maxSize = MaxFileSizeBytes
-	}
-
-	if fsize > maxSize {
-		return nil, fmt.Errorf("file too big: %d", fsize)
-	}
-
-	content, err := io.ReadAll(file)
+	content, err := fetchFileContent(f)
 	if err != nil {
 		return nil, err
 	}
@@ -322,8 +338,26 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	// Save file to cache for future attempts
 	i.retrieveCache.Add(path, content)
 
-	log.Infow("retrieved file", "path", path, "size", fsize)
+	log.Infow("retrieved file", "path", path, "size", len(content))
 	return content, nil
+}
+
+func fetchFileContent(node files.Node) ([]byte, error) {
+	file := files.ToFile(node)
+	if file == nil {
+		return nil, fmt.Errorf("object is not a file")
+	}
+	defer file.Close()
+
+	fsize, err := file.Size()
+	if err != nil {
+		return nil, err
+	}
+
+	if fsize > MaxFileSizeBytes {
+		return nil, fmt.Errorf("file too big: %d", fsize)
+	}
+	return io.ReadAll(io.LimitReader(file, MaxFileSizeBytes))
 }
 
 // PublishIPNSpath creates or updates an IPNS record with the content of a

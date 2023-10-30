@@ -110,6 +110,9 @@ const (
 	// on a specific block
 	IndexerProcessEndingPrefix = byte(0x25)
 
+	// ArchiveURL is the default URL where the archive is retrieved from
+	ArchiveURL = "/ipns/k2k4r8mdn544n7f8nprwqeo27jr1v1unsu74th57s1j8mumjck7y7cbz"
+
 	// Vochain
 
 	// PetitionSign contains the string that needs to match with the received vote type

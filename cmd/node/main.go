@@ -116,6 +116,7 @@ func newConfig() (*config.Config, config.Error) {
 		"enable IPFS group synchronization using the given secret key")
 	conf.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
+	conf.Vochain.Indexer.ArchiveURL = *flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url")
 
 	// vochain
 	conf.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
@@ -197,6 +198,11 @@ func newConfig() (*config.Config, config.Error) {
 
 	// use different datadirs for different chains
 	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Chain)
+
+	if err = viper.BindPFlag("archiveURL", flag.Lookup("archiveURL")); err != nil {
+		log.Fatalf("failed to bind archiveURL flag to viper: %v", err)
+	}
+	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 
 	// add viper config path (now we know it)
 	viper.AddConfigPath(conf.DataDir)
