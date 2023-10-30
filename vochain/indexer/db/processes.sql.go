@@ -16,7 +16,7 @@ import (
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block, block_count,
-	have_results, final_results, census_root,
+	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -27,7 +27,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
-	?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -45,6 +45,7 @@ type CreateProcessParams struct {
 	StartBlock        int64
 	EndBlock          int64
 	BlockCount        int64
+	VoteCount         int64
 	HaveResults       bool
 	FinalResults      bool
 	CensusRoot        types.CensusRoot
@@ -73,6 +74,7 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.StartBlock,
 		arg.EndBlock,
 		arg.BlockCount,
+		arg.VoteCount,
 		arg.HaveResults,
 		arg.FinalResults,
 		arg.CensusRoot,
@@ -107,53 +109,22 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT p.id, p.entity_id, p.start_block, p.end_block, p.block_count, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, COUNT(v.nullifier) AS vote_count FROM processes AS p
-LEFT JOIN votes AS v
-	ON p.id = v.process_id
-WHERE p.id = ?
-GROUP BY p.id
+SELECT id, entity_id, start_block, end_block, block_count, vote_count, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+WHERE id = ?
+GROUP BY id
 LIMIT 1
 `
 
-type GetProcessRow struct {
-	ID                 types.ProcessID
-	EntityID           types.EntityID
-	StartBlock         int64
-	EndBlock           int64
-	BlockCount         int64
-	HaveResults        bool
-	FinalResults       bool
-	ResultsVotes       string
-	ResultsWeight      string
-	ResultsBlockHeight int64
-	CensusRoot         types.CensusRoot
-	MaxCensusSize      int64
-	CensusUri          string
-	Metadata           string
-	CensusOrigin       int64
-	Status             int64
-	Namespace          int64
-	Envelope           string
-	Mode               string
-	VoteOpts           string
-	PrivateKeys        string
-	PublicKeys         string
-	QuestionIndex      int64
-	CreationTime       time.Time
-	SourceBlockHeight  int64
-	SourceNetworkID    int64
-	VoteCount          int64
-}
-
-func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProcessRow, error) {
+func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, error) {
 	row := q.queryRow(ctx, q.getProcessStmt, getProcess, id)
-	var i GetProcessRow
+	var i Process
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
 		&i.StartBlock,
 		&i.EndBlock,
 		&i.BlockCount,
+		&i.VoteCount,
 		&i.HaveResults,
 		&i.FinalResults,
 		&i.ResultsVotes,
@@ -175,7 +146,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (GetProces
 		&i.CreationTime,
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
-		&i.VoteCount,
 	)
 	return i, err
 }
@@ -367,6 +337,21 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 		arg.BlockHeight,
 		arg.ID,
 	)
+}
+
+const setProcessVoteCount = `-- name: SetProcessVoteCount :execresult
+UPDATE processes
+SET vote_count = ?1
+WHERE id = ?2
+`
+
+type SetProcessVoteCountParams struct {
+	VoteCount int64
+	ID        types.ProcessID
+}
+
+func (q *Queries) SetProcessVoteCount(ctx context.Context, arg SetProcessVoteCountParams) (sql.Result, error) {
+	return q.exec(ctx, q.setProcessVoteCountStmt, setProcessVoteCount, arg.VoteCount, arg.ID)
 }
 
 const updateProcessEndBlock = `-- name: UpdateProcessEndBlock :execresult

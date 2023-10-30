@@ -164,6 +164,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		StartBlock:        int64(p.StartBlock),
 		EndBlock:          int64(p.BlockCount + p.StartBlock),
 		BlockCount:        int64(p.BlockCount),
+		VoteCount:         0,                              // an empty process has no votes yet
 		HaveResults:       !p.EnvelopeType.EncryptedVotes, // like isOpenProcess, but on the state type
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),

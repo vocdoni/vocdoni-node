@@ -16,6 +16,36 @@ type Block struct {
 	DataHash []byte
 }
 
+type Process struct {
+	ID                 types.ProcessID
+	EntityID           types.EntityID
+	StartBlock         int64
+	EndBlock           int64
+	BlockCount         int64
+	VoteCount          int64
+	HaveResults        bool
+	FinalResults       bool
+	ResultsVotes       string
+	ResultsWeight      string
+	ResultsBlockHeight int64
+	CensusRoot         types.CensusRoot
+	MaxCensusSize      int64
+	CensusUri          string
+	Metadata           string
+	CensusOrigin       int64
+	Status             int64
+	Namespace          int64
+	Envelope           string
+	Mode               string
+	VoteOpts           string
+	PrivateKeys        string
+	PublicKeys         string
+	QuestionIndex      int64
+	CreationTime       time.Time
+	SourceBlockHeight  int64
+	SourceNetworkID    int64
+}
+
 type TokenFee struct {
 	ID          int64
 	BlockHeight int64

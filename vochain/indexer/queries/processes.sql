@@ -1,7 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block, block_count,
-	have_results, final_results, census_root,
+	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -12,7 +12,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
-	?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -24,11 +24,9 @@ INSERT INTO processes (
 );
 
 -- name: GetProcess :one
-SELECT p.*, COUNT(v.nullifier) AS vote_count FROM processes AS p
-LEFT JOIN votes AS v
-	ON p.id = v.process_id
-WHERE p.id = ?
-GROUP BY p.id
+SELECT * FROM processes
+WHERE id = ?
+GROUP BY id
 LIMIT 1;
 
 -- name: SearchProcesses :many
@@ -78,6 +76,11 @@ WHERE id = sqlc.arg(id);
 -- name: SetProcessResultsCancelled :execresult
 UPDATE processes
 SET have_results = FALSE, final_results = TRUE
+WHERE id = sqlc.arg(id);
+
+-- name: SetProcessVoteCount :execresult
+UPDATE processes
+SET vote_count = sqlc.arg(vote_count)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessCount :one
