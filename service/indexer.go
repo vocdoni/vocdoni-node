@@ -21,5 +21,11 @@ func (vs *VocdoniService) VochainIndexer() error {
 	}
 	// launch the indexer after sync routine (executed when the blockchain is ready)
 	go vs.Indexer.AfterSyncBootstrap(false)
+
+	if vs.Config.Indexer.ArchiveURL != "" {
+		log.Infow("starting archive retrieval", "path", vs.Config.Indexer.ArchiveURL)
+		go vs.Indexer.StartArchiveRetrival(vs.Storage, vs.Config.Indexer.ArchiveURL)
+	}
+
 	return nil
 }

@@ -14,6 +14,7 @@ type Storage interface {
 	Init(d *types.DataStore) error
 	Publish(ctx context.Context, data []byte) (string, error)
 	Retrieve(ctx context.Context, id string, maxSize int64) ([]byte, error)
+	RetrieveDir(ctx context.Context, id string, maxSize int64) (map[string][]byte, error)
 	Pin(ctx context.Context, path string) error
 	Unpin(ctx context.Context, path string) error
 	ListPins(ctx context.Context) (map[string]string, error)

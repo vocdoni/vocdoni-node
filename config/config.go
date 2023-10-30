@@ -144,6 +144,8 @@ type IndexerCfg struct {
 	Enabled bool
 	// Disables live results computation on indexer
 	IgnoreLiveResults bool
+	// ArchiveURL is the URL where the archive is retrieved from (usually IPNS)
+	ArchiveURL string
 }
 
 // MetricsCfg initializes the metrics config
