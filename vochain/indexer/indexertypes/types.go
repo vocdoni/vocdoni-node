@@ -22,6 +22,7 @@ type Process struct {
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
 	BlockCount        uint32                     `json:"blockCount"`
+	VoteCount         uint64                     `json:"voteCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
@@ -42,8 +43,6 @@ type Process struct {
 	PrivateKeys json.RawMessage `json:"-"` // json array
 	PublicKeys  json.RawMessage `json:"-"` // json array
 
-	VoteCount uint64 `json:"-"` // via LEFT JOIN
-
 	ResultsVotes       [][]*types.BigInt `json:"-"`
 	ResultsWeight      *types.BigInt     `json:"-"`
 	ResultsBlockHeight uint32            `json:"-"`
@@ -60,7 +59,7 @@ func (p *Process) Results() *results.Results {
 	}
 }
 
-func ProcessFromDB(dbproc *indexerdb.GetProcessRow) *Process {
+func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
 		EntityID:          nonEmptyBytes(dbproc.EntityID),

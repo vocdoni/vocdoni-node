@@ -117,6 +117,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.setProcessResultsReadyStmt, err = db.PrepareContext(ctx, setProcessResultsReady); err != nil {
 		return nil, fmt.Errorf("error preparing query SetProcessResultsReady: %w", err)
 	}
+	if q.setProcessVoteCountStmt, err = db.PrepareContext(ctx, setProcessVoteCount); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessVoteCount: %w", err)
+	}
 	if q.updateProcessEndBlockStmt, err = db.PrepareContext(ctx, updateProcessEndBlock); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProcessEndBlock: %w", err)
 	}
@@ -289,6 +292,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing setProcessResultsReadyStmt: %w", cerr)
 		}
 	}
+	if q.setProcessVoteCountStmt != nil {
+		if cerr := q.setProcessVoteCountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessVoteCountStmt: %w", cerr)
+		}
+	}
 	if q.updateProcessEndBlockStmt != nil {
 		if cerr := q.updateProcessEndBlockStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateProcessEndBlockStmt: %w", cerr)
@@ -379,6 +387,7 @@ type Queries struct {
 	searchVotesStmt                              *sql.Stmt
 	setProcessResultsCancelledStmt               *sql.Stmt
 	setProcessResultsReadyStmt                   *sql.Stmt
+	setProcessVoteCountStmt                      *sql.Stmt
 	updateProcessEndBlockStmt                    *sql.Stmt
 	updateProcessFromStateStmt                   *sql.Stmt
 	updateProcessResultByIDStmt                  *sql.Stmt
@@ -420,6 +429,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		searchVotesStmt:                q.searchVotesStmt,
 		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,
 		setProcessResultsReadyStmt:     q.setProcessResultsReadyStmt,
+		setProcessVoteCountStmt:        q.setProcessVoteCountStmt,
 		updateProcessEndBlockStmt:      q.updateProcessEndBlockStmt,
 		updateProcessFromStateStmt:     q.updateProcessFromStateStmt,
 		updateProcessResultByIDStmt:    q.updateProcessResultByIDStmt,

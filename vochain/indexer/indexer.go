@@ -77,7 +77,8 @@ type Indexer struct {
 	blockQueries *indexerdb.Queries
 	// blockUpdateProcs is the list of process IDs that require sync with the state database.
 	// The key is a types.ProcessID as a string, so that it can be used as a map key.
-	blockUpdateProcs map[string]bool
+	blockUpdateProcs          map[string]bool
+	blockUpdateProcVoteCounts map[string]bool
 
 	// list of live processes (those on which the votes will be computed on arrival)
 	// TODO: we could query the procs table, perhaps memoizing to avoid querying the same over and over again?
@@ -100,8 +101,13 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
 
-		votePool:         make(map[string]map[string]*state.Vote),
-		blockUpdateProcs: make(map[string]bool),
+		// TODO(mvdan): these three maps are all keyed by process ID,
+		// and each of them needs to query existing data from the DB.
+		// Since the map keys very often overlap, consider joining the maps
+		// so that we can also reuse queries to the DB.
+		votePool:                  make(map[string]map[string]*state.Vote),
+		blockUpdateProcs:          make(map[string]bool),
+		blockUpdateProcVoteCounts: make(map[string]bool),
 	}
 	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", countLiveResults)
 
@@ -408,6 +414,24 @@ func (idx *Indexer) Commit(height uint32) error {
 	}
 	clear(idx.votePool)
 
+	// Note that we re-compute each process vote count from the votes table,
+	// since simply incrementing the vote count would break with vote overwrites.
+	for pidStr := range idx.blockUpdateProcVoteCounts {
+		pid := []byte(pidStr)
+		voteCount, err := queries.CountVotesByProcessID(ctx, pid)
+		if err != nil {
+			log.Errorw(err, "could not get vote count")
+			continue
+		}
+		if _, err := queries.SetProcessVoteCount(ctx, indexerdb.SetProcessVoteCountParams{
+			ID:        pid,
+			VoteCount: voteCount,
+		}); err != nil {
+			log.Errorw(err, "could not set vote count")
+		}
+	}
+	clear(idx.blockUpdateProcVoteCounts)
+
 	if err := idx.blockTx.Commit(); err != nil {
 		log.Errorw(err, "could not commit tx")
 	}
@@ -428,6 +452,7 @@ func (idx *Indexer) Rollback() {
 	defer idx.blockMu.Unlock()
 	clear(idx.votePool)
 	clear(idx.blockUpdateProcs)
+	clear(idx.blockUpdateProcVoteCounts)
 	if idx.blockTx != nil {
 		if err := idx.blockTx.Rollback(); err != nil {
 			log.Errorw(err, "could not rollback tx")
@@ -452,9 +477,9 @@ func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 // voterID is the identifier of the voter, the most common case is an ethereum address
 // but can be any kind of id expressed as bytes.
 func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
+	pid := string(vote.ProcessID)
 	if !idx.ignoreLiveResults && idx.isProcessLiveResults(vote.ProcessID) {
 		// Since []byte in Go isn't comparable, but we can convert any bytes to string.
-		pid := string(vote.ProcessID)
 		nullifier := string(vote.Nullifier)
 		if idx.votePool[pid] == nil {
 			idx.votePool[pid] = make(map[string]*state.Vote)
@@ -473,6 +498,7 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
 		log.Errorw(err, "could not index vote")
 	}
+	idx.blockUpdateProcVoteCounts[pid] = true
 }
 
 // OnCancel indexer stores the processID and entityID
