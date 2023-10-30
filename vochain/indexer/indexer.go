@@ -100,6 +100,7 @@ func NewIndexer(dataDir string, app *vochain.BaseApplication, countLiveResults b
 		App:               app,
 		ignoreLiveResults: !countLiveResults,
 
+		votePool:         make(map[string]map[string]*state.Vote),
 		blockUpdateProcs: make(map[string]bool),
 	}
 	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", countLiveResults)
@@ -405,6 +406,7 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}()
 	}
+	clear(idx.votePool)
 
 	if err := idx.blockTx.Commit(); err != nil {
 		log.Errorw(err, "could not commit tx")
@@ -424,14 +426,14 @@ func (idx *Indexer) Commit(height uint32) error {
 func (idx *Indexer) Rollback() {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
-	idx.votePool = make(map[string]map[string]*state.Vote)
+	clear(idx.votePool)
+	clear(idx.blockUpdateProcs)
 	if idx.blockTx != nil {
 		if err := idx.blockTx.Rollback(); err != nil {
 			log.Errorw(err, "could not rollback tx")
 		}
 		idx.blockTx = nil
 	}
-	clear(idx.blockUpdateProcs)
 }
 
 // OnProcess indexer stores the processID
