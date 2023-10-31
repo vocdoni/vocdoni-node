@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 
@@ -30,6 +31,7 @@ func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.Tx) error {
 	if len(tx.To) == 0 {
 		return fmt.Errorf("invalid to address")
 	}
+
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return fmt.Errorf("cannot extract public key from vtx.Signature: %w", err)
@@ -46,6 +48,10 @@ func (t *TransactionHandler) SendTokensTxCheck(vtx *vochaintx.Tx) error {
 		)
 	}
 	txToAddress := common.BytesToAddress(tx.To)
+	if bytes.Equal(txFromAddress.Bytes(), txToAddress.Bytes()) {
+		return fmt.Errorf("to and from address are equal")
+	}
+
 	toTxAccount, err := t.state.GetAccount(txToAddress, false)
 	if err != nil {
 		return fmt.Errorf("cannot get to account: %w", err)

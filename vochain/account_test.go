@@ -594,6 +594,33 @@ func TestSendTokensTx(t *testing.T) {
 	qt.Assert(t, fromAcc.Balance, qt.Equals, uint64(890))
 }
 
+func TestSendTokensTxToTheSameAccount(t *testing.T) {
+	app := TestBaseApplication(t)
+
+	signer := ethereum.SignKeys{}
+	err := signer.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	app.State.SetAccount(state.BurnAddress, &state.Account{})
+
+	err = app.State.SetTxBaseCost(models.TxType_SEND_TOKENS, 10)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.CreateAccount(signer.Address(), "ipfs://", [][]byte{}, 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	err = app.State.MintBalance(&vochaintx.TokenTransfer{
+		ToAddress: signer.Address(),
+		Amount:    1000,
+	})
+	qt.Assert(t, err, qt.IsNil)
+	testCommitState(t, app)
+
+	err = testSendTokensTx(t, &signer, app, signer.Address(), 89, 0)
+	qt.Assert(t, err, qt.IsNotNil)
+
+}
+
 func testSendTokensTx(t *testing.T,
 	signer *ethereum.SignKeys,
 	app *BaseApplication,
