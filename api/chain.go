@@ -400,7 +400,7 @@ func (a *API) chainEstimateHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 //	@Success		200		{object}	object{date=string}
 //	@Router			/chain/blockToDate/{height} [get]
 func (a *API) chainEstimateDateHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
 	}
@@ -737,11 +737,11 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/{height} [get]
 func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHeight(height)
+	tmblock := a.vocapp.GetBlockByHeight(int64(height))
 	if tmblock == nil {
 		return ErrBlockNotFound
 	}
