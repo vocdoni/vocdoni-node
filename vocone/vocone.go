@@ -448,10 +448,10 @@ func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx,
 
 // VochainPrintInfo initializes the Vochain statistics recollection
 func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
-	var a *[5]int32
-	var h int64
+	var a *[5]uint64
+	var h uint64
 	var p, v uint64
-	var m, vc, vxm int
+	var m, vc, vxm uint64
 	var b strings.Builder
 	for {
 		b.Reset()

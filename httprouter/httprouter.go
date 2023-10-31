@@ -13,10 +13,12 @@ import (
 	"time"
 
 	chiprometheus "github.com/766b/chi-prometheus"
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	reuse "github.com/libp2p/go-reuseport"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"go.vocdoni.io/dvote/log"
 	"golang.org/x/crypto/acme"
@@ -168,6 +170,21 @@ func (r *HTTProuter) EnablePrometheusMetrics(prometheusID string) {
 		prometheusID = "gochi_http"
 	}
 	r.Mux.Use(chiprometheus.NewMiddleware(prometheusID))
+}
+
+// ExposePrometheusEndpoint registers a HTTPHandler at the passed path
+// that will expose the metrics collected by VictoriaMetrics and Prometheus
+func (r *HTTProuter) ExposePrometheusEndpoint(path string) {
+	r.AddRawHTTPHandler(path, "GET", func(w http.ResponseWriter, req *http.Request) {
+		// upstream packages (cometbft, libp2p) call prometheus.Register(), so expose those metrics first
+		promhttp.Handler().ServeHTTP(w, req)
+
+		// then append the metrics registered in VictoriaMetrics (our metrics, basically)
+		// don't exposeProcessMetrics here since the go_* and process_* are already part of the output of
+		// the previous promhttp.Handler().ServeHTTP()
+		metrics.WritePrometheus(w, false)
+	})
+	log.Infof("prometheus metrics ready at: %s", path)
 }
 
 // Address return the current network address used by the HTTP router

@@ -30,7 +30,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -507,8 +506,9 @@ func main() {
 		}
 		// Enable metrics via proxy
 		if conf.Metrics.Enabled {
-			srv.MetricsAgent = metrics.NewAgent("/metrics",
-				time.Duration(conf.Metrics.RefreshInterval)*time.Second, srv.Router)
+			// This flag will make CometBFT register their metrics in prometheus
+			srv.Config.TendermintMetrics = true
+			srv.Router.ExposePrometheusEndpoint("/metrics")
 		}
 	}
 

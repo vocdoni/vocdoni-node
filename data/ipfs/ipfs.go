@@ -133,7 +133,6 @@ func (i *Handler) Init(d *types.DataStore) error {
 	}
 
 	go i.updateStats(time.Minute)
-	i.registerMetrics()
 
 	return nil
 }
@@ -221,7 +220,7 @@ func (i *Handler) Unpin(ctx context.Context, path string) error {
 
 // Stats returns stats about the IPFS node.
 func (i *Handler) Stats() map[string]any {
-	return map[string]any{"peers": stats.Peers.Load(), "addresses": stats.KnownAddrs.Load(), "pins": stats.Pins.Load()}
+	return map[string]any{"peers": stats.Peers.Get(), "addresses": stats.KnownAddrs.Get(), "pins": stats.Pins.Get()}
 }
 
 func (i *Handler) countPins(ctx context.Context) (int, error) {

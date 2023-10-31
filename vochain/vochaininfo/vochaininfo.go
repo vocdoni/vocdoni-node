@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
@@ -16,26 +17,16 @@ import (
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain
 // Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
 type VochainInfo struct {
-	sync   bool
-	height int64
-	// NOTE(Edu): After the integration of the arbo-based StateDB, there's
-	// no single voteTree, but we can still count total number of votes.  A
-	// more appropriate name for this variable would be voteCount
-	voteTreeSize    uint64
-	processTreeSize uint64
-	accountTreeSize uint64
-	sikTreeSize     uint64
-	mempoolSize     int
-	voteCacheSize   int
-	votesPerMinute  int
-	avg1            int32
-	avg10           int32
-	avg60           int32
-	avg360          int32
-	avg1440         int32
-	vnode           *vochain.BaseApplication
-	close           chan bool
-	lock            sync.RWMutex
+	sync           bool
+	votesPerMinute uint64
+	avg1           uint64
+	avg10          uint64
+	avg60          uint64
+	avg360         uint64
+	avg1440        uint64
+	vnode          *vochain.BaseApplication
+	close          chan bool
+	lock           sync.RWMutex
 }
 
 // NewVochainInfo creates a new VochainInfo type
@@ -46,19 +37,48 @@ func NewVochainInfo(node *vochain.BaseApplication) *VochainInfo {
 	}
 }
 
+func (vi *VochainInfo) updateCounters() {
+	height.Set(uint64(vi.vnode.Height()))
+
+	pc, err := vi.vnode.State.CountProcesses(true)
+	if err != nil {
+		log.Errorf("cannot count processes: %s", err)
+	}
+	processTreeSize.Set(pc)
+
+	vc, err := vi.vnode.State.CountTotalVotes()
+	if err != nil {
+		log.Errorf("cannot access vote count: %s", err)
+	}
+	voteCount.Set(vc)
+
+	ac, err := vi.vnode.State.CountAccounts(true)
+	if err != nil {
+		log.Errorf("cannot count accounts: %s", err)
+	}
+	accountTreeSize.Set(ac)
+
+	sc, err := vi.vnode.State.CountSIKs(true)
+	if err != nil {
+		log.Errorf("cannot count SIKs: %s", err)
+	}
+	sikTreeSize.Set(sc)
+
+	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
+	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
+}
+
 // Height returns the current number of blocks of the blockchain
-func (vi *VochainInfo) Height() int64 {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return vi.height
+func (vi *VochainInfo) Height() uint64 {
+	return height.Get()
 }
 
 // BlockTimes returns the average block time in milliseconds for 1, 10, 60, 360 and 1440 minutes.
 // Value 0 means there is not yet an average
-func (vi *VochainInfo) BlockTimes() *[5]int32 {
+func (vi *VochainInfo) BlockTimes() *[5]uint64 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return &[5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
+	return &[5]uint64{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
 }
 
 // EstimateBlockHeight provides an estimation time for a future blockchain height number.
@@ -113,13 +133,13 @@ func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint64, error) {
 
 // HeightTime estimates the UTC time for a future height or returns the
 // block timestamp if height is in the past.
-func (vi *VochainInfo) HeightTime(height int64) time.Time {
+func (vi *VochainInfo) HeightTime(height uint64) time.Time {
 	times := vi.BlockTimes()
 	currentHeight := vi.Height()
-	diffHeight := height - currentHeight
+	diffHeight := int64(height - currentHeight)
 
 	if diffHeight < 0 {
-		blk := vi.vnode.GetBlockByHeight(height)
+		blk := vi.vnode.GetBlockByHeight(int64(height))
 		if blk == nil {
 			log.Errorf("cannot get block height %d", height)
 			return time.Time{}
@@ -127,16 +147,16 @@ func (vi *VochainInfo) HeightTime(height int64) time.Time {
 		return blk.Header.Time
 	}
 
-	getMaxTimeFrom := func(i int) int64 {
+	getMaxTimeFrom := func(i int) uint64 {
 		for ; i >= 0; i-- {
 			if times[i] != 0 {
-				return int64(times[i])
+				return times[i]
 			}
 		}
 		return 10000 // fallback
 	}
 
-	t := int64(0)
+	t := uint64(0)
 	switch {
 	// if less than around 15 minutes missing
 	case diffHeight < 100:
@@ -148,48 +168,40 @@ func (vi *VochainInfo) HeightTime(height int64) time.Time {
 	case diffHeight >= 1000:
 		t = getMaxTimeFrom(4)
 	}
-	return time.Now().Add(time.Duration(diffHeight*t) * time.Millisecond)
+	return time.Now().Add(time.Duration(diffHeight*int64(t)) * time.Millisecond)
 }
 
 // TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
 // ProcessTree: total number of created voting processes in the blockchain
 // VoteTree: total number of votes registered in the blockchain
 // VotesPerMinute: number of votes included in the last 60 seconds
-func (vi *VochainInfo) TreeSizes() (uint64, uint64, int) {
+func (vi *VochainInfo) TreeSizes() (uint64, uint64, uint64) {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return vi.processTreeSize, vi.voteTreeSize, vi.votesPerMinute
+	return processTreeSize.Get(), voteCount.Get(), vi.votesPerMinute
 }
 
 // MempoolSize returns the current number of transactions waiting to be validated
-func (vi *VochainInfo) MempoolSize() int {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return vi.mempoolSize
+func (vi *VochainInfo) MempoolSize() uint64 {
+	return mempoolSize.Get()
 }
 
 // VoteCacheSize returns the current number of validated votes waiting to be
 // included in the blockchain
-func (vi *VochainInfo) VoteCacheSize() int {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return vi.voteCacheSize
+func (vi *VochainInfo) VoteCacheSize() uint64 {
+	return voteCacheSize.Get()
 }
 
 // AccountTreeSize returns the current number of validated votes waiting to be
 // included in the blockchain
 func (vi *VochainInfo) AccountTreeSize() uint64 {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return vi.accountTreeSize
+	return accountTreeSize.Get()
 }
 
 // SIKTreeSize returns the current number of validated votes waiting to be
 // included in the blockchain
 func (vi *VochainInfo) SIKTreeSize() uint64 {
-	vi.lock.RLock()
-	defer vi.lock.RUnlock()
-	return vi.sikTreeSize
+	return sikTreeSize.Get()
 }
 
 // TokensBurned returns the current balance of the burn address
@@ -220,21 +232,26 @@ func (vi *VochainInfo) NPeers() int {
 
 // Start initializes the Vochain statistics recollection.
 // TODO: use time.Duration instead of int64
-func (vi *VochainInfo) Start(sleepSecs int64) {
+func (vi *VochainInfo) Start(sleepSecs uint64) {
 	log.Infof("starting vochain info service every %d seconds", sleepSecs)
-	vi.registerMetrics()
+
+	metrics.NewGauge("vochain_tokens_burned",
+		func() float64 { return float64(vi.TokensBurned()) })
+
 	var duration time.Duration
-	var pheight, height int64
-	var h1, h10, h60, h360, h1440 int64
-	var n1, n10, n60, n360, n1440, vm int64
-	var a1, a10, a60, a360, a1440 int32
+	var pheight, height uint64
+	var h1, h10, h60, h360, h1440 uint64
+	var n1, n10, n60, n360, n1440, vm uint64
+	var a1, a10, a60, a360, a1440 uint64
 	var sync bool
 	var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
 		case <-time.After(duration):
-			height = int64(vi.vnode.Height())
+			vi.updateCounters()
+
+			height = uint64(vi.vnode.Height())
 
 			// less than 2s per block it's not real. Consider blockchain is synchcing
 			if pheight > 0 {
@@ -252,27 +269,27 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 				h1440 += height - pheight
 
 				if sleepSecs*n1 >= 60 && h1 > 0 {
-					a1 = int32((n1 * sleepSecs * 1000) / h1)
+					a1 = uint64((n1 * sleepSecs * 1000) / h1)
 					n1 = 0
 					h1 = 0
 				}
 				if sleepSecs*n10 >= 600 && h10 > 0 {
-					a10 = int32((n10 * sleepSecs * 1000) / h10)
+					a10 = uint64((n10 * sleepSecs * 1000) / h10)
 					n10 = 0
 					h10 = 0
 				}
 				if sleepSecs*n60 >= 3600 && h60 > 0 {
-					a60 = int32((n60 * sleepSecs * 1000) / h60)
+					a60 = uint64((n60 * sleepSecs * 1000) / h60)
 					n60 = 0
 					h60 = 0
 				}
 				if sleepSecs*n360 >= 21600 && h360 > 0 {
-					a360 = int32((n360 * sleepSecs * 1000) / h360)
+					a360 = uint64((n360 * sleepSecs * 1000) / h360)
 					n360 = 0
 					h360 = 0
 				}
 				if sleepSecs*n1440 >= 86400 && h1440 > 0 {
-					a1440 = int32((n1440 * sleepSecs * 1000) / h1440)
+					a1440 = uint64((n1440 * sleepSecs * 1000) / h1440)
 					n1440 = 0
 					h1440 = 0
 				}
@@ -282,37 +299,18 @@ func (vi *VochainInfo) Start(sleepSecs int64) {
 			pheight = height
 
 			vi.lock.Lock()
-			vi.height = height
 			vi.sync = sync
 			vi.avg1 = a1
 			vi.avg10 = a10
 			vi.avg60 = a60
 			vi.avg360 = a360
 			vi.avg1440 = a1440
-			var err error
-			vi.processTreeSize, err = vi.vnode.State.CountProcesses(true)
-			if err != nil {
-				log.Errorf("cannot count processes: %s", err)
-			}
-			vi.voteTreeSize, err = vi.vnode.State.CountTotalVotes()
-			if err != nil {
-				log.Errorf("cannot access vote count: %s", err)
-			}
-			vi.accountTreeSize, err = vi.vnode.State.CountAccounts(true)
-			if err != nil {
-				log.Errorf("cannot count accounts: %s", err)
-			}
-			vi.sikTreeSize, err = vi.vnode.State.CountSIKs(true)
-			if err != nil {
-				log.Errorf("cannot count SIKs: %s", err)
-			}
+
 			if sleepSecs*vm >= 60 {
-				vi.votesPerMinute = int(vi.voteTreeSize) - int(oldVoteTreeSize)
-				oldVoteTreeSize = vi.voteTreeSize
+				vi.votesPerMinute = voteCount.Get() - oldVoteTreeSize
+				oldVoteTreeSize = voteCount.Get()
 				vm = 0
 			}
-			vi.voteCacheSize = vi.vnode.State.CacheSize()
-			vi.mempoolSize = vi.vnode.MempoolSize()
 			vi.lock.Unlock()
 
 		case <-vi.close:

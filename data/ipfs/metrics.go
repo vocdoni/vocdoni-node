@@ -5,40 +5,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
-	"go.uber.org/atomic"
-
-	"go.vocdoni.io/dvote/metrics"
+	"github.com/VictoriaMetrics/metrics"
 )
 
-var stats struct {
-	Peers      atomic.Float64
-	KnownAddrs atomic.Float64
-	Pins       atomic.Float64
-}
-
-// registerMetrics registers prometheus metrics
-func (i *Handler) registerMetrics() {
-	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Namespace: "file",
-		Name:      "peers",
-		Help:      "The number of connected peers",
-	},
-		stats.Peers.Load))
-
-	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Namespace: "file",
-		Name:      "addresses",
-		Help:      "The number of registered addresses",
-	},
-		stats.KnownAddrs.Load))
-
-	metrics.Register(prometheus.NewGaugeFunc(prometheus.GaugeOpts{
-		Namespace: "file",
-		Name:      "pins",
-		Help:      "The number of pinned files",
-	},
-		stats.Pins.Load))
+var stats = struct {
+	Peers      *metrics.Counter
+	KnownAddrs *metrics.Counter
+	Pins       *metrics.Counter
+}{
+	Peers:      metrics.NewCounter("file_peers"),
+	KnownAddrs: metrics.NewCounter("file_addresses"),
+	Pins:       metrics.NewCounter("file_pins"),
 }
 
 // updateStats constantly updates the ipfs stats (Peers, KnownAddrs, Pins)
@@ -55,7 +32,7 @@ func (i *Handler) updateStats(interval time.Duration) {
 		go func() {
 			list, err := i.CoreAPI.Swarm().Peers(ctx)
 			if err == nil {
-				stats.Peers.Store(float64(len(list)))
+				stats.Peers.Set(uint64(len(list)))
 			}
 			wg.Done()
 		}()
@@ -64,7 +41,7 @@ func (i *Handler) updateStats(interval time.Duration) {
 		go func() {
 			list, err := i.CoreAPI.Swarm().KnownAddrs(ctx)
 			if err == nil {
-				stats.KnownAddrs.Store(float64(len(list)))
+				stats.KnownAddrs.Set(uint64(len(list)))
 			}
 			wg.Done()
 		}()
@@ -73,7 +50,7 @@ func (i *Handler) updateStats(interval time.Duration) {
 		go func() {
 			count, err := i.countPins(ctx)
 			if err == nil {
-				stats.Pins.Store(float64(count))
+				stats.Pins.Set(uint64(count))
 			}
 			wg.Done()
 		}()

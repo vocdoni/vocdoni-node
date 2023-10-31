@@ -7,7 +7,6 @@ import (
 	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/metrics"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
@@ -20,7 +19,6 @@ type VocdoniService struct {
 	Config         *config.VochainCfg
 	App            *vochain.BaseApplication
 	Router         *httprouter.HTTProuter
-	MetricsAgent   *metrics.Agent
 	OffChainData   *offchaindatahandler.OffChainDataHandler
 	DataDownloader *downloader.Downloader
 	CensusDB       *censusdb.CensusDB

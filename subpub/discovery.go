@@ -4,24 +4,20 @@ import (
 	"context"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	corediscovery "github.com/libp2p/go-libp2p/core/discovery"
 	libpeer "github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
 	discrouting "github.com/libp2p/go-libp2p/p2p/discovery/routing"
 	discutil "github.com/libp2p/go-libp2p/p2p/discovery/util"
 	multiaddr "github.com/multiformats/go-multiaddr"
-	"github.com/prometheus/client_golang/prometheus"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/metrics"
 )
 
 // Metrics exported via prometheus
 var (
-	dhtLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
-		Namespace: "file",
-		Name:      "peers_dht_latency",
-		Help:      "The time it takes FindPeers to discover peers",
-	})
+	// The time it takes FindPeers to discover peers
+	dhtLatency = metrics.NewHistogram("file_peers_dht_latency")
 )
 
 // setupDiscovery creates a DHT discovery service and attaches it to the libp2p Host.
@@ -38,8 +34,6 @@ func (s *SubPub) setupDiscovery(ctx context.Context) {
 	log.Infof("advertising myself periodically in topic %s", s.Topic)
 	s.routing = discrouting.NewRoutingDiscovery(s.node.DHT)
 	discutil.Advertise(ctx, s.routing, s.Topic)
-
-	metrics.Register(dhtLatency)
 
 	// Discover new peers periodically
 	go func() { // this spawns a single background task per instance
@@ -58,7 +52,8 @@ func (s *SubPub) setupDiscovery(ctx context.Context) {
 }
 
 func (s *SubPub) discover(ctx context.Context) {
-	dhtLatencyTimer := prometheus.NewTimer(dhtLatency)
+	startTime := time.Now()
+
 	// Now, look for others who have announced.
 	// This is like your friend telling you the location to meet you.
 	log.Debugf("looking for peers in topic %s", s.Topic)
@@ -83,7 +78,7 @@ func (s *SubPub) discover(ctx context.Context) {
 		}
 		// new peer; let's connect to it
 		// first update the latency metrics
-		dhtLatencyTimer.ObserveDuration()
+		dhtLatency.UpdateDuration(startTime)
 		connectCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 		if err := s.node.PeerHost.Connect(connectCtx, peer); err != nil {
 			cancel()

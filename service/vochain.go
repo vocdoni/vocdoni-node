@@ -97,11 +97,6 @@ func (vs *VocdoniService) Vochain() error {
 		}
 	}
 
-	// Metrics agent (Prometheus)
-	if vs.MetricsAgent != nil {
-		vs.Config.TendermintMetrics = true
-	}
-
 	// Create the vochain node
 	vs.App = vochain.NewVochain(vs.Config, genesisBytes)
 
@@ -136,7 +131,7 @@ func (vs *VocdoniService) Start() error {
 
 	if !vs.Config.NoWaitSync {
 		log.Infof("waiting for vochain to synchronize")
-		var lastHeight int64
+		var lastHeight uint64
 		i := 0
 		timeSyncCounter := time.Now()
 		timeCounter := time.Now()
@@ -171,10 +166,10 @@ func (vs *VocdoniService) Start() error {
 
 // VochainPrintInfo initializes the Vochain statistics recollection.
 func VochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
-	var a *[5]int32
-	var h int64
+	var a *[5]uint64
+	var h uint64
 	var p, v uint64
-	var m, vc, vxm int
+	var m, vc, vxm uint64
 	var b strings.Builder
 	for {
 		b.Reset()

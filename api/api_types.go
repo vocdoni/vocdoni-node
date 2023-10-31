@@ -198,7 +198,7 @@ type GenericTransactionWithInfo struct {
 
 type ChainInfo struct {
 	ID                      string    `json:"chainId" example:"azeno"`
-	BlockTime               [5]int32  `json:"blockTime" example:"12000,11580,11000,11100,11100"`
+	BlockTime               [5]uint64 `json:"blockTime" example:"12000,11580,11000,11100,11100"`
 	ElectionCount           uint64    `json:"electionCount" example:"120"`
 	OrganizationCount       uint64    `json:"organizationCount" example:"20"`
 	GenesisTime             time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
