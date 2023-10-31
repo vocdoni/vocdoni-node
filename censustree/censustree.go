@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
-	"sync/atomic"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/prefixeddb"
@@ -24,7 +23,6 @@ var censusWeightKey = []byte("censusWeight")
 // updates it.
 type Tree struct {
 	tree        *tree.Tree
-	public      atomic.Bool
 	censusType  models.Census_Type
 	hashFunc    func(...[]byte) ([]byte, error)
 	hashLen     int
@@ -145,16 +143,6 @@ func (t *Tree) FromRoot(root []byte) (*Tree, error) {
 
 	return &Tree{tree: treeFromRoot, censusType: t.Type()}, nil
 }
-
-// Publish makes a merkle tree available for queries.  Application layer should
-// call Publish() before considering the Tree available.
-func (t *Tree) Publish() { t.public.Store(true) }
-
-// Unpublish makes a merkle tree not available for queries.
-func (t *Tree) Unpublish() { t.public.Store(false) }
-
-// IsPublic returns true if the tree is available.
-func (t *Tree) IsPublic() bool { return t.public.Load() }
 
 // Root wraps tree.Tree.Root.
 func (t *Tree) Root() ([]byte, error) {

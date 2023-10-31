@@ -710,7 +710,6 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err := newRef.Tree().ImportDump(dump); err != nil {
 		return err
 	}
-	newRef.Tree().Publish()
 
 	var data []byte
 	if data, err = json.Marshal(&Census{

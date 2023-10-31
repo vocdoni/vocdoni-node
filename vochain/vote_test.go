@@ -37,8 +37,6 @@ func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.
 		qt.Check(t, err, qt.IsNil)
 	}
 
-	tr.Publish()
-
 	root, err := tr.Root()
 	qt.Check(t, err, qt.IsNil)
 	var proofs [][]byte
@@ -74,7 +72,6 @@ func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys,
 		hashedKeys = append(hashedKeys, c)
 	}
 
-	tr.Publish()
 	var proofs [][]byte
 	for i := range keys {
 		_, proof, err := tr.GenProof(hashedKeys[i])

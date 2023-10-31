@@ -67,7 +67,6 @@ func CreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []b
 		hashedKeys = append(hashedKeys, c)
 	}
 
-	tr.Publish()
 	var proofs [][]byte
 	for i := range keys {
 		_, proof, err := tr.GenProof(hashedKeys[i])
