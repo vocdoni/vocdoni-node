@@ -4,6 +4,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"io"
 
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/types"
@@ -13,6 +14,7 @@ import (
 type Storage interface {
 	Init(d *types.DataStore) error
 	Publish(ctx context.Context, data []byte) (string, error)
+	PublishReader(ctx context.Context, data io.Reader) (string, error)
 	Retrieve(ctx context.Context, id string, maxSize int64) ([]byte, error)
 	Pin(ctx context.Context, path string) error
 	Unpin(ctx context.Context, path string) error

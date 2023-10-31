@@ -61,6 +61,7 @@ func TestCensusDBLoad(t *testing.T) {
 
 	// Attempting to load a non-existent census should return an error
 	_, err := censusDB.Load(censusID, &authToken)
+	censusDB.UnLoad()
 	qt.Assert(t, err, qt.IsNotNil)
 
 	// Create a new census for loading
@@ -69,6 +70,7 @@ func TestCensusDBLoad(t *testing.T) {
 
 	// Load the census with the correct auth token
 	censusRef, err := censusDB.Load(censusID, &authToken)
+	censusDB.UnLoad()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, censusRef, qt.IsNotNil)
 }
@@ -131,8 +133,10 @@ func TestImportCensusDB(t *testing.T) {
 
 	// Ensure the data is in the database
 	_, err = censusDB.Load(censusID1, &token1)
+	censusDB.UnLoad()
 	qt.Assert(t, err, qt.IsNil)
 	_, err = censusDB.Load(censusID2, &token2)
+	censusDB.UnLoad()
 	qt.Assert(t, err, qt.IsNil)
 
 	// Dump the census data to a byte buffer
@@ -156,7 +160,7 @@ func TestImportCensusDB(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, v, qt.DeepEquals, value)
 	}
-
+	newDB.UnLoad()
 	newCensusRef, err = newDB.Load(censusID2, &token2)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -165,4 +169,5 @@ func TestImportCensusDB(t *testing.T) {
 		qt.Assert(t, err, qt.IsNil)
 		qt.Assert(t, v, qt.DeepEquals, value)
 	}
+	newDB.UnLoad()
 }

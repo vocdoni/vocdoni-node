@@ -41,7 +41,11 @@ func (t *E2ECensus) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.accounts = ethereum.NewSignKeysBatch(c.nvotes)
 	t.api = api
 	t.batchSize = 250 // TODO: make this configurable
-	log.Infow("census created", "censusID", t.censusID, "type", vapi.CensusTypeWeighted)
+	log.Infow("census created",
+		"censusID", t.censusID,
+		"type", vapi.CensusTypeWeighted,
+		"bearer", api.BearerToken().String(),
+	)
 	return nil
 }
 
@@ -90,5 +94,11 @@ func (t *E2ECensus) Run() error {
 	wg.Wait()  // Wait for all goroutines to finish
 	close(sem) // Close the semaphore channel
 	log.Infow("census created", "took (s)", time.Since(startTime).Seconds(), "participants/second", float64(len(t.accounts))/time.Since(startTime).Seconds())
-	return nil // Or return an aggregated error
+	startTime = time.Now()
+	newCensusID, uri, err := t.api.CensusPublish(t.censusID)
+	if err != nil {
+		return err
+	}
+	log.Infow("census published", "censusID", newCensusID.String(), "uri", uri, "took (s)", time.Since(startTime).Seconds())
+	return nil
 }

@@ -1,6 +1,7 @@
 package ipfs
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -154,8 +155,8 @@ func (*Handler) URIprefix() string {
 	return "ipfs://"
 }
 
-// Publish publishes a file or message to ipfs and returns the resulting CID v1.
-func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err error) {
+// PublishReader publishes a reader buffer to ipfs and returns the resulting CID v1.
+func (i *Handler) PublishReader(ctx context.Context, buf io.Reader) (cid string, err error) {
 	adder, err := coreunix.NewAdder(ctx, i.Node.Pinning, i.Node.Blockstore, i.Node.DAG)
 	if err != nil {
 		return "", err
@@ -165,14 +166,23 @@ func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err erro
 		Codec:  uint64(multicodec.DagJson),
 		MhType: uint64(multihash.SHA2_256),
 	}
-	msgFile := files.NewBytesFile(msg)
+	msgFile := files.NewReaderFile(buf)
 	format, err := adder.AddAllAndPin(ctx, msgFile)
 	if err != nil {
 		return "", err
 	}
+	size, err := msgFile.Size()
+	if err != nil {
+		size = 0
+	}
 	cid = format.Cid().String()
-	log.Infow("published file", "protocol", "ipfs", "cid", cid, "size", len(msg))
+	log.Infow("published file", "protocol", "ipfs", "cid", cid, "size", size)
 	return cid, nil
+}
+
+// Publish publishes a file or message to ipfs and returns the resulting CID v1.
+func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err error) {
+	return i.PublishReader(ctx, bytes.NewBuffer(msg))
 }
 
 // Pin adds a file to ipfs and returns the resulting CID v1.

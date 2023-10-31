@@ -114,6 +114,11 @@ func (c *HTTPclient) SetAuthToken(token *uuid.UUID) {
 	c.token = token
 }
 
+// BearerToken returns the current bearer authentication token.
+func (c *HTTPclient) BearerToken() *uuid.UUID {
+	return c.token
+}
+
 // SetHostAddr configures the host address of the API server.
 func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	c.addr = addr
