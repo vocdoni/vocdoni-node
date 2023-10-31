@@ -109,9 +109,6 @@ func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
 		return nil, err
 	}
 	ref.tree = tree
-	if uri != "" {
-		ref.tree.Publish()
-	}
 	return ref, nil
 }
 
@@ -149,9 +146,6 @@ func (c *CensusDB) Load(censusID []byte, authToken *uuid.UUID) (*CensusRef, erro
 		})
 	if err != nil {
 		return nil, err
-	}
-	if ref.URI != "" {
-		ref.tree.Publish()
 	}
 	root, err := ref.Tree().Root()
 	if err != nil {

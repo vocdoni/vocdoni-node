@@ -16,28 +16,6 @@ import (
 // The proper tests are in tree package, here there are tests that check the
 // added code in the CensusTree wrapper.
 
-func TestPublish(t *testing.T) {
-	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_BLAKE2B})
-	qt.Assert(t, err, qt.IsNil)
-	rnd := testutil.NewRandom(0)
-	key, value := rnd.RandomBytes(DefaultMaxKeyLen), rnd.RandomBytes(32)
-	qt.Assert(t, censusTree.Add(key, value), qt.IsNil)
-
-	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
-
-	censusTree.Publish()
-	qt.Assert(t, censusTree.IsPublic(), qt.IsTrue)
-
-	recValue, _, err := censusTree.GenProof(key)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, value, qt.DeepEquals, recValue)
-
-	censusTree.Unpublish()
-	qt.Assert(t, censusTree.IsPublic(), qt.IsFalse)
-}
-
 func TestImportWeighted(t *testing.T) {
 	db := metadb.NewTest(t)
 	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
@@ -117,8 +95,6 @@ func TestWeightedProof(t *testing.T) {
 
 	err = censusTree.Add(userKey, userWeight)
 	qt.Assert(t, err, qt.IsNil)
-
-	censusTree.Publish()
 
 	// generate and test the proof
 	value, siblings, err := censusTree.GenProof(userKey)
