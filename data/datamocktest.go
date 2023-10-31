@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"io"
 	"maps"
 	"os"
 	"sync"
@@ -25,6 +26,14 @@ func (d *DataMockTest) Init(_ *types.DataStore) error {
 	d.prefix = "ipfs://"
 	d.rnd = testutil.NewRandom(0)
 	return nil
+}
+
+func (d *DataMockTest) PublishReader(_ context.Context, r io.Reader) (string, error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return "", err
+	}
+	return d.Publish(context.Background(), data)
 }
 
 func (d *DataMockTest) Publish(_ context.Context, o []byte) (string, error) {

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,7 +33,8 @@ const (
 
 	MaxCensusAddBatchSize = 8192
 
-	censusIDsize = 32
+	censusIDsize          = 32
+	censusRetrieveTimeout = 5 * time.Minute
 )
 
 func (a *API) enableCensusHandlers() error {
@@ -140,6 +142,16 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
+
+	// Admin-only endpoints
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/export/ipfs",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.censusExportDBHandler,
+	); err != nil {
+		return err
+	}
 	if err := a.Endpoint.RegisterMethod(
 		"/censuses/export",
 		"GET",
@@ -149,10 +161,26 @@ func (a *API) enableCensusHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/censuses/import/{ipfscid}",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.censusImportDBHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/import",
 		"POST",
 		apirest.MethodAccessTypeAdmin,
 		a.censusImportDBHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/list",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.censusListHandler,
 	); err != nil {
 		return err
 	}
@@ -236,6 +264,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -309,6 +338,7 @@ func (a *API) censusTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	}
 	// Get the current census type from the disk
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -342,6 +372,7 @@ func (a *API) censusRootHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 		return err
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -383,6 +414,7 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 	ref, err := a.censusdb.Load(censusID, &token)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -439,6 +471,7 @@ func (a *API) censusImportHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -481,6 +514,7 @@ func (a *API) censusWeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		return err
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -517,6 +551,7 @@ func (a *API) censusSizeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 		return err
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -560,6 +595,7 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return err
 	}
 	_, err = a.censusdb.Load(censusID, &token)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -595,6 +631,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	}
 
 	ref, err := a.censusdb.Load(censusID, &token)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -624,6 +661,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	// if the census already exists, return the URI and the root
 	if a.censusdb.Exists(root) {
 		ref, err := a.censusdb.Load(root, nil)
+		defer a.censusdb.UnLoad()
 		if err != nil {
 			if errors.Is(err, censusdb.ErrCensusNotFound) {
 				return ErrCensusNotFound
@@ -707,6 +745,7 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 		return err
 	}
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -785,6 +824,7 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	}
 
 	ref, err := a.censusdb.Load(censusID, nil)
+	defer a.censusdb.UnLoad()
 	if err != nil {
 		if errors.Is(err, censusdb.ErrCensusNotFound) {
 			return ErrCensusNotFound
@@ -823,6 +863,27 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
+// censusListHandler
+//
+//	@Summary		List all census references
+//	@Description	List all census references. Requires Admin Bearer token.
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{valid=bool}
+//	@Router			/censuses/list/ [get]
+func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	list, err := a.censusdb.List()
+	if err != nil {
+		return err
+	}
+	data, err := json.Marshal(list)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
 // censusExportDBHandler
 //
 //	@Summary		Export census database
@@ -830,14 +891,31 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	object{valid=bool}
-//	@Router			/censuses/export [get]
-func (a *API) censusExportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+//	@Param			ipfs	path		string	true	"Export to IPFS. Blank to return the JSON file"
+//	@Success		200		{object}	object{valid=bool}
+//	@Router			/censuses/export/{ipfs} [get]
+func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	isIPFSExport := strings.HasSuffix(ctx.Request.URL.Path, "ipfs")
 	buf := bytes.Buffer{}
 	if err := a.censusdb.ExportCensusDB(&buf); err != nil {
 		return err
 	}
-	return ctx.Send(buf.Bytes(), apirest.HTTPstatusOK)
+	var data []byte
+	if isIPFSExport {
+		uri, err := a.storage.PublishReader(ctx.Request.Context(), &buf)
+		if err != nil {
+			return err
+		}
+		data, err = json.Marshal(map[string]string{
+			"uri": uri,
+		})
+		if err != nil {
+			return err
+		}
+	} else {
+		data = buf.Bytes()
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // censusImportHandler
@@ -848,10 +926,31 @@ func (a *API) censusExportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Accept			json
 //	@Produce		json
 //	@Success		200	{object}	object{valid=bool}
-//	@Router			/censuses/import [post]
+//	@Router			/censuses/import/{ipfscid} [post]
 func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
-		return err
+	ipfscid := ctx.URLParam("ipfscid")
+	if ipfscid == "" {
+		// if no ipfs cid, import from the request body
+		if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
+			return err
+		}
+		return ctx.Send(nil, apirest.HTTPstatusOK)
 	}
+	log.Infow("importing census database from ipfs async", "ipfscid", ipfscid)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), censusRetrieveTimeout)
+		defer cancel()
+		// TODO: Retrieve should return a reader
+		startTime := time.Now()
+		data, err := a.storage.Retrieve(ctx, "/ipfs/"+ipfscid, 0)
+		if err != nil {
+			log.Errorw(err, "could not retrieve census database from ipfs")
+			return
+		}
+		log.Infow("census database retrieved from ipfs", "ipfscid", ipfscid, "duration", time.Since(startTime))
+		if err := a.censusdb.ImportCensusDB(bytes.NewReader(data)); err != nil {
+			log.Errorw(err, "could not import census database from ipfs")
+		}
+	}()
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }
