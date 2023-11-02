@@ -7,7 +7,7 @@
 [![Join Discord](https://img.shields.io/badge/discord-join%20chat-blue.svg)](https://discord.gg/xFTh8Np2ga)
 [![Twitter Follow](https://img.shields.io/twitter/follow/vocdoni.svg?style=social&label=Follow)](https://twitter.com/vocdoni)
 
-This repository contains a set of libraries and tools for the **Vocdoni** decentralized backend infrastructure, as described [in the documentation](https://docs.vocdoni.io/).
+This repository contains a set of libraries and tools for the **Vocdoni** decentralized protocol, as described [in the documentation](https://developer.vocdoni.io/protocol/overview).
 
 If you want to build on top of the Vocdoni protocol, you can visit the [developer portal](https://developer.vocdoni.io)
 
@@ -15,42 +15,44 @@ A good summary of the whole Vocdoni architecture can be found in [this paper](ht
 
 ## Vocdoni
 
-Vocdoni is a universally verifiable, censorship-resistant, and anonymous self sovereign governance system, designed with the scalability and ease-of-use to support either small/private and big/national elections.
+Vocdoni is a universally verifiable, censorship-resistant, and anonymous self-sovereign governance protocol, designed with the scalability and ease-of-use to supply all kind of voting needs.
 
 Our main aim is a trustless voting system, where anyone can speak their voice and where everything can be audited. We are engineering building blocks for a permissionless, private and censorship resistant democracy.
 
 We intend the algorithms, systems, and software that we build to be a useful contribution toward making violence in these cryptonetworks impossible by protecting users privacy with cryptography. In particular, our aim is to provide the necessary tooling for the political will of network participants to translate outwardly into real political capital, without sacrificing privacy.
 
-![vocdoni team](https://assets.gitlab-static.net/uploads/-/system/project/avatar/12677379/go-dvote.png)
+<img src="https://raw.githubusercontent.com/vocdoni/vocdoni-node/main/assets/vocdoni_logo.svg?sanitize=true&raw=true" />
+
 
 ## vocdoni node
 
-The vocdoni node contains all the required features for running the decentralized Vocdoni Protocol blockchain node.
+The Vocdoni node is equipped with all the necessary components to operate a node on the decentralized Vocdoni protocol blockchain.
 
-Currently the node can operate in three modes:
+There are two operational modes available for the node:
 
-- **gateway** provides a full block validation node in addition to an entry point for the API and other services.
+- Gateway: This mode runs a full block validation node and serves as an access point for the API and other services.
 
-- **miner** provides a block validation node (full node), without providing any external service but capable of proposing new blocks.
+- Miner: In this mode, the node can validate blocks or run as a full node. It does not offer external services but can propose and validate new blocks.
 
-The most common mode is the `gateway`, that's probably what you are looking for.
 
-One of the design primitives of vocdoni-node is to run everything as a single process in order to have complete control over the components and avoid local RPC or IPC connections. So unlike other projects, vocdoni node uses go-ethereum, go-ipfs and tendermint as GoLang libraries.
+## Gateway mode
 
-vocdoni-node is currently pure GoLang code, so generating a static and reproducible binary that works on most of the Linux and MacOS hosts without any dependence, is possible.
+The gateway mode is the most frequently used and likely the one you need.
 
-For running vocdoni-node in gateway mode, 8 GiB of ram memory is recommended (4 GiB works too).
+Vocdoni-node is uniquely designed to run all components within a single process, giving full control and eliminating the need for local RPC or IPC connections. This is in contrast to other projects, as Vocdoni-node incorporates go-ethereum, go-ipfs, and tendermint directly as GoLang libraries.
+
+To run a Vocdoni-node as a gateway, it's recommended to have at least 4 GiB of RAM and 40 GiB of disk space.
 
 #### Compile and run
 
 Compile from source in a golang environment (Go>1.21 required):
 
 ```bash
-git clone https://github.com/vocdoni/vocdoni-node.git
+git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
 cd vocdoni-node
 go build ./cmd/node
 ./node --help
-./node --mode=gateway --chain=dev --logLevel=info
+./node --mode=gateway --chain=lts --logLevel=info
 ```
 
 #### Docker
@@ -59,14 +61,15 @@ You can run vocdoni node as a standalone container with docker compose (recommen
 It is recommended to also start `watchtower` to automatically update the container when a new version is released.
 
 ```bash
-cd dockerfiles/vocdoninode
-cp env.example env
+git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
+cd vocdoni-node/dockerfiles/vocdoninode
+cp env.example env # see env file for config options
 COMPOSE_PROFILES=watchtower docker compose up -d
 ```
 
 All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090/v2`.
 
-If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the file `dockerfiles/vocdoninode/env`.
+If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the `env` file.
 
 To stop the container: 
 
@@ -102,18 +105,67 @@ Once the node has finished the blockchain fast sync process, you can connect que
   "cicuitConfigurationTag": "dev",
   "maxCensusSize": 10000
 }
-
 ```
 
 API methods, SDK and documentation can be found at [the developer portal](https://developer.vocdoni.io)
 
-#### Testing
+## Miner mode
+
+Miners, also known as validators, play a crucial role in proposing and validating new blocks on the blockchain, ensuring the network operates correctly.
+
+The process of becoming a validator is selective to mitigate the risk of malicious activity. Although the role is not currently compensated, those interested in supporting the open-source protocol are encouraged to apply.
+
+To become a validator, there is a manual verification process in place. If you're interested, please follow these steps and reach out to our team via Discord or email for further instructions.
+
+Generate a private key: `hexdump -n 32 -e '4/4 "%08x" 1 ""' /dev/urandom`
+
+Clone and prepare environment:
+```bash
+git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
+cd vocdoni-node/dockerfiles/vocdoninode
+echo "VOCDONI_NODE_TAG=release-lts-1" > .env
+```
+
+Create the config `env` file.
+
+```bash
+VOCDONI_DATADIR=/app/run
+VOCDONI_MODE=miner
+VOCDONI_CHAIN=lts
+VOCDONI_LOGLEVEL=info
+VOCDONI_VOCHAIN_LOGLEVEL=error
+VOCDONI_DEV=True
+VOCDONI_ENABLEAPI=False
+VOCDONI_ENABLERPC=False
+VOCDONI_LISTENHOST=0.0.0.0
+VOCDONI_LISTENPORT=9090
+VOCDONI_VOCHAIN_MINERKEY=<YOUR_HEX_PRIVATE_KEY>
+VOCDONI_VOCHAIN_MEMPOOLSIZE=20000
+VOCDONI_METRICS_ENABLED=True # if you want prometheus metrics enabled
+VOCDONI_METRICS_REFRESHINTERVAL=5
+```
+
+Finally start the container: `COMPOSE_PROFILES=watchtower docker compose up -d`
+
+You can monitor the log output: `docker compose logs -f vocdoninode`
+
+#### Fetch the validator key
+
+At this point **if you want your node to become validator**, you need to extract the public key from the logs: 
+
+`docker compose logs vocdoninode | grep publicKey`.
+
+Provide the public key and a fancy name to the Vocdoni team so they can upgrade your node to validator.
+
+
+## Testing
 
 The test suite is an all-in-one compose file to bootstrap a minimal testing testing environment. To do a voting process test, follow the examples mentioned in the included README:
 
 ```bash
 cd dockerfiles/testsuite
 cat README.md
+bash start_test.sh # creates the environment and runs all tests
 ```
 
 ---
