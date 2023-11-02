@@ -43,7 +43,10 @@ func iterate(reader pebble.Reader, prefix []byte, callback func(k, v []byte) boo
 		LowerBound: prefix,
 		UpperBound: keyUpperBound(prefix),
 	}
-	iter := reader.NewIter(iterOptions)
+	iter, err := reader.NewIter(iterOptions)
+	if err != nil {
+		return err
+	}
 	defer func() {
 		errC := iter.Close()
 		if err != nil {
@@ -180,7 +183,10 @@ func (db *PebbleDB) Iterate(prefix []byte, callback func(k, v []byte) bool) (err
 // Compact implements the db.Database.Compact interface method
 func (db *PebbleDB) Compact() error {
 	// from https://github.com/cockroachdb/pebble/issues/1474#issuecomment-1022313365
-	iter := db.db.NewIter(nil)
+	iter, err := db.db.NewIter(nil)
+	if err != nil {
+		return err
+	}
 	var first, last []byte
 	if iter.First() {
 		first = append(first, iter.Key()...)
