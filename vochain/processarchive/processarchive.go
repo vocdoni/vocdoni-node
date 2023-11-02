@@ -127,27 +127,32 @@ func BuildIndex(datadir string) (*Index, error) {
 		Entities: make(map[string][]*IndexProcess),
 	}
 	count := 0
-	if err := filepath.Walk(datadir, func(path string, info os.FileInfo, err error) error {
-		if len(info.Name()) == 64 {
-			content, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			if content == nil {
-				log.Warnf("archive file %s is empty", path)
-				return nil
-			}
-			count++
-			p := &Process{}
-			if err := json.Unmarshal(content, p); err != nil {
-				return err
-			}
-			eid := fmt.Sprintf("%x", p.ProcessInfo.EntityID)
-			i.Entities[eid] = append(i.Entities[eid], &IndexProcess{ProcessID: p.ProcessInfo.ID})
-		}
-		return nil
-	}); err != nil {
+	entries, err := os.ReadDir(datadir)
+	if err != nil {
 		return nil, err
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		path := filepath.Join(datadir, name)
+		if len(entry.Name()) != 64 {
+			log.Warnf("archive file %s has an invalid name", path)
+			continue
+		}
+		content, err := os.ReadFile(filepath.Join(datadir, name))
+		if err != nil {
+			return nil, err
+		}
+		if content == nil {
+			log.Warnf("archive file %s is empty", path)
+			continue
+		}
+		count++
+		p := &Process{}
+		if err := json.Unmarshal(content, p); err != nil {
+			return nil, err
+		}
+		eid := fmt.Sprintf("%x", p.ProcessInfo.EntityID)
+		i.Entities[eid] = append(i.Entities[eid], &IndexProcess{ProcessID: p.ProcessInfo.ID})
 	}
 	indexData, err := json.MarshalIndent(i, " ", " ")
 	if err != nil {
