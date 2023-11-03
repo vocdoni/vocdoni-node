@@ -85,7 +85,7 @@ func (s *SubPub) discover(ctx context.Context) {
 			continue
 		}
 		cancel()
-		log.Infow("connected to cluster peer!", "address", peer.ID.Pretty())
+		log.Infow("connected to cluster peer!", "address", peer.ID.String())
 
 		// protect the peer from being disconnected by the connection manager
 		s.node.PeerHost.ConnManager().Protect(peer.ID, "discoveredPeer")
