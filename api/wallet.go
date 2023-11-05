@@ -398,12 +398,8 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 			Description: question.Description,
 			Title:       question.Title,
 		}
-		for _, choice := range question.Choices {
-			metaQuestion.Choices = append(metaQuestion.Choices, ChoiceMetadata{
-				Title: choice.Title,
-				Value: choice.Value,
-			})
-		}
+
+		metaQuestion.Choices = append(metaQuestion.Choices, question.Choices...)
 		metadata.Questions = append(metadata.Questions, metaQuestion)
 	}
 
