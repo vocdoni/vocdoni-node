@@ -289,7 +289,7 @@ func (c *CensusDB) List() ([]*CensusList, error) {
 	c.Lock()
 	defer c.Unlock()
 	var list []*CensusList
-	if err := c.db.Iterate([]byte(censusDBreferencePrefix), func(key []byte, data []byte) bool {
+	if err := c.db.Iterate([]byte(censusDBreferencePrefix), func(key, data []byte) bool {
 		censusID := make([]byte, len(key))
 		copy(censusID, key)
 		dec := gob.NewDecoder(bytes.NewReader(data))
@@ -340,7 +340,7 @@ func (c *CensusDB) ExportCensusDB(buffer io.Writer) error {
 	c.Lock()
 	defer c.Unlock()
 	// Iterate through all census entries in the DB
-	err := c.db.Iterate([]byte(censusDBreferencePrefix), func(key []byte, data []byte) bool {
+	err := c.db.Iterate([]byte(censusDBreferencePrefix), func(key, data []byte) bool {
 		censusID := make([]byte, len(key))
 		copy(censusID, key)
 		dec := gob.NewDecoder(bytes.NewReader(data))
