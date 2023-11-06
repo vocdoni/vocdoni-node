@@ -130,7 +130,7 @@ func (t *PrefixedWriteTx) Discard() {
 }
 
 // Set implements the db.WriteTx.Set interface method
-func (t *PrefixedWriteTx) Set(key []byte, value []byte) error {
+func (t *PrefixedWriteTx) Set(key, value []byte) error {
 	return t.tx.Set(prefixSlice(t.prefix, key), value)
 }
 

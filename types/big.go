@@ -48,17 +48,17 @@ func (i *BigInt) MathBigInt() *big.Int {
 }
 
 // Add sum x+y
-func (i *BigInt) Add(x *BigInt, y *BigInt) *BigInt {
+func (i *BigInt) Add(x, y *BigInt) *BigInt {
 	return (*BigInt)(i.MathBigInt().Add(x.MathBigInt(), y.MathBigInt()))
 }
 
 // Sub subs x-y
-func (i *BigInt) Sub(x *BigInt, y *BigInt) *BigInt {
+func (i *BigInt) Sub(x, y *BigInt) *BigInt {
 	return (*BigInt)(i.MathBigInt().Sub(x.MathBigInt(), y.MathBigInt()))
 }
 
 // Mul multiplies x*y
-func (i *BigInt) Mul(x *BigInt, y *BigInt) *BigInt {
+func (i *BigInt) Mul(x, y *BigInt) *BigInt {
 	return (*BigInt)(i.MathBigInt().Mul(x.MathBigInt(), y.MathBigInt()))
 }
 

@@ -66,7 +66,7 @@ func (s *SubPub) joinGossip(ctx context.Context, p2pPS *pubsub.PubSub, selfID pe
 		self:     selfID,
 		Messages: make(chan *Message, GossipBufSize),
 	}
-	log.Infow("joined to gossipsub topic", "topic", sub.Topic(), "peer", selfID.Pretty())
+	log.Infow("joined to gossipsub topic", "topic", sub.Topic(), "peer", selfID.String())
 
 	// start reading messages from the subscription in a loop
 	go s.readGossipLoop() // this spawns a single background task per instance (since a single gossip topic is used)

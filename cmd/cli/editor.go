@@ -25,7 +25,7 @@ func GetPreferredEditorFromEnvironment() string {
 	return editor
 }
 
-func resolveEditorArguments(executable string, filename string) []string {
+func resolveEditorArguments(executable, filename string) []string {
 	args := []string{filename}
 
 	if strings.Contains(executable, "Visual Studio Code.app") {

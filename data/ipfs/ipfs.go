@@ -88,7 +88,7 @@ func (i *Handler) Init(d *types.DataStore) error {
 		}
 	}()
 	log.Infow("IPFS initialization",
-		"peerID", node.Identity.Pretty(),
+		"peerID", node.Identity.String(),
 		"addresses", node.PeerHost.Addrs(),
 		"pubKey", node.PrivateKey.GetPublic(),
 	)

@@ -298,8 +298,8 @@ func TestAPIElectionCost(t *testing.T) {
 
 func runAPIElectionCostWithParams(t *testing.T,
 	electionParams electionprice.ElectionParameters,
-	startBlock uint32, initialBalance uint64,
-	txCostNewProcess, networkCapacity uint64,
+	startBlock uint32, initialBalance,
+	txCostNewProcess, networkCapacity,
 	expectedPrice uint64,
 ) {
 	server := testcommon.APIserver{}

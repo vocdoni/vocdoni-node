@@ -94,7 +94,7 @@ func (s *SubPub) Start(ctx context.Context, receiver chan *Message) {
 		log.Fatal("no group key provided")
 	}
 	ipfslog.SetLogLevel("*", "ERROR")
-	s.NodeID = s.node.PeerHost.ID().Pretty()
+	s.NodeID = s.node.PeerHost.ID().String()
 	s.messages = receiver
 	s.setupDiscovery(ctx)
 	s.setupGossip(ctx)

@@ -63,7 +63,7 @@ type WriteTx interface {
 
 	// Set adds a key-value pair. If the key already exists, its value is
 	// updated.
-	Set(key []byte, value []byte) error
+	Set(key, value []byte) error
 	// Delete deletes a key and its value.
 	Delete(key []byte) error
 	// Apply applies the value-passed WriteTx into the given WriteTx,
