@@ -92,6 +92,7 @@ func (r *HTTProuter) Init(host string, port int) error {
 	r.Mux.Use(middleware.Heartbeat("/ping"))
 	r.Mux.Use(middleware.ThrottleBacklog(5000, 40000, 30*time.Second))
 	r.Mux.Use(middleware.Timeout(30 * time.Second))
+	r.Mux.Use(middleware.Compress(5))
 
 	// Cors handler
 	cors := cors.New(cors.Options{
@@ -177,6 +178,11 @@ func (r *HTTProuter) EnablePrometheusMetrics(prometheusID string) {
 func (r *HTTProuter) ExposePrometheusEndpoint(path string) {
 	r.AddRawHTTPHandler(path, "GET", func(w http.ResponseWriter, req *http.Request) {
 		// upstream packages (cometbft, libp2p) call prometheus.Register(), so expose those metrics first
+		//
+		// we need to remove the "Accept-Encoding: gzip" to ensure promhttp.Handler().ServeHTTP() outputs plaintext,
+		// to be able to append the plaintext from metrics.WritePrometheus,
+		// and let go-chi take care of compression of the combined output
+		req.Header.Del("Accept-Encoding")
 		promhttp.Handler().ServeHTTP(w, req)
 
 		// then append the metrics registered in VictoriaMetrics (our metrics, basically)
