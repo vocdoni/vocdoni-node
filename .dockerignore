@@ -1,8 +1,0 @@
-run/
-
-# changes to these shouldn't affect caching
-Dockerfile*
-*.md
-*.txt
-*.yml
-*_test.go
