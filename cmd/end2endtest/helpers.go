@@ -23,8 +23,6 @@ import (
 )
 
 const (
-	nextBlock     = "nextBlock"
-	sameBlock     = "sameBlock"
 	defaultWeight = 10
 	retriesSend   = retries / 2
 )
@@ -468,8 +466,9 @@ func (t *e2eElection) checkElectionPrice(ed *vapi.ElectionDescription) error {
 	return nil
 }
 
-// overwriteVote allow to try to overwrite a previous vote given the index of the account, it can use the sameBlock or the nextBlock
-func (t *e2eElection) overwriteVote(choices []int, v *apiclient.VoteData, waitType string) error {
+// overwriteVote allow to try to overwrite a previous vote given the index of the account,
+// always waiting for a block between overwrites (otherwise results are impredictable)
+func (t *e2eElection) overwriteVote(choices []int, v *apiclient.VoteData) error {
 	for i := 0; i < len(choices); i++ {
 		// assign the choices wanted for each overwrite vote
 		v.Choices = []int{choices[i]}
@@ -481,9 +480,7 @@ func (t *e2eElection) overwriteVote(choices []int, v *apiclient.VoteData, waitTy
 			}
 			log.Debug("error expected: ", err.Error())
 		}
-		if waitType == nextBlock {
-			_ = t.api.WaitUntilNextBlock()
-		}
+		_ = t.api.WaitUntilNextBlock()
 	}
 	return nil
 }
