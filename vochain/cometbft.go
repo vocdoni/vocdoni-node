@@ -372,6 +372,9 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		}
 		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr != nil {
 			if bytes.Equal(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) {
+				if validTxInfos[i].Nonce == validTxInfos[j].Nonce {
+					return bytes.Compare(validTxInfos[i].Data, validTxInfos[j].Data) == -1
+				}
 				return validTxInfos[i].Nonce < validTxInfos[j].Nonce
 			}
 			return bytes.Compare(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) == -1
