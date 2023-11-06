@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -515,6 +516,9 @@ func main() {
 			// This flag will make CometBFT register their metrics in prometheus
 			srv.Config.TendermintMetrics = true
 			srv.Router.ExposePrometheusEndpoint("/metrics")
+
+			metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,chain=%q}",
+				internal.Version, conf.Mode, conf.Vochain.Chain)).Set(1)
 		}
 	}
 
