@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/VictoriaMetrics/metrics"
 	"github.com/ethereum/go-ethereum/common"
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -232,6 +233,8 @@ func main() {
 	}
 
 	vc.Router.ExposePrometheusEndpoint("/metrics")
+	metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,chain=%q}",
+		internal.Version, "vocone", config.chainID)).Set(1)
 
 	// enable faucet if requested, this will create a new account and attach the faucet API to the vocone API
 	if config.enableFaucetWithAmount > 0 {
