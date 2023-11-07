@@ -18,7 +18,7 @@ func TestImportArchive(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	archive = append(archive, archiveProcess1)
 
-	err = idx.ImportArchive(archive)
+	_, err = idx.ImportArchive(archive)
 	qt.Assert(t, err, qt.IsNil)
 
 	process1, err := idx.ProcessInfo(archiveProcess1.ProcessInfo.ID)
