@@ -27,6 +27,13 @@ type importItem struct {
 	censusRoot string
 }
 
+var itemTypesToString = map[int]string{
+	itemTypeExternalCensus:       "external census",
+	itemTypeOrganizationMetadata: "organization metadata",
+	itemTypeElectionMetadata:     "election metadata",
+	itemTypeAccountMetadata:      "account metadata",
+}
+
 // TBD: A startup process for importing on-going process census
 // TBD: a mechanism for removing already finished census?
 
@@ -57,6 +64,7 @@ func NewOffChainDataHandler(v *vochain.BaseApplication, d *downloader.Downloader
 	return &od
 }
 
+// Rollback is called when a new block is reverted, so we revert the import actions.
 func (d *OffChainDataHandler) Rollback() {
 	d.queueLock.Lock()
 	d.queue = make([]importItem, 0)
@@ -72,14 +80,14 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 	for _, item := range d.queue {
 		switch item.itemType {
 		case itemTypeExternalCensus:
-			log.Infow("importing data", "type", "external census", "uri", item.uri)
+			log.Infow("importing data", "type", itemTypesToString[item.itemType], "uri", item.uri)
 			// AddToQueue() writes to a channel that might be full, so we don't want to block the main thread.
 			go d.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
-			log.Infow("importing metadata", "type", item.itemType, "uri", item.uri)
+			log.Infow("importing data", "type", itemTypesToString[item.itemType], "uri", item.uri)
 			go d.enqueueMetadata(item.uri)
 		default:
-			log.Errorf("unknown item %d", item.itemType)
+			log.Errorf("unknown import item %d", item.itemType)
 		}
 	}
 	return nil

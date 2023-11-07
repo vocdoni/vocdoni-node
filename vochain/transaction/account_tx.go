@@ -8,7 +8,6 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -312,7 +311,6 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if err != nil {
 		return common.Address{}, nil, nil, false, fmt.Errorf("cannot extract address from public key: %w", err)
 	}
-	log.Info(txAddress.String())
 	// check if the address is already registered
 	if _, err := t.state.GetAccount(txAddress, false); err != nil {
 		return common.Address{}, nil, nil, false, fmt.Errorf("cannot get the account for the tx address: %w", err)

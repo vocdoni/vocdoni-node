@@ -126,7 +126,6 @@ func (c *Controller) Schedule(height uint32, id []byte, action Action) error {
 	actions[string(id)] = action
 
 	// store the IST actions
-	log.Debugw("schedule IST action", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 	return c.storeToNoState(dbIndex(height), actions.encode())
 }
 
@@ -236,7 +235,6 @@ func (c *Controller) Commit(height uint32) error {
 					action.ElectionID, err)
 			}
 		case ActionUpdateValidatorScore:
-			log.Debugw("update validator score", "height", height, "id", fmt.Sprintf("%x", id), "action", ActionsToString[action.ID])
 			if err := c.updateValidatorScore(action.ValidatorVotes, action.ValidatorProposer); err != nil {
 				return fmt.Errorf("cannot update validator score: %w", err)
 			}

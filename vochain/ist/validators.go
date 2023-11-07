@@ -2,10 +2,7 @@ package ist
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
-
-	"go.vocdoni.io/dvote/log"
 )
 
 /*
@@ -64,7 +61,6 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 		return fmt.Errorf("cannot update validator score: %w", err)
 	}
 	// get the validator score
-	log.Debugw("update validator score", "totalVoters", len(voteAddresses), "proposer", hex.EncodeToString(proposer))
 	for _, voteAddr := range voteAddresses {
 		validator := ""
 		for k, v := range validators {
