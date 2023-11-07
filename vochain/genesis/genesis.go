@@ -12,7 +12,8 @@ var Genesis = map[string]Vochain{
 	"dev": {
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
-			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656"},
+			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656",
+		},
 		CircuitsConfigTag: "dev",
 		Genesis:           &devGenesis,
 	},
@@ -21,7 +22,8 @@ var Genesis = map[string]Vochain{
 	"stage": {
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
-			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656"},
+			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656",
+		},
 		CircuitsConfigTag: "dev",
 		Genesis:           &stageGenesis,
 	},
@@ -120,8 +122,8 @@ var devGenesis = Doc{
 }
 
 var stageGenesis = Doc{
-	GenesisTime: time.Date(2023, time.September, 21, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni-stage-8",
+	GenesisTime: time.Date(2023, time.November, 7, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/STAGE/9",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -146,71 +148,71 @@ var stageGenesis = Doc{
 				Address:  types.HexStringToHexBytes("321d141cf1fcb41d7844af611b5347afc380a03f"),
 				PubKey:   types.HexStringToHexBytes("02420b2ee645b9509453cd3b99a6bd8e5e10c1d746fb0bb0ac5af79aba19bb9784"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni1",
 				KeyIndex: 1,
 			},
 			{ // 1
 				Address:  types.HexStringToHexBytes("5e6c49d98ff3b90ca46387d7c583d20cf99f29bd"),
 				PubKey:   types.HexStringToHexBytes("03e6c55195825f9736ce8a4553913bbadb26c7f094540e06aed9ccda0e6e26050d"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni2",
 				KeyIndex: 0,
 			},
 			{ // 2
 				Address:  types.HexStringToHexBytes("9d4c46f7485036faea5f15c3034e9e864b9415b5"),
 				PubKey:   types.HexStringToHexBytes("03cb39e1132eee0b25ec75d7dad1f2885460f9b2f200d108a923b78e648b783839"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni3",
 				KeyIndex: 0,
 			},
 			{ // 3
 				Address:  types.HexStringToHexBytes("52d74938f81569aba46f384c8108c370b5403585"),
 				PubKey:   types.HexStringToHexBytes("03f6c246831a524e8214e9ceb61d3da2c3c4dbee09bcbe5d9d9878aaa085764d65"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni4",
 				KeyIndex: 2,
 			},
 			{ // 4
 				Address:  types.HexStringToHexBytes("ad6ff21ccfb31002adc52714043e37da1b555b15"),
 				PubKey:   types.HexStringToHexBytes("02fd283ff5760958b4e59eac6b0647ed002669ef2862eb9361251376160aa72fe5"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni5",
 				KeyIndex: 0,
 			},
 			{ // 5
 				Address:  types.HexStringToHexBytes("8367a1488c3afda043a2a602c13f01d801d0270e"),
 				PubKey:   types.HexStringToHexBytes("03369a8c595c70526baf8528b908591ec286e910b10796c3d6dfca0ef76a645167"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni6",
 				KeyIndex: 0,
 			},
 			{ // 6
 				Address:  types.HexStringToHexBytes("4146598ff76009f45903958c4c7a3195683b2f61"),
 				PubKey:   types.HexStringToHexBytes("02b5005aeefdb8bb196d308df3fba157a7c1e84966f899a9def6aa97b086bc87e7"),
 				Power:    10,
-				Name:     "",
-				KeyIndex: 3,
+				Name:     "vocdoni7",
+				KeyIndex: 0,
 			},
 			{ // 7
 				Address:  types.HexStringToHexBytes("205bd3ae071118849535c9746f577ddd5eb226e6"),
 				PubKey:   types.HexStringToHexBytes("02cc2386b56cd46c196d33ec23cc9ad5228942fabd62e1cdbc12b4688fa3ac49e0"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni8",
 				KeyIndex: 0,
 			},
 			{ // 8
 				Address:  types.HexStringToHexBytes("96db730d4478eaea44ee2bcb90fc1430a22521cb"),
 				PubKey:   types.HexStringToHexBytes("02a059f4f5454555a588ef99b1c6ba525b551a16621d6c476998e4972ef5e42913"),
 				Power:    10,
-				Name:     "",
+				Name:     "vocdoni9",
 				KeyIndex: 0,
 			},
 			{ // 9
 				Address:  types.HexStringToHexBytes("c7864964dab0107eb01a1cade4c3319dae69754e"),
 				PubKey:   types.HexStringToHexBytes("022fb2c1b4df15418a268b3d8027809e44d321c640b21ace6f0d5c6fa9fde18989"),
 				Power:    10,
-				Name:     "",
-				KeyIndex: 4,
+				Name:     "vocdoni10",
+				KeyIndex: 0,
 			},
 		},
 		Accounts: []Account{
@@ -233,7 +235,7 @@ var stageGenesis = Doc{
 			CollectFaucet:           1,
 			SetAccountSIK:           1,
 			DelAccountSIK:           1,
-			SetAccountValidator:     100000,
+			SetAccountValidator:     500000,
 		},
 	},
 }
