@@ -23,6 +23,10 @@ import (
 // * how many times to retry opening a connection to an endpoint before giving up
 const retries = 10
 
+// specifying the flag --operation all will allow to run all tests available in
+// the ops map
+const allTests = "all"
+
 // VochainTest is the interface that tests should comply with.
 // Duration of each step will be measured and reported.
 //
@@ -70,24 +74,15 @@ type config struct {
 	timeout         time.Duration
 }
 
-func main() {
-	// Report the version before loading the config or logger init, just in case something goes wrong.
-	// For the sake of including the version in the log, it's also included in a log line later on.
-	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
-
-	c := &config{}
+func parseFlags(c *config) {
 	flag.StringVar(&c.host, "host", "https://api-dev.vocdoni.net/v2", "API host to connect to")
 	flag.StringVar(&c.logLevel, "logLevel", "info", "log level (debug, info, warn, error, fatal)")
-	flag.StringVar(&c.operation, "operation", "",
-		fmt.Sprintf("set operation mode: %v", opNames()))
-	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{},
-		"account private key (optional)")
+	flag.StringVar(&c.operation, "operation", "", fmt.Sprintf("set operation mode: %v", opNames()))
+	flag.StringSliceVarP(&c.accountPrivKeys, "accountPrivKey", "k", []string{}, "account private key (optional)")
 	flag.IntVar(&c.nvotes, "votes", 10, "number of votes to cast")
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
-	flag.StringVar(&c.faucet, "faucet", "",
-		"faucet URL for fetching tokens (if empty, default faucet URL will be used)")
-	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "",
-		"(optional) token passed as Bearer when fetching faucetURL")
+	flag.StringVar(&c.faucet, "faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
 	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout, "timeout duration of each step")
 
 	flag.Usage = func() {
@@ -106,7 +101,9 @@ func main() {
 
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
+}
 
+func initializeLogger(c *config) {
 	log.Init(c.logLevel, "stdout", nil)
 	log.Infow("starting "+filepath.Base(os.Args[0]),
 		"version", internal.Version,
@@ -115,34 +112,24 @@ func main() {
 		"parallel", c.parallelCount,
 		"timeout", c.timeout,
 		"votes", c.nvotes)
+}
 
-	if len(c.accountPrivKeys) == 0 {
-		c.accountPrivKeys = []string{util.RandomHex(32)}
-		log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
-	}
-
+func createSignKeys(c *config) error {
 	c.accountKeys = make([]*ethereum.SignKeys, len(c.accountPrivKeys))
 	for i, key := range c.accountPrivKeys {
 		ak, err := privKeyToSigner(key)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		c.accountKeys[i] = ak
 		log.Infof("privkey %x = account %s", ak.PrivateKey(), ak.AddressString())
 	}
+	return nil
+}
 
-	op, found := ops[c.operation]
-	if !found {
-		log.Fatal("no valid operation mode specified")
-	}
-
-	api, err := NewAPIclient(c.host)
-	if err != nil {
-		log.Fatal(err)
-	}
-
+func setupAndRun(op operation, api *apiclient.HTTPclient, c *config) error {
 	startTime := time.Now()
-	err = op.test.Setup(api, c)
+	err := op.test.Setup(api, c)
 	duration := time.Since(startTime)
 	if err != nil {
 		log.Fatal(err)
@@ -161,22 +148,11 @@ func main() {
 	err = op.test.Teardown()
 	duration = time.Since(startTime)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	log.Infow("teardown done", "test", c.operation, "duration", duration.String())
-}
 
-// NewAPIclient connects to the API host and returns the handle
-func NewAPIclient(host string) (*apiclient.HTTPclient, error) {
-	hostURL, err := url.Parse(host)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Debugf("connecting to %s", hostURL.String())
-
-	token := uuid.New()
-	return apiclient.NewHTTPclient(hostURL, &token)
+	return nil
 }
 
 func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
@@ -188,4 +164,67 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 		}
 	}
 	return skey, nil
+}
+
+// NewAPIclient connects to the API host and returns the handle
+func NewAPIclient(host string) (*apiclient.HTTPclient, error) {
+	hostURL, err := url.Parse(host)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Debugf("connecting to %s", hostURL.String())
+	token := uuid.New()
+
+	return apiclient.NewHTTPclient(hostURL, &token)
+}
+
+func main() {
+	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
+
+	c := &config{}
+	parseFlags(c)
+	initializeLogger(c)
+
+	if len(c.accountPrivKeys) == 0 {
+		c.accountPrivKeys = []string{util.RandomHex(32)}
+		log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
+	}
+
+	if err := createSignKeys(c); err != nil {
+		log.Fatal(err)
+	}
+
+	api, err := NewAPIclient(c.host)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if c.operation == allTests {
+		wg := &sync.WaitGroup{}
+		for _, op := range ops {
+			wg.Add(1)
+			go func(op operation, c config) {
+				defer wg.Done()
+				c.accountPrivKeys = []string{util.RandomHex(32)}
+				if err := createSignKeys(&c); err != nil {
+					log.Fatal(err)
+				}
+
+				if err := setupAndRun(op, api, &c); err != nil {
+					log.Fatal(err)
+				}
+			}(op, *c) // Pass the op and c variable
+		}
+		wg.Wait()
+
+	} else {
+		op, found := ops[c.operation]
+		if !found {
+			log.Fatal("no valid operation mode specified")
+		}
+
+		if err := setupAndRun(op, api, c); err != nil {
+			log.Fatal(err)
+		}
+	}
 }
