@@ -100,7 +100,7 @@ func Test_sikRoots(t *testing.T) {
 	c.Assert(s.SetAddressSIK(address1, sik1), qt.IsNil)
 	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
-	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	validSIKs := s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 1)
@@ -108,6 +108,9 @@ func Test_sikRoots(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	firstRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
+	t.Logf("first root: %x", firstRoot)
+	t.Logf("valid sik: %x", validSIKs[0])
+	t.Logf("valid sik size: %d", len(validSIKs))
 	c.Assert(firstRoot, qt.ContentEquals, validSIKs[0])
 	// increase the height and include a new sik
 	address2 := common.HexToAddress("0x5fb53c1f9b53fba0296f4e8306802d44235c1a11")
@@ -116,7 +119,7 @@ func Test_sikRoots(t *testing.T) {
 	c.Assert(s.SetAddressSIK(address2, sik2), qt.IsNil)
 	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
-	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	validSIKs = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(validSIKs), qt.Equals, 2)
@@ -124,20 +127,20 @@ func Test_sikRoots(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(firstRoot, qt.ContentEquals, validSIKs[0])
 	c.Assert(secondRoot, qt.ContentEquals, validSIKs[1])
-	// increase the height and include a new sik that will delete the rest of sikroots
+	// increase the height and include a new sik
 	address3 := common.HexToAddress("0x2dd603151d817f829b03412f7378e1179b5b2b1c")
 	sik3, _ := hex.DecodeString("7ccbc0da9e8d7e469ba60cd898a5b881c99a960c1e69990a3196")
 	s.SetHeight(66)
 	c.Assert(s.SetAddressSIK(address3, sik3), qt.IsNil)
 	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	// check the results
-	c.Assert(s.FetchValidSIKRoots(), qt.IsNil)
+	c.Assert(s.UpdateSIKRoots(), qt.IsNil)
 	validSIKs = s.ValidSIKRoots()
 	c.Assert(err, qt.IsNil)
-	c.Assert(len(validSIKs), qt.Equals, 1)
+	c.Assert(len(validSIKs), qt.Equals, 3)
 	thirdRoot, err := sikTree.Root()
 	c.Assert(err, qt.IsNil)
-	c.Assert(thirdRoot, qt.ContentEquals, validSIKs[0])
+	c.Assert(thirdRoot, qt.ContentEquals, validSIKs[2])
 }
 
 func TestAssignSIKToElectionAndPurge(t *testing.T) {
