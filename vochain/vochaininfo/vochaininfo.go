@@ -78,7 +78,7 @@ func (vi *VochainInfo) Height() uint64 {
 // Value 0 means there is not yet an average.
 func (vi *VochainInfo) BlockTimes() *[5]uint64 {
 	if vi.vnode.IsSynchronizing() {
-		return &[5]uint64{types.DefaultBlockTimeSeconds, 0, 0, 0, 0}
+		return &[5]uint64{uint64(types.DefaultBlockTime.Seconds()), 0, 0, 0, 0}
 	}
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()

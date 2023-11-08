@@ -69,13 +69,13 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 				startDate = *p.StartDate
 			} else {
 				// Calculate startDate equal to time.Now() minus defaultBlockTime*p.ProcessInfo.BlockCount
-				startDate = time.Now().Add(-types.DefaultBlockTimeSeconds * time.Duration(p.ProcessInfo.BlockCount))
+				startDate = time.Now().Add(-types.DefaultBlockTime * time.Duration(p.ProcessInfo.BlockCount))
 			}
 		}
 		endDate := p.ProcessInfo.EndDate
 		if endDate.IsZero() {
 			// Calculate endDate equal to startDate plus defaultBlockTime*p.ProcessInfo.BlockCount
-			endDate = startDate.Add(types.DefaultBlockTimeSeconds * time.Duration(p.ProcessInfo.BlockCount))
+			endDate = startDate.Add(types.DefaultBlockTime * time.Duration(p.ProcessInfo.BlockCount))
 		}
 
 		// Create and store process in the indexer database

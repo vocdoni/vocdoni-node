@@ -1,5 +1,7 @@
 package types
 
+import "time"
+
 func Bool(b bool) *bool { return &b }
 
 // These exported variables should be treated as constants, to be used in API
@@ -33,8 +35,8 @@ const (
 	// ArchiveURL is the default URL where the archive is retrieved from.
 	ArchiveURL = "/ipns/k2k4r8mdn544n7f8nprwqeo27jr1v1unsu74th57s1j8mumjck7y7cbz"
 
-	// DefaultBlockTimeSeconds is the default block time in seconds.
-	DefaultBlockTimeSeconds = 12
+	// DefaultBlockTime is the default block time in seconds.
+	DefaultBlockTime = 12 * time.Second
 
 	// KeyKeeperMaxKeyIndex is the maxim number of allowed encryption keys.
 	KeyKeeperMaxKeyIndex = 16
