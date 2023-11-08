@@ -541,8 +541,7 @@ func (idx *Indexer) OnRevealKeys(pid []byte, _ string, _ int32) {
 }
 
 // OnProcessResults verifies the results for a process and appends it to blockUpdateProcs
-func (idx *Indexer) OnProcessResults(pid []byte, _ *models.ProcessResult,
-	_ int32) {
+func (idx *Indexer) OnProcessResults(pid []byte, _ *models.ProcessResult, _ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true

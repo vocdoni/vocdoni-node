@@ -15,22 +15,24 @@ import (
 
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, start_block, end_block, block_count,
-	vote_count, have_results, final_results, census_root,
+	id, entity_id, start_block, end_block, start_date, end_date, 
+	block_count, vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
+	from_archive, chain_id,
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
+	?, ?, ?, ?, ?, ?,
 	?, ?, ?, ?, ?,
-	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
+	?, ?,
 	?, ?,
 	?, ?,
 	?, ?,
@@ -44,6 +46,8 @@ type CreateProcessParams struct {
 	EntityID          types.EntityID
 	StartBlock        int64
 	EndBlock          int64
+	StartDate         time.Time
+	EndDate           time.Time
 	BlockCount        int64
 	VoteCount         int64
 	HaveResults       bool
@@ -64,6 +68,8 @@ type CreateProcessParams struct {
 	CreationTime      time.Time
 	SourceBlockHeight int64
 	SourceNetworkID   int64
+	FromArchive       bool
+	ChainID           string
 	ResultsVotes      string
 }
 
@@ -73,6 +79,8 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.EntityID,
 		arg.StartBlock,
 		arg.EndBlock,
+		arg.StartDate,
+		arg.EndDate,
 		arg.BlockCount,
 		arg.VoteCount,
 		arg.HaveResults,
@@ -93,6 +101,8 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.CreationTime,
 		arg.SourceBlockHeight,
 		arg.SourceNetworkID,
+		arg.FromArchive,
+		arg.ChainID,
 		arg.ResultsVotes,
 	)
 }
@@ -109,7 +119,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_block, end_block, block_count, vote_count, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id FROM processes
+SELECT id, entity_id, start_block, end_block, start_date, end_date, block_count, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive FROM processes
 WHERE id = ?
 GROUP BY id
 LIMIT 1
@@ -123,8 +133,11 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.EntityID,
 		&i.StartBlock,
 		&i.EndBlock,
+		&i.StartDate,
+		&i.EndDate,
 		&i.BlockCount,
 		&i.VoteCount,
+		&i.ChainID,
 		&i.HaveResults,
 		&i.FinalResults,
 		&i.ResultsVotes,
@@ -146,6 +159,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.CreationTime,
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
+		&i.FromArchive,
 	)
 	return i, err
 }
@@ -306,12 +320,18 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 
 const setProcessResultsCancelled = `-- name: SetProcessResultsCancelled :execresult
 UPDATE processes
-SET have_results = FALSE, final_results = TRUE
-WHERE id = ?1
+SET have_results = FALSE, final_results = TRUE, 
+    end_date = ?1
+WHERE id = ?2
 `
 
-func (q *Queries) SetProcessResultsCancelled(ctx context.Context, id types.ProcessID) (sql.Result, error) {
-	return q.exec(ctx, q.setProcessResultsCancelledStmt, setProcessResultsCancelled, id)
+type SetProcessResultsCancelledParams struct {
+	EndDate time.Time
+	ID      types.ProcessID
+}
+
+func (q *Queries) SetProcessResultsCancelled(ctx context.Context, arg SetProcessResultsCancelledParams) (sql.Result, error) {
+	return q.exec(ctx, q.setProcessResultsCancelledStmt, setProcessResultsCancelled, arg.EndDate, arg.ID)
 }
 
 const setProcessResultsReady = `-- name: SetProcessResultsReady :execresult
@@ -319,14 +339,16 @@ UPDATE processes
 SET have_results = TRUE, final_results = TRUE,
 	results_votes = ?1,
 	results_weight = ?2,
-	results_block_height = ?3
-WHERE id = ?4
+	results_block_height = ?3,
+	end_date = ?4
+WHERE id = ?5
 `
 
 type SetProcessResultsReadyParams struct {
 	Votes       string
 	Weight      string
 	BlockHeight int64
+	EndDate     time.Time
 	ID          types.ProcessID
 }
 
@@ -335,6 +357,7 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 		arg.Votes,
 		arg.Weight,
 		arg.BlockHeight,
+		arg.EndDate,
 		arg.ID,
 	)
 }
@@ -356,17 +379,19 @@ func (q *Queries) SetProcessVoteCount(ctx context.Context, arg SetProcessVoteCou
 
 const updateProcessEndBlock = `-- name: UpdateProcessEndBlock :execresult
 UPDATE processes
-SET end_block  = ?1
-WHERE id = ?2
+SET end_block  = ?1,
+	end_date = ?2
+WHERE id = ?3
 `
 
 type UpdateProcessEndBlockParams struct {
 	EndBlock int64
+	EndDate  time.Time
 	ID       types.ProcessID
 }
 
 func (q *Queries) UpdateProcessEndBlock(ctx context.Context, arg UpdateProcessEndBlockParams) (sql.Result, error) {
-	return q.exec(ctx, q.updateProcessEndBlockStmt, updateProcessEndBlock, arg.EndBlock, arg.ID)
+	return q.exec(ctx, q.updateProcessEndBlockStmt, updateProcessEndBlock, arg.EndBlock, arg.EndDate, arg.ID)
 }
 
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
@@ -378,8 +403,9 @@ SET census_root         = ?1,
 	private_keys        = ?3,
 	public_keys         = ?4,
 	metadata            = ?5,
-	status              = ?6
-WHERE id = ?7
+	status              = ?6,
+	start_date 	        = ?7
+WHERE id = ?8
 `
 
 type UpdateProcessFromStateParams struct {
@@ -389,6 +415,7 @@ type UpdateProcessFromStateParams struct {
 	PublicKeys  string
 	Metadata    string
 	Status      int64
+	StartDate   time.Time
 	ID          types.ProcessID
 }
 
@@ -400,6 +427,7 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.PublicKeys,
 		arg.Metadata,
 		arg.Status,
+		arg.StartDate,
 		arg.ID,
 	)
 }

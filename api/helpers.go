@@ -21,15 +21,25 @@ import (
 )
 
 func (a *API) electionSummary(pi *indexertypes.Process) ElectionSummary {
+	startDate := pi.StartDate
+	if startDate.IsZero() {
+		startDate = a.vocinfo.HeightTime(uint64(pi.StartBlock))
+	}
+	endDate := pi.EndDate
+	if endDate.IsZero() {
+		endDate = a.vocinfo.HeightTime(uint64(pi.EndBlock))
+	}
 	return ElectionSummary{
 		ElectionID:     pi.ID,
 		OrganizationID: pi.EntityID,
 		Status:         models.ProcessStatus_name[pi.Status],
-		StartDate:      a.vocinfo.HeightTime(uint64(pi.StartBlock)),
-		EndDate:        a.vocinfo.HeightTime(uint64(pi.EndBlock)),
+		StartDate:      startDate,
+		EndDate:        endDate,
 		FinalResults:   pi.FinalResults,
 		VoteCount:      pi.VoteCount,
 		ManuallyEnded:  pi.EndBlock < pi.StartBlock+pi.BlockCount,
+		ChainID:        pi.ChainID,
+		FromArchive:    pi.FromArchive,
 	}
 }
 
@@ -115,12 +125,8 @@ func convertKeysToCamelInner(val any) any {
 // encodeEVMResultsArgs encodes the arguments for the EVM mimicking the Solidity built-in abi.encode(args...)
 // in this case we encode the organizationId the censusRoot and the results that will be translated in the EVM
 // contract to the corresponding struct{address, bytes32, uint256[][]}
-func encodeEVMResultsArgs(electionId common.Hash,
-	organizationId common.Address,
-	censusRoot common.Hash,
-	sourceContractAddress common.Address,
-	results [][]*types.BigInt,
-) (string, error) {
+func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address, censusRoot common.Hash,
+	sourceContractAddress common.Address, results [][]*types.BigInt) (string, error) {
 	address, _ := abi.NewType("address", "", nil)
 	bytes32, _ := abi.NewType("bytes32", "", nil)
 	uint256SliceNested, _ := abi.NewType("uint256[][]", "", nil)

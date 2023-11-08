@@ -27,8 +27,11 @@ type Process struct {
 	EntityID           types.EntityID
 	StartBlock         int64
 	EndBlock           int64
+	StartDate          time.Time
+	EndDate            time.Time
 	BlockCount         int64
 	VoteCount          int64
+	ChainID            string
 	HaveResults        bool
 	FinalResults       bool
 	ResultsVotes       string
@@ -50,6 +53,7 @@ type Process struct {
 	CreationTime       time.Time
 	SourceBlockHeight  int64
 	SourceNetworkID    int64
+	FromArchive        bool
 }
 
 type TokenFee struct {

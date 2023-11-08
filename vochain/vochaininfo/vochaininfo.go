@@ -10,6 +10,7 @@ import (
 	"github.com/VictoriaMetrics/metrics"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
 )
@@ -68,14 +69,17 @@ func (vi *VochainInfo) updateCounters() {
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
 }
 
-// Height returns the current number of blocks of the blockchain
+// Height returns the current number of blocks of the blockchain.
 func (vi *VochainInfo) Height() uint64 {
 	return height.Get()
 }
 
 // BlockTimes returns the average block time in milliseconds for 1, 10, 60, 360 and 1440 minutes.
-// Value 0 means there is not yet an average
+// Value 0 means there is not yet an average.
 func (vi *VochainInfo) BlockTimes() *[5]uint64 {
+	if vi.vnode.IsSynchronizing() {
+		return &[5]uint64{types.DefaultBlockTimeSeconds, 0, 0, 0, 0}
+	}
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return &[5]uint64{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}

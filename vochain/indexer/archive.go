@@ -40,7 +40,6 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 		return nil, err
 	}
 	defer tx.Rollback()
-	height := idx.App.State.CurrentHeight()
 	queries := indexerdb.New(tx)
 	added := []*ArchiveProcess{}
 	for _, p := range archive {
@@ -61,17 +60,33 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 		} else {
 			continue
 		}
-		creationTime := time.Now()
-		if p.StartDate != nil {
-			creationTime = *p.StartDate
+
+		// For backward compatibility, we try to fetch the start/end date from multiple sources.
+		// If not found, we calculate them from the block count and the default block time.
+		startDate := p.ProcessInfo.StartDate
+		if startDate.IsZero() {
+			if p.StartDate != nil {
+				startDate = *p.StartDate
+			} else {
+				// Calculate startDate equal to time.Now() minus defaultBlockTime*p.ProcessInfo.BlockCount
+				startDate = time.Now().Add(-types.DefaultBlockTimeSeconds * time.Duration(p.ProcessInfo.BlockCount))
+			}
 		}
+		endDate := p.ProcessInfo.EndDate
+		if endDate.IsZero() {
+			// Calculate endDate equal to startDate plus defaultBlockTime*p.ProcessInfo.BlockCount
+			endDate = startDate.Add(types.DefaultBlockTimeSeconds * time.Duration(p.ProcessInfo.BlockCount))
+		}
+
 		// Create and store process in the indexer database
 		procParams := indexerdb.CreateProcessParams{
 			ID:                nonNullBytes(p.ProcessInfo.ID),
 			EntityID:          nonNullBytes(p.ProcessInfo.EntityID),
-			StartBlock:        int64(height),
-			EndBlock:          int64(height + 1),
-			BlockCount:        int64(1),
+			StartBlock:        int64(p.ProcessInfo.StartBlock),
+			StartDate:         startDate,
+			EndBlock:          int64(p.ProcessInfo.EndBlock),
+			EndDate:           endDate,
+			BlockCount:        int64(p.ProcessInfo.BlockCount),
 			HaveResults:       p.ProcessInfo.HaveResults,
 			FinalResults:      p.ProcessInfo.FinalResults,
 			CensusRoot:        nonNullBytes(p.ProcessInfo.CensusRoot),
@@ -85,13 +100,16 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 			VoteOpts:          indexertypes.EncodeProtoJSON(p.ProcessInfo.VoteOpts),
 			PrivateKeys:       indexertypes.EncodeJSON(p.ProcessInfo.PrivateKeys),
 			PublicKeys:        indexertypes.EncodeJSON(p.ProcessInfo.PublicKeys),
-			CreationTime:      creationTime,
+			CreationTime:      time.Now(),
 			SourceBlockHeight: int64(p.ProcessInfo.SourceBlockHeight),
 			SourceNetworkID:   int64(models.SourceNetworkId_value[p.ProcessInfo.SourceNetworkId]),
 			Metadata:          p.ProcessInfo.Metadata,
 			ResultsVotes:      indexertypes.EncodeJSON(p.Results.Votes),
 			VoteCount:         int64(p.ProcessInfo.VoteCount),
+			ChainID:           p.ChainID,
+			FromArchive:       true,
 		}
+
 		if _, err := queries.CreateProcess(context.TODO(), procParams); err != nil {
 			return nil, fmt.Errorf("create archive process: %w", err)
 		}
@@ -100,9 +118,9 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 	return added, tx.Commit()
 }
 
-// StartArchiveRetrival starts the archive retrieval process. It is a blocking function that runs continuously.
+// StartArchiveRetrieval starts the archive retrieval process. It is a blocking function that runs continuously.
 // Retrieves the archive directory from the storage and imports the processes into the indexer database.
-func (idx *Indexer) StartArchiveRetrival(storage data.Storage, archiveURL string) {
+func (idx *Indexer) StartArchiveRetrieval(storage data.Storage, archiveURL string) {
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), timeoutArchiveRetrieval)
 		dirMap, err := storage.RetrieveDir(ctx, archiveURL, marxArchiveFileSize)
