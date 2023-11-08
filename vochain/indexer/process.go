@@ -182,6 +182,8 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
 		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(options)),
+		ChainID:           idx.App.ChainID(),
+		FromArchive:       false,
 	}
 
 	idx.blockMu.Lock()
@@ -206,6 +208,21 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		return err
 	}
 
+	// We need to use the time of start/end from the block header, as we might be syncing the blockchain
+	currentBlockTime := func() time.Time {
+		t := idx.App.TimestampFromBlock(int64(idx.App.Height()))
+		if t == nil {
+			return time.Now()
+		}
+		return *t
+	}
+
+	// Update start date with the block time if the process starts on this block
+	var startDate time.Time
+	if idx.App.Height() == p.StartBlock {
+		startDate = currentBlockTime()
+	}
+
 	// Update the process in the indexer database
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
 		ID:          pid,
@@ -215,6 +232,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		PublicKeys:  indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		Metadata:    p.GetMetadata(),
 		Status:      int64(p.Status),
+		StartDate:   startDate,
 	}); err != nil {
 		return err
 	}
@@ -225,6 +243,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		if _, err := queries.UpdateProcessEndBlock(ctx, indexerdb.UpdateProcessEndBlockParams{
 			ID:       pid,
 			EndBlock: int64(idx.App.Height()),
+			EndDate:  currentBlockTime(),
 		}); err != nil {
 			return err
 		}
@@ -241,7 +260,11 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	// If the process is in CANCELED status, and it was not in CANCELED status before, then remove the results
 	if models.ProcessStatus(previousStatus) != models.ProcessStatus_CANCELED &&
 		p.Status == models.ProcessStatus_CANCELED {
-		if _, err := queries.SetProcessResultsCancelled(ctx, pid); err != nil {
+		if _, err := queries.SetProcessResultsCancelled(ctx,
+			indexerdb.SetProcessResultsCancelledParams{
+				EndDate: currentBlockTime(),
+				ID:      pid,
+			}); err != nil {
 			return err
 		}
 	}

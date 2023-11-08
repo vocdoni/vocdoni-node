@@ -1,21 +1,23 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, start_block, end_block, block_count,
-	vote_count, have_results, final_results, census_root,
+	id, entity_id, start_block, end_block, start_date, end_date, 
+	block_count, vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
+	from_archive, chain_id,
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
+	?, ?, ?, ?, ?, ?,
 	?, ?, ?, ?, ?,
-	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
+	?, ?,
 	?, ?,
 	?, ?,
 	?, ?,
@@ -50,7 +52,8 @@ SET census_root         = sqlc.arg(census_root),
 	private_keys        = sqlc.arg(private_keys),
 	public_keys         = sqlc.arg(public_keys),
 	metadata            = sqlc.arg(metadata),
-	status              = sqlc.arg(status)
+	status              = sqlc.arg(status),
+	start_date 	        = sqlc.arg(start_date)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessStatus :one
@@ -70,12 +73,14 @@ UPDATE processes
 SET have_results = TRUE, final_results = TRUE,
 	results_votes = sqlc.arg(votes),
 	results_weight = sqlc.arg(weight),
-	results_block_height = sqlc.arg(block_height)
+	results_block_height = sqlc.arg(block_height),
+	end_date = sqlc.arg(end_date)
 WHERE id = sqlc.arg(id);
 
 -- name: SetProcessResultsCancelled :execresult
 UPDATE processes
-SET have_results = FALSE, final_results = TRUE
+SET have_results = FALSE, final_results = TRUE, 
+    end_date = sqlc.arg(end_date)
 WHERE id = sqlc.arg(id);
 
 -- name: SetProcessVoteCount :execresult
@@ -112,5 +117,6 @@ WHERE id = sqlc.arg(id);
 
 -- name: UpdateProcessEndBlock :execresult
 UPDATE processes
-SET end_block  = sqlc.arg(end_block)
+SET end_block  = sqlc.arg(end_block),
+	end_date = sqlc.arg(end_date)
 WHERE id = sqlc.arg(id);

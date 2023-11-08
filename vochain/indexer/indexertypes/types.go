@@ -21,6 +21,8 @@ type Process struct {
 	EntityID          types.HexBytes             `json:"entityId"`
 	StartBlock        uint32                     `json:"startBlock"`
 	EndBlock          uint32                     `json:"endBlock"`
+	StartDate         time.Time                  `json:"startDate,omitempty"`
+	EndDate           time.Time                  `json:"endDate,omitempty"`
 	BlockCount        uint32                     `json:"blockCount"`
 	VoteCount         uint64                     `json:"voteCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
@@ -39,6 +41,8 @@ type Process struct {
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
+	FromArchive       bool                       `json:"fromArchive,omitempty"`
+	ChainID           string                     `json:"chainId,omitempty"`
 
 	PrivateKeys json.RawMessage `json:"-"` // json array
 	PublicKeys  json.RawMessage `json:"-"` // json array
@@ -65,6 +69,8 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		EntityID:          nonEmptyBytes(dbproc.EntityID),
 		StartBlock:        uint32(dbproc.StartBlock),
 		EndBlock:          uint32(dbproc.EndBlock),
+		StartDate:         dbproc.StartDate,
+		EndDate:           dbproc.EndDate,
 		BlockCount:        uint32(dbproc.BlockCount),
 		HaveResults:       dbproc.HaveResults,
 		FinalResults:      dbproc.FinalResults,
@@ -80,6 +86,8 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
+		ChainID:           dbproc.ChainID,
+		FromArchive:       dbproc.FromArchive,
 
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
 		PublicKeys:         json.RawMessage(dbproc.PublicKeys),

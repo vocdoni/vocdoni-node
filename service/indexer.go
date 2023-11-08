@@ -24,7 +24,7 @@ func (vs *VocdoniService) VochainIndexer() error {
 
 	if vs.Config.Indexer.ArchiveURL != "" {
 		log.Infow("starting archive retrieval", "path", vs.Config.Indexer.ArchiveURL)
-		go vs.Indexer.StartArchiveRetrival(vs.Storage, vs.Config.Indexer.ArchiveURL)
+		go vs.Indexer.StartArchiveRetrieval(vs.Storage, vs.Config.Indexer.ArchiveURL)
 	}
 
 	return nil

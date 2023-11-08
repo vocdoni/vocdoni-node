@@ -27,9 +27,13 @@ func TestImportArchive(t *testing.T) {
 	qt.Assert(t, process1.Results().Votes[0][0].MathBigInt().Int64(), qt.Equals, int64(342))
 	qt.Assert(t, process1.Results().Votes[0][1].MathBigInt().Int64(), qt.Equals, int64(365))
 	qt.Assert(t, process1.Results().Votes[0][2].MathBigInt().Int64(), qt.Equals, int64(21))
-	// TODO: qt.Assert(t, process1.Results().Weight.MathBigInt().Int64(), qt.Equals, int64(342+365+21))
+	qt.Assert(t, process1.StartDate, qt.DeepEquals, *archiveProcess1.StartDate)
+	// check that endDate is set after startDate
+	qt.Assert(t, process1.EndDate.After(process1.StartDate), qt.Equals, true)
 }
 
+// This is an old archive process format, we check backwards compatibility.
+// At some point we should update this format to the new one.
 var testArchiveProcess1 = `
 {
   "chainId": "vocdoni-stage-8",
