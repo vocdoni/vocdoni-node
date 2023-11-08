@@ -248,11 +248,13 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 			Info: tx.Info,
 		}
 	}
-	log.Debugw("finalize block", "height", height,
-		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-		"blockSeconds", time.Since(req.GetTime()).Seconds(),
-		"elapsedSeconds", time.Since(start).Seconds(),
-		"proposer", hex.EncodeToString(req.GetProposerAddress()))
+	if len(req.Txs) > 0 {
+		log.Debugw("finalize block", "height", height,
+			"txs", len(req.Txs), "hash", hex.EncodeToString(root),
+			"blockSeconds", time.Since(req.GetTime()).Seconds(),
+			"elapsedSeconds", time.Since(start).Seconds(),
+			"proposer", hex.EncodeToString(req.GetProposerAddress()))
+	}
 
 	// update validator score as an IST action for the next block. Note that at this point,
 	// we cannot modify the state or we would break ProcessProposal optimistic execution
@@ -303,11 +305,10 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	// save state and get hash
-	h, err := app.CommitState()
+	_, err := app.CommitState()
 	if err != nil {
 		return nil, err
 	}
-	log.Debugw("commit block", "height", app.Height(), "hash", hex.EncodeToString(h))
 	return &abcitypes.ResponseCommit{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil
