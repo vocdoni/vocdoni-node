@@ -237,6 +237,6 @@ type Account struct {
 
 // TokenTransfersAccount contains the tokes transfers received and sent information in an account
 type TokenTransfersAccount struct {
-	Received []*TokenTransferMeta
-	Sent     []*TokenTransferMeta
+	Received []*TokenTransferMeta `json:"received"`
+	Sent     []*TokenTransferMeta `json:"sent"`
 }
