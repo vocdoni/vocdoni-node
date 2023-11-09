@@ -158,11 +158,7 @@ func (t *E2EAnonElectionTempSIKs) Run() error {
 		"n", t.config.nvotes, "time", time.Since(startTime),
 		"vps", int(float64(t.config.nvotes)/time.Since(startTime).Seconds()))
 
-	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
-		return err
-	}
-
-	elres, err := t.endElectionAndFetchResults()
+	elres, err := t.verifyAndEndElection(t.config.nvotes)
 	if err != nil {
 		return err
 	}
