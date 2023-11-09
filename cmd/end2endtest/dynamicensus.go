@@ -190,15 +190,9 @@ func (t *E2EDynamicensusElection) Run() error {
 			log.Debugw("error expected when try to vote,", "error:", err)
 		}
 
-		if err := t.elections[0].verifyVoteCount(nvotes - 1); err != nil {
-			errCh <- fmt.Errorf("error in verifyVoteCount: %s", err)
-			return
-		}
-
-		elres, err := t.elections[0].endElectionAndFetchResults()
+		elres, err := t.elections[0].verifyAndEndElection(nvotes - 1)
 		if err != nil {
-			errCh <- fmt.Errorf("error in electionAndFetchResults: %s", err)
-			return
+			errCh <- err
 		}
 
 		expectedResults := [][]*types.BigInt{votesToBigInt(uint64(nvotes-2)*10, 10, 0)}

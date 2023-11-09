@@ -88,11 +88,7 @@ func (t *E2EOverwriteElection) Run() error {
 	}
 	log.Infof("the account %v send an overwrite vote", votes[0].VoterAccount.Address())
 
-	if err := t.verifyVoteCount(t.config.nvotes); err != nil {
-		return err
-	}
-
-	elres, err := t.endElectionAndFetchResults()
+	elres, err := t.verifyAndEndElection(t.config.nvotes)
 	if err != nil {
 		return err
 	}

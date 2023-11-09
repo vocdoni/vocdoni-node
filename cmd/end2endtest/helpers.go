@@ -625,10 +625,11 @@ func cspGenProof(pid, voterKey []byte, csp *ethereum.SignKeys) (*apiclient.Censu
 
 func (t *e2eElection) verifyVoteCount(nvotesExpected int) error {
 	startTime := time.Now()
+	api := t.api.Clone(t.config.accountPrivKeys[0])
 
 	// Wait for all the votes to be verified
 	for {
-		count, err := t.api.ElectionVoteCount(t.election.ElectionID)
+		count, err := api.ElectionVoteCount(t.election.ElectionID)
 		if err != nil {
 			log.Warn(err)
 		}
@@ -636,13 +637,13 @@ func (t *e2eElection) verifyVoteCount(nvotesExpected int) error {
 			break
 		}
 
-		if err := t.api.WaitUntilNextBlock(); err != nil {
+		if err := api.WaitUntilNextBlock(); err != nil {
 			return fmt.Errorf("timeout waiting for next block")
 		}
 
 		log.Infof("verified %d/%d votes", count, nvotesExpected)
 		if time.Since(startTime) > t.config.timeout {
-			log.Fatalf("timeout waiting for votes to be registered")
+			return fmt.Errorf("timeout waiting for votes to be registered")
 		}
 	}
 
@@ -670,6 +671,41 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 	if err != nil {
 		return nil, fmt.Errorf("error waiting for election publish final results %w", err)
 	}
+	return results, nil
+}
+
+func (t *e2eElection) verifyAndEndElection(nvotesExpected int) (*vapi.ElectionResults, error) {
+	var wg sync.WaitGroup
+	var results *vapi.ElectionResults
+	errCh := make(chan error, 2)
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := t.verifyVoteCount(nvotesExpected); err != nil {
+			errCh <- fmt.Errorf("error in verifyVoteCount %w", err)
+		}
+	}()
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		elres, err := t.endElectionAndFetchResults()
+		if err != nil {
+			errCh <- fmt.Errorf("error in endElectionAndFetchResults %w", err)
+		}
+		results = elres
+	}()
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		if err != nil {
+			return &vapi.ElectionResults{}, err
+		}
+	}
+
 	return results, nil
 }
 

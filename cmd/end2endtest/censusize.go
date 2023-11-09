@@ -99,11 +99,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 	}
 
 	// one vote is not valid
-	if err := t.verifyVoteCount(t.config.nvotes - 1); err != nil {
-		return err
-	}
-
-	elres, err := t.endElectionAndFetchResults()
+	elres, err := t.verifyAndEndElection(t.config.nvotes - 1)
 	if err != nil {
 		return err
 	}

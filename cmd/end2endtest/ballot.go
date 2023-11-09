@@ -246,13 +246,9 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 		"n", e.config.nvotes, "time", time.Since(startTime),
 		"vps", float64(e.config.nvotes)/time.Since(startTime).Seconds())
 
-	if err := e.verifyVoteCount(nvotes); err != nil {
-		return fmt.Errorf("error in verifyVoteCount: %s", err)
-	}
-
-	elres, err := e.endElectionAndFetchResults()
+	elres, err := e.verifyAndEndElection(nvotes)
 	if err != nil {
-		return fmt.Errorf("error in electionAndFetchResults: %s", err)
+		return err
 	}
 
 	if !matchResults(elres.Results, expectedResults) {
