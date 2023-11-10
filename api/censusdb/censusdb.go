@@ -79,6 +79,7 @@ type CensusDump struct {
 	CensusID  types.HexBytes `json:"censusID,omitempty"`
 	Token     *uuid.UUID     `json:"token,omitempty"`
 	Size      uint64         `json:"size,omitempty"`
+	URI       string         `json:"uri,omitempty"`
 }
 
 // CensusDB is a safe and persistent database of census trees.  It allows
@@ -202,8 +203,18 @@ func BuildExportDump(root, data []byte, typ models.Census_Type, maxLevels int) (
 	return exportData, nil
 }
 
+// ImportTree imports a census from a dump.
+func (c *CensusDB) ImportTree(censusID, data []byte) error {
+	return c.importTreeCommon(censusID, data)
+}
+
 // ImportTreeAsPublic imports a census from a dump and makes it public.
 func (c *CensusDB) ImportTreeAsPublic(data []byte) error {
+	return c.importTreeCommon(nil, data)
+}
+
+// importTreeCommon contains the shared logic for importing a census.
+func (c *CensusDB) importTreeCommon(censusID []byte, data []byte) error {
 	cdata := CensusDump{}
 	if err := json.Unmarshal(data, &cdata); err != nil {
 		return fmt.Errorf("could not unmarshal census: %w", err)
@@ -211,22 +222,46 @@ func (c *CensusDB) ImportTreeAsPublic(data []byte) error {
 	if cdata.Data == nil || cdata.RootHash == nil {
 		return fmt.Errorf("missing dump or root parameters")
 	}
-	log.Debugw("importing census", "root", hex.EncodeToString(cdata.RootHash), "type", cdata.Type.String())
-	if c.Exists(cdata.RootHash) {
+	// If the censusID is nil, it means that the census is imported as public.
+	isPublic := false
+	if censusID == nil {
+		isPublic = true
+		censusID = cdata.RootHash
+	}
+
+	c.Lock()
+	defer c.Unlock()
+
+	log.Infow("importing census",
+		"public", isPublic,
+		"id", hex.EncodeToString(censusID),
+		"root", hex.EncodeToString(cdata.RootHash),
+		"type", cdata.Type.String(),
+	)
+
+	if c.Exists(censusID) {
 		return ErrCensusAlreadyExists
 	}
+
 	uri := "ipfs://" + ipfs.CalculateCIDv1json(data)
-	ref, err := c.New(cdata.RootHash, cdata.Type, uri, nil, cdata.MaxLevels)
+	var token *uuid.UUID
+	if !isPublic {
+		token = cdata.Token
+	}
+	ref, err := c.New(censusID, cdata.Type, uri, token, cdata.MaxLevels)
 	if err != nil {
 		return err
 	}
+
 	if err := ref.Tree().ImportDump(compressor.NewCompressor().DecompressBytes(cdata.Data)); err != nil {
 		return err
 	}
+
 	root, err := ref.Tree().Root()
 	if err != nil {
 		return err
 	}
+
 	if !bytes.Equal(root, cdata.RootHash) {
 		if err := c.Del(cdata.RootHash); err != nil {
 			log.Warnf("could not delete census %x: %v", cdata.RootHash, err)
@@ -385,6 +420,7 @@ func (c *CensusDB) ExportCensusDB(buffer io.Writer) error {
 			CensusID:  censusID,
 			Token:     ref.AuthToken,
 			Size:      size,
+			URI:       ref.URI,
 		}
 
 		censusList = append(censusList, dump)
@@ -421,9 +457,8 @@ func (c *CensusDB) ImportCensusDB(buffer io.Reader) error {
 				"type", dump.Type.String(), "censusID", dump.CensusID.String())
 			continue
 		}
-
 		// Create a new census reference
-		ref, err := c.New(dump.CensusID, dump.Type, "", dump.Token, dump.MaxLevels)
+		ref, err := c.New(dump.CensusID, dump.Type, dump.URI, dump.Token, dump.MaxLevels)
 		if err != nil {
 			return err
 		}
@@ -433,7 +468,7 @@ func (c *CensusDB) ImportCensusDB(buffer io.Reader) error {
 		if err != nil {
 			return err
 		}
-		log.Infow("importing census", "id", dump.CensusID.String(), "size", len(dump.Data))
+		log.Infow("importing census", "uri", dump.URI, "id", dump.CensusID.String(), "size", dump.Size)
 	}
 
 	return nil
