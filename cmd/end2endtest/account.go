@@ -57,7 +57,7 @@ func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 
 	// get faucet package for alice
 	var err error
-	t.aliceFP, err = faucetPackage(t.config.faucet, t.config.faucetAuthToken, t.alice.Address().Hex())
+	t.aliceFP, err = faucetPackage(t.config.faucet, t.alice.Address().Hex())
 	if err != nil {
 		return err
 	}

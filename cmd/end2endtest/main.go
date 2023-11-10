@@ -84,8 +84,8 @@ func main() {
 		"account private key (optional)")
 	flag.IntVar(&c.nvotes, "votes", 10, "number of votes to cast")
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
-	flag.StringVar(&c.faucet, "faucet", "dev",
-		"faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
+	flag.StringVar(&c.faucet, "faucet", "",
+		"faucet URL for fetching tokens (if empty, default faucet URL will be used)")
 	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "",
 		"(optional) token passed as Bearer when fetching faucetURL")
 	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout, "timeout duration of each step")

@@ -15,10 +15,15 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	// DefaultDevelopmentFaucetURL is the default URL for the development faucet which can be used freely.
-	DefaultDevelopmentFaucetURL = "https://api-dev.faucet.vocdoni.net/v2/open/claim/"
-)
+// DefaultFaucetURLs is a map of default faucet URLs for each network.
+var DefaultFaucetURLs = map[string]string{
+	"dev":     "https://api-dev.faucet.vocdoni.net/v2/open/claim/",
+	"develop": "https://api-dev.faucet.vocdoni.net/v2/open/claim/",
+	"stg":     "https://api-stg.faucet.vocdoni.net/v2/open/claim",
+	"stage":   "https://api-stg.faucet.vocdoni.net/v2/open/claim",
+	"lts":     "https://api-faucet.vocdoni.io/v2/open/claim/",
+	"prod":    "https://api-faucet.vocdoni.io/v2/open/claim/",
+}
 
 var (
 	// ErrAccountNotConfigured is returned when the client has not been configured with an account.

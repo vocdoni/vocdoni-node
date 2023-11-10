@@ -255,13 +255,23 @@ func (c *HTTPclient) EncryptionKeys(electionID types.HexBytes) ([]api.Key, error
 	return keysEnc, nil
 }
 
-// GetFaucetPackageFromDevService returns a faucet package.
-// Needs just the destination wallet address, the URL and bearer token are hardcoded
-func GetFaucetPackageFromDevService(account string) (*models.FaucetPackage, error) {
-	url, err := util.BuildURL(DefaultDevelopmentFaucetURL, account)
+// GetFaucetPackageFromDefaultService returns a faucet package.
+// Needs the destination wallet address and the chainID.
+func GetFaucetPackageFromDefaultService(account string, chainID string) (*models.FaucetPackage, error) {
+	faucetChainID := chainID
+	chainIDsplit := strings.Split(chainID, "/")
+	if len(chainIDsplit) > 1 {
+		faucetChainID = strings.ToLower(chainIDsplit[1])
+	}
+	baseURL, ok := DefaultFaucetURLs[faucetChainID]
+	if !ok {
+		return nil, fmt.Errorf("no default faucet URL for network %s", chainID)
+	}
+	url, err := util.BuildURL(baseURL, account)
 	if err != nil {
 		return nil, err
 	}
+	log.Infow("requesting faucet package", "url", url)
 	return GetFaucetPackageFromRemoteService(
 		url,
 		"",
