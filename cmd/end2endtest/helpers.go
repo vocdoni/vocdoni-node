@@ -87,10 +87,18 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 	}
 
 	address := accountApi.MyAddress().Hex()
-
-	faucetPkg, err := faucetPackage(t.config.faucet, t.config.faucetAuthToken, address)
-	if err != nil {
-		return nil, nil, err
+	faucetPkg := &models.FaucetPackage{}
+	var err error
+	if t.config.faucet == "" {
+		faucetPkg, err = apiclient.GetFaucetPackageFromDefaultService(address, t.api.ChainID())
+		if err != nil {
+			return nil, nil, fmt.Errorf("could not get faucet package from default service: %w", err)
+		}
+	} else {
+		faucetPkg, err = faucetPackage(t.config.faucet, address)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 
 	accountMetadata := &vapi.AccountMetadata{
@@ -568,18 +576,22 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
 	return errs
 }
 
-func faucetPackage(faucet, faucetAuthToken, myAddress string) (*models.FaucetPackage, error) {
-	switch faucet {
+func faucetPackage(faucetURL, myAddress string) (*models.FaucetPackage, error) {
+	switch faucetURL {
 	case "":
 		return nil, fmt.Errorf("need to pass a valid URL (--faucet)")
 	case "dev":
-		return apiclient.GetFaucetPackageFromDevService(myAddress)
+		return apiclient.GetFaucetPackageFromDefaultService(myAddress, "dev")
+	case "stg", "stage":
+		return apiclient.GetFaucetPackageFromDefaultService(myAddress, "stg")
+	case "prod", "lts":
+		return apiclient.GetFaucetPackageFromDefaultService(myAddress, "lts")
 	default:
-		url, err := util.BuildURL(faucet, myAddress)
+		url, err := util.BuildURL(faucetURL, myAddress)
 		if err != nil {
 			return nil, err
 		}
-		return apiclient.GetFaucetPackageFromRemoteService(url, faucetAuthToken)
+		return apiclient.GetFaucetPackageFromRemoteService(url, "")
 	}
 }
 
