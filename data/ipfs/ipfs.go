@@ -17,8 +17,8 @@ import (
 	ipfslog "github.com/ipfs/go-log/v2"
 
 	"github.com/ipfs/boxo/coreiface/options"
-	corepath "github.com/ipfs/boxo/coreiface/path"
 	"github.com/ipfs/boxo/ipns"
+	ipfspath "github.com/ipfs/boxo/path"
 	ipfscmds "github.com/ipfs/kubo/commands"
 	ipfscore "github.com/ipfs/kubo/core"
 	"github.com/ipfs/kubo/core/corehttp"
@@ -187,13 +187,17 @@ func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err erro
 // Pin adds a file to ipfs and returns the resulting CID v1.
 func (i *Handler) Pin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-	return i.CoreAPI.Pin().Add(ctx, corepath.New(path))
+	p, err := ipfspath.NewPath(path)
+	if err != nil {
+		return err
+	}
+	return i.CoreAPI.Pin().Add(ctx, p)
 }
 
-func (i *Handler) addAndPin(ctx context.Context, path string) (corepath.Resolved, error) {
+func (i *Handler) addAndPin(ctx context.Context, path string) (ipfspath.ImmutablePath, error) {
 	f, err := unixfsFilesNode(path)
 	if err != nil {
-		return nil, err
+		return ipfspath.ImmutablePath{}, err
 	}
 	defer f.Close()
 
@@ -201,7 +205,7 @@ func (i *Handler) addAndPin(ctx context.Context, path string) (corepath.Resolved
 		options.Unixfs.CidVersion(1),
 		options.Unixfs.Pin(true))
 	if err != nil {
-		return nil, err
+		return ipfspath.ImmutablePath{}, err
 	}
 
 	return rpath, nil
@@ -210,9 +214,9 @@ func (i *Handler) addAndPin(ctx context.Context, path string) (corepath.Resolved
 // Unpin removes a file pin from ipfs.
 func (i *Handler) Unpin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-	cpath := corepath.New(path)
-	if err := cpath.IsValid(); err != nil {
-		return fmt.Errorf("invalid path %s: %w", path, err)
+	cpath, err := ipfspath.NewPath(path)
+	if err != nil {
+		return err
 	}
 	log.Debugf("removing pin %s", cpath)
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
@@ -266,7 +270,11 @@ func (i *Handler) RetrieveDir(ctx context.Context, path string, maxSize int64) (
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 
 	// first resolve the path
-	cpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
+	p, err := ipfspath.NewPath(path)
+	if err != nil {
+		return nil, err
+	}
+	cpath, _, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve path %s", path)
 	}
@@ -308,7 +316,11 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	}
 
 	// first resolve the path
-	cpath, err := i.CoreAPI.ResolvePath(ctx, corepath.New(path))
+	p, err := ipfspath.NewPath(path)
+	if err != nil {
+		return nil, err
+	}
+	cpath, _, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
 		return nil, fmt.Errorf("could not resolve path %s", path)
 	}
@@ -370,15 +382,15 @@ func fetchFileContent(node files.Node) ([]byte, error) {
 // The execution of this method might take a while (some minutes),
 // so the caller must handle properly the logic by using goroutines, channels or other
 // mechanisms in order to not block the whole program execution.
-func (i *Handler) PublishIPNSpath(ctx context.Context, path string, keyalias string) (ipns.Name, corepath.Resolved, error) {
+func (i *Handler) PublishIPNSpath(ctx context.Context, path string, keyalias string) (ipns.Name, ipfspath.ImmutablePath, error) {
 	rpath, err := i.addAndPin(ctx, path)
 	if err != nil {
-		return ipns.Name{}, nil, err
+		return ipns.Name{}, ipfspath.ImmutablePath{}, err
 	}
 	if keyalias == "" {
 		ck, err := i.CoreAPI.Key().Self(ctx)
 		if err != nil {
-			return ipns.Name{}, nil, err
+			return ipns.Name{}, ipfspath.ImmutablePath{}, err
 		}
 		keyalias = ck.Name()
 	}
@@ -389,7 +401,7 @@ func (i *Handler) PublishIPNSpath(ctx context.Context, path string, keyalias str
 		options.Name.Key(keyalias),
 	)
 	if err != nil {
-		return ipns.Name{}, nil, err
+		return ipns.Name{}, ipfspath.ImmutablePath{}, err
 	}
 	return name, rpath, nil
 }
