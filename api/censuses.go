@@ -660,8 +660,9 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 
 	// if the census already exists, return the URI and the root
 	if a.censusdb.Exists(root) {
+		a.censusdb.UnLoad()
+		// note that there is already a UnLoad call set on defer
 		ref, err := a.censusdb.Load(root, nil)
-		defer a.censusdb.UnLoad()
 		if err != nil {
 			if errors.Is(err, censusdb.ErrCensusNotFound) {
 				return ErrCensusNotFound
