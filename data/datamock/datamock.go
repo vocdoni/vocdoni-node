@@ -1,4 +1,4 @@
-package data
+package datamock
 
 import (
 	"context"
@@ -8,10 +8,12 @@ import (
 	"sync"
 	"time"
 
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
-	"go.vocdoni.io/dvote/types"
 )
+
+var _ data.Storage = &DataMockTest{}
 
 // DataMockTest is a mock data provider for testing purposes.
 type DataMockTest struct {
@@ -21,7 +23,7 @@ type DataMockTest struct {
 	rnd     testutil.Random
 }
 
-func (d *DataMockTest) Init(_ *types.DataStore) error {
+func (d *DataMockTest) Init() error {
 	d.files = make(map[string]string)
 	d.prefix = "ipfs://"
 	d.rnd = testutil.NewRandom(0)

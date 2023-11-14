@@ -12,14 +12,18 @@ import (
 )
 
 // IPFS starts the IPFS service
-func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage, err error) {
+func IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage, err error) {
 	log.Info("creating ipfs service")
 	os.Setenv("IPFS_FD_MAX", "1024")
-	ipfsStore := data.IPFSNewConfig(ipfsconfig.ConfigPath)
-	storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
+
+	ipfsStore := ipfs.New()
+	ipfsStore.DataDir = ipfsconfig.ConfigPath
+	ipfsStore.EnableLocalDiscovery = ipfsconfig.LocalDiscovery
+	err = ipfsStore.Init()
 	if err != nil {
-		return
+		return nil, err
 	}
+	storage = ipfsStore
 
 	go func() {
 		for {
@@ -40,5 +44,5 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 		}
 		ipfsconn.Start()
 	}
-	return
+	return storage, nil
 }

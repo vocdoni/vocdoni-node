@@ -1,9 +1,5 @@
 package types
 
-type DataStore struct {
-	Datadir string
-}
-
 // TODO: use an array, and possibly declare methods to encode/decode as hex.
 
 type ProcessID = []byte

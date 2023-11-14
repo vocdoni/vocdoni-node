@@ -81,6 +81,9 @@ type IPFSCfg struct {
 	ConnectKey string
 	// ConnectPeers is the list of ipfsConnect peers
 	ConnectPeers []string
+	// LocalDiscovery enables IPFS to communicate with other nodes in local networks (192.168.0.0/16 and such).
+	// Disabled by default since it creates issues in production deployments, but needed in test environments
+	LocalDiscovery bool
 }
 
 // VochainCfg includes all possible config params needed by the Vochain
