@@ -81,52 +81,8 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 
-	metadataBytes, err := json.Marshal(
-		&api.ElectionMetadata{
-			Title:       map[string]string{"default": "test election"},
-			Description: map[string]string{"default": "test election description"},
-			Version:     "1.0",
-		})
-
-	qt.Assert(t, err, qt.IsNil)
-	metadataURI := ipfs.CalculateCIDv1json(metadataBytes)
-
-	tx := models.Tx{
-		Payload: &models.Tx_NewProcess{
-			NewProcess: &models.NewProcessTx{
-				Txtype: models.TxType_NEW_PROCESS,
-				Nonce:  0,
-				Process: &models.Process{
-					StartBlock:    0,
-					BlockCount:    100,
-					Status:        models.ProcessStatus_READY,
-					CensusRoot:    root,
-					CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
-					Mode:          &models.ProcessMode{AutoStart: true, Interruptible: true},
-					VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
-					EnvelopeType:  &models.EnvelopeType{},
-					Metadata:      &metadataURI,
-					MaxCensusSize: 1000,
-				},
-			},
-		},
-	}
-	txb, err := proto.Marshal(&tx)
-	qt.Assert(t, err, qt.IsNil)
-	signedTxb, err := server.Account.SignVocdoniTx(txb, server.VochainAPP.ChainID())
-	qt.Assert(t, err, qt.IsNil)
-	stx := models.SignedTx{Tx: txb, Signature: signedTxb}
-	stxb, err := proto.Marshal(&stx)
-	qt.Assert(t, err, qt.IsNil)
-
-	election := api.ElectionCreate{
-		TxPayload: stxb,
-		Metadata:  metadataBytes,
-	}
-	resp, code = c.Request("POST", election, "elections")
-	qt.Assert(t, code, qt.Equals, 200)
-	err = json.Unmarshal(resp, &election)
-	qt.Assert(t, err, qt.IsNil)
+	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
+	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID())
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -154,11 +110,13 @@ func TestAPIcensusAndVote(t *testing.T) {
 			},
 		},
 	}
+
+	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
 	qt.Assert(t, err, qt.IsNil)
 	stx.Signature, err = voterKey.SignVocdoniTx(stx.Tx, server.VochainAPP.ChainID())
 	qt.Assert(t, err, qt.IsNil)
-	stxb, err = proto.Marshal(&stx)
+	stxb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
 	v := &api.Vote{TxPayload: stxb}
