@@ -373,6 +373,17 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int) e
 					log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
 					errorChan <- err
 				}
+
+				// check if the current account has a valid SIK
+				validSik, err := accountApi.ValidSIK()
+				if err != nil {
+					errorChan <- fmt.Errorf("unexpected error in account %s, when validate SIK, %s", acc.Address(), err)
+				}
+				if !validSik {
+					errorChan <- fmt.Errorf("unexpected invalid SIK for account %x", acc.Address())
+				}
+				log.Infof("valid SIK for the account %x", acc.Address())
+
 			}(i, acc)
 		}
 
