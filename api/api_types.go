@@ -196,6 +196,7 @@ type BlockTransactionsInfo struct {
 type GenericTransactionWithInfo struct {
 	TxContent json.RawMessage          `json:"tx"`
 	TxInfo    indexertypes.Transaction `json:"txInfo"`
+	Signature types.HexBytes           `json:"signature"`
 }
 
 type ChainInfo struct {

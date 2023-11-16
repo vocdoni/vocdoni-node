@@ -580,6 +580,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	}
 	tx := &GenericTransactionWithInfo{
 		TxContent: []byte(protoFormat(stx.Tx)),
+		Signature: stx.Signature,
 		TxInfo:    *ref,
 	}
 	data, err := json.Marshal(tx)
