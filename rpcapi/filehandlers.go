@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	storageTimeout = time.Second * 20
-	maxJSONsize    = 1024 * 20       // 20 KiB
+	storageTimeout = time.Second * 240
+	maxJSONsize    = 1024 * 1024     // 1 MiB
 	maxFetchFile   = 1024 * 1024 * 2 // 2 MiB
 )
 
