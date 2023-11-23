@@ -73,7 +73,7 @@ func NewIPFSsync(dataDir, groupKey, privKeyHex, transport string, storage data.S
 		UpdateInterval:  time.Second * 20,
 		Timeout:         time.Second * 600,
 		Storage:         storage.(*data.IPFSHandle),
-		TimestampWindow: 180, // seconds
+		TimestampWindow: 3000, // seconds
 		Messages:        make(chan *subpub.Message),
 	}
 	if transport == "privlibp2p" {
