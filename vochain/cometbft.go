@@ -168,6 +168,12 @@ func (app *BaseApplication) InitChain(_ context.Context,
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(_ context.Context,
 	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
+	if req == nil || req.Tx == nil {
+		return &abcitypes.ResponseCheckTx{
+			Code: 1,
+			Data: []byte("nil request or tx"),
+		}, fmt.Errorf("nil request or tx")
+	}
 	txReference := vochaintx.TxKey(req.Tx)
 	ref, ok := app.txReferences.Load(txReference)
 	if !ok {
@@ -219,6 +225,9 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	if req == nil {
+		return nil, fmt.Errorf("nil request")
+	}
 	start := time.Now()
 	height := uint32(req.GetHeight())
 
@@ -327,6 +336,9 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	if req == nil {
+		return nil, fmt.Errorf("nil request")
+	}
 	startTime := time.Now()
 
 	type txInfo struct {
@@ -431,6 +443,9 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
+	if req == nil {
+		return nil, fmt.Errorf("nil request")
+	}
 	// Check if the node is a validator, if not, just accept the proposal and return (nothing to say)
 	validator, err := app.State.Validator(app.NodeAddress, true)
 	if err != nil {
