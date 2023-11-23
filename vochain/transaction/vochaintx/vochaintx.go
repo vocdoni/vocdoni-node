@@ -36,7 +36,15 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 	if err != nil {
 		return fmt.Errorf("failed to unmarshal transaction: %w", err)
 	}
-	tx.TxModelType = string(tx.Tx.ProtoReflect().WhichOneof(tx.Tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
+	txReflectDescriptor := tx.Tx.ProtoReflect().Descriptor().Oneofs().Get(0)
+	if txReflectDescriptor == nil {
+		return fmt.Errorf("failed to determine transaction type")
+	}
+	whichOneTxModelType := tx.Tx.ProtoReflect().WhichOneof(txReflectDescriptor)
+	if whichOneTxModelType == nil {
+		return fmt.Errorf("failed to determine transaction type")
+	}
+	tx.TxModelType = string(whichOneTxModelType.Name())
 	tx.Signature = stx.GetSignature()
 	tx.TxID = TxKey(content)
 	return nil
