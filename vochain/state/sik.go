@@ -43,7 +43,14 @@ type SIK []byte
 // SIKFromAddress function return the current SIK value associated to the provided
 // address.
 func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
-	sik, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
+	v.tx.Lock()
+	defer v.tx.Unlock()
+
+	sik, err := siksTree.Get(address.Bytes())
 	if err != nil {
 		if errors.Is(err, arbo.ErrKeyNotFound) {
 			return nil, fmt.Errorf("%w: %w", ErrSIKNotFound, err)
@@ -110,8 +117,14 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 // prevent it from being updated until all processes created before that height
 // have finished.
 func (v *State) InvalidateSIK(address common.Address) error {
+	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
+	if err != nil {
+		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
+	}
 	// if the sik does not exists or something fails querying return the error
-	rawSIK, err := v.mainTreeViewer(false).DeepGet(address.Bytes(), StateTreeCfg(TreeSIK))
+	v.tx.Lock()
+	rawSIK, err := siksTree.Get(address.Bytes())
+	v.tx.Unlock()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKGet, err)
 	}
@@ -121,7 +134,7 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	}
 	v.tx.Lock()
 	invalidatedSIK := make(SIK, sikLeafValueLen).InvalidateAt(v.CurrentHeight())
-	err = v.tx.DeepSet(address.Bytes(), invalidatedSIK, StateTreeCfg(TreeSIK))
+	err = siksTree.Set(address.Bytes(), invalidatedSIK)
 	v.tx.Unlock()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
