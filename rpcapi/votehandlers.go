@@ -390,7 +390,10 @@ func (r *RPCAPI) getEntityList(request *api.APIrequest) (*api.APIresponse, error
 
 func (r *RPCAPI) getBlockStatus(request *api.APIrequest) (*api.APIresponse, error) {
 	var response api.APIresponse
-	h := r.vocapp.Height()
+	h, err := r.vocapp.State.LastHeight()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get block status: %w", err)
+	}
 	response.Height = &h
 	response.BlockTime = r.vocinfo.BlockTimes()
 	response.BlockTimestamp = int32(r.vocapp.Timestamp())
