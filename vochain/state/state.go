@@ -348,12 +348,12 @@ func (v *State) Save() ([]byte, error) {
 	// Commit the statedb tx
 	// Note that we need to commit the tx after calling listeners, because
 	// the listeners may need to get the previous (not committed) state.
-	v.tx.Lock()
-	defer v.tx.Unlock()
 	// Update the SIK merkle-tree roots
 	if err := v.UpdateSIKRoots(); err != nil {
 		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
 	}
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	err := func() error {
 		var err error
 		if err := v.tx.SaveWithoutCommit(); err != nil {

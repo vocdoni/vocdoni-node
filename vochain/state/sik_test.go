@@ -3,6 +3,8 @@ package state
 import (
 	"bytes"
 	"encoding/hex"
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -204,4 +206,52 @@ func Test_validSIK(t *testing.T) {
 
 	input, _ = hex.DecodeString("F3668000B66c61aAa08aBC559a8C78Ae7E007C2e")
 	qt.Assert(t, SIK(input).Valid(), qt.IsTrue)
+}
+
+func TestSIKDataRace(t *testing.T) {
+	c := qt.New(t)
+	// create a state for testing
+	dir := t.TempDir()
+	s, err := NewState(db.TypePebble, dir)
+	qt.Assert(t, err, qt.IsNil)
+
+	// create some siks
+	addrs := []common.Address{}
+	siks := map[common.Address]SIK{}
+	for i := 0; i < 10000; i++ {
+		s := ethereum.NewSignKeys()
+		c.Assert(s.Generate(), qt.IsNil)
+		sik, err := s.AccountSIK(nil)
+		c.Assert(err, qt.IsNil)
+		addrs = append(addrs, s.Address())
+		siks[s.Address()] = sik
+	}
+
+	wg := &sync.WaitGroup{}
+	iterations := len(addrs) * 10
+
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+
+		for i := 0; i < iterations; i++ {
+			idx := util.RandomInt(0, len(addrs)-1)
+			addr := addrs[idx]
+			if err := s.SetAddressSIK(addr, siks[addr]); err != nil {
+				c.Assert(errors.Is(err, ErrRegisteredValidSIK), qt.IsTrue)
+			}
+		}
+	}()
+	go func() {
+		defer wg.Done()
+
+		idx := util.RandomInt(0, len(addrs)-1)
+		addr := addrs[idx]
+		if _, err := s.SIKFromAddress(addr); err != nil {
+			c.Assert(errors.Is(err, ErrSIKNotFound), qt.IsTrue)
+			return
+		}
+		c.Assert(s.InvalidateSIK(addr), qt.IsNil)
+	}()
+	wg.Wait()
 }
