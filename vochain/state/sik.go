@@ -43,13 +43,13 @@ type SIK []byte
 // SIKFromAddress function return the current SIK value associated to the provided
 // address.
 func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
+	v.tx.RLock()
+	defer v.tx.RUnlock()
+
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
-	v.tx.Lock()
-	defer v.tx.Unlock()
-
 	sik, err := siksTree.Get(address.Bytes())
 	if err != nil {
 		if errors.Is(err, arbo.ErrKeyNotFound) {
@@ -69,24 +69,21 @@ func (v *State) SIKFromAddress(address common.Address) (SIK, error) {
 //   - If it exists but it is not valid, overwrite the stored value with the
 //     provided one.
 func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	// check if exists a registered sik for the provided address, query also for
 	// no committed tree version
-	v.tx.Lock()
 	rawSIK, err := siksTree.Get(address.Bytes())
-	v.tx.Unlock()
 	if errors.Is(err, arbo.ErrKeyNotFound) {
 		// if not exists create it
 		log.Debugw("setSIK (create)",
 			"address", address.String(),
 			"sik", newSIK.String())
-		v.tx.Lock()
-		err = siksTree.Add(address.Bytes(), newSIK)
-		v.tx.Unlock()
-		if err != nil {
+		if err := siksTree.Add(address.Bytes(), newSIK); err != nil {
 			return fmt.Errorf("%w: %w", ErrSIKSet, err)
 		}
 		return nil
@@ -102,10 +99,7 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 		"address", address.String(),
 		"sik", SIK(rawSIK).String())
 	// if the hysteresis is reached update the sik for the address
-	v.tx.Lock()
-	err = siksTree.Set(address.Bytes(), newSIK)
-	v.tx.Unlock()
-	if err != nil {
+	if err := siksTree.Set(address.Bytes(), newSIK); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSet, err)
 	}
 	return nil
@@ -117,14 +111,14 @@ func (v *State) SetAddressSIK(address common.Address, newSIK SIK) error {
 // prevent it from being updated until all processes created before that height
 // have finished.
 func (v *State) InvalidateSIK(address common.Address) error {
+	v.tx.Lock()
+	defer v.tx.Unlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
 	}
 	// if the sik does not exists or something fails querying return the error
-	v.tx.Lock()
 	rawSIK, err := siksTree.Get(address.Bytes())
-	v.tx.Unlock()
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKGet, err)
 	}
@@ -132,11 +126,8 @@ func (v *State) InvalidateSIK(address common.Address) error {
 	if !SIK(rawSIK).Valid() {
 		return ErrSIKAlreadyInvalid
 	}
-	v.tx.Lock()
 	invalidatedSIK := make(SIK, sikLeafValueLen).InvalidateAt(v.CurrentHeight())
-	err = siksTree.Set(address.Bytes(), invalidatedSIK)
-	v.tx.Unlock()
-	if err != nil {
+	if err := siksTree.Set(address.Bytes(), invalidatedSIK); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKDelete, err)
 	}
 	return nil
@@ -200,6 +191,8 @@ func (v *State) UpdateSIKRoots() error {
 	currentBlock := v.CurrentHeight()
 
 	// get sik roots key-value database associated to the siks tree
+	v.tx.RLock()
+	defer v.tx.RUnlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)
@@ -383,8 +376,8 @@ func (v *State) PurgeSIKsByElection(pid []byte) error {
 // SIKGenProof returns the proof of the provided address in the SIKs tree.
 // The first returned value is the leaf value and the second the proof siblings.
 func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
-	v.tx.Lock()
-	defer v.tx.Unlock()
+	v.tx.RLock()
+	defer v.tx.RUnlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return nil, nil, fmt.Errorf("%w: %w", ErrSIKSubTree, err)
@@ -395,8 +388,8 @@ func (v *State) SIKGenProof(address common.Address) ([]byte, []byte, error) {
 
 // SIKRoot returns the last root hash of the SIK merkle tree.
 func (v *State) SIKRoot() ([]byte, error) {
-	v.tx.Lock()
-	defer v.tx.Unlock()
+	v.tx.RLock()
+	defer v.tx.RUnlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		v.tx.Unlock()
