@@ -180,6 +180,10 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 //	@Router					/accounts [post]
 func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &AccountSet{}
+	if msg == nil || msg.Data == nil {
+		return ErrCantParseDataAsJSON
+	}
+
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
@@ -187,11 +191,18 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	// check if the transaction is of the correct type and extract metadata URI
 	metadataURI, err := func() (string, error) {
 		stx := &models.SignedTx{}
+		if req.TxPayload == nil {
+			return "", ErrUnmarshalingServerProto
+		}
 		if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
 			return "", err
 		}
 		tx := &models.Tx{}
-		if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+		gotTx := stx.GetTx()
+		if gotTx == nil {
+			return "", ErrUnmarshalingServerProto
+		}
+		if err := proto.Unmarshal(gotTx, tx); err != nil {
 			return "", err
 		}
 		if np := tx.GetSetAccount(); np != nil {
