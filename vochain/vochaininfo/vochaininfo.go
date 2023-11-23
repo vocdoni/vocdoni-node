@@ -8,6 +8,10 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 )
 
+const (
+	defaultBlockTime = 12000
+)
+
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain
 // Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
 type VochainInfo struct {
@@ -51,7 +55,11 @@ func (vi *VochainInfo) Height() int64 {
 func (vi *VochainInfo) BlockTimes() *[5]int32 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return &[5]int32{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
+	baseBlockTime := int32(defaultBlockTime)
+	if vi.avg1 != 0 {
+		baseBlockTime = vi.avg1
+	}
+	return &[5]int32{baseBlockTime, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
 }
 
 // HeightTime estimates the UTC time for a future height or returns the
