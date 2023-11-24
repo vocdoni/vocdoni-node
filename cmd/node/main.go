@@ -548,6 +548,12 @@ func main() {
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
+		// create the offchain data downloader service
+		if conf.Vochain.OffChainDataDownloader {
+			if err := srv.OffChainDataHandler(); err != nil {
+				log.Fatal(err)
+			}
+		}
 		// create the indexer service
 		if conf.Vochain.Indexer.Enabled {
 			if err := srv.VochainIndexer(); err != nil {
@@ -557,12 +563,6 @@ func main() {
 		// create the process archiver service
 		if conf.Vochain.ProcessArchive {
 			if err := srv.ProcessArchiver(); err != nil {
-				log.Fatal(err)
-			}
-		}
-		// create the offchain data downloader service
-		if conf.Vochain.OffChainDataDownloader {
-			if err := srv.OffChainDataHandler(); err != nil {
 				log.Fatal(err)
 			}
 		}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"go.vocdoni.io/dvote/data"
+	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	marxArchiveFileSize     = 1024 * 100 // 100KB
+	maxArchiveFileSize      = 1024 * 100 // 100KB
 	timeoutArchiveRetrieval = 120 * time.Second
 	archiveFetchInterval    = 60 * time.Minute
 	archiveFileNameSize     = types.ProcessIDsize * 2 // 64 hex chars
@@ -40,6 +40,7 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 		return nil, err
 	}
 	defer tx.Rollback()
+
 	queries := indexerdb.New(tx)
 	added := []*ArchiveProcess{}
 	for _, p := range archive {
@@ -120,10 +121,14 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 
 // StartArchiveRetrieval starts the archive retrieval process. It is a blocking function that runs continuously.
 // Retrieves the archive directory from the storage and imports the processes into the indexer database.
-func (idx *Indexer) StartArchiveRetrieval(storage data.Storage, archiveURL string) {
+func (idx *Indexer) StartArchiveRetrieval(storage *downloader.Downloader, archiveURL string) {
+	if storage == nil || archiveURL == "" {
+		log.Warnw("cannot start archive retrieval", "downloader", storage != nil, "url", archiveURL)
+		return
+	}
 	for {
 		ctx, cancel := context.WithTimeout(context.Background(), timeoutArchiveRetrieval)
-		dirMap, err := storage.RetrieveDir(ctx, archiveURL, marxArchiveFileSize)
+		dirMap, err := storage.RemoteStorage.RetrieveDir(ctx, archiveURL, maxArchiveFileSize)
 		cancel()
 		if err != nil {
 			log.Warnw("cannot retrieve archive directory", "url", archiveURL, "err", err)
@@ -153,11 +158,9 @@ func (idx *Indexer) StartArchiveRetrieval(storage data.Storage, archiveURL strin
 		if len(added) > 0 {
 			log.Infow("new archive imported", "count", len(added))
 			for _, p := range added {
-				ctx, cancel := context.WithTimeout(context.Background(), timeoutArchiveRetrieval)
-				if err := storage.Pin(ctx, p.ProcessInfo.Metadata); err != nil {
-					log.Warnw("cannot pin metadata", "err", err.Error())
+				if p.ProcessInfo.Metadata != "" {
+					storage.AddToQueue(p.ProcessInfo.Metadata, nil, true)
 				}
-				cancel()
 			}
 		}
 		time.Sleep(archiveFetchInterval)
