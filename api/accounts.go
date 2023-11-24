@@ -128,8 +128,31 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	}
 	addr := common.HexToAddress(ctx.URLParam("address"))
 	acc, err := a.vocapp.State.GetAccount(addr, true)
-	if err != nil || acc == nil {
+	if err != nil {
 		return ErrAccountNotFound.With(addr.Hex())
+	}
+
+	// If the account does not exist in state, try to retrieve it from the indexer.
+	// This is a fallback for the case where the account is not in state but it is in the process archive.
+	if acc == nil {
+		indexerEntities := a.indexer.EntityList(1, 0, ctx.URLParam("address"))
+		if len(indexerEntities) == 0 {
+			return ErrAccountNotFound.With(addr.Hex())
+		}
+		var data []byte
+		if data, err = json.Marshal(Account{
+			Address:       addr.Bytes(),
+			Nonce:         0,
+			Balance:       0,
+			ElectionIndex: uint32(indexerEntities[0].ProcessCount),
+			InfoURL:       "",
+			Metadata: &AccountMetadata{
+				Name: LanguageString{"default": addr.Hex()},
+			},
+		}); err != nil {
+			return err
+		}
+		return ctx.Send(data, apirest.HTTPstatusOK)
 	}
 
 	// Try to retrieve the account info metadata

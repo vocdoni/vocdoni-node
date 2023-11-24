@@ -44,11 +44,11 @@ func (idx *Indexer) ImportArchive(archive []*ArchiveProcess) ([]*ArchiveProcess,
 	added := []*ArchiveProcess{}
 	for _, p := range archive {
 		if idx.App.ChainID() == p.ChainID {
-			log.Debugw("skipping import of archive process from current chain", "chainID", p.ChainID, "processID", p.ProcessInfo.ID.String())
+			// skip process from current chain
 			continue
 		}
 		if p.ProcessInfo == nil {
-			log.Debugw("skipping import of archive process with nil process info")
+			// skip process without process info
 			continue
 		}
 

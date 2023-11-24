@@ -33,7 +33,7 @@ const (
 	EntityIDsize = EthereumAddressSize
 
 	// ArchiveURL is the default URL where the archive is retrieved from.
-	ArchiveURL = "/ipns/k2k4r8mdn544n7f8nprwqeo27jr1v1unsu74th57s1j8mumjck7y7cbz"
+	ArchiveURL = "/ipns/k2k4r8otxrf176h1i08txap0ep6ynr1jac0vymozi068eedml7gk1595"
 
 	// DefaultBlockTime is the default block time in seconds.
 	DefaultBlockTime = 12 * time.Second
