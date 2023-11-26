@@ -88,10 +88,8 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 	vc.App.State.SetHeight(uint32(vc.height.Load()))
 
 	// Create indexer
-	if vc.Indexer, err = indexer.NewIndexer(
-		filepath.Join(dataDir, "indexer"),
-		vc.App,
-		true,
+	if vc.Indexer, err = indexer.New(filepath.Join(dataDir, "indexer"), vc.App,
+		indexer.Options{CountLiveResults: true},
 	); err != nil {
 		return nil, err
 	}
