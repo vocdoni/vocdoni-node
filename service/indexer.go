@@ -11,9 +11,10 @@ import (
 func (vs *VocdoniService) VochainIndexer() error {
 	log.Info("creating vochain indexer service")
 	var err error
-	vs.Indexer, err = indexer.New(filepath.Join(vs.Config.DataDir, "indexer"), vs.App,
-		indexer.Options{IgnoreLiveResults: vs.Config.Indexer.IgnoreLiveResults},
-	)
+	vs.Indexer, err = indexer.New(vs.App, indexer.Options{
+		DataDir:           filepath.Join(vs.Config.DataDir, "indexer"),
+		IgnoreLiveResults: vs.Config.Indexer.IgnoreLiveResults,
+	})
 	if err != nil {
 		return err
 	}

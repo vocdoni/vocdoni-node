@@ -95,12 +95,14 @@ type Indexer struct {
 }
 
 type Options struct {
+	DataDir string
+
 	IgnoreLiveResults bool
 }
 
 // New returns an instance of the Indexer
-// using the local storage database in dataDir and integrated into the state vochain instance
-func New(dataDir string, app *vochain.BaseApplication, opts Options) (*Indexer, error) {
+// using the local storage database in DataDir and integrated into the state vochain instance.
+func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 	idx := &Indexer{
 		App:               app,
 		ignoreLiveResults: opts.IgnoreLiveResults,
@@ -113,14 +115,14 @@ func New(dataDir string, app *vochain.BaseApplication, opts Options) (*Indexer, 
 		blockUpdateProcs:          make(map[string]bool),
 		blockUpdateProcVoteCounts: make(map[string]bool),
 	}
-	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", !opts.IgnoreLiveResults)
+	log.Infow("indexer initialization", "dataDir", opts.DataDir, "liveResults", !opts.IgnoreLiveResults)
 
 	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
 	// Create the parent directory as well if it doesn't exist.
-	if err := os.MkdirAll(dataDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(opts.DataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
-	dbPath := filepath.Join(dataDir, "db.sqlite")
+	dbPath := filepath.Join(opts.DataDir, "db.sqlite")
 	var err error
 
 	// sqlite doesn't support multiple concurrent writers.
