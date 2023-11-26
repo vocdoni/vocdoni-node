@@ -10,7 +10,7 @@ import (
 
 func TestImportArchive(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	archive := []*ArchiveProcess{}
 	archiveProcess1 := &ArchiveProcess{}

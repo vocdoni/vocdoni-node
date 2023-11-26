@@ -21,7 +21,7 @@ import (
 func BenchmarkIndexer(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	idx := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app)
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
@@ -131,7 +131,7 @@ func BenchmarkFetchTx(b *testing.B) {
 	numTxs := 1000
 	app := vochain.TestBaseApplication(b)
 
-	idx := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app)
 
 	b.ReportAllocs()
 	b.ResetTimer()
@@ -164,7 +164,7 @@ func BenchmarkFetchTx(b *testing.B) {
 func BenchmarkNewProcess(b *testing.B) {
 	app := vochain.TestBaseApplication(b)
 
-	idx := newTestIndexer(b, app, true)
+	idx := newTestIndexer(b, app)
 	_ = idx // used via the callbacks; we want to benchmark it too
 	startTime := time.Now()
 	numProcesses := b.N
