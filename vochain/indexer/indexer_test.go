@@ -30,8 +30,8 @@ func init() {
 	goose.SetLogger(stdlog.New(io.Discard, "", 0))
 }
 
-func newTestIndexer(tb testing.TB, app *vochain.BaseApplication, countLiveResults bool) *Indexer {
-	idx, err := New(tb.TempDir(), app, Options{CountLiveResults: countLiveResults})
+func newTestIndexer(tb testing.TB, app *vochain.BaseApplication) *Indexer {
+	idx, err := New(tb.TempDir(), app, Options{})
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func TestEntityList(t *testing.T) {
 
 func testEntityList(t *testing.T, entityCount int) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 	baseProcess := &models.Process{
 		BlockCount:    10,
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 8, MaxValue: 3},
@@ -110,7 +110,7 @@ func testEntityList(t *testing.T, entityCount int) {
 
 func TestEntitySearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	entityIds := []string{
 		"1011d50537fa164b6fef261141797bbe4014526e",
@@ -204,7 +204,7 @@ func TestProcessList(t *testing.T) {
 
 func testProcessList(t *testing.T, procsCount int) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Add 10 entities and process for storing random content
 	var eidOneProcess []byte // entity ID with one process
@@ -285,7 +285,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 func TestProcessSearch(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Add 10 entities and process for storing random content
 	for i := 0; i < 10; i++ {
@@ -436,7 +436,7 @@ func TestProcessSearch(t *testing.T) {
 func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Add 10 processes with different namespaces (from 10 to 20) and status ENDED
 	for i := 0; i < 10; i++ {
@@ -503,7 +503,7 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 
 func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 30)
 	pid := util.RandomBytes(32)
@@ -668,7 +668,7 @@ func TestResults(t *testing.T) {
 
 func TestLiveResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	pid := util.RandomBytes(32)
 	if err := app.State.AddProcess(&models.Process{
@@ -720,7 +720,7 @@ func TestLiveResults(t *testing.T) {
 func TestAddVote(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	options := &models.ProcessVoteOptions{
 		MaxCount:     3,
@@ -810,7 +810,7 @@ func TestBallotProtocolRateProduct(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -848,7 +848,7 @@ func TestBallotProtocolQuadratic(t *testing.T) {
 	// Rate a product from 0 to 4
 	app := vochain.TestBaseApplication(t)
 
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -898,7 +898,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 	app := vochain.TestBaseApplication(t)
 
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	// Rate 2 products from 0 to 4
 	pid := util.RandomBytes(32)
@@ -943,7 +943,7 @@ func TestBallotProtocolMultiChoice(t *testing.T) {
 
 func TestAfterSyncBootStrap(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
 	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
 
@@ -1011,7 +1011,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 
 func TestCountVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
 
 	err := app.State.AddProcess(&models.Process{
@@ -1069,7 +1069,7 @@ func TestCountVotes(t *testing.T) {
 
 func TestOverwriteVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
 	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
 
@@ -1257,7 +1257,7 @@ func TestOverwriteVotes(t *testing.T) {
 
 func TestTxIndexer(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	getTxID := func(i, j int) [32]byte {
 		return [32]byte{byte(i), byte(j)}
@@ -1316,7 +1316,7 @@ func TestTxIndexer(t *testing.T) {
 
 func TestCensusUpdate(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	originalCensusRoot := util.RandomBytes(32)
 	originalCensusURI := new(string)
@@ -1368,7 +1368,7 @@ func TestCensusUpdate(t *testing.T) {
 
 func TestEndBlock(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	pid := util.RandomBytes(32)
 
@@ -1418,7 +1418,7 @@ func TestEndBlock(t *testing.T) {
 
 func TestAccountsList(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	keys := make([]*ethereum.SignKeys, 0)
 	for i := 0; i < 25; i++ {
@@ -1479,7 +1479,7 @@ func TestAccountsList(t *testing.T) {
 
 func TestTokenTransfers(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app, true)
+	idx := newTestIndexer(t, app)
 
 	keys := make([]*ethereum.SignKeys, 0)
 	// create 3 accounts

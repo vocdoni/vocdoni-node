@@ -95,7 +95,7 @@ type Indexer struct {
 }
 
 type Options struct {
-	CountLiveResults bool
+	IgnoreLiveResults bool
 }
 
 // New returns an instance of the Indexer
@@ -103,7 +103,7 @@ type Options struct {
 func New(dataDir string, app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 	idx := &Indexer{
 		App:               app,
-		ignoreLiveResults: !opts.CountLiveResults,
+		ignoreLiveResults: opts.IgnoreLiveResults,
 
 		// TODO(mvdan): these three maps are all keyed by process ID,
 		// and each of them needs to query existing data from the DB.
@@ -113,7 +113,7 @@ func New(dataDir string, app *vochain.BaseApplication, opts Options) (*Indexer, 
 		blockUpdateProcs:          make(map[string]bool),
 		blockUpdateProcVoteCounts: make(map[string]bool),
 	}
-	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", opts.CountLiveResults)
+	log.Infow("indexer initialization", "dataDir", dataDir, "liveResults", !opts.IgnoreLiveResults)
 
 	// The DB itself is opened in "rwc" mode, so it is created if it does not yet exist.
 	// Create the parent directory as well if it doesn't exist.
