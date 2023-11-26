@@ -105,7 +105,7 @@ func NewVochainStateWithProcess(tb testing.TB) *state.State {
 
 func NewMockIndexer(tb testing.TB, vnode *vochain.BaseApplication) *indexer.Indexer {
 	tb.Log("starting vochain indexer")
-	sc, err := indexer.New(tb.TempDir(), vnode, indexer.Options{})
+	sc, err := indexer.New(vnode, indexer.Options{DataDir: tb.TempDir()})
 	if err != nil {
 		tb.Fatal(err)
 	}

@@ -31,7 +31,7 @@ func init() {
 }
 
 func newTestIndexer(tb testing.TB, app *vochain.BaseApplication) *Indexer {
-	idx, err := New(tb.TempDir(), app, Options{})
+	idx, err := New(app, Options{DataDir: tb.TempDir()})
 	if err != nil {
 		tb.Fatal(err)
 	}
