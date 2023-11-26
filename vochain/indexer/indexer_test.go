@@ -2,11 +2,13 @@ package indexer
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	stdlog "log"
 	"math/big"
+	"path/filepath"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -41,6 +43,79 @@ func newTestIndexer(tb testing.TB, app *vochain.BaseApplication) *Indexer {
 		}
 	})
 	return idx
+}
+
+func TestBackup(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+
+	idx, err := New(app, Options{DataDir: t.TempDir()})
+	qt.Assert(t, err, qt.IsNil)
+
+	wantTotalVotes := func(want uint64) {
+		got, err := idx.CountTotalVotes()
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, got, qt.Equals, want)
+	}
+
+	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	// A new indexer has no votes.
+	wantTotalVotes(0)
+
+	// Add 10 votes and check they are counted.
+	pid := util.RandomBytes(32)
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    10,
+		MaxCensusSize: 1000,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:     5,
+			MaxValue:     1,
+			MaxTotalCost: 3,
+			CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	for i := 0; i < 10; i++ {
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+	}
+	app.AdvanceTestBlock()
+	wantTotalVotes(10)
+
+	// Back up the database.
+	backupPath := filepath.Join(t.TempDir(), "backup")
+	err = idx.SaveBackup(context.TODO(), backupPath)
+	qt.Assert(t, err, qt.IsNil)
+
+	// Add another 5 votes which aren't in the backup.
+	for i := 0; i < 5; i++ {
+		v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+		qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+	}
+	app.AdvanceTestBlock()
+	wantTotalVotes(15)
+
+	// Starting a new database without the backup should see zero votes.
+	idx.Close()
+	idx, err = New(app, Options{DataDir: t.TempDir()})
+	qt.Assert(t, err, qt.IsNil)
+	wantTotalVotes(0)
+
+	// Starting a new database with the backup should see the votes from the backup.
+	idx.Close()
+	idx, err = New(app, Options{DataDir: t.TempDir(), ExpectBackupRestore: true})
+	qt.Assert(t, err, qt.IsNil)
+	err = idx.RestoreBackup(context.TODO(), backupPath)
+	qt.Assert(t, err, qt.IsNil)
+	wantTotalVotes(10)
+
+	// Close the last indexer.
+	idx.Close()
 }
 
 func TestEntityList(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -62,6 +63,7 @@ type Indexer struct {
 	// TODO: try using blockTx directly, after some more refactors?
 	votePool map[string]map[string]*state.Vote
 
+	dbPath      string
 	readOnlyDB  *sql.DB
 	readWriteDB *sql.DB
 
@@ -97,6 +99,10 @@ type Indexer struct {
 type Options struct {
 	DataDir string
 
+	// ExpectBackupRestore should be set to true if a call to Indexer.RestoreBackup
+	// will be made shortly after New is called, and before any indexing or queries happen.
+	ExpectBackupRestore bool
+
 	IgnoreLiveResults bool
 }
 
@@ -122,25 +128,42 @@ func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 	if err := os.MkdirAll(opts.DataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
-	dbPath := filepath.Join(opts.DataDir, "db.sqlite")
+	idx.dbPath = filepath.Join(opts.DataDir, "db.sqlite")
+
+	// If we are expecting a restore shortly after, that will initialize the DB.
+	if !opts.ExpectBackupRestore {
+		idx.startDB()
+	}
+
+	// Subscribe to events
+	idx.App.State.AddEventListener(idx)
+
+	return idx, nil
+}
+
+func (idx *Indexer) startDB() error {
+	if idx.readWriteDB != nil {
+		panic("Indexer.startDB called twice")
+	}
+
 	var err error
 
 	// sqlite doesn't support multiple concurrent writers.
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
-	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", dbPath))
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", idx.dbPath))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	idx.readWriteDB.SetMaxOpenConns(1)
 	idx.readWriteDB.SetMaxIdleConns(2)
 	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
 	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
 
-	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", dbPath))
+	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", idx.dbPath))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Increasing these numbers can allow for more queries to run concurrently,
 	// but it also increases the memory used by sqlite and our connection pool.
@@ -151,27 +174,42 @@ func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
-		return nil, err
+		return err
 	}
 	goose.SetLogger(log.GooseLogger())
 	goose.SetBaseFS(embedMigrations)
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
-		return nil, fmt.Errorf("goose up: %w", err)
+		return fmt.Errorf("goose up: %w", err)
 	}
 
 	idx.readOnlyQuery, err = indexerdb.Prepare(context.TODO(), idx.readOnlyDB)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	idx.blockQueries, err = indexerdb.Prepare(context.TODO(), idx.readWriteDB)
 	if err != nil {
-		panic(err)
+		return err
 	}
+	return nil
+}
 
-	// Subscribe to events
-	idx.App.State.AddEventListener(idx)
+func copyFile(dst, src string) error {
+	srcf, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer srcf.Close()
 
-	return idx, nil
+	// For now, we don't care about permissions
+	dstf, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	_, err = io.Copy(dstf, srcf)
+	if err2 := dstf.Close(); err == nil {
+		err = err2
+	}
+	return err
 }
 
 func (idx *Indexer) Close() error {
@@ -182,6 +220,32 @@ func (idx *Indexer) Close() error {
 		return err
 	}
 	return nil
+}
+
+// BackupPath restores the database from a backup created via SaveBackup.
+// Note that this must be called with ExpectBackupRestore set to true,
+// and before any indexing or queries happen.
+func (idx *Indexer) RestoreBackup(ctx context.Context, path string) error {
+	if idx.readWriteDB != nil {
+		panic("Indexer.RestoreBackup called after the database was initialized")
+	}
+	if err := copyFile(idx.dbPath, path); err != nil {
+		return fmt.Errorf("could not restore indexer backup: %w", err)
+	}
+	if err := idx.startDB(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// SaveBackup backs up the database to a file on disk.
+// Note that writes to the database may be blocked until the backup finishes,
+// and an error may occur if a file at path already exists.
+//
+// For sqlite, this is done via "VACUUM INTO", so the resulting file is also a database.
+func (idx *Indexer) SaveBackup(ctx context.Context, path string) error {
+	_, err := idx.readOnlyDB.ExecContext(ctx, `VACUUM INTO ?`, path)
+	return err
 }
 
 // blockTxQueries assumes that lockPool is locked.
