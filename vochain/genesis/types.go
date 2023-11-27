@@ -15,7 +15,6 @@ import (
 type Vochain struct {
 	AutoUpdateGenesis bool
 	SeedNodes         []string
-	CircuitsConfigTag string
 	Genesis           *Doc
 }
 

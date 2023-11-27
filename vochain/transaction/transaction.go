@@ -6,7 +6,6 @@ import (
 
 	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
-	snarkTypes "github.com/vocdoni/go-snark/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
@@ -47,8 +46,6 @@ type TransactionHandler struct {
 	istc *ist.Controller
 	// dataDir is the path for storing some files
 	dataDir string
-	// ZkVKs contains the VerificationKey for each circuit parameters index
-	ZkVKs []*snarkTypes.Vk
 	// ZkCircuit contains the current chain circuit
 	ZkCircuit *circuit.ZkCircuit
 }

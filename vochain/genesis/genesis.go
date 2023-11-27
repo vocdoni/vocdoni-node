@@ -14,8 +14,7 @@ var Genesis = map[string]Vochain{
 		SeedNodes: []string{
 			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656",
 		},
-		CircuitsConfigTag: "dev",
-		Genesis:           &devGenesis,
+		Genesis: &devGenesis,
 	},
 
 	// Staging network
@@ -24,8 +23,7 @@ var Genesis = map[string]Vochain{
 		SeedNodes: []string{
 			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656",
 		},
-		CircuitsConfigTag: "dev",
-		Genesis:           &stageGenesis,
+		Genesis: &stageGenesis,
 	},
 
 	// LTS production network
@@ -35,8 +33,7 @@ var Genesis = map[string]Vochain{
 			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
 			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
 		},
-		CircuitsConfigTag: "prod",
-		Genesis:           &ltsGenesis,
+		Genesis: &ltsGenesis,
 	},
 }
 
