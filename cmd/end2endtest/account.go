@@ -169,73 +169,119 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 	// send a couple of token txs to increase the nonce, without waiting for them to be mined
 	// this tests that the mempool transactions are properly ordered.
 	var wg sync.WaitGroup
+	errChan := make(chan error, 3)
+
 	wg.Add(1)
 	go func() {
 		log.Warnf("send transactions with nonce+1, should not be mined before the others")
 		// send 1 token to burn address with nonce + 1 (should be mined after the other txs)
 		if _, err := alice.TransferWithNonce(state.BurnAddress, 1, aliceAcc.Nonce+1); err != nil {
-			log.Fatalf("cannot burn tokens: %v", err)
+			errChan <- fmt.Errorf("cannot burn tokens with alice account: %v", err)
+			return
 		}
 		if _, err := bob.TransferWithNonce(state.BurnAddress, 1, bobAcc.Nonce+1); err != nil {
-			log.Fatalf("cannot burn tokens: %v", err)
+			errChan <- fmt.Errorf("cannot burn tokens with bob account: %v", err)
+			return
 		}
 		wg.Done()
 	}()
 	log.Warnf("waiting 6 seconds to let the burn txs be sent")
 	time.Sleep(6 * time.Second)
+
 	var txhasha, txhashb []byte
 	wg.Add(1)
 	go func() {
 		var err error
 		txhasha, err = alice.TransferWithNonce(bobKeys.Address(), amountAtoB, aliceAcc.Nonce)
 		if err != nil {
-			log.Fatalf("cannot send tokens: %v", err)
+			errChan <- fmt.Errorf("cannot send tokens: %v", err)
+			return
 		}
 		log.Infof("alice sent %d tokens to bob", amountAtoB)
 		log.Debugf("tx hash is %x", txhasha)
 
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		txrefa, err := api.WaitUntilTxIsMined(ctx, txhasha)
+		if err != nil {
+			errChan <- fmt.Errorf("cannot send tokens: %v", err)
+			return
+		}
+
+		log.Debugf("mined, tx ref %+v", txrefa)
+		wg.Done()
+	}()
+
+	wg.Add(1)
+	go func() {
 		txhashb, err = bob.TransferWithNonce(aliceKeys.Address(), amountBtoA, bobAcc.Nonce)
 		if err != nil {
-			log.Fatalf("cannot send tokens: %v", err)
+			errChan <- fmt.Errorf("cannot send tokens: %v", err)
+			return
 		}
 		log.Infof("bob sent %d tokens to alice", amountBtoA)
 		log.Debugf("tx hash is %x", txhashb)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		txrefb, err := api.WaitUntilTxIsMined(ctx, txhashb)
+		if err != nil {
+			errChan <- fmt.Errorf("cannot send tokens: %v", err)
+			return
+		}
+
+		log.Debugf("mined, tx ref %+v", txrefb)
 		wg.Done()
 	}()
 
 	wg.Wait()
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	txrefa, err := api.WaitUntilTxIsMined(ctx, txhasha)
-	if err != nil {
-		return err
+	close(errChan)
+
+	for err := range errChan {
+		if err != nil {
+			return err
+		}
 	}
-	txrefb, err := api.WaitUntilTxIsMined(ctx, txhashb)
-	if err != nil {
-		return err
-	}
-	log.Debugf("mined, tx refs are %+v and %+v", txrefa, txrefb)
 
 	// after a tx is mined in a block, the indexer takes some time to update the balances
 	// (i.e. seconds, if there are votes to be indexed)
 	// give it one more block time
 	_ = api.WaitUntilNextBlock()
 
-	// now check the resulting state
-	if err := checkAccountNonceAndBalance(alice, aliceAcc.Nonce+2,
-		aliceAcc.Balance-amountAtoB-(2*txCost+1)+amountBtoA); err != nil {
-		return err
-	}
-	if err := checkAccountNonceAndBalance(bob, bobAcc.Nonce+2,
-		bobAcc.Balance-amountBtoA-(2*txCost+1)+amountAtoB); err != nil {
-		return err
-	}
+	errorChan := make(chan error, 2)
+	wg.Add(1)
+	go func() {
+		if err := checkAccountNonceAndBalance(alice, aliceAcc.Nonce+2,
+			aliceAcc.Balance-amountAtoB-(2*txCost+1)+amountBtoA); err != nil {
+			errorChan <- fmt.Errorf("failed when checkAccountNonceAndBalance for alice: %v", err)
+			return
+		}
+		if err := checkAccountNonceAndBalance(bob, bobAcc.Nonce+2,
+			bobAcc.Balance-amountBtoA-(2*txCost+1)+amountAtoB); err != nil {
+			errorChan <- fmt.Errorf("failed when checkAccountNonceAndBalance for bob: %v", err)
+			return
+		}
+		wg.Done()
+	}()
 
-	if err := checkTokenTransfersCount(alice, aliceKeys.Address()); err != nil {
-		return err
-	}
-	if err := checkTokenTransfersCount(bob, bobKeys.Address()); err != nil {
-		return err
+	wg.Add(1)
+	go func() {
+		if err := checkTokenTransfersCount(alice, aliceKeys.Address()); err != nil {
+			errorChan <- fmt.Errorf("failed when checkTokenTransfersCount for alice: %v", err)
+		}
+		if err := checkTokenTransfersCount(bob, bobKeys.Address()); err != nil {
+			errorChan <- fmt.Errorf("failed when checkTokenTransfersCount for bob: %v", err)
+		}
+		wg.Done()
+	}()
+
+	wg.Wait()
+	close(errorChan)
+
+	for err := range errorChan {
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -271,6 +317,8 @@ func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address)
 	if count != countTokenTxs {
 		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, countTokenTxs)
 	}
+
+	log.Infow("current transfers count", "account", address.String(), "count", count)
 	return nil
 }
 
@@ -286,12 +334,11 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 			return acct, nil
 		}
 
-		if _, err = api.AccountBootstrap(faucetPkg, nil, nil); err != nil {
-			if strings.Contains(err.Error(), "tx already exists in cache") {
-				// don't worry then, someone else created it in a race, nevermind, job done.
-			} else {
+		if _, err := api.AccountBootstrap(faucetPkg, nil, nil); err != nil {
+			if !strings.Contains(err.Error(), "tx already exists in cache") {
 				return nil, fmt.Errorf("cannot create account %s: %w", api.MyAddress(), err)
 			}
+			// don't worry then, someone else created it in a race, nevermind, job done.
 		}
 
 		_ = api.WaitUntilNextBlock()
@@ -299,12 +346,11 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 	return nil, fmt.Errorf("cannot create account %s after %d retries", api.MyAddress(), retries)
 }
 
-func ensureAccountMetadataEquals(api *apiclient.HTTPclient,
-	metadata *apipkg.AccountMetadata) (*apipkg.Account, error) {
+func ensureAccountMetadataEquals(api *apiclient.HTTPclient, metadata *apipkg.AccountMetadata) (*apipkg.Account, error) {
 	for i := 0; i < retries; i++ {
 		acct, err := api.Account("")
 		if err != nil {
-			log.Debugf("GetAccount try %d: %v", i, err)
+			log.Debugf("GetAccount try %d failed: %v", i, err)
 		}
 		// if account metadata is as expected, we're done
 		if acct != nil && cmp.Equal(acct.Metadata, metadata) {
@@ -312,11 +358,14 @@ func ensureAccountMetadataEquals(api *apiclient.HTTPclient,
 		}
 
 		if _, err := api.AccountSetMetadata(metadata); err != nil {
-			if strings.Contains(err.Error(), "tx already exists in cache") {
+			switch {
+			case strings.Contains(err.Error(), "tx already exists in cache"):
 				// don't worry then, someone else created it in a race, or still pending, nevermind
-			} else if strings.Contains(err.Error(), "invalid URI, must be different") {
-				// the tx from previous loop JUST got mined, also nevermind
-			} else {
+				continue
+			case strings.Contains(err.Error(), "invalid URI, must be different"):
+				// the tx from the previous loop JUST got mined, also nevermind
+				continue
+			default:
 				return nil, fmt.Errorf("cannot set account %s metadata: %w", api.MyAddress(), err)
 			}
 		}
