@@ -453,3 +453,38 @@ func (c *HTTPclient) ElectionPrice(election *api.ElectionDescription) (uint64, e
 	}
 	return price.Price, nil
 }
+
+// NextElectionID gets the next election ID for an organization.
+// POST /elections/id
+func (c *HTTPclient) NextElectionID(organizationID types.HexBytes, censusOrigin int32, envelopeType *models.EnvelopeType) (string, error) {
+	body := &api.NextElectionID{
+		OrganizationID: organizationID,
+		CensusOrigin:   censusOrigin,
+		EnvelopeType: struct {
+			Serial         bool `json:"serial"`
+			Anonymous      bool `json:"anonymous"`
+			EncryptedVotes bool `json:"encryptedVotes"`
+			UniqueValues   bool `json:"uniqueValues"`
+			CostFromWeight bool `json:"costFromWeight"`
+		}{
+			Serial:         envelopeType.Serial,
+			Anonymous:      envelopeType.Anonymous,
+			EncryptedVotes: envelopeType.EncryptedVotes,
+			UniqueValues:   envelopeType.UniqueValues,
+			CostFromWeight: envelopeType.CostFromWeight,
+		},
+	}
+	resp, code, err := c.Request(HTTPPOST, body, "elections", "id")
+	if err != nil {
+		return "", err
+	}
+	if code != apirest.HTTPstatusOK {
+		return "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+
+	var electionID string
+	if err := json.Unmarshal(resp, &electionID); err != nil {
+		return "", err
+	}
+	return electionID, nil
+}

@@ -647,3 +647,55 @@ func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
 	resp, code := c.Request("POST", tx, "chain", "transactions")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
+
+func TestAPINextElectionID(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, nil)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+
+	// create a new account
+	signer := createAccount(t, c, server, 80)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// create request for calling api elections/id
+	body := api.NextElectionID{
+		OrganizationID: signer.Address().Bytes(),
+		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED.Number()),
+		EnvelopeType: struct {
+			Serial         bool `json:"serial"`
+			Anonymous      bool `json:"anonymous"`
+			EncryptedVotes bool `json:"encryptedVotes"`
+			UniqueValues   bool `json:"uniqueValues"`
+			CostFromWeight bool `json:"costFromWeight"`
+		}{
+			Serial:         true,
+			Anonymous:      true,
+			EncryptedVotes: true,
+			UniqueValues:   true,
+			CostFromWeight: true,
+		},
+	}
+	resp, code := c.Request("POST", body, "elections", "id")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	nextElectionID := struct {
+		ElectionID string `json:"electionID"`
+	}{}
+	err := json.Unmarshal(resp, &nextElectionID)
+	qt.Assert(t, err, qt.IsNil)
+}

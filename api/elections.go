@@ -112,6 +112,15 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 
+	if err := a.Endpoint.RegisterMethod(
+		"/elections/id",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.nextElectionIDHandler,
+	); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -661,6 +670,51 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		Elections []ElectionSummary `json:"elections"`
 	}{
 		Elections: list,
+	})
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// nextElectionIDHandler
+//
+//	@Summary				Get next election ID
+//	@Description			nextElectionIDHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					transaction	body		NextElectionID	true	"OrganizationID, CensusOrigin and EnvelopeType"
+//	@Success				200			{object}	object{electionID=string}
+//	@Router					/elections/id [post]
+func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	body := &NextElectionID{}
+	if err := json.Unmarshal(msg.Data, body); err != nil {
+		return err
+	}
+	process := &models.Process{
+		EntityId:     body.OrganizationID,
+		CensusOrigin: models.CensusOrigin(body.CensusOrigin),
+		EnvelopeType: &models.EnvelopeType{
+			Serial:         body.EnvelopeType.Serial,
+			Anonymous:      body.EnvelopeType.Anonymous,
+			EncryptedVotes: body.EnvelopeType.EncryptedVotes,
+			UniqueValues:   body.EnvelopeType.UniqueValues,
+			CostFromWeight: body.EnvelopeType.CostFromWeight,
+		},
+	}
+	pid, err := processid.BuildProcessID(
+		process,
+		a.vocapp.State,
+	)
+	if err != nil {
+		return ErrCantParseElectionID.WithErr(err)
+	}
+
+	data, err := json.Marshal(struct {
+		ElectionID string `json:"electionID"`
+	}{
+		ElectionID: pid.String(),
 	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
