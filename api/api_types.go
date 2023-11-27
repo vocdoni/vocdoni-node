@@ -270,6 +270,18 @@ type Validator struct {
 	Score            uint32         `json:"score"`
 }
 
+type NextElectionID struct {
+	OrganizationID types.HexBytes `json:"organizationId"`
+	CensusOrigin   int32          `json:"censusOrigin"`
+	EnvelopeType   struct {
+		Serial         bool `json:"serial"`
+		Anonymous      bool `json:"anonymous"`
+		EncryptedVotes bool `json:"encryptedVotes"`
+		UniqueValues   bool `json:"uniqueValues"`
+		CostFromWeight bool `json:"costFromWeight"`
+	} `json:"envelopeType"`
+}
+
 // Protobuf wrappers
 
 type VoteMode struct {
