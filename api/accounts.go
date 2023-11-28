@@ -135,7 +135,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	// If the account does not exist in state, try to retrieve it from the indexer.
 	// This is a fallback for the case where the account is not in state but it is in the process archive.
 	if acc == nil {
-		indexerEntities := a.indexer.EntityList(1, 0, ctx.URLParam("address"))
+		indexerEntities := a.indexer.EntityList(1, 0, hex.EncodeToString(addr.Bytes()))
 		if len(indexerEntities) == 0 {
 			return ErrAccountNotFound.With(addr.Hex())
 		}
