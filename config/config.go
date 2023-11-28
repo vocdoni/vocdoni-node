@@ -85,8 +85,8 @@ type IPFSCfg struct {
 
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
-	// Chain is the network name to connect with
-	Chain string
+	// Network is the network name to connect with
+	Network string
 	// Dev indicates we use the Vochain development mode (low security is accepted)
 	Dev bool
 	// LogLevel logging level for tendermint

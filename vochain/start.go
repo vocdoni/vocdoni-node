@@ -133,9 +133,9 @@ func newTendermint(app *BaseApplication,
 		tconfig.P2P.AddrBookStrict = false
 	}
 	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-	if _, ok := vocdoniGenesis.Genesis[localConfig.Chain]; len(tconfig.P2P.Seeds) < 8 &&
+	if _, ok := vocdoniGenesis.Genesis[localConfig.Network]; len(tconfig.P2P.Seeds) < 8 &&
 		!localConfig.IsSeedNode && ok {
-		tconfig.P2P.Seeds = strings.Join(vocdoniGenesis.Genesis[localConfig.Chain].SeedNodes, ",")
+		tconfig.P2P.Seeds = strings.Join(vocdoniGenesis.Genesis[localConfig.Network].SeedNodes, ",")
 	}
 	if len(tconfig.P2P.Seeds) > 0 {
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)

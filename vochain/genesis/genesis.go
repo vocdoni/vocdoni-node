@@ -353,11 +353,11 @@ var ltsGenesis = Doc{
 	},
 }
 
-// AvailableChains returns the list of hardcoded chains
-func AvailableChains() []string {
-	chains := []string{}
+// AvailableNetworks returns the list of hardcoded networks
+func AvailableNetworks() []string {
+	networks := []string{}
 	for k := range Genesis {
-		chains = append(chains, k)
+		networks = append(networks, k)
 	}
-	return chains
+	return networks
 }

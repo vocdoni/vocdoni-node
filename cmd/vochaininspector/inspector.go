@@ -170,9 +170,9 @@ func main() {
 	}
 }
 
-func newVochain(chain, dataDir string) *vochain.BaseApplication {
+func newVochain(network, dataDir string) *vochain.BaseApplication {
 	cfg := &config.VochainCfg{
-		Chain:     chain,
+		Network:   network,
 		Dev:       true,
 		LogLevel:  "error",
 		DataDir:   dataDir,
@@ -192,7 +192,7 @@ func newVochain(chain, dataDir string) *vochain.BaseApplication {
 	}
 	log.Infof("external ip address %s", cfg.PublicAddr)
 	// Create the vochain node
-	genesisBytes := genesis.Genesis[chain].Genesis.Marshal()
+	genesisBytes := genesis.Genesis[network].Genesis.Marshal()
 	return vochain.NewVochain(cfg, genesisBytes)
 }
 
