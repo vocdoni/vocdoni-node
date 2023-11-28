@@ -67,7 +67,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 	vc.Config = &config.VochainCfg{}
 	vc.Config.DataDir = dataDir
 	vc.Config.DBType = db.TypePebble
-	vc.App, err = vochain.NewBaseApplication(db.TypePebble, dataDir)
+	vc.App, err = vochain.NewBaseApplication(vc.Config)
 	if err != nil {
 		return nil, err
 	}
