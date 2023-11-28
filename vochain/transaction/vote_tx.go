@@ -6,6 +6,7 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -131,7 +132,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 
 	// verify the proof associated with the vote
 	if process.EnvelopeType.Anonymous {
-		if t.ZkCircuit == nil {
+		if !circuit.IsLoaded() {
 			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
 		// get snark proof from vote envelope
@@ -154,7 +155,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
 		// get vote weight from proof publicSignals
-		vote.Weight, err = proof.VoteWeight()
+		vote.Weight, err = proof.ExtractPubSignal("voteWeight")
 		if err != nil {
 			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}
@@ -165,7 +166,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
 		// verify the proof with the circuit verification key
-		if err := proof.Verify(t.ZkCircuit.VerificationKey); err != nil {
+		if err := proof.Verify(circuit.Global().VerificationKey); err != nil {
 			return nil, fmt.Errorf("zkSNARK proof verification failed: %w", err)
 		}
 

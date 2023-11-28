@@ -41,7 +41,7 @@ type HTTPclient struct {
 	addr    *url.URL
 	account *ethereum.SignKeys
 	chainID string
-	circuit *circuit.ZkCircuitConfig
+	circuit *circuit.ZkCircuit
 	retries int
 }
 
@@ -72,8 +72,11 @@ func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 		return nil, fmt.Errorf("cannot get chain ID from API server")
 	}
 	c.chainID = info.ID
-	// Get the default circuit config
-	c.circuit = circuit.GetCircuitConfiguration(info.CircuitConfigurationTag)
+
+	c.circuit, err = circuit.LoadVersion(info.CircuitVersion)
+	if err != nil {
+		return nil, fmt.Errorf("error loading circuit: %w", err)
+	}
 	return c, nil
 }
 

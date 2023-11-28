@@ -209,14 +209,9 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		return ErrCensusTypeUnknown
 	}
 
-	// get census max levels from vochain app if available
-	maxLevels := circuit.CircuitsConfigurations[circuit.DefaultCircuitConfigurationTag].Levels
-	if a.vocapp != nil {
-		maxLevels = a.vocapp.TransactionHandler.ZkCircuit.Config.Levels
-	}
-
+	// census max levels is limited by global ZkCircuit Levels
 	censusID := util.RandomBytes(32)
-	_, err = a.censusdb.New(censusID, censusType, "", &token, maxLevels)
+	_, err = a.censusdb.New(censusID, censusType, "", &token, circuit.Global().Config.Levels)
 	if err != nil {
 		return err
 	}

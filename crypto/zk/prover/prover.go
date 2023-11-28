@@ -14,6 +14,7 @@ import (
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/iden3/go-rapidsnark/witness"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/tree/arbo"
 )
 
@@ -21,9 +22,8 @@ import (
 // into the error returned.
 var (
 	ErrPublicSignalFormat = fmt.Errorf("invalid proof public signals format")
-	ErrParsingWeight      = fmt.Errorf("error parsing proof weight string to big.Int")
-	ErrParsingNullifier   = fmt.Errorf("error parsing proof nullifier string to big.Int")
-	ErrParsingSIKRoot     = fmt.Errorf("error parsing proof sIKRoot string to []byte")
+	ErrPubSignalNotFound  = fmt.Errorf("public signal not found in circuit definition")
+	ErrParsingProofSignal = fmt.Errorf("error parsing proof signal string to big.Int")
 	ErrParsingWitness     = fmt.Errorf("error parsing provided circuit inputs, it must be a not empty marshalled bytes of a json")
 	ErrInitWitnessCalc    = fmt.Errorf("error parsing circuit wasm during calculator instance")
 	ErrWitnessCalc        = fmt.Errorf("error during witness calculation")
@@ -34,10 +34,6 @@ var (
 	ErrDecodingProof      = fmt.Errorf("error decoding prove as []byte")
 	ErrVerifyProof        = fmt.Errorf("error during zksnark verification")
 )
-
-// DefaultPubSignals constant contains the default number of public signal that
-// a proof has.
-const DefaultPubSignals = 8
 
 // ProofData struct contains the calculated parameters of a Proof. It allows to
 // encode and decode go-rapidsnark inputs and outputs easily.
@@ -86,51 +82,35 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	return proofData, pubSignals, nil
 }
 
-// VoteWeight decodes the vote weight value from the current proof public
-// signals and return it as a big.Int.
-func (p *Proof) VoteWeight() (*big.Int, error) {
+// ExtractPubSignal decodes the requested public signal (identified by a string: "nullifier", "sikRoot", etc)
+// from the current proof and returns it as a big.Int.
+func (p *Proof) ExtractPubSignal(id string) (*big.Int, error) {
 	// Check if the current proof contains public signals and it contains the
 	// correct number of positions.
-	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
+	if p.PubSignals == nil || len(p.PubSignals) != len(circuit.Global().Config.PublicSignals) {
 		return nil, ErrPublicSignalFormat
 	}
-	// Get the weight from the fifth public signal of the proof
-	strWeight := p.PubSignals[7]
-	// Parse it into a big.Int
-	weight, ok := new(big.Int).SetString(strWeight, 10)
-	if !ok {
-		return nil, ErrParsingWeight
+	idx, found := circuit.Global().Config.PublicSignals[id]
+	if !found {
+		return nil, ErrPubSignalNotFound
 	}
-	return weight, nil
+	s := p.PubSignals[idx]
+	// Parse it into a big.Int
+	i, ok := new(big.Int).SetString(s, 10)
+	if !ok {
+		return nil, ErrParsingProofSignal
+	}
+	return i, nil
+
 }
 
-// Nullifier decodes the vote nullifier value from the current proof public
-// signals and return it as a big.Int
-func (p *Proof) Nullifier() (*big.Int, error) {
-	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
-		return nil, ErrPublicSignalFormat
-	}
-	// Get the nullifier from the third public signal of the proof
-	strNullifier := p.PubSignals[2]
-	// Parse it into a big.Int
-	nullifier, ok := new(big.Int).SetString(strNullifier, 10)
-	if !ok {
-		return nil, ErrParsingNullifier
-	}
-	return nullifier, nil
-}
-
-// SIKRoot function returns the sIKRoot included into the current proof.
+// SIKRoot function returns the SIKRoot included into the current proof.
 func (p *Proof) SIKRoot() ([]byte, error) {
-	if p.PubSignals == nil || len(p.PubSignals) != DefaultPubSignals {
-		return nil, ErrPublicSignalFormat
+	sikRoot, err := p.ExtractPubSignal("sikRoot")
+	if err != nil {
+		return nil, err
 	}
-	arboSIK, ok := new(big.Int).SetString(p.PubSignals[5], 10)
-	if !ok {
-		return nil, ErrParsingSIKRoot
-	}
-
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), arboSIK), nil
+	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), sikRoot), nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based

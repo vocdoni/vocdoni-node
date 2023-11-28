@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
@@ -18,16 +19,6 @@ import (
 // 		A: [3]bigint,
 // 		B: [3][2]bigint,
 // 		C: [3]bigint,
-// 		PublicSignals: [8]bigint{
-//			0: electionId[0],
-// 			1: electionId[1],
-// 			2: nullifier,
-// 			3: voteHash[0],
-// 			4: voteHash[1],
-// 			5: sikRoot,
-// 			6: censusRoot
-// 			7: voteWeight,
-//		}
 // 	}
 
 // Default length of each proof parameters
@@ -36,7 +27,6 @@ const (
 	proofBLen    = 6 // flatted
 	proofBEncLen = 3 // matrix
 	proofCLen    = 3
-	publicSigLen = 8
 )
 
 // ProtobufZKProofToProverProof parses the provided protobuf ready proof struct
@@ -83,7 +73,7 @@ func ProverProofToProtobufZKProof(p *prover.Proof, electionId, sikRoot,
 
 	// if public signals are provided, check their format
 	proof.PublicInputs = p.PubSignals
-	if p.PubSignals != nil && len(p.PubSignals) != publicSigLen {
+	if p.PubSignals != nil && len(p.PubSignals) != len(circuit.Global().Config.PublicSignals) {
 		return nil, fmt.Errorf("wrong ZkSnark prover public signals format")
 	}
 	// if not, check if the rest of the arguments are provided and try to

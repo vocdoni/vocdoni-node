@@ -78,7 +78,6 @@ type BaseApplication struct {
 	// abcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp atomic.Int64
 	chainID             string
-	circuitConfigTag    string
 	dataDir             string
 	genesisInfo         *tmtypes.GenesisDoc
 
@@ -136,10 +135,11 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		istc,
 		filepath.Join(vochainCfg.DataDir, "txHandler"),
 	)
-	// Load or download the zk verification keys
-	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
+
+	if err := circuit.Init(); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
+
 	blockCache, err := lru.New[int64, *tmtypes.Block](32)
 	if err != nil {
 		return nil, err
@@ -150,7 +150,6 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		TransactionHandler: transactionHandler,
 		blockCache:         blockCache,
 		dataDir:            vochainCfg.DataDir,
-		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil
 }
@@ -260,6 +259,10 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.State.Rollback()
 	app.startBlockTimestamp.Store(t.Unix())
 	app.State.SetHeight(height)
+	err := app.SetZkCircuit()
+	if err != nil {
+		log.Fatalf("failed to set ZkCircuit: %w", err)
+	}
 	go app.State.CachePurge(height)
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
@@ -352,22 +355,14 @@ func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
 	return app.genesisInfo
 }
 
-// SetCircuitConfigTag sets the current BaseApplication circuit config tag
-// attribute to the provided one and loads the circuit configuration based on
-// it. The available circuit config tags are defined in
-// /crypto/zk/circuit/config.go
-func (app *BaseApplication) SetCircuitConfigTag(tag string) error {
-	// Update the loaded circuit of the current app transactionHandler
-	if err := app.TransactionHandler.LoadZkCircuit(tag); err != nil {
-		return fmt.Errorf("cannot load zk circuit: %w", err)
+// SetZkCircuit ensures the global ZkCircuit is the correct for a chain that implements forks
+func (app *BaseApplication) SetZkCircuit() error {
+	switch {
+	case app.Height() < config.ForksForChainID(app.chainID).VoceremonyForkBlock:
+		return circuit.SetGlobal(circuit.PreVoceremonyForkZkCircuitVersion)
+	default: // for example, if VoceremonyForkBlock == 0, or if Height is past the fork
+		return circuit.SetGlobal(circuit.DefaultZkCircuitVersion)
 	}
-	app.circuitConfigTag = tag
-	return nil
-}
-
-// CircuitConfigurationTag returns the Node CircuitConfigurationTag
-func (app *BaseApplication) CircuitConfigurationTag() string {
-	return app.circuitConfigTag
 }
 
 // IsSynchronizing informs if the blockchain is synchronizing or not.

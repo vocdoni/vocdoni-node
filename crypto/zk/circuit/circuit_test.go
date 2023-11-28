@@ -46,7 +46,7 @@ func TestLoadZkCircuit(t *testing.T) {
 	server := testFileServer(testFiles)
 	defer server.Close()
 
-	config := &ZkCircuitConfig{
+	config := &Config{
 		URI:                     server.URL,
 		CircuitPath:             "/test/",
 		ProvingKeyFilename:      testProvingKey,
@@ -69,7 +69,7 @@ func TestLoadZkCircuit(t *testing.T) {
 	testCircuits := filepath.Join(BaseDir, config.CircuitPath)
 	defer os.RemoveAll(testCircuits)
 
-	circuit, err := LoadZkCircuit(context.Background(), config)
+	circuit, err := LoadConfig(context.Background(), config)
 	c.Assert(err, qt.IsNil)
 	c.Assert(circuit.ProvingKey, qt.DeepEquals, testFiles[testProvingKey])
 	c.Assert(circuit.VerificationKey, qt.DeepEquals, testFiles[testVerificationKey])
@@ -90,7 +90,7 @@ func TestLoadLocal(t *testing.T) {
 	c := qt.New(t)
 
 	circuit := &ZkCircuit{
-		Config: &ZkCircuitConfig{
+		Config: &Config{
 			CircuitPath:             "/test/",
 			ProvingKeyFilename:      testProvingKey,
 			VerificationKeyFilename: testVerificationKey,
@@ -135,7 +135,7 @@ func TestLoadRemote(t *testing.T) {
 	defer server.Close()
 
 	circuit := &ZkCircuit{
-		Config: &ZkCircuitConfig{
+		Config: &Config{
 			URI:                     server.URL,
 			CircuitPath:             "/test/",
 			ProvingKeyFilename:      testProvingKey,
@@ -199,7 +199,7 @@ func TestVerifiedCircuitArtifacts(t *testing.T) {
 		ProvingKey:      testFiles[testProvingKey],
 		VerificationKey: testFiles[testVerificationKey],
 		Wasm:            testFiles[testWasm],
-		Config:          &ZkCircuitConfig{},
+		Config:          &Config{},
 	}
 
 	hashFn := sha256.New()

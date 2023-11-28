@@ -23,9 +23,8 @@ func TestHysteresis(t *testing.T) {
 
 	// create test app and load zk circuit
 	app := TestBaseApplication(t)
-	devCircuit, err := circuit.LoadZkCircuitByTag(circuit.DefaultCircuitConfigurationTag)
+	err := circuit.Init()
 	c.Assert(err, qt.IsNil)
-	app.TransactionHandler.ZkCircuit = devCircuit
 
 	// initial accounts
 	testWeight := big.NewInt(10)
@@ -94,7 +93,7 @@ func TestHysteresis(t *testing.T) {
 			encInputs, err := json.Marshal(inputs)
 			c.Assert(err, qt.IsNil)
 
-			zkProof, err := prover.Prove(devCircuit.ProvingKey, devCircuit.Wasm, encInputs)
+			zkProof, err := prover.Prove(circuit.Global().ProvingKey, circuit.Global().Wasm, encInputs)
 			c.Assert(err, qt.IsNil)
 
 			protoZkProof, err := zk.ProverProofToProtobufZKProof(zkProof, nil, nil, nil, nil, nil)

@@ -22,9 +22,8 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c := qt.New(t)
 	// create test app and load zk circuit
 	app := TestBaseApplication(t)
-	devCircuit, err := circuit.LoadZkCircuitByTag(circuit.DefaultCircuitConfigurationTag)
+	err := circuit.Init()
 	c.Assert(err, qt.IsNil)
-	app.TransactionHandler.ZkCircuit = devCircuit
 	// set initial inputs
 	testWeight := big.NewInt(10)
 	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 10, testWeight)
@@ -84,7 +83,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	encInputs, err := json.Marshal(inputs)
 	c.Assert(err, qt.IsNil)
-	proof, err := prover.Prove(devCircuit.ProvingKey, devCircuit.Wasm, encInputs)
+	proof, err := prover.Prove(circuit.Global().ProvingKey, circuit.Global().Wasm, encInputs)
 	c.Assert(err, qt.IsNil)
 	// generate nullifier
 	nullifier, err := testAccount.AccountSIKnullifier(electionId, nil)

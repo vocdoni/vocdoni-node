@@ -12,6 +12,7 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
 	tmcfg "github.com/cometbft/cometbft/config"
@@ -274,6 +275,12 @@ func newTendermint(app *BaseApplication,
 	}
 	log.Infow("genesis file", "genesis", tconfig.GenesisFile(), "chainID", genesisCID.ChainID)
 	app.SetChainID(genesisCID.ChainID)
+
+	// the chain might need additional ZkCircuits, now that we know the chainID ensure they are downloaded now,
+	// to avoid delays at beginBlock during a fork
+	if err := circuit.DownloadArtifactsForChainID(genesisCID.ChainID); err != nil {
+		return nil, fmt.Errorf("cannot download zk circuits for chainID: %w", err)
+	}
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()

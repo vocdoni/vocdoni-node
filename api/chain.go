@@ -301,20 +301,20 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	}
 
 	data, err := json.Marshal(&ChainInfo{
-		ID:                      a.vocapp.ChainID(),
-		BlockTime:               a.vocinfo.BlockTimes(),
-		ElectionCount:           a.indexer.CountTotalProcesses(),
-		OrganizationCount:       a.indexer.CountTotalEntities(),
-		Height:                  a.vocapp.Height(),
-		Syncing:                 a.vocapp.IsSynchronizing(),
-		TransactionCount:        transactionCount,
-		ValidatorCount:          uint32(len(validators)),
-		Timestamp:               a.vocapp.Timestamp(),
-		VoteCount:               voteCount,
-		GenesisTime:             a.vocapp.Genesis().GenesisTime,
-		CircuitConfigurationTag: a.vocapp.CircuitConfigurationTag(),
-		MaxCensusSize:           maxCensusSize,
-		NetworkCapacity:         networkCapacity,
+		ID:                a.vocapp.ChainID(),
+		BlockTime:         a.vocinfo.BlockTimes(),
+		ElectionCount:     a.indexer.CountTotalProcesses(),
+		OrganizationCount: a.indexer.CountTotalEntities(),
+		Height:            a.vocapp.Height(),
+		Syncing:           a.vocapp.IsSynchronizing(),
+		TransactionCount:  transactionCount,
+		ValidatorCount:    uint32(len(validators)),
+		Timestamp:         a.vocapp.Timestamp(),
+		VoteCount:         voteCount,
+		GenesisTime:       a.vocapp.Genesis().GenesisTime,
+		CircuitVersion:    circuit.Version(),
+		MaxCensusSize:     maxCensusSize,
+		NetworkCapacity:   networkCapacity,
 	})
 	if err != nil {
 		return err
@@ -329,13 +329,11 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	circuit.ZkCircuitConfig
+//	@Success		200	{object}	circuit.Config
 //	@Router			/chain/info/circuit [get]
 func (a *API) chainCircuitInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// Get current circuit tag
-	circuitConfig := circuit.GetCircuitConfiguration(a.vocapp.CircuitConfigurationTag())
-	// Encode the circuit configuration to JSON
-	data, err := json.Marshal(circuitConfig)
+	// Encode the current circuit configuration to JSON
+	data, err := json.Marshal(circuit.Global().Config)
 	if err != nil {
 		return err
 	}
