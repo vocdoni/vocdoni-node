@@ -6,6 +6,7 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -72,10 +73,10 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
 	}
 	// check that the census size is not bigger than the circuit levels
-	if tx.Process.EnvelopeType.Anonymous && !t.ZkCircuit.Config.SupportsCensusSize(txMaxCensusSize) {
+	if tx.Process.EnvelopeType.Anonymous && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
 		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
 			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
-			t.ZkCircuit.Config.MaxCensusSize().Int64(), txMaxCensusSize)
+			circuit.Global().Config.MaxCensusSize().Int64(), txMaxCensusSize)
 	}
 
 	// check signature

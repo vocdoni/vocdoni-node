@@ -7,7 +7,6 @@ import (
 	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -46,8 +45,6 @@ type TransactionHandler struct {
 	istc *ist.Controller
 	// dataDir is the path for storing some files
 	dataDir string
-	// ZkCircuit contains the current chain circuit
-	ZkCircuit *circuit.ZkCircuit
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
@@ -57,15 +54,6 @@ func NewTransactionHandler(state *vstate.State, istc *ist.Controller, dataDir st
 		dataDir: dataDir,
 		istc:    istc,
 	}
-}
-
-func (t *TransactionHandler) LoadZkCircuit(configTag string) error {
-	circuit, err := circuit.LoadZkCircuitByTag(configTag)
-	if err != nil {
-		return fmt.Errorf("could not load zk verification keys: %w", err)
-	}
-	t.ZkCircuit = circuit
-	return nil
 }
 
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.

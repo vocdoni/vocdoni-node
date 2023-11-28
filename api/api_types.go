@@ -200,20 +200,20 @@ type GenericTransactionWithInfo struct {
 }
 
 type ChainInfo struct {
-	ID                      string    `json:"chainId" example:"azeno"`
-	BlockTime               [5]uint64 `json:"blockTime" example:"12000,11580,11000,11100,11100"`
-	ElectionCount           uint64    `json:"electionCount" example:"120"`
-	OrganizationCount       uint64    `json:"organizationCount" example:"20"`
-	GenesisTime             time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
-	Height                  uint32    `json:"height" example:"5467"`
-	Syncing                 bool      `json:"syncing" example:"true"`
-	Timestamp               int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
-	TransactionCount        uint64    `json:"transactionCount" example:"554"`
-	ValidatorCount          uint32    `json:"validatorCount" example:"5"`
-	VoteCount               uint64    `json:"voteCount" example:"432"`
-	CircuitConfigurationTag string    `json:"cicuitConfigurationTag" example:"dev"`
-	MaxCensusSize           uint64    `json:"maxCensusSize" example:"50000"`
-	NetworkCapacity         uint64    `json:"networkCapacity" example:"2000"`
+	ID                string    `json:"chainId" example:"azeno"`
+	BlockTime         [5]uint64 `json:"blockTime" example:"12000,11580,11000,11100,11100"`
+	ElectionCount     uint64    `json:"electionCount" example:"120"`
+	OrganizationCount uint64    `json:"organizationCount" example:"20"`
+	GenesisTime       time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	Height            uint32    `json:"height" example:"5467"`
+	Syncing           bool      `json:"syncing" example:"true"`
+	Timestamp         int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	TransactionCount  uint64    `json:"transactionCount" example:"554"`
+	ValidatorCount    uint32    `json:"validatorCount" example:"5"`
+	VoteCount         uint64    `json:"voteCount" example:"432"`
+	CircuitVersion    string    `json:"circuitVersion" example:"v1.0.0"`
+	MaxCensusSize     uint64    `json:"maxCensusSize" example:"50000"`
+	NetworkCapacity   uint64    `json:"networkCapacity" example:"2000"`
 }
 
 type Account struct {

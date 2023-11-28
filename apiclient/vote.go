@@ -1,7 +1,6 @@
 package apiclient
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -102,14 +101,9 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, fmt.Errorf("error encoding inputs: %w", err)
 		}
-		// load the correct circuit from the ApiClient configuration
-		currentCircuit, err := circuit.LoadZkCircuit(context.Background(), c.circuit)
-		if err != nil {
-			return nil, fmt.Errorf("error loading circuit: %w", err)
-		}
 		// instance the prover with the circuit config loaded and generate the
 		// proof for the calculated inputs
-		proof, err := prover.Prove(currentCircuit.ProvingKey, currentCircuit.Wasm, inputs)
+		proof, err := prover.Prove(c.circuit.ProvingKey, c.circuit.Wasm, inputs)
 		if err != nil {
 			return nil, fmt.Errorf("could not generate anonymous proof: %w", err)
 		}
@@ -119,7 +113,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			return nil, err
 		}
 		// include vote nullifier and the encoded proof in a VoteEnvelope
-		nullifier, err := proof.Nullifier()
+		nullifier, err := proof.ExtractPubSignal("nullifier")
 		if err != nil {
 			return nil, err
 		}

@@ -10,12 +10,14 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
 )
 
-var downloadCircuitsTimeout = time.Minute * 5
+const downloadCircuitsTimeout = time.Minute * 5
 
 // BaseDir is where the artifact cache is expected to be found.
 // If the artifacts are not found there, they will be downloaded and stored.
@@ -31,29 +33,102 @@ var BaseDir = func() string {
 	return filepath.Join(home, ".cache", "vocdoni", "zkCircuits")
 }()
 
+// Global circuit
+var (
+	mtx sync.Mutex
+
+	globalCircuit = &ZkCircuit{
+		Config: CircuitsConfigurations[DefaultZkCircuitVersion],
+	}
+)
+
 // ZkCircuit struct wraps the circuit configuration and contains the file
 // content of the circuit artifacts (provingKey, verificationKey and wasm)
 type ZkCircuit struct {
 	ProvingKey      []byte
 	VerificationKey []byte
 	Wasm            []byte
-	Config          *ZkCircuitConfig
+	Config          *Config
 }
 
-// LoadZkCircuitByTag gets the circuit configuration associated to the provided
-// tag or gets the default one and load its artifacts to prepare the circuit to
-// be used.
-func LoadZkCircuitByTag(configTag string) (*ZkCircuit, error) {
-	circuitConf := GetCircuitConfiguration(configTag)
-	ctx, cancel := context.WithTimeout(context.Background(), downloadCircuitsTimeout)
-	defer cancel()
-	return LoadZkCircuit(ctx, circuitConf)
+// Global returns the global ZkCircuit
+func Global() *ZkCircuit {
+	mtx.Lock()
+	defer mtx.Unlock()
+	return globalCircuit
 }
 
-// LoadZkCircuit load the circuit artifacts based on the configuration provided.
+// SetGlobal will LoadVersion into the global ZkCircuit
+//
+// If current version is already equal to the passed version, and the artifacts are loaded into memory,
+// it returns immediately
+func SetGlobal(version string) error {
+	mtx.Lock()
+	defer mtx.Unlock()
+	if globalCircuit.Version() == version && globalCircuit.IsLoaded() {
+		return nil
+	}
+	circuit, err := LoadVersion(version)
+	if err != nil {
+		return fmt.Errorf("could not load zk verification keys: %w", err)
+	}
+	globalCircuit = circuit
+	return nil
+}
+
+// Version returns the version of the global ZkCircuit
+func Version() string {
+	return Global().Version()
+}
+
+// IsLoaded returns true if all needed keys (Proving, Verification and Wasm) are loaded into memory
+func IsLoaded() bool {
+	return Global().IsLoaded()
+}
+
+// Init will load (or download) the default circuit artifacts into memory, ready to be used globally.
+func Init() error {
+	return SetGlobal(DefaultZkCircuitVersion)
+}
+
+// DownloadDefaultArtifacts ensures the default circuit is cached locally
+func DownloadDefaultArtifacts() error {
+	_, err := LoadVersion(DefaultZkCircuitVersion)
+	if err != nil {
+		return fmt.Errorf("could not load zk verification keys: %w", err)
+	}
+	return nil
+}
+
+// DownloadArtifactsForChainID ensures all circuits needed for chainID are cached locally
+func DownloadArtifactsForChainID(chainID string) error {
+	if config.ForksForChainID(chainID).VoceremonyForkBlock > 0 {
+		_, err := LoadVersion(PreVoceremonyForkZkCircuitVersion)
+		if err != nil {
+			return fmt.Errorf("could not load zk verification keys: %w", err)
+		}
+	}
+	return DownloadDefaultArtifacts()
+}
+
+// LoadVersion loads the circuit artifacts based on the version provided.
 // First, tries to load the artifacts from local storage, if they are not
 // available, tries to download from their remote location.
-func LoadZkCircuit(ctx context.Context, config *ZkCircuitConfig) (*ZkCircuit, error) {
+//
+// Stores the loaded circuit in the global variable, and returns it as well
+func LoadVersion(version string) (*ZkCircuit, error) {
+	circuitConf := GetCircuitConfiguration(version)
+	ctx, cancel := context.WithTimeout(context.Background(), downloadCircuitsTimeout)
+	defer cancel()
+	return LoadConfig(ctx, circuitConf)
+}
+
+// LoadConfig loads the circuit artifacts based on the configuration provided.
+// First, tries to load the artifacts from local storage, if they are not
+// available, tries to download from their remote location.
+//
+// Stores the loaded circuit in the global variable, and returns it as well
+func LoadConfig(ctx context.Context, config *Config) (*ZkCircuit, error) {
 	circuit := &ZkCircuit{Config: config}
 	// load the artifacts of the provided circuit from the local storage
 	if err := circuit.LoadLocal(); err == nil {
@@ -77,7 +152,20 @@ func LoadZkCircuit(ctx context.Context, config *ZkCircuitConfig) (*ZkCircuit, er
 	if !correct {
 		return nil, fmt.Errorf("hashes from downloaded artifacts don't match the expected ones")
 	}
+	globalCircuit = circuit
 	return circuit, nil
+}
+
+// Version returns the version of the ZkCircuit
+func (circuit *ZkCircuit) Version() string {
+	return circuit.Config.Version
+}
+
+// IsLoaded returns true if all needed keys (Proving, Verification and Wasm) are loaded into memory
+func (circuit *ZkCircuit) IsLoaded() bool {
+	return (circuit.ProvingKey != nil &&
+		circuit.VerificationKey != nil &&
+		circuit.Wasm != nil)
 }
 
 // LoadLocal tries to read the content of current circuit artifacts from its
@@ -85,7 +173,7 @@ func LoadZkCircuit(ctx context.Context, config *ZkCircuitConfig) (*ZkCircuit, er
 // operations fails, returns an error.
 func (circuit *ZkCircuit) LoadLocal() error {
 	var err error
-	log.Debugw("loading circuit locally...", "BaseDir", BaseDir)
+	log.Debugw("loading circuit locally...", "BaseDir", BaseDir, "version", circuit.Config.Version)
 	files := map[string][]byte{
 		circuit.Config.ProvingKeyFilename:      nil,
 		circuit.Config.VerificationKeyFilename: nil,
@@ -112,7 +200,7 @@ func (circuit *ZkCircuit) LoadLocal() error {
 // remote location. If any of the downloads fails, returns an error.
 func (circuit *ZkCircuit) LoadRemote(ctx context.Context) error {
 	log.Debugw("circuit not downloaded yet, downloading...",
-		"BaseDir", BaseDir)
+		"BaseDir", BaseDir, "version", circuit.Config.Version)
 	baseUri, err := url.Parse(circuit.Config.URI)
 	if err != nil {
 		return err

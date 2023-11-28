@@ -158,7 +158,7 @@ func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusD
 		"nullifier", nullifier.String())
 
 	// Get artifacts of the current circuit
-	currentCircuit, err := circuit.LoadZkCircuit(context.Background(), zkCircuitTest)
+	currentCircuit, err := circuit.LoadConfig(context.Background(), zkCircuitTest)
 	qt.Assert(b, err, qt.IsNil)
 	// Calculate the proof for the current apiclient circuit config and the
 	// inputs encoded.

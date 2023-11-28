@@ -101,6 +101,7 @@ services:
     networks:
       - blockchain
     volumes:
+      - /tmp/.vochain-zkCircuits/:/root/.cache/vocdoni/zkCircuits/
       - gocoverage-test:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
