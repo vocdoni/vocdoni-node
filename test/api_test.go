@@ -659,7 +659,8 @@ func TestAPINextElectionID(t *testing.T) {
 		api.WalletHandler,
 	)
 
-	c := testutil.NewTestHTTPclient(t, server.ListenAddr, nil)
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
 
 	// Block 1
 	server.VochainAPP.AdvanceTestBlock()
@@ -672,6 +673,13 @@ func TestAPINextElectionID(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
+	// create a new process
+	censusRoot := createCensus(t, c)
+
+	// Block 3
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
 	// create request for calling api elections/id
 	body := api.NextElectionID{
 		OrganizationID: signer.Address().Bytes(),
@@ -683,19 +691,32 @@ func TestAPINextElectionID(t *testing.T) {
 			UniqueValues   bool `json:"uniqueValues"`
 			CostFromWeight bool `json:"costFromWeight"`
 		}{
-			Serial:         true,
-			Anonymous:      true,
-			EncryptedVotes: true,
-			UniqueValues:   true,
-			CostFromWeight: true,
+			Serial:         false,
+			Anonymous:      false,
+			EncryptedVotes: false,
+			UniqueValues:   false,
+			CostFromWeight: false,
 		},
 	}
 	resp, code := c.Request("POST", body, "elections", "id")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	nextElectionID := struct {
-		ElectionID string `json:"electionID"`
+		ElectionID []byte `json:"electionID"`
 	}{}
 	err := json.Unmarshal(resp, &nextElectionID)
 	qt.Assert(t, err, qt.IsNil)
+
+	// create a new election
+	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
+	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID())
+
+	electionId := response.ElectionID
+
+	// Block 4
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 4)
+
+	// check next election id is the same as the election id created
+	qt.Assert(t, hex.EncodeToString(nextElectionID.ElectionID), qt.Equals, electionId.String())
 }
