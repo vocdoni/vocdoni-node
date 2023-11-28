@@ -679,14 +679,14 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 
 // nextElectionIDHandler
 //
-//	@Summary				Get next election ID
-//	@Description			nextElectionIDHandler
-//	@Tags					Elections
-//	@Accept					json
-//	@Produce				json
-//	@Param					transaction	body		NextElectionID	true	"OrganizationID, CensusOrigin and EnvelopeType"
-//	@Success				200			{object}	object{electionID=string}
-//	@Router					/elections/id [post]
+//	@Summary		Get next election ID
+//	@Description	nextElectionIDHandler
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			transaction	body		NextElectionID	true	"OrganizationID, CensusOrigin and EnvelopeType"
+//	@Success		200			{object}	object{electionID=string}
+//	@Router			/elections/id [post]
 func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	body := &NextElectionID{}
 	if err := json.Unmarshal(msg.Data, body); err != nil {
@@ -712,9 +712,9 @@ func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	data, err := json.Marshal(struct {
-		ElectionID string `json:"electionID"`
+		ElectionID []byte `json:"electionID"`
 	}{
-		ElectionID: pid.String(),
+		ElectionID: pid.Marshal(),
 	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
