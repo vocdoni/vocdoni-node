@@ -79,8 +79,8 @@ func newConfig() (*config.Config, config.Error) {
 		"directory where data is stored")
 	flag.StringVarP(&conf.Vochain.DBType, "dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
-	flag.StringVarP(&conf.Vochain.Chain, "chain", "c", "dev",
-		fmt.Sprintf("vocdoni blockchain to connect with: %q", genesis.AvailableChains()))
+	flag.StringVarP(&conf.Vochain.Network, "chain", "c", "dev",
+		fmt.Sprintf("vocdoni network to connect with: %q", genesis.AvailableNetworks()))
 	flag.BoolVar(&conf.Dev, "dev", false,
 		"use developer mode (less security)")
 	conf.PprofPort = *flag.Int("pprof", 0,
@@ -181,7 +181,7 @@ func newConfig() (*config.Config, config.Error) {
 	if err = viper.BindPFlag("chain", flag.Lookup("chain")); err != nil {
 		log.Fatalf("failed to bind chain flag to viper: %v", err)
 	}
-	conf.Vochain.Chain = viper.GetString("chain")
+	conf.Vochain.Network = viper.GetString("chain")
 
 	if err = viper.BindPFlag("dev", flag.Lookup("dev")); err != nil {
 		log.Fatalf("failed to bind dev flag to viper: %v", err)
@@ -197,8 +197,8 @@ func newConfig() (*config.Config, config.Error) {
 	}
 	conf.Vochain.DBType = viper.GetString("dbType")
 
-	// use different datadirs for different chains
-	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Chain)
+	// use different datadirs for different networks
+	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Network)
 
 	if err = viper.BindPFlag("archiveURL", flag.Lookup("archiveURL")); err != nil {
 		log.Fatalf("failed to bind archiveURL flag to viper: %v", err)
@@ -478,7 +478,7 @@ func main() {
 		}()
 	}
 	log.Infow("starting vocdoni node", "version", internal.Version, "mode", conf.Mode,
-		"chain", conf.Vochain.Chain, "dbType", conf.Vochain.DBType)
+		"network", conf.Vochain.Network, "dbType", conf.Vochain.DBType)
 	if conf.Dev {
 		log.Warn("developer mode is enabled!")
 	}
@@ -517,8 +517,8 @@ func main() {
 			srv.Config.TendermintMetrics = true
 			srv.Router.ExposePrometheusEndpoint("/metrics")
 
-			metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,chain=%q}",
-				internal.Version, conf.Mode, conf.Vochain.Chain)).Set(1)
+			metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,network=%q}",
+				internal.Version, conf.Mode, conf.Vochain.Network)).Set(1)
 		}
 	}
 

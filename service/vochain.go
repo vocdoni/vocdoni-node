@@ -44,7 +44,7 @@ func (vs *VocdoniService) Vochain() error {
 		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
 	log.Infow("vochain p2p enabled",
-		"network", vs.Config.Chain,
+		"network", vs.Config.Network,
 		"address", vs.Config.PublicAddr,
 		"listenHost", vs.Config.P2PListen)
 
@@ -66,18 +66,18 @@ func (vs *VocdoniService) Vochain() error {
 		if err == nil { // If genesis file found
 			log.Info("found genesis file")
 			// compare genesis
-			if !bytes.Equal(ethereum.HashRaw(genesisBytes), vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Hash()) {
+			if !bytes.Equal(ethereum.HashRaw(genesisBytes), vocdoniGenesis.Genesis[vs.Config.Network].Genesis.Hash()) {
 				// if auto-update genesis enabled, delete local genesis and use hardcoded genesis
-				if vocdoniGenesis.Genesis[vs.Config.Chain].AutoUpdateGenesis || vs.Config.Dev {
+				if vocdoniGenesis.Genesis[vs.Config.Network].AutoUpdateGenesis || vs.Config.Dev {
 					log.Warn("new genesis found, cleaning and restarting Vochain")
 					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
 						return err
 					}
-					if _, ok := vocdoniGenesis.Genesis[vs.Config.Chain]; !ok {
-						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
+					if _, ok := vocdoniGenesis.Genesis[vs.Config.Network]; !ok {
+						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Network)
 						return err
 					}
-					genesisBytes = vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Marshal()
+					genesisBytes = vocdoniGenesis.Genesis[vs.Config.Network].Genesis.Marshal()
 				} else {
 					log.Warn("local and hardcoded genesis are different, risk of potential consensus failure")
 				}
@@ -89,11 +89,11 @@ func (vs *VocdoniService) Vochain() error {
 				return err
 			}
 			log.Info("genesis file does not exist, using factory")
-			if _, ok := vocdoniGenesis.Genesis[vs.Config.Chain]; !ok {
-				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Chain)
+			if _, ok := vocdoniGenesis.Genesis[vs.Config.Network]; !ok {
+				err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Network)
 				return err
 			}
-			genesisBytes = vocdoniGenesis.Genesis[vs.Config.Chain].Genesis.Marshal()
+			genesisBytes = vocdoniGenesis.Genesis[vs.Config.Network].Genesis.Marshal()
 		}
 	}
 
