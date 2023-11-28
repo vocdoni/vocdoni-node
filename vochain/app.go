@@ -15,6 +15,7 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -119,11 +120,11 @@ type ExecuteBlockResponse struct {
 	InvalidTransactions [][32]byte
 }
 
-// NewBaseApplication creates a new BaseApplication given a name and a DB backend.
+// NewBaseApplication creates a new BaseApplication, using vochainCfg.DBType and vochainCfg.DataDir.
 // Node still needs to be initialized with SetNode.
 // Callback functions still need to be initialized.
-func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
-	state, err := vstate.NewState(dbType, dbpath)
+func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error) {
+	state, err := vstate.NewState(vochainCfg.DBType, vochainCfg.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
@@ -133,7 +134,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 	transactionHandler := transaction.NewTransactionHandler(
 		state,
 		istc,
-		filepath.Join(dbpath, "txHandler"),
+		filepath.Join(vochainCfg.DataDir, "txHandler"),
 	)
 	// Load or download the zk verification keys
 	if err := transactionHandler.LoadZkCircuit(circuit.DefaultCircuitConfigurationTag); err != nil {
@@ -148,7 +149,7 @@ func NewBaseApplication(dbType, dbpath string) (*BaseApplication, error) {
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
 		blockCache:         blockCache,
-		dataDir:            dbpath,
+		dataDir:            vochainCfg.DataDir,
 		circuitConfigTag:   circuit.DefaultCircuitConfigurationTag,
 		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil

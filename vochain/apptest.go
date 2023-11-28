@@ -9,6 +9,7 @@ import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
 	tmtypes "github.com/cometbft/cometbft/types"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/proto/build/go/models"
@@ -28,7 +29,10 @@ func TestBaseApplication(tb testing.TB) *BaseApplication {
 // Once the application is create, it is the caller's responsibility to call
 // app.AdvanceTestBlock() to advance the block height and commit the state.
 func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplication {
-	app, err := NewBaseApplication(metadb.ForTest(), tb.TempDir())
+	app, err := NewBaseApplication(&config.VochainCfg{
+		DBType:  metadb.ForTest(),
+		DataDir: tb.TempDir(),
+	})
 	if err != nil {
 		tb.Fatal(err)
 	}
