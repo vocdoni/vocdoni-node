@@ -135,7 +135,6 @@ func BuildIndex(datadir string) (*Index, error) {
 		name := entry.Name()
 		path := filepath.Join(datadir, name)
 		if len(entry.Name()) != 64 {
-			log.Warnf("archive file %s has an invalid name", path)
 			continue
 		}
 		content, err := os.ReadFile(filepath.Join(datadir, name))
@@ -158,7 +157,7 @@ func BuildIndex(datadir string) (*Index, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("archive index build with %d processes", count)
+	log.Infow("archive index build", "processes", count)
 	return i, os.WriteFile(filepath.Join(datadir, "index.json"), indexData, 0o644)
 }
 
@@ -232,9 +231,7 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 	if err != nil {
 		return err
 	}
-
-	log.Infof("scanning blockchain processes from block %d (ended:%d results:%d ready:%d)",
-		fromBlock, len(pids2), len(pids), len(pids3))
+	log.Infow("archive scan started", "fromBlock", fromBlock, "ended", len(pids2), "results", len(pids), "ready", len(pids3))
 	added := 0
 	for _, p := range append(append(pids, pids2...), pids3...) {
 		exists, err := pa.storage.ProcessExist(p)
@@ -249,58 +246,46 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 		if err != nil {
 			return err
 		}
-		// If status is READY but the process is not yet finished, ignore
-		if procInfo.Status == int32(models.ProcessStatus_READY) {
-			if pa.indexer.App.Height() < procInfo.EndBlock {
-				continue
-			}
+		// If status is not results, we skip it.
+		if procInfo.Status != int32(models.ProcessStatus_RESULTS) {
+			continue
 		}
-		results := procInfo.Results()
 		if err := pa.storage.AddProcess(&Process{
 			ProcessInfo: procInfo,
-			Results:     results,
-			StartDate:   pa.indexer.App.TimestampFromBlock(int64(procInfo.StartBlock)),
-			EndDate:     pa.indexer.App.TimestampFromBlock(int64(results.BlockHeight)),
-			ChainID:     pa.indexer.App.ChainID(),
+			Results:     procInfo.Results(),
 		}); err != nil {
 			log.Warnf("processScan: %v", err)
 		}
 		added++
 	}
-	log.Infof("archive scan added %d archive processes, took %s", added, time.Since(startTime))
+	log.Infow("archive scan finished", "added", added, "took", time.Since(startTime).String())
 	return nil
 }
 
 // OnComputeResults implements the indexer event callback.
 // On this event the results are set always and the process info only if it
 // does not exist yet in the json storage.
-func (pa *ProcessArchive) OnComputeResults(results *results.Results,
-	proc *indexertypes.Process, height uint32) {
+func (pa *ProcessArchive) OnComputeResults(results *results.Results, proc *indexertypes.Process, _ uint32) {
 	// Get the process (if exist)
 	jsProc, err := pa.storage.GetProcess(results.ProcessID)
 	if err != nil {
 		if os.IsNotExist(err) { // if it does not exist yet, we create it
 			jsProc = &Process{
 				ProcessInfo: proc,
-				Results:     results,
-				ChainID:     pa.indexer.App.ChainID(),
 			}
 		} else {
-			log.Errorf("cannot get json store process: %v", err)
+			log.Errorw(err, "cannot get json store process")
 			return
 		}
 	}
 	jsProc.Results = results
-	jsProc.StartDate = pa.indexer.App.TimestampFromBlock(int64(proc.StartBlock))
-	jsProc.EndDate = pa.indexer.App.TimestampFromBlock(int64(results.BlockHeight))
 	if err := pa.storage.AddProcess(jsProc); err != nil {
 		log.Errorf("cannot add json process: %v", err)
 		return
 	}
-	log.Infof("stored json process %x for compute results event", proc.ID)
+	log.Infow("stored json archive process", "id", proc.ID.String())
 
 	// send publish signal
-	log.Debugf("sending archive publish signal for height %d", height)
 	select {
 	case pa.publish <- true:
 	default: // do nothing

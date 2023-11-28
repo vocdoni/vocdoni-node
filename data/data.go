@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 
-	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -25,40 +24,13 @@ type Storage interface {
 	Stop() error
 }
 
-// StorageID is the type for the different storage providers.
-// Currently only IPFS is supported.
-type StorageID int
-
-const (
-	// IPFS is the InterPlanetary File System.
-	IPFS StorageID = iota + 1
+var (
+	// ErrInvalidPath is returned when the path provided is not valid.
+	ErrInvalidPath = fmt.Errorf("invalid storage path")
+	// ErrUnavailable is returned when the storage path is not available.
+	ErrUnavailable = fmt.Errorf("storage path is unavailable")
+	// ErrNotFound is returned when the file is not found (cannot be fetch).
+	ErrNotFound = fmt.Errorf("storage file not found")
+	// ErrTimeout is returned when the storage context times out.
+	ErrTimeout = fmt.Errorf("storage context timeout")
 )
-
-// StorageIDFromString returns the Storage identifier from a string.
-func StorageIDFromString(i string) StorageID {
-	switch i {
-	case "IPFS":
-		return IPFS
-	default:
-		return -1
-	}
-}
-
-// IPFSNewConfig returns a new DataStore configuration for IPFS.
-func IPFSNewConfig(path string) *types.DataStore {
-	datastore := new(types.DataStore)
-	datastore.Datadir = path
-	return datastore
-}
-
-// Init returns a new Storage instance of type `t`.
-func Init(t StorageID, d *types.DataStore) (Storage, error) {
-	switch t {
-	case IPFS:
-		s := new(ipfs.Handler)
-		err := s.Init(d)
-		return s, err
-	default:
-		return nil, fmt.Errorf("bad storage type or DataStore specification")
-	}
-}

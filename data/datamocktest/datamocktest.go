@@ -1,13 +1,13 @@
-package data
+package datamocktest
 
 import (
 	"context"
 	"io"
 	"maps"
-	"os"
 	"sync"
 	"time"
 
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -51,7 +51,7 @@ func (d *DataMockTest) Retrieve(_ context.Context, id string, _ int64) ([]byte, 
 		return []byte(data), nil
 	}
 	if d.rnd.RandomIntn(2) == 0 {
-		return nil, os.ErrDeadlineExceeded
+		return nil, data.ErrTimeout
 	}
 	time.Sleep(200 * time.Millisecond)
 	return d.rnd.RandomBytes(256), nil
@@ -77,7 +77,7 @@ func (d *DataMockTest) Unpin(_ context.Context, path string) error {
 	d.filesMu.Lock()
 	defer d.filesMu.Unlock()
 	if _, ok := d.files[path]; !ok {
-		return os.ErrNotExist
+		return data.ErrNotFound
 	}
 	delete(d.files, path)
 	return nil

@@ -4,6 +4,8 @@ import (
 	"net/url"
 	"testing"
 
+	"go.vocdoni.io/dvote/data/datamocktest"
+
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/censusdb"
@@ -44,7 +46,7 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	}
 
 	// create the IPFS storage
-	d.Storage = &data.DataMockTest{}
+	d.Storage = &datamocktest.DataMockTest{}
 	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
 
 	// create the API router
