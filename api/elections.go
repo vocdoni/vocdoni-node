@@ -712,9 +712,9 @@ func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	data, err := json.Marshal(struct {
-		ElectionID []byte `json:"electionID"`
+		ElectionID string `json:"electionID"`
 	}{
-		ElectionID: pid.Marshal(),
+		ElectionID: hex.EncodeToString(pid.Marshal()),
 	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)

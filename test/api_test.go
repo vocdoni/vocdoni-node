@@ -702,7 +702,7 @@ func TestAPINextElectionID(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	nextElectionID := struct {
-		ElectionID []byte `json:"electionID"`
+		ElectionID string `json:"electionID"`
 	}{}
 	err := json.Unmarshal(resp, &nextElectionID)
 	qt.Assert(t, err, qt.IsNil)
@@ -718,5 +718,5 @@ func TestAPINextElectionID(t *testing.T) {
 	waitUntilHeight(t, c, 4)
 
 	// check next election id is the same as the election id created
-	qt.Assert(t, hex.EncodeToString(nextElectionID.ElectionID), qt.Equals, electionId.String())
+	qt.Assert(t, nextElectionID.ElectionID, qt.Equals, electionId.String())
 }
