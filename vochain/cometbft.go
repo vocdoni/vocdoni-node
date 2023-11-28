@@ -260,8 +260,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	if len(req.Txs) > 0 {
 		log.Debugw("finalize block", "height", height,
 			"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-			"blockSeconds", time.Since(req.GetTime()).Seconds(),
-			"elapsedSeconds", time.Since(start).Seconds(),
+			"milliSeconds", time.Since(start).Milliseconds(),
 			"proposer", hex.EncodeToString(req.GetProposerAddress()))
 	}
 
@@ -425,7 +424,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	// Rollback the state to discard the changes made
 	app.State.Rollback()
 	log.Debugw("prepare proposal", "height", app.Height(), "txs", len(validTxs),
-		"elapsedSeconds", time.Since(startTime).Seconds())
+		"milliSeconds", time.Since(startTime).Milliseconds())
 	return &abcitypes.ResponsePrepareProposal{
 		Txs: validTxs,
 	}, nil
@@ -477,7 +476,7 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	app.lastBlockHash = req.GetHash()
 	log.Debugw("process proposal", "height", app.Height(), "txs", len(req.Txs), "action", "accept",
 		"blockHash", hex.EncodeToString(app.lastBlockHash),
-		"hash", hex.EncodeToString(resp.Root), "elapsedSeconds", time.Since(startTime).Seconds())
+		"hash", hex.EncodeToString(resp.Root), "milliSeconds", time.Since(startTime).Milliseconds())
 	return &abcitypes.ResponseProcessProposal{
 		Status: abcitypes.ResponseProcessProposal_ACCEPT,
 	}, nil

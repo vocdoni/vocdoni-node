@@ -16,6 +16,7 @@ import (
 )
 
 var (
+	// ErrProcessNotFound is returned if the process is not found in the indexer database.
 	ErrProcessNotFound = fmt.Errorf("process not found")
 	zeroBytes          = []byte("")
 )
@@ -46,14 +47,8 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // EntityID, searchTerm, namespace, status, and withResults are optional filters, if
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (idx *Indexer) ProcessList(entityID []byte,
-	from,
-	max int,
-	searchTerm string,
-	namespace uint32,
-	srcNetworkId int32,
-	status string,
-	withResults bool) ([][]byte, error) {
+func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
+	srcNetworkId int32, status string, withResults bool) ([][]byte, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
@@ -203,10 +198,11 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
 
-	previousStatus, err := queries.GetProcessStatus(ctx, pid)
+	dbProc, err := queries.GetProcess(ctx, pid)
 	if err != nil {
-		return err
+		return fmt.Errorf("updateProcess: cannot fetch process %x: %w", pid, err)
 	}
+	previousStatus := dbProc.Status
 
 	// We need to use the time of start/end from the block header, as we might be syncing the blockchain
 	currentBlockTime := func() time.Time {
@@ -218,7 +214,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	}
 
 	// Update start date with the block time if the process starts on this block
-	var startDate time.Time
+	startDate := dbProc.StartDate
 	if idx.App.Height() == p.StartBlock {
 		startDate = currentBlockTime()
 	}

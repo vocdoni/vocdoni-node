@@ -3,6 +3,7 @@ package ipfs
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -30,6 +31,7 @@ import (
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 )
@@ -87,7 +89,7 @@ func (i *Handler) Init(d *types.DataStore) error {
 			log.Errorw(err, "error running ipfs garbage collector")
 		}
 	}()
-	log.Infow("IPFS initialization",
+	log.Debugw("IPFS initialization",
 		"peerID", node.Identity.String(),
 		"addresses", node.PeerHost.Addrs(),
 		"pubKey", node.PrivateKey.GetPublic(),
@@ -189,7 +191,7 @@ func (i *Handler) Pin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	p, err := ipfspath.NewPath(path)
 	if err != nil {
-		return err
+		return data.ErrInvalidPath
 	}
 	return i.CoreAPI.Pin().Add(ctx, p)
 }
@@ -216,7 +218,7 @@ func (i *Handler) Unpin(ctx context.Context, path string) error {
 	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
 	cpath, err := ipfspath.NewPath(path)
 	if err != nil {
-		return err
+		return data.ErrInvalidPath
 	}
 	log.Debugf("removing pin %s", cpath)
 	return i.CoreAPI.Pin().Rm(ctx, cpath, options.Pin.RmRecursive(true))
@@ -272,16 +274,20 @@ func (i *Handler) RetrieveDir(ctx context.Context, path string, maxSize int64) (
 	// first resolve the path
 	p, err := ipfspath.NewPath(path)
 	if err != nil {
-		return nil, err
+		return nil, data.ErrInvalidPath
 	}
 	cpath, _, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve path %s", path)
+		return nil, data.ErrUnavailable
 	}
 	// then get the file
 	f, err := i.CoreAPI.Unixfs().Get(ctx, cpath)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve unixfs file: %w", err)
+		// if error is timeout or context deadline exceeded, return timeout error
+		if os.IsTimeout(err) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, data.ErrTimeout
+		}
+		return nil, data.ErrNotFound
 	}
 
 	dirMap := make(map[string][]byte)
@@ -311,23 +317,28 @@ func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]b
 	// check if we have the file in the local cache
 	ccontent, _ := i.retrieveCache.Get(path)
 	if ccontent != nil {
-		log.Debugf("retrieved file %s from cache", path)
 		return ccontent, nil
 	}
 
 	// first resolve the path
 	p, err := ipfspath.NewPath(path)
 	if err != nil {
-		return nil, err
+		log.Warnw("invalid path", "path", path, "error", err)
+		return nil, data.ErrInvalidPath
 	}
 	cpath, _, err := i.CoreAPI.ResolvePath(ctx, p)
 	if err != nil {
-		return nil, fmt.Errorf("could not resolve path %s", path)
+		return nil, data.ErrUnavailable
 	}
 	// then get the file
 	f, err := i.CoreAPI.Unixfs().Get(ctx, cpath)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve unixfs file: %w", err)
+		// if error is timeout or context deadline exceeded, return timeout error
+		if os.IsTimeout(err) || errors.Is(err, context.DeadlineExceeded) {
+			return nil, data.ErrTimeout
+		}
+		log.Warnw("could not retrieve file", "path", path, "error", err)
+		return nil, data.ErrNotFound
 	}
 
 	content, err := fetchFileContent(f)

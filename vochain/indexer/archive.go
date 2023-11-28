@@ -24,11 +24,11 @@ const (
 
 // ArchiveProcess is the struct used to store the process data in the archive.
 type ArchiveProcess struct {
-	ChainID     string                `json:"chainId,omitempty"`
+	ChainID     string                `json:"chainId,omitempty"` // Legacy
 	ProcessInfo *indexertypes.Process `json:"process"`
 	Results     *results.Results      `json:"results"`
-	StartDate   *time.Time            `json:"startDate,omitempty"`
-	EndDate     *time.Time            `json:"endDate,omitempty"`
+	StartDate   *time.Time            `json:"startDate,omitempty"` // Legacy
+	EndDate     *time.Time            `json:"endDate,omitempty"`   // Legacy
 }
 
 // ImportArchive imports an archive list of processes into the indexer database.

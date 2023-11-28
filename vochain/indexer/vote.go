@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
 
@@ -107,8 +108,12 @@ func (idx *Indexer) CountTotalVotes() (uint64, error) {
 func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Queries, process *models.Process) error {
 	height := idx.App.Height()
 	processID := process.ProcessId
-	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height)
-
+	endDate := idx.App.TimestampFromBlock(int64(idx.App.Height()))
+	if endDate == nil {
+		endDate = new(time.Time)
+		*endDate = time.Now()
+	}
+	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height, "endDate", endDate.String())
 	// Get the results
 	r := results.ProtoToResults(process.Results)
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
@@ -116,6 +121,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 		Votes:       indexertypes.EncodeJSON(r.Votes),
 		Weight:      indexertypes.EncodeJSON(r.Weight),
 		BlockHeight: int64(r.BlockHeight),
+		EndDate:     *endDate,
 	}); err != nil {
 		return err
 	}

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,10 +20,10 @@ const (
 	ImportQueueRoutines = 32
 	// ImportRetrieveTimeout the maximum duration the import queue will wait
 	// for retrieving a remote file.
-	ImportRetrieveTimeout = 5 * time.Minute
+	ImportRetrieveTimeout = 3 * time.Minute
 	// ImportPinTimeout is the maximum duration the import queue will wait
 	// for pinning a remote file.
-	ImportPinTimeout = 3 * time.Minute
+	ImportPinTimeout = 2 * time.Minute
 	// MaxFileSize is the maximum size of a file that can be imported.
 	MaxFileSize = 100 * 1024 * 1024 // 100MB
 
@@ -122,16 +121,16 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 	d.queueAddDelta(1)
 	defer d.queueAddDelta(-1)
 	ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-	data, err := d.RemoteStorage.Retrieve(ctx, item.URI, MaxFileSize)
+	file, err := d.RemoteStorage.Retrieve(ctx, item.URI, MaxFileSize)
 	cancel()
 	if err != nil {
-		if os.IsTimeout(err) || errors.Is(err, context.DeadlineExceeded) {
+		if errors.Is(err, data.ErrTimeout) {
 			log.Warnw("timeout importing file, adding it to failed queue for retry", "uri", item.URI)
 			d.failedQueueLock.Lock()
 			d.failedQueue[item.URI] = item
 			d.failedQueueLock.Unlock()
 		} else {
-			log.Warnw("could not retrieve file", "uri", item.URI, "error", fmt.Sprintf("%v", err))
+			log.Warnw("could not retrieve file", "uri", item.URI, "error", err)
 		}
 		return
 	}
@@ -145,7 +144,7 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 		}
 	}()
 	if item.Callback != nil {
-		go item.Callback(item.URI, data)
+		go item.Callback(item.URI, file)
 	}
 
 }
@@ -181,11 +180,19 @@ func (d *Downloader) importFailedQueue() map[string]*DownloadItem {
 // handleImportFailedQueue tries to import files that failed.
 func (d *Downloader) handleImportFailedQueue() {
 	for cid, item := range d.importFailedQueue() {
-		log.Debugf("retrying download %s", cid)
+		log.Debugw("retrying failed download", "cid", cid)
 		ctx, cancel := context.WithTimeout(context.Background(), ImportRetrieveTimeout)
-		data, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), 0)
+		file, err := d.RemoteStorage.Retrieve(ctx, strings.TrimPrefix(item.URI, d.RemoteStorage.URIprefix()), MaxFileSize)
 		cancel()
 		if err != nil {
+			if !errors.Is(err, data.ErrTimeout) {
+				// if the error is not a timeout, we remove the item from the failed queue
+				d.failedQueueLock.Lock()
+				delete(d.failedQueue, cid)
+				d.failedQueueLock.Unlock()
+				log.Debugw("removed download from failed queue, we won't try anymore", "cid", cid)
+			}
+			// if the error is a timeout, we just continue to retry
 			continue
 		}
 		d.failedQueueLock.Lock()
@@ -199,7 +206,7 @@ func (d *Downloader) handleImportFailedQueue() {
 			log.Warnf("could not pin file %q: %v", uri, err)
 		}
 		if item.Callback != nil {
-			go item.Callback(uri, data)
+			go item.Callback(uri, file)
 		}
 	}
 }

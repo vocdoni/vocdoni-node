@@ -544,7 +544,7 @@ func main() {
 		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
 			conf.Mode == types.ModeGateway
 
-		// create the vochain service
+			// create the vochain service
 		if err = srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
@@ -556,6 +556,10 @@ func main() {
 		}
 		// create the indexer service
 		if conf.Vochain.Indexer.Enabled {
+			// disable archive if process archive mode is enabled
+			if conf.Vochain.ProcessArchive {
+				conf.Vochain.Indexer.ArchiveURL = ""
+			}
 			if err := srv.VochainIndexer(); err != nil {
 				log.Fatal(err)
 			}

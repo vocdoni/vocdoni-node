@@ -9,18 +9,19 @@ import (
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/data/ipfs/ipfsconnect"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 // IPFS starts the IPFS service
-func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage, err error) {
+func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (data.Storage, error) {
 	log.Info("creating ipfs service")
-	os.Setenv("IPFS_FD_MAX", "1024")
-	ipfsStore := data.IPFSNewConfig(ipfsconfig.ConfigPath)
-	storage, err = data.Init(data.StorageIDFromString("IPFS"), ipfsStore)
-	if err != nil {
-		return
+	if err := os.Setenv("IPFS_FD_MAX", "1024"); err != nil {
+		log.Warnw("could not set IPFS_FD_MAX", "err", err)
 	}
-
+	storage := new(ipfs.Handler)
+	if err := storage.Init(&types.DataStore{Datadir: ipfsconfig.ConfigPath}); err != nil {
+		return nil, err
+	}
 	go func() {
 		for {
 			time.Sleep(time.Second * 120)
@@ -32,7 +33,7 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 		log.Infow("starting ipfsconnect service", "key", ipfsconfig.ConnectKey)
 		ipfsconn := ipfsconnect.New(
 			ipfsconfig.ConnectKey,
-			storage.(*ipfs.Handler),
+			storage,
 		)
 		if len(ipfsconfig.ConnectPeers) > 0 && len(ipfsconfig.ConnectPeers[0]) > 8 {
 			log.Debugf("using custom ipfsconnect bootnodes %s", ipfsconfig.ConnectPeers)
@@ -40,5 +41,5 @@ func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (storage data.Storage
 		}
 		ipfsconn.Start()
 	}
-	return
+	return storage, nil
 }
