@@ -459,6 +459,15 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	}
 
 	startTime := time.Now()
+
+	// TODO: check if we can enable this check without breaking consensus
+	//
+	// Check if the time difference is within the allowed threshold
+	//	timeDiff := startTime.Sub(req.Time)
+	//	if timeDiff > allowedConsensusTimeDiff {
+	//		return nil, fmt.Errorf("the time difference for the proposal exceeds the threshold")
+	//	}
+
 	resp, err := app.ExecuteBlock(req.Txs, uint32(req.GetHeight()), req.GetTime())
 	if err != nil {
 		return nil, fmt.Errorf("cannot execute block on process proposal: %w", err)

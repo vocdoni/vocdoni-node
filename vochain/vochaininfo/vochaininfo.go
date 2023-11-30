@@ -18,13 +18,9 @@ import (
 // VochainInfo stores some metrics and information regarding the Vochain Blockchain
 // Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
 type VochainInfo struct {
-	sync           bool
 	votesPerMinute uint64
-	avg1           uint64
-	avg10          uint64
-	avg60          uint64
-	avg360         uint64
-	avg1440        uint64
+	blockTimes     [5]uint64
+	blocksMinute   float64
 	vnode          *vochain.BaseApplication
 	close          chan bool
 	lock           sync.RWMutex
@@ -67,6 +63,8 @@ func (vi *VochainInfo) updateCounters() {
 
 	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
+	blockPeriodMinute.Set(vi.BlockTimes()[0])
+	blocksSyncLastMinute.Set(uint64(vi.BlocksLastMinute()))
 }
 
 // Height returns the current number of blocks of the blockchain.
@@ -74,15 +72,52 @@ func (vi *VochainInfo) Height() uint64 {
 	return height.Get()
 }
 
+// averageBlockTime calculates the average block time for the last intervalBlocks blocks.
+// The timestamp information is taken from the block headers.
+func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) float64 {
+	if intervalBlocks == 0 {
+		return 0
+	}
+	currentHeight := int64(vi.vnode.Height())
+
+	// Calculate the starting block height for the interval
+	startBlockHeight := currentHeight - intervalBlocks
+	if startBlockHeight < 0 {
+		// We cannot calculate the average block time for the given interval
+		return 0
+	}
+
+	// Fetch timestamps for the starting and current blocks
+	startTime := vi.vnode.TimestampFromBlock(startBlockHeight)
+	currentTime := vi.vnode.TimestampFromBlock(currentHeight)
+
+	if startTime == nil || currentTime == nil {
+		return 0
+	}
+
+	// Calculate the time frame in seconds
+	timeFrameSeconds := currentTime.Sub(*startTime).Seconds()
+
+	// Adjust the average block time based on the actual time frame
+	return timeFrameSeconds / float64(intervalBlocks)
+}
+
+func (vi *VochainInfo) updateBlockTimes() {
+	vi.blockTimes = [5]uint64{
+		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*1)),
+		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*10)),
+		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*60)),
+		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*360)),
+		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*1440)),
+	}
+}
+
 // BlockTimes returns the average block time in milliseconds for 1, 10, 60, 360 and 1440 minutes.
 // Value 0 means there is not yet an average.
-func (vi *VochainInfo) BlockTimes() *[5]uint64 {
-	if vi.vnode.IsSynchronizing() {
-		return &[5]uint64{uint64(types.DefaultBlockTime.Seconds()), 0, 0, 0, 0}
-	}
+func (vi *VochainInfo) BlockTimes() [5]uint64 {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
-	return &[5]uint64{vi.avg1, vi.avg10, vi.avg60, vi.avg360, vi.avg1440}
+	return vi.blockTimes
 }
 
 // EstimateBlockHeight provides an estimation time for a future blockchain height number.
@@ -234,86 +269,51 @@ func (vi *VochainInfo) NPeers() int {
 	return ni.NPeers
 }
 
-// Start initializes the Vochain statistics recollection.
-// TODO: use time.Duration instead of int64
-func (vi *VochainInfo) Start(sleepSecs uint64) {
-	log.Infof("starting vochain info service every %d seconds", sleepSecs)
+// BlocksLastMinute returns the number of blocks synced during the last minute.
+func (vi *VochainInfo) BlocksLastMinute() float64 {
+	vi.lock.RLock()
+	defer vi.lock.RUnlock()
+	return vi.blocksMinute
+}
 
+// Start initializes the Vochain statistics recollection.
+func (vi *VochainInfo) Start(sleepSecs uint64) {
+	if sleepSecs == 0 {
+		panic("sleepSecs cannot be zero")
+	}
+	log.Infof("starting vochain info service every %d seconds", sleepSecs)
 	metrics.NewGauge("vochain_tokens_burned",
 		func() float64 { return float64(vi.TokensBurned()) })
 
 	var duration time.Duration
-	var pheight, height uint64
-	var h1, h10, h60, h360, h1440 uint64
-	var n1, n10, n60, n360, n1440, vm uint64
-	var a1, a10, a60, a360, a1440 uint64
-	var sync bool
+	var prevHeight, currentHeight uint64
+	var intervalCount, heightDiffSum, voteMetricsCount uint64
+	var avgBlocksPerMinute float64
 	var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
 		case <-time.After(duration):
 			vi.updateCounters()
-
-			height = uint64(vi.vnode.Height())
-
-			// less than 2s per block it's not real. Consider blockchain is synchcing
-			if pheight > 0 {
-				sync = true
-				vm++
-				n1++
-				n10++
-				n60++
-				n360++
-				n1440++
-				h1 += height - pheight
-				h10 += height - pheight
-				h60 += height - pheight
-				h360 += height - pheight
-				h1440 += height - pheight
-
-				if sleepSecs*n1 >= 60 && h1 > 0 {
-					a1 = uint64((n1 * sleepSecs * 1000) / h1)
-					n1 = 0
-					h1 = 0
-				}
-				if sleepSecs*n10 >= 600 && h10 > 0 {
-					a10 = uint64((n10 * sleepSecs * 1000) / h10)
-					n10 = 0
-					h10 = 0
-				}
-				if sleepSecs*n60 >= 3600 && h60 > 0 {
-					a60 = uint64((n60 * sleepSecs * 1000) / h60)
-					n60 = 0
-					h60 = 0
-				}
-				if sleepSecs*n360 >= 21600 && h360 > 0 {
-					a360 = uint64((n360 * sleepSecs * 1000) / h360)
-					n360 = 0
-					h360 = 0
-				}
-				if sleepSecs*n1440 >= 86400 && h1440 > 0 {
-					a1440 = uint64((n1440 * sleepSecs * 1000) / h1440)
-					n1440 = 0
-					h1440 = 0
-				}
-			} else {
-				sync = false
+			currentHeight = uint64(vi.vnode.Height())
+			voteMetricsCount++
+			intervalCount++
+			heightDiffSum += currentHeight - prevHeight
+			if sleepSecs*intervalCount >= 60 && heightDiffSum > 0 {
+				avgBlocksPerMinute = float64(heightDiffSum) / float64((intervalCount * sleepSecs))
+				intervalCount = 0
+				heightDiffSum = 0
 			}
-			pheight = height
+			prevHeight = currentHeight
 
+			// update values
 			vi.lock.Lock()
-			vi.sync = sync
-			vi.avg1 = a1
-			vi.avg10 = a10
-			vi.avg60 = a60
-			vi.avg360 = a360
-			vi.avg1440 = a1440
-
-			if sleepSecs*vm >= 60 {
+			vi.blocksMinute = avgBlocksPerMinute
+			vi.updateBlockTimes()
+			if sleepSecs*voteMetricsCount >= 60 {
 				vi.votesPerMinute = voteCount.Get() - oldVoteTreeSize
 				oldVoteTreeSize = voteCount.Get()
-				vm = 0
+				voteMetricsCount = 0
 			}
 			vi.lock.Unlock()
 

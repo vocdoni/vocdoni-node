@@ -140,9 +140,9 @@ func (vs *VocdoniService) Start() error {
 			time.Sleep(time.Second * 1)
 			if i%10 == 0 {
 				log.Monitor("vochain fastsync", map[string]any{
-					"height":   vs.Stats.Height(),
-					"blocks/s": float64(vs.Stats.Height()-lastHeight) / time.Since(timeCounter).Seconds(),
-					"peers":    vs.Stats.NPeers(),
+					"height":     vs.Stats.Height(),
+					"blocks/sec": fmt.Sprintf("%.2f", float64(vs.Stats.Height()-lastHeight)/time.Since(timeCounter).Seconds()),
+					"peers":      vs.Stats.NPeers(),
 				})
 				timeCounter = time.Now()
 				lastHeight = vs.Stats.Height()
@@ -166,25 +166,18 @@ func (vs *VocdoniService) Start() error {
 
 // VochainPrintInfo initializes the Vochain statistics recollection.
 func VochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
-	var a *[5]uint64
 	var h uint64
 	var p, v uint64
 	var m, vc, vxm uint64
 	var b strings.Builder
 	for {
 		b.Reset()
-		a = vi.BlockTimes()
-		if a[0] > 0 {
-			fmt.Fprintf(&b, "1m:%.2f", float32(a[0])/1000)
-		}
+		a := vi.BlockTimes()
 		if a[1] > 0 {
 			fmt.Fprintf(&b, " 10m:%.2f", float32(a[1])/1000)
 		}
 		if a[2] > 0 {
 			fmt.Fprintf(&b, " 1h:%.2f", float32(a[2])/1000)
-		}
-		if a[3] > 0 {
-			fmt.Fprintf(&b, " 6h:%.2f", float32(a[3])/1000)
 		}
 		if a[4] > 0 {
 			fmt.Fprintf(&b, " 24h:%.2f", float32(a[4])/1000)
@@ -195,14 +188,15 @@ func VochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		vc = vi.VoteCacheSize()
 		log.Monitor("vochain status",
 			map[string]any{
-				"height":    h,
-				"mempool":   m,
-				"peers":     vi.NPeers(),
-				"elections": p,
-				"votes":     v,
-				"voteCache": vc,
-				"votes/min": vxm,
-				"blockTime": b.String(),
+				"height":       h,
+				"mempool":      m,
+				"peers":        vi.NPeers(),
+				"elections":    p,
+				"votes":        v,
+				"voteCache":    vc,
+				"votes/min":    vxm,
+				"blockPeriod":  b.String(),
+				"blocksMinute": fmt.Sprintf("%.2f", vi.BlocksLastMinute()),
 			})
 
 		time.Sleep(interval)

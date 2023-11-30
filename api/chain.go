@@ -302,7 +302,7 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 
 	data, err := json.Marshal(&ChainInfo{
 		ID:                      a.vocapp.ChainID(),
-		BlockTime:               *a.vocinfo.BlockTimes(),
+		BlockTime:               a.vocinfo.BlockTimes(),
 		ElectionCount:           a.indexer.CountTotalProcesses(),
 		OrganizationCount:       a.indexer.CountTotalEntities(),
 		Height:                  a.vocapp.Height(),

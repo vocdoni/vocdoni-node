@@ -195,7 +195,7 @@ func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime 
 func (app *BaseApplication) CommitState() ([]byte, error) {
 	// Commit the state and get the hash
 	if app.State.TxCounter() > 0 {
-		log.Infow("commit block", "height", app.Height(), "txs", app.State.TxCounter())
+		log.Debugw("commit block", "height", app.Height(), "txs", app.State.TxCounter())
 	}
 	hash, err := app.State.Save()
 	if err != nil {
