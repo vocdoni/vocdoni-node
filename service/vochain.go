@@ -174,7 +174,7 @@ func VochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		b.Reset()
 		a := vi.BlockTimes()
 		if a[1] > 0 {
-			fmt.Fprintf(&b, " 10m:%.2f", float32(a[1])/1000)
+			fmt.Fprintf(&b, "10m:%.2f", float32(a[1])/1000)
 		}
 		if a[2] > 0 {
 			fmt.Fprintf(&b, " 1h:%.2f", float32(a[2])/1000)

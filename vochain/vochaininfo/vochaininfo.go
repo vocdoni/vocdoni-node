@@ -287,8 +287,8 @@ func (vi *VochainInfo) Start(sleepSecs uint64) {
 
 	var duration time.Duration
 	var prevHeight, currentHeight uint64
-	var intervalCount, heightDiffSum, voteMetricsCount uint64
-	var avgBlocksPerMinute float64
+	var accumulatedTimeSecs, heightDiffSum, voteMetricsCount uint64
+	var blocksPerMinute float64
 	var oldVoteTreeSize uint64
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
@@ -297,18 +297,22 @@ func (vi *VochainInfo) Start(sleepSecs uint64) {
 			vi.updateCounters()
 			currentHeight = uint64(vi.vnode.Height())
 			voteMetricsCount++
-			intervalCount++
+			accumulatedTimeSecs += sleepSecs
 			heightDiffSum += currentHeight - prevHeight
-			if sleepSecs*intervalCount >= 60 && heightDiffSum > 0 {
-				avgBlocksPerMinute = float64(heightDiffSum) / float64((intervalCount * sleepSecs))
-				intervalCount = 0
+
+			if accumulatedTimeSecs >= 60 {
+				if accumulatedTimeSecs > 0 {
+					blocksPerMinute = float64(heightDiffSum) * 60.0 / float64(accumulatedTimeSecs)
+				}
+				accumulatedTimeSecs = 0
 				heightDiffSum = 0
 			}
+
 			prevHeight = currentHeight
 
 			// update values
 			vi.lock.Lock()
-			vi.blocksMinute = avgBlocksPerMinute
+			vi.blocksMinute = blocksPerMinute
 			vi.updateBlockTimes()
 			if sleepSecs*voteMetricsCount >= 60 {
 				vi.votesPerMinute = voteCount.Get() - oldVoteTreeSize
