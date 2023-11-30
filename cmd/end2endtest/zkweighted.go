@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
@@ -113,6 +116,7 @@ func (t *E2EAnonElectionTempSIKs) Setup(api *apiclient.HTTPclient, c *config) er
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeZKWeighted}
+	// use temporal siks
 	ed.TempSIKs = true
 
 	if err := t.setupElection(ed, t.config.nvotes); err != nil {
@@ -163,8 +167,63 @@ func (t *E2EAnonElectionTempSIKs) Run() error {
 		return err
 	}
 
+	removedCount, err := removedSiks(t.api, votes, t.config.parallelCount)
+	if err != nil {
+		return err
+	}
+
+	// the half of accounts should not have valid sik, due they are using temporal sik
+	if int(removedCount) != len(votes)/2 {
+		return fmt.Errorf("unexpected number of accounts without valid SIK, got %d want %d", removedCount, len(votes)/2)
+	}
+
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", elres.Results)
 
 	return nil
+}
+
+// removedSiks get the number of accounts without a valid SIK
+func removedSiks(api *apiclient.HTTPclient, votes []*apiclient.VoteData, parallelCount int) (accts int32, err error) {
+	var removedCount int32
+	var wg sync.WaitGroup
+	errorChan := make(chan error, len(votes))
+
+	// worker pool channel with a maximum of parallelCount workers
+	workerPool := make(chan struct{}, parallelCount)
+
+	for _, v := range votes {
+		wg.Add(1)
+		workerPool <- struct{}{} // reserves a slot in the worker pool
+		go func(v *apiclient.VoteData) {
+			defer wg.Done()
+			defer func() { <-workerPool }() // make available for another goroutine to use
+			privKey := v.VoterAccount.PrivateKey()
+			accountApi := api.Clone(privKey.String())
+			valid, err := accountApi.ValidSIK()
+
+			if err != nil {
+				if !strings.Contains(err.Error(), "SIK not found") {
+					errorChan <- fmt.Errorf("unexpected SIK validation error for account: %x, %s", v.VoterAccount.Address(), err)
+				}
+				atomic.AddInt32(&removedCount, 1)
+				log.Infof("SIK removed for account %x", v.VoterAccount.Address())
+
+			} else if valid {
+				log.Infof("valid SIK for account: %x", v.VoterAccount.Address())
+			}
+		}(v)
+	}
+
+	go func() {
+		wg.Wait()
+		close(errorChan)
+	}()
+
+	for err := range errorChan {
+		if err != nil {
+			return 0, err
+		}
+	}
+	return removedCount, nil
 }
