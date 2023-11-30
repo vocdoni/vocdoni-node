@@ -448,14 +448,13 @@ func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx,
 
 // VochainPrintInfo initializes the Vochain statistics recollection
 func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
-	var a *[5]uint64
 	var h uint64
 	var p, v uint64
 	var m, vc, vxm uint64
 	var b strings.Builder
 	for {
 		b.Reset()
-		a = vi.BlockTimes()
+		a := vi.BlockTimes()
 		if a[0] > 0 {
 			fmt.Fprintf(&b, "1m:%.2f", float32(a[0])/1000)
 		}
@@ -476,13 +475,14 @@ func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		p, v, vxm = vi.TreeSizes()
 		vc = vi.VoteCacheSize()
 		log.Monitor("[vochain info]", map[string]any{
-			"height":    h,
-			"mempool":   m,
-			"processes": p,
-			"votes":     v,
-			"vxm":       vxm,
-			"voteCache": vc,
-			"blockTime": b.String(),
+			"height":       h,
+			"mempool":      m,
+			"processes":    p,
+			"votes":        v,
+			"vxm":          vxm,
+			"voteCache":    vc,
+			"blockPeriod":  b.String(),
+			"blocksMinute": fmt.Sprintf("%.2f", vi.BlocksLastMinute()),
 		})
 		time.Sleep(interval)
 	}
