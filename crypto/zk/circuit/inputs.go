@@ -6,8 +6,8 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/util"
 )
 
 // CircuitInputs wraps all the necessary circuit parameters. They must all be
@@ -71,23 +71,23 @@ func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
 	}
 	ffPassword := new(big.Int)
 	if p.Password != nil {
-		ffPassword = zk.BigToFF(new(big.Int).SetBytes(p.Password))
+		ffPassword = util.BigToFF(new(big.Int).SetBytes(p.Password))
 	}
 	signature, err := p.Account.SIKsignature()
 	if err != nil {
 		return nil, err
 	}
 	return &CircuitInputs{
-		ElectionId:      zk.BytesToArboStr(p.ElectionId),
+		ElectionId:      util.BytesToArboStr(p.ElectionId),
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: p.AvailableWeight.String(),
-		VoteHash:        zk.BytesToArboStr(p.AvailableWeight.Bytes()),
+		VoteHash:        util.BytesToArboStr(p.AvailableWeight.Bytes()),
 		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
 		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
 
 		Address:   arbo.BytesToBigInt(p.Account.Address().Bytes()).String(),
 		Password:  ffPassword.String(),
-		Signature: zk.BigToFF(new(big.Int).SetBytes(signature)).String(),
+		Signature: util.BigToFF(new(big.Int).SetBytes(signature)).String(),
 
 		VoteWeight:     p.VoteWeight.String(),
 		CensusSiblings: p.CensusSiblings,

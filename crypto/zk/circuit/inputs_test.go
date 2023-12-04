@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/util"
 
 	qt "github.com/frankban/quicktest"
 )
@@ -33,7 +33,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	// mock the availableWeight
 	availableWeight := new(big.Int).SetUint64(10)
 	// calc vote hash
-	voteHash := zk.BytesToArboStr(availableWeight.Bytes())
+	voteHash := util.BytesToArboStr(availableWeight.Bytes())
 	// decode the test root
 	hexTestRoot, err := hex.DecodeString(testRoot)
 	c.Assert(err, qt.IsNil)
@@ -51,7 +51,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 
 		Address:   arbo.BytesToBigInt(acc.Address().Bytes()).String(),
 		Password:  "0",
-		Signature: zk.BigToFF(new(big.Int).SetBytes(signature)).String(),
+		Signature: util.BigToFF(new(big.Int).SetBytes(signature)).String(),
 
 		VoteWeight:     availableWeight.String(),
 		CensusSiblings: testSiblings,

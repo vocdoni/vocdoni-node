@@ -5,8 +5,8 @@ import (
 	"math/big"
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/util"
 )
 
 // SIKsignature signs the default vocdoni sik payload. It envolves the
@@ -38,8 +38,8 @@ func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
 	}
 	seed := []*big.Int{
 		arbo.BytesToBigInt(k.Address().Bytes()),
-		zk.BigToFF(new(big.Int).SetBytes(secret)),
-		zk.BigToFF(new(big.Int).SetBytes(sign)),
+		util.BigToFF(new(big.Int).SetBytes(secret)),
+		util.BigToFF(new(big.Int).SetBytes(sign)),
 	}
 	hash, err := poseidon.Hash(seed)
 	if err != nil {
@@ -58,14 +58,14 @@ func (k *SignKeys) AccountSIKnullifier(electionID, secret []byte) ([]byte, error
 	}
 	// get the representation of the signature on the finite field and repeat
 	// the same with the secret if it is provided, if not add a zero
-	seed := []*big.Int{zk.BigToFF(new(big.Int).SetBytes(sign))}
+	seed := []*big.Int{util.BigToFF(new(big.Int).SetBytes(sign))}
 	if secret != nil {
-		seed = append(seed, zk.BigToFF(new(big.Int).SetBytes(secret)))
+		seed = append(seed, util.BigToFF(new(big.Int).SetBytes(secret)))
 	} else {
 		seed = append(seed, big.NewInt(0))
 	}
 	// encode the election id for circom and include it into the nullifier
-	seed = append(seed, zk.BytesToArbo(electionID)...)
+	seed = append(seed, util.BytesToArbo(electionID)...)
 	// calculate the poseidon image --> H(signature + secret + electionId)
 	hash, err := poseidon.Hash(seed)
 	if err != nil {
