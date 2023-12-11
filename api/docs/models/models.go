@@ -12,7 +12,6 @@ import (
 //	@Success	200	{object}	models.Tx_Admin
 //	@Success	200	{object}	models.Tx_SetProcess
 //	@Success	200	{object}	models.Tx_RegisterKey
-//	@Success	200	{object}	models.Tx_MintTokens
 //	@Success	200	{object}	models.Tx_SendTokens
 //	@Success	200	{object}	models.Tx_SetTransactionCosts
 //	@Success	200	{object}	models.Tx_SetAccount
