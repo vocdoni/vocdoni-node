@@ -11,10 +11,10 @@ var Forks = map[string]*ForksCfg{
 		VoceremonyForkBlock: 217200, // estimated 2023-12-05T11:33:31.426638381Z
 	},
 	"vocdoni/STAGE/9": {
-		VoceremonyForkBlock: 249500, // estimated 2023-12-11T10:38:31.862340282Z
+		VoceremonyForkBlock: 250000, // estimated 2023-12-11T12:09:00.917676214Z
 	},
 	"vocdoni/LTS/1.2": {
-		VoceremonyForkBlock: 393000, // estimated 2023-12-11T11:51:47.046130989Z
+		VoceremonyForkBlock: 400200, // estimated 2023-12-12T09:09:31.511245938Z
 	},
 }
 
