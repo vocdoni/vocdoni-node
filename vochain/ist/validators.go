@@ -51,7 +51,7 @@ const (
 	maxPower               = 100  // maximum power of a validator
 	updatePowerPeriod      = 10   // number of blocks to wait before updating validators power
 	positiveScoreThreshold = 80   // if this minimum score is kept, the validator power will be increased
-	powerDecayRate         = 0.05 // 5% decay rate
+	powerDecayRate         = 0.20 // 20% decay rate
 )
 
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
@@ -60,53 +60,64 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 	if err != nil {
 		return fmt.Errorf("cannot update validator score: %w", err)
 	}
-	// get the validator score
+	// update Votes and Proposals of each validator found in voteAddresses
 	for _, voteAddr := range voteAddresses {
-		validator := ""
-		for k, v := range validators {
+		for _, v := range validators {
 			if bytes.Equal(voteAddr, v.ValidatorAddress) {
-				validator = k
+				v.Votes++
+				if bytes.Equal(proposer, v.ValidatorAddress) {
+					v.Proposals++
+				}
 				break
 			}
 		}
-		if validator != "" {
-			validators[validator].Votes++
-			if bytes.Equal(proposer, validators[validator].ValidatorAddress) {
-				validators[validator].Proposals++
-			}
-		}
 	}
+	if c.state.CurrentHeight()%updatePowerPeriod != 0 {
+		return nil
+	}
+
 	// compute the new power and score
-	for idx := range validators {
-		if c.state.CurrentHeight()%updatePowerPeriod == 0 {
-			newScore := uint32(float64(validators[idx].Votes) /
-				float64(c.state.CurrentHeight()-uint32(validators[idx].Height)) * 100)
-			if newScore > validators[idx].Score ||
-				(newScore >= positiveScoreThreshold && validators[idx].Score == newScore) {
-				if validators[idx].Power < maxPower {
-					validators[idx].Power++
-				}
+	for _, v := range validators {
+		// if a validator voted on every block since they joined the validator list,
+		// they will have a score of 100
+		// if they voted on only half of the blocks, they will have a score of 50
+		newScore := uint32(float64(v.Votes) /
+			float64(c.state.CurrentHeight()-uint32(v.Height)) * 100)
+		if newScore > v.Score ||
+			(newScore >= positiveScoreThreshold && v.Score == newScore) {
+			// validators that contributed lots of votes to the network,
+			// regain a significant share of their power after downtime
+			contributionSinceGenesis := float64(v.Votes) / float64(c.state.CurrentHeight())
+			if v.Power < uint64(contributionSinceGenesis*maxPower) {
+				v.Power = uint64(contributionSinceGenesis * maxPower)
 			}
-			if newScore < validators[idx].Score || newScore == 0 {
-				validators[idx].Power = uint64(float64(validators[idx].Power) * (1 - powerDecayRate))
+			if v.Power < maxPower {
+				v.Power++
 			}
-			validators[idx].Score = newScore
+			if v.Power > maxPower {
+				v.Power = maxPower
+			}
 		}
+		if newScore < v.Score || newScore == 0 {
+			v.Power = uint64(float64(v.Power) * (1 - powerDecayRate))
+		}
+		v.Score = newScore
 		// update or remove the validator
-		if validators[idx].Power <= 0 {
+		if v.Power <= 0 {
 			if len(validators) <= 3 {
 				// cannot remove the last 3 validators
-				validators[idx].Power = 1
+				v.Power = 1
 			} else {
-				if err := c.state.RemoveValidator(validators[idx]); err != nil {
+				if err := c.state.RemoveValidator(v); err != nil {
 					return fmt.Errorf("cannot remove validator: %w", err)
 				}
 				continue
 			}
 		}
-		if err := c.state.AddValidator(validators[idx]); err != nil {
+		if err := c.state.AddValidator(v); err != nil {
 			return fmt.Errorf("cannot update validator score: %w", err)
 		}
 	}
+
 	return nil
 }
