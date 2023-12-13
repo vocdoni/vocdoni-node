@@ -40,7 +40,7 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 	if err != nil {
 		tb.Fatal(err)
 	}
-	_, err = app.InitChain(context.TODO(), &abcitypes.RequestInitChain{
+	_, err = app.InitChain(context.TODO(), &abcitypes.InitChainRequest{
 		Time:          time.Now(),
 		ChainId:       chainID,
 		Validators:    []abcitypes.ValidatorUpdate{},

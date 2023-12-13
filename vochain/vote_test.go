@@ -142,8 +142,8 @@ func TestVoteOverwrite(t *testing.T) {
 	qt.Check(t, err, qt.IsNil)
 	app.AdvanceTestBlock()
 
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(abcitypes.CheckTxRequest)
+	var cktxresp *abcitypes.CheckTxResponse
 
 	// send 9 votes, should be fine
 	for i := 1; i < 10; i++ {
@@ -257,7 +257,7 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// define a function to send a vote
 	vote := func(i int) uint32 {
-		cktx := new(abcitypes.RequestCheckTx)
+		cktx := new(abcitypes.CheckTxRequest)
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)

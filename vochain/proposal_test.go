@@ -78,7 +78,7 @@ func TestTransactionsSorted(t *testing.T) {
 		txs = append(txs, stx)
 	}
 
-	req := &abcitypes.RequestPrepareProposal{
+	req := &abcitypes.PrepareProposalRequest{
 		Txs: txs,
 	}
 

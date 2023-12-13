@@ -900,7 +900,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 		return err
 	}
 
-	cktx := new(abcitypes.RequestCheckTx)
+	cktx := new(abcitypes.CheckTxRequest)
 	cktx.Tx = stxBytes
 	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {

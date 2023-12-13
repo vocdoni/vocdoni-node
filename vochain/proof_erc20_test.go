@@ -65,8 +65,8 @@ func TestEthProof(t *testing.T) {
 
 func testEthSendVotes(t *testing.T, s testStorageProof,
 	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(abcitypes.CheckTxRequest)
+	var cktxresp *abcitypes.CheckTxResponse
 	var stx models.SignedTx
 
 	t.Logf("voting %x", s.StorageProof.Key)
