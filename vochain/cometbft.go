@@ -11,8 +11,8 @@ import (
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometapitypes "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
-	"github.com/cometbft/cometbft/proto/tendermint/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/genesis"
@@ -31,7 +31,7 @@ import (
 //
 // We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
-	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
+	req *abcitypes.InfoRequest) (*abcitypes.InfoResponse, error) {
 	app.isSynchronizing.Store(true)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
@@ -47,17 +47,17 @@ func (app *BaseApplication) Info(_ context.Context,
 		req.P2PVersion, "blockVersion", req.BlockVersion, "lastHeight",
 		lastHeight, "appHash", hex.EncodeToString(appHash))
 
-	return &abcitypes.ResponseInfo{
+	return &abcitypes.InfoResponse{
 		LastBlockHeight:  int64(lastHeight),
 		LastBlockAppHash: appHash,
 	}, nil
 }
 
 // InitChain called once upon genesis
-// ResponseInitChain can return a list of validators. If the list is empty,
+// InitChainResponse can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(_ context.Context,
-	req *abcitypes.RequestInitChain) (*abcitypes.ResponseInitChain, error) {
+	req *abcitypes.InitChainRequest) (*abcitypes.InitChainResponse, error) {
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState genesis.AppState
@@ -159,7 +159,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	if _, err = app.State.Save(); err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-	return &abcitypes.ResponseInitChain{
+	return &abcitypes.InitChainResponse{
 		Validators: tendermintValidators,
 		AppHash:    hash,
 	}, nil
@@ -167,9 +167,9 @@ func (app *BaseApplication) InitChain(_ context.Context,
 
 // CheckTx unmarshals req.Tx and checks its validity
 func (app *BaseApplication) CheckTx(_ context.Context,
-	req *abcitypes.RequestCheckTx) (*abcitypes.ResponseCheckTx, error) {
+	req *abcitypes.CheckTxRequest) (*abcitypes.CheckTxResponse, error) {
 	if req == nil || req.Tx == nil {
-		return &abcitypes.ResponseCheckTx{
+		return &abcitypes.CheckTxResponse{
 			Code: 1,
 			Data: []byte("nil request or tx"),
 		}, fmt.Errorf("nil request or tx")
@@ -188,29 +188,29 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 			// remove tx reference and return checkTx error
 			log.Debugw("pruning expired tx from mempool", "height", app.Height(), "hash", fmt.Sprintf("%x", txReference))
 			app.txReferences.Delete(txReference)
-			return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
+			return &abcitypes.CheckTxResponse{Code: 1, Data: []byte(fmt.Sprintf("tx expired %x", txReference))}, nil
 		}
 	}
 	// execute recheck mempool every recheckTxHeightInterval blocks
-	if req.Type == abcitypes.CheckTxType_Recheck {
+	if req.Type == abcitypes.CHECK_TX_TYPE_RECHECK {
 		if app.Height()%recheckTxHeightInterval != 0 {
-			return &abcitypes.ResponseCheckTx{Code: 0}, nil
+			return &abcitypes.CheckTxResponse{Code: 0}, nil
 		}
 	}
 	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
+		return &abcitypes.CheckTxResponse{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
 	}
 	response, err := app.TransactionHandler.CheckTx(tx, false)
 	if err != nil {
 		if errors.Is(err, transaction.ErrorAlreadyExistInCache) {
-			return &abcitypes.ResponseCheckTx{Code: 0}, nil
+			return &abcitypes.CheckTxResponse{Code: 0}, nil
 		}
 		log.Errorw(err, "checkTx")
-		return &abcitypes.ResponseCheckTx{Code: 1, Data: []byte("checkTx " + err.Error())}, err
+		return &abcitypes.CheckTxResponse{Code: 1, Data: []byte("checkTx " + err.Error())}, err
 	}
-	return &abcitypes.ResponseCheckTx{
+	return &abcitypes.CheckTxResponse{
 		Code: 0,
 		Data: response.Data,
 		Info: fmt.Sprintf("%x", response.TxHash),
@@ -220,9 +220,9 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 
 // FinalizeBlock is executed by cometBFT when a new block is decided.
 // Cryptographic commitments to the block and transaction results, returned via the corresponding
-// parameters in ResponseFinalizeBlock, are included in the header of the next block.
+// parameters in FinalizeBlockResponse, are included in the header of the next block.
 func (app *BaseApplication) FinalizeBlock(_ context.Context,
-	req *abcitypes.RequestFinalizeBlock) (*abcitypes.ResponseFinalizeBlock, error) {
+	req *abcitypes.FinalizeBlockRequest) (*abcitypes.FinalizeBlockResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -268,7 +268,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	// we cannot modify the state or we would break ProcessProposal optimistic execution
 	proposalVotes := [][]byte{}
 	for _, v := range req.GetDecidedLastCommit().Votes {
-		if idFlag := v.GetBlockIdFlag(); idFlag == types.BlockIDFlagAbsent || idFlag == types.BlockIDFlagUnknown {
+		if idFlag := v.GetBlockIdFlag(); idFlag == cometapitypes.BlockIDFlagAbsent || idFlag == cometapitypes.BlockIDFlagUnknown {
 			// skip invalid votes
 			continue
 		}
@@ -287,7 +287,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get validators: %w", err)
 	}
-	return &abcitypes.ResponseFinalizeBlock{
+	return &abcitypes.FinalizeBlockResponse{
 		AppHash:          root,
 		TxResults:        txResults,
 		ValidatorUpdates: validatorUpdate(validators),
@@ -309,7 +309,7 @@ func validatorUpdate(validators map[string]*models.Validator) abcitypes.Validato
 }
 
 // Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.
-func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit) (*abcitypes.ResponseCommit, error) {
+func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.CommitRequest) (*abcitypes.CommitResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	// save state and get hash
@@ -317,7 +317,7 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 	if err != nil {
 		return nil, err
 	}
-	return &abcitypes.ResponseCommit{
+	return &abcitypes.CommitResponse{
 		RetainHeight: 0, // When snapshot sync enabled, we can start to remove old blocks
 	}, nil
 }
@@ -327,12 +327,12 @@ func (app *BaseApplication) Commit(_ context.Context, _ *abcitypes.RequestCommit
 // demonstrated to be a key component for improved performance. Method PrepareProposal is called every
 // time CometBFT is about to broadcast a Proposal message and validValue is nil. CometBFT gathers
 // outstanding transactions from the mempool, generates a block header, and uses them to create a block
-// to propose. Then, it calls RequestPrepareProposal with the newly created proposal, called raw proposal.
+// to propose. Then, it calls PrepareProposalRequest with the newly created proposal, called raw proposal.
 // The Application can make changes to the raw proposal, such as modifying the set of transactions or the
 // order in which they appear, and returns the (potentially) modified proposal, called prepared proposal in
-// the ResponsePrepareProposal call. The logic modifying the raw proposal MAY be non-deterministic.
+// the PrepareProposalResponse call. The logic modifying the raw proposal MAY be non-deterministic.
 func (app *BaseApplication) PrepareProposal(ctx context.Context,
-	req *abcitypes.RequestPrepareProposal) (*abcitypes.ResponsePrepareProposal, error) {
+	req *abcitypes.PrepareProposalRequest) (*abcitypes.PrepareProposalResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -425,7 +425,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	app.State.Rollback()
 	log.Debugw("prepare proposal", "height", app.Height(), "txs", len(validTxs),
 		"milliSeconds", time.Since(startTime).Milliseconds())
-	return &abcitypes.ResponsePrepareProposal{
+	return &abcitypes.PrepareProposalResponse{
 		Txs: validTxs,
 	}, nil
 }
@@ -439,7 +439,7 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
 func (app *BaseApplication) ProcessProposal(_ context.Context,
-	req *abcitypes.RequestProcessProposal) (*abcitypes.ResponseProcessProposal, error) {
+	req *abcitypes.ProcessProposalRequest) (*abcitypes.ProcessProposalResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -455,7 +455,7 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 		app.lastDeliverTxResponse = nil
 		app.lastRootHash = nil
 		app.lastBlockHash = nil
-		return &abcitypes.ResponseProcessProposal{Status: abcitypes.ResponseProcessProposal_ACCEPT}, nil
+		return &abcitypes.ProcessProposalResponse{Status: abcitypes.PROCESS_PROPOSAL_STATUS_ACCEPT}, nil
 	}
 
 	startTime := time.Now()
@@ -476,8 +476,8 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	if len(resp.InvalidTransactions) > 0 {
 		log.Warnw("invalid transactions on process proposal", "height", app.Height(), "count", len(resp.InvalidTransactions),
 			"proposer", hex.EncodeToString(req.ProposerAddress), "action", "reject")
-		return &abcitypes.ResponseProcessProposal{
-			Status: abcitypes.ResponseProcessProposal_REJECT,
+		return &abcitypes.ProcessProposalResponse{
+			Status: abcitypes.PROCESS_PROPOSAL_STATUS_REJECT,
 		}, nil
 	}
 	app.lastDeliverTxResponse = resp.Responses
@@ -486,49 +486,49 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	log.Debugw("process proposal", "height", app.Height(), "txs", len(req.Txs), "action", "accept",
 		"blockHash", hex.EncodeToString(app.lastBlockHash),
 		"hash", hex.EncodeToString(resp.Root), "milliSeconds", time.Since(startTime).Milliseconds())
-	return &abcitypes.ResponseProcessProposal{
-		Status: abcitypes.ResponseProcessProposal_ACCEPT,
+	return &abcitypes.ProcessProposalResponse{
+		Status: abcitypes.PROCESS_PROPOSAL_STATUS_ACCEPT,
 	}, nil
 }
 
 // ListSnapshots returns a list of available snapshots.
 func (*BaseApplication) ListSnapshots(context.Context,
-	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
-	return &abcitypes.ResponseListSnapshots{}, nil
+	*abcitypes.ListSnapshotsRequest) (*abcitypes.ListSnapshotsResponse, error) {
+	return &abcitypes.ListSnapshotsResponse{}, nil
 }
 
 // OfferSnapshot returns the response to a snapshot offer.
 func (*BaseApplication) OfferSnapshot(context.Context,
-	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
-	return &abcitypes.ResponseOfferSnapshot{}, nil
+	*abcitypes.OfferSnapshotRequest) (*abcitypes.OfferSnapshotResponse, error) {
+	return &abcitypes.OfferSnapshotResponse{}, nil
 }
 
 // LoadSnapshotChunk returns the response to a snapshot chunk loading request.
 func (*BaseApplication) LoadSnapshotChunk(context.Context,
-	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
-	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
+	*abcitypes.LoadSnapshotChunkRequest) (*abcitypes.LoadSnapshotChunkResponse, error) {
+	return &abcitypes.LoadSnapshotChunkResponse{}, nil
 }
 
 // ApplySnapshotChunk returns the response to a snapshot chunk applying request.
 func (*BaseApplication) ApplySnapshotChunk(context.Context,
-	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
-	return &abcitypes.ResponseApplySnapshotChunk{}, nil
+	*abcitypes.ApplySnapshotChunkRequest) (*abcitypes.ApplySnapshotChunkResponse, error) {
+	return &abcitypes.ApplySnapshotChunkResponse{}, nil
 }
 
 // Query does nothing
 func (*BaseApplication) Query(_ context.Context,
-	_ *abcitypes.RequestQuery) (*abcitypes.ResponseQuery, error) {
-	return &abcitypes.ResponseQuery{}, nil
+	_ *abcitypes.QueryRequest) (*abcitypes.QueryResponse, error) {
+	return &abcitypes.QueryResponse{}, nil
 }
 
 // ExtendVote creates application specific vote extension
 func (*BaseApplication) ExtendVote(_ context.Context,
-	req *abcitypes.RequestExtendVote) (*abcitypes.ResponseExtendVote, error) {
-	return &abcitypes.ResponseExtendVote{}, nil
+	req *abcitypes.ExtendVoteRequest) (*abcitypes.ExtendVoteResponse, error) {
+	return &abcitypes.ExtendVoteResponse{}, nil
 }
 
 // VerifyVoteExtension verifies application's vote extension data
 func (*BaseApplication) VerifyVoteExtension(context.Context,
-	*abcitypes.RequestVerifyVoteExtension) (*abcitypes.ResponseVerifyVoteExtension, error) {
-	return &abcitypes.ResponseVerifyVoteExtension{}, nil
+	*abcitypes.VerifyVoteExtensionRequest) (*abcitypes.VerifyVoteExtensionResponse, error) {
+	return &abcitypes.VerifyVoteExtensionResponse{}, nil
 }

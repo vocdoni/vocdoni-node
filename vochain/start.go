@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -20,7 +21,6 @@ import (
 	"github.com/cometbft/cometbft/proxy"
 
 	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmos "github.com/cometbft/cometbft/libs/os"
 	tmnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
 )
@@ -241,7 +241,7 @@ func newTendermint(app *BaseApplication,
 		"seed", tconfig.P2P.SeedMode)
 
 	// read or create genesis file
-	if tmos.FileExists(tconfig.GenesisFile()) {
+	if _, err := os.Stat(tconfig.GenesisFile()); err == nil {
 		log.Infof("found genesis file %s", tconfig.GenesisFile())
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
@@ -284,7 +284,9 @@ func newTendermint(app *BaseApplication,
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
-	node, err := tmnode.NewNode(tconfig,
+	node, err := tmnode.NewNode(
+		context.Background(),
+		tconfig,
 		pv,
 		nodeKey,
 		proxy.NewLocalClientCreator(app),

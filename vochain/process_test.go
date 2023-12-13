@@ -419,7 +419,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
-	cktx := new(abcitypes.RequestCheckTx)
+	cktx := new(abcitypes.CheckTxRequest)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)

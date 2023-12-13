@@ -169,7 +169,7 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			panic(err)
 		}
-		if _, err = vc.App.InitChain(context.Background(), &abcitypes.RequestInitChain{
+		if _, err = vc.App.InitChain(context.Background(), &abcitypes.InitChainRequest{
 			ChainId:       vc.App.ChainID(),
 			AppStateBytes: genesisAppData,
 			Time:          time.Now(),
@@ -338,7 +338,7 @@ func (vc *Vocone) setDefaultMethods() {
 }
 
 func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+	resp, err := vc.App.CheckTx(context.Background(), &abcitypes.CheckTxRequest{Tx: tx})
 	if err != nil {
 		return nil, err
 	}
@@ -376,7 +376,7 @@ txLoop:
 			break txLoop
 		}
 		// ensure all txs are still valid valid
-		resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+		resp, err := vc.App.CheckTx(context.Background(), &abcitypes.CheckTxRequest{Tx: tx})
 		if err != nil {
 			log.Errorw(err, "error on check tx")
 			continue

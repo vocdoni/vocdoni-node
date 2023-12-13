@@ -47,7 +47,7 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	cktx := new(abcitypes.RequestCheckTx)
+	cktx := new(abcitypes.CheckTxRequest)
 
 	// send the votes (but not the last one), should be ok
 	for i, s := range keys {
@@ -196,8 +196,8 @@ func TestCSPproof(t *testing.T) {
 
 func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(abcitypes.CheckTxRequest)
+	var cktxresp *abcitypes.CheckTxResponse
 	var stx models.SignedTx
 	var err error
 
