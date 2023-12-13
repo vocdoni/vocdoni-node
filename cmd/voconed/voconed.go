@@ -223,7 +223,7 @@ func main() {
 		}
 	}
 
-	vc.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
+	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
 	vc.SetBlockSize(config.blockSize)
 
 	go vc.Start()

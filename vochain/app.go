@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
@@ -71,6 +72,9 @@ type BaseApplication struct {
 	// txLReferences is a map indexed by hashed transactions and storing the height where the transaction
 	// was seen frist time and the number of attempts failed for including it into a block.
 	txReferences sync.Map
+
+	// blockTime is the target block time that miners use
+	blockTime time.Duration
 
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
@@ -412,4 +416,17 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 // MempoolSize returns the size of the transaction mempool
 func (app *BaseApplication) MempoolSize() int {
 	return app.fnMempoolSize()
+}
+
+// BlockTimeTarget returns the current block time target
+func (app *BaseApplication) BlockTimeTarget() time.Duration {
+	if app.blockTime == 0 {
+		return types.DefaultBlockTime
+	}
+	return app.blockTime
+}
+
+// SetBlockTimeTarget sets the current block time target
+func (app *BaseApplication) SetBlockTimeTarget(d time.Duration) {
+	app.blockTime = d
 }

@@ -300,9 +300,17 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		return err
 	}
 
+	var blockTimesInMs [5]uint64
+	for i, v := range a.vocinfo.BlockTimes() {
+		blockTimesInMs[i] = uint64(v.Milliseconds())
+	}
+	if blockTimesInMs[0] == 0 {
+		blockTimesInMs[0] = uint64(a.vocapp.BlockTimeTarget().Milliseconds())
+	}
+
 	data, err := json.Marshal(&ChainInfo{
 		ID:                a.vocapp.ChainID(),
-		BlockTime:         a.vocinfo.BlockTimes(),
+		BlockTime:         blockTimesInMs,
 		ElectionCount:     a.indexer.CountTotalProcesses(),
 		OrganizationCount: a.indexer.CountTotalEntities(),
 		Height:            a.vocapp.Height(),

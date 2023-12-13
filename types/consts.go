@@ -36,7 +36,7 @@ const (
 	ArchiveURL = "/ipns/k2k4r8otxrf176h1i08txap0ep6ynr1jac0vymozi068eedml7gk1595"
 
 	// DefaultBlockTime is the default block time in seconds.
-	DefaultBlockTime = 12 * time.Second
+	DefaultBlockTime = 10 * time.Second
 
 	// KeyKeeperMaxKeyIndex is the maxim number of allowed encryption keys.
 	KeyKeeperMaxKeyIndex = 16

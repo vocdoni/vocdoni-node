@@ -34,7 +34,7 @@ func TestVocone(t *testing.T) {
 	vc, err := NewVocone(dir, &keymng, false, "", nil)
 	qt.Assert(t, err, qt.IsNil)
 
-	vc.SetBlockTimeTarget(time.Millisecond * 500)
+	vc.App.SetBlockTimeTarget(time.Millisecond * 500)
 	go vc.Start()
 	port := 13000 + util.RandomInt(0, 2000)
 	_, err = vc.EnableAPI("127.0.0.1", port, "/v2")

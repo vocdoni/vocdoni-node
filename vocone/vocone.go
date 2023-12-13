@@ -50,8 +50,8 @@ type Vocone struct {
 	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
 	blockStore      db.Database
 	height          atomic.Int64
+	blockTimestamps sync.Map
 	lastBlockTime   time.Time
-	blockTimeTarget time.Duration
 	txsPerBlock     int
 	// vcMtx is a lock on modification to the app state.
 	// this enables direct calls to vochain functions from the vocone
@@ -72,7 +72,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 		return nil, err
 	}
 	vc.mempool = make(chan []byte, mempoolSize)
-	vc.blockTimeTarget = DefaultBlockTimeTarget
 	vc.txsPerBlock = DefaultTxsPerBlock
 	version, err := vc.App.State.LastHeight()
 	if err != nil {
@@ -86,6 +85,7 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 
 	vc.setDefaultMethods()
 	vc.App.State.SetHeight(uint32(vc.height.Load()))
+	vc.App.SetBlockTimeTarget(DefaultBlockTimeTarget)
 
 	// Create indexer
 	if vc.Indexer, err = indexer.New(vc.App, indexer.Options{
@@ -200,17 +200,12 @@ func (vc *Vocone) Start() {
 
 		// Waiting time
 		sinceLast := time.Since(vc.lastBlockTime)
-		if sinceLast < vc.blockTimeTarget {
-			time.Sleep(vc.blockTimeTarget - sinceLast)
+		if sinceLast < vc.App.BlockTimeTarget() {
+			time.Sleep(vc.App.BlockTimeTarget() - sinceLast)
 		}
 		vc.lastBlockTime = time.Now()
 		vc.height.Add(1)
 	}
-}
-
-// SetBlockTimeTarget configures the time window in which blocks will be created.
-func (vc *Vocone) SetBlockTimeTarget(targetTime time.Duration) {
-	vc.blockTimeTarget = targetTime
 }
 
 // SetBlockSize configures the maximum number of transactions per block.
@@ -368,6 +363,7 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 
 // prepareBlock prepares a block with transactions from the mempool and returns the list of transactions.
 func (vc *Vocone) prepareBlock() [][]byte {
+	defer vc.blockTimestamps.Store(vc.height.Load(), time.Now())
 	blockStoreTx := vc.blockStore.WriteTx()
 	defer blockStoreTx.Discard()
 	var transactions [][]byte
@@ -407,6 +403,14 @@ txLoop:
 // TO-DO: improve this function
 func (vc *Vocone) getBlock(height int64) *tmtypes.Block {
 	blk := new(tmtypes.Block)
+	blk.Height = height
+	blk.ChainID = vc.App.ChainID()
+	v, found := vc.blockTimestamps.Load(height)
+	if found {
+		if t, ok := v.(time.Time); ok {
+			blk.Time = t
+		}
+	}
 	for i := int32(0); ; i++ {
 		tx, err := vc.getTx(uint32(height), i)
 		if err != nil {
@@ -454,19 +458,19 @@ func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		b.Reset()
 		a := vi.BlockTimes()
 		if a[0] > 0 {
-			fmt.Fprintf(&b, "1m:%.2f", float32(a[0])/1000)
+			fmt.Fprintf(&b, "1m:%s", a[0].Truncate(time.Millisecond))
 		}
 		if a[1] > 0 {
-			fmt.Fprintf(&b, " 10m:%.2f", float32(a[1])/1000)
+			fmt.Fprintf(&b, " 10m:%s", a[1].Truncate(time.Millisecond))
 		}
 		if a[2] > 0 {
-			fmt.Fprintf(&b, " 1h:%.2f", float32(a[2])/1000)
+			fmt.Fprintf(&b, " 1h:%s", a[2].Truncate(time.Millisecond))
 		}
 		if a[3] > 0 {
-			fmt.Fprintf(&b, " 6h:%.2f", float32(a[3])/1000)
+			fmt.Fprintf(&b, " 6h:%s", a[3].Truncate(time.Millisecond))
 		}
 		if a[4] > 0 {
-			fmt.Fprintf(&b, " 24h:%.2f", float32(a[4])/1000)
+			fmt.Fprintf(&b, " 24h:%s", a[4].Truncate(time.Millisecond))
 		}
 		h = vi.Height()
 		m = vi.MempoolSize()
