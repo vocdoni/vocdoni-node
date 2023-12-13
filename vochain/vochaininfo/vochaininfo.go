@@ -3,14 +3,12 @@ package vochaininfo
 import (
 	"context"
 	"fmt"
-	"math"
 	"sync"
 	"time"
 
 	"github.com/VictoriaMetrics/metrics"
 	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
 )
@@ -19,7 +17,7 @@ import (
 // Avg1/10/60/360 are the block time average for 1 minute, 10 minutes, 1 hour and 6 hours
 type VochainInfo struct {
 	votesPerMinute uint64
-	blockTimes     [5]uint64
+	blockTimes     [5]time.Duration
 	blocksMinute   float64
 	vnode          *vochain.BaseApplication
 	close          chan bool
@@ -63,7 +61,7 @@ func (vi *VochainInfo) updateCounters() {
 
 	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
-	blockPeriodMinute.Set(vi.BlockTimes()[0])
+	blockPeriodMinute.Set(uint64(vi.BlockTimes()[0].Milliseconds()))
 	blocksSyncLastMinute.Set(uint64(vi.BlocksLastMinute()))
 }
 
@@ -74,7 +72,7 @@ func (vi *VochainInfo) Height() uint64 {
 
 // averageBlockTime calculates the average block time for the last intervalBlocks blocks.
 // The timestamp information is taken from the block headers.
-func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) float64 {
+func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) time.Duration {
 	if intervalBlocks == 0 {
 		return 0
 	}
@@ -91,81 +89,69 @@ func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) float64 {
 	startTime := vi.vnode.TimestampFromBlock(startBlockHeight)
 	currentTime := vi.vnode.TimestampFromBlock(currentHeight)
 
-	if startTime == nil || currentTime == nil {
+	if startTime == nil || currentTime == nil || startTime.Equal(time.Time{}) {
 		return 0
 	}
 
 	// Calculate the time frame in seconds
-	timeFrameSeconds := currentTime.Sub(*startTime).Seconds()
+	timeFrame := currentTime.Sub(*startTime)
 
 	// Adjust the average block time based on the actual time frame
-	return timeFrameSeconds / float64(intervalBlocks)
+	return timeFrame / time.Duration(intervalBlocks)
 }
 
 func (vi *VochainInfo) updateBlockTimes() {
-	vi.blockTimes = [5]uint64{
-		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*1)),
-		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*10)),
-		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*60)),
-		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*360)),
-		uint64(1000 * vi.averageBlockTime(60/int64(types.DefaultBlockTime.Seconds())*1440)),
+	vi.blockTimes = [5]time.Duration{
+		vi.averageBlockTime(int64(1 * time.Minute / vi.vnode.BlockTimeTarget())),
+		vi.averageBlockTime(int64(10 * time.Minute / vi.vnode.BlockTimeTarget())),
+		vi.averageBlockTime(int64(1 * time.Hour / vi.vnode.BlockTimeTarget())),
+		vi.averageBlockTime(int64(6 * time.Hour / vi.vnode.BlockTimeTarget())),
+		vi.averageBlockTime(int64(24 * time.Hour / vi.vnode.BlockTimeTarget())),
+	}
+	if vi.blockTimes[0] == 0 {
+		vi.blockTimes[0] = vi.vnode.BlockTimeTarget()
 	}
 }
 
-// BlockTimes returns the average block time in milliseconds for 1, 10, 60, 360 and 1440 minutes.
+// BlockTimes returns the average block time for 1, 10, 60, 360 and 1440 minutes.
 // Value 0 means there is not yet an average.
-func (vi *VochainInfo) BlockTimes() [5]uint64 {
+func (vi *VochainInfo) BlockTimes() [5]time.Duration {
 	vi.lock.RLock()
 	defer vi.lock.RUnlock()
 	return vi.blockTimes
 }
 
-// EstimateBlockHeight provides an estimation time for a future blockchain height number.
-func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint64, error) {
-	currentTime := time.Now()
-	// diff time in seconds
-	diffTime := target.Unix() - currentTime.Unix()
-
-	// block time in ms
+func (vi *VochainInfo) getBlockTimeBestEstimate(i int) time.Duration {
 	times := vi.BlockTimes()
-	getMaxTimeFrom := func(i int) uint64 {
-		for ; i >= 0; i-- {
-			if times[i] != 0 {
-				return uint64(times[i])
-			}
+	for ; i >= 0; i-- {
+		if times[i] != 0 {
+			return times[i]
 		}
-		return 10000 // fallback
 	}
-	inPast := diffTime < 0
-	absDiff := diffTime
-	// check diff is not too big
-	if absDiff > math.MaxUint64/1000 {
-		return 0, fmt.Errorf("target time %v is too far in the future", target)
-	}
-	if inPast {
-		absDiff = -absDiff
-	}
-	t := uint64(0)
-	switch {
-	// if less than around 15 minutes missing
-	case absDiff < 900:
-		t = getMaxTimeFrom(1)
-	// if less than around 6 hours missing
-	case absDiff < 21600:
-		t = getMaxTimeFrom(3)
-	// if more than around 6 hours missing
-	default:
-		t = getMaxTimeFrom(4)
-	}
-	// Multiply by 1000 because t is represented in seconds, not ms.
-	// Dividing t first can floor the integer, leading to divide-by-zero
-	currentHeight := uint64(vi.Height())
-	blockDiff := uint64(absDiff*1000) / t
-	if inPast {
-		if blockDiff > currentHeight {
-			return 0, fmt.Errorf("target time %v is before origin", target)
+	return vi.vnode.BlockTimeTarget() // fallback
+}
+
+// EstimateBlockHeight provides an estimated blockchain height for a future or past date.
+func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint64, error) {
+	timeDiff := time.Until(target)
+	timeBetweenBlocks := func() time.Duration {
+		switch {
+		// if less than around 15 minutes missing
+		case timeDiff.Abs().Minutes() < 15:
+			return vi.getBlockTimeBestEstimate(1)
+		// if less than around 6 hours missing
+		case timeDiff.Abs().Hours() < 6:
+			return vi.getBlockTimeBestEstimate(3)
+		// if more than around 6 hours missing
+		default:
+			return vi.getBlockTimeBestEstimate(4)
 		}
-		return currentHeight - blockDiff, nil
+	}()
+	blockDiff := uint64(timeDiff / timeBetweenBlocks)
+	currentHeight := uint64(vi.vnode.Height())
+	// timeDiff is negative if target is in the past
+	if timeDiff < 0 && currentHeight+blockDiff <= 0 {
+		return 0, fmt.Errorf("target time %v is before genesis", target)
 	}
 	return currentHeight + blockDiff, nil
 }
@@ -173,11 +159,9 @@ func (vi *VochainInfo) EstimateBlockHeight(target time.Time) (uint64, error) {
 // HeightTime estimates the UTC time for a future height or returns the
 // block timestamp if height is in the past.
 func (vi *VochainInfo) HeightTime(height uint64) time.Time {
-	times := vi.BlockTimes()
-	currentHeight := vi.Height()
-	diffHeight := int64(height - currentHeight)
+	diffHeight := int64(height - uint64(vi.vnode.Height()))
 
-	if diffHeight < 0 {
+	if diffHeight < 0 { // height is in the past
 		blk := vi.vnode.GetBlockByHeight(int64(height))
 		if blk == nil {
 			log.Errorf("cannot get block height %d", height)
@@ -186,28 +170,20 @@ func (vi *VochainInfo) HeightTime(height uint64) time.Time {
 		return blk.Header.Time
 	}
 
-	getMaxTimeFrom := func(i int) uint64 {
-		for ; i >= 0; i-- {
-			if times[i] != 0 {
-				return times[i]
-			}
+	timeBetweenBlocks := func() time.Duration {
+		switch {
+		// if less than around 15 minutes missing
+		case diffHeight < int64(15*time.Minute/vi.vnode.BlockTimeTarget()):
+			return vi.getBlockTimeBestEstimate(1)
+		// if less than around 6 hours missing
+		case diffHeight < int64(6*time.Hour/vi.vnode.BlockTimeTarget()):
+			return vi.getBlockTimeBestEstimate(3)
+		// if more than around 6 hours missing
+		default:
+			return vi.getBlockTimeBestEstimate(4)
 		}
-		return 10000 // fallback
-	}
-
-	t := uint64(0)
-	switch {
-	// if less than around 15 minutes missing
-	case diffHeight < 100:
-		t = getMaxTimeFrom(1)
-	// if less than around 6 hours missing
-	case diffHeight < 1000:
-		t = getMaxTimeFrom(3)
-	// if less than around 6 hours missing
-	case diffHeight >= 1000:
-		t = getMaxTimeFrom(4)
-	}
-	return time.Now().Add(time.Duration(diffHeight*int64(t)) * time.Millisecond)
+	}()
+	return time.Now().Add(time.Duration(diffHeight) * timeBetweenBlocks)
 }
 
 // TreeSizes returns the current size of the ProcessTree, VoteTree and the votes per minute
