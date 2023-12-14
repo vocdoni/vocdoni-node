@@ -700,5 +700,4 @@ func main() {
 	tmBlock := srv.App.GetBlockByHeight(int64(height))
 	log.Infow("last block", "height", height, "appHash", hex.EncodeToString(hash),
 		"time", tmBlock.Time, "tmAppHash", tmBlock.AppHash.String(), "tmHeight", tmBlock.Height)
-	os.Exit(0)
 }

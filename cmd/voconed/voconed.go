@@ -264,6 +264,4 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
-	os.Exit(0)
-
 }
