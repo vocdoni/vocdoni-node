@@ -446,14 +446,6 @@ func main() {
 	// using the global datadir as parent folder.
 	circuit.BaseDir = filepath.Join(conf.DataDir, "zkCircuits")
 
-	// Ensure we can have at least 8k open files. This is necessary, since
-	// many components like IPFS and Tendermint require keeping many active
-	// connections. Some systems have low defaults like 1024, which can make
-	// the program crash after it's been running for a bit.
-	if err := ensureNumberFiles(8000); err != nil {
-		log.Errorf("could not ensure support for enough open files: %v", err)
-	}
-
 	// Check the mode is valid
 	if !conf.ValidMode() {
 		log.Fatalf("mode %s is invalid", conf.Mode)
@@ -709,23 +701,4 @@ func main() {
 	log.Infow("last block", "height", height, "appHash", hex.EncodeToString(hash),
 		"time", tmBlock.Time, "tmAppHash", tmBlock.AppHash.String(), "tmHeight", tmBlock.Height)
 	os.Exit(0)
-}
-
-func ensureNumberFiles(min uint64) error {
-	// Note that this function should work on Unix-y systems, but not on
-	// others like Windows.
-
-	var rlim syscall.Rlimit
-	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &rlim); err != nil {
-		return err
-	}
-	if rlim.Max < min {
-		return fmt.Errorf("hard limit is %d, but we require a minimum of %d", rlim.Max, min)
-	}
-	if rlim.Cur >= rlim.Max {
-		return nil // nothing to do
-	}
-	log.Infof("raising file descriptor soft limit from %d to %d", rlim.Cur, rlim.Max)
-	rlim.Cur = rlim.Max
-	return syscall.Setrlimit(syscall.RLIMIT_NOFILE, &rlim)
 }
