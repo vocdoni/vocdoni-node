@@ -1,7 +1,6 @@
 package service
 
 import (
-	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/config"
@@ -15,9 +14,6 @@ import (
 // IPFS starts the IPFS service
 func (vs *VocdoniService) IPFS(ipfsconfig *config.IPFSCfg) (data.Storage, error) {
 	log.Info("creating ipfs service")
-	if err := os.Setenv("IPFS_FD_MAX", "1024"); err != nil {
-		log.Warnw("could not set IPFS_FD_MAX", "err", err)
-	}
 	storage := new(ipfs.Handler)
 	if err := storage.Init(&types.DataStore{Datadir: ipfsconfig.ConfigPath}); err != nil {
 		return nil, err
