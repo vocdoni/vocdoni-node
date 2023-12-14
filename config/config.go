@@ -7,11 +7,11 @@ import (
 // Config stores global configurations for vocdoni-node
 type Config struct {
 	// Vochain config options
-	Vochain *VochainCfg
+	Vochain VochainCfg
 	// Ipfs config options
-	Ipfs *IPFSCfg
+	Ipfs IPFSCfg
 	// Metrics config options
-	Metrics *MetricsCfg
+	Metrics MetricsCfg
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
@@ -62,15 +62,6 @@ func (c *Config) ValidMode() bool {
 		return false
 	}
 	return true
-}
-
-// NewConfig initializes the fields in the config stuct.
-func NewConfig() *Config {
-	return &Config{
-		Vochain: new(VochainCfg),
-		Ipfs:    new(IPFSCfg),
-		Metrics: new(MetricsCfg),
-	}
 }
 
 // IPFSCfg includes all possible config params needed by IPFS

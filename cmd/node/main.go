@@ -58,8 +58,8 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 // newConfig creates a new config object and loads the stored configuration file
 func newConfig() (*config.Config, config.Error) {
 	var cfgError config.Error
-	// create base config
-	conf := config.NewConfig()
+	conf := &config.Config{}
+
 	// get current user home dir
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -476,7 +476,7 @@ func main() {
 	}
 
 	var err error
-	srv := service.VocdoniService{Config: conf.Vochain}
+	srv := service.VocdoniService{Config: &conf.Vochain}
 
 	if conf.Mode == types.ModeGateway {
 		// Signing key
@@ -516,7 +516,7 @@ func main() {
 
 	// Storage service for Gateway
 	if conf.Mode == types.ModeGateway || conf.Mode == types.ModeCensus {
-		srv.Storage, err = srv.IPFS(conf.Ipfs)
+		srv.Storage, err = srv.IPFS(&conf.Ipfs)
 		if err != nil {
 			log.Fatal(err)
 		}
