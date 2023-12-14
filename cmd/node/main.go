@@ -50,7 +50,7 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		name = "ipfsConnectPeers"
 	}
 	if oldName != name {
-		fmt.Printf("Flag --%s has been deprecated, please use --%s instead\n", oldName, name)
+		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
 	}
 	return flag.NormalizedName(name)
 }
@@ -355,7 +355,7 @@ func newConfig() (*config.Config, config.Error) {
 	}
 
 	if conf.SigningKey == "" {
-		fmt.Println("no signing key, generating one...")
+		log.Info("no signing key, generating one...")
 		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
 		if err != nil {
@@ -376,7 +376,7 @@ func newConfig() (*config.Config, config.Error) {
 
 	if conf.AdminToken == "" {
 		conf.AdminToken = uuid.New().String()
-		fmt.Println("created new admin API token", conf.AdminToken)
+		log.Info("created new admin API token", conf.AdminToken)
 	}
 
 	if conf.SaveConfig {
