@@ -127,89 +127,93 @@ func newConfig() (*config.Config, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// global
-	flag.StringVarP(&conf.DataDir, "dataDir", "d", home+"/.vocdoni",
+	// TODO: remove from vocdoni.yml file; it's literally where the file sits
+	flag.StringP("dataDir", "d", home+"/.vocdoni",
 		"directory where data is stored")
-	flag.StringVarP(&conf.Vochain.DBType, "dbType", "t", db.TypePebble,
+	flag.StringP("dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
-	flag.StringVarP(&conf.Vochain.Network, "chain", "c", "dev",
+	flag.StringP("chain", "c", "dev",
 		fmt.Sprintf("vocdoni network to connect with: %q", genesis.AvailableNetworks()))
-	flag.BoolVar(&conf.Dev, "dev", false,
+	flag.Bool("dev", false,
 		"use developer mode (less security)")
-	conf.PprofPort = *flag.Int("pprofPort", 0,
+
+	flag.Int("pprofPort", 0,
 		"pprof port for runtime profiling data (zero is disabled)")
-	conf.LogLevel = *flag.StringP("logLevel", "l", "info",
+	flag.StringP("logLevel", "l", "info",
 		"log level (debug, info, warn, error, fatal)")
-	conf.LogOutput = *flag.String("logOutput", "stdout",
+	flag.String("logOutput", "stdout",
 		"log output (stdout, stderr or filepath)")
-	conf.LogErrorFile = *flag.String("logErrorFile", "",
+	flag.String("logErrorFile", "",
 		"log errors and warnings to a file")
-	conf.SaveConfig = *flag.Bool("saveConfig", false,
+	// TODO: remove from vocdoni.yml file
+	flag.Bool("saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
-	conf.Mode = *flag.StringP("mode", "m", types.ModeGateway,
+	flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway, miner, seed, census]")
-	conf.SigningKey = *flag.StringP("signingKey", "k", "",
+	flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
 	// api
-	conf.ListenHost = *flag.String("listenHost", "0.0.0.0",
+	flag.String("listenHost", "0.0.0.0",
 		"API endpoint listen address")
-	conf.ListenPort = *flag.IntP("listenPort", "p", 9090,
+	flag.IntP("listenPort", "p", 9090,
 		"API endpoint http port")
-	conf.EnableAPI = *flag.Bool("enableAPI", true,
+	flag.Bool("enableAPI", true,
 		"enable HTTP API endpoints")
-	conf.AdminToken = *flag.String("adminToken", "",
+	flag.String("adminToken", "",
 		"bearer token for admin API endpoints (leave empty to autogenerate)")
-	conf.TLS.Domain = *flag.String("tlsDomain", "",
+	flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
-	conf.EnableFaucetWithAmount = *flag.Uint64("enableFaucetWithAmount", 0,
+	flag.Uint64("enableFaucetWithAmount", 0,
 		"enable faucet for the current network and the specified amount (testing purposes only)")
 
 	// ipfs
-	conf.Ipfs.ConnectKey = *flag.StringP("ipfsConnectKey", "i", "",
+	flag.StringP("ipfsConnectKey", "i", "",
 		"enable IPFS group synchronization using the given secret key")
-	conf.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
+	flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
-	conf.Vochain.Indexer.ArchiveURL = *flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url")
+	flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url")
 
 	// vochain
-	conf.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
+	flag.String("vochainP2PListen", "0.0.0.0:26656",
 		"p2p host and port to listent for the voting chain")
-	conf.Vochain.PublicAddr = *flag.String("vochainPublicAddr", "",
+	flag.String("vochainPublicAddr", "",
 		"external address:port to announce to other peers (automatically guessed if empty)")
-	conf.Vochain.Genesis = *flag.String("vochainGenesis", "",
+	flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
-	conf.Vochain.LogLevel = *flag.String("vochainLogLevel", "disabled",
+	flag.String("vochainLogLevel", "disabled",
 		"tendermint node log level (debug, info, error, disabled)")
-	conf.Vochain.Peers = *flag.StringSlice("vochainPeers", []string{},
+	flag.StringSlice("vochainPeers", []string{},
 		"comma-separated list of p2p peers")
-	conf.Vochain.Seeds = *flag.StringSlice("vochainSeeds", []string{},
+	flag.StringSlice("vochainSeeds", []string{},
 		"comma-separated list of p2p seed nodes")
-	conf.Vochain.MinerKey = *flag.String("vochainMinerKey", "",
+	flag.String("vochainMinerKey", "",
 		"user alternative vochain miner private key (hexstring[64])")
-	conf.Vochain.NodeKey = *flag.String("vochainNodeKey", "",
+	flag.String("vochainNodeKey", "",
 		"user alternative vochain private key (hexstring[64])")
-	conf.Vochain.NoWaitSync = *flag.Bool("vochainNoWaitSync", false,
+	flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
-	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
+	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 
-	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
+	flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
 		"vochain consensus block time target (in seconds)")
-	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("vochainSkipPreviousOffchainData", false,
+	flag.Bool("vochainSkipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
-	conf.Vochain.ProcessArchive = *flag.Bool("vochainProcessArchive", false,
+	flag.Bool("vochainProcessArchive", false,
 		"enables the process archiver component")
-	conf.Vochain.ProcessArchiveKey = *flag.String("vochainProcessArchiveKey", "",
+	flag.String("vochainProcessArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
-	conf.Vochain.OffChainDataDownloader = *flag.Bool("vochainOffChainDataDownload", true,
+	flag.Bool("vochainOffChainDataDownload", true,
 		"enables the off-chain data downloader component")
+	// TODO: remove from vocdoni.yml file
 	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
 
 	// metrics
-	conf.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
-	conf.Metrics.RefreshInterval = *flag.Int("metricsRefreshInterval", 5,
+	flag.Bool("metricsEnabled", false, "enable prometheus metrics")
+	flag.Int("metricsRefreshInterval", 5,
 		"metrics refresh interval in seconds")
 
 	// parse flags
@@ -226,27 +230,27 @@ func newConfig() (*config.Config, config.Error) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	viper.BindFlagValues(pflagValueSet{flag.CommandLine})
+
+	conf.Vochain.DBType = viper.GetString("dbType")                 // TODO: unused?
+	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL") // TODO: unused?
+
+	// use different datadirs for different networks
 	conf.DataDir = viper.GetString("dataDir")
 	conf.Vochain.Network = viper.GetString("chain")
-	conf.Dev = viper.GetBool("dev")
-	conf.Vochain.DBType = viper.GetString("dbType")
-	// use different datadirs for different networks
 	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Network)
-	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
+	viper.Set("dataDir", conf.DataDir)
+
+	// set up the data subdirectories
+	viper.Set("TLS.DirCert", conf.DataDir+"/tls")
+	viper.Set("ipfs.ConfigPath", conf.DataDir+"/ipfs")
+	viper.Set("vochain.DataDir", conf.DataDir+"/vochain")
+	viper.Set("vochain.ProcessArchiveDataDir", conf.DataDir+"/archive")
+
+	// propagate dev to vochain.Dev
+	viper.Set("vochain.Dev", viper.GetBool("dev"))
 
 	// add viper config path (now we know it)
 	viper.AddConfigPath(conf.DataDir)
-
-	viper.Set("TLS.DirCert", conf.DataDir+"/tls")
-
-	// ipfs
-	viper.Set("ipfs.ConfigPath", conf.DataDir+"/ipfs")
-
-	// vochain
-	viper.Set("vochain.DataDir", conf.DataDir+"/vochain")
-	viper.Set("vochain.Dev", conf.Dev)
-	viper.Set("vochain.ProcessArchiveDataDir", conf.DataDir+"/archive")
-
 	// check if config file exists
 	_, err = os.Stat(conf.DataDir + "/vocdoni.yml")
 	if os.IsNotExist(err) {
