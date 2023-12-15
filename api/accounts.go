@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +30,14 @@ const (
 func (a *API) enableAccountHandlers() error {
 	if err := a.Endpoint.RegisterMethod(
 		"/accounts/{address}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.accountHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts/{address}/metadata",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.accountHandler,
@@ -122,6 +131,8 @@ func (a *API) enableAccountHandlers() error {
 //	@Param			address	path		string	true	"Account address"
 //	@Success		200		{object}	Account
 //	@Router			/accounts/{address} [get]
+//	@Router			/accounts/{address}/metadata [get]
+//	@Success		200	{object}	AccountMetadata
 func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return ErrAddressMalformed
@@ -132,43 +143,57 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrAccountNotFound.With(addr.Hex())
 	}
 
-	// If the account does not exist in state, try to retrieve it from the indexer.
-	// This is a fallback for the case where the account is not in state but it is in the process archive.
-	if acc == nil {
-		indexerEntities := a.indexer.EntityList(1, 0, hex.EncodeToString(addr.Bytes()))
-		if len(indexerEntities) == 0 {
+	getAccountMetadata := func() *AccountMetadata {
+		// Try to retrieve the account info metadata
+		accMetadata := &AccountMetadata{}
+		if a.storage != nil {
+			stgCtx, cancel := context.WithTimeout(context.Background(), AccountFetchMetadataTimeoutSeconds*time.Second)
+			defer cancel()
+			metadataBytes, err := a.storage.Retrieve(stgCtx, acc.InfoURI, MaxOffchainFileSize)
+			if err != nil {
+				log.Warnf("cannot get account metadata from %s: %v", acc.InfoURI, err)
+			} else {
+				if err := json.Unmarshal(metadataBytes, &accMetadata); err != nil {
+					log.Warnf("cannot unmarshal metadata from %s: %v", acc.InfoURI, err)
+				}
+			}
+		}
+		return accMetadata
+	}
+	// take the last word of the URL path to determine the type of request
+	// if the last word is "metadata" then return only the account metadata
+	// otherwise return the full account information
+	if strings.HasSuffix(ctx.Request.URL.Path, "/metadata") {
+		// If the account does not exist in state, try to retrieve it from the indexer.
+		// This is a fallback for the case where the account is not in state but it is in the process archive.
+		// We only return this information if the query is for the "metadata" endpoint.
+		var data []byte
+		if acc == nil {
+			indexerEntities := a.indexer.EntityList(1, 0, hex.EncodeToString(addr.Bytes()))
+			if len(indexerEntities) == 0 {
+				return ErrAccountNotFound.With(addr.Hex())
+			}
+			if data, err = json.Marshal(AccountMetadata{
+				Name: LanguageString{"default": addr.Hex()},
+			}); err != nil {
+				return err
+			}
+			return ctx.Send(data, apirest.HTTPstatusOK)
+		}
+		accMetadata := getAccountMetadata()
+		if accMetadata == nil {
 			return ErrAccountNotFound.With(addr.Hex())
 		}
-		var data []byte
-		if data, err = json.Marshal(Account{
-			Address:       addr.Bytes(),
-			Nonce:         0,
-			Balance:       0,
-			ElectionIndex: uint32(indexerEntities[0].ProcessCount),
-			InfoURL:       "",
-			Metadata: &AccountMetadata{
-				Name: LanguageString{"default": addr.Hex()},
-			},
-		}); err != nil {
+		if data, err = json.Marshal(accMetadata); err != nil {
 			return err
 		}
 		return ctx.Send(data, apirest.HTTPstatusOK)
 	}
 
-	// Try to retrieve the account info metadata
-	accMetadata := &AccountMetadata{}
-	if a.storage != nil {
-		stgCtx, cancel := context.WithTimeout(context.Background(), AccountFetchMetadataTimeoutSeconds*time.Second)
-		defer cancel()
-		metadataBytes, err := a.storage.Retrieve(stgCtx, acc.InfoURI, MaxOffchainFileSize)
-		if err != nil {
-			log.Warnf("cannot get account metadata from %s: %v", acc.InfoURI, err)
-		} else {
-			if err := json.Unmarshal(metadataBytes, &accMetadata); err != nil {
-				log.Warnf("cannot unmarshal metadata from %s: %v", acc.InfoURI, err)
-			}
-		}
+	if acc == nil {
+		return ErrAccountNotFound.With(addr.Hex())
 	}
+	accMetadata := getAccountMetadata()
 
 	sik, err := a.vocapp.State.SIKFromAddress(addr)
 	if err != nil && !errors.Is(err, state.ErrSIKNotFound) {

@@ -54,6 +54,30 @@ func (c *HTTPclient) Account(address string) (*api.Account, error) {
 	return acc, nil
 }
 
+// AccountMetadata returns the metadata associated with a Vocdoni account. If address is empty, it returns the information
+// about the account associated with the client.
+func (c *HTTPclient) AccountMetadata(address string) (*api.AccountMetadata, error) {
+	if address == "" {
+		if c.account == nil {
+			return nil, ErrAccountNotConfigured
+		}
+		address = c.account.AddressString()
+	}
+	resp, code, err := c.Request(HTTPGET, nil, "accounts", address, "metadata")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	acc := &api.AccountMetadata{}
+	err = json.Unmarshal(resp, acc)
+	if err != nil {
+		return nil, err
+	}
+	return acc, nil
+}
+
 // Transfer sends tokens from the account associated with the client to the given address.
 // The nonce is automatically calculated from the account information.
 // Returns the transaction hash.
