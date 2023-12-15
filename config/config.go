@@ -126,7 +126,7 @@ type VochainCfg struct {
 	// IsSeedNode specifies if the node is configured to act as a seed node
 	IsSeedNode bool
 	// OffChainDataDownload specifies if the node is configured to download off-chain data
-	OffChainDataDownloader bool
+	OffChainDataDownload bool
 }
 
 // IndexerCfg handles the configuration options of the indexer

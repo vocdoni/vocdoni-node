@@ -465,8 +465,8 @@ func main() {
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
 		// do we need indexer?
 		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
-		// offchainDataDownloader is only needed for gateways
-		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
+		// offchainDataDownload is only needed for gateways
+		conf.Vochain.OffChainDataDownload = conf.Vochain.OffChainDataDownload &&
 			conf.Mode == types.ModeGateway
 
 			// create the vochain service
@@ -474,7 +474,7 @@ func main() {
 			log.Fatal(err)
 		}
 		// create the offchain data downloader service
-		if conf.Vochain.OffChainDataDownloader {
+		if conf.Vochain.OffChainDataDownload {
 			if err := srv.OffChainDataHandler(); err != nil {
 				log.Fatal(err)
 			}
