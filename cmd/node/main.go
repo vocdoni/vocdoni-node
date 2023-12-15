@@ -52,8 +52,60 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 	if oldName != name {
 		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
 	}
+	// These were just renamed; don't warn just yet.
+	switch name {
+	case "vochainBlockTime":
+		return "vochainMinerTargetBlockTimeSeconds"
+	case "skipPreviousOffchainData":
+		return "vochainSkipPreviousOffchainData"
+	case "processArchive":
+		return "vochainProcessArchive"
+	case "processArchiveKey":
+		return "vochainProcessArchiveKey"
+	case "offChainDataDownload":
+		return "vochainOffChainDataDownload"
+	case "pprof":
+		return "pprofPort"
+	}
 	return flag.NormalizedName(name)
 }
+
+// pflagValueSet implements viper.FlagValueSet with our tweaks for categories.
+type pflagValueSet struct {
+	flags *flag.FlagSet
+}
+
+func (p pflagValueSet) VisitAll(fn func(flag viper.FlagValue)) {
+	p.flags.VisitAll(func(flag *flag.Flag) {
+		fn(pflagValue{flag})
+	})
+}
+
+// pflagValue wraps pflag.Flag so it implements viper.FlagValue.
+type pflagValue struct {
+	flag *flag.Flag
+}
+
+func (p pflagValue) Name() string {
+	name := p.flag.Name
+	// In some cases, vochainFoo becomes vochain.Foo to get YAML nesting
+	if after, ok := strings.CutPrefix(name, "vochain"); ok {
+		return "vochain." + after
+	}
+	if after, ok := strings.CutPrefix(name, "ipfs"); ok {
+		return "ipfs." + after
+	}
+	if after, ok := strings.CutPrefix(name, "metrics"); ok {
+		return "metrics." + after
+	}
+	if after, ok := strings.CutPrefix(name, "tls"); ok {
+		return "TLS." + after // note that it's all uppercase
+	}
+	return name
+}
+func (p pflagValue) HasChanged() bool    { return p.flag.Changed }
+func (p pflagValue) ValueString() string { return p.flag.Value.String() }
+func (p pflagValue) ValueType() string   { return p.flag.Value.Type() }
 
 // newConfig creates a new config object and loads the stored configuration file
 func newConfig() (*config.Config, config.Error) {
@@ -83,7 +135,7 @@ func newConfig() (*config.Config, config.Error) {
 		fmt.Sprintf("vocdoni network to connect with: %q", genesis.AvailableNetworks()))
 	flag.BoolVar(&conf.Dev, "dev", false,
 		"use developer mode (less security)")
-	conf.PprofPort = *flag.Int("pprof", 0,
+	conf.PprofPort = *flag.Int("pprofPort", 0,
 		"pprof port for runtime profiling data (zero is disabled)")
 	conf.LogLevel = *flag.StringP("logLevel", "l", "info",
 		"log level (debug, info, warn, error, fatal)")
@@ -140,15 +192,16 @@ func newConfig() (*config.Config, config.Error) {
 		"do not wait for Vochain to synchronize (for testing only)")
 	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
-	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
+
+	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
 		"vochain consensus block time target (in seconds)")
-	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
+	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("vochainSkipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
-	conf.Vochain.ProcessArchive = *flag.Bool("processArchive", false,
+	conf.Vochain.ProcessArchive = *flag.Bool("vochainProcessArchive", false,
 		"enables the process archiver component")
-	conf.Vochain.ProcessArchiveKey = *flag.String("processArchiveKey", "",
+	conf.Vochain.ProcessArchiveKey = *flag.String("vochainProcessArchiveKey", "",
 		"IPFS base64 encoded private key for process archive IPNS")
-	conf.Vochain.OffChainDataDownloader = *flag.Bool("offChainDataDownload", true,
+	conf.Vochain.OffChainDataDownloader = *flag.Bool("vochainOffChainDataDownload", true,
 		"enables the off-chain data downloader component")
 	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
@@ -172,151 +225,27 @@ func newConfig() (*config.Config, config.Error) {
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
-	// set FlagVars first
-	if err = viper.BindPFlag("dataDir", flag.Lookup("dataDir")); err != nil {
-		log.Fatalf("failed to bind dataDir flag to viper: %v", err)
-	}
+	viper.BindFlagValues(pflagValueSet{flag.CommandLine})
 	conf.DataDir = viper.GetString("dataDir")
-
-	if err = viper.BindPFlag("chain", flag.Lookup("chain")); err != nil {
-		log.Fatalf("failed to bind chain flag to viper: %v", err)
-	}
 	conf.Vochain.Network = viper.GetString("chain")
-
-	if err = viper.BindPFlag("dev", flag.Lookup("dev")); err != nil {
-		log.Fatalf("failed to bind dev flag to viper: %v", err)
-	}
 	conf.Dev = viper.GetBool("dev")
-
-	if err = viper.BindPFlag("pprofPort", flag.Lookup("pprof")); err != nil {
-		log.Fatalf("failed to bind pprof flag to viper: %v", err)
-	}
-
-	if err = viper.BindPFlag("dbType", flag.Lookup("dbType")); err != nil {
-		log.Fatalf("failed to bind dbType flag to viper: %v", err)
-	}
 	conf.Vochain.DBType = viper.GetString("dbType")
-
 	// use different datadirs for different networks
 	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Network)
-
-	if err = viper.BindPFlag("archiveURL", flag.Lookup("archiveURL")); err != nil {
-		log.Fatalf("failed to bind archiveURL flag to viper: %v", err)
-	}
 	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 
 	// add viper config path (now we know it)
 	viper.AddConfigPath(conf.DataDir)
 
-	// binding flags to viper
-	if err = viper.BindPFlag("mode", flag.Lookup("mode")); err != nil {
-		log.Fatalf("failed to bind mode flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("logLevel", flag.Lookup("logLevel")); err != nil {
-		log.Fatalf("failed to bind logLevel flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("logErrorFile", flag.Lookup("logErrorFile")); err != nil {
-		log.Fatalf("failed to bind logErrorFile flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("logOutput", flag.Lookup("logOutput")); err != nil {
-		log.Fatalf("failed to bind logOutput flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("saveConfig", flag.Lookup("saveConfig")); err != nil {
-		log.Fatalf("failed to bind saveConfig flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("signingKey", flag.Lookup("signingKey")); err != nil {
-		log.Fatalf("failed to bind signingKey flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("listenHost", flag.Lookup("listenHost")); err != nil {
-		log.Fatalf("failed to bind listenHost flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("listenPort", flag.Lookup("listenPort")); err != nil {
-		log.Fatalf("failed to bind listenPort flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("enableAPI", flag.Lookup("enableAPI")); err != nil {
-		log.Fatalf("failed to bind enableAPI flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("adminToken", flag.Lookup("adminToken")); err != nil {
-		log.Fatalf("failed to bind adminToken flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("enableFaucetWithAmount", flag.Lookup("enableFaucetWithAmount")); err != nil {
-		log.Fatalf("failed to bind enableFaucetWithAmount flag to viper: %v", err)
-	}
 	viper.Set("TLS.DirCert", conf.DataDir+"/tls")
-	if err = viper.BindPFlag("TLS.Domain", flag.Lookup("tlsDomain")); err != nil {
-		log.Fatalf("failed to bind TLS.Domain flag to viper: %v", err)
-	}
 
 	// ipfs
 	viper.Set("ipfs.ConfigPath", conf.DataDir+"/ipfs")
-	if err = viper.BindPFlag("ipfs.ConnectKey", flag.Lookup("ipfsConnectKey")); err != nil {
-		log.Fatalf("failed to bind ipfsConnectKey flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("ipfs.ConnectPeers", flag.Lookup("ipfsConnectPeers")); err != nil {
-		log.Fatalf("failed to bind ipfsConnectPeers flag to viper: %v", err)
-	}
 
 	// vochain
 	viper.Set("vochain.DataDir", conf.DataDir+"/vochain")
 	viper.Set("vochain.Dev", conf.Dev)
-
-	if err = viper.BindPFlag("vochain.P2PListen", flag.Lookup("vochainP2PListen")); err != nil {
-		log.Fatalf("failed to bind vochainP2PListen flag to viper: %v", err)
-	}
-	if err = viper.BindPFlag("vochain.PublicAddr", flag.Lookup("vochainPublicAddr")); err != nil {
-		log.Fatalf("failed to bind vochainPublicAddr flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.LogLevel", flag.Lookup("vochainLogLevel")); err != nil {
-		log.Fatalf("failed to bind vochainLogLevel flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.Peers", flag.Lookup("vochainPeers")); err != nil {
-		log.Fatalf("failed to bind vochainPeers flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.Seeds", flag.Lookup("vochainSeeds")); err != nil {
-		log.Fatalf("failed to bind vochainSeeds flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.CreateGenesis", flag.Lookup("vochainCreateGenesis")); err != nil {
-		log.Fatalf("failed to bind vochainCreateGenesis flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.Genesis", flag.Lookup("vochainGenesis")); err != nil {
-		log.Fatalf("failed to bind vochainGenesis flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.MinerKey", flag.Lookup("vochainMinerKey")); err != nil {
-		log.Fatalf("failed to bind vochainMinerKey flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.NodeKey", flag.Lookup("vochainNodeKey")); err != nil {
-		log.Fatalf("failed to bind vochainNodeKey flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.NoWaitSync", flag.Lookup("vochainNoWaitSync")); err != nil {
-		log.Fatalf("failed to bind vochainNoWaitSync flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.MempoolSize", flag.Lookup("vochainMempoolSize")); err != nil {
-		log.Fatalf("failed to bind vochainMempoolSize flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.MinerTargetBlockTimeSeconds", flag.Lookup("vochainBlockTime")); err != nil {
-		log.Fatalf("failed to bind vochainBlockTime flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.SkipPreviousOffchainData", flag.Lookup("skipPreviousOffchainData")); err != nil {
-		log.Fatalf("failed to bind skipPreviousOffchainData flag to viper: %v", err)
-	}
 	viper.Set("vochain.ProcessArchiveDataDir", conf.DataDir+"/archive")
-	if err := viper.BindPFlag("vochain.ProcessArchive", flag.Lookup("processArchive")); err != nil {
-		log.Fatalf("failed to bind processArchive flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.ProcessArchiveKey", flag.Lookup("processArchiveKey")); err != nil {
-		log.Fatalf("failed to bind processArchiveKey flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("vochain.OffChainDataDownload", flag.Lookup("offChainDataDownload")); err != nil {
-		log.Fatalf("failed to bind offChainDataDownload flag to viper: %v", err)
-	}
-
-	// metrics
-	if err := viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled")); err != nil {
-		log.Fatalf("failed to bind metricsEnabled flag to viper: %v", err)
-	}
-	if err := viper.BindPFlag("metrics.RefreshInterval", flag.Lookup("metricsRefreshInterval")); err != nil {
-		log.Fatalf("failed to bind metricsRefreshInterval flag to viper: %v", err)
-	}
 
 	// check if config file exists
 	_, err = os.Stat(conf.DataDir + "/vocdoni.yml")
