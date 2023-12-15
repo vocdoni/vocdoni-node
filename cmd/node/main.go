@@ -616,42 +616,40 @@ func main() {
 	//
 	// Gateway API and RPC
 	//
-	if conf.Mode == types.ModeGateway {
+	if conf.Mode == types.ModeGateway && conf.EnableAPI {
 		// HTTP API REST service
-		if conf.EnableAPI {
-			log.Info("enabling API")
-			uAPI, err := urlapi.NewAPI(srv.Router, "/v2", conf.DataDir, conf.Vochain.DBType)
-			if err != nil {
-				log.Fatal(err)
-			}
-			uAPI.Attach(
-				srv.App,
-				srv.Stats,
-				srv.Indexer,
-				srv.Storage,
-				srv.CensusDB,
-			)
-			uAPI.Endpoint.SetAdminToken(conf.AdminToken)
-			if err := uAPI.EnableHandlers(
-				urlapi.ElectionHandler,
-				urlapi.VoteHandler,
-				urlapi.ChainHandler,
-				urlapi.WalletHandler,
-				urlapi.AccountHandler,
-				urlapi.CensusHandler,
-				urlapi.SIKHandler,
+		log.Info("enabling API")
+		uAPI, err := urlapi.NewAPI(srv.Router, "/v2", conf.DataDir, conf.Vochain.DBType)
+		if err != nil {
+			log.Fatal(err)
+		}
+		uAPI.Attach(
+			srv.App,
+			srv.Stats,
+			srv.Indexer,
+			srv.Storage,
+			srv.CensusDB,
+		)
+		uAPI.Endpoint.SetAdminToken(conf.AdminToken)
+		if err := uAPI.EnableHandlers(
+			urlapi.ElectionHandler,
+			urlapi.VoteHandler,
+			urlapi.ChainHandler,
+			urlapi.WalletHandler,
+			urlapi.AccountHandler,
+			urlapi.CensusHandler,
+			urlapi.SIKHandler,
+		); err != nil {
+			log.Fatal(err)
+		}
+		// attach faucet to the API if enabled
+		if conf.EnableFaucetWithAmount > 0 {
+			if err := faucet.AttachFaucetAPI(srv.Signer,
+				conf.EnableFaucetWithAmount,
+				uAPI.RouterHandler(),
+				"/open/claim",
 			); err != nil {
 				log.Fatal(err)
-			}
-			// attach faucet to the API if enabled
-			if conf.EnableFaucetWithAmount > 0 {
-				if err := faucet.AttachFaucetAPI(srv.Signer,
-					conf.EnableFaucetWithAmount,
-					uAPI.RouterHandler(),
-					"/open/claim",
-				); err != nil {
-					log.Fatal(err)
-				}
 			}
 		}
 	}
