@@ -38,7 +38,10 @@ import (
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 )
 
-var createVochainGenesisFile = ""
+var (
+	flagSaveConfig           bool
+	flagVochainCreateGenesis string
+)
 
 // deprecatedFlagsFunc makes deprecated flags work the same as the new flags, but prints a warning
 func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
@@ -127,8 +130,7 @@ func newConfig() (*config.Config, config.Error) {
 	// Booleans should be passed to the CLI as: var=True/false
 
 	// global
-	// TODO: remove from vocdoni.yml file; it's literally where the file sits
-	flag.StringP("dataDir", "d", home+"/.vocdoni",
+	flag.StringP("dataDir", "d", filepath.Join(home, ".vocdoni"),
 		"directory where data is stored")
 	flag.StringP("dbType", "t", db.TypePebble,
 		fmt.Sprintf("key-value db type [%s,%s,%s]", db.TypePebble, db.TypeLevelDB, db.TypeMongo))
@@ -145,8 +147,7 @@ func newConfig() (*config.Config, config.Error) {
 		"log output (stdout, stderr or filepath)")
 	flag.String("logErrorFile", "",
 		"log errors and warnings to a file")
-	// TODO: remove from vocdoni.yml file
-	flag.Bool("saveConfig", false,
+	flag.BoolVar(&flagSaveConfig, "saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
 	flag.StringP("mode", "m", types.ModeGateway,
 		"global operation mode. Available options: [gateway, miner, seed, census]")
@@ -206,8 +207,7 @@ func newConfig() (*config.Config, config.Error) {
 		"IPFS base64 encoded private key for process archive IPNS")
 	flag.Bool("vochainOffChainDataDownload", true,
 		"enables the off-chain data downloader component")
-	// TODO: remove from vocdoni.yml file
-	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
+	flag.StringVar(&flagVochainCreateGenesis, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
 
@@ -235,16 +235,14 @@ func newConfig() (*config.Config, config.Error) {
 	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL") // TODO: unused?
 
 	// use different datadirs for different networks
-	conf.DataDir = viper.GetString("dataDir")
-	conf.Vochain.Network = viper.GetString("chain")
-	conf.DataDir = filepath.Join(conf.DataDir, conf.Vochain.Network)
+	conf.DataDir = filepath.Join(viper.GetString("dataDir"), viper.GetString("chain"))
 	viper.Set("dataDir", conf.DataDir)
 
 	// set up the data subdirectories
-	viper.Set("TLS.DirCert", conf.DataDir+"/tls")
-	viper.Set("ipfs.ConfigPath", conf.DataDir+"/ipfs")
-	viper.Set("vochain.DataDir", conf.DataDir+"/vochain")
-	viper.Set("vochain.ProcessArchiveDataDir", conf.DataDir+"/archive")
+	viper.Set("TLS.DirCert", filepath.Join(conf.DataDir, "tls"))
+	viper.Set("ipfs.ConfigPath", filepath.Join(conf.DataDir, "ipfs"))
+	viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
+	viper.Set("vochain.ProcessArchiveDataDir", filepath.Join(conf.DataDir, "archive"))
 
 	// propagate dev to vochain.Dev
 	viper.Set("vochain.Dev", viper.GetBool("dev"))
@@ -300,7 +298,7 @@ func newConfig() (*config.Config, config.Error) {
 		_, priv := signer.HexString()
 		viper.Set("signingKey", priv)
 		conf.SigningKey = priv
-		conf.SaveConfig = true
+		flagSaveConfig = true
 	}
 
 	if conf.Vochain.MinerKey == "" {
@@ -312,7 +310,7 @@ func newConfig() (*config.Config, config.Error) {
 		log.Info("created new admin API token", conf.AdminToken)
 	}
 
-	if conf.SaveConfig {
+	if flagSaveConfig {
 		viper.Set("saveConfig", false)
 		if err := viper.WriteConfig(); err != nil {
 			cfgError = config.Error{
@@ -349,8 +347,8 @@ func main() {
 	}
 
 	// Check if we need to create a vochain genesis file with validators and exit.
-	if createVochainGenesisFile != "" {
-		dirWithNodes := strings.Split(createVochainGenesisFile, ":")
+	if flagVochainCreateGenesis != "" {
+		dirWithNodes := strings.Split(flagVochainCreateGenesis, ":")
 		if len(dirWithNodes) != 2 {
 			log.Fatal("invalid format for --vochainCreateGenesis expected dir:numValidators (e.g. /tmp/vochain:4)")
 		}
