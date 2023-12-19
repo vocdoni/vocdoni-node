@@ -110,19 +110,14 @@ func (p pflagValue) HasChanged() bool    { return p.flag.Changed }
 func (p pflagValue) ValueString() string { return p.flag.Value.String() }
 func (p pflagValue) ValueType() string   { return p.flag.Value.Type() }
 
-// newConfig creates a new config object and loads the stored configuration file
-func newConfig() (*config.Config, config.Error) {
-	var cfgError config.Error
+// loadConfig creates a new config object and loads the stored configuration file
+func loadConfig() *config.Config {
 	conf := &config.Config{}
 
 	// get current user home dir
 	home, err := os.UserHomeDir()
 	if err != nil {
-		cfgError = config.Error{
-			Critical: true,
-			Message:  fmt.Sprintf("cannot get user home directory with error: %s", err),
-		}
-		return nil, cfgError
+		log.Fatal(err)
 	}
 
 	// CLI flags will be used if something fails from this point
@@ -252,37 +247,27 @@ func newConfig() (*config.Config, config.Error) {
 	// check if config file exists
 	_, err = os.Stat(conf.DataDir + "/vocdoni.yml")
 	if os.IsNotExist(err) {
-		cfgError = config.Error{
-			Message: fmt.Sprintf("creating new config file in %s", conf.DataDir),
-		}
+		log.Infof("creating new config file in %s", conf.DataDir)
 		// creating config folder if not exists
 		err = os.MkdirAll(conf.DataDir, os.ModePerm)
 		if err != nil {
-			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot create data directory: %s", err),
-			}
+			log.Fatalf("cannot create data directory: %s", err)
 		}
 		// create config file if not exists
 		if err := viper.SafeWriteConfig(); err != nil {
-			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot write config file into config dir: %s", err),
-			}
+			log.Fatalf("cannot write config file into config dir: %s", err)
 		}
 	} else {
 		// read config file
 		err = viper.ReadInConfig()
 		if err != nil {
-			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot read loaded config file in %s: %s", conf.DataDir, err),
-			}
+			log.Fatalf("cannot read loaded config file in %s: %s", conf.DataDir, err)
 		}
 	}
 
 	err = viper.Unmarshal(&conf)
 	if err != nil {
-		cfgError = config.Error{
-			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
-		}
+		log.Fatalf("cannot unmarshal loaded config file: %s", err)
 	}
 
 	if conf.SigningKey == "" {
@@ -290,10 +275,7 @@ func newConfig() (*config.Config, config.Error) {
 		signer := ethereum.NewSignKeys()
 		err = signer.Generate()
 		if err != nil {
-			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot generate signing key: %s", err),
-			}
-			return conf, cfgError
+			log.Fatalf("cannot generate signing key: %s", err)
 		}
 		_, priv := signer.HexString()
 		viper.Set("signingKey", priv)
@@ -313,13 +295,11 @@ func newConfig() (*config.Config, config.Error) {
 	if flagSaveConfig {
 		viper.Set("saveConfig", false)
 		if err := viper.WriteConfig(); err != nil {
-			cfgError = config.Error{
-				Message: fmt.Sprintf("cannot overwrite config file into config dir: %s", err),
-			}
+			log.Fatalf("cannot overwrite config file into config dir: %s", err)
 		}
 	}
 
-	return conf, cfgError
+	return conf
 }
 
 func main() {
@@ -328,10 +308,8 @@ func main() {
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
 	// creating config and init logger
-	conf, cfgErr := newConfig()
-	if conf == nil {
-		log.Fatal("cannot read configuration")
-	}
+	conf := loadConfig()
+
 	var errorOutput io.Writer
 	if path := conf.LogErrorFile; path != "" {
 		f, err := os.OpenFile(path, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o644)
@@ -345,6 +323,7 @@ func main() {
 		// Once the logger has been initialized.
 		log.Infof("using file %s for logging warning and errors", path)
 	}
+	log.Debugf("loaded config %+v", *conf)
 
 	// Check if we need to create a vochain genesis file with validators and exit.
 	if flagVochainCreateGenesis != "" {
@@ -361,16 +340,6 @@ func main() {
 			log.Fatal(err)
 		}
 		return
-	}
-
-	// Check if errors during config creation and determine if Critical.
-	log.Debugf("initializing config %+v", *conf)
-	if cfgErr.Critical && cfgErr.Message != "" {
-		log.Fatalf("critical error loading config: %s", cfgErr.Message)
-	} else if !cfgErr.Critical && cfgErr.Message != "" {
-		log.Warnf("non-critical error loading config: %s", cfgErr.Message)
-	} else if !cfgErr.Critical && cfgErr.Message == "" {
-		log.Infof("config file loaded successfully. Reminder: CLI flags have preference")
 	}
 
 	// Overwrite the default path to download the zksnarks circuits artifacts
