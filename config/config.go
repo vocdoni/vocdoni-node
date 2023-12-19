@@ -20,8 +20,6 @@ type Config struct {
 	LogErrorFile string
 	// DataDir path where the gateway files will be stored
 	DataDir string
-	// SaveConfig overwrites the config file with the CLI provided flags
-	SaveConfig bool
 	// SigningKey key used to sign transactions
 	SigningKey string
 	// Mode describes the operation mode of program
