@@ -226,9 +226,6 @@ func loadConfig() *config.Config {
 
 	viper.BindFlagValues(pflagValueSet{flag.CommandLine})
 
-	conf.Vochain.DBType = viper.GetString("dbType")                 // TODO: unused?
-	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL") // TODO: unused?
-
 	// use different datadirs for different networks
 	conf.DataDir = filepath.Join(viper.GetString("dataDir"), viper.GetString("chain"))
 	viper.Set("dataDir", conf.DataDir)
@@ -239,7 +236,8 @@ func loadConfig() *config.Config {
 	viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
 	viper.Set("vochain.ProcessArchiveDataDir", filepath.Join(conf.DataDir, "archive"))
 
-	// propagate dev to vochain.Dev
+	// propagate some keys to the vochain category
+	viper.Set("vochain.dbType", viper.GetString("dbType"))
 	viper.Set("vochain.Dev", viper.GetBool("dev"))
 
 	// add viper config path (now we know it)
@@ -269,6 +267,8 @@ func loadConfig() *config.Config {
 	if err != nil {
 		log.Fatalf("cannot unmarshal loaded config file: %s", err)
 	}
+	// Note that conf.Vochain.Indexer isn't bound with viper.
+	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 
 	if conf.SigningKey == "" {
 		log.Info("no signing key, generating one...")
