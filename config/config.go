@@ -142,13 +142,3 @@ type MetricsCfg struct {
 	Enabled         bool
 	RefreshInterval int
 }
-
-// TODO(mvdan): replace with a special error type
-
-// Error helps to handle better config errors on startup
-type Error struct {
-	// Critical indicates if the error encountered is critical and the app must be stopped
-	Critical bool
-	// Message error message
-	Message string
-}
