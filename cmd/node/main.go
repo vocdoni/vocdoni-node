@@ -267,8 +267,10 @@ func loadConfig() *config.Config {
 	if err != nil {
 		log.Fatalf("cannot unmarshal loaded config file: %s", err)
 	}
-	// Note that conf.Vochain.Indexer isn't bound with viper.
+	// Note that these Config.Vochain fields aren't bound via viper.
+	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
 	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
+	conf.Vochain.Network = viper.GetString("chain")
 
 	if conf.SigningKey == "" {
 		log.Info("no signing key, generating one...")

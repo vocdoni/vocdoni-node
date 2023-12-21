@@ -74,7 +74,7 @@ func (vs *VocdoniService) Vochain() error {
 						return err
 					}
 					if _, ok := vocdoniGenesis.Genesis[vs.Config.Network]; !ok {
-						err = fmt.Errorf("cannot find a valid genesis for the %s network", vs.Config.Network)
+						err = fmt.Errorf("cannot find a valid genesis for the %q network", vs.Config.Network)
 						return err
 					}
 					genesisBytes = vocdoniGenesis.Genesis[vs.Config.Network].Genesis.Marshal()
