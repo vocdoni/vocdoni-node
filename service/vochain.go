@@ -32,14 +32,14 @@ func (vs *VocdoniService) Vochain() error {
 		} else {
 			_, port, err := net.SplitHostPort(vs.Config.P2PListen)
 			if err != nil {
-				return err
+				return fmt.Errorf("invalid P2PListen %q: %w", vs.Config.P2PListen, err)
 			}
 			vs.Config.PublicAddr = net.JoinHostPort(ip.String(), port)
 		}
 	} else {
 		host, port, err := net.SplitHostPort(vs.Config.PublicAddr)
 		if err != nil {
-			return err
+			return fmt.Errorf("invalid PublicAddr %q: %w", vs.Config.PublicAddr, err)
 		}
 		vs.Config.PublicAddr = net.JoinHostPort(host, port)
 	}
