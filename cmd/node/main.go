@@ -89,20 +89,15 @@ type pflagValue struct {
 	flag *flag.Flag
 }
 
+var viperGroups = []string{"vochain", "ipfs", "metrics", "tls"}
+
 func (p pflagValue) Name() string {
 	name := p.flag.Name
 	// In some cases, vochainFoo becomes vochain.Foo to get YAML nesting
-	if after, ok := strings.CutPrefix(name, "vochain"); ok {
-		return "vochain." + after
-	}
-	if after, ok := strings.CutPrefix(name, "ipfs"); ok {
-		return "ipfs." + after
-	}
-	if after, ok := strings.CutPrefix(name, "metrics"); ok {
-		return "metrics." + after
-	}
-	if after, ok := strings.CutPrefix(name, "tls"); ok {
-		return "TLS." + after // note that it's all uppercase
+	for _, group := range viperGroups {
+		if after, ok := strings.CutPrefix(name, group); ok {
+			return group + "." + after
+		}
 	}
 	return name
 }
@@ -223,6 +218,17 @@ func loadConfig() *config.Config {
 	viper.SetEnvPrefix("VOCDONI")
 	viper.AutomaticEnv()
 	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// If VOCDONI_VOCHAIN is set, then other values like VOCDONI_VOCHAIN_PEERS
+	// would be entirely ignored and left empty by viper as "shadowed".
+	// Since that's almost always a human error and would lead to confusing failures,
+	// refuse to continue any further.
+	for _, group := range viperGroups {
+		name := "VOCDONI_" + strings.ToUpper(group)
+		if val := os.Getenv(name); val != "" {
+			log.Fatalf("found %s=%s, which breaks our viper config", name, val)
+		}
+	}
 
 	viper.BindFlagValues(pflagValueSet{flag.CommandLine})
 
