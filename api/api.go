@@ -61,12 +61,8 @@ var (
 
 // API is the URL based REST API supporting bearer authentication.
 type API struct {
-	PrivateCalls uint64
-	PublicCalls  uint64
-	BaseRoute    string
-	Endpoint     *apirest.API
+	Endpoint *apirest.API
 
-	router   *httprouter.HTTProuter
 	indexer  *indexer.Indexer
 	vocapp   *vochain.BaseApplication
 	storage  data.Storage
@@ -90,10 +86,7 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 	if len(baseRoute) > 1 {
 		baseRoute = strings.TrimSuffix(baseRoute, "/")
 	}
-	api := API{
-		BaseRoute: baseRoute,
-		router:    router,
-	}
+	api := API{}
 	var err error
 	api.Endpoint, err = apirest.NewAPI(router, baseRoute)
 	if err != nil {
