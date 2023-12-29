@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	_ "net/http/pprof" // for the pprof endpoints
@@ -249,12 +251,10 @@ func loadConfig() *config.Config {
 	// add viper config path (now we know it)
 	viper.AddConfigPath(conf.DataDir)
 	// check if config file exists
-	_, err = os.Stat(conf.DataDir + "/vocdoni.yml")
-	if os.IsNotExist(err) {
+	if _, err := os.Stat(conf.DataDir + "/vocdoni.yml"); errors.Is(err, fs.ErrNotExist) {
 		log.Infof("creating new config file in %s", conf.DataDir)
 		// creating config folder if not exists
-		err = os.MkdirAll(conf.DataDir, os.ModePerm)
-		if err != nil {
+		if err := os.MkdirAll(conf.DataDir, os.ModePerm); err != nil {
 			log.Fatalf("cannot create data directory: %s", err)
 		}
 		// create config file if not exists
@@ -263,14 +263,12 @@ func loadConfig() *config.Config {
 		}
 	} else {
 		// read config file
-		err = viper.ReadInConfig()
-		if err != nil {
+		if err := viper.ReadInConfig(); err != nil {
 			log.Fatalf("cannot read loaded config file in %s: %s", conf.DataDir, err)
 		}
 	}
 
-	err = viper.Unmarshal(&conf)
-	if err != nil {
+	if err := viper.Unmarshal(&conf); err != nil {
 		log.Fatalf("cannot unmarshal loaded config file: %s", err)
 	}
 	// Note that these Config.Vochain fields aren't bound via viper.
@@ -281,8 +279,7 @@ func loadConfig() *config.Config {
 	if conf.SigningKey == "" {
 		log.Info("no signing key, generating one...")
 		signer := ethereum.NewSignKeys()
-		err = signer.Generate()
-		if err != nil {
+		if err := signer.Generate(); err != nil {
 			log.Fatalf("cannot generate signing key: %s", err)
 		}
 		_, priv := signer.HexString()
@@ -408,7 +405,7 @@ func main() {
 		srv.Router = new(httprouter.HTTProuter)
 		srv.Router.TLSdomain = conf.TLS.Domain
 		srv.Router.TLSdirCert = conf.TLS.DirCert
-		if err = srv.Router.Init(conf.ListenHost, conf.ListenPort); err != nil {
+		if err := srv.Router.Init(conf.ListenHost, conf.ListenPort); err != nil {
 			log.Fatal(err)
 		}
 		// Enable metrics via proxy
@@ -445,7 +442,7 @@ func main() {
 			conf.Mode == types.ModeGateway
 
 			// create the vochain service
-		if err = srv.Vochain(); err != nil {
+		if err := srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
 		// create the offchain data downloader service
@@ -495,8 +492,7 @@ func main() {
 		// create the key for the validator used to sign transactions
 		signer := ethereum.SignKeys{}
 		if err := signer.AddHexKey(conf.Vochain.MinerKey); err != nil {
-			log.Errorf("add hex key failed %v", err)
-			return
+			log.Fatalf("add hex key failed %v", err)
 		}
 		validator, err := srv.App.State.Validator(signer.Address(), true)
 		if err != nil {
