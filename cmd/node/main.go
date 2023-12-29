@@ -550,7 +550,7 @@ func main() {
 		if conf.EnableFaucetWithAmount > 0 {
 			if err := faucet.AttachFaucetAPI(srv.Signer,
 				conf.EnableFaucetWithAmount,
-				uAPI.RouterHandler(),
+				uAPI.Endpoint,
 				"/open/claim",
 			); err != nil {
 				log.Fatal(err)

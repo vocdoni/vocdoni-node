@@ -252,7 +252,7 @@ func main() {
 		log.Infof("faucet account %s, faucet amount %d", faucetAccount.Address().Hex(), config.enableFaucetWithAmount)
 		if err := faucet.AttachFaucetAPI(&faucetAccount,
 			config.enableFaucetWithAmount,
-			uAPI.RouterHandler(),
+			uAPI.Endpoint,
 			"/open/claim",
 		); err != nil {
 			log.Fatal(err)

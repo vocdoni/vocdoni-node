@@ -111,11 +111,6 @@ func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochainin
 	a.censusdb = censusdb
 }
 
-// RouterHandler returns the API router handler which can be used to register new custom endpoints.
-func (a *API) RouterHandler() *apirest.API {
-	return a.Endpoint
-}
-
 // EnableHandlers enables the list of handlers. Attach must be called before.
 func (a *API) EnableHandlers(handlers ...string) error {
 	for _, h := range handlers {
