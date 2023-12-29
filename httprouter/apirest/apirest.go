@@ -9,6 +9,7 @@ import (
 	"path"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/dvote/httprouter"
@@ -45,8 +46,7 @@ type API struct {
 	router         *httprouter.HTTProuter
 	basePath       string
 	authTokens     sync.Map
-	adminToken     string
-	adminTokenLock sync.RWMutex
+	adminToken     atomic.Pointer[string]
 	verboseAuthLog bool
 }
 
@@ -153,9 +153,11 @@ func (a *API) AuthorizeRequest(data any, accessType httprouter.AuthAccessType) (
 	}
 	switch accessType {
 	case httprouter.AccessTypeAdmin:
-		a.adminTokenLock.RLock()
-		defer a.adminTokenLock.RUnlock()
-		if msg.AuthToken != a.adminToken {
+		var adminToken string
+		if t := a.adminToken.Load(); t != nil {
+			adminToken = *t
+		}
+		if adminToken != "" && msg.AuthToken != adminToken {
 			return false, fmt.Errorf("admin token not valid")
 		}
 		return true, nil
@@ -262,9 +264,7 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string, accessType string, hand
 
 // SetAdminToken sets the bearer admin token capable to execute admin handlers
 func (a *API) SetAdminToken(bearerToken string) {
-	a.adminTokenLock.Lock()
-	defer a.adminTokenLock.Unlock()
-	a.adminToken = bearerToken
+	a.adminToken.Store(&bearerToken)
 }
 
 // AddAuthToken adds a new bearer token capable to perform up to n requests

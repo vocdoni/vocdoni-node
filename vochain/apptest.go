@@ -11,7 +11,6 @@ import (
 	tmtypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -61,8 +60,6 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 
 // SetTestingMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
 func (app *BaseApplication) SetTestingMethods() {
-	app.testMockBlockStore = new(testutil.MockBlockStore)
-	app.testMockBlockStore.Init()
 	app.SetFnGetBlockByHash(app.testMockBlockStore.GetByHash)
 	app.SetFnGetBlockByHeight(app.testMockBlockStore.Get)
 	app.SetFnGetTx(func(height uint32, txIndex int32) (*models.SignedTx, error) {
