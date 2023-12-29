@@ -14,7 +14,7 @@ import (
 // bufioWithMutex is a *bufio.Writer with methods Lock() and Unlock()
 type bufioWithMutex struct {
 	*bufio.Writer
-	*sync.Mutex
+	sync.Mutex
 }
 
 func (ps *SubPub) handleStream(stream network.Stream) {
@@ -27,7 +27,7 @@ func (ps *SubPub) handleStream(stream network.Stream) {
 	go ps.readHandler(stream) // ps.readHandler just deals with chans so is thread-safe
 
 	// Create a buffer stream for concurrent, non blocking writes.
-	ps.streams.Store(peer, bufioWithMutex{bufio.NewWriter(stream), new(sync.Mutex)})
+	ps.streams.Store(peer, &bufioWithMutex{Writer: bufio.NewWriter(stream)})
 
 	if fn := ps.OnPeerAdd; fn != nil {
 		fn(peer)
@@ -40,9 +40,9 @@ func (ps *SubPub) sendStreamMessage(address string, message []byte) error {
 	if err != nil {
 		return fmt.Errorf("cannot decode %s into a peerID: %w", address, err)
 	}
-	value, found := ps.streams.Load(peerID)
-	stream, ok := value.(bufioWithMutex) // check type to avoid panics
-	if !found || !ok {
+	value, _ := ps.streams.Load(peerID)
+	stream, ok := value.(*bufioWithMutex) // check type to avoid panics
+	if !ok {
 		return fmt.Errorf("stream for peer %s not found", peerID)
 	}
 

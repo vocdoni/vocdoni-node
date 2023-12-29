@@ -91,7 +91,7 @@ type State struct {
 	ProcessBlockRegistry *ProcessBlockRegistry
 
 	validSIKRoots    [][]byte
-	mtxValidSIKRoots *sync.Mutex
+	mtxValidSIKRoots sync.Mutex
 }
 
 // NewState creates a new State
@@ -141,7 +141,6 @@ func NewState(dbType, dataDir string) (*State, error) {
 		db:    s.NoState(true),
 		state: s,
 	}
-	s.mtxValidSIKRoots = &sync.Mutex{}
 	if err := s.FetchValidSIKRoots(); err != nil {
 		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
 	}

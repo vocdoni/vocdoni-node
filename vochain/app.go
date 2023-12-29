@@ -97,7 +97,7 @@ type BaseApplication struct {
 	prepareProposalLock sync.Mutex
 
 	// testMockBlockStore is used for testing purposes only
-	testMockBlockStore *testutil.MockBlockStore
+	testMockBlockStore testutil.MockBlockStore
 }
 
 // pendingTxReference is used to store the block height where the transaction was accepted by the mempool, and the number
