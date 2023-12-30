@@ -152,7 +152,7 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
 	sdb := statedb.NewStateDB(database)
 	startTime := time.Now()
-	defer log.Infof("state database load took %s", time.Since(startTime))
+	defer func() { log.Infof("state database load took %s", time.Since(startTime)) }()
 	root, err := sdb.Hash()
 	if err != nil {
 		return nil, err
