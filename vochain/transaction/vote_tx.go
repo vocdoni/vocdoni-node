@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -95,12 +97,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	} else { // if vote not in cache, initialize it
 		// Initialize the vote based on the envelope type
 		if process.GetEnvelopeType().Anonymous {
-			vote = initializeZkVote(voteEnvelope, height)
+			vote, err = initializeZkVote(voteEnvelope, height)
 		} else {
 			vote, err = initializeSignedVote(voteEnvelope, vtx.SignedBody, vtx.Signature, height)
-			if err != nil {
-				return nil, err
-			}
+		}
+		if err != nil {
+			return nil, err
 		}
 
 		// if process encrypted, check the vote is encrypted (includes at least one key index)
@@ -136,14 +138,9 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 		}
 		// get snark proof from vote envelope
-		proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
-		if proofZkSNARK == nil {
-			return nil, fmt.Errorf("zkSNARK proof is empty")
-		}
-		// parse the ZkProof protobuf to prover.Proof
-		proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
+		proof, err := zkProofFromEnvelope(voteEnvelope)
 		if err != nil {
-			return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
+			return nil, err
 		}
 		// get sikroot from the proof
 		proofSIKRoot, err := proof.SIKRoot()
@@ -154,6 +151,13 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		if t.state.ExpiredSIKRoot(proofSIKRoot) {
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
+
+		// soft-fork: get nullifier from proof publicSignals
+		if nullifierCheckForkBlock := config.ForksForChainID(t.state.ChainID()).NullifierFromZkProof; nullifierCheckForkBlock > 0 &&
+			t.state.CurrentHeight() < nullifierCheckForkBlock {
+			vote.Nullifier = voteEnvelope.Nullifier
+		}
+
 		// get vote weight from proof publicSignals
 		vote.Weight, err = proof.ExtractPubSignal("voteWeight")
 		if err != nil {
@@ -162,7 +166,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		log.Debugw("new vote",
 			"type", "zkSNARK",
 			"weight", vote.Weight,
-			"nullifier", fmt.Sprintf("%x", voteEnvelope.Nullifier),
+			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
 		// verify the proof with the circuit verification key
@@ -200,15 +204,37 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	return vote, nil
 }
 
+func zkProofFromEnvelope(voteEnvelope *models.VoteEnvelope) (*prover.Proof, error) {
+	proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
+	if proofZkSNARK == nil {
+		return nil, fmt.Errorf("zkSNARK proof is empty")
+	}
+	// parse the ZkProof protobuf to prover.Proof
+	proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
+	if err != nil {
+		return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
+	}
+	return proof, nil
+}
+
 // initializeZkVote initializes a zkSNARK vote. It does not check the proof nor includes the weight of the vote.
-func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) *vstate.Vote {
+func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) (*vstate.Vote, error) {
+	proof, err := zkProofFromEnvelope(voteEnvelope)
+	if err != nil {
+		return nil, err
+	}
+	nullifier, err := proof.Nullifier()
+	if err != nil {
+		return nil, fmt.Errorf("failed on parsing nullifier from public inputs: %w", err)
+	}
+
 	return &vstate.Vote{
 		Height:               height,
 		ProcessID:            voteEnvelope.ProcessId,
 		VotePackage:          voteEnvelope.VotePackage,
-		Nullifier:            voteEnvelope.Nullifier,
+		Nullifier:            nullifier,
 		EncryptionKeyIndexes: voteEnvelope.EncryptionKeyIndexes,
-	}
+	}, nil
 }
 
 // initializeSignedVote initializes a signed vote. It does not check the proof nor includes the weight of the vote.

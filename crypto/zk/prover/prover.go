@@ -113,6 +113,15 @@ func (p *Proof) SIKRoot() ([]byte, error) {
 	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), sikRoot), nil
 }
 
+// Nullifier function returns the Nullifier included into the current proof.
+func (p *Proof) Nullifier() ([]byte, error) {
+	nullifier, err := p.ExtractPubSignal("nullifier")
+	if err != nil {
+		return nil, err
+	}
+	return nullifier.Bytes(), nil
+}
+
 // calcWitness perform the witness calculation using go-rapidsnark library based
 // on wasm version of the circuit and inputs provided. To provide the arguments
 // into the correct way, just read the content of wasm binary and inputs JSON
