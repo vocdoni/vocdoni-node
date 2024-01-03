@@ -1,10 +1,11 @@
 package keykeeper
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
-	"strconv"
 	"sync"
+	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -83,8 +84,7 @@ func (pk *processKeys) Decode(data []byte) error {
 }
 
 // NewKeyKeeper registers a new keyKeeper to the vochain
-func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
-	signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
+func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.SignKeys, index int8) (*KeyKeeper, error) {
 	if v == nil || signer == nil || len(dbPath) < 1 {
 		return nil, fmt.Errorf("missing values for creating a key keeper")
 	}
@@ -106,75 +106,33 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication,
 }
 
 // RevealUnpublished is a rescue function for revealing keys that should be already revealed.
-// It should be called once the Vochain is synchronized in order to have the correct height.
 func (k *KeyKeeper) RevealUnpublished() {
-	// wait for vochain sync?
-	height, err := k.vochain.State.LastHeight()
-	if err != nil {
-		log.Errorf("cannot get blockchain last height, skipping RevealUnpublished operation")
-		return
+	// Wait for the node to be synchronized
+	for k.vochain.IsSynchronizing() {
+		time.Sleep(10 * time.Second)
 	}
+	// Acquire the lock
 	k.lock.Lock()
 	defer k.lock.Unlock()
 
-	var pids models.StoredKeys
-	log.Infof("starting keykeeper reveal recovery")
-	wTx := k.storage.WriteTx()
-	defer wTx.Discard()
-
-	// First get the scheduled reveal key process from the storage, iterate
-	// over the prefix dbPrefixBlock
-	if err := k.storage.Iterate([]byte(dbPrefixBlock), func(key, value []byte) bool {
-		h, err := strconv.ParseInt(string(key[len(dbPrefixBlock):]), 10, 64)
-		if err != nil {
-			log.Errorf("cannot fetch block number from keykeeper database: (%s)", err)
-			return true
-		}
-		if int64(height) <= h+1 {
-			return true
-		}
-		if err := proto.Unmarshal(value, &pids); err != nil {
-			log.Errorf("could not unmarshal value: %s", err)
-			return true
-		}
-		log.Warnf("found pending keys for reveal")
-		for _, p := range pids.GetPids() {
-			if err := k.revealKeys(string(p)); err != nil {
-				log.Error(err)
-			}
-		}
-		if err := wTx.Delete(key); err != nil {
-			log.Error(err)
-		}
-		return true
-	}); err != nil {
-		log.Error(err)
+	// Check for all if we have pending keys to reveal
+	pids, err := k.vochain.State.ListProcessIDs(true)
+	if err != nil {
+		log.Errorw(err, "cannot get process list to reveal unpublished keykeeper keys")
 	}
-	if err := wTx.Commit(); err != nil {
-		log.Error(err)
-	}
-
-	var pid []byte
-	var process *models.Process
-	// Second take all existing processes and check if keys should be
-	// revealed (if canceled), iterate over the prefix dbPrefixProcess
-	if err := k.storage.Iterate([]byte(dbPrefixProcess), func(key, value []byte) bool {
-		pid = key[len(dbPrefixProcess):]
-		process, err = k.vochain.State.Process(pid, true)
+	for _, pid := range pids {
+		process, err := k.vochain.State.Process(pid, true)
 		if err != nil {
-			log.Error(err)
-			return true
+			log.Warnw("cannot get process from state", "pid", hex.EncodeToString(pid), "err", err)
+			continue
 		}
-		if process.Status == models.ProcessStatus_CANCELED ||
-			process.Status == models.ProcessStatus_ENDED {
-			log.Warnf("found pending keys for reveal on process %x", pid)
+		if process.Status == models.ProcessStatus_ENDED && process.EnvelopeType.EncryptedVotes &&
+			len(process.EncryptionPublicKeys)-1 >= int(k.myIndex) && process.EncryptionPublicKeys[k.myIndex] != "" {
+			log.Warnw("found pending keys", "processId", hex.EncodeToString(pid))
 			if err := k.revealKeys(string(pid)); err != nil {
-				log.Error(err)
+				log.Errorw(err, fmt.Sprintf("cannot reveal keys for process %x", hex.EncodeToString(pid)))
 			}
 		}
-		return true
-	}); err != nil {
-		log.Error(err)
 	}
 	log.Infof("keykeeper reveal recovery finished")
 }
