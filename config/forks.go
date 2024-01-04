@@ -4,6 +4,7 @@ package config
 type ForksCfg struct {
 	VoceremonyForkBlock  uint32
 	NullifierFromZkProof uint32
+	FixMaxCensusSize     uint32
 }
 
 // Forks is a map of chainIDs
@@ -18,6 +19,7 @@ var Forks = map[string]*ForksCfg{
 	"vocdoni/LTS/1.2": {
 		VoceremonyForkBlock:  400200, // estimated 2023-12-12T09:09:31.511245938Z
 		NullifierFromZkProof: 575800, // estimated 2024-01-03T12:09:30.009477164Z
+		FixMaxCensusSize:     575800, // estimated 2024-01-03T12:09:30.009477164Z
 	},
 }
 
