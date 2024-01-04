@@ -123,7 +123,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		return nil, fmt.Errorf("cannot count votes: %w", err)
 	}
 	// if maxCensusSize is reached, we should check if the vote is an overwrite
-	if votesCount >= process.GetMaxCensusSize() && !isOverwrite {
+	if votesCount > process.GetMaxCensusSize() && !isOverwrite {
 		return nil, fmt.Errorf("maxCensusSize reached %d/%d", votesCount, process.GetMaxCensusSize())
 	}
 
