@@ -122,10 +122,19 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	if err != nil {
 		return nil, fmt.Errorf("cannot count votes: %w", err)
 	}
+
 	// if maxCensusSize is reached, we should check if the vote is an overwrite
-	if votesCount > process.GetMaxCensusSize() && !isOverwrite {
+	if votesCount >= process.GetMaxCensusSize() && !isOverwrite {
+		// apply soft-fork: allow maxCensusSize+1 votes
+		if t.state.CurrentHeight() < config.ForksForChainID(t.state.ChainID()).FixMaxCensusSize {
+			if votesCount == process.GetMaxCensusSize() {
+				goto skipMaxCensusSizeCheck
+			}
+		}
+		// end of soft-fork
 		return nil, fmt.Errorf("maxCensusSize reached %d/%d", votesCount, process.GetMaxCensusSize())
 	}
+skipMaxCensusSizeCheck: // skip maxCensusSize check for soft-fork `FixMaxCensusSize`
 
 	// if vote was from cache, we already checked the proof, so we can return
 	if fromCache {
