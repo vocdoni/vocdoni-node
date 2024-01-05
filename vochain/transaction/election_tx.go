@@ -46,17 +46,36 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
 		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
 	}
-	// start and block count sanity check
-	// if startBlock is zero or one, the process will be enabled on the next block
-	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
-		tx.Process.StartBlock = t.state.CurrentHeight() + 1
-	} else if tx.Process.StartBlock < t.state.CurrentHeight() {
-		return nil, ethereum.Address{}, fmt.Errorf(
-			"cannot add process with start block lower than or equal to the current height")
-	}
-	if tx.Process.BlockCount <= 0 {
-		return nil, ethereum.Address{}, fmt.Errorf(
-			"cannot add process with duration lower than or equal to the current height")
+
+	// time based process (duration and start time)
+	if tx.Process.Duration > 0 {
+		currentTimestamp, err := t.state.Timestamp(false)
+		if err != nil {
+			return nil, ethereum.Address{}, fmt.Errorf("cannot get current timestamp: %w", err)
+		}
+		// if start time is zero or one, the process will be enabled on the next block
+		if tx.Process.StartTime == 0 {
+			tx.Process.StartTime = currentTimestamp
+		}
+		if tx.Process.StartTime < currentTimestamp {
+			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with start time lower than the current timestamp")
+		}
+		if tx.Process.StartTime+tx.Process.Duration < currentTimestamp {
+			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with duration lower than the current timestamp")
+		}
+	} else {
+		// block based process (block count and start block)
+		// TODO: remove due deprecation
+		if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
+			tx.Process.StartBlock = t.state.CurrentHeight() + 1
+		} else if tx.Process.StartBlock < t.state.CurrentHeight() {
+			return nil, ethereum.Address{}, fmt.Errorf(
+				"cannot add process with start block lower than or equal to the current height")
+		}
+		if tx.Process.BlockCount <= 0 {
+			return nil, ethereum.Address{}, fmt.Errorf(
+				"cannot add process with duration lower than or equal to the current height")
+		}
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range

@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,6 +42,8 @@ func (v *State) AddProcess(p *models.Process) error {
 		"entityId", fmt.Sprintf("%x", p.EntityId),
 		"startBlock", p.StartBlock,
 		"endBlock", p.BlockCount+p.StartBlock,
+		"startTime", util.TimestampToTime(p.StartTime).String(),
+		"endTime", util.TimestampToTime(p.StartTime+p.Duration).String(),
 		"mode", p.Mode,
 		"envelopeType", p.EnvelopeType,
 		"voteOptions", p.VoteOptions,

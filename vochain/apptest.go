@@ -55,6 +55,10 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 			tb.Error(err)
 		}
 	})
+	// Set the initial timestamp
+	if err := app.State.SetTimestamp(uint32(time.Now().Unix())); err != nil {
+		tb.Fatal(err)
+	}
 	return app
 }
 

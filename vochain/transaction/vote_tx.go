@@ -39,21 +39,38 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		return nil, fmt.Errorf("process %x malformed", voteEnvelope.ProcessId)
 	}
 
-	// Get the current height of the blockchain
+	// Get the current height and timestamp from the blockchain state
 	height := t.state.CurrentHeight()
+	currentTime, err := t.state.Timestamp(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get current time: %w", err)
+	}
 
-	// Calculate the end block of the process
-	endBlock := process.StartBlock + process.BlockCount
-
-	// Check that the current height is within the bounds of the process
-	if height < process.StartBlock {
-		return nil, fmt.Errorf(
-			"process %x starts at height %d, current height is %d",
-			voteEnvelope.ProcessId, process.StartBlock, height)
-	} else if height > endBlock {
-		return nil, fmt.Errorf(
-			"process %x finished at height %d, current height is %d",
-			voteEnvelope.ProcessId, endBlock, height)
+	// Check the process accepts votes by height or timestamp window
+	if process.Duration > 0 { // Timestamp based processes
+		endTime := process.StartTime + process.Duration
+		// Check that the current time is within the bounds of the process
+		if currentTime < process.StartTime {
+			return nil, fmt.Errorf(
+				"process %x starts at time %d, current time is %d",
+				voteEnvelope.ProcessId, process.StartTime, currentTime)
+		} else if currentTime > endTime {
+			return nil, fmt.Errorf(
+				"process %x finished at time %d, current time is %d",
+				voteEnvelope.ProcessId, endTime, currentTime)
+		}
+	} else { // Block count based processes
+		endBlock := process.StartBlock + process.BlockCount
+		// Check that the current height is within the bounds of the process
+		if height < process.StartBlock {
+			return nil, fmt.Errorf(
+				"process %x starts at height %d, current height is %d",
+				voteEnvelope.ProcessId, process.StartBlock, height)
+		} else if height > endBlock {
+			return nil, fmt.Errorf(
+				"process %x finished at height %d, current height is %d",
+				voteEnvelope.ProcessId, endBlock, height)
+		}
 	}
 
 	// Check that the process is in the READY state
@@ -166,6 +183,8 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		log.Debugw("new vote",
 			"type", "zkSNARK",
 			"weight", vote.Weight,
+			"timestamp", currentTime,
+			"height", height,
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
@@ -184,6 +203,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"address", addr.Hex(),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
+			"timestamp", currentTime,
 			"height", height)
 
 		// Verify the proof

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"path"
 	"strings"
+	"time"
 )
 
 func TrimHex(s string) string {
@@ -66,4 +67,9 @@ func BuildURL(parts ...string) (string, error) {
 	fullPath := path.Join(base.Path, path.Join(otherParts...))
 	base.Path = fullPath
 	return base.String(), nil
+}
+
+// TimestampToTime converts a uint32 timestamp to a time.Time object.
+func TimestampToTime(timestamp uint32) time.Time {
+	return time.Unix(int64(timestamp), 0)
 }

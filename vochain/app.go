@@ -131,6 +131,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
+	// Create the IST controller for internal state transitions
 	istc := ist.NewISTC(state)
 
 	// Create the transaction handler for checking and processing transactions
@@ -140,10 +141,12 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		filepath.Join(vochainCfg.DataDir, "txHandler"),
 	)
 
+	// Initialize the zk circuit
 	if err := circuit.Init(); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
 
+	// Initialize the LRU cache for blocks
 	blockCache, err := lru.New[int64, *tmtypes.Block](32)
 	if err != nil {
 		return nil, err
@@ -262,7 +265,11 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	}
 	app.State.Rollback()
 	app.startBlockTimestamp.Store(t.Unix())
+	if err := app.State.SetTimestamp(uint32(t.Unix())); err != nil {
+		log.Fatalf("failed to set timestamp: %w", err)
+	}
 	app.State.SetHeight(height)
+
 	err := app.SetZkCircuit()
 	if err != nil {
 		log.Fatalf("failed to set ZkCircuit: %w", err)
