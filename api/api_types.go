@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	tmtypes "github.com/cometbft/cometbft/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
@@ -331,6 +331,6 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 }
 
 type Block struct {
-	tmtypes.Block `json:",inline"`
-	Hash          types.HexBytes `json:"hash" `
+	comettypes.Block `json:",inline"`
+	Hash             types.HexBytes `json:"hash" `
 }

@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"time"
 
-	tmtypes "github.com/cometbft/cometbft/types"
+	comettypes "github.com/cometbft/cometbft/types"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -34,22 +34,22 @@ type Doc struct {
 }
 
 // TendermintDoc returns the Tendermint GenesisDoc from the Vocdoni genesis.Doc.
-func (g *Doc) TendermintDoc() tmtypes.GenesisDoc {
+func (g *Doc) TendermintDoc() comettypes.GenesisDoc {
 	appState, err := json.Marshal(g.AppState)
 	if err != nil {
 		// must never happen
 		panic(err)
 	}
-	return tmtypes.GenesisDoc{
+	return comettypes.GenesisDoc{
 		GenesisTime: g.GenesisTime,
 		ChainID:     g.ChainID,
-		ConsensusParams: &tmtypes.ConsensusParams{
-			Block: tmtypes.BlockParams{
+		ConsensusParams: &comettypes.ConsensusParams{
+			Block: comettypes.BlockParams{
 				MaxBytes: int64(g.ConsensusParams.Block.MaxBytes),
 				MaxGas:   int64(g.ConsensusParams.Block.MaxGas),
 			},
 		},
-		Validators: []tmtypes.GenesisValidator{},
+		Validators: []comettypes.GenesisValidator{},
 		AppHash:    []byte(g.AppHash),
 		AppState:   appState,
 	}

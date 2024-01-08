@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 
@@ -900,7 +900,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 		return err
 	}
 
-	cktx := new(abcitypes.CheckTxRequest)
+	cktx := new(cometabcitypes.CheckTxRequest)
 	cktx.Tx = stxBytes
 	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {

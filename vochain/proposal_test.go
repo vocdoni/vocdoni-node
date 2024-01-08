@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -78,7 +78,7 @@ func TestTransactionsSorted(t *testing.T) {
 		txs = append(txs, stx)
 	}
 
-	req := &abcitypes.PrepareProposalRequest{
+	req := &cometabcitypes.PrepareProposalRequest{
 		Txs: txs,
 	}
 

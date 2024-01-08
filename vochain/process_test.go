@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -419,7 +419,7 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
-	cktx := new(abcitypes.CheckTxRequest)
+	cktx := new(cometabcitypes.CheckTxRequest)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)
