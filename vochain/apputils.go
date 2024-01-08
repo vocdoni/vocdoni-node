@@ -15,19 +15,18 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 
-	"github.com/cometbft/cometbft/crypto"
 	crypto25519 "github.com/cometbft/cometbft/crypto/ed25519"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
-	tmp2p "github.com/cometbft/cometbft/p2p"
-	"github.com/cometbft/cometbft/privval"
-	tmtypes "github.com/cometbft/cometbft/types"
+	cometp2p "github.com/cometbft/cometbft/p2p"
+	cometprivval "github.com/cometbft/cometbft/privval"
+	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
-func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval.FilePV, error) {
-	pv := privval.LoadOrGenFilePV(keyFilePath, stateFilePath)
+func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*cometprivval.FilePV, error) {
+	pv := cometprivval.LoadOrGenFilePV(keyFilePath, stateFilePath)
 	if len(tmPrivKey) > 0 {
 		var privKey crypto256k1.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
@@ -47,8 +46,8 @@ func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*privval
 
 // NewNodeKey returns and saves to the disk storage a tendermint node key.
 // If tmPrivKey not specified, generates a new one
-func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmp2p.NodeKey, error) {
-	nodeKey := &tmp2p.NodeKey{}
+func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*cometp2p.NodeKey, error) {
+	nodeKey := &cometp2p.NodeKey{}
 	if tmPrivKey != "" {
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
 		if err != nil {
@@ -61,11 +60,6 @@ func NewNodeKey(tmPrivKey, nodeKeyFilePath string) (*tmp2p.NodeKey, error) {
 	}
 	// Write nodeKey to disk
 	return nodeKey, nodeKey.SaveAs(nodeKeyFilePath)
-}
-
-// NodeKeyToAddress returns the ethereum address of the given cometBFT node key
-func NodePvKeyToAddress(pubk crypto.PubKey) (ethcommon.Address, error) {
-	return ethereum.AddrFromPublicKey(pubk.Bytes())
 }
 
 // GenerateFaucetPackage generates a faucet package.
@@ -95,12 +89,12 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount
 // NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
 // Also includes faucet account.
 // The genesis document is returned.
-func NewTemplateGenesisFile(dir string, validators int) (*tmtypes.GenesisDoc, error) {
-	gd := tmtypes.GenesisDoc{}
+func NewTemplateGenesisFile(dir string, validators int) (*comettypes.GenesisDoc, error) {
+	gd := comettypes.GenesisDoc{}
 	gd.ChainID = "test-chain-1"
 	gd.GenesisTime = time.Now()
 	gd.InitialHeight = 0
-	gd.ConsensusParams = tmtypes.DefaultConsensusParams()
+	gd.ConsensusParams = comettypes.DefaultConsensusParams()
 	gd.ConsensusParams.Block.MaxBytes = 5242880
 	gd.ConsensusParams.Block.MaxGas = -1
 	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000

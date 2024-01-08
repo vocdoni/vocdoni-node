@@ -3,7 +3,7 @@ package vochaintx
 import (
 	"fmt"
 
-	tmtypes "github.com/cometbft/cometbft/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -52,7 +52,7 @@ func (tx *Tx) Unmarshal(content []byte, chainID string) error {
 
 // TxKey computes the checksum of the tx
 func TxKey(tx []byte) [32]byte {
-	return tmtypes.Tx(tx).Key()
+	return comettypes.Tx(tx).Key()
 }
 
 // TokenTransfer wraps information about a token transfer.

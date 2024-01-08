@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/VictoriaMetrics/metrics"
-	coretypes "github.com/cometbft/cometbft/rpc/core/types"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -229,7 +229,7 @@ func (vi *VochainInfo) TokensBurned() uint64 {
 }
 
 // NetInfo returns network info (mainly, peers)
-func (vi *VochainInfo) NetInfo() (*coretypes.ResultNetInfo, error) {
+func (vi *VochainInfo) NetInfo() (*cometcoretypes.ResultNetInfo, error) {
 	if vi.vnode.NodeClient != nil {
 		return vi.vnode.NodeClient.NetInfo(context.Background())
 	}

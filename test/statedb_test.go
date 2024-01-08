@@ -5,8 +5,7 @@ import (
 	"math/rand"
 	"testing"
 
-	secp "github.com/cometbft/cometbft/crypto/secp256k1"
-	"github.com/cometbft/cometbft/privval"
+	cometprivval "github.com/cometbft/cometbft/privval"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/proto/build/go/models"
 
@@ -20,8 +19,7 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	tmp := t.TempDir()
-	val := privval.NewFilePV(
-		secp.GenPrivKey(),
+	val := cometprivval.GenFilePV(
 		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
 		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
 	)

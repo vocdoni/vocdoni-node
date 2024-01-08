@@ -8,11 +8,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
-	tmnode "github.com/cometbft/cometbft/node"
-	tmcli "github.com/cometbft/cometbft/rpc/client/local"
-	ctypes "github.com/cometbft/cometbft/rpc/core/types"
-	tmtypes "github.com/cometbft/cometbft/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
+	cometnode "github.com/cometbft/cometbft/node"
+	cometcli "github.com/cometbft/cometbft/rpc/client/local"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/config"
@@ -43,16 +43,16 @@ const (
 var (
 	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
 	ErrTransactionNotFound = fmt.Errorf("transaction not found")
-	// Ensure that BaseApplication implements abcitypes.Application.
-	_ abcitypes.Application = (*BaseApplication)(nil)
+	// Ensure that BaseApplication implements cometabcitypes.Application.
+	_ cometabcitypes.Application = (*BaseApplication)(nil)
 )
 
 // BaseApplication reflects the ABCI application implementation.
 type BaseApplication struct {
 	State              *vstate.State
 	Istc               *ist.Controller
-	Node               *tmnode.Node
-	NodeClient         *tmcli.Local
+	Node               *cometnode.Node
+	NodeClient         *cometcli.Local
 	NodeAddress        ethcommon.Address
 	TransactionHandler *transaction.TransactionHandler
 	isSynchronizingFn  func() bool
@@ -61,14 +61,14 @@ type BaseApplication struct {
 	isSynchronizing atomic.Bool
 
 	// Callback blockchain functions
-	fnGetBlockByHeight func(height int64) *tmtypes.Block
-	fnGetBlockByHash   func(hash []byte) *tmtypes.Block
-	fnSendTx           func(tx []byte) (*ctypes.ResultBroadcastTx, error)
+	fnGetBlockByHeight func(height int64) *comettypes.Block
+	fnGetBlockByHash   func(hash []byte) *comettypes.Block
+	fnSendTx           func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error)
 	fnGetTx            func(height uint32, txIndex int32) (*models.SignedTx, error)
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
-	blockCache         *lru.Cache[int64, *tmtypes.Block]
+	blockCache         *lru.Cache[int64, *comettypes.Block]
 	// txLReferences is a map indexed by hashed transactions and storing the height where the transaction
 	// was seen frist time and the number of attempts failed for including it into a block.
 	txReferences sync.Map
@@ -79,11 +79,11 @@ type BaseApplication struct {
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
-	// abcitypes.RequestBeginBlock.Header.Time
+	// cometabcitypes.RequestBeginBlock.Header.Time
 	startBlockTimestamp atomic.Int64
 	chainID             string
 	dataDir             string
-	genesisInfo         *tmtypes.GenesisDoc
+	genesisInfo         *comettypes.GenesisDoc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
 	// can skip block re-execution on FinalizeBlock call.
@@ -144,7 +144,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
 
-	blockCache, err := lru.New[int64, *tmtypes.Block](32)
+	blockCache, err := lru.New[int64, *comettypes.Block](32)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +154,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		TransactionHandler: transactionHandler,
 		blockCache:         blockCache,
 		dataDir:            vochainCfg.DataDir,
-		genesisInfo:        &tmtypes.GenesisDoc{},
+		genesisInfo:        &comettypes.GenesisDoc{},
 	}, nil
 }
 
@@ -282,7 +282,7 @@ func (app *BaseApplication) endBlock(t time.Time, h uint32) {
 // GetBlockByHeight retrieves a full block indexed by its height.
 // This method uses an LRU cache for the blocks so in general it is more
 // convenient for high load operations than GetBlockByHash(), which does not use cache.
-func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
+func (app *BaseApplication) GetBlockByHeight(height int64) *comettypes.Block {
 	if app.fnGetBlockByHeight == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
 		return nil
@@ -306,7 +306,7 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *tmtypes.Block {
 }
 
 // GetBlockByHash retreies a full block indexed by its Hash
-func (app *BaseApplication) GetBlockByHash(hash []byte) *tmtypes.Block {
+func (app *BaseApplication) GetBlockByHash(hash []byte) *comettypes.Block {
 	if app.fnGetBlockByHash == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHash")
 		return nil
@@ -325,7 +325,7 @@ func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.Sig
 }
 
 // SendTx sends a transaction to the mempool (sync)
-func (app *BaseApplication) SendTx(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+func (app *BaseApplication) SendTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	if app.fnSendTx == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "sendTx")
 		return nil, nil
@@ -355,7 +355,7 @@ func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 }
 
 // Genesis returns the tendermint genesis information
-func (app *BaseApplication) Genesis() *tmtypes.GenesisDoc {
+func (app *BaseApplication) Genesis() *comettypes.GenesisDoc {
 	return app.genesisInfo
 }
 

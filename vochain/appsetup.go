@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	tmcli "github.com/cometbft/cometbft/rpc/client/local"
-	ctypes "github.com/cometbft/cometbft/rpc/core/types"
-	tmtypes "github.com/cometbft/cometbft/types"
+	cometcli "github.com/cometbft/cometbft/rpc/client/local"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
@@ -22,8 +22,8 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	if vochaincfg.IsSeedNode {
 		return nil
 	}
-	// Note that tmcli.New logs any error rather than returning it.
-	app.NodeClient = tmcli.New(app.Node)
+	// Note that cometcli.New logs any error rather than returning it.
+	app.NodeClient = cometcli.New(app.Node)
 	nodeGenesis, err := app.NodeClient.Genesis(context.TODO())
 	if err != nil {
 		return err
@@ -35,7 +35,7 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 // SetDefaultMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use the
 // BlockStore from app.Node to load blocks. Assumes app.Node has been set.
 func (app *BaseApplication) SetDefaultMethods() {
-	app.SetFnGetBlockByHash(func(hash []byte) *tmtypes.Block {
+	app.SetFnGetBlockByHash(func(hash []byte) *comettypes.Block {
 		resblock, err := app.NodeClient.BlockByHash(context.Background(), hash)
 		if err != nil {
 			log.Warnf("cannot fetch block by hash: %v", err)
@@ -44,7 +44,7 @@ func (app *BaseApplication) SetDefaultMethods() {
 		return resblock.Block
 	})
 
-	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
+	app.SetFnGetBlockByHeight(func(height int64) *comettypes.Block {
 		resblock, err := app.NodeClient.Block(context.Background(), &height)
 		if err != nil {
 			log.Warnf("cannot fetch block by height: %v", err)
@@ -60,7 +60,7 @@ func (app *BaseApplication) SetDefaultMethods() {
 		return app.Node.Mempool().Size()
 	})
 	app.SetFnMempoolPrune(app.fnMempoolRemoveTxTendermint)
-	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 		result, err := app.NodeClient.BroadcastTxSync(context.Background(), tx)
 		log.Debugw("broadcast tx",
 			"size", len(tx),
@@ -108,17 +108,17 @@ func (app *BaseApplication) getTxHashTendermint(height uint32, txIndex int32) (*
 }
 
 // SetFnGetBlockByHash sets the getter for blocks by hash
-func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *tmtypes.Block) {
+func (app *BaseApplication) SetFnGetBlockByHash(fn func(hash []byte) *comettypes.Block) {
 	app.fnGetBlockByHash = fn
 }
 
 // SetFnGetBlockByHeight sets the getter for blocks by height
-func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *tmtypes.Block) {
+func (app *BaseApplication) SetFnGetBlockByHeight(fn func(height int64) *comettypes.Block) {
 	app.fnGetBlockByHeight = fn
 }
 
 // SetFnSendTx sets the sendTx method
-func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*ctypes.ResultBroadcastTx, error)) {
+func (app *BaseApplication) SetFnSendTx(fn func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error)) {
 	app.fnSendTx = fn
 }
 
@@ -149,7 +149,7 @@ func (app *BaseApplication) SetFnMempoolPrune(fn func([32]byte) error) {
 
 // fnMempoolRemoveTxTendermint removes a transaction (identifier by its vochain.TxKey() hash)
 // from the Tendermint mempool.
-func (app *BaseApplication) fnMempoolRemoveTxTendermint(txKey [tmtypes.TxKeySize]byte) error {
+func (app *BaseApplication) fnMempoolRemoveTxTendermint(txKey [comettypes.TxKeySize]byte) error {
 	if app.Node == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "mempoolRemoveTxTendermint")
 		return nil

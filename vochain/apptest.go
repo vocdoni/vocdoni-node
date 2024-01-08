@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
-	ctypes "github.com/cometbft/cometbft/rpc/core/types"
-	tmtypes "github.com/cometbft/cometbft/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/proto/build/go/models"
@@ -40,10 +40,10 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 	if err != nil {
 		tb.Fatal(err)
 	}
-	_, err = app.InitChain(context.TODO(), &abcitypes.InitChainRequest{
+	_, err = app.InitChain(context.TODO(), &cometabcitypes.InitChainRequest{
 		Time:          time.Now(),
 		ChainId:       chainID,
-		Validators:    []abcitypes.ValidatorUpdate{},
+		Validators:    []cometabcitypes.ValidatorUpdate{},
 		AppStateBytes: genesisDoc.AppState,
 	})
 	if err != nil {
@@ -85,13 +85,13 @@ func (app *BaseApplication) SetTestingMethods() {
 		tx := blk.Txs[txIndex]
 		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
 	})
-	app.SetFnSendTx(func(tx []byte) (*ctypes.ResultBroadcastTx, error) {
+	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 		resp := app.deliverTx(tx)
 		if resp.Code == 0 {
 			app.testMockBlockStore.AddTxToBlock(tx)
 		}
-		return &ctypes.ResultBroadcastTx{
-			Hash: tmtypes.Tx(tx).Hash(),
+		return &cometcoretypes.ResultBroadcastTx{
+			Hash: comettypes.Tx(tx).Hash(),
 			Code: resp.Code,
 			Data: resp.Data,
 		}, nil
