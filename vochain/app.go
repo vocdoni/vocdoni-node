@@ -340,6 +340,14 @@ func (app *BaseApplication) ChainID() string {
 
 // SetChainID sets the app and state chainID
 func (app *BaseApplication) SetChainID(chainID string) {
+	// A chain must have a chainID in order to be univocally identified.
+	// If the chainID is empty, panic here as it is the first part
+	// of the node app initialization.
+	// Stopping the execution at this point avoids carrying an invalid
+	// chainID in all subsequent operations.
+	if chainID == "" {
+		panic("chainID cannot be empty")
+	}
 	app.chainID = chainID
 	app.State.SetChainID(chainID)
 }
