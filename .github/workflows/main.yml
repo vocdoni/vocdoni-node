@@ -38,9 +38,9 @@ jobs:
             echo "go mod tidy made these changes, please run 'go mod tidy' and include those changes in a commit"
             exit 1
           fi
-      - name: Run gofmt
-        # Run gofmt first, as it's quick and issues are common.
-        run: diff -u <(echo -n) <(gofmt -s -d .)
+      - name: Run gofumpt
+        # Run gofumpt first, as it's quick and issues are common.
+        run: diff -u <(echo -n) <(go run mvdan.cc/gofumpt@v0.5.0 -d .)
       - name: Run go vet
         run: go vet ./...
       - name: Run go generate
