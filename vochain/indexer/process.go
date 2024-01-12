@@ -145,7 +145,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 
 	eid := p.EntityId
 	// Get the block time from the Header
-	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
+	currentBlockTime := idx.App.Timestamp()
 
 	// If startBlock is zero, then we use the current block height (zero means start right now)
 	if p.StartBlock == 0 {
@@ -172,7 +172,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		VoteOpts:          indexertypes.EncodeProtoJSON(p.VoteOptions),
 		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
 		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
-		CreationTime:      currentBlockTime,
+		CreationTime:      time.Unix(currentBlockTime, 0),
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),

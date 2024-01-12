@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -52,14 +54,17 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		// Check that the current time is within the bounds of the process
 		if currentTime < process.StartTime {
 			return nil, fmt.Errorf(
-				"process %x starts at time %d, current time is %d",
-				voteEnvelope.ProcessId, process.StartTime, currentTime)
+				"process %x starts at time %s, current time is %s",
+				voteEnvelope.ProcessId, util.TimestampToTime(process.StartTime).String(),
+				util.TimestampToTime(currentTime).String())
 		} else if currentTime > endTime {
 			return nil, fmt.Errorf(
-				"process %x finished at time %d, current time is %d",
-				voteEnvelope.ProcessId, endTime, currentTime)
+				"process %x finished at time %s, current time is %s",
+				voteEnvelope.ProcessId, util.TimestampToTime(endTime).String(),
+				util.TimestampToTime(currentTime).String())
 		}
-	} else { // Block count based processes
+	} else { // Block count based processes. Remove when block count based processes are deprecated.
+		log.Warnw("deprecated block count based vote detected", "process", hex.EncodeToString(process.ProcessId))
 		endBlock := process.StartBlock + process.BlockCount
 		// Check that the current height is within the bounds of the process
 		if height < process.StartBlock {

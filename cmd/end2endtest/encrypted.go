@@ -41,7 +41,7 @@ func (t *E2EEncryptedElection) Setup(api *apiclient.HTTPclient, c *config) error
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 

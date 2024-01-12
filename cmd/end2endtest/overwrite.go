@@ -42,7 +42,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 

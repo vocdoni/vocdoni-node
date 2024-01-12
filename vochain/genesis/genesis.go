@@ -38,8 +38,8 @@ var Genesis = map[string]Vochain{
 }
 
 var devGenesis = Doc{
-	GenesisTime: time.Date(2023, time.November, 8, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni/DEV/30",
+	GenesisTime: time.Date(2024, time.January, 12, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/DEV/31",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -53,7 +53,7 @@ var devGenesis = Doc{
 			PubKeyTypes: []string{"secp256k1"},
 		},
 		Version: VersionParams{
-			AppVersion: 0,
+			AppVersion: 1,
 		},
 	},
 	AppState: AppState{
@@ -119,8 +119,8 @@ var devGenesis = Doc{
 }
 
 var stageGenesis = Doc{
-	GenesisTime: time.Date(2023, time.November, 7, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni/STAGE/9",
+	GenesisTime: time.Date(2024, time.January, 12, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/STAGE/10",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -134,7 +134,7 @@ var stageGenesis = Doc{
 			PubKeyTypes: []string{"secp256k1"},
 		},
 		Version: VersionParams{
-			AppVersion: 0,
+			AppVersion: 1,
 		},
 	},
 	AppState: AppState{

@@ -122,7 +122,7 @@ func (t *E2EAnonElectionTempSIKs) Setup(api *apiclient.HTTPclient, c *config) er
 	if err := t.setupElection(ed, t.config.nvotes); err != nil {
 		return err
 	}
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 

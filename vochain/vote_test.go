@@ -233,7 +233,6 @@ func TestMaxCensusSize(t *testing.T) {
 	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
-		StartBlock:   0,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
 		Mode: &models.ProcessMode{
 			AutoStart: true,
@@ -248,7 +247,8 @@ func TestMaxCensusSize(t *testing.T) {
 		CensusRoot:    root,
 		CensusURI:     &censusURI,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1024,
+		StartTime:     0,
+		Duration:      100,
 		MaxCensusSize: 10,
 	}
 	err = app.State.AddProcess(process)

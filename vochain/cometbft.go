@@ -14,6 +14,7 @@ import (
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/proto/tendermint/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -151,6 +152,11 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
 
+	// set initial timestamp
+	if err := app.State.SetTimestamp(uint32(req.GetTime().Unix())); err != nil {
+		return nil, fmt.Errorf("cannot set timestamp: %w", err)
+	}
+
 	// commit state and get hash
 	hash, err := app.State.PrepareCommit()
 	if err != nil {
@@ -274,10 +280,12 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		}
 		proposalVotes = append(proposalVotes, v.GetValidator().Address)
 	}
-	if err := app.Istc.Schedule(height+1, []byte(fmt.Sprintf("validators-update-score-%d", height)), ist.Action{
-		ID:                ist.ActionUpdateValidatorScore,
+	if err := app.Istc.Schedule(ist.Action{
+		TypeID:            ist.ActionUpdateValidatorScore,
 		ValidatorVotes:    proposalVotes,
 		ValidatorProposer: req.GetProposerAddress(),
+		ID:                ethereum.HashRaw([]byte(fmt.Sprintf("validators-update-score-%d", height))),
+		Height:            height + 1,
 	}); err != nil {
 		return nil, fmt.Errorf("finalize block: could not schedule IST action: %w", err)
 	}

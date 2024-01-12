@@ -328,13 +328,10 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	// Set startBlock and endBlock
-	var startBlock uint64
-	// if start date is empty, do not attempt to parse it. Set startBlock to 0, starting the
-	// election immediately. Otherwise, ensure the startBlock is in the future
+	var startTime uint32
+
 	if !description.StartDate.IsZero() {
-		if startBlock, err = a.vocinfo.EstimateBlockHeight(description.StartDate); err != nil {
-			return ErrCantEstimateBlockHeight.WithErr(err)
-		}
+		startTime = uint32(description.StartDate.Unix())
 	} else {
 		description.StartDate = time.Now().Add(time.Minute * 10)
 	}
@@ -342,20 +339,15 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if description.EndDate.Before(time.Now()) {
 		return ErrElectionEndDateInThePast
 	}
-	endBlock, err := a.vocinfo.EstimateBlockHeight(description.EndDate)
-	if err != nil {
-		return ErrCantEstimateBlockHeight.WithErr(err)
-	}
 	if description.EndDate.Before(description.StartDate) {
 		return ErrElectionEndDateBeforeStart
 	}
+	endTime := uint32(description.EndDate.Unix())
 
 	// Calculate block count
-	blockCount := endBlock - startBlock
-	if startBlock == 0 {
-		// If startBlock is set to 0 (process starts asap), set the blockcount to the desired
-		// end block, minus the expected start block of the process
-		blockCount = blockCount - uint64(a.vocinfo.Height()) + 3
+	duration := endTime - startTime
+	if startTime == 0 {
+		duration = endTime - uint32(time.Now().Unix())
 	}
 
 	// Set the envelope and process models
@@ -434,8 +426,8 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	// Build the process transaction
 	process := &models.Process{
 		EntityId:     wallet.Address().Bytes(),
-		StartBlock:   uint32(startBlock),
-		BlockCount:   uint32(blockCount),
+		StartTime:    startTime,
+		Duration:     duration,
 		CensusRoot:   root,
 		CensusURI:    &description.Census.URL,
 		Status:       models.ProcessStatus_READY,
@@ -456,7 +448,9 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 				Nonce:   acc.GetNonce(),
 				Txtype:  models.TxType_NEW_PROCESS,
 			},
-		}}); err != nil {
+		},
+	},
+	); err != nil {
 		return err
 	}
 	tx, err := a.walletSignAndSendTx(&stx, wallet)

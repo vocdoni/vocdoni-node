@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"strconv"
 	"testing"
+	"time"
 
 	secp "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/privval"
@@ -36,7 +37,7 @@ var (
 		EntityId:      testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
 		CensusRoot:    testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1000,
+		Duration:      uint32((time.Minute * 60).Seconds()),
 		EnvelopeType:  &models.EnvelopeType{},
 		Mode:          &models.ProcessMode{},
 		Status:        models.ProcessStatus_READY,

@@ -92,15 +92,18 @@ package electionprice
 
 import (
 	"sync"
+
+	"go.vocdoni.io/dvote/types"
 )
 
 // ElectionParameters is a struct to group the input parameters for CalculatePrice method.
 type ElectionParameters struct {
-	MaxCensusSize    uint64 `json:"maxCensusSize"`
-	ElectionDuration uint32 `json:"electionBlocks"`
-	EncryptedVotes   bool   `json:"encryptedVotes"`
-	AnonymousVotes   bool   `json:"anonymousVotes"`
-	MaxVoteOverwrite uint32 `json:"maxVoteOverwrite"`
+	MaxCensusSize           uint64 `json:"maxCensusSize"`
+	ElectionDuration        uint32 `json:"electionBlocks"`
+	ElectionDurationSeconds uint32 `json:"electionDuration"`
+	EncryptedVotes          bool   `json:"encryptedVotes"`
+	AnonymousVotes          bool   `json:"anonymousVotes"`
+	MaxVoteOverwrite        uint32 `json:"maxVoteOverwrite"`
 }
 
 // Factors is a struct that stores the constant factors required for calculating
@@ -162,6 +165,12 @@ func (p *Calculator) Price(params *ElectionParameters) uint64 {
 	// If the calculator is disabled, return 0 as the price
 	if p.Disable {
 		return 0
+	}
+
+	// If the election duration is specified in seconds, convert it to blocks
+	// This is a temporary solution until the block duration support is removed.
+	if params.ElectionDurationSeconds > 0 {
+		params.ElectionDuration = params.ElectionDurationSeconds / uint32(types.DefaultBlockTime.Seconds())
 	}
 
 	p.mutex.Lock()

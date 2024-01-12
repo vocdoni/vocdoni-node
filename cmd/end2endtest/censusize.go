@@ -45,7 +45,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 

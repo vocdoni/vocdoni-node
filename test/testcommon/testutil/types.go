@@ -32,14 +32,18 @@ func (b *MockBlockStore) AddTxToBlock(tx []byte) {
 	block.Txs = append(block.Txs, tx)
 }
 
-func (b *MockBlockStore) NewBlock(height int64) {
+func (b *MockBlockStore) NewBlock(height int64, timestamp time.Time) {
 	if count := b.height.Load(); height != count {
 		panic(fmt.Sprintf("height is not the expected one (got:%d expected:%d)", height, count))
 	}
-	log.Infow("new block", "height", height)
+	log.Infow("new block", "height", height, "timestamp", timestamp)
 	b.set(height, &tmtypes.Block{
-		Header: tmtypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
-		Data:   tmtypes.Data{Txs: make([]tmtypes.Tx, 0)}},
+		Header: tmtypes.Header{
+			Height: height, Time: timestamp, ChainID: "test",
+		},
+		Data: tmtypes.Data{
+			Txs: make([]tmtypes.Tx, 0),
+		}},
 	)
 }
 

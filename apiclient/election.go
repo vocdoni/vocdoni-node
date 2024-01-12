@@ -95,28 +95,18 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		return nil, fmt.Errorf("no account configured")
 	}
 
-	// Set startBlock, endBlock and blockCount
+	// Set start and end dates
 	if description.EndDate.Before(time.Now()) {
 		return nil, fmt.Errorf("election end date cannot be in the past")
 	}
-	endBlock, err := c.DateToHeight(description.EndDate)
-	if err != nil {
-		return nil, fmt.Errorf("unable to estimate endDate block height: %w", err)
-	}
-	var startBlock, blockCount uint32
-	// if start date is empty, do not attempt to parse it. Set startBlock to 0, starting the
-	// election immediately. Otherwise, ensure the startBlock is in the future
-	if !description.StartDate.IsZero() {
-		if startBlock, err = c.DateToHeight(description.StartDate); err != nil {
-			return nil, fmt.Errorf("unable to estimate startDate block height: %w", err)
-		}
-		info, err := c.ChainInfo() // get current Height
-		if err != nil {
-			return nil, err
-		}
-		blockCount = endBlock - info.Height
+	var startTime, duration uint32
+	if description.StartDate.IsZero() {
+		// if start date is empty, start the election immediately.
+		startTime = 0
+		duration = uint32(description.EndDate.Unix() - time.Now().Unix())
 	} else {
-		blockCount = endBlock - startBlock
+		startTime = uint32(description.StartDate.Unix())
+		duration = uint32(description.EndDate.Unix() - description.StartDate.Unix())
 	}
 
 	// Set the envelope and process models
@@ -201,8 +191,8 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	// build the process transaction
 	process := &models.Process{
 		EntityId:      c.account.Address().Bytes(),
-		StartBlock:    startBlock,
-		BlockCount:    blockCount,
+		Duration:      duration,
+		StartTime:     startTime,
 		CensusRoot:    root,
 		CensusURI:     &description.Census.URL,
 		Status:        models.ProcessStatus_READY,

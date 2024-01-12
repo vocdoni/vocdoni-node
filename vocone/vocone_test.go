@@ -84,7 +84,6 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	entityID := cli.MyAddress().Bytes()
 	censusRoot := cspKey.PublicKey()
 	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA
-	duration := 100
 	censusSize := uint64(10)
 	processID, err := cli.NewElectionRaw(
 		&models.Process{
@@ -101,8 +100,8 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 				AutoStart:     true,
 				Interruptible: true,
 			},
-			BlockCount:    uint32(duration),
-			StartBlock:    0,
+			StartTime:     0,
+			Duration:      60,
 			MaxCensusSize: censusSize,
 		})
 	if err != nil {
@@ -115,7 +114,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	}
 
 	// Wait until the process is ready
-	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second*30)
+	ctx1, cancel1 := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel1()
 	election, err := cli.WaitUntilElectionStatus(ctx1, processID, "READY")
 	if err != nil {
@@ -125,23 +124,40 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	// Send the votes
 	for i, k := range voterKeys {
 		c := cli.Clone(fmt.Sprintf("%x", k.PrivateKey()))
-		c.Vote(&apiclient.VoteData{
+		if _, err := c.Vote(&apiclient.VoteData{
 			Choices:  []int{1},
 			Election: election,
 			ProofCSP: proofs[i],
-		})
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Wait until all votes are counted
+	startTimeVoteCount := time.Now()
+	for {
+		if time.Since(startTimeVoteCount) > time.Second*10 {
+			return fmt.Errorf("timeout waiting for votes to be counted")
+		}
+		votes, err := cli.ElectionVoteCount(processID)
+		if err != nil {
+			return err
+		}
+		if votes == uint32(censusSize) {
+			break
+		}
+		time.Sleep(time.Second)
 	}
 
 	if _, err = cli.SetElectionStatus(processID, "ENDED"); err != nil {
 		return err
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
 	election, err = cli.WaitUntilElectionStatus(ctx, processID, "RESULTS")
 	if err != nil {
 		return err
 	}
-	fmt.Printf("election: %+v\n", election)
 	if !election.Results[0][0].Equal(new(types.BigInt).SetUint64(0)) {
 		return err
 	}

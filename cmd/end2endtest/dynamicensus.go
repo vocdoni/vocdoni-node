@@ -50,7 +50,7 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		if err := t.elections[i].setupElection(ed.d, t.elections[i].config.nvotes-1); err != nil {
 			return err
 		}
-		log.Debugf("election detail: %+v", *t.elections[i].election)
+		logElection(t.elections[i].election)
 	}
 
 	return nil

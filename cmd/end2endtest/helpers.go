@@ -62,12 +62,13 @@ func newTestElectionDescription(numChoices int) *vapi.ElectionDescription {
 
 func newTestProcess() *models.Process {
 	return &models.Process{
-		StartBlock: 0,
-		BlockCount: 100,
-		Status:     models.ProcessStatus_READY,
+		StartTime: 0,
+		Duration:  uint32((time.Minute * 10).Seconds()),
+		Status:    models.ProcessStatus_READY,
 		EnvelopeType: &models.EnvelopeType{
 			EncryptedVotes: false,
-			UniqueValues:   true},
+			UniqueValues:   true,
+		},
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount: 1,
@@ -769,4 +770,25 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 		return err
 	}
 	return nil
+}
+
+// logElection prints the election description in the log.
+func logElection(e *vapi.Election) {
+	log.Debugw("election description",
+		"id", e.ElectionID,
+		"censusOrigin", e.Census.CensusOrigin,
+		"maxCensusSize", e.Census.MaxCensusSize,
+		"maxVoteOverwrites", e.TallyMode.MaxVoteOverwrites,
+		"startDate", e.StartDate.String(),
+		"endDate", e.EndDate.String(),
+		"status", e.Status,
+		"organizationId", e.OrganizationID.String(),
+		"voteMode", e.VoteMode,
+		"electionMode", e.ElectionMode,
+		"tallyMaxCount", e.TallyMode.MaxCount,
+		"tallyMaxValue", e.TallyMode.MaxValue,
+		"tallyMaxTotalCost", e.TallyMode.MaxTotalCost,
+		"tallyCostExponent", e.TallyMode.CostExponent,
+	)
+
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -57,8 +58,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
 		Status:        models.ProcessStatus_READY,
 		CensusRoot:    censusRoot,
-		StartBlock:    0,
-		BlockCount:    3,
+		Duration:      uint32((time.Second * 60).Seconds()),
 		MaxCensusSize: 100,
 	}
 	err = app.State.AddProcess(process)

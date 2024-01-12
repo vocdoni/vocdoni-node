@@ -49,8 +49,8 @@ func (t *E2ELifecycleElection) Setup(api *apiclient.HTTPclient, c *config) error
 			log.Errorf("failed to setup election %d: %v", i, err)
 		}
 	}
-
-	log.Debugf("election details: %+v  %+v", *t.elections[0].election, *t.elections[1].election)
+	logElection(t.elections[0].election)
+	logElection(t.elections[1].election)
 	return nil
 }
 
@@ -73,7 +73,7 @@ func (t *E2ELifecycleElection) Run() error {
 		isExpectedError := func(err error, status string) bool {
 			switch status {
 			case "READY":
-				return strings.Contains(err.Error(), "cannot set process status from READY to ready")
+				return strings.Contains(err.Error(), "already in READY state")
 			case "PROCESS_UNKNOWN":
 				return strings.Contains(err.Error(), "process status PROCESS_UNKNOWN unknown")
 			case "RESULTS":
@@ -84,6 +84,10 @@ func (t *E2ELifecycleElection) Run() error {
 		}
 
 		for _, status := range models.ProcessStatus_name {
+			log.Infow("testing election status transition",
+				"election", electionID.String(),
+				"to", status,
+			)
 			if _, err := api.SetElectionStatus(electionID, status); err != nil {
 				if !isExpectedError(err, status) {
 					errChan <- fmt.Errorf("unexpected error for status %s: %v", status, err)
@@ -107,18 +111,24 @@ func (t *E2ELifecycleElection) Run() error {
 			toStatus   string
 			errMsg     string
 		}{
-			{"PAUSED", "PAUSED", "cannot set process status from PAUSED to paused"},
+			{"PAUSED", "PAUSED", "already in PAUSED state"},
 			{"PAUSED", "READY", ""},
 			{"READY", "RESULTS", "not authorized to set process status to RESULTS"},
 			{"READY", "CANCELED", ""},
 			{"CANCELED", "PAUSED", "cannot set process status from CANCELED to paused"},
 			{"CANCELED", "ENDED", "only be ended from ready or paused status"},
 			{"CANCELED", "READY", "cannot set process status from CANCELED to ready"},
-			{"CANCELED", "CANCELED", "already in canceled state"},
+			{"CANCELED", "CANCELED", "already in CANCELED state"},
 		}
 
 		// Test each status transition
 		for _, t := range transitions {
+			log.Infow("testing election status transition",
+				"election", electionID.String(),
+				"from", t.fromStatus,
+				"to", t.toStatus,
+				"expected error", t.errMsg != "",
+			)
 			hash, err := api.SetElectionStatus(electionID, t.toStatus)
 			if err != nil {
 				if t.errMsg != "" && !strings.Contains(err.Error(), t.errMsg) {

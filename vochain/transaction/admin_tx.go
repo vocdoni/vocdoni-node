@@ -75,17 +75,15 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.Tx) (ethereum.Address, 
 			return ethereum.Address{}, fmt.Errorf("transaction key index does not match with validator index")
 		}
 
-		// get current height
-		height := t.state.CurrentHeight()
+		// get current timestamp
+		currentTime, err := t.state.Timestamp(false)
+		if err != nil {
+			return ethereum.Address{}, err
+		}
 
 		// Specific checks
 		switch tx.Txtype {
 		case models.TxType_ADD_PROCESS_KEYS:
-			// endblock is always greater than start block so that case is also included here
-			if height > process.StartBlock {
-				return ethereum.Address{}, fmt.Errorf(
-					"cannot add keys to a process that has started or finished (%s)", process.Status)
-			}
 			// process is not canceled
 			if process.Status == models.ProcessStatus_CANCELED ||
 				process.Status == models.ProcessStatus_ENDED ||
@@ -101,10 +99,9 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.Tx) (ethereum.Address, 
 			}
 		case models.TxType_REVEAL_PROCESS_KEYS:
 			// check process is finished
-			if height < process.StartBlock+process.BlockCount &&
-				!(process.Status == models.ProcessStatus_ENDED ||
-					process.Status == models.ProcessStatus_CANCELED) {
-				return ethereum.Address{}, fmt.Errorf("cannot reveal keys before the process is finished")
+			if currentTime < process.StartTime+process.Duration &&
+				!(process.Status == models.ProcessStatus_ENDED) {
+				return ethereum.Address{}, fmt.Errorf("cannot reveal keys before the process is finished or not in ENDED status")
 			}
 			if len(process.EncryptionPrivateKeys[tx.GetKeyIndex()]) > 0 {
 				return ethereum.Address{}, fmt.Errorf("keys for process %x already revealed", tx.ProcessId)

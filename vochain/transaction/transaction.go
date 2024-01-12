@@ -126,9 +126,11 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				return nil, fmt.Errorf("newProcessTx: cannot increment process index: %w", err)
 			}
 			// schedule end process on the ISTC
-			if err := t.istc.Schedule(p.StartBlock+p.BlockCount, p.ProcessId, ist.Action{
-				ID:         ist.ActionEndProcess,
+			if err := t.istc.Schedule(ist.Action{
+				TypeID:     ist.ActionEndProcess,
 				ElectionID: p.ProcessId,
+				ID:         p.ProcessId,
+				TimeStamp:  p.StartTime + p.Duration,
 			}); err != nil {
 				return nil, fmt.Errorf("newProcessTx: cannot schedule end process: %w", err)
 			}
@@ -161,14 +163,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
 					}
 					// schedule results computations on the ISTC
-					if err := t.istc.Schedule(t.state.CurrentHeight()+1, tx.ProcessId, ist.Action{
-						ID:         ist.ActionCommitResults,
+					if err := t.istc.Remove(tx.ProcessId); err != nil {
+						log.Errorw(err, "setProcessStatus: cannot remove IST action")
+					}
+					if err := t.istc.Schedule(ist.Action{
+						TypeID:     ist.ActionCommitResults,
 						ElectionID: tx.ProcessId,
+						ID:         tx.ProcessId,
+						Height:     t.state.CurrentHeight() + 1,
 					}); err != nil {
-						return nil, fmt.Errorf("setProcessStatus: cannot schedule end process: %w", err)
+						return nil, fmt.Errorf("setProcessStatus: cannot schedule commit results: %w", err)
 					}
 				}
-
 			case models.TxType_SET_PROCESS_CENSUS:
 				if tx.GetCensusRoot() == nil {
 					return nil, fmt.Errorf("set process census, census root is nil")

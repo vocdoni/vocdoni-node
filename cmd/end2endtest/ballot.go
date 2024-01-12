@@ -70,7 +70,7 @@ func (t *E2EBallotRanked) Setup(api *apiclient.HTTPclient, c *config) error {
 		return fmt.Errorf("error in setupElectionRaw for ranked voting: %s", err)
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 
@@ -179,8 +179,9 @@ func (t *E2EBallotApproval) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
-	//setup for approval voting
+	// setup for approval voting
 	p := newTestProcess()
+
 	// update uniqueValues to false
 	p.EnvelopeType.UniqueValues = false
 	p.VoteOptions = &models.ProcessVoteOptions{
@@ -210,11 +211,7 @@ func (t *E2EBallotApproval) Run() error {
 		t.election.TallyMode, nvotes,
 		approvalVote, t.election.VoteMode.UniqueValues)
 
-	if err := sendAndValidateVotes(t.e2eElection, choices, expectedResults); err != nil {
-		return err
-	}
-
-	return nil
+	return sendAndValidateVotes(t.e2eElection, choices, expectedResults)
 }
 
 func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*types.BigInt) error {
@@ -233,7 +230,7 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 				Choices:      choices[vcount],
 				VoterAccount: acctp.account,
 			})
-			vcount += 1
+			vcount++
 		}
 		return true
 	})
