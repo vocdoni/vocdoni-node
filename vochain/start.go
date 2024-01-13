@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -15,13 +16,12 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
 
-	tmcfg "github.com/cometbft/cometbft/config"
-	"github.com/cometbft/cometbft/p2p"
-	"github.com/cometbft/cometbft/proxy"
+	cometconfig "github.com/cometbft/cometbft/config"
+	cometp2p "github.com/cometbft/cometbft/p2p"
+	cometproxy "github.com/cometbft/cometbft/proxy"
 
-	tmlog "github.com/cometbft/cometbft/libs/log"
-	tmos "github.com/cometbft/cometbft/libs/os"
-	tmnode "github.com/cometbft/cometbft/node"
+	cometlog "github.com/cometbft/cometbft/libs/log"
+	cometnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -61,7 +61,7 @@ type TenderLogger struct {
 	logLevel int // 0:debug 1:info 2:error 3:disabled
 }
 
-var _ tmlog.Logger = (*TenderLogger)(nil)
+var _ cometlog.Logger = (*TenderLogger)(nil)
 
 func (l *TenderLogger) SetLogLevel(logLevel string) {
 	switch logLevel {
@@ -94,7 +94,7 @@ func (l *TenderLogger) Error(msg string, keyvals ...any) {
 	}
 }
 
-func (l *TenderLogger) With(keyvals ...any) tmlog.Logger {
+func (l *TenderLogger) With(keyvals ...any) cometlog.Logger {
 	// Make sure we copy the values, to avoid modifying the parent.
 	// TODO(mvdan): use zap's With method directly.
 	l2 := &TenderLogger{Artifact: l.Artifact, logLevel: l.logLevel}
@@ -112,10 +112,10 @@ func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
 func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (*tmnode.Node, error) {
+	localConfig *config.VochainCfg, genesis []byte) (*cometnode.Node, error) {
 	var err error
 
-	tconfig := tmcfg.DefaultConfig()
+	tconfig := cometconfig.DefaultConfig()
 	tconfig.SetRoot(localConfig.DataDir)
 	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0750); err != nil {
 		log.Fatal(err)
@@ -175,7 +175,7 @@ func newTendermint(app *BaseApplication,
 		"block", blockTime)
 
 	// disable transaction indexer (we don't use it)
-	tconfig.TxIndex = &tmcfg.TxIndexConfig{Indexer: "null"}
+	tconfig.TxIndex = &cometconfig.TxIndexConfig{Indexer: "null"}
 	// mempool config
 	tconfig.Mempool.Size = localConfig.MempoolSize
 	tconfig.Mempool.Recheck = true
@@ -213,21 +213,22 @@ func newTendermint(app *BaseApplication,
 		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
 			return nil, fmt.Errorf("cannot add private validator key: %w", err)
 		}
-		app.NodeAddress, err = NodePvKeyToAddress(pv.Key.PubKey)
+		// NodeAddress is the ethereum address of the given cometBFT node key
+		app.NodeAddress, err = ethereum.AddrFromPublicKey(pv.Key.PubKey.Bytes())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create node address from pubkey: %w", err)
 		}
 	}
 
 	// nodekey is used for the p2p transport layer
-	nodeKey := new(p2p.NodeKey)
+	nodeKey := new(cometp2p.NodeKey)
 	if len(localConfig.NodeKey) > 0 {
 		nodeKey, err = NewNodeKey(localConfig.NodeKey, tconfig.NodeKeyFile())
 		if err != nil {
 			return nil, fmt.Errorf("cannot create node key: %w", err)
 		}
 	} else {
-		if nodeKey, err = p2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
+		if nodeKey, err = cometp2p.LoadOrGenNodeKey(tconfig.NodeKeyFile()); err != nil {
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
@@ -241,7 +242,7 @@ func newTendermint(app *BaseApplication,
 		"seed", tconfig.P2P.SeedMode)
 
 	// read or create genesis file
-	if tmos.FileExists(tconfig.GenesisFile()) {
+	if _, err := os.Stat(tconfig.GenesisFile()); err == nil {
 		log.Infof("found genesis file %s", tconfig.GenesisFile())
 	} else {
 		log.Debugf("loaded genesis: %s", string(genesis))
@@ -252,7 +253,7 @@ func newTendermint(app *BaseApplication,
 	}
 
 	if localConfig.TendermintMetrics {
-		tconfig.Instrumentation = &tmcfg.InstrumentationConfig{
+		tconfig.Instrumentation = &cometconfig.InstrumentationConfig{
 			Prometheus:           true,
 			PrometheusListenAddr: "",
 			MaxOpenConnections:   2,
@@ -284,13 +285,15 @@ func newTendermint(app *BaseApplication,
 
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
-	node, err := tmnode.NewNode(tconfig,
+	node, err := cometnode.NewNode(
+		context.Background(),
+		tconfig,
 		pv,
 		nodeKey,
-		proxy.NewLocalClientCreator(app),
-		tmnode.DefaultGenesisDocProviderFunc(tconfig),
-		tmcfg.DefaultDBProvider,
-		tmnode.DefaultMetricsProvider(tconfig.Instrumentation),
+		cometproxy.NewLocalClientCreator(app),
+		cometnode.DefaultGenesisDocProviderFunc(tconfig),
+		cometconfig.DefaultDBProvider,
+		cometnode.DefaultMetricsProvider(tconfig.Instrumentation),
 		logger,
 	)
 

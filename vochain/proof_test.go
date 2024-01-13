@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -47,7 +47,7 @@ func TestMerkleTreeProof(t *testing.T) {
 
 	app.AdvanceTestBlock()
 
-	cktx := new(abcitypes.RequestCheckTx)
+	cktx := new(cometabcitypes.CheckTxRequest)
 
 	// send the votes (but not the last one), should be ok
 	for i, s := range keys {
@@ -196,8 +196,8 @@ func TestCSPproof(t *testing.T) {
 
 func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(cometabcitypes.CheckTxRequest)
+	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx
 	var err error
 

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -65,8 +65,8 @@ func TestEthProof(t *testing.T) {
 
 func testEthSendVotes(t *testing.T, s testStorageProof,
 	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(cometabcitypes.CheckTxRequest)
+	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx
 
 	t.Logf("voting %x", s.StorageProof.Key)

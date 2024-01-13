@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 
@@ -547,7 +547,7 @@ func TestSendTokensTx(t *testing.T) {
 	err := signer.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	app.State.SetAccount(state.BurnAddress, &state.Account{})
+	qt.Assert(t, app.State.SetAccount(state.BurnAddress, &state.Account{}), qt.IsNil)
 
 	err = app.State.SetTxBaseCost(models.TxType_SEND_TOKENS, 10)
 	qt.Assert(t, err, qt.IsNil)
@@ -900,7 +900,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 		return err
 	}
 
-	cktx := new(abcitypes.RequestCheckTx)
+	cktx := new(cometabcitypes.CheckTxRequest)
 	cktx.Tx = stxBytes
 	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {

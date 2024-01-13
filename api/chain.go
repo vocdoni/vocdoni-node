@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	tmtypes "github.com/cometbft/cometbft/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -753,7 +753,7 @@ func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 		return ErrBlockNotFound
 	}
 	block := &Block{
-		Block: tmtypes.Block{
+		Block: comettypes.Block{
 			Header:     tmblock.Header,
 			Data:       tmblock.Data,
 			Evidence:   tmblock.Evidence,
@@ -788,7 +788,7 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		return ErrBlockNotFound
 	}
 	block := &Block{
-		Block: tmtypes.Block{
+		Block: comettypes.Block{
 			Header:     tmblock.Header,
 			Data:       tmblock.Data,
 			Evidence:   tmblock.Evidence,

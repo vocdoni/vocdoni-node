@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/vocdoni/storage-proofs-eth-go/ethstorageproof"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -86,8 +86,8 @@ func storageProofToModel(s *ethstorageproof.StorageResult) *models.ProofEthereum
 
 func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr common.Address,
 	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
-	cktx := new(abcitypes.RequestCheckTx)
-	var cktxresp *abcitypes.ResponseCheckTx
+	cktx := new(cometabcitypes.CheckTxRequest)
+	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx
 
 	t.Logf("voting %x", s.StorageProof[0].Key)

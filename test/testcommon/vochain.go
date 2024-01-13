@@ -7,8 +7,7 @@ import (
 	"testing"
 	"time"
 
-	secp "github.com/cometbft/cometbft/crypto/secp256k1"
-	"github.com/cometbft/cometbft/privval"
+	cometprivval "github.com/cometbft/cometbft/privval"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -62,16 +61,14 @@ func NewVochainState(tb testing.TB) *state.State {
 
 func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
-	vals := make([]*privval.FilePV, 2)
+	vals := make([]*cometprivval.FilePV, 2)
 	rint := rand.Int()
-	vals[0] = privval.NewFilePV(
-		secp.GenPrivKey(),
+	vals[0] = cometprivval.GenFilePV(
 		"/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
 	)
 	rint = rand.Int()
-	vals[1] = privval.NewFilePV(
-		secp.GenPrivKey(),
+	vals[1] = cometprivval.GenFilePV(
 		"/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
 	)

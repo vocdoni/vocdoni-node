@@ -12,10 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	abcitypes "github.com/cometbft/cometbft/abci/types"
-	"github.com/cometbft/cometbft/crypto/tmhash"
-	tmcoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	tmtypes "github.com/cometbft/cometbft/types"
+	cometabcitypes "github.com/cometbft/cometbft/abci/types"
+	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
@@ -169,7 +169,7 @@ func (vc *Vocone) Start() {
 		if err != nil {
 			panic(err)
 		}
-		if _, err = vc.App.InitChain(context.Background(), &abcitypes.RequestInitChain{
+		if _, err = vc.App.InitChain(context.Background(), &cometabcitypes.InitChainRequest{
 			ChainId:       vc.App.ChainID(),
 			AppStateBytes: genesisAppData,
 			Time:          time.Now(),
@@ -340,8 +340,8 @@ func (vc *Vocone) setDefaultMethods() {
 	vc.App.SetFnMempoolPrune(nil)
 }
 
-func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+	resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
 	if err != nil {
 		return nil, err
 	}
@@ -349,7 +349,7 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 		select {
 		case vc.mempool <- tx:
 		default: // mempool is full
-			return &tmcoretypes.ResultBroadcastTx{
+			return &cometcoretypes.ResultBroadcastTx{
 				Code: 1,
 				Data: []byte("mempool is full"),
 			}, fmt.Errorf("mempool is full")
@@ -357,10 +357,10 @@ func (vc *Vocone) addTx(tx []byte) (*tmcoretypes.ResultBroadcastTx, error) {
 	} else {
 		log.Debugf("checkTx failed: %s", resp.Data)
 	}
-	return &tmcoretypes.ResultBroadcastTx{
+	return &cometcoretypes.ResultBroadcastTx{
 		Code: resp.Code,
 		Data: resp.Data,
-		Hash: tmhash.Sum(tx),
+		Hash: comettmhash.Sum(tx),
 	}, nil
 }
 
@@ -379,7 +379,7 @@ txLoop:
 			break txLoop
 		}
 		// ensure all txs are still valid valid
-		resp, err := vc.App.CheckTx(context.Background(), &abcitypes.RequestCheckTx{Tx: tx})
+		resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
 		if err != nil {
 			log.Errorw(err, "error on check tx")
 			continue
@@ -404,8 +404,8 @@ txLoop:
 }
 
 // TO-DO: improve this function
-func (vc *Vocone) getBlock(height int64) *tmtypes.Block {
-	blk := new(tmtypes.Block)
+func (vc *Vocone) getBlock(height int64) *comettypes.Block {
+	blk := new(comettypes.Block)
 	blk.Height = height
 	blk.ChainID = vc.App.ChainID()
 	v, found := vc.blockTimestamps.Load(height)
