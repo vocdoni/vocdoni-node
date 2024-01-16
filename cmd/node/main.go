@@ -117,7 +117,7 @@ func newConfig() (*config.Config, config.Error) {
 		"enable IPFS group synchronization using the given secret key")
 	conf.Ipfs.ConnectPeers = *flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
-	conf.Vochain.Indexer.ArchiveURL = *flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url")
+	conf.Vochain.Indexer.ArchiveURL = *flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url  (set \"none\" to disable)")
 
 	// vochain
 	conf.Vochain.P2PListen = *flag.String("vochainP2PListen", "0.0.0.0:26656",
