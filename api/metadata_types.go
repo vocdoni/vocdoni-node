@@ -2,13 +2,13 @@ package api
 
 // ElectionMetadata contains the process metadata fields as stored on ipfs
 type ElectionMetadata struct {
-	Title       LanguageString         `json:"title"`
-	Version     string                 `json:"version"`
-	Description LanguageString         `json:"description"`
-	Media       ProcessMedia           `json:"media,omitempty"`
-	Meta        any                    `json:"meta,omitempty"`
-	Questions   []Question             `json:"questions,omitempty"`
-	Results     ElectionResultsDetails `json:"results,omitempty"`
+	Title       LanguageString     `json:"title"`
+	Version     string             `json:"version"`
+	Description LanguageString     `json:"description"`
+	Media       ProcessMedia       `json:"media,omitempty"`
+	Meta        any                `json:"meta,omitempty"`
+	Questions   []Question         `json:"questions,omitempty"`
+	Type        ElectionProperties `json:"type,omitempty"`
 }
 
 // LanguageString is a wrapper for multi-language strings, specified in metadata.
@@ -22,10 +22,10 @@ type ProcessMedia struct {
 	StreamURI string `json:"streamUri,omitempty"`
 }
 
-// ElectionResultsDetails describes how a process results should be displayed and aggregated
-type ElectionResultsDetails struct {
-	Aggregation string `json:"aggregation"`
-	Display     string `json:"display"`
+// ElectionProperties describes how a process results should be displayed and aggregated
+type ElectionProperties struct {
+	Name       string `json:"name"`
+	Properties any    `json:"properties"`
 }
 
 // Question contains metadata for one single question of a process
