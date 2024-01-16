@@ -382,9 +382,8 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		},
 		Meta:      nil,
 		Questions: []Question{},
-		Results: ElectionResultsDetails{
-			Aggregation: "discrete-values",
-			Display:     "multiple-choice",
+		Type: ElectionProperties{
+			Name: "single-choice-multiquestion",
 		},
 		Title:   description.Title,
 		Version: "1.0",

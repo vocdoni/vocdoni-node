@@ -143,9 +143,8 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 		},
 		Meta:      nil,
 		Questions: []api.Question{},
-		Results: api.ElectionResultsDetails{
-			Aggregation: "discrete-values",
-			Display:     "multiple-choice",
+		Type: api.ElectionProperties{
+			Name: "single-choice-multiquestion",
 		},
 		Title:   description.Title,
 		Version: "1.0",
