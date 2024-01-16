@@ -110,6 +110,7 @@ type DeliverTxResponse struct {
 	Log  string
 	Info string
 	Data []byte
+	TxID [32]byte
 }
 
 // ExecuteBlockResponse is the response returned by ExecuteBlock after executing the block.
@@ -173,7 +174,7 @@ func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime 
 				"data", string(resp.Data),
 				"info", resp.Info,
 				"log", resp.Log)
-			invalidTxs = append(invalidTxs, [32]byte{})
+			invalidTxs = append(invalidTxs, resp.TxID)
 		}
 		result = append(result, resp)
 	}
@@ -239,7 +240,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 	response, err := app.TransactionHandler.CheckTx(tx, true)
 	if err != nil {
 		log.Errorw(err, "rejected tx")
-		return &DeliverTxResponse{Code: 1, Data: []byte(err.Error())}
+		return &DeliverTxResponse{Code: 1, TxID: tx.TxID, Data: []byte(err.Error())}
 	}
 	app.txReferences.Delete(tx.TxID)
 	// call event listeners
@@ -251,6 +252,7 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 		Data: response.Data,
 		Info: fmt.Sprintf("%x", response.TxHash),
 		Log:  response.Log,
+		TxID: tx.TxID,
 	}
 }
 
