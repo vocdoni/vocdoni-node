@@ -21,23 +21,15 @@ import (
 )
 
 func (a *API) electionSummary(pi *indexertypes.Process) ElectionSummary {
-	startDate := pi.StartDate
-	if startDate.IsZero() {
-		startDate = a.vocinfo.HeightTime(uint64(pi.StartBlock))
-	}
-	endDate := pi.EndDate
-	if endDate.IsZero() {
-		endDate = a.vocinfo.HeightTime(uint64(pi.EndBlock))
-	}
 	return ElectionSummary{
 		ElectionID:     pi.ID,
 		OrganizationID: pi.EntityID,
 		Status:         models.ProcessStatus_name[pi.Status],
-		StartDate:      startDate,
-		EndDate:        endDate,
+		StartDate:      pi.StartDate,
+		EndDate:        pi.EndDate,
 		FinalResults:   pi.FinalResults,
 		VoteCount:      pi.VoteCount,
-		ManuallyEnded:  pi.EndBlock < pi.StartBlock+pi.BlockCount,
+		ManuallyEnded:  pi.ManuallyEnded,
 		ChainID:        pi.ChainID,
 		FromArchive:    pi.FromArchive,
 	}

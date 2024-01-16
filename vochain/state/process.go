@@ -270,7 +270,7 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnProcessStatusChange(process.ProcessId, process.Status, v.txCounter.Load())
+			l.OnProcessStatusChange(process.ProcessId, newstatus, v.txCounter.Load())
 		}
 	}
 	return nil

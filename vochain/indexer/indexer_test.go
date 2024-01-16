@@ -1441,7 +1441,7 @@ func TestCensusUpdate(t *testing.T) {
 	qt.Assert(t, proc.CensusURI, qt.DeepEquals, *newCensusURI)
 }
 
-func TestEndBlock(t *testing.T) {
+func TestEndProcess(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
 
@@ -1451,8 +1451,8 @@ func TestEndBlock(t *testing.T) {
 		ProcessId:     pid,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Status:        models.ProcessStatus_READY,
-		BlockCount:    100,
-		StartBlock:    1,
+		StartTime:     0,
+		Duration:      10,
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
 		Mode:          &models.ProcessMode{AutoStart: true, Interruptible: true},
 		MaxCensusSize: 1000,
@@ -1461,13 +1461,13 @@ func TestEndBlock(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	app.AdvanceTestBlock()
+	app.AdvanceTestBlocksUntilTimestamp(5)
 
 	// get created process
 	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
-	// check the endblock matches the startblock + blockcount
-	qt.Assert(t, proc.EndBlock, qt.Equals, uint32(101))
+	// check the end date is correct
+	qt.Assert(t, proc.EndDate.Unix(), qt.Equals, int64(10))
 	// check the status is READY
 	qt.Assert(t, proc.Status, qt.Equals, int32(models.ProcessStatus_READY))
 
@@ -1483,12 +1483,9 @@ func TestEndBlock(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, proc.Status, qt.Equals, int32(models.ProcessStatus_ENDED))
 
-	// check the endblock is equal to the current height
+	// check manually ended is true
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, proc.EndBlock, qt.Equals, app.Height()-1)
-
-	// check the block count is still the original value
-	qt.Assert(t, proc.BlockCount, qt.Equals, uint32(100))
+	qt.Assert(t, proc.ManuallyEnded, qt.Equals, true)
 }
 
 func TestAccountsList(t *testing.T) {

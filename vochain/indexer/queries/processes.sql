@@ -1,7 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, start_block, end_block, start_date, end_date, 
-	block_count, vote_count, have_results, final_results, census_root,
+	id, entity_id, start_date, end_date, manually_ended,
+	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -12,8 +12,8 @@ INSERT INTO processes (
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
-	?, ?, ?, ?, ?, ?,
 	?, ?, ?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -52,8 +52,7 @@ SET census_root         = sqlc.arg(census_root),
 	private_keys        = sqlc.arg(private_keys),
 	public_keys         = sqlc.arg(public_keys),
 	metadata            = sqlc.arg(metadata),
-	status              = sqlc.arg(status),
-	start_date 	        = sqlc.arg(start_date)
+	status              = sqlc.arg(status)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessStatus :one
@@ -80,7 +79,8 @@ WHERE id = sqlc.arg(id);
 -- name: SetProcessResultsCancelled :execresult
 UPDATE processes
 SET have_results = FALSE, final_results = TRUE, 
-    end_date = sqlc.arg(end_date)
+    end_date = sqlc.arg(end_date),
+	manually_ended = sqlc.arg(manually_ended)
 WHERE id = sqlc.arg(id);
 
 -- name: SetProcessVoteCount :execresult
@@ -115,8 +115,8 @@ SET results_votes  = sqlc.arg(votes),
     envelope = sqlc.arg(envelope)
 WHERE id = sqlc.arg(id);
 
--- name: UpdateProcessEndBlock :execresult
+-- name: UpdateProcessEndDate :execresult
 UPDATE processes
-SET end_block  = sqlc.arg(end_block),
-	end_date = sqlc.arg(end_date)
+SET end_date = sqlc.arg(end_date),
+	manually_ended = sqlc.arg(manually_ended)
 WHERE id = sqlc.arg(id);

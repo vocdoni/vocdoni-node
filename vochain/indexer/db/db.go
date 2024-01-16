@@ -135,8 +135,8 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.setProcessVoteCountStmt, err = db.PrepareContext(ctx, setProcessVoteCount); err != nil {
 		return nil, fmt.Errorf("error preparing query SetProcessVoteCount: %w", err)
 	}
-	if q.updateProcessEndBlockStmt, err = db.PrepareContext(ctx, updateProcessEndBlock); err != nil {
-		return nil, fmt.Errorf("error preparing query UpdateProcessEndBlock: %w", err)
+	if q.updateProcessEndDateStmt, err = db.PrepareContext(ctx, updateProcessEndDate); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessEndDate: %w", err)
 	}
 	if q.updateProcessFromStateStmt, err = db.PrepareContext(ctx, updateProcessFromState); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProcessFromState: %w", err)
@@ -337,9 +337,9 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing setProcessVoteCountStmt: %w", cerr)
 		}
 	}
-	if q.updateProcessEndBlockStmt != nil {
-		if cerr := q.updateProcessEndBlockStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing updateProcessEndBlockStmt: %w", cerr)
+	if q.updateProcessEndDateStmt != nil {
+		if cerr := q.updateProcessEndDateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessEndDateStmt: %w", cerr)
 		}
 	}
 	if q.updateProcessFromStateStmt != nil {
@@ -433,7 +433,7 @@ type Queries struct {
 	setProcessResultsCancelledStmt               *sql.Stmt
 	setProcessResultsReadyStmt                   *sql.Stmt
 	setProcessVoteCountStmt                      *sql.Stmt
-	updateProcessEndBlockStmt                    *sql.Stmt
+	updateProcessEndDateStmt                     *sql.Stmt
 	updateProcessFromStateStmt                   *sql.Stmt
 	updateProcessResultByIDStmt                  *sql.Stmt
 	updateProcessResultsStmt                     *sql.Stmt
@@ -480,7 +480,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,
 		setProcessResultsReadyStmt:     q.setProcessResultsReadyStmt,
 		setProcessVoteCountStmt:        q.setProcessVoteCountStmt,
-		updateProcessEndBlockStmt:      q.updateProcessEndBlockStmt,
+		updateProcessEndDateStmt:       q.updateProcessEndDateStmt,
 		updateProcessFromStateStmt:     q.updateProcessFromStateStmt,
 		updateProcessResultByIDStmt:    q.updateProcessResultByIDStmt,
 		updateProcessResultsStmt:       q.updateProcessResultsStmt,

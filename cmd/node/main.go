@@ -165,7 +165,7 @@ func loadConfig() *config.Config {
 		"enable IPFS group synchronization using the given secret key")
 	flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
-	flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url")
+	flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url (set \"none\" to disable)")
 
 	// vochain
 	flag.String("vochainP2PListen", "0.0.0.0:26656",
