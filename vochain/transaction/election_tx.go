@@ -60,7 +60,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		if tx.Process.Duration > 0 {
 			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with both duration time and block count")
 		}
-		log.Warnw("deprecated block count based new process detected", "id", hex.EncodeToString(tx.Process.ProcessId))
+		log.Warnw("deprecated block count based new process detected", "pid", hex.EncodeToString(tx.Process.ProcessId))
 		tx.Process.Duration = tx.Process.BlockCount * uint32(types.DefaultBlockTime.Seconds())
 		if tx.Process.StartBlock == 0 {
 			tx.Process.StartTime = 0
