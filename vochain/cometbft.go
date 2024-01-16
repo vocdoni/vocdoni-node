@@ -414,8 +414,13 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 					log.Debugf("transaction %x has reached max attempts, remove from mempool", txInfo.DecodedTx.TxID)
 					app.MempoolDeleteTx(txInfo.DecodedTx.TxID)
 					app.txReferences.Delete(txInfo.DecodedTx.TxID)
+				} else {
+					app.txReferences.Store(txInfo.DecodedTx.TxID, val)
 				}
 			}
+			log.Warnw("transaction reference not found on prepare proposal!",
+				"hash", fmt.Sprintf("%x", txInfo.DecodedTx.TxID),
+			)
 			continue
 		}
 		validTxs = append(validTxs, txInfo.Data)
@@ -459,23 +464,19 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	}
 
 	startTime := time.Now()
-
-	// TODO: check if we can enable this check without breaking consensus
-	//
-	// Check if the time difference is within the allowed threshold
-	//	timeDiff := startTime.Sub(req.Time)
-	//	if timeDiff > allowedConsensusTimeDiff {
-	//		return nil, fmt.Errorf("the time difference for the proposal exceeds the threshold")
-	//	}
-
 	resp, err := app.ExecuteBlock(req.Txs, uint32(req.GetHeight()), req.GetTime())
 	if err != nil {
 		return nil, fmt.Errorf("cannot execute block on process proposal: %w", err)
 	}
-	// invalid txx on a proposed block, should actually never happened if proposer acts honestly
+	// invalid tx on a proposed block, should actually never happened if proposer acts honestly
 	if len(resp.InvalidTransactions) > 0 {
 		log.Warnw("invalid transactions on process proposal", "height", app.Height(), "count", len(resp.InvalidTransactions),
 			"proposer", hex.EncodeToString(req.ProposerAddress), "action", "reject")
+		for _, tx := range resp.InvalidTransactions {
+			// remove transaction from mempool, just in case we have it
+			app.MempoolDeleteTx(tx)
+			log.Debugw("remove invalid tx from mempool", "hash", fmt.Sprintf("%x", tx))
+		}
 		return &cometabcitypes.ProcessProposalResponse{
 			Status: cometabcitypes.PROCESS_PROPOSAL_STATUS_REJECT,
 		}, nil
