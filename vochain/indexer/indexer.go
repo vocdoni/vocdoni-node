@@ -307,6 +307,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	prcIDs, err := queries.GetProcessIDsByFinalResults(ctx, false)
 	if err != nil {
 		log.Error(err)
+		return // no point in continuing further
 	}
 
 	log.Infof("recovered %d live results processes", len(prcIDs))
