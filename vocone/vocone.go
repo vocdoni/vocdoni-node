@@ -186,7 +186,7 @@ func (vc *Vocone) Start() {
 		// Create and execute block
 		resp, err := vc.App.ExecuteBlock(vc.prepareBlock(), uint32(height), time.Now())
 		if err != nil {
-			log.Error(err, "execute block error")
+			log.Fatal(err, "execute block error")
 		}
 		if _, err := vc.App.CommitState(); err != nil {
 			log.Fatalf("could not commit state: %v", err)

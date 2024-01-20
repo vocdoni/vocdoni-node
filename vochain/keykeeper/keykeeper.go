@@ -346,7 +346,6 @@ func (k *KeyKeeper) checkRevealProcess(height uint32) {
 	}
 	if err := wTx.Commit(); err != nil {
 		log.Error(err)
-		return
 	}
 }
 
