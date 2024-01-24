@@ -24,6 +24,7 @@ func TestImportArchive(t *testing.T) {
 	process1, err := idx.ProcessInfo(archiveProcess1.ProcessInfo.ID)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, process1.ID.String(), qt.Equals, archiveProcess1.ProcessInfo.ID.String())
+	qt.Assert(t, process1.CreationTime, qt.DeepEquals, archiveProcess1.ProcessInfo.CreationTime)
 	qt.Assert(t, process1.Results().Votes[0][0].MathBigInt().Int64(), qt.Equals, int64(342))
 	qt.Assert(t, process1.Results().Votes[0][1].MathBigInt().Int64(), qt.Equals, int64(365))
 	qt.Assert(t, process1.Results().Votes[0][2].MathBigInt().Int64(), qt.Equals, int64(21))
