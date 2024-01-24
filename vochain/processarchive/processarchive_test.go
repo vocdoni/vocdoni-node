@@ -7,6 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 )
 
@@ -21,10 +22,10 @@ func TestJsonStorage(t *testing.T) {
 	dir := t.TempDir()
 	js, err := NewJsonStorage(dir)
 	qt.Assert(t, err, qt.IsNil)
-	p1 := &Process{ProcessInfo: &indexertypes.Process{ID: PID1, EntityID: EID1}}
+	p1 := &indexer.ArchiveProcess{ProcessInfo: &indexertypes.Process{ID: PID1, EntityID: EID1}}
 	err = js.AddProcess(p1)
 	qt.Assert(t, err, qt.IsNil)
-	p2 := &Process{ProcessInfo: &indexertypes.Process{ID: PID2, EntityID: EID2}}
+	p2 := &indexer.ArchiveProcess{ProcessInfo: &indexertypes.Process{ID: PID2, EntityID: EID2}}
 	err = js.AddProcess(p2)
 	qt.Assert(t, err, qt.IsNil)
 	exist, err := js.ProcessExist(PID3)
@@ -42,7 +43,7 @@ func TestJsonStorage(t *testing.T) {
 	qt.Assert(t, string(pr.ProcessInfo.EntityID), qt.DeepEquals, string(EID2))
 
 	// create a new process on second storage
-	p3 := &Process{ProcessInfo: &indexertypes.Process{ID: PID3, EntityID: EID3}}
+	p3 := &indexer.ArchiveProcess{ProcessInfo: &indexertypes.Process{ID: PID3, EntityID: EID3}}
 	err = js2.AddProcess(p3)
 	qt.Assert(t, err, qt.IsNil)
 
