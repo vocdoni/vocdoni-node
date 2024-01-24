@@ -45,7 +45,7 @@ type IndexProcess struct {
 
 type JsonStorage struct {
 	datadir string
-	lock    sync.RWMutex
+	lock    sync.Mutex
 	index   *Index
 }
 
