@@ -34,7 +34,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.23.0 generate
+//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.25.0 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
