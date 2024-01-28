@@ -15,7 +15,7 @@ import (
 
 const computeProcessVoteCount = `-- name: ComputeProcessVoteCount :execresult
 UPDATE processes
-SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = ?1)
+SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = id)
 WHERE id = ?1
 `
 

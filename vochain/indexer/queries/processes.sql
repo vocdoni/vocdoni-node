@@ -84,7 +84,7 @@ WHERE id = sqlc.arg(id);
 
 -- name: ComputeProcessVoteCount :execresult
 UPDATE processes
-SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = sqlc.arg(id))
+SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = id)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessCount :one
