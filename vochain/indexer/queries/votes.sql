@@ -22,10 +22,6 @@ LIMIT 1;
 -- name: CountVotes :one
 SELECT COUNT(*) FROM votes;
 
--- name: CountVotesByProcessID :one
-SELECT COUNT(*) FROM votes
-WHERE process_id = ?;
-
 -- name: SearchVotes :many
 SELECT v.*, t.hash FROM votes AS v
 LEFT JOIN transactions AS t

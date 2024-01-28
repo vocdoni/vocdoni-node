@@ -24,18 +24,6 @@ func (q *Queries) CountVotes(ctx context.Context) (int64, error) {
 	return count, err
 }
 
-const countVotesByProcessID = `-- name: CountVotesByProcessID :one
-SELECT COUNT(*) FROM votes
-WHERE process_id = ?
-`
-
-func (q *Queries) CountVotesByProcessID(ctx context.Context, processID types.ProcessID) (int64, error) {
-	row := q.queryRow(ctx, q.countVotesByProcessIDStmt, countVotesByProcessID, processID)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const createVote = `-- name: CreateVote :execresult
 REPLACE INTO votes (
 	nullifier, process_id, block_height, block_index,

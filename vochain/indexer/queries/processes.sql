@@ -83,9 +83,9 @@ SET have_results = FALSE, final_results = TRUE,
     end_date = sqlc.arg(end_date)
 WHERE id = sqlc.arg(id);
 
--- name: SetProcessVoteCount :execresult
+-- name: ComputeProcessVoteCount :execresult
 UPDATE processes
-SET vote_count = sqlc.arg(vote_count)
+SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = sqlc.arg(id))
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessCount :one

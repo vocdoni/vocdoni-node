@@ -494,16 +494,8 @@ func (idx *Indexer) Commit(height uint32) error {
 	// since simply incrementing the vote count would break with vote overwrites.
 	for pidStr := range idx.blockUpdateProcVoteCounts {
 		pid := []byte(pidStr)
-		voteCount, err := queries.CountVotesByProcessID(ctx, pid)
-		if err != nil {
-			log.Errorw(err, "could not get vote count")
-			continue
-		}
-		if _, err := queries.SetProcessVoteCount(ctx, indexerdb.SetProcessVoteCountParams{
-			ID:        pid,
-			VoteCount: voteCount,
-		}); err != nil {
-			log.Errorw(err, "could not set vote count")
+		if _, err := queries.ComputeProcessVoteCount(ctx, pid); err != nil {
+			log.Errorw(err, "could not compute process vote count")
 		}
 	}
 	clear(idx.blockUpdateProcVoteCounts)
