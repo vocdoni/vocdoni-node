@@ -152,7 +152,7 @@ func (idx *Indexer) startDB() error {
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
-	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", idx.dbPath))
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal&_foreign_keys=true", idx.dbPath))
 	if err != nil {
 		return err
 	}
