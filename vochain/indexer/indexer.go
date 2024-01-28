@@ -89,9 +89,6 @@ type Indexer struct {
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
 
-	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
-	// being executed.
-	recoveryBootLock sync.RWMutex
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
 }
@@ -300,13 +297,10 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	}
 	log.Infof("running indexer after-sync bootstrap")
 
-	// Block the new votes addition until the recovery finishes.
-	// TODO: perhaps redundant with lockPool now?
-	idx.recoveryBootLock.Lock()
-	defer idx.recoveryBootLock.Unlock()
-
+	// Note that holding blockMu means new votes aren't added until the recovery finishes.
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
+
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()
 
@@ -479,15 +473,9 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		func() {
-			// If the recovery bootstrap is running, wait
-			idx.recoveryBootLock.RLock()
-			defer idx.recoveryBootLock.RUnlock()
-
-			if err := idx.commitVotesUnsafe(queries, pid, proc.Results(), addedResults, subtractedResults, idx.App.Height()); err != nil {
-				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
-			}
-		}()
+		if err := idx.commitVotesUnsafe(queries, pid, proc.Results(), addedResults, subtractedResults, idx.App.Height()); err != nil {
+			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
+		}
 	}
 	clear(idx.votePool)
 
