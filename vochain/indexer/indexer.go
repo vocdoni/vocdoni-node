@@ -132,7 +132,9 @@ func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 
 	// If we are expecting a restore shortly after, that will initialize the DB.
 	if !opts.ExpectBackupRestore {
-		idx.startDB()
+		if err := idx.startDB(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Subscribe to events
