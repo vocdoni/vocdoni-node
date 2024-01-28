@@ -157,9 +157,8 @@ func (idx *Indexer) startDB() error {
 		return err
 	}
 	idx.readWriteDB.SetMaxOpenConns(1)
-	idx.readWriteDB.SetMaxIdleConns(2)
+	idx.readWriteDB.SetMaxIdleConns(1)
 	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
-	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
 
 	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", idx.dbPath))
 	if err != nil {
