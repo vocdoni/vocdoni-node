@@ -569,10 +569,27 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 		idx.votePool[pid][nullifier] = vote
 	}
 
+	ctx := context.TODO()
+	weightStr := `"1"`
+	if vote.Weight != nil {
+		weightStr = indexertypes.EncodeJSON((*types.BigInt)(vote.Weight))
+	}
+	keyIndexes := indexertypes.EncodeJSON(vote.EncryptionKeyIndexes)
+
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
-	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
+	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
+		Nullifier:            vote.Nullifier,
+		ProcessID:            vote.ProcessID,
+		BlockHeight:          int64(vote.Height),
+		BlockIndex:           int64(txIndex),
+		Weight:               weightStr,
+		OverwriteCount:       int64(vote.Overwrites),
+		VoterID:              nonNullBytes(vote.VoterID),
+		EncryptionKeyIndexes: keyIndexes,
+		Package:              string(vote.VotePackage),
+	}); err != nil {
 		log.Errorw(err, "could not index vote")
 	}
 	idx.blockUpdateProcVoteCounts[pid] = true

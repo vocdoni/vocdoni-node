@@ -189,30 +189,6 @@ func (*Indexer) addLiveVote(process *indexertypes.Process, VotePackage []byte, w
 	return nil
 }
 
-// addVoteIndex adds the nullifier reference to the kv for fetching vote Txs from BlockStore.
-// This method is triggered by Commit callback for each vote added to the blockchain.
-// If txn is provided the vote will be added on the transaction (without performing a commit).
-func (*Indexer) addVoteIndex(ctx context.Context, queries *indexerdb.Queries, vote *state.Vote, txIndex int32) error {
-	weightStr := `"1"` // note that weight is stored as a JSON string-quoted number
-	if vote.Weight != nil {
-		weightStr = indexertypes.EncodeJSON((*types.BigInt)(vote.Weight))
-	}
-	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
-		Nullifier:            vote.Nullifier,
-		ProcessID:            vote.ProcessID,
-		BlockHeight:          int64(vote.Height),
-		BlockIndex:           int64(txIndex),
-		Weight:               weightStr,
-		OverwriteCount:       int64(vote.Overwrites),
-		VoterID:              nonNullBytes(vote.VoterID),
-		EncryptionKeyIndexes: indexertypes.EncodeJSON(vote.EncryptionKeyIndexes),
-		Package:              string(vote.VotePackage),
-	}); err != nil {
-		return err
-	}
-	return nil
-}
-
 // addProcessToLiveResults adds the process id to the liveResultsProcs map
 func (idx *Indexer) addProcessToLiveResults(pid []byte) {
 	idx.liveResultsProcs.Store(string(pid), true)
