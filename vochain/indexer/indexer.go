@@ -182,10 +182,9 @@ func (idx *Indexer) startDB() error {
 	// Increasing these numbers can allow for more queries to run concurrently,
 	// but it also increases the memory used by sqlite and our connection pool.
 	// Most read-only queries we run are quick enough, so a small number seems OK.
-	idx.readOnlyDB.SetMaxOpenConns(10)
-	idx.readOnlyDB.SetMaxIdleConns(20)
-	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
-	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
+	idx.readOnlyDB.SetMaxOpenConns(16)
+	idx.readOnlyDB.SetMaxIdleConns(4)
+	idx.readOnlyDB.SetConnMaxIdleTime(30 * time.Minute)
 
 	idx.readOnlyQuery, err = indexerdb.Prepare(context.TODO(), idx.readOnlyDB)
 	if err != nil {
