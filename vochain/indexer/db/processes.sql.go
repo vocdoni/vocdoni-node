@@ -13,6 +13,16 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+const computeProcessVoteCount = `-- name: ComputeProcessVoteCount :execresult
+UPDATE processes
+SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = ?1)
+WHERE id = ?1
+`
+
+func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessID) (sql.Result, error) {
+	return q.exec(ctx, q.computeProcessVoteCountStmt, computeProcessVoteCount, id)
+}
+
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_block, end_block, start_date, end_date, 
@@ -360,21 +370,6 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 		arg.EndDate,
 		arg.ID,
 	)
-}
-
-const setProcessVoteCount = `-- name: SetProcessVoteCount :execresult
-UPDATE processes
-SET vote_count = ?1
-WHERE id = ?2
-`
-
-type SetProcessVoteCountParams struct {
-	VoteCount int64
-	ID        types.ProcessID
-}
-
-func (q *Queries) SetProcessVoteCount(ctx context.Context, arg SetProcessVoteCountParams) (sql.Result, error) {
-	return q.exec(ctx, q.setProcessVoteCountStmt, setProcessVoteCount, arg.VoteCount, arg.ID)
 }
 
 const updateProcessEndBlock = `-- name: UpdateProcessEndBlock :execresult
