@@ -160,6 +160,21 @@ func (idx *Indexer) startDB() error {
 	idx.readWriteDB.SetMaxIdleConns(1)
 	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
 
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return err
+	}
+	goose.SetLogger(log.GooseLogger())
+	goose.SetBaseFS(embedMigrations)
+	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
+		return fmt.Errorf("goose up: %w", err)
+	}
+
+	// Analyze the tables and indices and store information in internal tables
+	// so that the query optimizer can make better choices.
+	if _, err := idx.readWriteDB.Exec("PRAGMA analysis_limit=1000; ANALYZE"); err != nil {
+		return err
+	}
+
 	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", idx.dbPath))
 	if err != nil {
 		return err
@@ -171,15 +186,6 @@ func (idx *Indexer) startDB() error {
 	idx.readOnlyDB.SetMaxIdleConns(20)
 	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
 	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
-
-	if err := goose.SetDialect("sqlite3"); err != nil {
-		return err
-	}
-	goose.SetLogger(log.GooseLogger())
-	goose.SetBaseFS(embedMigrations)
-	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
-		return fmt.Errorf("goose up: %w", err)
-	}
 
 	idx.readOnlyQuery, err = indexerdb.Prepare(context.TODO(), idx.readOnlyDB)
 	if err != nil {
@@ -506,6 +512,14 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	if height%1000 == 0 {
+		// Regularly see if sqlite thinks another optimization analysis would be useful.
+		// Block times tend to be in the order of seconds like 10s,
+		// so a thousand blocks will tend to be in the order of hours.
+		if _, err := idx.readWriteDB.Exec("PRAGMA optimize"); err != nil {
+			return err
+		}
+	}
 
 	if newVotes+overwritedVotes > 0 {
 		log.Infow("add live votes to results",
