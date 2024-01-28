@@ -16,8 +16,8 @@ CREATE INDEX transactions_block_height_index
 ON transactions(block_height, block_index);
 
 -- +goose Down
-DROP TABLE transactions
+DROP TABLE transactions;
 
-DROP INDEX transactions_hash
+DROP INDEX transactions_hash;
 
-DROP INDEX transactions_block_height_index
+DROP INDEX transactions_block_height_index;

@@ -17,4 +17,4 @@ ON token_transfers(from_account);
 -- +goose Down
 DROP TABLE token_transfers;
 
-DROP INDEX index_from_account_token_transfers
+DROP INDEX index_from_account_token_transfers;

@@ -45,8 +45,8 @@ CREATE INDEX index_processes_namespace
 ON processes(namespace);
 
 -- +goose Down
-DROP TABLE processes
+DROP TABLE processes;
 
-DROP INDEX index_processes_entity_id
+DROP INDEX index_processes_entity_id;
 
-DROP INDEX index_processes_namespace
+DROP INDEX index_processes_namespace;
