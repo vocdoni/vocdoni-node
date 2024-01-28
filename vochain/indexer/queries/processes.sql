@@ -28,7 +28,6 @@ INSERT INTO processes (
 -- name: GetProcess :one
 SELECT * FROM processes
 WHERE id = ?
-GROUP BY id
 LIMIT 1;
 
 -- name: SearchProcesses :many

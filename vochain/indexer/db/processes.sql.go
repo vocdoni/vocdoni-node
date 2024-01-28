@@ -131,7 +131,6 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 const getProcess = `-- name: GetProcess :one
 SELECT id, entity_id, start_block, end_block, start_date, end_date, block_count, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive FROM processes
 WHERE id = ?
-GROUP BY id
 LIMIT 1
 `
 
