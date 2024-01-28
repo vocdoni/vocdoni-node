@@ -6,4 +6,4 @@ CREATE TABLE blocks (
 );
 
 -- +goose Down
-DROP TABLE blocks
+DROP TABLE blocks;
