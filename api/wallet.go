@@ -464,7 +464,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	tx.Code = nil
 	data, err := json.Marshal(tx)
 	if err != nil {
-		log.Error(err)
+		return err
 	}
 
 	return ctx.Send(data, apirest.HTTPstatusOK)

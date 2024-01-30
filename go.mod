@@ -47,7 +47,7 @@ require (
 	github.com/libp2p/go-libp2p-pubsub v0.10.0
 	github.com/libp2p/go-reuseport v0.4.0
 	github.com/manifoldco/promptui v0.9.0
-	github.com/mattn/go-sqlite3 v1.14.19
+	github.com/mattn/go-sqlite3 v1.14.20
 	github.com/multiformats/go-multiaddr v0.12.0
 	github.com/multiformats/go-multicodec v0.9.0
 	github.com/multiformats/go-multihash v0.2.3

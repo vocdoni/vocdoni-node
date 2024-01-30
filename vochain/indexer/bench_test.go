@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"fmt"
 	"math/big"
 	"sync"
@@ -107,8 +108,8 @@ func BenchmarkIndexer(b *testing.B) {
 					voteRef, err := idx.GetEnvelope(vote.Nullifier)
 					qt.Check(b, err, qt.IsNil)
 					if err == nil {
-						qt.Check(b, voteRef.Meta.Nullifier, qt.DeepEquals, vote.Nullifier)
-						qt.Check(b, []byte(voteRef.Meta.TxHash), qt.DeepEquals, tx.TxID[:])
+						qt.Check(b, bytes.Equal(voteRef.Meta.Nullifier, vote.Nullifier), qt.IsTrue)
+						qt.Check(b, bytes.Equal(voteRef.Meta.TxHash, tx.TxID[:]), qt.IsTrue)
 					}
 
 					txRef, err := idx.GetTxHashReference(tx.TxID[:])

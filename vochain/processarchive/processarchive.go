@@ -27,25 +27,17 @@ type ProcessArchive struct {
 	close      chan bool
 }
 
-type Process struct {
-	ChainID     string                `json:"chainId,omitempty"`
-	ProcessInfo *indexertypes.Process `json:"process"`
-	Results     *results.Results      `json:"results"`
-	StartDate   *time.Time            `json:"startDate,omitempty"`
-	EndDate     *time.Time            `json:"endDate,omitempty"`
-}
-
 type Index struct {
-	Entities map[string][]*IndexProcess `json:"entities"`
+	Entities map[string][]*IndexProcess
 }
 
 type IndexProcess struct {
-	ProcessID types.HexBytes `json:"processId"`
+	ProcessID types.HexBytes
 }
 
 type JsonStorage struct {
 	datadir string
-	lock    sync.RWMutex
+	lock    sync.Mutex
 	index   *Index
 }
 
@@ -60,7 +52,7 @@ func NewJsonStorage(datadir string) (*JsonStorage, error) {
 }
 
 // AddProcess adds an entire process to js
-func (js *JsonStorage) AddProcess(p *Process) error {
+func (js *JsonStorage) AddProcess(p *indexer.ArchiveProcess) error {
 	if p == nil || p.ProcessInfo == nil || len(p.ProcessInfo.ID) != types.ProcessIDsize {
 		return fmt.Errorf("process not valid")
 	}
@@ -94,7 +86,7 @@ func (js *JsonStorage) AddProcess(p *Process) error {
 }
 
 // GetProcess retrieves a process from the js storage
-func (js *JsonStorage) GetProcess(pid []byte) (*Process, error) {
+func (js *JsonStorage) GetProcess(pid []byte) (*indexer.ArchiveProcess, error) {
 	if len(pid) != types.ProcessIDsize {
 		return nil, fmt.Errorf("process not valid")
 	}
@@ -104,7 +96,7 @@ func (js *JsonStorage) GetProcess(pid []byte) (*Process, error) {
 	if err != nil {
 		return nil, err
 	}
-	p := &Process{}
+	p := &indexer.ArchiveProcess{}
 	return p, json.Unmarshal(data, p)
 }
 
@@ -146,7 +138,7 @@ func BuildIndex(datadir string) (*Index, error) {
 			continue
 		}
 		count++
-		p := &Process{}
+		p := &indexer.ArchiveProcess{}
 		if err := json.Unmarshal(content, p); err != nil {
 			return nil, err
 		}
@@ -250,7 +242,7 @@ func (pa *ProcessArchive) ProcessScan(fromBlock int) error {
 		if procInfo.Status != int32(models.ProcessStatus_RESULTS) {
 			continue
 		}
-		if err := pa.storage.AddProcess(&Process{
+		if err := pa.storage.AddProcess(&indexer.ArchiveProcess{
 			ProcessInfo: procInfo,
 			Results:     procInfo.Results(),
 		}); err != nil {
@@ -270,7 +262,7 @@ func (pa *ProcessArchive) OnComputeResults(results *results.Results, proc *index
 	jsProc, err := pa.storage.GetProcess(results.ProcessID)
 	if err != nil {
 		if os.IsNotExist(err) { // if it does not exist yet, we create it
-			jsProc = &Process{
+			jsProc = &indexer.ArchiveProcess{
 				ProcessInfo: proc,
 			}
 		} else {

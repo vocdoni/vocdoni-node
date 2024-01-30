@@ -34,7 +34,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.23.0 generate
+//go:generate go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.25.0 generate
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
@@ -89,9 +89,6 @@ type Indexer struct {
 	// eventOnResults is the list of external callbacks that will be executed by the indexer
 	eventOnResults []EventListener
 
-	// recoveryBootLock prevents Commit() to add new votes while the recovery bootstratp is
-	// being executed.
-	recoveryBootLock sync.RWMutex
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
 }
@@ -132,7 +129,9 @@ func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 
 	// If we are expecting a restore shortly after, that will initialize the DB.
 	if !opts.ExpectBackupRestore {
-		idx.startDB()
+		if err := idx.startDB(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Subscribe to events
@@ -152,26 +151,13 @@ func (idx *Indexer) startDB() error {
 	// For that reason, readWriteDB is limited to one open connection.
 	// Per https://github.com/mattn/go-sqlite3/issues/1022#issuecomment-1067353980,
 	// we use WAL to allow multiple concurrent readers at the same time.
-	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal", idx.dbPath))
+	idx.readWriteDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal&_foreign_keys=true", idx.dbPath))
 	if err != nil {
 		return err
 	}
 	idx.readWriteDB.SetMaxOpenConns(1)
-	idx.readWriteDB.SetMaxIdleConns(2)
+	idx.readWriteDB.SetMaxIdleConns(1)
 	idx.readWriteDB.SetConnMaxIdleTime(10 * time.Minute)
-	idx.readWriteDB.SetConnMaxLifetime(time.Hour)
-
-	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", idx.dbPath))
-	if err != nil {
-		return err
-	}
-	// Increasing these numbers can allow for more queries to run concurrently,
-	// but it also increases the memory used by sqlite and our connection pool.
-	// Most read-only queries we run are quick enough, so a small number seems OK.
-	idx.readOnlyDB.SetMaxOpenConns(10)
-	idx.readOnlyDB.SetMaxIdleConns(20)
-	idx.readOnlyDB.SetConnMaxIdleTime(5 * time.Minute)
-	idx.readOnlyDB.SetConnMaxLifetime(time.Hour)
 
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		return err
@@ -181,6 +167,23 @@ func (idx *Indexer) startDB() error {
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
+
+	// Analyze the tables and indices and store information in internal tables
+	// so that the query optimizer can make better choices.
+	if _, err := idx.readWriteDB.Exec("PRAGMA analysis_limit=1000; ANALYZE"); err != nil {
+		return err
+	}
+
+	idx.readOnlyDB, err = sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=ro&_journal_mode=wal", idx.dbPath))
+	if err != nil {
+		return err
+	}
+	// Increasing these numbers can allow for more queries to run concurrently,
+	// but it also increases the memory used by sqlite and our connection pool.
+	// Most read-only queries we run are quick enough, so a small number seems OK.
+	idx.readOnlyDB.SetMaxOpenConns(16)
+	idx.readOnlyDB.SetMaxIdleConns(4)
+	idx.readOnlyDB.SetConnMaxIdleTime(30 * time.Minute)
 
 	idx.readOnlyQuery, err = indexerdb.Prepare(context.TODO(), idx.readOnlyDB)
 	if err != nil {
@@ -294,19 +297,17 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	}
 	log.Infof("running indexer after-sync bootstrap")
 
-	// Block the new votes addition until the recovery finishes.
-	// TODO: perhaps redundant with lockPool now?
-	idx.recoveryBootLock.Lock()
-	defer idx.recoveryBootLock.Unlock()
-
+	// Note that holding blockMu means new votes aren't added until the recovery finishes.
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
+
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()
 
 	prcIDs, err := queries.GetProcessIDsByFinalResults(ctx, false)
 	if err != nil {
 		log.Error(err)
+		return // no point in continuing further
 	}
 
 	log.Infof("recovered %d live results processes", len(prcIDs))
@@ -472,15 +473,9 @@ func (idx *Indexer) Commit(height uint32) error {
 			}
 		}
 		// Commit votes (store to disk)
-		func() {
-			// If the recovery bootstrap is running, wait
-			idx.recoveryBootLock.RLock()
-			defer idx.recoveryBootLock.RUnlock()
-
-			if err := idx.commitVotesUnsafe(queries, pid, proc.Results(), addedResults, subtractedResults, idx.App.Height()); err != nil {
-				log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
-			}
-		}()
+		if err := idx.commitVotesUnsafe(queries, pid, proc.Results(), addedResults, subtractedResults, idx.App.Height()); err != nil {
+			log.Errorf("cannot commit live votes from block %d: (%v)", err, height)
+		}
 	}
 	clear(idx.votePool)
 
@@ -488,16 +483,8 @@ func (idx *Indexer) Commit(height uint32) error {
 	// since simply incrementing the vote count would break with vote overwrites.
 	for pidStr := range idx.blockUpdateProcVoteCounts {
 		pid := []byte(pidStr)
-		voteCount, err := queries.CountVotesByProcessID(ctx, pid)
-		if err != nil {
-			log.Errorw(err, "could not get vote count")
-			continue
-		}
-		if _, err := queries.SetProcessVoteCount(ctx, indexerdb.SetProcessVoteCountParams{
-			ID:        pid,
-			VoteCount: voteCount,
-		}); err != nil {
-			log.Errorw(err, "could not set vote count")
+		if _, err := queries.ComputeProcessVoteCount(ctx, pid); err != nil {
+			log.Errorw(err, "could not compute process vote count")
 		}
 	}
 	clear(idx.blockUpdateProcVoteCounts)
@@ -506,6 +493,14 @@ func (idx *Indexer) Commit(height uint32) error {
 		log.Errorw(err, "could not commit tx")
 	}
 	idx.blockTx = nil
+	if height%1000 == 0 {
+		// Regularly see if sqlite thinks another optimization analysis would be useful.
+		// Block times tend to be in the order of seconds like 10s,
+		// so a thousand blocks will tend to be in the order of hours.
+		if _, err := idx.readWriteDB.Exec("PRAGMA optimize"); err != nil {
+			return err
+		}
+	}
 
 	if newVotes+overwritedVotes > 0 {
 		log.Infow("add live votes to results",
@@ -562,10 +557,27 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 		idx.votePool[pid][nullifier] = vote
 	}
 
+	ctx := context.TODO()
+	weightStr := `"1"`
+	if vote.Weight != nil {
+		weightStr = indexertypes.EncodeJSON((*types.BigInt)(vote.Weight))
+	}
+	keyIndexes := indexertypes.EncodeJSON(vote.EncryptionKeyIndexes)
+
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
-	if err := idx.addVoteIndex(context.TODO(), queries, vote, txIndex); err != nil {
+	if _, err := queries.CreateVote(ctx, indexerdb.CreateVoteParams{
+		Nullifier:            vote.Nullifier,
+		ProcessID:            vote.ProcessID,
+		BlockHeight:          int64(vote.Height),
+		BlockIndex:           int64(txIndex),
+		Weight:               weightStr,
+		OverwriteCount:       int64(vote.Overwrites),
+		VoterID:              nonNullBytes(vote.VoterID),
+		EncryptionKeyIndexes: keyIndexes,
+		Package:              string(vote.VotePackage),
+	}); err != nil {
 		log.Errorw(err, "could not index vote")
 	}
 	idx.blockUpdateProcVoteCounts[pid] = true

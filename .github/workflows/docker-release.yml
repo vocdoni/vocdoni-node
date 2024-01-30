@@ -12,22 +12,25 @@ jobs:
   job_docker_release:
     name: Publish images
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
       - name: Login to DockerHub
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
-          password: ${{ secrets.CR_PAT }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
       - name: Set up vars used in next step
         id: vars
         shell: bash
@@ -36,10 +39,10 @@ jobs:
           echo "GIT_HASH_SHORT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "DATE_IN_SECS=$(date +%s)" >> $GITHUB_OUTPUT
       - name: Build and Push image to Docker Hub and ghcr.io
-        uses: docker/build-push-action@v3
+        uses: docker/build-push-action@v5
         with:
           context: .
-          # platforms: linux/amd64,linux/arm64
+            # platforms: linux/amd64
           push: true     # true to upload image to registry
           tags: |
             vocdoni/vocdoni-node:latest,

@@ -20,7 +20,6 @@ import (
 
 // TestVocOne runs a full test of the VocOne API. It creates a new account, and then creates a new election.
 func TestVocone(t *testing.T) {
-	//log.Init("info", "stdout")
 	dir := t.TempDir()
 
 	keymng := ethereum.SignKeys{}

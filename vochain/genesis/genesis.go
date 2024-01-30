@@ -119,7 +119,7 @@ var devGenesis = Doc{
 }
 
 var stageGenesis = Doc{
-	GenesisTime: time.Date(2024, time.January, 12, 1, 0, 0, 0, time.UTC),
+	GenesisTime: time.Date(2024, time.January, 30, 1, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni/STAGE/10",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
@@ -199,7 +199,7 @@ var stageGenesis = Doc{
 		},
 		TxCost: TransactionCosts{
 			SetProcessStatus:        2,
-			SetProcessCensus:        50,
+			SetProcessCensus:        1,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              5,

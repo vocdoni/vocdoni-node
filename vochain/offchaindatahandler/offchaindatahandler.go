@@ -44,7 +44,7 @@ type OffChainDataHandler struct {
 	census        *censusdb.CensusDB
 	storage       *downloader.Downloader
 	queue         []importItem
-	queueLock     sync.RWMutex
+	queueLock     sync.Mutex
 	importOnlyNew bool
 	isFastSync    bool
 }

@@ -28,7 +28,6 @@ INSERT INTO processes (
 -- name: GetProcess :one
 SELECT * FROM processes
 WHERE id = ?
-GROUP BY id
 LIMIT 1;
 
 -- name: SearchProcesses :many
@@ -83,9 +82,9 @@ SET have_results = FALSE, final_results = TRUE,
 	manually_ended = sqlc.arg(manually_ended)
 WHERE id = sqlc.arg(id);
 
--- name: SetProcessVoteCount :execresult
+-- name: ComputeProcessVoteCount :execresult
 UPDATE processes
-SET vote_count = sqlc.arg(vote_count)
+SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = id)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessCount :one

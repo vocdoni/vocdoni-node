@@ -19,8 +19,8 @@ CREATE INDEX index_tx_reference_fees
 ON token_fees(reference);
 
 -- +goose Down
-DROP TABLE token_fees
+DROP TABLE token_fees;
 
-DROP INDEX index_tx_type_token_fees
-DROP INDEX index_from_account_token_fees
-DROP INDEX index_tx_reference_fees
+DROP INDEX index_tx_type_token_fees;
+DROP INDEX index_from_account_token_fees;
+DROP INDEX index_tx_reference_fees;

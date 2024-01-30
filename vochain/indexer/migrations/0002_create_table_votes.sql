@@ -17,6 +17,6 @@ CREATE INDEX index_votes_block_height_index
 ON votes(block_height, block_index);
 
 -- +goose Down
-DROP TABLE votes
+DROP TABLE votes;
 
-DROP INDEX index_votes_block_height_index
+DROP INDEX index_votes_block_height_index;
