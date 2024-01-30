@@ -119,8 +119,8 @@ var devGenesis = Doc{
 }
 
 var stageGenesis = Doc{
-	GenesisTime: time.Date(2023, time.November, 7, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni/STAGE/9",
+	GenesisTime: time.Date(2024, time.January, 30, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/STAGE/10",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -190,27 +190,6 @@ var stageGenesis = Doc{
 				Name:     "vocdoni7",
 				KeyIndex: 0,
 			},
-			{ // 7
-				Address:  types.HexStringToHexBytes("205bd3ae071118849535c9746f577ddd5eb226e6"),
-				PubKey:   types.HexStringToHexBytes("02cc2386b56cd46c196d33ec23cc9ad5228942fabd62e1cdbc12b4688fa3ac49e0"),
-				Power:    10,
-				Name:     "vocdoni8",
-				KeyIndex: 0,
-			},
-			{ // 8
-				Address:  types.HexStringToHexBytes("96db730d4478eaea44ee2bcb90fc1430a22521cb"),
-				PubKey:   types.HexStringToHexBytes("02a059f4f5454555a588ef99b1c6ba525b551a16621d6c476998e4972ef5e42913"),
-				Power:    10,
-				Name:     "vocdoni9",
-				KeyIndex: 0,
-			},
-			{ // 9
-				Address:  types.HexStringToHexBytes("c7864964dab0107eb01a1cade4c3319dae69754e"),
-				PubKey:   types.HexStringToHexBytes("022fb2c1b4df15418a268b3d8027809e44d321c640b21ace6f0d5c6fa9fde18989"),
-				Power:    10,
-				Name:     "vocdoni10",
-				KeyIndex: 0,
-			},
 		},
 		Accounts: []Account{
 			{ // faucet
@@ -220,7 +199,7 @@ var stageGenesis = Doc{
 		},
 		TxCost: TransactionCosts{
 			SetProcessStatus:        2,
-			SetProcessCensus:        50,
+			SetProcessCensus:        1,
 			SetProcessQuestionIndex: 1,
 			RegisterKey:             1,
 			NewProcess:              5,
