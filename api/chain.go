@@ -1023,7 +1023,7 @@ func (a *API) chainListFeesByTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 //	@Description	Exports the indexer SQL database in raw format
 //	@Tags			Indexer
 //	@Produce		json
-//	@Success		200		{string}	raw-data
+//	@Success		200	{string}	raw-data
 //	@Router			/chain/export/indexer [get]
 func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	exportCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
