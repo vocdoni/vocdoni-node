@@ -1,9 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -11,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -199,6 +205,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainListFeesByTypeHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/export/indexer",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.chainIndexerExportHandler,
 	); err != nil {
 		return err
 	}
@@ -999,6 +1013,40 @@ func (a *API) chainListFeesByTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 	)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainIndexerExportHandler
+//
+//	@Summary		Exports the indexer database
+//	@Description	Exports the indexer SQL database in raw format
+//	@Tags			Indexer
+//	@Produce		json
+//	@Success		200		{string}	raw-data
+//	@Router			/chain/export/indexer [get]
+func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	exportCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	tmpFilePath := filepath.Join(os.TempDir(), "indexer.sql")
+	if err := a.indexer.SaveBackup(exportCtx, tmpFilePath); err != nil {
+		return fmt.Errorf("error saving indexer backup: %w", err)
+	}
+	tmpFile, err := os.Open(tmpFilePath)
+	if err != nil {
+		return fmt.Errorf("error opening indexer backup: %w", err)
+	}
+	defer func() {
+		if err := tmpFile.Close(); err != nil {
+			log.Warnw("error closing indexer backup file", "err", err)
+		}
+		if err := os.Remove(tmpFilePath); err != nil {
+			log.Warnw("error removing indexer backup file", "err", err)
+		}
+	}()
+	data, err := io.ReadAll(tmpFile)
+	if err != nil {
+		return fmt.Errorf("error reading indexer backup: %w", err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
