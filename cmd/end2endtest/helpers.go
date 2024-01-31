@@ -688,7 +688,7 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout*3)
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 	defer cancel()
 
 	results, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)

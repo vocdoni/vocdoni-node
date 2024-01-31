@@ -16,7 +16,9 @@ import (
 
 func init() {
 	ops["lifecyclelection"] = operation{
-		test:        &E2ELifecycleElection{},
+		testFunc: func() VochainTest {
+			return &E2ELifecycleElection{}
+		},
 		description: "Publishes two elections one to validate that the election cannot be interrupted and the other validate that the election can be interrupted to valid status",
 		example:     os.Args[0] + " --operation=lifecyclelection --votes=1000",
 	}

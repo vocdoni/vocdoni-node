@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/hex"
 	"fmt"
 	"net/url"
 	"os"
@@ -47,14 +48,14 @@ type e2eElection struct {
 }
 
 type operation struct {
-	test VochainTest
-
+	testFunc             func() VochainTest
 	description, example string
 }
 
 var ops = map[string]operation{}
 
-func opNames() (names []string) {
+func opNames() []string {
+	names := []string{allTests}
 	for name := range ops {
 		names = append(names, name)
 	}
@@ -69,9 +70,44 @@ type config struct {
 	accountKeys     []*ethereum.SignKeys
 	nvotes          int
 	parallelCount   int
+	parallelTests   int
+	runs            int
 	faucet          string
 	faucetAuthToken string
 	timeout         time.Duration
+}
+
+// Clone creates a deep copy of the config object.
+func (c *config) Clone() *config {
+	// Create a new config instance
+	cloned := config{
+		host:            c.host,
+		logLevel:        c.logLevel,
+		operation:       c.operation,
+		accountPrivKeys: make([]string, len(c.accountPrivKeys)),
+		accountKeys:     make([]*ethereum.SignKeys, len(c.accountKeys)),
+		nvotes:          c.nvotes,
+		parallelCount:   c.parallelCount,
+		parallelTests:   c.parallelTests,
+		runs:            c.runs,
+		faucet:          c.faucet,
+		faucetAuthToken: c.faucetAuthToken,
+		timeout:         c.timeout,
+	}
+
+	// Copy the slice of strings
+	copy(cloned.accountPrivKeys, c.accountPrivKeys)
+
+	// Recreate each of SignKeys
+	for i, key := range c.accountKeys {
+		newKey := ethereum.SignKeys{}
+		if err := newKey.AddHexKey(hex.EncodeToString(key.PrivateKey())); err != nil {
+			log.Fatalf("could not clone account private key")
+		}
+		cloned.accountKeys[i] = &newKey
+	}
+
+	return &cloned
 }
 
 func parseFlags(c *config) {
@@ -83,7 +119,9 @@ func parseFlags(c *config) {
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
 	flag.StringVar(&c.faucet, "faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
 	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
-	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout, "timeout duration of each step")
+	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout*6, "timeout duration to wait for operations to complete")
+	flag.IntVar(&c.parallelTests, "parallelTests", 1, "number of parallel tests to run (of the same type specified in --operation)")
+	flag.IntVar(&c.runs, "runs", 1, "number of tests to run (of the same type specified in --operation)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
@@ -128,8 +166,10 @@ func createSignKeys(c *config) error {
 }
 
 func setupAndRun(op operation, api *apiclient.HTTPclient, c *config) error {
+	log.Infow("starting setup", "test", c.operation)
 	startTime := time.Now()
-	err := op.test.Setup(api, c)
+	testFunc := op.testFunc()
+	err := testFunc.Setup(api, c)
 	duration := time.Since(startTime)
 	if err != nil {
 		log.Fatal(err)
@@ -137,7 +177,7 @@ func setupAndRun(op operation, api *apiclient.HTTPclient, c *config) error {
 	log.Infow("setup done", "test", c.operation, "duration", duration.String())
 
 	startTime = time.Now()
-	err = op.test.Run()
+	err = testFunc.Run()
 	duration = time.Since(startTime)
 	if err != nil {
 		log.Fatal(err)
@@ -145,7 +185,7 @@ func setupAndRun(op operation, api *apiclient.HTTPclient, c *config) error {
 	log.Infow("run finished", "test", c.operation, "duration", duration.String())
 
 	startTime = time.Now()
-	err = op.test.Teardown()
+	err = testFunc.Teardown()
 	duration = time.Since(startTime)
 	if err != nil {
 		return err
@@ -181,50 +221,52 @@ func NewAPIclient(host string) (*apiclient.HTTPclient, error) {
 func main() {
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
-	c := &config{}
-	parseFlags(c)
-	initializeLogger(c)
+	mainConfig := &config{}
+	parseFlags(mainConfig)
+	initializeLogger(mainConfig)
 
-	if len(c.accountPrivKeys) == 0 {
-		c.accountPrivKeys = []string{util.RandomHex(32)}
-		log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
-	}
-
-	if err := createSignKeys(c); err != nil {
-		log.Fatal(err)
-	}
-
-	api, err := NewAPIclient(c.host)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if c.operation == allTests {
-		wg := &sync.WaitGroup{}
-		for _, op := range ops {
-			wg.Add(1)
-			go func(op operation, c config) {
-				defer wg.Done()
-				c.accountPrivKeys = []string{util.RandomHex(32)}
-				if err := createSignKeys(&c); err != nil {
-					log.Fatal(err)
-				}
-
-				if err := setupAndRun(op, api, &c); err != nil {
-					log.Fatal(err)
-				}
-			}(op, *c) // Pass the op and c variable
+	createAccount := func(c *config) (*apiclient.HTTPclient, error) {
+		if len(c.accountPrivKeys) == 0 {
+			c.accountPrivKeys = []string{util.RandomHex(32)}
+			log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
 		}
-		wg.Wait()
-
-	} else {
-		op, found := ops[c.operation]
-		if !found {
-			log.Fatal("no valid operation mode specified")
+		if err := createSignKeys(c); err != nil {
+			log.Fatal(err)
 		}
+		return NewAPIclient(c.host)
+	}
 
+	runTests := func(op operation, c *config, wg *sync.WaitGroup) {
+		defer wg.Done()
+		api, err := createAccount(c)
+		if err != nil {
+			log.Fatalf("could not create account: %v", err)
+		}
 		if err := setupAndRun(op, api, c); err != nil {
 			log.Fatal(err)
 		}
 	}
+
+	wg := &sync.WaitGroup{}
+	for i := 0; i < mainConfig.runs; i++ {
+		if mainConfig.operation == allTests {
+			for _, op := range ops {
+				wg.Add(1)
+				c := mainConfig.Clone()
+				go runTests(op, c, wg)
+			}
+		} else {
+			op, found := ops[mainConfig.operation]
+			if !found {
+				log.Fatal("no valid operation mode specified")
+			}
+			for j := 0; j < mainConfig.parallelTests; j++ {
+				wg.Add(1)
+				c := mainConfig.Clone()
+				log.Infow("starting test", "number", j, "test", c.operation)
+				go runTests(op, c, wg)
+			}
+		}
+	}
+	wg.Wait()
 }

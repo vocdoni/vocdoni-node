@@ -12,7 +12,9 @@ import (
 
 func init() {
 	ops["cspelection"] = operation{
-		test:        &E2ECSPElection{},
+		testFunc: func() VochainTest {
+			return &E2ECSPElection{}
+		},
 		description: "csp election",
 		example:     os.Args[0] + " --operation=cspelection --votes=1000",
 	}

@@ -13,7 +13,9 @@ import (
 
 func init() {
 	ops["overwritelection"] = operation{
-		test: &E2EOverwriteElection{},
+		testFunc: func() VochainTest {
+			return &E2EOverwriteElection{}
+		},
 		description: "Checks that the MaxVoteOverwrite feature is correctly implemented, even if a vote is consecutive " +
 			"overwrite without wait the next block, that means the error in checkTx: overwrite count reached, it's not raised",
 		example: os.Args[0] + " --operation=overwritelection --votes=1000",

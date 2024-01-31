@@ -12,7 +12,9 @@ import (
 
 func init() {
 	ops["encryptedelection"] = operation{
-		test:        &E2EEncryptedElection{},
+		testFunc: func() VochainTest {
+			return &E2EEncryptedElection{}
+		},
 		description: "Publishes a census and a non-anonymous, secret-until-the-end election, emits N votes and verifies the results",
 		example:     os.Args[0] + " --operation=encryptedelection --votes=1000",
 	}
