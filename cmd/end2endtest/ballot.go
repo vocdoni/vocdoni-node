@@ -22,22 +22,30 @@ const (
 
 func init() {
 	ops["ballotRanked"] = operation{
-		test:        &E2EBallotRanked{},
+		testFunc: func() VochainTest {
+			return &E2EBallotRanked{}
+		},
 		description: "ballot election to test ranked voting",
 		example:     os.Args[0] + " --operation=ballotRanked --votes=1000",
 	}
 	ops["ballotQuadratic"] = operation{
-		test:        &E2EBallotQuadratic{},
+		testFunc: func() VochainTest {
+			return &E2EBallotQuadratic{}
+		},
 		description: "ballot election to test quadratic voting",
 		example:     os.Args[0] + " --operation=ballotQuadratic --votes=1000",
 	}
 	ops["ballotRange"] = operation{
-		test:        &E2EBallotRange{},
+		testFunc: func() VochainTest {
+			return &E2EBallotRange{}
+		},
 		description: "ballot election to test range voting",
 		example:     os.Args[0] + " --operation=ballotRange --votes=1000",
 	}
 	ops["ballotApproval"] = operation{
-		test:        &E2EBallotApproval{},
+		testFunc: func() VochainTest {
+			return &E2EBallotApproval{}
+		},
 		description: "ballot election to test approval voting",
 		example:     os.Args[0] + " --operation=ballotApproval --votes=1000",
 	}

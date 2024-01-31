@@ -10,11 +10,14 @@ import (
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 )
 
 func init() {
 	ops["raceDuringCommit"] = operation{
-		test:        &E2ERaceDuringCommit{},
+		testFunc: func() VochainTest {
+			return &E2ERaceDuringCommit{}
+		},
 		description: "Creates an election, votes, ends it, and while waiting for the results, spams the API to check for unexpected errors during block commit",
 		example:     os.Args[0] + " --operation=raceDuringCommit",
 	}
@@ -97,7 +100,7 @@ func (t *E2ERaceDuringCommit) Run() error {
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout*3)
+	ctx, cancel := context.WithTimeout(context.Background(), types.DefaultBlockTime*3)
 	defer cancel()
 
 	for {

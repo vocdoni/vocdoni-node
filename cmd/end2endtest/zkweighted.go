@@ -16,12 +16,16 @@ import (
 
 func init() {
 	ops["anonelection"] = operation{
-		test:        &E2EAnonElection{},
+		testFunc: func() VochainTest {
+			return &E2EAnonElection{}
+		},
 		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
 		example:     os.Args[0] + " --operation=anonelection --votes=1000",
 	}
 	ops["anonelectionTempSIKs"] = operation{
-		test:        &E2EAnonElectionTempSIKs{},
+		testFunc: func() VochainTest {
+			return &E2EAnonElectionTempSIKs{}
+		},
 		description: "Performs a complete test of anonymous election with TempSIKs flag to vote with half of the accounts that are not registered, and the remaining half with registered accounts",
 		example:     os.Args[0] + " --operation=anonelectionTempSIKS --votes=1000",
 	}

@@ -16,7 +16,9 @@ import (
 
 func init() {
 	ops["dynamicensuselection"] = operation{
-		test:        &E2EDynamicensusElection{},
+		testFunc: func() VochainTest {
+			return &E2EDynamicensusElection{}
+		},
 		description: "Publish an election with the dynamic census flag set to true and another election with dynamic census flag set to false",
 		example:     os.Args[0] + " --operation=dynamicensuselection --votes=1000",
 	}

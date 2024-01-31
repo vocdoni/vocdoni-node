@@ -22,7 +22,9 @@ import (
 
 func init() {
 	ops["tokentxs"] = operation{
-		test:        &E2ETokenTxs{},
+		testFunc: func() VochainTest {
+			return &E2ETokenTxs{}
+		},
 		description: "Tests all token related transactions",
 		example: os.Args[0] + " --operation=tokentxs " +
 			"--host http://127.0.0.1:9090/v2",

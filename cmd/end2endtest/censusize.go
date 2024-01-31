@@ -14,7 +14,9 @@ import (
 
 func init() {
 	ops["censusizelection"] = operation{
-		test:        &E2EMaxCensusSizeElection{},
+		testFunc: func() VochainTest {
+			return &E2EMaxCensusSizeElection{}
+		},
 		description: "Publishes a census with maxCensusSize smaller than the actual census size validate the maxCensusSize restriction feature",
 		example:     os.Args[0] + " --operation=censusizelection --votes=1000",
 	}

@@ -12,7 +12,9 @@ import (
 
 func init() {
 	ops["plaintextelection"] = operation{
-		test:        &E2EPlaintextElection{},
+		testFunc: func() VochainTest {
+			return &E2EPlaintextElection{}
+		},
 		description: "Publishes a census and a non-anonymous, non-secret election, emits N votes and verifies the results",
 		example:     os.Args[0] + " --operation=plaintextelection --votes=1000",
 	}
