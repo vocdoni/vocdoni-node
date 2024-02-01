@@ -2,10 +2,11 @@
 CREATE TABLE processes (
   id           BLOB NOT NULL PRIMARY KEY,
   entity_id    BLOB NOT NULL,
+  start_block  INTEGER NOT NULL,
+  end_block    INTEGER NOT NULL,
   start_date   DATETIME NOT NULL,
   end_date     DATETIME NOT NULL,
-  manually_ended BOOLEAN NOT NULL,
-  block_count  INTEGER,
+  block_count  INTEGER NOT NULL,
   vote_count   INTEGER NOT NULL,
   chain_id     TEXT NOT NULL,
 
