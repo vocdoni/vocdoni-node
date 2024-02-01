@@ -247,8 +247,8 @@ func main() {
 		}
 	}
 
-	wg := &sync.WaitGroup{}
 	for i := 0; i < mainConfig.runs; i++ {
+		wg := &sync.WaitGroup{}
 		if mainConfig.operation == allTests {
 			for _, op := range ops {
 				wg.Add(1)
@@ -267,6 +267,6 @@ func main() {
 				go runTests(op, c, wg)
 			}
 		}
+		wg.Wait()
 	}
-	wg.Wait()
 }

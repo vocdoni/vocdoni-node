@@ -62,6 +62,10 @@ func (app *BaseApplication) SetDefaultMethods() {
 	app.SetFnMempoolPrune(app.fnMempoolRemoveTxTendermint)
 	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 		result, err := app.NodeClient.BroadcastTxSync(context.Background(), tx)
+		if result.Code != 0 && err == nil {
+			errmsg := string(result.Data)
+			err = fmt.Errorf("%s", errmsg)
+		}
 		log.Debugw("broadcast tx",
 			"size", len(tx),
 			"result",
@@ -73,10 +77,10 @@ func (app *BaseApplication) SetDefaultMethods() {
 			}(),
 			"error",
 			func() string {
-				if err != nil {
-					return err.Error()
+				if err == nil {
+					return ""
 				}
-				return ""
+				return err.Error()
 			}(),
 		)
 		return result, err

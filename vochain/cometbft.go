@@ -172,13 +172,12 @@ func (app *BaseApplication) InitChain(_ context.Context,
 }
 
 // CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(_ context.Context,
-	req *cometabcitypes.CheckTxRequest) (*cometabcitypes.CheckTxResponse, error) {
+func (app *BaseApplication) CheckTx(_ context.Context, req *cometabcitypes.CheckTxRequest) (*cometabcitypes.CheckTxResponse, error) {
 	if req == nil || req.Tx == nil {
 		return &cometabcitypes.CheckTxResponse{
 			Code: 1,
 			Data: []byte("nil request or tx"),
-		}, fmt.Errorf("nil request or tx")
+		}, nil
 	}
 	txReference := vochaintx.TxKey(req.Tx)
 	ref, ok := app.txReferences.Load(txReference)
@@ -206,7 +205,7 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
 	}
 	response, err := app.TransactionHandler.CheckTx(tx, false)
 	if err != nil {
@@ -214,7 +213,7 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 			return &cometabcitypes.CheckTxResponse{Code: 0}, nil
 		}
 		log.Errorw(err, "checkTx")
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte("checkTx " + err.Error())}, err
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
 	}
 	return &cometabcitypes.CheckTxResponse{
 		Code: 0,
