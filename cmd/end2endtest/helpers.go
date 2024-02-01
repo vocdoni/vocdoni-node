@@ -798,3 +798,24 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 	}
 	return nil
 }
+
+// logElection prints the election description in the log.
+func logElection(e *vapi.Election) {
+	log.Debugw("election description",
+		"id", e.ElectionID,
+		"censusOrigin", e.Census.CensusOrigin,
+		"maxCensusSize", e.Census.MaxCensusSize,
+		"maxVoteOverwrites", e.TallyMode.MaxVoteOverwrites,
+		"startDate", e.StartDate.String(),
+		"endDate", e.EndDate.String(),
+		"status", e.Status,
+		"organizationId", e.OrganizationID.String(),
+		"voteMode", e.VoteMode,
+		"electionMode", e.ElectionMode,
+		"tallyMaxCount", e.TallyMode.MaxCount,
+		"tallyMaxValue", e.TallyMode.MaxValue,
+		"tallyMaxTotalCost", e.TallyMode.MaxTotalCost,
+		"tallyCostExponent", e.TallyMode.CostExponent,
+	)
+
+}
