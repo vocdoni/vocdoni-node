@@ -5,7 +5,6 @@
 package indexerdb
 
 import (
-	"database/sql"
 	"time"
 
 	"go.vocdoni.io/dvote/types"
@@ -28,8 +27,6 @@ type Process struct {
 	EntityID           types.EntityID
 	StartDate          time.Time
 	EndDate            time.Time
-	ManuallyEnded      bool
-	BlockCount         sql.NullInt64
 	VoteCount          int64
 	ChainID            string
 	HaveResults        bool
@@ -54,6 +51,7 @@ type Process struct {
 	SourceBlockHeight  int64
 	SourceNetworkID    int64
 	FromArchive        bool
+	ManuallyEnded      bool
 }
 
 type TokenFee struct {

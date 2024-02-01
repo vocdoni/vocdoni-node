@@ -125,7 +125,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, manually_ended, block_count, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive, manually_ended FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -138,8 +138,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.EntityID,
 		&i.StartDate,
 		&i.EndDate,
-		&i.ManuallyEnded,
-		&i.BlockCount,
 		&i.VoteCount,
 		&i.ChainID,
 		&i.HaveResults,
@@ -164,6 +162,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
 		&i.FromArchive,
+		&i.ManuallyEnded,
 	)
 	return i, err
 }
