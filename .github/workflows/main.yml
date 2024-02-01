@@ -77,7 +77,7 @@ jobs:
           fi
 
   job_go_test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted]
     env:
       LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
     steps:
@@ -111,7 +111,7 @@ jobs:
           path: gocoverage-unit/
 
   job_compose_test:
-    runs-on: [self-hosted, ci2-1]
+    runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v3
       - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
