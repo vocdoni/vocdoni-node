@@ -40,7 +40,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 2}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed, t.config.nvotes); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (t *E2EOverwriteElection) Run() error {
 		}
 		return true
 	})
-	errs := t.sendVotes(votes)
+	errs := t.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

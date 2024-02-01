@@ -68,7 +68,7 @@ func (t *E2ECSPElection) Run() error {
 		}
 		return true
 	})
-	errs := t.sendVotes(votes)
+	errs := t.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

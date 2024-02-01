@@ -12,6 +12,7 @@
 #  e2etest_lifecyclelection: run lifecycle test
 #  e2etest_cspelection: run csp test
 #  e2etest_dynamicensuselection: run dynamic census test
+#  e2etest_electiontimebounds: run election time bounds test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
 [ -n "$GOCOVERDIR" ] && export BUILDARGS="$BUILDARGS -cover" # docker compose build passes this to go 1.20 so that binaries collect code coverage
@@ -45,7 +46,7 @@ log() { echo $(date --rfc-3339=s) "$@" ; }
 ### newtest() { whatever ; }
 
 tests_to_run=(
-		"e2etest_raceDuringCommit"
+	"e2etest_raceDuringCommit"
   	"e2etest_plaintextelection_empty"
   	"e2etest_plaintextelection"
   	"e2etest_encryptedelection"
@@ -57,6 +58,7 @@ tests_to_run=(
   	"e2etest_lifecyclelection"
   	"e2etest_cspelection"
   	"e2etest_dynamicensuselection"
+  	"e2etest_electiontimebounds"
 )
 
 # print help
@@ -93,6 +95,10 @@ e2etest() {
 
 e2etest_raceDuringCommit() {
   e2etest raceDuringCommit
+}
+
+e2etest_electiontimebounds() {
+	e2etest electionTimeBounds --votes=10
 }
 
 e2etest_plaintextelection() {

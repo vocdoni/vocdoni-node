@@ -1,6 +1,7 @@
 package apiclient
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -258,6 +259,11 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	}
 	if electionCreate.MetadataURL == "" {
 		log.Warnf("metadata could not be published")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	defer cancel()
+	if _, err := c.WaitUntilElectionCreated(ctx, electionCreate.ElectionID); err != nil {
+		return nil, err
 	}
 
 	return electionCreate.ElectionID, nil
