@@ -242,7 +242,7 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 		}
 		return true
 	})
-	errs := e.sendVotes(votes)
+	errs := e.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

@@ -256,7 +256,9 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 				Account: c.account.Address().Bytes(),
 				InfoURI: &metadataURI,
 			},
-		}})
+		},
+	},
+	)
 	if err != nil {
 		return nil, err
 	}
