@@ -42,7 +42,7 @@ func main() {
 	dataDir = filepath.Join(home, ".dvote", chain, "vochain")
 	flag.StringVar(&dataDir, "dataDir", dataDir, "vochain data directory (absolute path)")
 	flag.StringVar(&logLevel, "logLevel", "info", "log level [error,warn,info,debug]")
-	flag.StringVar(&chain, "chain", "stage", "chain [stage,dev,prod]")
+	flag.StringVar(&chain, "chain", "dev", "chain [stage,dev,prod]")
 	flag.StringVar(&action, "action", "sync", `action to execute: 
 	sync = synchronize the blockchain
 	block = print a block from the blockstore
@@ -177,7 +177,7 @@ func newVochain(network, dataDir string) *vochain.BaseApplication {
 		LogLevel:  "error",
 		DataDir:   dataDir,
 		P2PListen: "0.0.0.0:21500",
-		DBType:    "pebble",
+		DBType:    db.TypePebble,
 	}
 
 	ip, err := util.PublicIP(4)
