@@ -14,7 +14,9 @@ import (
 
 func init() {
 	ops["census"] = operation{
-		test:        &E2ECensus{},
+		testFunc: func() VochainTest {
+			return &E2ECensus{}
+		},
 		description: "Create a census to benchmark the performance of the merkle tree construction",
 		example:     os.Args[0] + " --operation=census --votes=1000",
 	}

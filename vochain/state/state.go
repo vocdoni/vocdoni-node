@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"os"
@@ -33,9 +34,18 @@ const (
 	storageDirectory = "vcstate"
 	// snapshotsDirectory is the final directory name where the snapshots are stored.
 	snapshotsDirectory = "snapshots"
+
+	// timestampKey is the key used to store the timestamp of the last block.
+	timestampKey = "timestamp"
 )
 
-var BurnAddress = common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
+var (
+	// BurnAddress is the address where tokens are sent when they are burned.
+	BurnAddress = common.HexToAddress("0xffffffffffffffffffffffffffffffffffffffff")
+
+	// ErrTimestampNotFound is returned when the timestamp is not found on the blockchain state.
+	ErrTimestampNotFound = fmt.Errorf("timestamp not found")
+)
 
 // _________________________ CENSUS ORIGINS __________________________
 
@@ -418,6 +428,32 @@ func (v *State) CurrentHeight() uint32 {
 // SetHeight sets the height for the current (not committed) block.
 func (v *State) SetHeight(height uint32) {
 	v.currentHeight.Store(height)
+}
+
+// SetTimestamp sets the timestamp for the current (not committed) block.
+func (v *State) SetTimestamp(timestamp uint32) error {
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	b := make([]byte, 4)
+	binary.LittleEndian.PutUint32(b, timestamp)
+	return v.tx.DeepSet([]byte(timestampKey), b, StateTreeCfg(TreeExtra))
+}
+
+// Timestamp returns the timestamp for the current or committed block.
+func (v *State) Timestamp(committed bool) (uint32, error) {
+	if !committed {
+		v.tx.RLock()
+		defer v.tx.RUnlock()
+	}
+	extraTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
+	if err != nil {
+		return 0, err
+	}
+	var b []byte
+	if b, err = extraTree.Get([]byte(timestampKey)); err != nil {
+		return 0, ErrTimestampNotFound
+	}
+	return binary.LittleEndian.Uint32(b), nil
 }
 
 // CommittedHash returns the hash of the last committed vochain StateDB

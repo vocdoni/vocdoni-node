@@ -148,9 +148,11 @@ func TestTempSIKs(t *testing.T) {
 	waitUntilHeight(t, client, 4)
 	// schedule election results and finishing election
 	c.Assert(server.VochainAPP.State.SetProcessStatus(electionId, models.ProcessStatus_ENDED, true), qt.IsNil)
-	c.Assert(server.VochainAPP.Istc.Schedule(5, electionId, ist.Action{
-		ID:         ist.ActionCommitResults,
+	c.Assert(server.VochainAPP.Istc.Schedule(ist.Action{
+		TypeID:     ist.ActionCommitResults,
 		ElectionID: electionId,
+		Height:     5,
+		ID:         electionId,
 	}), qt.IsNil)
 
 	// Block 6

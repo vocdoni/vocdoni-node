@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,6 +42,8 @@ func (v *State) AddProcess(p *models.Process) error {
 		"entityId", fmt.Sprintf("%x", p.EntityId),
 		"startBlock", p.StartBlock,
 		"endBlock", p.BlockCount+p.StartBlock,
+		"startTime", util.TimestampToTime(p.StartTime).String(),
+		"endTime", util.TimestampToTime(p.StartTime+p.Duration).String(),
 		"mode", p.Mode,
 		"envelopeType", p.EnvelopeType,
 		"voteOptions", p.VoteOptions,
@@ -193,78 +196,81 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 
 // SetProcessStatus changes the process status to the one provided.
 // One of ready, ended, canceled, paused, results.
-// Transition checks are handled inside this function, so the caller
-// does not need to worry about it.
+// If commit is true, the change is committed to the state.
+// Transition checks from the current status to the new one are performed.
 func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
 	}
+	currentTime, err := v.Timestamp(false)
+	if err != nil {
+		return fmt.Errorf("setProcessStatus: cannot get current timestamp: %w", err)
+	}
 	currentStatus := process.Status
+
+	// Check for state duplication
+	if currentStatus == newstatus {
+		return fmt.Errorf("process %x already in %s state", pid, newstatus.String())
+	}
 
 	// Check if the state transition is valid
 	switch newstatus {
 	case models.ProcessStatus_READY:
+		// Transition to READY is only allowed from PAUSED
 		if currentStatus != models.ProcessStatus_PAUSED {
-			return fmt.Errorf("cannot set process status from %s to ready", currentStatus)
+			return fmt.Errorf("cannot set process status from %s to ready", currentStatus.String())
 		}
-		if currentStatus == models.ProcessStatus_READY {
-			return fmt.Errorf("process %x already in ready state", pid)
+
+	case models.ProcessStatus_PAUSED:
+		// Transition to PAUSED is only allowed from READY
+		if currentStatus != models.ProcessStatus_READY {
+			return fmt.Errorf("cannot set process status from %s to paused", currentStatus.String())
 		}
+		// Check if the process is interruptible
+		if !process.Mode.Interruptible {
+			return fmt.Errorf("cannot pause process %x, it is not interruptible", pid)
+		}
+
 	case models.ProcessStatus_ENDED:
+		// Transition to ENDED is only allowed from READY or PAUSED
 		if currentStatus != models.ProcessStatus_READY && currentStatus != models.ProcessStatus_PAUSED {
 			return fmt.Errorf("process %x can only be ended from ready or paused status", pid)
 		}
-		if !process.Mode.Interruptible {
-			if v.CurrentHeight() < process.BlockCount+process.StartBlock {
-				return fmt.Errorf("process %x is not interruptible, cannot change status to %s",
-					pid, newstatus.String())
-			}
+		// Additional condition for interruptible and timing
+		if !process.Mode.Interruptible && currentTime < process.StartTime+process.Duration {
+			return fmt.Errorf("process %x is not interruptible and cannot be ended prematurely", pid)
 		}
+
 	case models.ProcessStatus_CANCELED:
-		if currentStatus == models.ProcessStatus_CANCELED {
-			return fmt.Errorf("process %x already in canceled state", pid)
-		}
+		// Transition to CANCELED is not allowed from ENDED or RESULTS
 		if currentStatus == models.ProcessStatus_ENDED || currentStatus == models.ProcessStatus_RESULTS {
 			return fmt.Errorf("cannot set state to canceled from ended or results")
 		}
+		// Additional condition for non-interruptible process
 		if currentStatus != models.ProcessStatus_PAUSED && !process.Mode.Interruptible {
-			return fmt.Errorf("process %x is not interruptible, cannot change state to %s",
-				pid, newstatus.String())
+			return fmt.Errorf("process %x is not interruptible, cannot change state to canceled", pid)
 		}
-	case models.ProcessStatus_PAUSED:
-		if currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("cannot set process status from %s to paused", currentStatus)
-		}
-		if currentStatus == models.ProcessStatus_PAUSED {
-			return fmt.Errorf("process %x already in paused state", pid)
-		}
-		if !process.Mode.Interruptible {
-			return fmt.Errorf("cannot pause process %x, it is not interruptible ", pid)
-		}
+
 	case models.ProcessStatus_RESULTS:
-		if currentStatus == models.ProcessStatus_RESULTS {
-			return fmt.Errorf("process %x already in results state", pid)
+		// Transition to RESULTS is only allowed from ENDED
+		if currentStatus != models.ProcessStatus_ENDED {
+			return fmt.Errorf("cannot set state to results from %s", currentStatus.String())
 		}
-		if currentStatus != models.ProcessStatus_ENDED && currentStatus != models.ProcessStatus_READY {
-			return fmt.Errorf("cannot set state to results from %s", currentStatus)
-		}
-		if currentStatus == models.ProcessStatus_READY &&
-			process.StartBlock+process.BlockCount < v.CurrentHeight() {
-			return fmt.Errorf("cannot set state to results from %s, process is still alive",
-				currentStatus.String())
-		}
+
 	default:
-		return fmt.Errorf("process status %s unknown", newstatus)
+		// Handle unknown status
+		return fmt.Errorf("process status %s unknown", newstatus.String())
 	}
 
+	// If all checks pass, the transition is valid
 	if commit {
 		process.Status = newstatus
 		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnProcessStatusChange(process.ProcessId, process.Status, v.txCounter.Load())
+			l.OnProcessStatusChange(process.ProcessId, newstatus, v.txCounter.Load())
 		}
 	}
 	return nil

@@ -12,7 +12,9 @@ import (
 
 func init() {
 	ops["plaintextelection"] = operation{
-		test:        &E2EPlaintextElection{},
+		testFunc: func() VochainTest {
+			return &E2EPlaintextElection{}
+		},
 		description: "Publishes a census and a non-anonymous, non-secret election, emits N votes and verifies the results",
 		example:     os.Args[0] + " --operation=plaintextelection --votes=1000",
 	}
@@ -36,11 +38,11 @@ func (t *E2EPlaintextElection) Setup(api *apiclient.HTTPclient, c *config) error
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
-	if err := t.setupElection(ed, t.config.nvotes); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 
@@ -72,7 +74,7 @@ func (t *E2EPlaintextElection) Run() error {
 		return true
 	})
 
-	errs := t.sendVotes(votes)
+	errs := t.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

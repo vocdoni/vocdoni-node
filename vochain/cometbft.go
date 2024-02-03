@@ -14,6 +14,7 @@ import (
 	cometapitypes "github.com/cometbft/cometbft/api/cometbft/types/v1"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -151,6 +152,11 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
 	}
 
+	// set initial timestamp
+	if err := app.State.SetTimestamp(uint32(req.GetTime().Unix())); err != nil {
+		return nil, fmt.Errorf("cannot set timestamp: %w", err)
+	}
+
 	// commit state and get hash
 	hash, err := app.State.PrepareCommit()
 	if err != nil {
@@ -166,13 +172,12 @@ func (app *BaseApplication) InitChain(_ context.Context,
 }
 
 // CheckTx unmarshals req.Tx and checks its validity
-func (app *BaseApplication) CheckTx(_ context.Context,
-	req *cometabcitypes.CheckTxRequest) (*cometabcitypes.CheckTxResponse, error) {
+func (app *BaseApplication) CheckTx(_ context.Context, req *cometabcitypes.CheckTxRequest) (*cometabcitypes.CheckTxResponse, error) {
 	if req == nil || req.Tx == nil {
 		return &cometabcitypes.CheckTxResponse{
 			Code: 1,
 			Data: []byte("nil request or tx"),
-		}, fmt.Errorf("nil request or tx")
+		}, nil
 	}
 	txReference := vochaintx.TxKey(req.Tx)
 	ref, ok := app.txReferences.Load(txReference)
@@ -200,7 +205,7 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte("unmarshalTx " + err.Error())}, err
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
 	}
 	response, err := app.TransactionHandler.CheckTx(tx, false)
 	if err != nil {
@@ -208,7 +213,7 @@ func (app *BaseApplication) CheckTx(_ context.Context,
 			return &cometabcitypes.CheckTxResponse{Code: 0}, nil
 		}
 		log.Errorw(err, "checkTx")
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte("checkTx " + err.Error())}, err
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
 	}
 	return &cometabcitypes.CheckTxResponse{
 		Code: 0,
@@ -274,10 +279,12 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		}
 		proposalVotes = append(proposalVotes, v.GetValidator().Address)
 	}
-	if err := app.Istc.Schedule(height+1, []byte(fmt.Sprintf("validators-update-score-%d", height)), ist.Action{
-		ID:                ist.ActionUpdateValidatorScore,
+	if err := app.Istc.Schedule(ist.Action{
+		TypeID:            ist.ActionUpdateValidatorScore,
 		ValidatorVotes:    proposalVotes,
 		ValidatorProposer: req.GetProposerAddress(),
+		ID:                ethereum.HashRaw([]byte(fmt.Sprintf("validators-update-score-%d", height))),
+		Height:            height + 1,
 	}); err != nil {
 		return nil, fmt.Errorf("finalize block: could not schedule IST action: %w", err)
 	}

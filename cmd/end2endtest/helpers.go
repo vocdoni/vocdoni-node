@@ -62,12 +62,13 @@ func newTestElectionDescription(numChoices int) *vapi.ElectionDescription {
 
 func newTestProcess() *models.Process {
 	return &models.Process{
-		StartBlock: 0,
-		BlockCount: 100,
-		Status:     models.ProcessStatus_READY,
+		StartTime: 0,
+		Duration:  uint32((time.Minute * 10).Seconds()),
+		Status:    models.ProcessStatus_READY,
 		EnvelopeType: &models.EnvelopeType{
 			EncryptedVotes: false,
-			UniqueValues:   true},
+			UniqueValues:   true,
+		},
 		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount: 1,
@@ -174,9 +175,8 @@ func (t *e2eElection) censusSizeEquals(censusID types.HexBytes, sizeExpected uin
 }
 
 func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.Election, error) {
-	log.Infof("wait until the election: %s, starts", electionID.String())
 	// Wait for the election to start
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*80)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second*300)
 	defer cancel()
 	election, err := t.api.WaitUntilElectionStarts(ctx, electionID)
 	if err != nil {
@@ -308,7 +308,7 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 	return censusID, voterAccounts, nil
 }
 
-func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int) error {
+func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, waitUntilStarted bool) error {
 	if err := t.setupAccount(); err != nil {
 		return err
 	}
@@ -342,11 +342,23 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int) e
 	}
 	log.Infof("created new election with id %s", electionID.String())
 
-	election, err := t.waitUntilElectionStarts(electionID)
-	if err != nil {
-		return err
+	if waitUntilStarted {
+		election, err := t.waitUntilElectionStarts(electionID)
+		if err != nil {
+			return err
+		}
+		t.election = election
+	} else {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		if _, err := t.api.WaitUntilElectionCreated(ctx, electionID); err != nil {
+			return err
+		}
+		t.election, err = t.api.Election(electionID)
+		if err != nil {
+			return err
+		}
 	}
-	t.election = election
 
 	if ed.TempSIKs {
 		errorChan := make(chan error)
@@ -491,7 +503,7 @@ func (t *e2eElection) overwriteVote(choices []int, v *apiclient.VoteData) error 
 	for i := 0; i < len(choices); i++ {
 		// assign the choices wanted for each overwrite vote
 		v.Choices = []int{choices[i]}
-		errs := t.sendVotes([]*apiclient.VoteData{v})
+		errs := t.sendVotes([]*apiclient.VoteData{v}, 5)
 		for _, err := range errs {
 			// check the error expected for overwrite with waitUntilNextBlock
 			if !strings.Contains(err.Error(), "overwrite count reached") {
@@ -504,20 +516,48 @@ func (t *e2eElection) overwriteVote(choices []int, v *apiclient.VoteData) error 
 	return nil
 }
 
-// sendVotes sends a batch of votes concurrently
-// (number of goroutines defined in t.config.parallelCount)
-// sendVotes sends a batch of votes concurrently
-// (number of goroutines defined in t.config.parallelCount)
-func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
-	var errs = make(map[int]error)
-	// used to avoid infinite for loop
+func (t *e2eElection) sendVotes(votes []*apiclient.VoteData, retries uint32) map[int]error {
+	var errs sync.Map // Use sync.Map to avoid data races
 	var timeoutsRetry, mempoolRetry, warnRetry atomic.Uint32
 	var wg sync.WaitGroup
-	var queues []map[int]*apiclient.VoteData
-	var mutex sync.Mutex
 
-	for p := 0; p < t.config.parallelCount; p++ {
-		queues = append(queues, make(map[int]*apiclient.VoteData, len(votes)))
+	// Helper functions to handle specific error cases, returning true if action is taken (delete or record error)
+	handleTimeout := func(retryCounter *atomic.Uint32, errs *sync.Map, index int, err error) bool {
+		if retryCounter.Load() > retries {
+			errs.Store(index, err)
+			return true
+		}
+		retryCounter.Add(1)
+		return false
+	}
+
+	handleMempoolFull := func(retryCounter *atomic.Uint32, errs *sync.Map, t *e2eElection, index int, err error) bool {
+		if retryCounter.Load() > retries {
+			errs.Store(index, err)
+			return true
+		}
+		waitErr := t.api.WaitUntilNextBlock()
+		if waitErr == nil {
+			retryCounter.Add(1)
+		}
+		return false
+	}
+
+	handleWarnRetry := func(retryCounter *atomic.Uint32, errs *sync.Map, index int, err error) bool {
+		if retryCounter.Load() > retries {
+			errs.Store(index, err)
+			return true
+		}
+		log.Warnw("retrying vote", "index", index)
+		time.Sleep(100 * time.Millisecond)
+		retryCounter.Add(1)
+		return false
+	}
+
+	// Divide votes into parallel queues
+	queues := make([]map[int]*apiclient.VoteData, t.config.parallelCount)
+	for p := range queues {
+		queues[p] = make(map[int]*apiclient.VoteData)
 	}
 	for i, v := range votes {
 		if v.Election == nil {
@@ -526,65 +566,54 @@ func (t *e2eElection) sendVotes(votes []*apiclient.VoteData) map[int]error {
 		queues[i%t.config.parallelCount][i] = v
 	}
 
-	for p := 0; p < t.config.parallelCount; p++ {
+	for p, queue := range queues {
 		wg.Add(1)
-		go func(queue map[int]*apiclient.VoteData) {
+		go func(p int, queue map[int]*apiclient.VoteData) {
 			defer wg.Done()
-			for len(queue) > 0 {
-				log.Infow("thread sending votes", "queue", len(queue))
-				for i, vote := range queue {
-					_, err := t.api.Vote(vote)
-					switch {
-					case err == nil:
-						delete(queue, i)
-					case errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err):
-						// if the context deadline is reached, no need to print it, just retry
-						if timeoutsRetry.Load() > retriesSend {
-							mutex.Lock()
-							errs[i] = err
-							mutex.Unlock()
-							return
-						}
-						timeoutsRetry.Add(1)
-					case strings.Contains(err.Error(), "mempool is full"):
-						log.Warn(err)
-						// wait and retry
-						waitErr := t.api.WaitUntilNextBlock()
-						if waitErr != nil {
-							if mempoolRetry.Load() > retriesSend {
-								mutex.Lock()
-								errs[i] = err
-								mutex.Unlock()
-								return
-							}
-							mempoolRetry.Add(1)
-						}
-					case strings.Contains(err.Error(), "already exists"):
-						// don't retry
-						delete(queue, i)
-						mutex.Lock()
-						errs[i] = err
-						mutex.Unlock()
-					default:
-						if warnRetry.Load() > retriesSend {
-							mutex.Lock()
-							errs[i] = err
-							mutex.Unlock()
-							return
-						}
-						// any other error, print it and wait a bit
-						log.Warn(err)
-						time.Sleep(100 * time.Millisecond)
-						warnRetry.Add(1)
+			for i, vote := range queue {
+				_, err := t.api.Vote(vote)
+				if err == nil {
+					continue
+				}
+
+				actionTaken := false
+				switch {
+				case errors.Is(err, context.DeadlineExceeded) || os.IsTimeout(err):
+					actionTaken = handleTimeout(&timeoutsRetry, &errs, i, err)
+				case strings.Contains(err.Error(), "mempool is full"):
+					actionTaken = handleMempoolFull(&mempoolRetry, &errs, t, i, err)
+				case strings.Contains(err.Error(), "already exists"):
+					errs.Store(i, err) // Don't retry, just record the error
+					actionTaken = true
+				default:
+					if retries > 0 {
+						actionTaken = handleWarnRetry(&warnRetry, &errs, i, err)
+					} else {
+						errs.Store(i, err)
+						actionTaken = true
 					}
 				}
+				if actionTaken {
+					delete(queue, i)
+				}
 			}
-		}(queues[p])
+		}(p, queue)
 	}
 	wg.Wait()
-	log.Infow("sent votes",
-		"n", len(votes), "timeouts", timeoutsRetry.Load(), "errors", len(errs))
-	return errs
+
+	// Convert errs back to a regular map for return
+	errsMap := make(map[int]error)
+	errs.Range(func(key, value any) bool {
+		k, okK := key.(int)
+		v, okV := value.(error)
+		if okK && okV {
+			errsMap[k] = v
+		}
+		return true
+	})
+
+	log.Infow("sent votes", "total", len(votes), "timeouts", timeoutsRetry.Load(), "errors", len(errsMap))
+	return errsMap
 }
 
 func faucetPackage(faucetURL, myAddress string) (*models.FaucetPackage, error) {
@@ -687,7 +716,7 @@ func (t *e2eElection) endElectionAndFetchResults() (*vapi.ElectionResults, error
 	}
 
 	// Wait for the election to be in RESULTS state
-	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout*3)
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 	defer cancel()
 
 	results, err := api.WaitUntilElectionResults(ctx, t.election.ElectionID)
@@ -769,4 +798,25 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 		return err
 	}
 	return nil
+}
+
+// logElection prints the election description in the log.
+func logElection(e *vapi.Election) {
+	log.Debugw("election description",
+		"id", e.ElectionID,
+		"censusOrigin", e.Census.CensusOrigin,
+		"maxCensusSize", e.Census.MaxCensusSize,
+		"maxVoteOverwrites", e.TallyMode.MaxVoteOverwrites,
+		"startDate", e.StartDate.String(),
+		"endDate", e.EndDate.String(),
+		"status", e.Status,
+		"organizationId", e.OrganizationID.String(),
+		"voteMode", e.VoteMode,
+		"electionMode", e.ElectionMode,
+		"tallyMaxCount", e.TallyMode.MaxCount,
+		"tallyMaxValue", e.TallyMode.MaxValue,
+		"tallyMaxTotalCost", e.TallyMode.MaxTotalCost,
+		"tallyCostExponent", e.TallyMode.CostExponent,
+	)
+
 }

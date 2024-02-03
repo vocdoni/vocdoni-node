@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -39,21 +41,41 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		return nil, fmt.Errorf("process %x malformed", voteEnvelope.ProcessId)
 	}
 
-	// Get the current height of the blockchain
+	// Get the current height and timestamp from the blockchain state
 	height := t.state.CurrentHeight()
+	currentTime, err := t.state.Timestamp(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get current time: %w", err)
+	}
 
-	// Calculate the end block of the process
-	endBlock := process.StartBlock + process.BlockCount
-
-	// Check that the current height is within the bounds of the process
-	if height < process.StartBlock {
-		return nil, fmt.Errorf(
-			"process %x starts at height %d, current height is %d",
-			voteEnvelope.ProcessId, process.StartBlock, height)
-	} else if height > endBlock {
-		return nil, fmt.Errorf(
-			"process %x finished at height %d, current height is %d",
-			voteEnvelope.ProcessId, endBlock, height)
+	// Check the process accepts votes by height or timestamp window
+	if process.Duration > 0 { // Timestamp based processes
+		endTime := process.StartTime + process.Duration
+		// Check that the current time is within the bounds of the process
+		if currentTime < process.StartTime {
+			return nil, fmt.Errorf(
+				"process %x starts at time %s, current time is %s",
+				voteEnvelope.ProcessId, util.TimestampToTime(process.StartTime).String(),
+				util.TimestampToTime(currentTime).String())
+		} else if currentTime > endTime {
+			return nil, fmt.Errorf(
+				"process %x finished at time %s, current time is %s",
+				voteEnvelope.ProcessId, util.TimestampToTime(endTime).String(),
+				util.TimestampToTime(currentTime).String())
+		}
+	} else { // Block count based processes. Remove when block count based processes are deprecated.
+		log.Warnw("deprecated block count based vote detected", "process", hex.EncodeToString(process.ProcessId))
+		endBlock := process.StartBlock + process.BlockCount
+		// Check that the current height is within the bounds of the process
+		if height < process.StartBlock {
+			return nil, fmt.Errorf(
+				"process %x starts at height %d, current height is %d",
+				voteEnvelope.ProcessId, process.StartBlock, height)
+		} else if height > endBlock {
+			return nil, fmt.Errorf(
+				"process %x finished at height %d, current height is %d",
+				voteEnvelope.ProcessId, endBlock, height)
+		}
 	}
 
 	// Check that the process is in the READY state
@@ -166,6 +188,8 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		log.Debugw("new vote",
 			"type", "zkSNARK",
 			"weight", vote.Weight,
+			"timestamp", currentTime,
+			"height", height,
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
@@ -184,6 +208,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"address", addr.Hex(),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
+			"timestamp", currentTime,
 			"height", height)
 
 		// Verify the proof

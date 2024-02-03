@@ -116,17 +116,18 @@ func testNewProcess(t *testing.T, _ []byte, txSender *ethereum.SignKeys,
 		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
 
-	return testCheckTxDeliverTxCommit(t, app, &stx)
+	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
+	return err
 }
 
 func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+
 	// add a process with status=READY and interruptible=true
 	censusURI := ipfsUrlTest
-	pid := util.RandomBytes(types.ProcessIDsize)
+
 	process := &models.Process{
-		ProcessId:     pid,
-		StartBlock:    0,
+		StartTime:     0,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Mode:          &models.ProcessMode{Interruptible: true},
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
@@ -135,108 +136,123 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1024,
+		Duration:      1024,
 		MaxCensusSize: 100,
 	}
-	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	pid := testCreateProcess(t, keys[0], app, process)
+	app.AdvanceTestBlock()
 
 	// Set it to PAUSE (should work)
 	status := models.ProcessStatus_PAUSED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to PAUSED by delegate (should work)
 	status = models.ProcessStatus_PAUSED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[1], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
+
 	// Set it to READY by delegate (should work)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[1], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to ENDED (should work)
 	status = models.ProcessStatus_ENDED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to RESULTS (should not work)
 	status = models.ProcessStatus_RESULTS
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
+	app.AdvanceTestBlock()
 
 	// Set it to READY (should fail)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
+	app.AdvanceTestBlock()
 
 	// Add a process with status=PAUSED and interruptible=true
 	censusURI = ipfsUrlTest
-	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
-		ProcessId:     pid,
-		StartBlock:    0,
+		StartTime:     0,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:        models.ProcessStatus_PAUSED,
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1024,
+		Duration:      1024,
 		MaxCensusSize: 100,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	pid = testCreateProcess(t, keys[0], app, process)
+	app.AdvanceTestBlock()
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to PAUSED (should work)
 	status = models.ProcessStatus_PAUSED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to CANCELED (should work)
 	status = models.ProcessStatus_CANCELED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to READY (should fail)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
+	app.AdvanceTestBlock()
 
 	// Add a process with status=PAUSE and interruptible=false
 	censusURI = ipfsUrlTest
-	pid = util.RandomBytes(types.ProcessIDsize)
 	process = &models.Process{
-		ProcessId:     pid,
-		StartBlock:    10,
+		StartTime:     0,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Mode:          &models.ProcessMode{Interruptible: false, AutoStart: false},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:        models.ProcessStatus_PAUSED,
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1024,
+		Duration:      1024,
 		MaxCensusSize: 100,
 	}
 	t.Logf("adding PAUSED process %x", process.ProcessId)
-	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	pid = testCreateProcess(t, keys[0], app, process)
+	app.AdvanceTestBlock()
 
 	// Set it to READY (should work)
 	status = models.ProcessStatus_READY
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
 
 	// Set it to PAUSE (should fail)
 	status = models.ProcessStatus_PAUSED
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
+	app.AdvanceTestBlock()
 
 	// Set it to ENDED (should fail)
 	status = models.ProcessStatus_ENDED
-	t.Logf("height: %d", app.State.CurrentHeight())
 	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNotNil)
 }
 
 func testSetProcessStatus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, status *models.ProcessStatus) error {
+	app *BaseApplication, status *models.ProcessStatus,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -260,7 +276,8 @@ func testSetProcessStatus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
 
-	return testCheckTxDeliverTxCommit(t, app, &stx)
+	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
+	return err
 }
 
 func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
@@ -359,7 +376,8 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
 	}
 
-	return testCheckTxDeliverTxCommit(t, app, &stx)
+	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
+	return err
 }
 
 func TestCount(t *testing.T) {
@@ -418,30 +436,55 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	return app, keys
 }
 
-func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) error {
+// testCreateProcess creates a process with the given parameters via transaction.
+func testCreateProcess(t *testing.T, txSender *ethereum.SignKeys, app *BaseApplication, process *models.Process) []byte {
+	var stx models.SignedTx
+
+	// assume account is not nil
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
+	qt.Assert(t, err, qt.IsNil, qt.Commentf("cannot get tx sender account %s with error %w", txSender.Address(), err))
+
+	// create tx
+	tx := &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   txSenderAcc.Nonce,
+		Process: process,
+	}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: tx}})
+	qt.Assert(t, err, qt.IsNil, qt.Commentf("cannot mashal tx %w", err))
+
+	stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID)
+	qt.Assert(t, err, qt.IsNil, qt.Commentf("cannot sign tx %+v with error %w", tx, err))
+
+	data, err := testCheckTxDeliverTxCommit(t, app, &stx)
+	qt.Assert(t, err, qt.IsNil)
+	return data
+}
+
+func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) ([]byte, error) {
 	cktx := new(cometabcitypes.CheckTxRequest)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)
 	if err != nil {
-		return fmt.Errorf("mashaling failed: %w", err)
+		return nil, fmt.Errorf("mashaling failed: %w", err)
 	}
 	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
-		return fmt.Errorf("checkTx failed: %s", cktxresp.Data)
+		return cktxresp.Data, fmt.Errorf("checkTx failed: %s", cktxresp.Data)
 	}
 	// deliverTx()
 	tx, err := proto.Marshal(stx)
 	if err != nil {
-		return fmt.Errorf("mashaling failed: %w", err)
+		return nil, fmt.Errorf("mashaling failed: %w", err)
 	}
 	detxresp := app.deliverTx(tx)
 	if detxresp.Code != 0 {
-		return fmt.Errorf("deliverTx failed: %s", detxresp.Data)
+		return detxresp.Data, fmt.Errorf("deliverTx failed: %s", detxresp.Data)
 	}
 	// commit()
 	testCommitState(t, app)
-	return nil
+	return detxresp.Data, nil
 }
 
 func TestGlobalMaxProcessSize(t *testing.T) {

@@ -115,29 +115,34 @@ func (c *HTTPclient) WaitUntilHeight(ctx context.Context, height uint32) error {
 	}
 }
 
-func (c *HTTPclient) WaitUntilElectionCreated(ctx context.Context,
-	electionID types.HexBytes) (*api.Election, error) {
+// WaitUntilElectionCreated waits until the given election is created.
+func (c *HTTPclient) WaitUntilElectionCreated(ctx context.Context, electionID types.HexBytes) (*api.Election, error) {
 	return c.WaitUntilElectionStatus(ctx, electionID, "READY")
 }
 
 // WaitUntilElectionStarts waits until the given election starts.
-func (c *HTTPclient) WaitUntilElectionStarts(ctx context.Context,
-	electionID types.HexBytes) (*api.Election, error) {
+func (c *HTTPclient) WaitUntilElectionStarts(ctx context.Context, electionID types.HexBytes) (*api.Election, error) {
 	election, err := c.WaitUntilElectionCreated(ctx, electionID)
 	if err != nil {
 		return nil, err
 	}
-	startHeight, err := c.DateToHeight(election.StartDate)
-	if err != nil {
-		return nil, err
+	// wait until blockchain timestamp is after election start date
+	log.Infow("waiting for election start", "election", electionID.String(), "start", election.StartDate.String())
+	for {
+		time.Sleep(5 * time.Second)
+		info, err := c.ChainInfo()
+		if err != nil {
+			return nil, fmt.Errorf("chainInfo failed on wait until election created: %w", err)
+		}
+		if time.Unix(int64(info.Timestamp), 0).After(election.StartDate) {
+			break
+		}
 	}
-	// api.DateToHeight() is not exact, wait for 1 additional block
-	return election, c.WaitUntilHeight(ctx, startHeight+1)
+	return election, nil
 }
 
 // WaitUntilElectionStatus waits until the given election has the given status.
-func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
-	electionID types.HexBytes, status string) (*api.Election, error) {
+func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context, electionID types.HexBytes, status string) (*api.Election, error) {
 	log.Infow("waiting for election status", "election", electionID.String(), "status", status)
 	startTime := time.Now()
 	for {
@@ -165,8 +170,7 @@ func (c *HTTPclient) WaitUntilElectionStatus(ctx context.Context,
 }
 
 // WaitUntilElectionResults waits until the given election has published final results.
-func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
-	electionID types.HexBytes) (*api.ElectionResults, error) {
+func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context, electionID types.HexBytes) (*api.ElectionResults, error) {
 	log.Infof("waiting for election %s to publish final results", electionID.String())
 	startTime := time.Now()
 	for {
@@ -190,8 +194,7 @@ func (c *HTTPclient) WaitUntilElectionResults(ctx context.Context,
 }
 
 // WaitUntilTxIsMined waits until the given transaction is mined (included in a block)
-func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
-	txHash types.HexBytes) (*api.TransactionReference, error) {
+func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context, txHash types.HexBytes) (*api.TransactionReference, error) {
 	startTime := time.Now()
 	for {
 		tr, err := c.TransactionReference(txHash)
@@ -213,8 +216,7 @@ func (c *HTTPclient) WaitUntilTxIsMined(ctx context.Context,
 
 // WaitUntilElectionKeys waits until the election has published its encryption keys,
 // and returns them.
-func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (
-	*api.ElectionKeys, error) {
+func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types.HexBytes) (*api.ElectionKeys, error) {
 	log.Debugf("fetching election keys for %x", electionID)
 	startTime := time.Now()
 	for {
@@ -234,6 +236,7 @@ func (c *HTTPclient) WaitUntilElectionKeys(ctx context.Context, electionID types
 	}
 }
 
+// EncryptionKeys returns the encryption keys for the given election.
 func (c *HTTPclient) EncryptionKeys(electionID types.HexBytes) ([]api.Key, error) {
 	keysEnc := []api.Key{}
 

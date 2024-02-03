@@ -16,7 +16,9 @@ import (
 
 func init() {
 	ops["dynamicensuselection"] = operation{
-		test:        &E2EDynamicensusElection{},
+		testFunc: func() VochainTest {
+			return &E2EDynamicensusElection{}
+		},
 		description: "Publish an election with the dynamic census flag set to true and another election with dynamic census flag set to false",
 		example:     os.Args[0] + " --operation=dynamicensuselection --votes=1000",
 	}
@@ -47,10 +49,10 @@ func (t *E2EDynamicensusElection) Setup(api *apiclient.HTTPclient, c *config) er
 		ed.d.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
 
 		// set up the election with the custom census created
-		if err := t.elections[i].setupElection(ed.d, t.elections[i].config.nvotes-1); err != nil {
+		if err := t.elections[i].setupElection(ed.d, t.elections[i].config.nvotes-1, true); err != nil {
 			return err
 		}
-		log.Debugf("election detail: %+v", *t.elections[i].election)
+		logElection(t.elections[i].election)
 	}
 
 	return nil
@@ -77,7 +79,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}
-		log.Infof("root : %x URI: %s  err: %s", censusRoot2, censusURI2, err)
+		log.Infow("census created successfully", "root", censusRoot2, "uri", censusURI2)
 
 		proof, err := api.CensusGenProof(censusRoot2, vAccts[0].Address().Bytes())
 		if err != nil {
@@ -124,7 +126,7 @@ func (t *E2EDynamicensusElection) Run() error {
 			}
 			return true
 		})
-		errs := t.elections[0].sendVotes(votes[1:])
+		errs := t.elections[0].sendVotes(votes[1:], 5)
 		if len(errs) > 0 {
 			errCh <- fmt.Errorf("error from electionID: %s, %+v", electionID, errs)
 			return
@@ -160,7 +162,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		}
 		log.Debugw("process census set", "tx hash:", hash)
 
-		ctx, cancel := context.WithTimeout(context.Background(), apiclient.WaitTimeout)
+		ctx, cancel := context.WithTimeout(context.Background(), apiclient.WaitTimeout*3)
 		defer cancel()
 		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
 			errCh <- fmt.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
@@ -239,7 +241,7 @@ func (t *E2EDynamicensusElection) Run() error {
 			return true
 		})
 
-		errs := t.elections[1].sendVotes(votes[1:])
+		errs := t.elections[1].sendVotes(votes[1:], 5)
 		if len(errs) > 0 {
 			errCh <- fmt.Errorf("error from electionID: %s, %+v", election.ElectionID, errs)
 			return

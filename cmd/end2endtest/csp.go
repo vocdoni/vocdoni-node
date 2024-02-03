@@ -12,7 +12,9 @@ import (
 
 func init() {
 	ops["cspelection"] = operation{
-		test:        &E2ECSPElection{},
+		testFunc: func() VochainTest {
+			return &E2ECSPElection{}
+		},
 		description: "csp election",
 		example:     os.Args[0] + " --operation=cspelection --votes=1000",
 	}
@@ -37,7 +39,7 @@ func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 
@@ -66,7 +68,7 @@ func (t *E2ECSPElection) Run() error {
 		}
 		return true
 	})
-	errs := t.sendVotes(votes)
+	errs := t.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

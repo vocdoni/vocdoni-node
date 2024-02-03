@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -46,17 +47,41 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
 		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
 	}
-	// start and block count sanity check
-	// if startBlock is zero or one, the process will be enabled on the next block
-	if tx.Process.StartBlock == 0 || tx.Process.StartBlock == 1 {
-		tx.Process.StartBlock = t.state.CurrentHeight() + 1
-	} else if tx.Process.StartBlock < t.state.CurrentHeight() {
-		return nil, ethereum.Address{}, fmt.Errorf(
-			"cannot add process with start block lower than or equal to the current height")
+
+	// get current timestamp from state
+	currentTimestamp, err := t.state.Timestamp(false)
+	if err != nil {
+		return nil, ethereum.Address{}, fmt.Errorf("cannot get current timestamp: %w", err)
 	}
-	if tx.Process.BlockCount <= 0 {
-		return nil, ethereum.Address{}, fmt.Errorf(
-			"cannot add process with duration lower than or equal to the current height")
+
+	// for backwards compatibility with block count based processes, we transform the block count to duration timestamp.
+	// TODO: remove once all processes are timestamp based
+	if tx.Process.BlockCount > 0 {
+		if tx.Process.Duration > 0 {
+			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with both duration time and block count")
+		}
+		log.Warnw("deprecated block count based new process detected", "pid", hex.EncodeToString(tx.Process.ProcessId))
+		tx.Process.Duration = tx.Process.BlockCount * uint32(types.DefaultBlockTime.Seconds())
+		if tx.Process.StartBlock == 0 {
+			tx.Process.StartTime = 0
+		} else {
+			height := t.state.CurrentHeight()
+			tx.Process.StartTime = currentTimestamp + (tx.Process.StartBlock-height)*uint32(types.DefaultBlockTime.Seconds())
+		}
+		tx.Process.BlockCount = 0
+		tx.Process.StartBlock = 0
+	}
+
+	// check duration and start time are properly set
+	// if start time is zero or one, the process will be enabled on the next block
+	if tx.Process.StartTime == 0 {
+		tx.Process.StartTime = currentTimestamp
+	}
+	if tx.Process.StartTime < currentTimestamp {
+		return nil, ethereum.Address{}, fmt.Errorf("cannot add process with start time lower than the current timestamp")
+	}
+	if tx.Process.StartTime+tx.Process.Duration < currentTimestamp {
+		return nil, ethereum.Address{}, fmt.Errorf("cannot add process with duration lower than the current timestamp")
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range
@@ -250,10 +275,11 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 
 func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) uint64 {
 	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
-		MaxCensusSize:    process.GetMaxCensusSize(),
-		ElectionDuration: process.BlockCount,
-		EncryptedVotes:   process.GetEnvelopeType().EncryptedVotes,
-		AnonymousVotes:   process.GetEnvelopeType().Anonymous,
-		MaxVoteOverwrite: process.GetVoteOptions().MaxVoteOverwrites,
+		MaxCensusSize:           process.GetMaxCensusSize(),
+		ElectionDuration:        process.BlockCount,
+		ElectionDurationSeconds: process.Duration,
+		EncryptedVotes:          process.GetEnvelopeType().EncryptedVotes,
+		AnonymousVotes:          process.GetEnvelopeType().Anonymous,
+		MaxVoteOverwrite:        process.GetVoteOptions().MaxVoteOverwrites,
 	})
 }

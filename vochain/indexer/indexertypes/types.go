@@ -19,11 +19,10 @@ import (
 type Process struct {
 	ID                types.HexBytes             `json:"processId"`
 	EntityID          types.HexBytes             `json:"entityId"`
-	StartBlock        uint32                     `json:"startBlock"`
-	EndBlock          uint32                     `json:"endBlock"`
 	StartDate         time.Time                  `json:"startDate,omitempty"`
 	EndDate           time.Time                  `json:"endDate,omitempty"`
-	BlockCount        uint32                     `json:"blockCount"`
+	ManuallyEnded     bool                       `json:"manuallyEnded"`
+	BlockCount        uint64                     `json:"blockCount"` // for backwards compatibility with archive
 	VoteCount         uint64                     `json:"voteCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
@@ -67,11 +66,9 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 	proc := &Process{
 		ID:                dbproc.ID,
 		EntityID:          nonEmptyBytes(dbproc.EntityID),
-		StartBlock:        uint32(dbproc.StartBlock),
-		EndBlock:          uint32(dbproc.EndBlock),
 		StartDate:         dbproc.StartDate,
 		EndDate:           dbproc.EndDate,
-		BlockCount:        uint32(dbproc.BlockCount),
+		ManuallyEnded:     dbproc.ManuallyEnded,
 		HaveResults:       dbproc.HaveResults,
 		FinalResults:      dbproc.FinalResults,
 		CensusRoot:        nonEmptyBytes(dbproc.CensusRoot),

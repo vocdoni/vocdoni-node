@@ -78,12 +78,9 @@ type BaseApplication struct {
 
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
-	// startBlockTimestamp is the current block timestamp from tendermint's
-	// cometabcitypes.RequestBeginBlock.Header.Time
-	startBlockTimestamp atomic.Int64
-	chainID             string
-	dataDir             string
-	genesisInfo         *comettypes.GenesisDoc
+	chainID           string
+	dataDir           string
+	genesisInfo       *comettypes.GenesisDoc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
 	// can skip block re-execution on FinalizeBlock call.
@@ -132,6 +129,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
+	// Create the IST controller for internal state transitions
 	istc := ist.NewISTC(state)
 
 	// Create the transaction handler for checking and processing transactions
@@ -141,6 +139,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		filepath.Join(vochainCfg.DataDir, "txHandler"),
 	)
 
+	// Initialize the zk circuit
 	if err := circuit.Init(); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
@@ -180,7 +179,11 @@ func (app *BaseApplication) ExecuteBlock(txs [][]byte, height uint32, blockTime 
 		result = append(result, resp)
 	}
 	// execute internal state transition commit
-	if err := app.Istc.Commit(height); err != nil {
+	timestamp, err := app.State.Timestamp(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get timestamp: %w", err)
+	}
+	if err := app.Istc.Commit(height, timestamp); err != nil {
 		return nil, fmt.Errorf("cannot execute ISTC commit: %w", err)
 	}
 	app.endBlock(blockTime, height)
@@ -263,8 +266,11 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 		}
 	}
 	app.State.Rollback()
-	app.startBlockTimestamp.Store(t.Unix())
+	if err := app.State.SetTimestamp(uint32(t.Unix())); err != nil {
+		log.Fatalf("failed to set timestamp: %w", err)
+	}
 	app.State.SetHeight(height)
+
 	err := app.SetZkCircuit()
 	if err != nil {
 		log.Fatalf("failed to set ZkCircuit: %w", err)
@@ -400,12 +406,11 @@ func (app *BaseApplication) Height() uint32 {
 
 // Timestamp returns the last block end timestamp
 func (app *BaseApplication) Timestamp() int64 {
-	return app.endBlockTimestamp.Load()
-}
-
-// TimestampStartBlock returns the current block start timestamp
-func (app *BaseApplication) TimestampStartBlock() int64 {
-	return app.startBlockTimestamp.Load()
+	ts, err := app.State.Timestamp(true)
+	if err != nil {
+		return 0
+	}
+	return int64(ts)
 }
 
 // TimestampFromBlock returns the timestamp for a specific block height.
@@ -413,7 +418,11 @@ func (app *BaseApplication) TimestampStartBlock() int64 {
 // If the block is the current block, it returns the current block start timestamp.
 func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 	if int64(app.Height()) == height {
-		t := time.Unix(app.TimestampStartBlock(), 0)
+		ts, err := app.State.Timestamp(false)
+		if err != nil {
+			ts = 0
+		}
+		t := time.Unix(int64(ts), 0)
 		return &t
 	}
 	blk := app.GetBlockByHeight(height)

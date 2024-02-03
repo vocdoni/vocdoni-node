@@ -17,6 +17,8 @@ func TestISTCschedule(t *testing.T) {
 	s, err := state.NewState(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
+	err = s.SetTimestamp(0)
+	qt.Assert(t, err, qt.IsNil)
 
 	// initialize the ISTC
 	istc := NewISTC(s)
@@ -38,15 +40,15 @@ func TestISTCschedule(t *testing.T) {
 			AutoStart:     true,
 			Interruptible: true,
 		},
-		Status:     models.ProcessStatus_READY,
-		StartBlock: 1,
-		BlockCount: 1, // endblock = 2
+		Status:    models.ProcessStatus_READY,
+		StartTime: 0,
+		Duration:  2, // 2s
 	}
 	err = s.AddProcess(p)
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	err = istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
+	err = istc.Schedule(Action{ID: pid, TypeID: ActionCommitResults, ElectionID: pid, TimeStamp: 2})
 	qt.Assert(t, err, qt.IsNil)
 
 	// commit block 0
@@ -88,6 +90,9 @@ func TestISTCsyncing(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
 
+	err = s.SetTimestamp(0)
+	qt.Assert(t, err, qt.IsNil)
+
 	// initialize the ISTC
 	istc := NewISTC(s)
 
@@ -108,15 +113,15 @@ func TestISTCsyncing(t *testing.T) {
 			AutoStart:     true,
 			Interruptible: true,
 		},
-		Status:     models.ProcessStatus_READY,
-		StartBlock: 1,
-		BlockCount: 1, // endblock = 2
+		Status:    models.ProcessStatus_READY,
+		StartTime: 0,
+		Duration:  2, // endblock = 2
 	}
 	err = s.AddProcess(p)
 	qt.Assert(t, err, qt.IsNil)
 
 	// schedule the election results computation at block 2 (endblock)
-	err = istc.Schedule(2, pid, Action{ID: ActionCommitResults, ElectionID: pid})
+	err = istc.Schedule(Action{TypeID: ActionCommitResults, ElectionID: pid, Height: 2, ID: pid})
 	qt.Assert(t, err, qt.IsNil)
 
 	// commit block 0
@@ -151,14 +156,18 @@ func TestISTCsyncing(t *testing.T) {
 	qt.Assert(t, r.String(), qt.Equals, "[0,10][10,0]")
 }
 
+// testAdvanceBlock advances height and timestamp +1
 func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller) {
 	height := s.CurrentHeight()
-	err := istc.Commit(height)
+	timestamp, err := s.Timestamp(false)
+	qt.Assert(t, err, qt.IsNil)
+	err = istc.Commit(height, timestamp)
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.PrepareCommit()
 	qt.Assert(t, err, qt.IsNil)
 	_, err = s.Save()
 	qt.Assert(t, err, qt.IsNil)
 	s.SetHeight(height + 1)
-	log.Infof("committed block %d", height)
+	qt.Assert(t, s.SetTimestamp(timestamp+1), qt.IsNil)
+	log.Infow("committed block", "height", height, "timestamp", timestamp)
 }

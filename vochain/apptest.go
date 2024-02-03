@@ -41,7 +41,7 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 		tb.Fatal(err)
 	}
 	_, err = app.InitChain(context.TODO(), &cometabcitypes.InitChainRequest{
-		Time:          time.Now(),
+		Time:          time.Unix(0, 0),
 		ChainId:       chainID,
 		Validators:    []cometabcitypes.ValidatorUpdate{},
 		AppStateBytes: genesisDoc.AppState,
@@ -55,6 +55,10 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 			tb.Error(err)
 		}
 	})
+	// Set the initial timestamp
+	if err := app.State.SetTimestamp(0); err != nil {
+		tb.Fatal(err)
+	}
 	return app
 }
 
@@ -107,15 +111,18 @@ func (app *BaseApplication) SetTestingMethods() {
 // Advances the block height and timestamp.
 func (app *BaseApplication) AdvanceTestBlock() {
 	height := uint32(app.testMockBlockStore.Height())
+	ts, err := app.State.Timestamp(false)
+	if err != nil {
+		panic(err)
+	}
 	// execute internal state transition commit
-	if err := app.Istc.Commit(height); err != nil {
+	if err := app.Istc.Commit(height, ts); err != nil {
 		panic(err)
 	}
 	// finalize block
-	app.endBlock(time.Now(), height)
+	app.endBlock(time.Unix(int64(ts), 0), height)
 	// save the state
-	_, err := app.State.PrepareCommit()
-	if err != nil {
+	if _, err = app.State.PrepareCommit(); err != nil {
 		panic(err)
 	}
 	_, err = app.CommitState()
@@ -125,16 +132,28 @@ func (app *BaseApplication) AdvanceTestBlock() {
 	// The next block begins 0.00005 seconds later
 	newHeight := app.testMockBlockStore.EndBlock()
 	time.Sleep(time.Microsecond * 50)
-	nextStartTime := time.Now()
-	app.testMockBlockStore.NewBlock(newHeight)
+	// nextStartTime is the previous block timestamp + second
+	nextStartTime := time.Unix(int64(ts+1), 0)
+	app.testMockBlockStore.NewBlock(newHeight, nextStartTime)
 	app.beginBlock(nextStartTime, uint32(newHeight))
 }
 
 // AdvanceTestBlocksUntilHeight loops over AdvanceTestBlock
-// until reaching height n
+// until reaching height n.
 func (app *BaseApplication) AdvanceTestBlocksUntilHeight(n uint32) {
 	for {
 		if uint32(app.testMockBlockStore.Height()) >= n {
+			return
+		}
+		app.AdvanceTestBlock()
+	}
+}
+
+// AdvanceTestBlocksUntilTimestamp loops over AdvanceTestBlock
+// until reaching timestamp ts.
+func (app *BaseApplication) AdvanceTestBlocksUntilTimestamp(ts uint32) {
+	for {
+		if uint32(app.Timestamp()) >= ts {
 			return
 		}
 		app.AdvanceTestBlock()

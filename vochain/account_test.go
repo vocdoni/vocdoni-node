@@ -547,7 +547,7 @@ func TestSendTokensTx(t *testing.T) {
 	err := signer.Generate()
 	qt.Assert(t, err, qt.IsNil)
 
-	app.State.SetAccount(state.BurnAddress, &state.Account{})
+	qt.Assert(t, app.State.SetAccount(state.BurnAddress, &state.Account{}), qt.IsNil)
 
 	err = app.State.SetTxBaseCost(models.TxType_SEND_TOKENS, 10)
 	qt.Assert(t, err, qt.IsNil)

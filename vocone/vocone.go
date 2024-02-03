@@ -176,6 +176,7 @@ func (vc *Vocone) Start() {
 		}); err != nil {
 			panic(err)
 		}
+		time.Sleep(1 * time.Second)
 	}
 	for {
 		// Begin block
@@ -184,14 +185,16 @@ func (vc *Vocone) Start() {
 		height := vc.height.Load()
 
 		// Create and execute block
-		resp, err := vc.App.ExecuteBlock(vc.prepareBlock(), uint32(height), time.Now())
+		resp, err := vc.App.ExecuteBlock(vc.prepareBlock(), uint32(height), startTime)
 		if err != nil {
-			log.Fatal(err, "execute block error")
+			log.Error(err, "execute block error")
+			continue
 		}
 		if _, err := vc.App.CommitState(); err != nil {
 			log.Fatalf("could not commit state: %v", err)
 		}
 		log.Debugw("block committed",
+			"timestamp", startTime.Unix(),
 			"height", height,
 			"hash", hex.EncodeToString(resp.Root),
 			"took", time.Since(startTime),

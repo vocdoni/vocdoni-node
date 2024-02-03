@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
@@ -22,7 +23,9 @@ import (
 
 func init() {
 	ops["tokentxs"] = operation{
-		test:        &E2ETokenTxs{},
+		testFunc: func() VochainTest {
+			return &E2ETokenTxs{}
+		},
 		description: "Tests all token related transactions",
 		example: os.Args[0] + " --operation=tokentxs " +
 			"--host http://127.0.0.1:9090/v2",
@@ -96,8 +99,12 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	log.Infow("account successfully created", "account", aliceAcc)
 
 	// now try set own account info
+	rnd := util.RandomHex(16)
 	if _, err := ensureAccountMetadataEquals(api.Clone(hex.EncodeToString(alice.PrivateKey())),
-		&apipkg.AccountMetadata{Version: "12345"}); err != nil {
+		&apipkg.AccountMetadata{
+			Version: "12345",
+			Name:    apipkg.LanguageString{"default": "AliceTest_" + rnd},
+		}); err != nil {
 		return err
 	}
 

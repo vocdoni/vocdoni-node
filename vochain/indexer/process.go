@@ -144,21 +144,14 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	}
 
 	eid := p.EntityId
-	// Get the block time from the Header
-	currentBlockTime := time.Unix(idx.App.TimestampStartBlock(), 0)
-
-	// If startBlock is zero, then we use the current block height (zero means start right now)
-	if p.StartBlock == 0 {
-		p.StartBlock = idx.App.Height()
-	}
 
 	// Create and store process in the indexer database
 	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
 		EntityID:          nonNullBytes(eid),
-		StartBlock:        int64(p.StartBlock),
-		EndBlock:          int64(p.BlockCount + p.StartBlock),
-		BlockCount:        int64(p.BlockCount),
+		StartDate:         time.Unix(int64(p.StartTime), 0),
+		EndDate:           time.Unix(int64(p.StartTime+p.Duration), 0),
+		ManuallyEnded:     false,
 		VoteCount:         0,                              // an empty process has no votes yet
 		HaveResults:       !p.EnvelopeType.EncryptedVotes, // like isOpenProcess, but on the state type
 		CensusRoot:        nonNullBytes(p.CensusRoot),
@@ -172,7 +165,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		VoteOpts:          indexertypes.EncodeProtoJSON(p.VoteOptions),
 		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
 		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
-		CreationTime:      currentBlockTime,
+		CreationTime:      time.Unix(idx.App.Timestamp(), 0),
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
@@ -204,20 +197,8 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	}
 	previousStatus := dbProc.Status
 
-	// We need to use the time of start/end from the block header, as we might be syncing the blockchain
-	currentBlockTime := func() time.Time {
-		t := idx.App.TimestampFromBlock(int64(idx.App.Height()))
-		if t == nil {
-			return time.Now()
-		}
-		return *t
-	}
-
-	// Update start date with the block time if the process starts on this block
-	startDate := dbProc.StartDate
-	if idx.App.Height() == p.StartBlock {
-		startDate = currentBlockTime()
-	}
+	// We need to use the time of start/end from the blockchain state, as we might be syncing the blockchain
+	currentBlockTime := time.Unix(idx.App.Timestamp(), 0)
 
 	// Update the process in the indexer database
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
@@ -228,7 +209,6 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		PublicKeys:  indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		Metadata:    p.GetMetadata(),
 		Status:      int64(p.Status),
-		StartDate:   startDate,
 	}); err != nil {
 		return err
 	}
@@ -236,10 +216,12 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 	// If the process is in ENDED status, and it was not in ENDED status before, then update the end block
 	if p.Status == models.ProcessStatus_ENDED &&
 		models.ProcessStatus(previousStatus) != models.ProcessStatus_ENDED {
-		if _, err := queries.UpdateProcessEndBlock(ctx, indexerdb.UpdateProcessEndBlockParams{
-			ID:       pid,
-			EndBlock: int64(idx.App.Height()),
-			EndDate:  currentBlockTime(),
+		// set mauallyEnded to true if the current bloc time is less than the original end date
+		manuallyEnded := currentBlockTime.Before(dbProc.EndDate)
+		if _, err := queries.UpdateProcessEndDate(ctx, indexerdb.UpdateProcessEndDateParams{
+			ID:            pid,
+			EndDate:       currentBlockTime,
+			ManuallyEnded: manuallyEnded,
 		}); err != nil {
 			return err
 		}
@@ -258,8 +240,9 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		p.Status == models.ProcessStatus_CANCELED {
 		if _, err := queries.SetProcessResultsCancelled(ctx,
 			indexerdb.SetProcessResultsCancelledParams{
-				EndDate: currentBlockTime(),
-				ID:      pid,
+				EndDate:       currentBlockTime,
+				ManuallyEnded: true,
+				ID:            pid,
 			}); err != nil {
 			return err
 		}

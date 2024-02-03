@@ -14,7 +14,9 @@ import (
 
 func init() {
 	ops["censusizelection"] = operation{
-		test:        &E2EMaxCensusSizeElection{},
+		testFunc: func() VochainTest {
+			return &E2EMaxCensusSizeElection{}
+		},
 		description: "Publishes a census with maxCensusSize smaller than the actual census size validate the maxCensusSize restriction feature",
 		example:     os.Args[0] + " --operation=censusizelection --votes=1000",
 	}
@@ -41,11 +43,11 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 		Size: uint64(t.config.nvotes - 1),
 	}
 
-	if err := t.setupElection(ed, t.config.nvotes); err != nil {
+	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 
@@ -75,7 +77,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		}
 		return true
 	})
-	errs := t.sendVotes(votes[1:])
+	errs := t.sendVotes(votes[1:], 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

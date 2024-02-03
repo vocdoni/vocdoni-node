@@ -25,8 +25,8 @@ func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessI
 
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
-	id, entity_id, start_block, end_block, start_date, end_date, 
-	block_count, vote_count, have_results, final_results, census_root,
+	id, entity_id, start_date, end_date, manually_ended,
+	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
@@ -37,8 +37,8 @@ INSERT INTO processes (
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
-	?, ?, ?, ?, ?, ?,
 	?, ?, ?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -54,11 +54,9 @@ INSERT INTO processes (
 type CreateProcessParams struct {
 	ID                types.ProcessID
 	EntityID          types.EntityID
-	StartBlock        int64
-	EndBlock          int64
 	StartDate         time.Time
 	EndDate           time.Time
-	BlockCount        int64
+	ManuallyEnded     bool
 	VoteCount         int64
 	HaveResults       bool
 	FinalResults      bool
@@ -87,11 +85,9 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 	return q.exec(ctx, q.createProcessStmt, createProcess,
 		arg.ID,
 		arg.EntityID,
-		arg.StartBlock,
-		arg.EndBlock,
 		arg.StartDate,
 		arg.EndDate,
-		arg.BlockCount,
+		arg.ManuallyEnded,
 		arg.VoteCount,
 		arg.HaveResults,
 		arg.FinalResults,
@@ -129,7 +125,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_block, end_block, start_date, end_date, block_count, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive, manually_ended FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -140,11 +136,8 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
-		&i.StartBlock,
-		&i.EndBlock,
 		&i.StartDate,
 		&i.EndDate,
-		&i.BlockCount,
 		&i.VoteCount,
 		&i.ChainID,
 		&i.HaveResults,
@@ -169,6 +162,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
 		&i.FromArchive,
+		&i.ManuallyEnded,
 	)
 	return i, err
 }
@@ -330,17 +324,19 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 const setProcessResultsCancelled = `-- name: SetProcessResultsCancelled :execresult
 UPDATE processes
 SET have_results = FALSE, final_results = TRUE, 
-    end_date = ?1
-WHERE id = ?2
+    end_date = ?1,
+	manually_ended = ?2
+WHERE id = ?3
 `
 
 type SetProcessResultsCancelledParams struct {
-	EndDate time.Time
-	ID      types.ProcessID
+	EndDate       time.Time
+	ManuallyEnded bool
+	ID            types.ProcessID
 }
 
 func (q *Queries) SetProcessResultsCancelled(ctx context.Context, arg SetProcessResultsCancelledParams) (sql.Result, error) {
-	return q.exec(ctx, q.setProcessResultsCancelledStmt, setProcessResultsCancelled, arg.EndDate, arg.ID)
+	return q.exec(ctx, q.setProcessResultsCancelledStmt, setProcessResultsCancelled, arg.EndDate, arg.ManuallyEnded, arg.ID)
 }
 
 const setProcessResultsReady = `-- name: SetProcessResultsReady :execresult
@@ -371,21 +367,21 @@ func (q *Queries) SetProcessResultsReady(ctx context.Context, arg SetProcessResu
 	)
 }
 
-const updateProcessEndBlock = `-- name: UpdateProcessEndBlock :execresult
+const updateProcessEndDate = `-- name: UpdateProcessEndDate :execresult
 UPDATE processes
-SET end_block  = ?1,
-	end_date = ?2
+SET end_date = ?1,
+	manually_ended = ?2
 WHERE id = ?3
 `
 
-type UpdateProcessEndBlockParams struct {
-	EndBlock int64
-	EndDate  time.Time
-	ID       types.ProcessID
+type UpdateProcessEndDateParams struct {
+	EndDate       time.Time
+	ManuallyEnded bool
+	ID            types.ProcessID
 }
 
-func (q *Queries) UpdateProcessEndBlock(ctx context.Context, arg UpdateProcessEndBlockParams) (sql.Result, error) {
-	return q.exec(ctx, q.updateProcessEndBlockStmt, updateProcessEndBlock, arg.EndBlock, arg.EndDate, arg.ID)
+func (q *Queries) UpdateProcessEndDate(ctx context.Context, arg UpdateProcessEndDateParams) (sql.Result, error) {
+	return q.exec(ctx, q.updateProcessEndDateStmt, updateProcessEndDate, arg.EndDate, arg.ManuallyEnded, arg.ID)
 }
 
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
@@ -397,9 +393,8 @@ SET census_root         = ?1,
 	private_keys        = ?3,
 	public_keys         = ?4,
 	metadata            = ?5,
-	status              = ?6,
-	start_date 	        = ?7
-WHERE id = ?8
+	status              = ?6
+WHERE id = ?7
 `
 
 type UpdateProcessFromStateParams struct {
@@ -409,7 +404,6 @@ type UpdateProcessFromStateParams struct {
 	PublicKeys  string
 	Metadata    string
 	Status      int64
-	StartDate   time.Time
 	ID          types.ProcessID
 }
 
@@ -421,7 +415,6 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.PublicKeys,
 		arg.Metadata,
 		arg.Status,
-		arg.StartDate,
 		arg.ID,
 	)
 }

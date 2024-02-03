@@ -22,22 +22,30 @@ const (
 
 func init() {
 	ops["ballotRanked"] = operation{
-		test:        &E2EBallotRanked{},
+		testFunc: func() VochainTest {
+			return &E2EBallotRanked{}
+		},
 		description: "ballot election to test ranked voting",
 		example:     os.Args[0] + " --operation=ballotRanked --votes=1000",
 	}
 	ops["ballotQuadratic"] = operation{
-		test:        &E2EBallotQuadratic{},
+		testFunc: func() VochainTest {
+			return &E2EBallotQuadratic{}
+		},
 		description: "ballot election to test quadratic voting",
 		example:     os.Args[0] + " --operation=ballotQuadratic --votes=1000",
 	}
 	ops["ballotRange"] = operation{
-		test:        &E2EBallotRange{},
+		testFunc: func() VochainTest {
+			return &E2EBallotRange{}
+		},
 		description: "ballot election to test range voting",
 		example:     os.Args[0] + " --operation=ballotRange --votes=1000",
 	}
 	ops["ballotApproval"] = operation{
-		test:        &E2EBallotApproval{},
+		testFunc: func() VochainTest {
+			return &E2EBallotApproval{}
+		},
 		description: "ballot election to test approval voting",
 		example:     os.Args[0] + " --operation=ballotApproval --votes=1000",
 	}
@@ -70,7 +78,7 @@ func (t *E2EBallotRanked) Setup(api *apiclient.HTTPclient, c *config) error {
 		return fmt.Errorf("error in setupElectionRaw for ranked voting: %s", err)
 	}
 
-	log.Debugf("election details: %+v", *t.election)
+	logElection(t.election)
 	return nil
 }
 
@@ -179,8 +187,9 @@ func (t *E2EBallotApproval) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
-	//setup for approval voting
+	// setup for approval voting
 	p := newTestProcess()
+
 	// update uniqueValues to false
 	p.EnvelopeType.UniqueValues = false
 	p.VoteOptions = &models.ProcessVoteOptions{
@@ -210,11 +219,7 @@ func (t *E2EBallotApproval) Run() error {
 		t.election.TallyMode, nvotes,
 		approvalVote, t.election.VoteMode.UniqueValues)
 
-	if err := sendAndValidateVotes(t.e2eElection, choices, expectedResults); err != nil {
-		return err
-	}
-
-	return nil
+	return sendAndValidateVotes(t.e2eElection, choices, expectedResults)
 }
 
 func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*types.BigInt) error {
@@ -233,11 +238,11 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 				Choices:      choices[vcount],
 				VoterAccount: acctp.account,
 			})
-			vcount += 1
+			vcount++
 		}
 		return true
 	})
-	errs := e.sendVotes(votes)
+	errs := e.sendVotes(votes, 5)
 	if len(errs) > 0 {
 		return fmt.Errorf("error in sendVotes %+v", errs)
 	}

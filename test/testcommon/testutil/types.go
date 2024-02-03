@@ -32,11 +32,11 @@ func (b *MockBlockStore) AddTxToBlock(tx []byte) {
 	block.Txs = append(block.Txs, tx)
 }
 
-func (b *MockBlockStore) NewBlock(height int64) {
+func (b *MockBlockStore) NewBlock(height int64, timestamp time.Time) {
 	if count := b.height.Load(); height != count {
 		panic(fmt.Sprintf("height is not the expected one (got:%d expected:%d)", height, count))
 	}
-	log.Infow("new block", "height", height)
+	log.Infow("new block", "height", height, "timestamp", timestamp)
 	b.set(height, &comettypes.Block{
 		Header: comettypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
 		Data:   comettypes.Data{Txs: make([]comettypes.Tx, 0)}},
