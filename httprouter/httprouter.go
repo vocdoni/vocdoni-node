@@ -28,6 +28,8 @@ import (
 
 const (
 	desiredSoMaxConn = 4096
+	// DefaultContentType is the default content type for the HTTP response.
+	DefaultContentType = "application/json"
 )
 
 // HTTProuter is a thread-safe multiplexer http(s) router using go-chi and autocert with a set of

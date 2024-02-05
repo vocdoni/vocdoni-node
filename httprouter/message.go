@@ -24,7 +24,13 @@ type HTTPContext struct {
 	Writer  http.ResponseWriter
 	Request *http.Request
 
-	sent chan struct{}
+	contentType string
+	sent        chan struct{}
+}
+
+// SetResponseContentType sets the content type for the response (the default content type is used if not defined).
+func (h *HTTPContext) SetResponseContentType(contentType string) {
+	h.contentType = contentType
 }
 
 // URLParam is a wrapper around go-chi to get a URL parameter (specified in the path pattern as {key})
@@ -49,7 +55,12 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 		// The connection was closed, so don't try to write to it.
 		return fmt.Errorf("connection is closed")
 	}
-	h.Writer.Header().Set("Content-Type", "application/json")
+	// Set the content type if not set to default application/json
+	if h.contentType == "" {
+		h.Writer.Header().Set("Content-Type", DefaultContentType)
+	} else {
+		h.Writer.Header().Set("Content-Type", h.contentType)
+	}
 
 	if httpStatusCode == http.StatusNoContent {
 		// For 204 status, don't set Content-Length, don't try to write a body.
@@ -62,8 +73,7 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
 	h.Writer.WriteHeader(httpStatusCode)
 
-	log.Debugf("response: (%d) %s", httpStatusCode, msg)
-
+	log.Debugw("http response", "status", httpStatusCode, "msg", string(msg))
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
 	}
