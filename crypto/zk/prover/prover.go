@@ -8,14 +8,11 @@ package prover
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
 
 	"github.com/iden3/go-rapidsnark/prover"
 	"github.com/iden3/go-rapidsnark/types"
 	"github.com/iden3/go-rapidsnark/verifier"
 	"github.com/iden3/go-rapidsnark/witness"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/tree/arbo"
 )
 
 // TODO: Refactor the error handling to include the trace of the original error
@@ -80,46 +77,6 @@ func (p *Proof) Bytes() ([]byte, []byte, error) {
 	}
 
 	return proofData, pubSignals, nil
-}
-
-// ExtractPubSignal decodes the requested public signal (identified by a string: "nullifier", "sikRoot", etc)
-// from the current proof and returns it as a big.Int.
-func (p *Proof) ExtractPubSignal(id string) (*big.Int, error) {
-	// Check if the current proof contains public signals and it contains the
-	// correct number of positions.
-	if p.PubSignals == nil || len(p.PubSignals) != len(circuit.Global().Config.PublicSignals) {
-		return nil, ErrPublicSignalFormat
-	}
-	idx, found := circuit.Global().Config.PublicSignals[id]
-	if !found {
-		return nil, ErrPubSignalNotFound
-	}
-	s := p.PubSignals[idx]
-	// Parse it into a big.Int
-	i, ok := new(big.Int).SetString(s, 10)
-	if !ok {
-		return nil, ErrParsingProofSignal
-	}
-	return i, nil
-
-}
-
-// SIKRoot function returns the SIKRoot included into the current proof.
-func (p *Proof) SIKRoot() ([]byte, error) {
-	sikRoot, err := p.ExtractPubSignal("sikRoot")
-	if err != nil {
-		return nil, err
-	}
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), sikRoot), nil
-}
-
-// Nullifier function returns the Nullifier included into the current proof.
-func (p *Proof) Nullifier() ([]byte, error) {
-	nullifier, err := p.ExtractPubSignal("nullifier")
-	if err != nil {
-		return nil, err
-	}
-	return nullifier.Bytes(), nil
 }
 
 // calcWitness perform the witness calculation using go-rapidsnark library based

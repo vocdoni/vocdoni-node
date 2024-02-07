@@ -78,10 +78,10 @@ func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
 		return nil, err
 	}
 	return &CircuitInputs{
-		ElectionId:      util.BytesToArboStr(p.ElectionId),
+		ElectionId:      util.BytesToArboSplitStr(p.ElectionId),
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: p.AvailableWeight.String(),
-		VoteHash:        util.BytesToArboStr(p.AvailableWeight.Bytes()),
+		VoteHash:        util.BytesToArboSplitStr(p.AvailableWeight.Bytes()),
 		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
 		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
 

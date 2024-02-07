@@ -328,6 +328,13 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if process.GetStatus() != models.ProcessStatus_READY {
 		return common.Address{}, nil, nil, false, fmt.Errorf("this process is not READY")
 	}
+	// ensure that the process is anonymous and the census origin is of the type OFF_CHAIN_TREE
+	if process.CensusOrigin != models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED && process.CensusOrigin != models.CensusOrigin_OFF_CHAIN_TREE {
+		return common.Address{}, nil, nil, false, fmt.Errorf("invalid census origin for register SIK transaction")
+	}
+	if !process.EnvelopeType.Anonymous {
+		return common.Address{}, nil, nil, false, fmt.Errorf("only anonymous elections are allowed for register SIK transaction")
+	}
 	// check if the number of registered SIK via RegisterSIKTx associated to
 	// this process reaches the MaxCensusSize
 	numberOfRegisterSIK, err := t.state.CountRegisterSIK(pid)
@@ -337,8 +344,13 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 	if process.GetMaxCensusSize() <= uint64(numberOfRegisterSIK) {
 		return common.Address{}, nil, nil, false, fmt.Errorf("process MaxCensusSize reached")
 	}
+	// we need to set the anonymous flag to false to verify the signature proof
+	process.EnvelopeType.Anonymous = false
+	defer func() {
+		process.EnvelopeType.Anonymous = true
+	}()
 	// verify the proof for the transaction signer address
-	valid, _, err := VerifyProof(process, censusProof, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
+	valid, _, err := VerifyProof(process, &models.VoteEnvelope{ProcessId: pid, Proof: censusProof}, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
 	if err != nil {
 		return common.Address{}, nil, nil, false, fmt.Errorf("error verifying the proof: %w", err)
 	}

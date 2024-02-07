@@ -33,7 +33,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 	// mock the availableWeight
 	availableWeight := new(big.Int).SetUint64(10)
 	// calc vote hash
-	voteHash := util.BytesToArboStr(availableWeight.Bytes())
+	voteHash := util.BytesToArboSplitStr(availableWeight.Bytes())
 	// decode the test root
 	hexTestRoot, err := hex.DecodeString(testRoot)
 	c.Assert(err, qt.IsNil)

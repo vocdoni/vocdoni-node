@@ -65,7 +65,7 @@ func (k *SignKeys) AccountSIKnullifier(electionID, secret []byte) ([]byte, error
 		seed = append(seed, big.NewInt(0))
 	}
 	// encode the election id for circom and include it into the nullifier
-	seed = append(seed, util.BytesToArbo(electionID)...)
+	seed = append(seed, util.BytesToArboSplit(electionID)...)
 	// calculate the poseidon image --> H(signature + secret + electionId)
 	hash, err := poseidon.Hash(seed)
 	if err != nil {
