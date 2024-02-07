@@ -25,10 +25,10 @@ func BigToFF(iv *big.Int) *big.Int {
 	return z.Mod(iv, bn254BaseField)
 }
 
-// BytesToArbo calculates the sha256 hash (32 bytes) of the slice of bytes
+// BytesToArboSplit calculates the sha256 hash (32 bytes) of the slice of bytes
 // provided. Then, splits the hash into a two parts of 16 bytes, swap the
 // endianess of that parts and encodes they into a two big.Int's.
-func BytesToArbo(input []byte) []*big.Int {
+func BytesToArboSplit(input []byte) []*big.Int {
 	hash := sha256.Sum256(input)
 	return []*big.Int{
 		new(big.Int).SetBytes(arbo.SwapEndianness(hash[:16])),
@@ -36,8 +36,24 @@ func BytesToArbo(input []byte) []*big.Int {
 	}
 }
 
-// BytesToArboStr function wraps BytesToArbo to return the input as []string.
-func BytesToArboStr(input []byte) []string {
-	arboBytes := BytesToArbo(input)
+// BytesToArboSplitStr function wraps BytesToArbo to return the input as []string.
+func BytesToArboSplitStr(input []byte) []string {
+	arboBytes := BytesToArboSplit(input)
 	return []string{arboBytes[0].String(), arboBytes[1].String()}
+}
+
+// SplittedArboToBytes function receives a slice of big.Int's and returns the
+func SplittedArboToBytes(input1, input2 *big.Int) []byte {
+	b1 := arbo.SwapEndianness(input1.Bytes())
+	b2 := arbo.SwapEndianness(input2.Bytes())
+	return append(b1, b2...)
+}
+
+// SplittedArboStrToBytes function wraps SplittedArboToBytes to return the input as []byte
+func SplittedArboStrToBytes(input1, input2 string) []byte {
+	b1 := new(big.Int)
+	b1.SetString(input1, 10)
+	b2 := new(big.Int)
+	b2.SetString(input2, 10)
+	return SplittedArboToBytes(b1, b2)
 }

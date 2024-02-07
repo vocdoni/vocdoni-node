@@ -113,11 +113,10 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			return nil, err
 		}
 		// include vote nullifier and the encoded proof in a VoteEnvelope
-		nullifier, err := proof.ExtractPubSignal("nullifier")
+		vote.Nullifier, err = proof.Nullifier()
 		if err != nil {
 			return nil, err
 		}
-		vote.Nullifier = nullifier.Bytes()
 		vote.Proof = &models.Proof{
 			Payload: &models.Proof_ZkSnark{
 				ZkSnark: protoProof,

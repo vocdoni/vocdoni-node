@@ -58,6 +58,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
 		Status:        models.ProcessStatus_READY,
 		CensusRoot:    censusRoot,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		Duration:      uint32((time.Second * 60).Seconds()),
 		MaxCensusSize: 100,
 	}
@@ -189,7 +190,7 @@ func TestMaxCensusSizeRegisterSIKTx(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	for i := 0; i < 10; i++ {
-		app.State.IncreaseRegisterSIKCounter(pid)
+		c.Assert(app.State.IncreaseRegisterSIKCounter(pid), qt.IsNil)
 	}
 	_, _, _, _, err = app.TransactionHandler.RegisterSIKTxCheck(tx)
 	c.Assert(err, qt.IsNotNil)

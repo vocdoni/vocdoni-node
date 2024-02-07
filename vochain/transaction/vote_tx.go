@@ -7,12 +7,10 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/transaction/proofs/zkproof"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -106,6 +104,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	// started in BaseApplication.BeginBlock.
 	// Warning: vote cache might change during the execution of this function.
 	vote := t.state.CacheGetCopy(vtx.TxID)
+	sikRoot := []byte{}
 	fromCache := vote != nil
 
 	if fromCache { // if the vote exists in cache
@@ -119,7 +118,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	} else { // if vote not in cache, initialize it
 		// Initialize the vote based on the envelope type
 		if process.GetEnvelopeType().Anonymous {
-			vote, err = initializeZkVote(voteEnvelope, height)
+			vote, sikRoot, err = initializeZkVote(voteEnvelope, height)
 		} else {
 			vote, err = initializeSignedVote(voteEnvelope, vtx.SignedBody, vtx.Signature, height)
 		}
@@ -156,34 +155,23 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 
 	// verify the proof associated with the vote
 	if process.EnvelopeType.Anonymous {
-		if !circuit.IsLoaded() {
-			return nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
-		}
-		// get snark proof from vote envelope
-		proof, err := zkProofFromEnvelope(voteEnvelope)
-		if err != nil {
-			return nil, err
-		}
-		// get sikroot from the proof
-		proofSIKRoot, err := proof.SIKRoot()
-		if err != nil {
-			return nil, fmt.Errorf("failed getting sik root from the proof: %w", err)
-		}
 		// check if it is expired
-		if t.state.ExpiredSIKRoot(proofSIKRoot) {
+		if t.state.ExpiredSIKRoot(sikRoot) {
 			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
 		}
-
+		// verify the proof
+		valid := false
+		valid, vote.Weight, err = VerifyProof(process, voteEnvelope, vote.VoterID)
+		if err != nil {
+			return nil, fmt.Errorf("proof not valid: %w", err)
+		}
+		if !valid {
+			return nil, fmt.Errorf("proof not valid")
+		}
 		// soft-fork: get nullifier from proof publicSignals
 		if nullifierCheckForkBlock := config.ForksForChainID(t.state.ChainID()).NullifierFromZkProof; nullifierCheckForkBlock > 0 &&
 			t.state.CurrentHeight() < nullifierCheckForkBlock {
 			vote.Nullifier = voteEnvelope.Nullifier
-		}
-
-		// get vote weight from proof publicSignals
-		vote.Weight, err = proof.ExtractPubSignal("voteWeight")
-		if err != nil {
-			return nil, fmt.Errorf("failed on parsing vote weight from public inputs provided: %w", err)
 		}
 		log.Debugw("new vote",
 			"type", "zkSNARK",
@@ -193,11 +181,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
 			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
 		)
-		// verify the proof with the circuit verification key
-		if err := proof.Verify(circuit.Global().VerificationKey); err != nil {
-			return nil, fmt.Errorf("zkSNARK proof verification failed: %w", err)
-		}
-
 	} else { // Signature based voting
 		// extract the ethereum address from the voterID
 		addr := ethereum.AddrFromBytes(vote.VoterID.Address())
@@ -212,7 +195,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"height", height)
 
 		// Verify the proof
-		valid, weight, err := VerifyProof(process, voteEnvelope.Proof, vote.VoterID)
+		valid, weight, err := VerifyProof(process, voteEnvelope, vote.VoterID)
 		if err != nil {
 			return nil, err
 		}
@@ -229,37 +212,27 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	return vote, nil
 }
 
-func zkProofFromEnvelope(voteEnvelope *models.VoteEnvelope) (*prover.Proof, error) {
-	proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
-	if proofZkSNARK == nil {
-		return nil, fmt.Errorf("zkSNARK proof is empty")
-	}
-	// parse the ZkProof protobuf to prover.Proof
-	proof, err := zk.ProtobufZKProofToProverProof(proofZkSNARK)
-	if err != nil {
-		return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
-	}
-	return proof, nil
-}
-
 // initializeZkVote initializes a zkSNARK vote. It does not check the proof nor includes the weight of the vote.
-func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) (*vstate.Vote, error) {
-	proof, err := zkProofFromEnvelope(voteEnvelope)
+func initializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) (*vstate.Vote, []byte, error) {
+	proof, err := zkproof.ProofFromEnvelope(voteEnvelope)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	nullifier, err := proof.Nullifier()
 	if err != nil {
-		return nil, fmt.Errorf("failed on parsing nullifier from public inputs: %w", err)
+		return nil, nil, fmt.Errorf("failed on parsing nullifier from public inputs: %w", err)
 	}
-
+	sikRoot, err := proof.SIKRoot()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed on getting sik root from the proof: %w", err)
+	}
 	return &vstate.Vote{
 		Height:               height,
 		ProcessID:            voteEnvelope.ProcessId,
 		VotePackage:          voteEnvelope.VotePackage,
 		Nullifier:            nullifier,
 		EncryptionKeyIndexes: voteEnvelope.EncryptionKeyIndexes,
-	}, nil
+	}, sikRoot, nil
 }
 
 // initializeSignedVote initializes a signed vote. It does not check the proof nor includes the weight of the vote.

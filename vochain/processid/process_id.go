@@ -35,10 +35,9 @@ type ProcessID struct {
 	nonce            uint32
 }
 
-// Marshal encodes to bytes
+// Marshal encodes to bytes:
+// processID = chainID[6bytes] + organizationAddress[20bytes] + proofType[1byte] + envelopeType[1byte] + nonce[4bytes]
 func (p *ProcessID) Marshal() []byte {
-	// processID =
-	//  chainID[6bytes] + organizationAddress[20bytes] + proofType[1byte] + envelopeType[1byte] + nonce[4bytes]
 	chainID := ethereum.HashRaw([]byte(p.chainID))
 
 	nonce := make([]byte, 4)
@@ -195,6 +194,9 @@ func BuildProcessID(proc *models.Process, state *state.State) (*ProcessID, error
 	acc, err := state.GetAccount(addr, false)
 	if err != nil {
 		return nil, err
+	}
+	if acc == nil {
+		return nil, fmt.Errorf("account not found %s", addr.Hex())
 	}
 	pid.SetAddr(addr)
 	pid.SetNonce(acc.GetProcessIndex())

@@ -11,8 +11,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
-	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -31,6 +30,9 @@ func TestHysteresis(t *testing.T) {
 	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 3, testWeight)
 
 	// add the test accounts siks to the test app
+	accountOrganizer := ethereum.NewSignKeys()
+	c.Assert(accountOrganizer.Generate(), qt.IsNil)
+	c.Assert(app.State.CreateAccount(accountOrganizer.Address(), "", nil, 1000), qt.IsNil)
 	for _, account := range accounts {
 		testSIK, err := account.AccountSIK(nil)
 		c.Assert(err, qt.IsNil)
@@ -39,10 +41,8 @@ func TestHysteresis(t *testing.T) {
 	}
 
 	// create a process with max census size 10
-	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId: pid,
-		EntityId:  util.RandomBytes(types.EntityIDsize),
+		EntityId: accountOrganizer.Address().Bytes(),
 		EnvelopeType: &models.EnvelopeType{
 			Anonymous: true,
 		},
@@ -50,13 +50,21 @@ func TestHysteresis(t *testing.T) {
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1},
 		Status:        models.ProcessStatus_READY,
 		CensusRoot:    censusRoot,
-		StartBlock:    0,
+		StartBlock:    1,
 		BlockCount:    1000,
 		MaxCensusSize: 10,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 	}
+	procID, err := processid.BuildProcessID(process, app.State)
+	c.Assert(err, qt.IsNil)
+	pid := procID.Marshal()
+	process.ProcessId = pid
 	c.Check(app.State.AddProcess(process), qt.IsNil)
+
+	// check the process is added
 	app.AdvanceTestBlock()
+	_, err = app.State.Process(pid, true)
+	c.Assert(err, qt.IsNil)
 
 	// get siktree root, sik proofs and zkproof
 	var zkProofs []*models.ProofZkSNARK

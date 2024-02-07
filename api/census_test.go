@@ -222,14 +222,18 @@ func TestCensusProof(t *testing.T) {
 			ProcessId:    electionID,
 			CensusRoot:   censusData.CensusID,
 			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+			EnvelopeType: &models.EnvelopeType{},
 		},
-		&models.Proof{
-			Payload: &models.Proof_Arbo{
-				Arbo: &models.ProofArbo{
-					Type:            models.ProofArbo_BLAKE2B,
-					Siblings:        censusData.CensusProof,
-					AvailableWeight: censusData.Value,
-					VoteWeight:      censusData.Value,
+		&models.VoteEnvelope{
+			ProcessId: electionID,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Arbo{
+					Arbo: &models.ProofArbo{
+						Type:            models.ProofArbo_BLAKE2B,
+						Siblings:        censusData.CensusProof,
+						AvailableWeight: censusData.Value,
+						VoteWeight:      censusData.Value,
+					},
 				},
 			},
 		},
@@ -329,14 +333,18 @@ func TestCensusZk(t *testing.T) {
 			ProcessId:    electionID,
 			CensusRoot:   censusData.CensusID,
 			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+			EnvelopeType: &models.EnvelopeType{},
 		},
-		&models.Proof{
-			Payload: &models.Proof_Arbo{
-				Arbo: &models.ProofArbo{
-					Type:            models.ProofArbo_POSEIDON,
-					Siblings:        censusData.CensusProof,
-					AvailableWeight: censusData.Value,
-					VoteWeight:      censusData.Value,
+		&models.VoteEnvelope{
+			ProcessId: electionID,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Arbo{
+					Arbo: &models.ProofArbo{
+						Type:            models.ProofArbo_POSEIDON,
+						Siblings:        censusData.CensusProof,
+						AvailableWeight: censusData.Value,
+						VoteWeight:      censusData.Value,
+					},
 				},
 			},
 		},
