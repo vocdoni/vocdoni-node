@@ -32,6 +32,8 @@ func encodeCensusType(t models.Census_Type) string {
 		return CensusTypeWeighted
 	case models.Census_CA:
 		return CensusTypeCSP
+	case models.Census_FARCASTER_FRAME:
+		return CensusTypeFarcaster
 	}
 
 	return CensusTypeUnknown

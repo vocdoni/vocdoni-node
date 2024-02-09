@@ -29,6 +29,7 @@ const (
 	CensusTypeWeighted   = "weighted"
 	CensusTypeZKWeighted = "zkweighted"
 	CensusTypeCSP        = "csp"
+	CensusTypeFarcaster  = "farcaster"
 	CensusTypeUnknown    = "unknown"
 
 	MaxCensusAddBatchSize = 8192
