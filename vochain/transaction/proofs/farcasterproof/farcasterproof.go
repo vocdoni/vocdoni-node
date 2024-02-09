@@ -91,7 +91,7 @@ func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed2
 	if msg.Data.Type != farcasterpb.MessageType_MESSAGE_TYPE_FRAME_ACTION {
 		return nil, nil, fmt.Errorf("invalid message type, got %s", msg.Data.Type.String())
 	}
-	var pubkey ed25519.PublicKey = msg.GetSigner()
+	pubkey := msg.GetSigner()
 
 	if pubkey == nil {
 		return nil, nil, fmt.Errorf("signer is nil")
