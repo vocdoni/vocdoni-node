@@ -23,7 +23,7 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 		return false, nil, fmt.Errorf("anonymous voting not supported, missing zk circuits data")
 	}
 	// get snark proof from vote envelope
-	proof, err := ProofFromEnvelope(envelope)
+	proof, err := proofFromEnvelope(envelope)
 	if err != nil {
 		return false, nil, err
 	}
@@ -68,8 +68,8 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	return true, weight, nil
 }
 
-// ProofFromEnvelope returns the parsed ZkProof from the vote envelope.
-func ProofFromEnvelope(voteEnvelope *models.VoteEnvelope) (*prover.Proof, error) {
+// proofFromEnvelope returns the parsed ZkProof from the vote envelope.
+func proofFromEnvelope(voteEnvelope *models.VoteEnvelope) (*prover.Proof, error) {
 	proofZkSNARK := voteEnvelope.Proof.GetZkSnark()
 	if proofZkSNARK == nil {
 		return nil, fmt.Errorf("zkSNARK proof is empty")
@@ -80,4 +80,27 @@ func ProofFromEnvelope(voteEnvelope *models.VoteEnvelope) (*prover.Proof, error)
 		return nil, fmt.Errorf("failed on zk.ProtobufZKProofToCircomProof: %w", err)
 	}
 	return proof, nil
+}
+
+// InitializeZkVote initializes a zkSNARK vote. It does not check the proof nor includes the weight of the vote.
+func InitializeZkVote(voteEnvelope *models.VoteEnvelope, height uint32) (*state.Vote, []byte, error) {
+	proof, err := proofFromEnvelope(voteEnvelope)
+	if err != nil {
+		return nil, nil, err
+	}
+	nullifier, err := proof.Nullifier()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed on parsing nullifier from public inputs: %w", err)
+	}
+	sikRoot, err := proof.SIKRoot()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed on getting sik root from the proof: %w", err)
+	}
+	return &state.Vote{
+		Height:               height,
+		ProcessID:            voteEnvelope.ProcessId,
+		VotePackage:          voteEnvelope.VotePackage,
+		Nullifier:            nullifier,
+		EncryptionKeyIndexes: voteEnvelope.EncryptionKeyIndexes,
+	}, sikRoot, nil
 }
