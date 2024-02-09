@@ -10,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/cspproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/ethereumproof"
+	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/zkproof"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -61,6 +62,8 @@ func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID sta
 		verifier = &cspproof.ProofVerifierCSP{}
 	case models.CensusOrigin_ERC20, models.CensusOrigin_MINI_ME:
 		verifier = &ethereumproof.ProofVerifierEthereumStorage{}
+	case models.CensusOrigin_FARCASTER_FRAME:
+		verifier = &farcasterproof.FarcasterVerifier{}
 	default:
 		return false, nil, fmt.Errorf("census origin not compatible")
 	}

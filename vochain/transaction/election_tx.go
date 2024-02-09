@@ -34,6 +34,10 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if tx.Process.VoteOptions.MaxCount == 0 {
 		return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
 	}
+	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
+		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
+	}
+
 	// check for maxCount/maxValue overflows
 	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions {
 		return nil, ethereum.Address{},
@@ -43,9 +47,23 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
 		return nil, ethereum.Address{}, fmt.Errorf("status must be READY or PAUSED")
 	}
-	// check vtx.Signature available
-	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
-		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
+
+	// run specific checks based on census origin
+	switch tx.Process.CensusOrigin {
+	case models.CensusOrigin_OFF_CHAIN_CA:
+		if tx.Process.EnvelopeType.Anonymous {
+			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
+		}
+	case models.CensusOrigin_FARCASTER_FRAME:
+		if tx.Process.EnvelopeType.Anonymous {
+			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for Farcaster voting")
+		}
+		if tx.Process.EnvelopeType.EncryptedVotes {
+			return nil, ethereum.Address{}, fmt.Errorf("encrypted votes not supported for Farcaster voting")
+		}
+		if tx.Process.VoteOptions.MaxCount > 1 {
+			return nil, ethereum.Address{}, fmt.Errorf("multi-vote not supported for Farcaster voting")
+		}
 	}
 
 	// get current timestamp from state

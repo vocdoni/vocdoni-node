@@ -559,8 +559,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	return election
 }
 
-func predictPriceForElection(t testing.TB, c *testutil.TestHTTPclient,
-	electionParams electionprice.ElectionParameters) uint64 {
+func predictPriceForElection(t testing.TB, c *testutil.TestHTTPclient, electionParams electionprice.ElectionParameters) uint64 {
 	predicted := struct {
 		Price uint64 `json:"price"`
 	}{}

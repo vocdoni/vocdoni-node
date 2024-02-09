@@ -1,6 +1,7 @@
 package state
 
 import (
+	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 )
 
@@ -17,6 +18,7 @@ const (
 	VoterIDTypeUndefined VoterIDType = 0
 	VoterIDTypeECDSA     VoterIDType = 1
 	VoterIDTypeZkSnark   VoterIDType = 2
+	VoterIDTypeEd25519   VoterIDType = 3
 )
 
 // Enum value map for VoterIDType.
@@ -24,6 +26,7 @@ var voterIDTypeName = map[VoterIDType]string{
 	VoterIDTypeUndefined: "UNDEFINED",
 	VoterIDTypeECDSA:     "ECDSA",
 	VoterIDTypeZkSnark:   "ZKSNARK",
+	VoterIDTypeEd25519:   "ED25519",
 }
 
 // NewVoterID creates a new VoterID from a VoterIDType and a key.
@@ -74,6 +77,8 @@ func (v VoterID) Address() []byte {
 		return ethAddr.Bytes()
 	case VoterIDTypeZkSnark:
 		return v[1:]
+	case VoterIDTypeEd25519:
+		return common.BytesToAddress(ethereum.HashRaw(v[1:])).Bytes()
 	default:
 		return nil
 	}

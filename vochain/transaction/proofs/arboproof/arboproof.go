@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/tree"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -74,4 +75,47 @@ func (*ProofVerifierArbo) Verify(process *models.Process, envelope *models.VoteE
 		return false, nil, fmt.Errorf("unexpected proof.Payload type: %T",
 			proof.Payload)
 	}
+}
+
+// InitializeSignedVote initializes a signed vote. It does not check the proof nor includes the weight of the vote.
+func InitializeSignedVote(voteEnvelope *models.VoteEnvelope, signedBody, signature []byte, height uint32) (*state.Vote, error) {
+	// Create a new vote object with the provided parameters
+	vote := &state.Vote{
+		Height:               height,
+		ProcessID:            voteEnvelope.ProcessId,
+		VotePackage:          voteEnvelope.VotePackage,
+		EncryptionKeyIndexes: voteEnvelope.EncryptionKeyIndexes,
+	}
+
+	// Check if the proof is nil or invalid
+	if voteEnvelope.Proof == nil {
+		return nil, fmt.Errorf("proof not found on transaction")
+	}
+	if voteEnvelope.Proof.Payload == nil {
+		return nil, fmt.Errorf("invalid proof payload provided")
+	}
+
+	// Check if the signature or signed body is nil
+	if signature == nil || signedBody == nil {
+		return nil, fmt.Errorf("nil signature or body provided")
+	}
+
+	// Extract the public key from the signature
+	pubKey, err := ethereum.PubKeyFromSignature(signedBody, signature)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+
+	// Generate the voter ID and assign it to the vote
+	vote.VoterID = append([]byte{state.VoterIDTypeECDSA}, pubKey...)
+
+	// Extract the address from the public key and assign a nullifier to the vote
+	addr, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	vote.Nullifier = state.GenerateNullifier(addr, vote.ProcessID)
+
+	// Return the initialized vote object
+	return vote, nil
 }
