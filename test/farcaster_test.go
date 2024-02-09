@@ -175,6 +175,32 @@ func TestAPIFarcasterVote(t *testing.T) {
 	frameSignedMessage, err = hex.DecodeString(frameVote2.signedMessage)
 	qt.Assert(t, err, qt.IsNil)
 
+	// first attempt with the wrong pubKey (should fail)
+	vote.Proof = &models.Proof{
+		Payload: &models.Proof_FarcasterFrame{
+			FarcasterFrame: &models.ProofFarcasterFrame{
+				SignedFrameMessageBody: frameSignedMessage,
+				PublicKey:              voter1PubKey,
+				CensusProof: &models.ProofArbo{
+					Type:            models.ProofArbo_BLAKE2B,
+					Siblings:        censusData.CensusProof,
+					AvailableWeight: censusData.Value,
+					VoteWeight:      censusData.Value,
+				},
+			},
+		},
+	}
+
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: vote}})
+	qt.Assert(t, err, qt.IsNil)
+	stxb, err = proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+
+	v = &api.Vote{TxPayload: stxb}
+	_, code = c.Request("POST", v, "votes")
+	qt.Assert(t, code, qt.Equals, 500)
+
+	// second attempt with the good pubKey (should work)
 	vote.Proof = &models.Proof{
 		Payload: &models.Proof_FarcasterFrame{
 			FarcasterFrame: &models.ProofFarcasterFrame{
