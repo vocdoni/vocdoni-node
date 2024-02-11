@@ -47,30 +47,6 @@ var (
 	ErrTimestampNotFound = fmt.Errorf("timestamp not found")
 )
 
-// _________________________ CENSUS ORIGINS __________________________
-
-type CensusProperties struct {
-	Name              string
-	AllowCensusUpdate bool
-	NeedsDownload     bool
-	NeedsIndexSlot    bool
-	NeedsURI          bool
-	WeightedSupport   bool
-}
-
-var CensusOrigins = map[models.CensusOrigin]CensusProperties{
-	models.CensusOrigin_OFF_CHAIN_TREE: {Name: "offchain tree",
-		NeedsDownload: true, NeedsURI: true, AllowCensusUpdate: true},
-	models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED: {
-		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
-		WeightedSupport: true, AllowCensusUpdate: true,
-	},
-	models.CensusOrigin_ERC20: {Name: "erc20", NeedsDownload: true,
-		WeightedSupport: true, NeedsIndexSlot: true},
-	models.CensusOrigin_OFF_CHAIN_CA: {Name: "ca", WeightedSupport: true,
-		NeedsURI: true, AllowCensusUpdate: true},
-}
-
 // State represents the state of the vochain application
 type State struct {
 	// data directory for storing files
