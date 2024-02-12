@@ -28,7 +28,7 @@ func TestSetStartBlock(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// set a start block for a random electionId
 	pid := util.RandomBytes(32)
@@ -44,7 +44,7 @@ func TestDeleteStartBlock(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// set a start block for a random electionId and delete it then
 	pid := util.RandomBytes(32)
@@ -60,7 +60,7 @@ func TestMinStartBlock(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	fromBlock := uint32(100)
 	// check min start block without create any election, fromBlock value
@@ -85,7 +85,7 @@ func TestMaxEndBlock(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	fromBlock := uint32(100)
 	// check max endBlock without create any election, fromBlock value
