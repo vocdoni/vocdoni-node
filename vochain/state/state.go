@@ -80,8 +80,8 @@ type State struct {
 	mtxValidSIKRoots sync.Mutex
 }
 
-// NewState creates a new State
-func NewState(dbType, dataDir string) (*State, error) {
+// New creates a new State
+func New(dbType, dataDir string) (*State, error) {
 	database, err := metadb.New(dbType, filepath.Join(dataDir, storageDirectory))
 	if err != nil {
 		return nil, err
@@ -136,7 +136,7 @@ func NewState(dbType, dataDir string) (*State, error) {
 // initStateDB initializes the StateDB with the default subTrees
 func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
-	sdb := statedb.NewStateDB(database)
+	sdb := statedb.New(database)
 	startTime := time.Now()
 	defer func() { log.Infof("state database load took %s", time.Since(startTime)) }()
 	root, err := sdb.Hash()
@@ -152,59 +152,20 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	defer update.Discard()
-	// Create the Extra, Validators and Processes subtrees (from
+	// Create the all the Main subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
 	// time.
-	treeCfg := StateTreeCfg(TreeExtra)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
+	for name := range MainTrees {
+		treeCfg := StateTreeCfg(name)
+		if err := update.Add(treeCfg.Key(),
+			make([]byte, treeCfg.HashFunc().Len())); err != nil {
+			return nil, err
+		}
+		if _, err := update.SubTree(treeCfg); err != nil {
+			return nil, err
+		}
 	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeValidators)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeProcess)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeAccounts)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeFaucet)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeSIK)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-
 	return sdb, update.Commit(0)
 }
 

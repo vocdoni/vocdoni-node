@@ -23,6 +23,7 @@ import (
 //   - FaucetNonce (key: hash(address + identifier), value: nil)
 
 const (
+	TreeMain       = "Main"
 	TreeProcess    = "Processes"
 	TreeExtra      = "Extra"
 	TreeValidators = "Validators"
@@ -71,8 +72,8 @@ func (v *State) mainTreeViewer(committed bool) statedb.TreeViewer {
 var (
 	// MainTrees contains the configuration for the singleton state trees
 	MainTrees = map[string]statedb.TreeConfig{
-		// Extra is the Extra subTree configuration.
-		"Extra": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeExtra is the Extra subTree configuration.
+		TreeExtra: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "xtra",
 			MaxLevels:         256,
@@ -80,8 +81,8 @@ var (
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
 
-		// Validators is the Validators subTree configuration.
-		"Validators": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeValidators is the Validators subTree configuration.
+		TreeValidators: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "valids",
 			MaxLevels:         256,
@@ -89,8 +90,8 @@ var (
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
 
-		// Processes is the Processes subTree configuration.
-		"Processes": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeProcess is the Processes subTree configuration.
+		TreeProcess: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "procs",
 			MaxLevels:         256,
@@ -98,8 +99,8 @@ var (
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
 
-		// Accounts is the Accounts subTree configuration.
-		"Accounts": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeAccounts is the Accounts subTree configuration.
+		TreeAccounts: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "balan",
 			MaxLevels:         256,
@@ -107,8 +108,8 @@ var (
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
 
-		// FaucetNonce is the Accounts used Faucet Nonce subTree configuration
-		"FaucetNonce": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeFaucet is the Accounts used Faucet Nonce subTree configuration
+		TreeFaucet: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "faucet",
 			MaxLevels:         256,
@@ -116,8 +117,8 @@ var (
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),
 
-		// CensusSIK is the Secret Identity Keys subTree configuration
-		"CensusSIK": statedb.NewTreeSingletonConfig(statedb.TreeParams{
+		// TreeSIK is the Secret Identity Keys subTree configuration
+		TreeSIK: statedb.NewTreeSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionPoseidon,
 			KindID:            "sik",
 			MaxLevels:         censustree.DefaultMaxLevels,
@@ -128,8 +129,8 @@ var (
 
 	// ChildTrees contains the configuration for the state trees dependent on a main tree.
 	ChildTrees = map[string]*statedb.TreeNonSingletonConfig{
-		// Votes is the Votes subTree (found under a Process leaf) configuration.
-		"Votes": statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
+		// ChildTreeVotes is the Votes subTree (found under a Process leaf) configuration.
+		ChildTreeVotes: statedb.NewTreeNonSingletonConfig(statedb.TreeParams{
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "votes",
 			MaxLevels:         256,
@@ -141,6 +142,9 @@ var (
 
 // StateTreeCfg returns the state merkle tree with name.
 func StateTreeCfg(name string) statedb.TreeConfig {
+	if name == TreeMain {
+		return statedb.MainTreeCfg
+	}
 	t, ok := MainTrees[name]
 	if !ok {
 		panic(fmt.Sprintf("state tree %s does not exist", name))
