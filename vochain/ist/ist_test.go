@@ -14,7 +14,7 @@ import (
 
 func TestISTCschedule(t *testing.T) {
 	rng := testutil.NewRandom(0)
-	s, err := state.NewState(db.TypePebble, t.TempDir())
+	s, err := state.New(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
 	err = s.SetTimestamp(0)
@@ -86,7 +86,7 @@ func TestISTCschedule(t *testing.T) {
 
 func TestISTCsyncing(t *testing.T) {
 	rng := testutil.NewRandom(0)
-	s, err := state.NewState(db.TypePebble, t.TempDir())
+	s, err := state.New(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	defer s.Close()
 

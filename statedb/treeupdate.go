@@ -314,7 +314,7 @@ func (t *TreeTx) Commit(version uint32) error {
 	if err := t.CommitOnTx(version); err != nil {
 		return err
 	}
-	return t.tx.Commit()
+	return t.SaveWithoutCommit()
 }
 
 // CommitOnTx do as Commit but without committing the transaction to database.
