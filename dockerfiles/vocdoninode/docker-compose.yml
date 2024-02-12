@@ -14,6 +14,7 @@ services:
       - "4001:4001"                     # IPFS swarm
       - "[::1]:5001:5001"               # IPFS api, never expose outside localhost
       - "26656:26656"                   # CometBFT p2p port (PublicAddr)
+      - "26657:26657"                   # CometBFT RPC port (used by StateSync)
       - "[::1]:26658:26658"             # CometBFT PrivValidatorListenAddr (disabled by default)
       - "[::1]:61000-61100:61000-61100" # PprofPort (runtime profiling data, disabled by default)
     sysctls:

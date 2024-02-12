@@ -285,6 +285,18 @@ func (t *Tree) ImportDump(b []byte) error {
 	return t.tree.ImportDump(b)
 }
 
+// ImportDumpReader imports the leafs (that have been exported with the Dump method)
+// in the Tree (using a byte reader)
+func (t *Tree) ImportDumpReader(r io.Reader) error {
+	return t.tree.ImportDumpReader(r)
+}
+
+// ImportDumpReaderWithTx imports the leafs (that have been exported with the Dump method)
+// in the Tree (using a byte reader)
+func (t *Tree) ImportDumpReaderWithTx(wTx db.WriteTx, r io.Reader) error {
+	return t.tree.ImportDumpReaderWithTx(wTx, r)
+}
+
 func (t *Tree) PrintGraphviz(rTx db.Reader) error {
 	if rTx == nil {
 		rTx = t.db

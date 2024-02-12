@@ -7,7 +7,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"os"
+	"path/filepath"
 	"sort"
+	"sync/atomic"
 	"time"
 
 	abcitypes "github.com/cometbft/cometbft/abci/types"
@@ -15,9 +19,10 @@ import (
 	"github.com/cometbft/cometbft/proto/tendermint/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
-	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -32,7 +37,6 @@ import (
 // We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
 	req *abcitypes.RequestInfo) (*abcitypes.ResponseInfo, error) {
-	app.isSynchronizing.Store(true)
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
@@ -44,8 +48,11 @@ func (app *BaseApplication) Info(_ context.Context,
 	}
 	// print some basic version info about tendermint components
 	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
-		req.P2PVersion, "blockVersion", req.BlockVersion, "lastHeight",
-		lastHeight, "appHash", hex.EncodeToString(appHash))
+		req.P2PVersion, "blockVersion", req.BlockVersion)
+	log.Infow("telling cometbft our state",
+		"LastBlockHeight", lastHeight,
+		"LastBlockAppHash", hex.EncodeToString(appHash),
+	)
 
 	return &abcitypes.ResponseInfo{
 		LastBlockHeight:  int64(lastHeight),
@@ -69,7 +76,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
 		if err := app.State.CreateAccount(addr, "", nil, acc.Balance); err != nil {
-			if err != vstate.ErrAccountAlreadyExists {
+			if err != state.ErrAccountAlreadyExists {
 				return nil, fmt.Errorf("cannot create acount %x: %w", addr, err)
 			}
 			if err := app.State.InitChainMintBalance(addr, acc.Balance); err != nil {
@@ -102,7 +109,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		}
 		addr := ethcommon.BytesToAddress(v.Address)
 		if err := app.State.CreateAccount(addr, "", nil, 0); err != nil {
-			if err != vstate.ErrAccountAlreadyExists {
+			if err != state.ErrAccountAlreadyExists {
 				return nil, fmt.Errorf("cannot create validator acount %x: %w", addr, err)
 			}
 		}
@@ -132,7 +139,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	}
 
 	// create burn account
-	if err := app.State.SetAccount(vstate.BurnAddress, &vstate.Account{}); err != nil {
+	if err := app.State.SetAccount(state.BurnAddress, &state.Account{}); err != nil {
 		return nil, fmt.Errorf("unable to set burn address")
 	}
 
@@ -257,12 +264,10 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 			Info: tx.Info,
 		}
 	}
-	if len(req.Txs) > 0 {
-		log.Debugw("finalize block", "height", height,
-			"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-			"milliSeconds", time.Since(start).Milliseconds(),
-			"proposer", hex.EncodeToString(req.GetProposerAddress()))
-	}
+	log.Debugw("finalize block", "height", height,
+		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
+		"milliSeconds", time.Since(start).Milliseconds(),
+		"proposer", hex.EncodeToString(req.GetProposerAddress()))
 
 	// update validator score as an IST action for the next block. Note that at this point,
 	// we cannot modify the state or we would break ProcessProposal optimistic execution
@@ -491,28 +496,169 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	}, nil
 }
 
-// ListSnapshots returns a list of available snapshots.
-func (*BaseApplication) ListSnapshots(context.Context,
-	*abcitypes.RequestListSnapshots) (*abcitypes.ResponseListSnapshots, error) {
-	return &abcitypes.ResponseListSnapshots{}, nil
+// Example StateSync (Snapshot) successful flow:
+// Alice is a comet node, up-to-date with RPC open on port 26657
+// Bob is a fresh node that is bootstrapping, with params:
+//    * StateSync.Enable = true
+//    * StateSync.RPCServers = alice:26657, alice:26657
+// * Bob comet will ask Alice for snapshots (app doesn't intervene here)
+// * Alice comet calls ListSnapshots, App returns a []*v1.Snapshot
+// * Bob comet calls OfferSnapshot passing a single *v1.Snapshot, App returns ACCEPT
+// * Bob comet asks Alice for chunks (app doesn't intervene here)
+// * Alice comet calls (N times) LoadSnapshotChunk passing height, format, chunk index. App returns []byte
+// * Bob comet calls (N times) ApplySnapshotChunk passing []byte, chunk index and sender. App returns ACCEPT
+
+// ListSnapshots provides cometbft with a list of available snapshots.
+func (app *BaseApplication) ListSnapshots(_ context.Context,
+	req *abcitypes.RequestListSnapshots,
+) (*abcitypes.ResponseListSnapshots, error) {
+	list := app.Snapshots.List()
+
+	response := &abcitypes.ResponseListSnapshots{}
+	for height, dsi := range list {
+		chunks := uint32(math.Ceil(float64(dsi.Size) / float64(app.Snapshots.ChunkSize)))
+
+		response.Snapshots = append(response.Snapshots, &abcitypes.Snapshot{
+			Height:   uint64(height),
+			Format:   0,
+			Chunks:   chunks,
+			Hash:     dsi.Hash,
+			Metadata: []byte{},
+		})
+	}
+	log.Debugf("cometbft requests our list of snapshots, we offer %d options", len(response.Snapshots))
+	return response, nil
 }
 
-// OfferSnapshot returns the response to a snapshot offer.
-func (*BaseApplication) OfferSnapshot(context.Context,
-	*abcitypes.RequestOfferSnapshot) (*abcitypes.ResponseOfferSnapshot, error) {
-	return &abcitypes.ResponseOfferSnapshot{}, nil
+// snapshotFromComet is used when receiving a Snapshot from CometBFT.
+// Only 1 snapshot at a time is processed by CometBFT, hence we keep it simple.
+var snapshotFromComet struct {
+	height atomic.Int64
+	chunks atomic.Int32
 }
 
-// LoadSnapshotChunk returns the response to a snapshot chunk loading request.
-func (*BaseApplication) LoadSnapshotChunk(context.Context,
-	*abcitypes.RequestLoadSnapshotChunk) (*abcitypes.ResponseLoadSnapshotChunk, error) {
-	return &abcitypes.ResponseLoadSnapshotChunk{}, nil
+// OfferSnapshot is called by cometbft during StateSync, when another node offers a Snapshot.
+func (app *BaseApplication) OfferSnapshot(_ context.Context,
+	req *abcitypes.RequestOfferSnapshot,
+) (*abcitypes.ResponseOfferSnapshot, error) {
+	log.Debugw("cometbft offers us a snapshot",
+		"appHash", hex.EncodeToString(req.AppHash),
+		"height", req.Snapshot.Height, "format", req.Snapshot.Format, "chunks", req.Snapshot.Chunks)
+
+	snapshotFromComet.height.Store(int64(req.Snapshot.Height))
+	snapshotFromComet.chunks.Store(int32(req.Snapshot.Chunks))
+
+	return &abcitypes.ResponseOfferSnapshot{
+		Result: abcitypes.ResponseOfferSnapshot_ACCEPT,
+	}, nil
 }
 
-// ApplySnapshotChunk returns the response to a snapshot chunk applying request.
-func (*BaseApplication) ApplySnapshotChunk(context.Context,
-	*abcitypes.RequestApplySnapshotChunk) (*abcitypes.ResponseApplySnapshotChunk, error) {
-	return &abcitypes.ResponseApplySnapshotChunk{}, nil
+// LoadSnapshotChunk provides cometbft with a snapshot chunk, during StateSync.
+//
+// cometbft will reject a len(Chunk) > 16M
+func (app *BaseApplication) LoadSnapshotChunk(_ context.Context,
+	req *abcitypes.RequestLoadSnapshotChunk,
+) (*abcitypes.ResponseLoadSnapshotChunk, error) {
+	log.Debugw("cometbft requests a chunk from our snapshot",
+		"height", req.Height, "format", req.Format, "chunk", req.Chunk)
+
+	buf, err := app.Snapshots.SliceChunk(req.Height, req.Format, req.Chunk)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &abcitypes.ResponseLoadSnapshotChunk{
+		Chunk: buf,
+	}, nil
+}
+
+// ApplySnapshotChunk saves to disk a snapshot chunk provided by cometbft StateSync.
+// When all chunks of a Snapshot are in disk, the Snapshot is restored.
+//
+// cometbft will never pass a Chunk bigger than 16M
+func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
+	req *abcitypes.RequestApplySnapshotChunk,
+) (*abcitypes.ResponseApplySnapshotChunk, error) {
+	log.Debugw("cometbft provides us a chunk",
+		"index", req.Index, "size", len(req.Chunk))
+
+	if err := app.Snapshots.WriteChunkToDisk(req.Index, req.Chunk); err != nil {
+		return nil, err
+	}
+
+	if app.Snapshots.CountChunksInDisk() == int(snapshotFromComet.chunks.Load()) {
+		// if we got here, all chunks are on disk
+		s, err := app.Snapshots.JoinChunks(snapshotFromComet.chunks.Load(), snapshotFromComet.height.Load())
+		if err != nil {
+			log.Error(err)
+			return &abcitypes.ResponseApplySnapshotChunk{
+				Result: abcitypes.ResponseApplySnapshotChunk_REJECT_SNAPSHOT,
+			}, nil
+		}
+
+		if err := app.RestoreStateFromSnapshot(s); err != nil {
+			log.Error(err)
+			return nil, err
+		}
+	}
+
+	return &abcitypes.ResponseApplySnapshotChunk{
+		Result: abcitypes.ResponseApplySnapshotChunk_ACCEPT,
+	}, nil
+}
+
+func (app *BaseApplication) RestoreStateFromSnapshot(snap *snapshot.Snapshot) error {
+	tmpDir, err := snap.Restore(app.dbType, app.dataDir)
+	if err != nil {
+		log.Error(err)
+		return err
+	}
+
+	// some components (Indexer, OffChainDataHandler) are initialized before statesync,
+	// and their EventListeners are added to the old state. So we need to copy them to the new state
+	oldEventListeners := app.State.EventListeners()
+
+	if err := app.State.Close(); err != nil {
+		return fmt.Errorf("cannot close old state: %w", err)
+	}
+
+	if err := os.RemoveAll(filepath.Join(app.dataDir, StateDataDir)); err != nil {
+		return fmt.Errorf("error removing existing dataDir: %w", err)
+	}
+
+	if err := os.Rename(tmpDir, filepath.Join(app.dataDir, StateDataDir)); err != nil {
+		return fmt.Errorf("error moving newDataDir into dataDir: %w", err)
+	}
+
+	// TODO: dedup this from vochain/app.go NewBaseApplication
+	newState, err := state.New(app.dbType, filepath.Join(app.dataDir, StateDataDir))
+	if err != nil {
+		return fmt.Errorf("cannot open new state: %w", err)
+	}
+
+	// we also need to SetChainID again (since app.SetChainID propagated chainID to the old state)
+	newState.SetChainID(app.ChainID())
+
+	newState.CleanEventListeners()
+	for _, l := range oldEventListeners {
+		newState.AddEventListener(l)
+	}
+
+	istc := ist.NewISTC(newState)
+	// Create the transaction handler for checking and processing transactions
+	transactionHandler := transaction.NewTransactionHandler(
+		newState,
+		istc,
+		filepath.Join(app.dataDir, TxHandlerDataDir),
+	)
+
+	// This looks racy but actually it's OK, since State Sync happens during very early init,
+	// when the app is blocked waiting for cometbft to finish startup.
+	app.State = newState
+	app.Istc = istc
+	app.TransactionHandler = transactionHandler
+	return nil
 }
 
 // Query does nothing

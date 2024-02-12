@@ -184,6 +184,47 @@ func newTendermint(app *BaseApplication,
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
 	tconfig.Mempool.Broadcast = true
+	tconfig.StateSync.Enable = localConfig.StateSyncEnabled
+	if tconfig.StateSync.Enable {
+		tconfig.StateSync.RPCServers = func() []string {
+			// prefer the most the specific flag first
+			if len(localConfig.StateSyncRPCServers) > 0 {
+				return localConfig.StateSyncRPCServers
+			}
+
+			// else, we resort to seeds (replacing the port)
+			replacePorts := func(slice []string) []string {
+				for i, v := range slice {
+					slice[i] = strings.ReplaceAll(v, ":26656", ":26657")
+				}
+				return slice
+			}
+
+			// first fallback to Seeds
+			if len(localConfig.Seeds) > 0 {
+				return replacePorts(localConfig.Seeds)
+			}
+
+			// if also no Seeds specified, fallback to genesis
+			if _, ok := vocdoniGenesis.Genesis[localConfig.Network]; ok {
+				return replacePorts(vocdoniGenesis.Genesis[localConfig.Network].SeedNodes)
+			}
+
+			return nil
+		}()
+
+		// after parsing flag and fallbacks, if we still have only 1 server specified,
+		// duplicate it as a quick workaround since cometbft requires passing 2 (primary and witness)
+		if len(tconfig.StateSync.RPCServers) == 1 {
+			tconfig.StateSync.RPCServers = append(tconfig.StateSync.RPCServers, tconfig.StateSync.RPCServers...)
+		}
+
+		log.Infof("state sync rpc servers: %s", tconfig.StateSync.RPCServers)
+
+		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
+		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
+	}
+	tconfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 
 	log.Debugf("mempool config: %+v", tconfig.Mempool)
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if

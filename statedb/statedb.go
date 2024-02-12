@@ -55,6 +55,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"path"
 	"sync"
 
@@ -405,4 +406,36 @@ func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
 		tree: tree,
 		cfg:  MainTreeCfg,
 	}, nil
+}
+
+// Import imports the contents from r into a state tree
+func (s *StateDB) Import(cfg TreeConfig, parent *TreeConfig, r io.Reader) (err error) {
+	dbtx := s.db.WriteTx()
+	defer func() {
+		if err != nil {
+			dbtx.Discard()
+		}
+	}()
+
+	var txTree db.WriteTx
+	if cfg.kindID == "" { // TreeMain
+		txTree = subWriteTx(dbtx, subKeyTree)
+	} else if parent != nil && parent.prefix != "" { // ChildTree (for example Votes)
+		txParent := subWriteTx(dbtx, path.Join(subKeySubTree, parent.prefix))
+		txChild := subWriteTx(txParent, path.Join(subKeySubTree, cfg.prefix))
+		txTree = subWriteTx(txChild, subKeyTree)
+	} else {
+		tx := subWriteTx(dbtx, path.Join(subKeySubTree, cfg.prefix))
+		txTree = subWriteTx(tx, subKeyTree)
+	}
+	tree, err := tree.New(txTree,
+		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
+	if err != nil {
+		return err
+	}
+	if err := tree.ImportDumpReaderWithTx(txTree, r); err != nil {
+		return err
+	}
+
+	return txTree.Commit()
 }
