@@ -155,7 +155,7 @@ func newEmptyTreeForTest(t *testing.T) *tree.Tree {
 }
 
 func newStateForTest(t *testing.T) *State {
-	state, err := NewState(db.TypePebble, t.TempDir())
+	state, err := New(db.TypePebble, t.TempDir())
 	qt.Assert(t, err, qt.IsNil)
 	return state
 }

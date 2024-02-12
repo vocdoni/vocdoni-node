@@ -19,7 +19,7 @@ func TestSetAddressSIK(t *testing.T) {
 	c := qt.New(t)
 	// create a tree for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// create a valid leaf
 	address := common.HexToAddress("0xF3668000B66c61aAa08aBC559a8C78Ae7E007C2e")
@@ -40,7 +40,7 @@ func TestDelSIK(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// create a valid leaf
 	address := common.HexToAddress("0xF3668000B66c61aAa08aBC559a8C78Ae7E007C2e")
@@ -68,7 +68,7 @@ func Test_registerSIKCounter(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	c.Assert(err, qt.IsNil)
 
 	pid := util.RandomBytes(32)
@@ -93,7 +93,7 @@ func Test_sikRoots(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// mock height and new sik and update the valid roots
 	address1 := common.HexToAddress("0xF3668000B66c61aAa08aBC559a8C78Ae7E007C2e")
@@ -149,7 +149,7 @@ func TestAssignSIKToElectionAndPurge(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 	// mock an account
 	testAccount := ethereum.NewSignKeys()
@@ -212,7 +212,7 @@ func TestSIKDataRace(t *testing.T) {
 	c := qt.New(t)
 	// create a state for testing
 	dir := t.TempDir()
-	s, err := NewState(db.TypePebble, dir)
+	s, err := New(db.TypePebble, dir)
 	qt.Assert(t, err, qt.IsNil)
 
 	// create some siks

@@ -123,7 +123,7 @@ type ExecuteBlockResponse struct {
 // Node still needs to be initialized with SetNode.
 // Callback functions still need to be initialized.
 func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error) {
-	state, err := vstate.NewState(vochainCfg.DBType, vochainCfg.DataDir)
+	state, err := vstate.New(vochainCfg.DBType, vochainCfg.DataDir)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
