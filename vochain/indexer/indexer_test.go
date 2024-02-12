@@ -110,7 +110,7 @@ func TestBackup(t *testing.T) {
 	idx.Close()
 	idx, err = New(app, Options{DataDir: t.TempDir(), ExpectBackupRestore: true})
 	qt.Assert(t, err, qt.IsNil)
-	err = idx.RestoreBackup(context.TODO(), backupPath)
+	err = idx.RestoreBackup(backupPath)
 	qt.Assert(t, err, qt.IsNil)
 	wantTotalVotes(10)
 

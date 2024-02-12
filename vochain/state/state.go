@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,10 +29,6 @@ const (
 	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
 	// arbo.HashFunctionBlake2b.Len()
 	defaultHashLen = 32
-	// storageDirectory is the final directory name where all files are stored.
-	storageDirectory = "vcstate"
-	// snapshotsDirectory is the final directory name where the snapshots are stored.
-	snapshotsDirectory = "snapshots"
 
 	// timestampKey is the key used to store the timestamp of the last block.
 	timestampKey = "timestamp"
@@ -49,8 +44,6 @@ var (
 
 // State represents the state of the vochain application
 type State struct {
-	// data directory for storing files
-	dataDir string
 	// db is the underlying key-value database used by the StateDB
 	db db.Database
 	// Store contains the StateDB.  We match every StateDB commit version
@@ -80,12 +73,13 @@ type State struct {
 	mtxValidSIKRoots sync.Mutex
 }
 
-// New creates a new State
+// NewState creates a new State
 func New(dbType, dataDir string) (*State, error) {
-	database, err := metadb.New(dbType, filepath.Join(dataDir, storageDirectory))
+	database, err := metadb.New(dbType, dataDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot init metadb: %w", err)
 	}
+
 	sdb, err := initStateDB(database)
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
@@ -102,8 +96,8 @@ func New(dbType, dataDir string) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("state database is ready at version %d with hash %x",
-		version, root)
+	log.Infof("state database at %s is ready at version %d with hash %x",
+		dataDir, version, root)
 	tx, err := sdb.BeginTx()
 	if err != nil {
 		return nil, err
@@ -113,7 +107,6 @@ func New(dbType, dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
-		dataDir:           dataDir,
 		db:                database,
 		store:             sdb,
 		tx:                treeTxWithMutex{TreeTx: tx},
@@ -130,7 +123,7 @@ func New(dbType, dataDir string) (*State, error) {
 	if err := s.FetchValidSIKRoots(); err != nil {
 		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
 	}
-	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
+	return s, os.MkdirAll(dataDir, 0o750)
 }
 
 // initStateDB initializes the StateDB with the default subTrees
@@ -152,6 +145,7 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	defer update.Discard()
+
 	// Create the all the Main subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first

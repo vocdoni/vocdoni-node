@@ -187,6 +187,18 @@ func loadConfig() *config.Config {
 		"do not wait for Vochain to synchronize (for testing only)")
 	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
+	flag.Int("vochainSnapshotInterval", 0,
+		"create state snapshot every N blocks (0 to disable)")
+	flag.Bool("vochainStateSyncEnabled", false,
+		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
+	flag.StringSlice("vochainStateSyncRPCServers", []string{},
+		"list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)")
+	flag.String("vochainStateSyncTrustHash", "",
+		"hash of the trusted block (required if vochainStateSyncEnabled)")
+	flag.Int64("vochainStateSyncTrustHeight", 0,
+		"height of the trusted block (required if vochainStateSyncEnabled)")
+	flag.Int64("vochainStateSyncChunkSize", 10*(1<<20), // 10 MB
+		"cometBFT chunk size in bytes")
 
 	flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
 		"vochain consensus block time target (in seconds)")
@@ -440,7 +452,12 @@ func main() {
 		conf.Vochain.OffChainDataDownload = conf.Vochain.OffChainDataDownload &&
 			conf.Mode == types.ModeGateway
 
-			// create the vochain service
+		// if there's no indexer, then never do snapshots because they would be incomplete
+		if !conf.Vochain.Indexer.Enabled {
+			conf.Vochain.SnapshotInterval = 0
+		}
+
+		// create the vochain service
 		if err := srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
@@ -467,6 +484,7 @@ func main() {
 			}
 		}
 		// start the service and block until finish fast sync
+		// State Sync (if enabled) also happens during this step
 		if err := srv.Start(); err != nil {
 			log.Fatal(err)
 		}
