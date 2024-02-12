@@ -136,6 +136,21 @@ type VochainCfg struct {
 	IsSeedNode bool
 	// OffChainDataDownload specifies if the node is configured to download off-chain data
 	OffChainDataDownloader bool
+	// SnapshotInterval enables creating a state snapshot every N blocks (0 to disable)
+	SnapshotInterval int
+	// StateSyncEnabled allows cometBFT during startup, to ask peers for available snapshots
+	// and use them to bootstrap the state
+	StateSyncEnabled bool
+	// StateSyncRPCServers is the list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)
+	StateSyncRPCServers []string
+	// StateSyncTrustHeight and TrustHash must both be provided to force the trusting of a
+	// particular header.
+	StateSyncTrustHeight int64
+	// StateSyncTrustHeight and TrustHash must both be provided to force the trusting of a
+	// particular header.
+	StateSyncTrustHash string
+	// StateSyncChunkSize defines the size of the chunks when splitting a Snapshot for sending via StateSync
+	StateSyncChunkSize int64
 }
 
 // IndexerCfg handles the configuration options of the indexer

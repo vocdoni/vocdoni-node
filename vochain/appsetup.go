@@ -29,6 +29,11 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 		return err
 	}
 	app.genesisInfo = nodeGenesis.Genesis
+
+	// immediately init isSynchronizing to true,
+	// else this will be (incorrectly) false until the first beginBlock, which can take some time
+	app.isSynchronizing.Store(true)
+
 	return nil
 }
 

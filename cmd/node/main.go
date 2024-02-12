@@ -140,6 +140,19 @@ func newConfig() (*config.Config, config.Error) {
 		"do not wait for Vochain to synchronize (for testing only)")
 	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
+	conf.Vochain.SnapshotInterval = *flag.Int("vochainSnapshotInterval", 0,
+		"create state snapshot every N blocks (0 to disable)")
+	conf.Vochain.StateSyncEnabled = *flag.Bool("vochainStateSyncEnabled", false,
+		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
+	conf.Vochain.StateSyncRPCServers = *flag.StringSlice("vochainStateSyncRPCServers", []string{},
+		"list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)")
+	conf.Vochain.StateSyncTrustHash = *flag.String("vochainStateSyncTrustHash", "",
+		"hash of the trusted block (required if vochainStateSyncEnabled)")
+	conf.Vochain.StateSyncTrustHeight = *flag.Int64("vochainStateSyncTrustHeight", 0,
+		"height of the trusted block (required if vochainStateSyncEnabled)")
+	conf.Vochain.StateSyncChunkSize = *flag.Int64("vochainStateSyncChunkSize", 10*(1<<20), // 10 MB
+		"cometBFT chunk size in bytes")
+
 	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
 	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
@@ -544,8 +557,13 @@ func main() {
 		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
 			conf.Mode == types.ModeGateway
 
-			// create the vochain service
-		if err = srv.Vochain(); err != nil {
+		// if there's no indexer, then never do snapshots because they would be incomplete
+		if !conf.Vochain.Indexer.Enabled {
+			conf.Vochain.SnapshotInterval = 0
+		}
+
+		// create the vochain service
+		if err := srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
 		// create the offchain data downloader service
@@ -571,6 +589,7 @@ func main() {
 			}
 		}
 		// start the service and block until finish fast sync
+		// State Sync (if enabled) also happens during this step
 		if err := srv.Start(); err != nil {
 			log.Fatal(err)
 		}
