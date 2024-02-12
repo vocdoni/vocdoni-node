@@ -6,9 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"strconv"
 	"time"
 
@@ -16,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -1028,23 +1024,7 @@ func (a *API) chainListFeesByTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	exportCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	tmpFilePath := filepath.Join(os.TempDir(), "indexer.sql")
-	if err := a.indexer.SaveBackup(exportCtx, tmpFilePath); err != nil {
-		return fmt.Errorf("error saving indexer backup: %w", err)
-	}
-	tmpFile, err := os.Open(tmpFilePath)
-	if err != nil {
-		return fmt.Errorf("error opening indexer backup: %w", err)
-	}
-	defer func() {
-		if err := tmpFile.Close(); err != nil {
-			log.Warnw("error closing indexer backup file", "err", err)
-		}
-		if err := os.Remove(tmpFilePath); err != nil {
-			log.Warnw("error removing indexer backup file", "err", err)
-		}
-	}()
-	data, err := io.ReadAll(tmpFile)
+	data, err := a.indexer.ExportBackupAsBytes(exportCtx)
 	if err != nil {
 		return fmt.Errorf("error reading indexer backup: %w", err)
 	}

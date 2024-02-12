@@ -90,6 +90,8 @@ services:
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
+      - VOCDONI_VOCHAIN_SNAPSHOTINTERVAL=3
+      - VOCDONI_VOCHAIN_STATESYNCCHUNKSIZE=2000
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
@@ -117,6 +119,7 @@ services:
       - gocoverage-miner2:/app/run/gocoverage/miner2
       - gocoverage-miner3:/app/run/gocoverage/miner3
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
+      - gocoverage-gatewaySync:/app/run/gocoverage/gatewaySync
       - gocoverage-test:/app/run/gocoverage/test
     networks:
       - blockchain
@@ -157,6 +160,27 @@ services:
     profiles:
       - grafana
 
+  gatewaySync:
+    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    env_file: "${COMPOSE_HOST_PATH:-.}/env.gatewaySync"
+    networks:
+      - blockchain
+    volumes:
+      - data-gatewaySync:/app/run/
+      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
+      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - gocoverage-gatewaySync:/app/run/gocoverage
+    environment:
+      - GOCOVERDIR=/app/run/gocoverage
+      - LOG_PANIC_ON_INVALIDCHARS
+      - VOCDONI_LOGLEVEL=debug
+      - VOCDONI_VOCHAIN_STATESYNCENABLED=True
+      - VOCDONI_VOCHAIN_STATESYNCRPCSERVERS=miner0:26657,miner0:26657
+      - VOCDONI_VOCHAIN_STATESYNCTRUSTHEIGHT
+      - VOCDONI_VOCHAIN_STATESYNCTRUSTHASH
+    profiles:
+      - statesync
+
 networks:
   blockchain:
 
@@ -167,12 +191,14 @@ volumes:
   data-miner2: {}
   data-miner3: {}
   data-gateway0: {}
+  data-gatewaySync: {}
   gocoverage-seed: {}
   gocoverage-miner0: {}
   gocoverage-miner1: {}
   gocoverage-miner2: {}
   gocoverage-miner3: {}
   gocoverage-gateway0: {}
+  gocoverage-gatewaySync: {}
   gocoverage-test: {}
   prometheus_data: {}
   grafana_data: {}
