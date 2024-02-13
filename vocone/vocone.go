@@ -31,6 +31,7 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -119,6 +120,9 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 			return nil, err
 		}
 	}
+
+	// Disable election ID verification on the farcaster proof for testing purposes
+	farcasterproof.DisableElectionIDVerification = true
 
 	return vc, err
 }
