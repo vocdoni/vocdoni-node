@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install swag
         run: |
           curl -L https://github.com/swaggo/swag/releases/download/v1.8.12/swag_1.8.12_Linux_x86_64.tar.gz | tar -xzf -
@@ -29,7 +29,7 @@ jobs:
             yq '.components.schemas."api.GenericTransactionWithInfo".properties.tx = load("api/docs/models/transactions.yaml").target' \
               api/docs/oas3.yaml > api/docs/vocdoni-api.yaml
       - name: Publish Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: vocdoni-api.yaml
           path: api/docs/vocdoni-api.yaml
@@ -39,7 +39,7 @@ jobs:
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Checkout developer-portal repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: vocdoni/developer-portal
           ref: main
