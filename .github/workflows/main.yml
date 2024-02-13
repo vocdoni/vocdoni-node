@@ -29,7 +29,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Tidy go module
         run: |
           go mod tidy
@@ -85,7 +85,7 @@ jobs:
       - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - run: mkdir -p "$PWD/gocoverage-unit/"
       - name: Run Go test -race
         id: go-test-race
@@ -140,7 +140,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
       - name: Run go build for Mac
         run: |
           # Some of our devs are on Mac. Ensure it builds.
@@ -167,7 +167,7 @@ jobs:
       - uses: actions/download-artifact@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.22'
           cache: false
       - name: Convert gocoverage format
         run: |
