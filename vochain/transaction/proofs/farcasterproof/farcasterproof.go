@@ -3,10 +3,13 @@ package farcasterproof
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
+	"regexp"
 
-	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -18,8 +21,20 @@ import (
 )
 
 const (
-	frameHashSize = 20
+	frameHashSize  = 20
+	pollURLpattern = `([0-9a-fA-F]{64})`
 )
+
+var (
+	// DisableElectionIDVerification is a flag to dissable the election ID verification on the poll URL.
+	// This should be used only for testing purposes.
+	DisableElectionIDVerification = false
+	re                            *regexp.Regexp
+)
+
+func init() {
+	re = regexp.MustCompile(pollURLpattern)
+}
 
 // FarcasterVerifier is a proof verifier for the Farcaster frame protocol.
 type FarcasterVerifier struct{}
@@ -53,8 +68,26 @@ func (*FarcasterVerifier) Verify(process *models.Process, envelope *models.VoteE
 		return false, nil, fmt.Errorf("vote package contains more than one vote")
 	}
 
-	if uint32(vp.Votes[0]) != frameAction.ButtonIndex {
-		return false, nil, fmt.Errorf("vote package button index mismatch (got %d, expected %d)", frameAction.ButtonIndex, vp.Votes[0])
+	if uint32(vp.Votes[0]) != frameAction.ButtonIndex-1 {
+		return false, nil, fmt.Errorf("vote package button index mismatch (got %d, expected %d)", frameAction.ButtonIndex, vp.Votes[0]+1)
+	}
+
+	// Verify the vote URL matches with the process ID. We enforce the process ID to be present in the poll URL because it
+	// is the only way to ensure the process ID is correct.
+	if !DisableElectionIDVerification {
+		matches := re.FindStringSubmatch(string(frameAction.Url))
+		// If a match is found, matches[1] contains the processID
+		if len(matches) > 1 {
+			votePID, err := hex.DecodeString(matches[1])
+			if err != nil {
+				return false, nil, fmt.Errorf("failed to decode process ID: %w", err)
+			}
+			if !bytes.Equal(votePID, envelope.ProcessId) {
+				return false, nil, fmt.Errorf("process ID mismatch (got %x, expected %x)", votePID, envelope.ProcessId)
+			}
+		} else {
+			return false, nil, fmt.Errorf("no process ID found on poll URL")
+		}
 	}
 
 	// Verify the census arbo proof (is the signer of the frame action allowed to vote?)
@@ -74,25 +107,36 @@ func (*FarcasterVerifier) Verify(process *models.Process, envelope *models.VoteE
 	return true, weight, nil
 }
 
-// VerifyFrameSignature validates the frame message and returns de deserialized frame action and public key.
-func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed25519.PublicKey, error) {
+// DecodeMessage decodes the signed message body and returns the frame action body, the message data and the public key.
+func DecodeMessage(signedMessageBody []byte) (*farcasterpb.FrameActionBody, *farcasterpb.Message, error) {
 	msg := farcasterpb.Message{}
-	if err := proto.Unmarshal(messageBody, &msg); err != nil {
+	if err := proto.Unmarshal(signedMessageBody, &msg); err != nil {
 		return nil, nil, fmt.Errorf("failed to unmarshal Message: %w", err)
 	}
-	log.Debugf("farcaster signed message: %s", log.FormatProto(&msg))
-
 	if msg.Data == nil {
 		return nil, nil, fmt.Errorf("invalid message data")
-	}
-	if msg.SignatureScheme != farcasterpb.SignatureScheme_SIGNATURE_SCHEME_ED25519 {
-		return nil, nil, fmt.Errorf("invalid signature scheme")
 	}
 	if msg.Data.Type != farcasterpb.MessageType_MESSAGE_TYPE_FRAME_ACTION {
 		return nil, nil, fmt.Errorf("invalid message type, got %s", msg.Data.Type.String())
 	}
-	pubkey := msg.GetSigner()
+	if msg.SignatureScheme != farcasterpb.SignatureScheme_SIGNATURE_SCHEME_ED25519 {
+		return nil, nil, fmt.Errorf("invalid signature scheme")
+	}
+	actionBody := msg.Data.GetFrameActionBody()
+	if actionBody == nil {
+		return nil, nil, fmt.Errorf("invalid action body")
+	}
+	return actionBody, &msg, nil
+}
 
+// VerifyFrameSignature validates the frame message and returns de deserialized frame action and public key.
+func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed25519.PublicKey, error) {
+	actionBody, msg, err := DecodeMessage(messageBody)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to decode message body: %w", err)
+	}
+
+	pubkey := msg.GetSigner()
 	if pubkey == nil {
 		return nil, nil, fmt.Errorf("signer is nil")
 	}
@@ -116,10 +160,6 @@ func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed2
 
 	if !ed25519.Verify(pubkey, hashed, msg.GetSignature()) {
 		return nil, nil, fmt.Errorf("signature verification failed")
-	}
-	actionBody := msg.Data.GetFrameActionBody()
-	if actionBody == nil {
-		return nil, nil, fmt.Errorf("invalid action body")
 	}
 
 	return actionBody, pubkey, nil
@@ -147,8 +187,25 @@ func InitializeFarcasterFrameVote(voteEnvelope *models.VoteEnvelope, height uint
 	if frameProof.PublicKey == nil {
 		return nil, fmt.Errorf("farcaster frame public key not found on transaction")
 	}
+	_, msg, err := DecodeMessage(frameProof.SignedFrameMessageBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode farcaster frame message: %w", err)
+	}
+	if msg.Data == nil {
+		return nil, fmt.Errorf("farcaster frame cast ID not found on transaction")
+	}
 	// Generate the voter ID and assign it to the vote
 	vote.VoterID = append([]byte{state.VoterIDTypeEd25519}, frameProof.PublicKey...)
-	vote.Nullifier = state.GenerateNullifier(common.Address(vote.VoterID.Address()), vote.ProcessID)
+	// Generate the nullifier
+	vote.Nullifier = GenerateNullifier(msg.Data.Fid, voteEnvelope.ProcessId)
 	return vote, nil
+}
+
+// GenerateNullifier generates a nullifier for a farcaster frame vote.
+// As nullifier we use: hash(farcasterID+processID) because the farcasterID is unique per voter while
+// the public key is not.
+func GenerateNullifier(farcasterID uint64, processID []byte) []byte {
+	fidBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(fidBytes, farcasterID)
+	return ethereum.HashRaw(append(fidBytes, processID...))
 }
