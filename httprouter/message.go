@@ -65,7 +65,7 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	if httpStatusCode == http.StatusNoContent {
 		// For 204 status, don't set Content-Length, don't try to write a body.
 		h.Writer.WriteHeader(httpStatusCode)
-		log.Debugf("response: (%d)", httpStatusCode)
+		log.Debugw("http response", "status", httpStatusCode)
 		return nil
 	}
 
@@ -73,7 +73,12 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
 	h.Writer.WriteHeader(httpStatusCode)
 
-	log.Debugw("http response", "status", httpStatusCode, "msg", string(msg))
+	log.Debugw("http response", "status", httpStatusCode, "data", func() string {
+		if len(msg) > 256 {
+			return string(msg[:256]) + "..."
+		}
+		return string(msg)
+	}())
 	if _, err := h.Writer.Write(msg); err != nil {
 		return err
 	}
