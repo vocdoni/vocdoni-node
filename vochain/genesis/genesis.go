@@ -120,7 +120,7 @@ var devGenesis = Doc{
 
 var stageGenesis = Doc{
 	GenesisTime: time.Date(2024, time.January, 30, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni/STAGE/10",
+	ChainID:     "vocdoni/STAGE/11",
 	ConsensusParams: &ConsensusParams{
 		Block: BlockParams{
 			MaxBytes: 2097152,
@@ -138,8 +138,8 @@ var stageGenesis = Doc{
 		},
 	},
 	AppState: AppState{
-		MaxElectionSize: 50000,
-		NetworkCapacity: 2000,
+		MaxElectionSize: 500000,
+		NetworkCapacity: 10000,
 		Validators: []AppStateValidators{
 			{ // 0
 				Address:  types.HexStringToHexBytes("321d141cf1fcb41d7844af611b5347afc380a03f"),
