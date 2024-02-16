@@ -90,8 +90,8 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 }
 
 // NewElection creates a new election given the election details
-// and returns the ElectionID
-func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.HexBytes, error) {
+// and returns the ElectionID. If wait is true, it will wait until the election is created.
+func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool) (types.HexBytes, error) {
 	if c.account == nil {
 		return nil, fmt.Errorf("no account configured")
 	}
@@ -250,10 +250,12 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription) (types.He
 	if electionCreate.MetadataURL == "" {
 		log.Warnf("metadata could not be published")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
-	defer cancel()
-	if _, err := c.WaitUntilElectionCreated(ctx, electionCreate.ElectionID); err != nil {
-		return nil, err
+	if wait {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		defer cancel()
+		if _, err := c.WaitUntilElectionCreated(ctx, electionCreate.ElectionID); err != nil {
+			return nil, err
+		}
 	}
 
 	return electionCreate.ElectionID, nil

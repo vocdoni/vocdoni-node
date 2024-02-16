@@ -688,7 +688,7 @@ func electionHandler(cli *VocdoniCLI) error {
 	}
 
 	infoPrint.Printf("creating new election...\n")
-	electionID, err := cli.api.NewElection(&description)
+	electionID, err := cli.api.NewElection(&description, true)
 	if err != nil {
 		return err
 	}

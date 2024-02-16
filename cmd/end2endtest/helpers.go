@@ -336,7 +336,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		return err
 	}
 
-	electionID, err := t.api.NewElection(ed)
+	electionID, err := t.api.NewElection(ed, true)
 	if err != nil {
 		return err
 	}
