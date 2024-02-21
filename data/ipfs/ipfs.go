@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"strings"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -188,7 +187,7 @@ func (i *Handler) Publish(ctx context.Context, msg []byte) (cid string, err erro
 
 // Pin adds a file to ipfs and returns the resulting CID v1.
 func (i *Handler) Pin(ctx context.Context, path string) error {
-	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	path = sanitizePath(path)
 	p, err := ipfspath.NewPath(path)
 	if err != nil {
 		return data.ErrInvalidPath
@@ -215,7 +214,7 @@ func (i *Handler) addAndPin(ctx context.Context, path string) (ipfspath.Immutabl
 
 // Unpin removes a file pin from ipfs.
 func (i *Handler) Unpin(ctx context.Context, path string) error {
-	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	path = sanitizePath(path)
 	cpath, err := ipfspath.NewPath(path)
 	if err != nil {
 		return data.ErrInvalidPath
@@ -269,8 +268,7 @@ func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
 // RetrieveDir gets an IPFS directory and returns a map of all files and their content.
 // It only supports 1 level of directory depth, so subdirectories are ignored.
 func (i *Handler) RetrieveDir(ctx context.Context, path string, maxSize int64) (map[string][]byte, error) {
-	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-
+	path = sanitizePath(path)
 	// first resolve the path
 	p, err := ipfspath.NewPath(path)
 	if err != nil {
@@ -312,8 +310,7 @@ func (i *Handler) RetrieveDir(ctx context.Context, path string, maxSize int64) (
 // Retrieve gets an IPFS file (either from the p2p network or from the local cache).
 // If maxSize is 0, it is set to the hardcoded maximum of MaxFileSizeBytes.
 func (i *Handler) Retrieve(ctx context.Context, path string, maxSize int64) ([]byte, error) {
-	path = strings.Replace(path, "ipfs://", "/ipfs/", 1)
-
+	path = sanitizePath(path)
 	// check if we have the file in the local cache
 	ccontent, _ := i.retrieveCache.Get(path)
 	if ccontent != nil {

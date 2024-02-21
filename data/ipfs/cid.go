@@ -80,3 +80,12 @@ func CIDequals(cid1, cid2 string) bool {
 	}
 	return c1.Hash().String() == c2.Hash().String()
 }
+
+// sanitizePath removes the ipfs:// prefix and adds the /ipfs/ prefix if missing.
+func sanitizePath(path string) string {
+	c := strings.Replace(path, "ipfs://", "/ipfs/", 1)
+	if len(c) > 0 && c[0] != '/' {
+		c = "/ipfs/" + c
+	}
+	return c
+}
