@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,13 +17,7 @@ type PreferredEditorResolver func() string
 // GetPreferredEditorFromEnvironment returns the user's editor as defined by the `$EDITOR` environment variable, or
 // the `DefaultEditor` if it is not set.
 func GetPreferredEditorFromEnvironment() string {
-	editor := os.Getenv("EDITOR")
-
-	if editor == "" {
-		return DefaultEditor
-	}
-
-	return editor
+	return cmp.Or(os.Getenv("EDITOR"), DefaultEditor)
 }
 
 func resolveEditorArguments(executable, filename string) []string {

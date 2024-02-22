@@ -1,6 +1,7 @@
 package metadb
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"testing"
@@ -39,11 +40,7 @@ func New(typ, dir string) (db.Database, error) {
 }
 
 func ForTest() (typ string) {
-	dbType := os.Getenv("DVOTE_DB_TYPE")
-	if dbType == "" {
-		dbType = "pebble" // default to Pebble, just like vocdoninode
-	}
-	return dbType
+	return cmp.Or(os.Getenv("DVOTE_DB_TYPE"), "pebble") // default to Pebble, just like vocdoninode
 }
 
 func NewTest(tb testing.TB) db.Database {

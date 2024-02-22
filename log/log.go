@@ -2,6 +2,7 @@ package log
 
 import (
 	"bytes"
+	"cmp"
 	"fmt"
 	"io"
 	"os"
@@ -33,11 +34,7 @@ func init() {
 	// environment variable can be set globally even when running tests.
 	// Always initializing the logger is also useful to avoid panics when
 	// logging if the logger is nil.
-	level := "error"
-	if s := os.Getenv("LOG_LEVEL"); s != "" {
-		level = s
-	}
-	Init(level, "stderr", nil)
+	Init(cmp.Or(os.Getenv("LOG_LEVEL"), "error"), "stderr", nil)
 }
 
 // Logger provides access to the global logger (zerolog).
