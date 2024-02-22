@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
@@ -82,11 +83,11 @@ func (v *Vote) Hash() []byte {
 // DeepCopy returns a deep copy of the Vote struct.
 func (v *Vote) DeepCopy() *Vote {
 	voteCopy := &Vote{
-		ProcessID:            append([]byte{}, v.ProcessID...),
-		Nullifier:            append([]byte{}, v.Nullifier...),
+		ProcessID:            slices.Clone(v.ProcessID),
+		Nullifier:            slices.Clone(v.Nullifier),
 		Height:               v.Height,
-		VotePackage:          append([]byte{}, v.VotePackage...),
-		EncryptionKeyIndexes: append([]uint32{}, v.EncryptionKeyIndexes...),
+		VotePackage:          slices.Clone(v.VotePackage),
+		EncryptionKeyIndexes: slices.Clone(v.EncryptionKeyIndexes),
 		Weight:               new(big.Int).Set(v.Weight),
 		VoterID:              v.VoterID,
 		Overwrites:           v.Overwrites,
