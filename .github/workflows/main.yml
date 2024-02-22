@@ -113,7 +113,7 @@ jobs:
           path: gocoverage-unit/
 
   job_compose_test:
-    runs-on: [self-hosted, ci2-1]
+    runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
       - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
