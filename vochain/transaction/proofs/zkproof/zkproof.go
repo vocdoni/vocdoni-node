@@ -44,17 +44,15 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	if !bytes.Equal(process.CensusRoot, proofCensusRoot) {
 		return false, nil, fmt.Errorf("census root mismatch")
 	}
-
-	// verify the votePackage hash TODO
-	//hashedVotePackage := sha256.Sum256(envelope.VotePackage)
-	//proofVoteHash, err := proof.VoteHash()
-	//if err != nil {
-	//	return false, nil, fmt.Errorf("failed on parsing vote hash from public inputs provided: %w", err)
-	//}
-	//if !bytes.Equal(hashedVotePackage[:], proofVoteHash) {
-	//	return false, nil, fmt.Errorf("vote hash mismatch")
-	//}
-
+	// verify the votePackage hash
+	proofVoteHash, err := proof.VoteHash()
+	if err != nil {
+		return false, nil, fmt.Errorf("failed on parsing vote hash from public inputs provided: %w", err)
+	}
+	hashedVotePackage := sha256.Sum256(envelope.VotePackage)
+	if !bytes.Equal(hashedVotePackage[:], proofVoteHash) {
+		return false, nil, fmt.Errorf("vote hash mismatch")
+	}
 	// get vote weight from proof publicSignals
 	weight, err := proof.VoteWeight()
 	if err != nil {
