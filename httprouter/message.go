@@ -21,7 +21,7 @@ type Message struct {
 
 // HTTPContext is the Context for an HTTP request.
 type HTTPContext struct {
-	Writer  http.ResponseWriter
+	writer  http.ResponseWriter
 	Request *http.Request
 
 	contentType string
@@ -46,7 +46,6 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 		}
 	}()
 	defer close(h.sent)
-	defer h.Request.Body.Close()
 
 	if httpStatusCode < 100 || httpStatusCode >= 600 {
 		return fmt.Errorf("http status code %d not supported", httpStatusCode)
@@ -57,21 +56,21 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	}
 	// Set the content type if not set to default application/json
 	if h.contentType == "" {
-		h.Writer.Header().Set("Content-Type", DefaultContentType)
+		h.writer.Header().Set("Content-Type", DefaultContentType)
 	} else {
-		h.Writer.Header().Set("Content-Type", h.contentType)
+		h.writer.Header().Set("Content-Type", h.contentType)
 	}
 
 	if httpStatusCode == http.StatusNoContent {
 		// For 204 status, don't set Content-Length, don't try to write a body.
-		h.Writer.WriteHeader(httpStatusCode)
+		h.writer.WriteHeader(httpStatusCode)
 		log.Debugw("http response", "status", httpStatusCode)
 		return nil
 	}
 
 	// Content length will be message length plus newline character
-	h.Writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
-	h.Writer.WriteHeader(httpStatusCode)
+	h.writer.Header().Set("Content-Length", fmt.Sprintf("%d", len(msg)+1))
+	h.writer.WriteHeader(httpStatusCode)
 
 	log.Debugw("http response", "status", httpStatusCode, "data", func() string {
 		if len(msg) > 256 {
@@ -79,10 +78,10 @@ func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 		}
 		return string(msg)
 	}())
-	if _, err := h.Writer.Write(msg); err != nil {
+	if _, err := h.writer.Write(msg); err != nil {
 		return err
 	}
 	// Ensure we end the response with a newline, to be nice.
-	_, err := h.Writer.Write([]byte("\n"))
+	_, err := h.writer.Write([]byte("\n"))
 	return err
 }

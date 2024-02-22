@@ -275,7 +275,7 @@ func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType
 			return
 		}
 
-		hc := &HTTPContext{Request: req, Writer: w, sent: make(chan struct{})}
+		hc := &HTTPContext{Request: req, writer: w, sent: make(chan struct{})}
 		msg := Message{
 			Data:      data,
 			TimeStamp: time.Now(),
