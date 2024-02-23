@@ -59,19 +59,19 @@ func TestGenerateCircuitInput(t *testing.T) {
 	}
 	// Generate correct inputs
 	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{acc, nil,
-		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings, nil,
+		electionId, hexTestRoot, hexTestRoot, availableWeight.Bytes(), testSiblings, testSiblings, nil,
 		availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
 	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{acc, nil,
-		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings,
+		electionId, hexTestRoot, hexTestRoot, availableWeight.Bytes(), testSiblings, testSiblings,
 		big.NewInt(1), availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
 	_, err = GenerateCircuitInput(CircuitInputsParameters{nil, nil, electionId,
-		hexTestRoot, hexTestRoot, testSiblings, testSiblings, big.NewInt(1),
+		hexTestRoot, hexTestRoot, availableWeight.Bytes(), testSiblings, testSiblings, big.NewInt(1),
 		availableWeight})
 	c.Assert(err, qt.IsNotNil)
 }
