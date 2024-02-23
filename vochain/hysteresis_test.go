@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -27,6 +28,7 @@ func TestHysteresis(t *testing.T) {
 
 	// initial accounts
 	testWeight := big.NewInt(10)
+	testVotePackage := util.RandomBytes(16)
 	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 3, testWeight)
 
 	// add the test accounts siks to the test app
@@ -93,6 +95,7 @@ func TestHysteresis(t *testing.T) {
 				ElectionId:      pid,
 				CensusRoot:      censusRoot,
 				SIKRoot:         sikRoot,
+				VotePackage:     testVotePackage,
 				CensusSiblings:  censusSiblings,
 				SIKSiblings:     sikSiblings,
 				AvailableWeight: testWeight,
@@ -121,7 +124,7 @@ func TestHysteresis(t *testing.T) {
 
 		vtx := &models.VoteEnvelope{
 			ProcessId:   pid,
-			VotePackage: testWeight.Bytes(),
+			VotePackage: testVotePackage,
 			Nullifier:   nullifier,
 			Proof: &models.Proof{
 				Payload: &models.Proof_ZkSnark{
@@ -163,7 +166,7 @@ func TestHysteresis(t *testing.T) {
 
 		vtx := &models.VoteEnvelope{
 			ProcessId:   pid,
-			VotePackage: testWeight.Bytes(),
+			VotePackage: testVotePackage,
 			Nullifier:   nullifier,
 			Proof: &models.Proof{
 				Payload: &models.Proof_ZkSnark{
