@@ -45,6 +45,7 @@ type CircuitInputsParameters struct {
 	ElectionId      []byte
 	CensusRoot      []byte
 	SIKRoot         []byte
+	VotePackage     []byte
 	CensusSiblings  []string
 	SIKSiblings     []string
 	VoteWeight      *big.Int
@@ -58,7 +59,8 @@ type CircuitInputsParameters struct {
 // census siblings provided into the result.
 func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
 	if p.Account == nil || p.ElectionId == nil || p.CensusRoot == nil || p.SIKRoot == nil ||
-		p.AvailableWeight == nil || len(p.CensusSiblings) == 0 || len(p.SIKSiblings) == 0 {
+		p.AvailableWeight == nil || len(p.VotePackage) == 0 || len(p.CensusSiblings) == 0 ||
+		len(p.SIKSiblings) == 0 {
 		return nil, fmt.Errorf("bad arguments provided")
 	}
 	if p.VoteWeight == nil {
@@ -81,7 +83,7 @@ func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
 		ElectionId:      util.BytesToArboSplitStr(p.ElectionId),
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: p.AvailableWeight.String(),
-		VoteHash:        util.BytesToArboSplitStr(p.AvailableWeight.Bytes()),
+		VoteHash:        util.BytesToArboSplitStr(p.VotePackage),
 		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
 		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
 

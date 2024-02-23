@@ -27,6 +27,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	// set initial inputs
 	testWeight := big.NewInt(10)
+	testVotePackage := util.RandomBytes(16)
 	accounts, censusRoot, proofs := testCreateKeysAndBuildWeightedZkCensus(t, 10, testWeight)
 	testAccount := accounts[0]
 	testProof := proofs[0]
@@ -77,6 +78,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		ElectionId:      electionId,
 		CensusRoot:      process.CensusRoot,
 		SIKRoot:         sikRoot,
+		VotePackage:     testVotePackage,
 		CensusSiblings:  testSiblings,
 		SIKSiblings:     sikSiblings,
 		AvailableWeight: testWeight,
@@ -94,7 +96,7 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	vtx := &models.VoteEnvelope{
 		ProcessId:   electionId,
-		VotePackage: testWeight.Bytes(),
+		VotePackage: testVotePackage,
 		Nullifier:   nullifier,
 		Proof: &models.Proof{
 			Payload: &models.Proof_ZkSnark{

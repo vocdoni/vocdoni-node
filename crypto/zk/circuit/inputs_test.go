@@ -32,8 +32,9 @@ func TestGenerateCircuitInput(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	// mock the availableWeight
 	availableWeight := new(big.Int).SetUint64(10)
+	testVotePackage := util.RandomBytes(16)
 	// calc vote hash
-	voteHash := util.BytesToArboSplitStr(availableWeight.Bytes())
+	voteHash := util.BytesToArboSplitStr(testVotePackage)
 	// decode the test root
 	hexTestRoot, err := hex.DecodeString(testRoot)
 	c.Assert(err, qt.IsNil)
@@ -59,19 +60,19 @@ func TestGenerateCircuitInput(t *testing.T) {
 	}
 	// Generate correct inputs
 	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{acc, nil,
-		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings, nil,
+		electionId, hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings, nil,
 		availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
 	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{acc, nil,
-		electionId, hexTestRoot, hexTestRoot, testSiblings, testSiblings,
+		electionId, hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings,
 		big.NewInt(1), availableWeight})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
 	_, err = GenerateCircuitInput(CircuitInputsParameters{nil, nil, electionId,
-		hexTestRoot, hexTestRoot, testSiblings, testSiblings, big.NewInt(1),
+		hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings, big.NewInt(1),
 		availableWeight})
 	c.Assert(err, qt.IsNotNil)
 }

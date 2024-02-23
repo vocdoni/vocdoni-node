@@ -135,12 +135,14 @@ func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusD
 	if censusData.Weight != nil {
 		weight = censusData.Weight.MathBigInt()
 	}
+	testingVotePackage := util.RandomBytes(16)
 	// Generate circuit inputs
 	rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
 		Account:         acc,
 		ElectionId:      electionID,
 		CensusRoot:      censusData.CensusRoot,
 		SIKRoot:         sikData.CensusRoot,
+		VotePackage:     testingVotePackage,
 		CensusSiblings:  censusData.CensusSiblings,
 		SIKSiblings:     sikData.CensusSiblings,
 		VoteWeight:      weight,

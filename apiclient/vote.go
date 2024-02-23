@@ -93,6 +93,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 			SIKSiblings:     v.ProofSIKTree.Siblings,
 			VoteWeight:      v.VoteWeight,
 			AvailableWeight: v.ProofMkTree.LeafWeight,
+			VotePackage:     vote.VotePackage,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("could not generate zk circuit inputs: %w", err)
