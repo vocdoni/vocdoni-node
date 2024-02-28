@@ -14,6 +14,13 @@ import "go.vocdoni.io/dvote/db"
 // The NoState transaction is committed or discarted with the state
 // transaction at Save() or Rollback().
 func (s *State) NoState(withTxLock bool) *NoState {
+	if !withTxLock && s.tx.TryLock() {
+		// withTxLock only exists so it can be set to false when the caller
+		// already holds the State.tx lock, to avoid deadlocks.
+		// If the lock is not held in any way and withTxLock is false,
+		// it is a race to read from or write to the state.
+		panic("State.NoState with withTxLock=false can only be called when State.tx is read or write locked")
+	}
 	return &NoState{
 		state:      s,
 		withTxLock: withTxLock,
@@ -31,6 +38,10 @@ func (ns *NoState) Set(key, value []byte) error {
 	if ns.withTxLock {
 		ns.state.tx.Lock()
 		defer ns.state.tx.Unlock()
+	} else if ns.state.tx.TryRLock() {
+		// Like the check in the constructor, but to check if NoState is used for writes
+		// when the State.tx lock is only held for reads.
+		panic("State.NoState with withTxLock=false can only use writes when State.tx is write locked")
 	}
 	return ns.state.store.NoStateWriteTx.Set(key, value)
 }
@@ -64,6 +75,10 @@ func (ns *NoState) Delete(key []byte) error {
 	if ns.withTxLock {
 		ns.state.tx.Lock()
 		defer ns.state.tx.Unlock()
+	} else if ns.state.tx.TryRLock() {
+		// Like the check in the constructor, but to check if NoState is used for writes
+		// when the State.tx lock is only held for reads.
+		panic("State.NoState with withTxLock=false can only use writes when State.tx is write locked")
 	}
 	return ns.state.store.NoStateWriteTx.Delete(key)
 }
