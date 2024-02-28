@@ -188,12 +188,14 @@ func (v *State) UpdateSIKRoots() error {
 	// network height.
 	v.mtxValidSIKRoots.Lock()
 	defer v.mtxValidSIKRoots.Unlock()
-	sikNoStateDB := v.NoState(false)
 	currentBlock := v.CurrentHeight()
 
+	// Note that later on we call sikNoStateDB.Set, so we must grab a write lock.
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	sikNoStateDB := v.NoState(false)
+
 	// get sik roots key-value database associated to the siks tree
-	v.tx.RLock()
-	defer v.tx.RUnlock()
 	siksTree, err := v.tx.DeepSubTree(StateTreeCfg(TreeSIK))
 	if err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKSubTree, err)

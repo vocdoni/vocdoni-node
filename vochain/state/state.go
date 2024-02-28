@@ -337,6 +337,8 @@ func (v *State) Save() ([]byte, error) {
 	if err := v.UpdateSIKRoots(); err != nil {
 		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
 	}
+	// TODO: UpdateSIKRoots holds a write lock during its run,
+	// and we grab another one here immediately after. Join them?
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	err := func() error {
