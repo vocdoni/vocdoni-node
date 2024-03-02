@@ -89,7 +89,7 @@ func (v *Vote) DeepCopy() *Vote {
 		VotePackage:          slices.Clone(v.VotePackage),
 		EncryptionKeyIndexes: slices.Clone(v.EncryptionKeyIndexes),
 		Weight:               new(big.Int).Set(v.Weight),
-		VoterID:              v.VoterID,
+		VoterID:              slices.Clone(v.VoterID),
 		Overwrites:           v.Overwrites,
 	}
 	return voteCopy

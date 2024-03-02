@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/db"
@@ -140,7 +139,7 @@ func (v *State) InvalidateSIK(address common.Address) error {
 func (v *State) ValidSIKRoots() [][]byte {
 	v.mtxValidSIKRoots.Lock()
 	defer v.mtxValidSIKRoots.Unlock()
-	return slices.Clone(v.validSIKRoots)
+	return v.validSIKRoots
 }
 
 // FetchValidSIKRoots updates the list of current valid SIK roots in the current
