@@ -62,7 +62,7 @@ func TestIterate(t *testing.T, d db.Database) {
 	qt.Assert(t, err, qt.IsNil)
 
 	noPrefixKeysFound := 0
-	err = d.Iterate(nil, func(k, v []byte) bool {
+	err = d.Iterate(nil, func(_, _ []byte) bool {
 		noPrefixKeysFound++
 		return true
 	})
@@ -70,7 +70,7 @@ func TestIterate(t *testing.T, d db.Database) {
 	qt.Assert(t, noPrefixKeysFound, qt.Equals, prefix0NumKeys+prefix1NumKeys)
 
 	prefix0KeysFound := 0
-	err = d.Iterate(prefix0, func(k, v []byte) bool {
+	err = d.Iterate(prefix0, func(_, _ []byte) bool {
 		prefix0KeysFound++
 		return true
 	})
@@ -78,7 +78,7 @@ func TestIterate(t *testing.T, d db.Database) {
 	qt.Assert(t, prefix0KeysFound, qt.Equals, prefix0NumKeys)
 
 	prefix1KeysFound := 0
-	err = d.Iterate(prefix1, func(k, v []byte) bool {
+	err = d.Iterate(prefix1, func(_, _ []byte) bool {
 		prefix1KeysFound++
 		return true
 	})
