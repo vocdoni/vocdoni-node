@@ -1058,7 +1058,7 @@ func TestDiskSizeBench(t *testing.T) {
 
 	countDBitems := func() int {
 		count := 0
-		if err := tree.db.Iterate(nil, func(k, v []byte) bool {
+		if err := tree.db.Iterate(nil, func(_, _ []byte) bool {
 			//fmt.Printf("db item: %x\n", k)
 			count++
 			return true

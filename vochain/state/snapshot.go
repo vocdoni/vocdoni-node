@@ -447,7 +447,7 @@ type DBPair struct {
 func ExportNoStateDB(w io.Writer, reader *NoState) (uint32, error) {
 	pairs := []DBPair{}
 	err := reader.Iterate(nil, func(key []byte, value []byte) bool {
-		pairs = append(pairs, DBPair{Key: key, Value: value})
+		pairs = append(pairs, DBPair{Key: bytes.Clone(key), Value: bytes.Clone(value)})
 		return true
 	})
 	if err != nil {
