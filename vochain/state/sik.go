@@ -148,7 +148,7 @@ func (v *State) ValidSIKRoots() [][]byte {
 func (v *State) FetchValidSIKRoots() error {
 	var validRoots [][]byte
 	if err := v.NoState(true).Iterate(sikDBPrefix, func(_, root []byte) bool {
-		validRoots = append(validRoots, root)
+		validRoots = append(validRoots, bytes.Clone(root))
 		return true
 	}); err != nil {
 		return fmt.Errorf("%w: %w", ErrSIKIterate, err)
@@ -224,7 +224,7 @@ func (v *State) UpdateSIKRoots() error {
 		// block to delete them.
 		var toPurge [][]byte
 		var nearestLowerBlock uint32
-		if err := sikNoStateDB.Iterate(sikDBPrefix, func(key, value []byte) bool {
+		if err := sikNoStateDB.Iterate(sikDBPrefix, func(key, _ []byte) bool {
 			candidateKey := bytes.Clone(key)
 			blockNumber := binary.LittleEndian.Uint32(candidateKey)
 			if blockNumber < minBlock {
