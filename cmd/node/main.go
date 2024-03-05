@@ -11,7 +11,6 @@ import (
 	_ "net/http/pprof" // for the pprof endpoints
 	"os"
 	"os/signal"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -502,7 +501,6 @@ func main() {
 			// start keykeeper service (if key index specified)
 			if validator.KeyIndex > 0 {
 				srv.KeyKeeper, err = keykeeper.NewKeyKeeper(
-					path.Join(conf.Vochain.DataDir, "keykeeper"),
 					srv.App,
 					&signer,
 					int8(validator.KeyIndex))
