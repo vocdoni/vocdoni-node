@@ -22,12 +22,12 @@ func init() {
 		description: "Performs a complete test of anonymous election, from creating a census to voting and validating votes",
 		example:     os.Args[0] + " --operation=anonelection --votes=1000",
 	}
-	ops["anonelectionTempSIKs"] = operation{
+	ops["anonelectionTempSiks"] = operation{
 		testFunc: func() VochainTest {
 			return &E2EAnonElectionTempSIKs{}
 		},
 		description: "Performs a complete test of anonymous election with TempSIKs flag to vote with half of the accounts that are not registered, and the remaining half with registered accounts",
-		example:     os.Args[0] + " --operation=anonelectionTempSIKS --votes=1000",
+		example:     os.Args[0] + " --operation=anonelectionTempSiks --votes=1000",
 	}
 	ops["anonelectionEncrypted"] = operation{
 		testFunc: func() VochainTest {
