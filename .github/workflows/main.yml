@@ -201,6 +201,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: gocoverage-all-textfmt@${{ env.SHA }}
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
       - name: Send coverage to coveralls.io (unit)
         if: ${{ always() }}
         uses: shogo82148/actions-goveralls@v1
