@@ -32,8 +32,7 @@ DEFAULT_ACCOUNT_KEYS="73ac72a16ea84dd1f76b62663d2aa380253aec4386935e460dad55d429
 be9248891bd6c220d013afb4b002f72c8c22cbad9c02003c19729bcbd6962e52
 cb595f3fa1a4790dd54c139524a1430fc500f95a02affee6a933fcb88849a48d"
 ACCOUNT_KEYS=${ACCOUNT_KEYS:-$DEFAULT_ACCOUNT_KEYS}
-GWHOST="http://gateway0:9090/dvote"
-APIHOST="http://gateway0:9090/v2"
+APIHOST=${APIHOST:-"http://gateway0:9090/v2"}
 FAUCET="$APIHOST/open/claim"
 TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
@@ -71,7 +70,7 @@ tests_to_run=(
 	echo "  ELECTION_SIZE_ANON=8"
 	echo "  CONCURRENT=0"
 	echo "  LOGLEVEL=debug"
-	echo "  GWHOST=http://gateway0:9090/dvote"
+	echo "  APIHOST=http://gateway0:9090/v2"
 	echo "  CONCURRENT_CONNECTIONS=1"
 	exit 0
 }
@@ -168,16 +167,20 @@ $COMPOSE_CMD up -d
 
 check_gw_is_up() {
 	date
-	$COMPOSE_CMD_RUN test \
-		curl -s --fail $APIHOST/chain/info 2>/dev/null
+	height=$($COMPOSE_CMD_RUN test \
+		curl -s --fail $APIHOST/chain/info 2>/dev/null \
+		| grep -o '"height":[0-9]*' | grep -o '[0-9]*')
+  [ -z "$height" ] && return 1
+  [ $height -gt 8 ] && return 0
+  return 1 
 }
 
-log "### Waiting for test suite to be ready ###"
-for i in {1..20}; do
+log "### Waiting for test suite to be ready at height 8 ###"
+for i in {1..30}; do
 	check_gw_is_up && break || sleep 2
 done
 
-if [ i == 20 ] ; then
+if [ $i -eq 30 ] ; then
 	log "### Timed out waiting! Abort, don't even try running tests ###"
 	tests_to_run=()
 	GOCOVERDIR=

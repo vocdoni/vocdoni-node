@@ -275,7 +275,6 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 		return err
 	}
 	vc.KeyKeeper, err = keykeeper.NewKeyKeeper(
-		filepath.Join(vc.Config.DataDir, "keykeeper"),
 		vc.App,
 		key,
 		1)
