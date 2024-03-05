@@ -51,6 +51,8 @@ tests_to_run=(
   	"e2etest_plaintextelection"
   	"e2etest_encryptedelection"
   	"e2etest_anonelection"
+  	"e2etest_anonelectionTempSIKS"
+  	"e2etest_anonelectionEncrypted"
   	"e2etest_overwritelection"
   	"e2etest_censusizelection"
   	"e2etest_ballotelection"
