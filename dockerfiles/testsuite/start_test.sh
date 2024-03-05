@@ -186,16 +186,16 @@ sleep 10
 $COMPOSE_CMD up -d
 
 check_gw_is_up() {
-	date
-	height=$($COMPOSE_CMD_RUN test \
-		curl -s --fail $APIHOST/chain/info 2>/dev/null \
-		| grep -o '"height":[0-9]*' | grep -o '[0-9]*')
+  height=$($COMPOSE_CMD_RUN test \
+               curl -s --fail $APIHOST/chain/info 2>/dev/null \
+               | grep -o '"height":[0-9]*' | grep -o '[0-9]*')
+  log "height=$height"
   [ -z "$height" ] && return 1
   [ $height -gt 8 ] && return 0
-  return 1 
+  return 1
 }
 
-log "### Waiting for test suite to be ready at height 8 ###"
+log "### Waiting for test suite to be ready and reaches height=8 ###"
 for i in {1..30}; do
 	check_gw_is_up && break || sleep 2
 done
