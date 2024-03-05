@@ -10,7 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -384,7 +384,7 @@ func (idx *Indexer) Commit(height uint32) error {
 
 	// Update existing processes
 	updateProcs := maps.Keys(idx.blockUpdateProcs)
-	sort.Strings(updateProcs)
+	slices.Sort(updateProcs)
 
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()

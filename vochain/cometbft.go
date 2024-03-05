@@ -2,12 +2,13 @@ package vochain
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"sort"
+	"slices"
 	"time"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
@@ -382,20 +383,17 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 	}
 
 	// Sort the transactions based on the sender's address and nonce
-	sort.Slice(validTxInfos, func(i, j int) bool {
-		if validTxInfos[i].Addr == nil && validTxInfos[j].Addr != nil {
-			return true
+	slices.SortFunc(validTxInfos, func(a, b txInfo) int {
+		// If both addresses are equal, compare by nonce.
+		if a.Addr == nil && b.Addr == nil {
+		} else if a.Addr == nil {
+			return -1 // a < b when only a is nil
+		} else if b.Addr == nil {
+			return 1 // a > b when only b is nil
+		} else if c := a.Addr.Cmp(*b.Addr); c != 0 {
+			return c
 		}
-		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr == nil {
-			return false
-		}
-		if validTxInfos[i].Addr != nil && validTxInfos[j].Addr != nil {
-			if bytes.Equal(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) {
-				return validTxInfos[i].Nonce < validTxInfos[j].Nonce
-			}
-			return bytes.Compare(validTxInfos[i].Addr.Bytes(), validTxInfos[j].Addr.Bytes()) == -1
-		}
-		return false
+		return cmp.Compare(a.Nonce, b.Nonce)
 	})
 
 	// Check the validity of the transactions
