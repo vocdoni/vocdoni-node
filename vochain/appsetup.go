@@ -9,8 +9,13 @@ import (
 	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	transactionSendTimeout = types.DefaultBlockTime * 3
 )
 
 // SetNode initializes the cometbft consensus node service and client.
@@ -61,7 +66,9 @@ func (app *BaseApplication) SetDefaultMethods() {
 	})
 	app.SetFnMempoolPrune(app.fnMempoolRemoveTxTendermint)
 	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
-		result, err := app.NodeClient.BroadcastTxSync(context.Background(), tx)
+		ctx, cancel := context.WithTimeout(context.Background(), transactionSendTimeout)
+		defer cancel()
+		result, err := app.NodeClient.BroadcastTxSync(ctx, tx)
 		if err != nil {
 			return nil, err
 		}
