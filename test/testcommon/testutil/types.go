@@ -39,7 +39,8 @@ func (b *MockBlockStore) NewBlock(height int64, timestamp time.Time) {
 	log.Infow("new block", "height", height, "timestamp", timestamp)
 	b.set(height, &comettypes.Block{
 		Header: comettypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
-		Data:   comettypes.Data{Txs: make([]comettypes.Tx, 0)}},
+		Data:   comettypes.Data{Txs: make([]comettypes.Tx, 0)},
+	},
 	)
 }
 

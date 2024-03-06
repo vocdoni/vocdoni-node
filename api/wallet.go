@@ -223,7 +223,8 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 				Account:       wallet.Address().Bytes(),
 				FaucetPackage: nil,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return err
 	}
@@ -285,7 +286,8 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 				To:     dst.Bytes(),
 				Value:  amount,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return err
 	}

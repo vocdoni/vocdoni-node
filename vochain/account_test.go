@@ -36,7 +36,8 @@ func testCommitState(t *testing.T, app *BaseApplication) {
 }
 
 func setupTestBaseApplicationAndSigners(t *testing.T,
-	numberSigners int) (*BaseApplication, []*ethereum.SignKeys, error) {
+	numberSigners int,
+) (*BaseApplication, []*ethereum.SignKeys, error) {
 	app := TestBaseApplication(t)
 	signers := make([]*ethereum.SignKeys, numberSigners)
 	for i := 0; i < numberSigners; i++ {
@@ -77,7 +78,8 @@ func TestSetAccountTx(t *testing.T) {
 	// set account 0
 	qt.Assert(t,
 		app.State.SetAccount(signers[0].Address(), &state.Account{
-			Account: models.Account{Balance: 10000, InfoURI: infoURI}}),
+			Account: models.Account{Balance: 10000, InfoURI: infoURI},
+		}),
 		qt.IsNil,
 	)
 	testCommitState(t, app)
@@ -507,7 +509,8 @@ func testSetAccountTx(t *testing.T,
 	app *BaseApplication,
 	infoURI string,
 	nonce uint32,
-	create bool) error {
+	create bool,
+) error {
 	var err error
 
 	sik, err := signer.AccountSIK(nil)
@@ -618,7 +621,6 @@ func TestSendTokensTxToTheSameAccount(t *testing.T) {
 
 	err = testSendTokensTx(t, &signer, app, signer.Address(), 89, 0)
 	qt.Assert(t, err, qt.IsNotNil)
-
 }
 
 func testSendTokensTx(t *testing.T,
@@ -626,7 +628,8 @@ func testSendTokensTx(t *testing.T,
 	app *BaseApplication,
 	toAddr common.Address,
 	value uint64,
-	nonce uint32) error {
+	nonce uint32,
+) error {
 	var err error
 
 	// tx
@@ -730,7 +733,8 @@ func testSetAccountDelegateTx(t *testing.T,
 	app *BaseApplication,
 	delegate common.Address,
 	op bool, // true == add, false == del
-	nonce uint32) error {
+	nonce uint32,
+) error {
 	var err error
 
 	// tx
@@ -854,7 +858,8 @@ func testCollectFaucetTx(t *testing.T,
 	app *BaseApplication,
 	nonce uint32,
 	amount,
-	identifier uint64) error {
+	identifier uint64,
+) error {
 	var err error
 
 	// tx

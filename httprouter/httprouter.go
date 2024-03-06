@@ -218,7 +218,8 @@ func (r *HTTProuter) getNamespace(id string) (RouterNamespace, bool) {
 // AddAdminHandler adds a handler function for the namespace, pattern and HTTPmethod.
 // The Admin requests are usually protected by some authorization mechanism.
 func (r *HTTProuter) AddAdminHandler(namespaceID,
-	pattern, HTTPmethod string, handler RouterHandlerFn) {
+	pattern, HTTPmethod string, handler RouterHandlerFn,
+) {
 	log.Infof("added admin handler for namespace %s with pattern %s", namespaceID, pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypeAdmin, handler))
 }
@@ -226,7 +227,8 @@ func (r *HTTProuter) AddAdminHandler(namespaceID,
 // AddQuotaHandler adds a handler function for the namespace, pattern and HTTPmethod.
 // The Quota requests are rate-limited per bearer token
 func (r *HTTProuter) AddQuotaHandler(namespaceID,
-	pattern, HTTPmethod string, handler RouterHandlerFn) {
+	pattern, HTTPmethod string, handler RouterHandlerFn,
+) {
 	log.Infow("added handler", "type", "quota", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypeQuota, handler))
 }
@@ -235,7 +237,8 @@ func (r *HTTProuter) AddQuotaHandler(namespaceID,
 // The Private requests are usually protected by some authorization mechanism, such as signature verification,
 // which must be handled by the namespace implementation.
 func (r *HTTProuter) AddPrivateHandler(namespaceID,
-	pattern, HTTPmethod string, handler RouterHandlerFn) {
+	pattern, HTTPmethod string, handler RouterHandlerFn,
+) {
 	log.Infow("added handler", "type", "private", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePrivate, handler))
 }
@@ -243,7 +246,8 @@ func (r *HTTProuter) AddPrivateHandler(namespaceID,
 // AddPublicHandler adds a handled function for the namespace, patter and HTTPmethod.
 // The public requests are not protected so all requests are allowed.
 func (r *HTTProuter) AddPublicHandler(namespaceID,
-	pattern, HTTPmethod string, handler RouterHandlerFn) {
+	pattern, HTTPmethod string, handler RouterHandlerFn,
+) {
 	log.Infow("added handler", "type", "public", "namespace", namespaceID, "pattern", pattern)
 	r.Mux.MethodFunc(HTTPmethod, pattern, r.routerHandler(namespaceID, AccessTypePublic, handler))
 }
@@ -256,7 +260,8 @@ func (r *HTTProuter) AddRawHTTPHandler(pattern, HTTPmethod string, handler http.
 }
 
 func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType,
-	handlerFunc RouterHandlerFn) func(w http.ResponseWriter, req *http.Request) {
+	handlerFunc RouterHandlerFn,
+) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 		defer req.Body.Close()
 

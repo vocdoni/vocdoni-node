@@ -62,12 +62,11 @@ func TestBytes(t *testing.T) {
 	expectedPubSignals, err := json.Marshal(expected.PubSignals)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, validPubSignals, qt.DeepEquals, expectedPubSignals)
-
 }
 
 func Test_calcWitness(t *testing.T) {
 	// Empty and first set of valid parameters
-	var emptyWasm, emptyInputs = []byte{}, []byte{}
+	emptyWasm, emptyInputs := []byte{}, []byte{}
 
 	_, err := calcWitness(emptyWasm, inputs)
 	qt.Assert(t, err, qt.IsNotNil)

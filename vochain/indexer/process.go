@@ -48,7 +48,8 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
-	srcNetworkId int32, status string, withResults bool) ([][]byte, error) {
+	srcNetworkId int32, status string, withResults bool,
+) ([][]byte, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}

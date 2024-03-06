@@ -64,7 +64,8 @@ func TestEthProof(t *testing.T) {
 }
 
 func testEthSendVotes(t *testing.T, s testStorageProof,
-	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
+	pid []byte, vp []byte, app *BaseApplication, expectedResult bool,
+) {
 	cktx := new(cometabcitypes.CheckTxRequest)
 	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx

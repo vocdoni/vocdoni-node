@@ -112,15 +112,16 @@ func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
 func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (*cometnode.Node, error) {
+	localConfig *config.VochainCfg, genesis []byte,
+) (*cometnode.Node, error) {
 	var err error
 
 	tconfig := cometconfig.DefaultConfig()
 	tconfig.SetRoot(localConfig.DataDir)
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0o750); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0o750); err != nil {
 		log.Fatal(err)
 	}
 
@@ -337,7 +338,6 @@ func newTendermint(app *BaseApplication,
 		cometnode.DefaultMetricsProvider(tconfig.Instrumentation),
 		logger,
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}

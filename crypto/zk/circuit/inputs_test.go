@@ -59,20 +59,26 @@ func TestGenerateCircuitInput(t *testing.T) {
 		SIKSiblings:    testSiblings,
 	}
 	// Generate correct inputs
-	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+	rawInputs, err := GenerateCircuitInput(CircuitInputsParameters{
+		acc, nil,
 		electionId, hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings, nil,
-		availableWeight})
+		availableWeight,
+	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.DeepEquals, expected)
 
-	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{acc, nil,
+	rawInputs, err = GenerateCircuitInput(CircuitInputsParameters{
+		acc, nil,
 		electionId, hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings,
-		big.NewInt(1), availableWeight})
+		big.NewInt(1), availableWeight,
+	})
 	c.Assert(err, qt.IsNil)
 	c.Assert(rawInputs, qt.Not(qt.DeepEquals), expected)
 
-	_, err = GenerateCircuitInput(CircuitInputsParameters{nil, nil, electionId,
+	_, err = GenerateCircuitInput(CircuitInputsParameters{
+		nil, nil, electionId,
 		hexTestRoot, hexTestRoot, testVotePackage, testSiblings, testSiblings, big.NewInt(1),
-		availableWeight})
+		availableWeight,
+	})
 	c.Assert(err, qt.IsNotNil)
 }

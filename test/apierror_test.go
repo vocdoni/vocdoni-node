@@ -72,34 +72,44 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrCantParseAccountID,
 		},
 		{
-			args: args{"GET", nil, []string{"votes", "verify",
+			args: args{"GET", nil, []string{
+				"votes", "verify",
 				"0123456789012345678901234567890123456789012345678901234567890123",
-				"000"}},
+				"000",
+			}},
 			want: api.ErrCantParseVoteID,
 		},
 		{
-			args: args{"GET", nil, []string{"votes", "verify",
+			args: args{"GET", nil, []string{
+				"votes", "verify",
 				"0123456789012345678901234567890123456789012345678901234567890123",
-				"0000"}},
+				"0000",
+			}},
 			want: api.ErrVoteIDMalformed,
 		},
 		{
-			args: args{"GET", nil, []string{"votes", "verify",
+			args: args{"GET", nil, []string{
+				"votes", "verify",
 				"0123456789012345678901234567890123456789012345678901234567890123",
-				"0123456789012345678901234567890123456789012345678901234567890123"}},
+				"0123456789012345678901234567890123456789012345678901234567890123",
+			}},
 			want: api.ErrVoteNotFound,
 		},
 		{
-			args: args{"GET", nil, []string{"votes", "verify",
+			args: args{"GET", nil, []string{
+				"votes", "verify",
 				"bbbbb",
-				"0123456789012345678901234567890123456789012345678901234567890123"}},
+				"0123456789012345678901234567890123456789012345678901234567890123",
+			}},
 			want: api.ErrCantParseElectionID,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts", "0123456789012345678901234567890123456789",
+			args: args{"GET", nil, []string{
+				"accounts", "0123456789012345678901234567890123456789",
 				"elections",
 				"status", "ready",
-				"page", "-1"}},
+				"page", "-1",
+			}},
 			want: api.ErrCantFetchElectionList,
 		},
 		{

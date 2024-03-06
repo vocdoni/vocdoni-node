@@ -436,7 +436,7 @@ func (n *node) add(p *params, currLvl int, leaf *node) error {
 	switch t {
 	case vtMid:
 		if leaf.path[currLvl] {
-			//right
+			// right
 			if n.r == nil {
 				// empty sub-node, add the leaf here
 				n.r = leaf
@@ -568,7 +568,8 @@ func flp2(n int) int {
 // computeHashes computes the hashes under the node from which is called the
 // method. Returns an array of key-values to store in the db
 func (n *node) computeHashes(currLvl, maxLvl int, p *params, pairs [][2][]byte) (
-	[][2][]byte, error) {
+	[][2][]byte, error,
+) {
 	if n == nil || currLvl >= maxLvl {
 		// no need to compute any hash
 		return pairs, nil

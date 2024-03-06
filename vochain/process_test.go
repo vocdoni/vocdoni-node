@@ -93,7 +93,8 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 }
 
 func testNewProcess(t *testing.T, _ []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, process *models.Process) error {
+	app *BaseApplication, process *models.Process,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -351,7 +352,8 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 }
 
 func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, censusRoot []byte, censusURI *string) error {
+	app *BaseApplication, censusRoot []byte, censusURI *string,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -368,7 +370,8 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 		CensusURI:  censusURI,
 	}
 	if stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetProcess{SetProcess: tx}},
+		Payload: &models.Tx_SetProcess{SetProcess: tx},
+	},
 	); err != nil {
 		return fmt.Errorf("cannot mashal tx %w", err)
 	}
@@ -396,7 +399,8 @@ func TestCount(t *testing.T) {
 // the application will have the accounts of the keys already initialized, as well as
 // the burn account and all tx costs set to txCostNumber
 func createTestBaseApplicationAndAccounts(t *testing.T,
-	txCostNumber uint64) (*BaseApplication, []*ethereum.SignKeys) {
+	txCostNumber uint64,
+) (*BaseApplication, []*ethereum.SignKeys) {
 	app := TestBaseApplication(t)
 	keys := make([]*ethereum.SignKeys, 0)
 	for i := 0; i < 4; i++ {
@@ -430,7 +434,6 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	// set tx costs
 	for _, cost := range genesis.TxCostNameToTxTypeMap {
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
-
 	}
 	testCommitState(t, app)
 	return app, keys

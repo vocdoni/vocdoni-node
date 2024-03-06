@@ -14,8 +14,10 @@ import (
 func TestGenerator(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := arbo.NewTree(arbo.Config{Database: database, MaxLevels: 4,
-		HashFunction: arbo.HashFunctionPoseidon})
+	tree, err := arbo.NewTree(arbo.Config{
+		Database: database, MaxLevels: 4,
+		HashFunction: arbo.HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	testVector := [][]int64{
@@ -40,7 +42,7 @@ func TestGenerator(t *testing.T) {
 	jCvp, err := json.Marshal(cvp)
 	c.Assert(err, qt.IsNil)
 	// store the data into a file that will be used at the circom test
-	err = os.WriteFile("go-smt-verifier-inputs.json", jCvp, 0600)
+	err = os.WriteFile("go-smt-verifier-inputs.json", jCvp, 0o600)
 	c.Assert(err, qt.IsNil)
 
 	// proof of non-existence
@@ -50,6 +52,6 @@ func TestGenerator(t *testing.T) {
 	jCvp, err = json.Marshal(cvp)
 	c.Assert(err, qt.IsNil)
 	// store the data into a file that will be used at the circom test
-	err = os.WriteFile("go-smt-verifier-non-existence-inputs.json", jCvp, 0600)
+	err = os.WriteFile("go-smt-verifier-non-existence-inputs.json", jCvp, 0o600)
 	c.Assert(err, qt.IsNil)
 }
