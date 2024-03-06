@@ -24,7 +24,7 @@ import (
 const (
 	frameHashSize           = 20
 	pollURLpattern          = `([0-9a-fA-F]{64})`
-	pollURLpatternShortened = `([0-9a-zA-Z+/]{8})`
+	pollURLpatternShortened = `\/([0-9a-zA-Z+\/]{8})$`
 )
 
 var (
