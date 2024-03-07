@@ -32,6 +32,8 @@ const (
 	// DefaultRetries this enables Request() to handle the situation where the server replies
 	// "mempool is full", it will wait for next block and retry sending the tx
 	DefaultRetries = 3
+	// DefaultTimeout is the default timeout for the HTTP client
+	DefaultTimeout = 10 * time.Second
 )
 
 // HTTPclient is the Vocdoni API HTTP client.
@@ -48,13 +50,13 @@ type HTTPclient struct {
 // NewHTTPclient creates a new HTTP(s) API Vocdoni client.
 func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	tr := &http.Transport{
-		IdleConnTimeout:    10 * time.Second,
+		IdleConnTimeout:    DefaultTimeout,
 		DisableCompression: false,
 		WriteBufferSize:    1 * 1024 * 1024, // 1 MiB
 		ReadBufferSize:     1 * 1024 * 1024, // 1 MiB
 	}
 	c := &HTTPclient{
-		c:       &http.Client{Transport: tr, Timeout: time.Second * 8},
+		c:       &http.Client{Transport: tr, Timeout: DefaultTimeout},
 		token:   bearerToken,
 		addr:    addr,
 		retries: DefaultRetries,
@@ -142,6 +144,15 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 
 func (c *HTTPclient) SetRetries(n int) {
 	c.retries = n
+}
+
+func (c *HTTPclient) SetTimeout(d time.Duration) {
+	c.c.Timeout = d
+	if c.c.Transport != nil {
+		if _, ok := c.c.Transport.(*http.Transport); ok {
+			c.c.Transport.(*http.Transport).ResponseHeaderTimeout = d
+		}
+	}
 }
 
 // Request performs a `method` type raw request to the endpoint specified in urlPath parameter.
