@@ -148,7 +148,11 @@ func (c *HTTPclient) SetRetries(n int) {
 
 func (c *HTTPclient) SetTimeout(d time.Duration) {
 	c.c.Timeout = d
-	c.c.Transport.(*http.Transport).ResponseHeaderTimeout = d
+	if c.c.Transport != nil {
+		if _, ok := c.c.Transport.(*http.Transport); ok {
+			c.c.Transport.(*http.Transport).ResponseHeaderTimeout = d
+		}
+	}
 }
 
 // Request performs a `method` type raw request to the endpoint specified in urlPath parameter.
