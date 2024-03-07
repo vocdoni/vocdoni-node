@@ -14,6 +14,12 @@ var Genesis = map[string]Vochain{
 		SeedNodes: []string{
 			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656",
 		},
+		StateSync: map[string]StateSyncParams{
+			"vocdoni/DEV/32": {
+				TrustHeight: 10000,
+				TrustHash:   types.HexStringToHexBytes("0x2b430478c7867dc078c0380b81838d75358db7c8b65bfaf84ade85448a0abd54"),
+			},
+		},
 		Genesis: &devGenesis,
 	},
 
@@ -22,6 +28,12 @@ var Genesis = map[string]Vochain{
 		AutoUpdateGenesis: true,
 		SeedNodes: []string{
 			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656",
+		},
+		StateSync: map[string]StateSyncParams{
+			"Vocdoni/STAGE/11": {
+				TrustHeight: 150000,
+				TrustHash:   types.HexStringToHexBytes("0xd964cd5ec4704d3b3e1864c174edd1331044926bb2e6d3fe0b239b1c59329ff2"),
+			},
 		},
 		Genesis: &stageGenesis,
 	},
@@ -32,6 +44,12 @@ var Genesis = map[string]Vochain{
 		SeedNodes: []string{
 			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
 			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
+		},
+		StateSync: map[string]StateSyncParams{
+			"Vocdoni/LTS/1.2": {
+				TrustHeight: 1000000,
+				TrustHash:   types.HexStringToHexBytes("0xd782c4a8e889a12fb326dd7f098336756f4238169a603501ae4a2b2f88c19db9"),
+			},
 		},
 		Genesis: &ltsGenesis,
 	},

@@ -35,6 +35,23 @@ func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
 	return chainInfo, nil
 }
 
+// Block returns information about a block, given a height.
+func (c *HTTPclient) Block(height uint32) (*api.Block, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "blocks", fmt.Sprintf("%d", height))
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	block := &api.Block{}
+	err = json.Unmarshal(resp, block)
+	if err != nil {
+		return nil, err
+	}
+	return block, nil
+}
+
 // TransactionsCost returns a map with the current cost for all transactions
 func (c *HTTPclient) TransactionsCost() (map[string]uint64, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", "cost")

@@ -34,6 +34,16 @@ const (
 	DefaultRetries = 3
 )
 
+// DefaultAPIUrls is a map of default API URLs for each network.
+var DefaultAPIUrls = map[string]string{
+	"dev":     "https://api-dev.vocdoni.net/v2/",
+	"develop": "https://api-dev.vocdoni.net/v2/",
+	"stg":     "https://api-stg.vocdoni.net/v2/",
+	"stage":   "https://api-stg.vocdoni.net/v2/",
+	"lts":     "https://api.vocdoni.io/v2/",
+	"prod":    "https://api.vocdoni.io/v2/",
+}
+
 // HTTPclient is the Vocdoni API HTTP client.
 type HTTPclient struct {
 	c       *http.Client
