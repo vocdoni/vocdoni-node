@@ -44,8 +44,16 @@ func BytesToArboSplitStr(input []byte) []string {
 
 // SplittedArboToBytes function receives a slice of big.Int's and returns the
 func SplittedArboToBytes(input1, input2 *big.Int) []byte {
+	// when the last bytes are 0, the SwapEndianness function removes them
+	// so we need to add them back until we have 16 bytes in both parts
 	b1 := arbo.SwapEndianness(input1.Bytes())
+	for len(b1) < 16 {
+		b1 = append(b1, 0)
+	}
 	b2 := arbo.SwapEndianness(input2.Bytes())
+	for len(b2) < 16 {
+		b2 = append(b2, 0)
+	}
 	return append(b1, b2...)
 }
 
