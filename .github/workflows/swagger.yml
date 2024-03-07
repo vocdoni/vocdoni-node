@@ -13,6 +13,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache: false
       - name: Install swag
         run: |
           curl -L https://github.com/swaggo/swag/releases/download/v1.8.12/swag_1.8.12_Linux_x86_64.tar.gz | tar -xzf -
