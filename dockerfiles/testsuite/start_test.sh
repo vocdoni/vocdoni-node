@@ -23,6 +23,7 @@ COMPOSE_CMD_RUN="$COMPOSE_CMD run"
 
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-30}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
+BUILD=${BUILD:-1}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-debug}
 CONCURRENT=${CONCURRENT:-1}
@@ -159,18 +160,7 @@ e2etest_ballotelection() {
 }
 
 test_statesync() {
-	HEIGHT=3
-	HASH=
-
-	log "### Waiting for height $HEIGHT ###"
-	for i in {1..20}; do
-		# very brittle hack to extract the hash without using jq, to avoid dependencies
-		HASH=$($COMPOSE_CMD_RUN test curl -s --fail $APIHOST/chain/blocks/$HEIGHT 2>/dev/null | grep -oP '"hash":"\K[^"]+' | head -1)
-		[ -n "$HASH" ] && break || sleep 2
-	done
-
-	export VOCDONI_VOCHAIN_STATESYNCTRUSTHEIGHT=$HEIGHT
-	export VOCDONI_VOCHAIN_STATESYNCTRUSTHASH=$HASH
+	export VOCDONI_VOCHAIN_STATESYNCFETCHPARAMSFROMAPI=$APIHOST
 	$COMPOSE_CMD --profile statesync up gatewaySync -d
 	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
 	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"
@@ -179,8 +169,10 @@ test_statesync() {
 ### end tests definition
 
 log "### Starting test suite ###"
-$COMPOSE_CMD build
-$COMPOSE_CMD build test
+[ $BUILD -eq 1 ] && {
+	$COMPOSE_CMD build
+	$COMPOSE_CMD build test
+}
 $COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
 sleep 10
 $COMPOSE_CMD up -d
@@ -204,6 +196,7 @@ if [ $i -eq 30 ] ; then
 	log "### Timed out waiting! Abort, don't even try running tests ###"
 	tests_to_run=()
 	GOCOVERDIR=
+	RET=30
 else
 	log "### Test suite ready ###"
 fi
