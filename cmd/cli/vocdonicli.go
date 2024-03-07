@@ -86,12 +86,8 @@ func NewVocdoniCLI(configFile, host string) (*VocdoniCLI, error) {
 	if cfg.Host == nil {
 		return nil, fmt.Errorf("no API server host configured")
 	}
-	hostURL, err := url.Parse(host)
-	if err != nil {
-		return nil, err
-	}
 
-	api, err := apiclient.NewHTTPclient(hostURL, cfg.Token)
+	api, err := apiclient.NewWithBearer(host, cfg.Token)
 	if err != nil {
 		return nil, err
 	}

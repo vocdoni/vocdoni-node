@@ -45,8 +45,23 @@ type HTTPclient struct {
 	retries int
 }
 
-// NewHTTPclient creates a new HTTP(s) API Vocdoni client.
-func NewHTTPclient(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
+// New connects to the API host with a random bearer token and returns the handle
+func New(host string) (*HTTPclient, error) {
+	token := uuid.New()
+	return NewWithBearer(host, &token)
+}
+
+// NewWithBearer connects to the API host with a random bearer token and returns the handle
+func NewWithBearer(host string, bearerToken *uuid.UUID) (*HTTPclient, error) {
+	hostURL, err := url.Parse(host)
+	if err != nil {
+		return nil, err
+	}
+	return NewWithURLAndBearer(hostURL, bearerToken)
+}
+
+// NewWithURLAndBearer creates a new HTTP(s) API Vocdoni client.
+func NewWithURLAndBearer(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, error) {
 	tr := &http.Transport{
 		IdleConnTimeout:    10 * time.Second,
 		DisableCompression: false,

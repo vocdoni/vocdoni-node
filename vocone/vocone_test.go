@@ -3,12 +3,10 @@ package vocone
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
-	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
@@ -45,10 +43,7 @@ func TestVocone(t *testing.T) {
 	err = vc.SetBulkTxCosts(0, true)
 	qt.Assert(t, err, qt.IsNil)
 
-	u, err := url.Parse(fmt.Sprintf("http://127.0.0.1:%d/v2", port))
-	qt.Assert(t, err, qt.IsNil)
-	token := uuid.New()
-	cli, err := apiclient.NewHTTPclient(u, &token)
+	cli, err := apiclient.New(fmt.Sprintf("http://127.0.0.1:%d/v2", port))
 	qt.Assert(t, err, qt.IsNil)
 	err = cli.SetAccount(fmt.Sprintf("%x", account.PrivateKey()))
 	qt.Assert(t, err, qt.IsNil)
