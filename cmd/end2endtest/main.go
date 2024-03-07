@@ -3,13 +3,11 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	flag "github.com/spf13/pflag"
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
@@ -206,18 +204,6 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 	return skey, nil
 }
 
-// NewAPIclient connects to the API host and returns the handle
-func NewAPIclient(host string) (*apiclient.HTTPclient, error) {
-	hostURL, err := url.Parse(host)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Debugf("connecting to %s", hostURL.String())
-	token := uuid.New()
-
-	return apiclient.NewHTTPclient(hostURL, &token)
-}
-
 func main() {
 	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
 
@@ -233,7 +219,7 @@ func main() {
 		if err := createSignKeys(c); err != nil {
 			log.Fatal(err)
 		}
-		return NewAPIclient(c.host)
+		return apiclient.New(c.host)
 	}
 
 	runTests := func(op operation, c *config, wg *sync.WaitGroup) {
