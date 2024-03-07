@@ -334,3 +334,35 @@ func UnmarshalFaucetPackage(data []byte) (*models.FaucetPackage, error) {
 		Signature: fpackage.Signature,
 	}, nil
 }
+
+// FetchChainHeightAndHashFromDefaultAPI returns the current chain height and block hash
+// from the default API url for the given network.
+func FetchChainHeightAndHashFromDefaultAPI(network string) (int64, types.HexBytes, error) {
+	apiURL, ok := DefaultAPIUrls[network]
+	if !ok {
+		return 0, nil, fmt.Errorf("no default API URL for network %s", network)
+	}
+	height, hash, err := FetchChainHeightAndHash(apiURL)
+	if err != nil {
+		return 0, nil, fmt.Errorf("couldn't fetch info: %w", err)
+	}
+	return height, hash, nil
+}
+
+// FetchChainHeightAndHash returns current chain height and block hash from an API endpoint.
+func FetchChainHeightAndHash(apiURL string) (int64, types.HexBytes, error) {
+	log.Infow("requesting chain height and hash", "url", apiURL)
+	c, err := New(apiURL)
+	if err != nil {
+		return 0, nil, fmt.Errorf("couldn't init apiclient: %w", err)
+	}
+	chain, err := c.ChainInfo()
+	if err != nil {
+		return 0, nil, fmt.Errorf("couldn't fetch chain info: %w", err)
+	}
+	block, err := c.Block(chain.Height)
+	if err != nil {
+		return 0, nil, fmt.Errorf("couldn't fetch block: %w", err)
+	}
+	return int64(chain.Height), block.Hash, nil
+}
