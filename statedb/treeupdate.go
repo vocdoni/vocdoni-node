@@ -1,7 +1,6 @@
 package statedb
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"path"
@@ -101,13 +100,8 @@ func (u *TreeUpdate) Dump(w io.Writer) error {
 }
 
 // Import writes the content exported with Dump.
-// TODO: use io.Reader once implemented in Arbo.
 func (u *TreeUpdate) Import(r io.Reader) error {
-	var buf bytes.Buffer
-	if _, err := buf.ReadFrom(r); err != nil {
-		return err
-	}
-	return u.tree.ImportDump(buf.Bytes())
+	return u.tree.ImportDumpReaderWithTx(u.tx, r)
 }
 
 // noState returns a key-value database associated with this tree that doesn't
@@ -115,6 +109,11 @@ func (u *TreeUpdate) Import(r io.Reader) error {
 // won't change the StateDB.Root.
 func (u *TreeUpdate) noState() Updater {
 	return subWriteTx(u.tx, subKeyNoState)
+}
+
+// MarkDirty sets dirtyTree = true
+func (u *TreeUpdate) MarkDirty() {
+	u.dirtyTree = true
 }
 
 // Add a new key-value to this tree.  `key` is the path of the leaf, and

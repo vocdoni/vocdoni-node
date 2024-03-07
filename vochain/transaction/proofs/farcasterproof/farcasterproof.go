@@ -3,6 +3,7 @@ package farcasterproof
 import (
 	"bytes"
 	"crypto/ed25519"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -21,8 +22,9 @@ import (
 )
 
 const (
-	frameHashSize  = 20
-	pollURLpattern = `([0-9a-fA-F]{64})`
+	frameHashSize           = 20
+	pollURLpattern          = `([0-9a-fA-F]{64})`
+	pollURLpatternShortened = `\/([0-9a-zA-Z+\/]{8})$`
 )
 
 var (
@@ -30,10 +32,12 @@ var (
 	// This should be used only for testing purposes.
 	DisableElectionIDVerification = false
 	re                            *regexp.Regexp
+	reShortened                   *regexp.Regexp
 )
 
 func init() {
 	re = regexp.MustCompile(pollURLpattern)
+	reShortened = regexp.MustCompile(pollURLpatternShortened)
 }
 
 // FarcasterVerifier is a proof verifier for the Farcaster frame protocol.
@@ -86,7 +90,17 @@ func (*FarcasterVerifier) Verify(process *models.Process, envelope *models.VoteE
 				return false, nil, fmt.Errorf("process ID mismatch (got %x, expected %x)", votePID, envelope.ProcessId)
 			}
 		} else {
-			return false, nil, fmt.Errorf("no process ID found on poll URL")
+			// If no match is found, we try to match a shortened process ID
+			matches = reShortened.FindStringSubmatch(string(frameAction.Url))
+			if len(matches) > 1 {
+				if matches[1] != generateShortenedProcessID(envelope.ProcessId) {
+					return false, nil, fmt.Errorf("shortened process ID mismatch (got %s, expected %s)",
+						matches[1], generateShortenedProcessID(envelope.ProcessId))
+				}
+			} else {
+				// If no match is found, we return an error
+				return false, nil, fmt.Errorf("no process ID found on poll URL")
+			}
 		}
 	}
 
@@ -208,4 +222,12 @@ func GenerateNullifier(farcasterID uint64, processID []byte) []byte {
 	fidBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(fidBytes, farcasterID)
 	return ethereum.HashRaw(append(fidBytes, processID...))
+}
+
+func generateShortenedProcessID(processID []byte) string {
+	// We take the 8 first chars of the base64 encoded hash of the processID.
+	// The probability of at least one collision among 100,000 generated hashes is approximately 0.0018%.
+	// The probability of at least one collision among 1,000,000 generated hashes is approximately 0.177%.
+	hash := blake3.Sum256(processID)
+	return base64.StdEncoding.EncodeToString(hash[:])[:8]
 }

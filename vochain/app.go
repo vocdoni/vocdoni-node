@@ -17,6 +17,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -38,6 +39,13 @@ const (
 	// maxPendingTxAttempts is the number of times a transaction can be included in a block
 	// and fail before being removed from the mempool.
 	maxPendingTxAttempts = 3
+
+	// StateDataDir is the subdirectory inside app.DataDir where State data will be saved
+	StateDataDir = "vcstate"
+	// TxHandlerDataDir is the subdirectory inside app.DataDir where TransactionHandler data will be saved
+	TxHandlerDataDir = "txHandler"
+	// TxHandlerDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
+	SnapshotsDataDir = "snapshots"
 )
 
 var (
@@ -55,6 +63,7 @@ type BaseApplication struct {
 	NodeClient         *cometcli.Local
 	NodeAddress        ethcommon.Address
 	TransactionHandler *transaction.TransactionHandler
+	Snapshots          *snapshot.SnapshotManager
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
@@ -76,10 +85,14 @@ type BaseApplication struct {
 	// blockTime is the target block time that miners use
 	blockTime time.Duration
 
+	// snapshotInterval create state snapshot every N blocks (0 to disable)
+	snapshotInterval int
+
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	chainID           string
 	dataDir           string
+	dbType            string
 	genesisInfo       *comettypes.GenesisDoc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
@@ -125,7 +138,7 @@ type ExecuteBlockResponse struct {
 // Node still needs to be initialized with SetNode.
 // Callback functions still need to be initialized.
 func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error) {
-	state, err := vstate.NewState(vochainCfg.DBType, vochainCfg.DataDir)
+	state, err := vstate.New(vochainCfg.DBType, filepath.Join(vochainCfg.DataDir, StateDataDir))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
@@ -136,8 +149,13 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	transactionHandler := transaction.NewTransactionHandler(
 		state,
 		istc,
-		filepath.Join(vochainCfg.DataDir, "txHandler"),
+		filepath.Join(vochainCfg.DataDir, TxHandlerDataDir),
 	)
+
+	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create snapshot manager: %w", err)
+	}
 
 	// Initialize the zk circuit
 	if err := circuit.Init(); err != nil {
@@ -152,8 +170,11 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		State:              state,
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
+		Snapshots:          snaps,
 		blockCache:         blockCache,
 		dataDir:            vochainCfg.DataDir,
+		dbType:             vochainCfg.DBType,
+		snapshotInterval:   vochainCfg.SnapshotInterval,
 		genesisInfo:        &comettypes.GenesisDoc{},
 	}, nil
 }
@@ -209,15 +230,17 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-	// perform state snapshot (DISABLED)
-	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
+
+	// perform state snapshot
+	if app.snapshotInterval > 0 &&
+		app.Height()%uint32(app.snapshotInterval) == 0 &&
+		!app.IsSynchronizing() {
 		startTime := time.Now()
-		log.Infof("performing a state snapshot on block %d", app.Height())
-		if _, err := app.State.Snapshot(); err != nil {
-			return hash, fmt.Errorf("cannot make state snapshot: %w", err)
+		log.Infof("performing a snapshot on block %d", app.Height())
+		if _, err := app.Snapshots.Do(app.State); err != nil {
+			return hash, fmt.Errorf("cannot make snapshot: %w", err)
 		}
 		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
-		log.Debugf("%+v", app.State.ListSnapshots())
 	}
 	return hash, err
 }

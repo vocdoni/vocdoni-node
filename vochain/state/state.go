@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,10 +29,6 @@ const (
 	// is the value of arbo.HashFunctionSha256.Len(), arbo.HashFunctionPoseidon.Len() and
 	// arbo.HashFunctionBlake2b.Len()
 	defaultHashLen = 32
-	// storageDirectory is the final directory name where all files are stored.
-	storageDirectory = "vcstate"
-	// snapshotsDirectory is the final directory name where the snapshots are stored.
-	snapshotsDirectory = "snapshots"
 
 	// timestampKey is the key used to store the timestamp of the last block.
 	timestampKey = "timestamp"
@@ -49,8 +44,6 @@ var (
 
 // State represents the state of the vochain application
 type State struct {
-	// data directory for storing files
-	dataDir string
 	// db is the underlying key-value database used by the StateDB
 	db db.Database
 	// Store contains the StateDB.  We match every StateDB commit version
@@ -81,11 +74,12 @@ type State struct {
 }
 
 // NewState creates a new State
-func NewState(dbType, dataDir string) (*State, error) {
-	database, err := metadb.New(dbType, filepath.Join(dataDir, storageDirectory))
+func New(dbType, dataDir string) (*State, error) {
+	database, err := metadb.New(dbType, dataDir)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("cannot init metadb: %w", err)
 	}
+
 	sdb, err := initStateDB(database)
 	if err != nil {
 		return nil, fmt.Errorf("cannot init StateDB: %s", err)
@@ -102,8 +96,8 @@ func NewState(dbType, dataDir string) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("state database is ready at version %d with hash %x",
-		version, root)
+	log.Infof("state database at %s is ready at version %d with hash %x",
+		dataDir, version, root)
 	tx, err := sdb.BeginTx()
 	if err != nil {
 		return nil, err
@@ -113,7 +107,6 @@ func NewState(dbType, dataDir string) (*State, error) {
 		return nil, err
 	}
 	s := &State{
-		dataDir:           dataDir,
 		db:                database,
 		store:             sdb,
 		tx:                treeTxWithMutex{TreeTx: tx},
@@ -130,13 +123,13 @@ func NewState(dbType, dataDir string) (*State, error) {
 	if err := s.FetchValidSIKRoots(); err != nil {
 		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
 	}
-	return s, os.MkdirAll(filepath.Join(dataDir, storageDirectory, snapshotsDirectory), 0750)
+	return s, os.MkdirAll(dataDir, 0o750)
 }
 
 // initStateDB initializes the StateDB with the default subTrees
 func initStateDB(database db.Database) (*statedb.StateDB, error) {
 	log.Infof("initializing StateDB")
-	sdb := statedb.NewStateDB(database)
+	sdb := statedb.New(database)
 	startTime := time.Now()
 	defer func() { log.Infof("state database load took %s", time.Since(startTime)) }()
 	root, err := sdb.Hash()
@@ -152,59 +145,21 @@ func initStateDB(database db.Database) (*statedb.StateDB, error) {
 		return nil, err
 	}
 	defer update.Discard()
-	// Create the Extra, Validators and Processes subtrees (from
+
+	// Create the all the Main subtrees (from
 	// mainTree) by adding leaves in the mainTree that contain the
 	// corresponding tree roots, and opening the subTrees for the first
 	// time.
-	treeCfg := StateTreeCfg(TreeExtra)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
+	for name := range MainTrees {
+		treeCfg := StateTreeCfg(name)
+		if err := update.Add(treeCfg.Key(),
+			make([]byte, treeCfg.HashFunc().Len())); err != nil {
+			return nil, err
+		}
+		if _, err := update.SubTree(treeCfg); err != nil {
+			return nil, err
+		}
 	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeValidators)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeProcess)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeAccounts)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeFaucet)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-	treeCfg = StateTreeCfg(TreeSIK)
-	if err := update.Add(treeCfg.Key(),
-		make([]byte, treeCfg.HashFunc().Len())); err != nil {
-		return nil, err
-	}
-	if _, err := update.SubTree(treeCfg); err != nil {
-		return nil, err
-	}
-
 	return sdb, update.Commit(0)
 }
 

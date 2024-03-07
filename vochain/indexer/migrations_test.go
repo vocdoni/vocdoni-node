@@ -1,7 +1,6 @@
 package indexer
 
 import (
-	"context"
 	"io"
 	"os"
 	"path/filepath"
@@ -45,8 +44,7 @@ func TestRestoreBackupAndMigrate(t *testing.T) {
 	// Restore the backup.
 	// Note that the indexer prepares all queries upfront,
 	// which means sqlite will fail if any of them reference missing columns or tables.
-	ctx := context.Background()
-	err = idx.RestoreBackup(ctx, backupPath)
+	err = idx.RestoreBackup(backupPath)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Sanity check that the data is there, and can be used.

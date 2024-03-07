@@ -55,6 +55,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"io"
 	"path"
 	"sync"
 
@@ -187,10 +188,10 @@ func (c *TreeConfig) HashFunc() arbo.HashFunction {
 	return c.hashFunc
 }
 
-// mainTreeCfg is the subTree configuration of the mainTree.  It doesn't have a
+// MainTreeCfg is the subTree configuration of the mainTree.  It doesn't have a
 // kindID because it's the top level tree.  For the same reason, it doesn't
 // contain functions to work with the parent leaf: it doesn't have a parent.
-var mainTreeCfg = NewTreeSingletonConfig(TreeParams{
+var MainTreeCfg = NewTreeSingletonConfig(TreeParams{
 	HashFunc:          arbo.HashFunctionSha256,
 	KindID:            "",
 	MaxLevels:         256,
@@ -209,10 +210,10 @@ type StateDB struct {
 	NoStateReadTx  db.Reader
 }
 
-// NewStateDB returns an instance of the StateDB.
-func NewStateDB(db db.Database) *StateDB {
+// New returns an instance of the StateDB.
+func New(db db.Database) *StateDB {
 	return &StateDB{
-		hashLen: mainTreeCfg.hashFunc.Len(),
+		hashLen: MainTreeCfg.hashFunc.Len(),
 		db:      db,
 	}
 }
@@ -285,7 +286,7 @@ func (s *StateDB) Hash() ([]byte, error) {
 // either call treeTx.Commit or treeTx.Discard if BeginTx doesn't return an
 // error.  Calling treeTx.Discard after treeTx.Commit is ok.
 func (s *StateDB) BeginTx() (treeTx *TreeTx, err error) {
-	cfg := mainTreeCfg
+	cfg := MainTreeCfg
 	// NOTE(Edu): The introduction of Batched Txs here came from the fact
 	// that Badger takes a lot of memory and as a preconfigured maximum
 	// memory allocated for a Tx, which we were easily reaching.  But by
@@ -379,7 +380,7 @@ func (*readOnlyWriteTx) Discard() {}
 // TreeView returns the mainTree opened at root as a TreeView for read-only.
 // If root is nil, the last version's root is used.
 func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
-	cfg := mainTreeCfg
+	cfg := MainTreeCfg
 
 	if root == nil {
 		var err error
@@ -403,6 +404,38 @@ func (s *StateDB) TreeView(root []byte) (*TreeView, error) {
 	return &TreeView{
 		db:   s.db,
 		tree: tree,
-		cfg:  mainTreeCfg,
+		cfg:  MainTreeCfg,
 	}, nil
+}
+
+// Import imports the contents from r into a state tree
+func (s *StateDB) Import(cfg TreeConfig, parent *TreeConfig, r io.Reader) (err error) {
+	dbtx := s.db.WriteTx()
+	defer func() {
+		if err != nil {
+			dbtx.Discard()
+		}
+	}()
+
+	var txTree db.WriteTx
+	if cfg.kindID == "" { // TreeMain
+		txTree = subWriteTx(dbtx, subKeyTree)
+	} else if parent != nil && parent.prefix != "" { // ChildTree (for example Votes)
+		txParent := subWriteTx(dbtx, path.Join(subKeySubTree, parent.prefix))
+		txChild := subWriteTx(txParent, path.Join(subKeySubTree, cfg.prefix))
+		txTree = subWriteTx(txChild, subKeyTree)
+	} else {
+		tx := subWriteTx(dbtx, path.Join(subKeySubTree, cfg.prefix))
+		txTree = subWriteTx(tx, subKeyTree)
+	}
+	tree, err := tree.New(txTree,
+		tree.Options{DB: nil, MaxLevels: cfg.maxLevels, HashFunc: cfg.hashFunc})
+	if err != nil {
+		return err
+	}
+	if err := tree.ImportDumpReaderWithTx(txTree, r); err != nil {
+		return err
+	}
+
+	return txTree.Commit()
 }
