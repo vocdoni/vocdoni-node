@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"time"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -79,16 +80,36 @@ func (c *HTTPclient) CensusSize(censusID types.HexBytes) (uint64, error) {
 // CensusPublish publishes a census to the distributed data storage and returns its root hash
 // and storage URI.
 func (c *HTTPclient) CensusPublish(censusID types.HexBytes) (types.HexBytes, string, error) {
-	resp, code, err := c.Request(HTTPPOST, nil, "censuses", censusID.String(), "publish")
+	resp, code, err := c.Request(HTTPPOST, nil, "censuses", censusID.String(), "publish", "async")
 	if err != nil {
 		return nil, "", err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
+
 	censusData := &api.Census{}
 	if err := json.Unmarshal(resp, censusData); err != nil {
 		return nil, "", fmt.Errorf("could not unmarshal response: %w", err)
+	}
+
+	// wait for the census to be ready and get the root hash and storage URI
+	for {
+		time.Sleep(2 * time.Second)
+		resp, code, err := c.Request(HTTPGET, nil, "censuses", censusData.CensusID.String(), "check")
+		if err != nil {
+			return nil, "", err
+		}
+		if code == apirest.HTTPstatusOK {
+			if err := json.Unmarshal(resp, censusData); err != nil {
+				return nil, "", fmt.Errorf("could not unmarshal response: %w", err)
+			}
+			break
+		}
+		if code == apirest.HTTPstatusNoContent {
+			continue
+		}
+		return nil, "", fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
 	return censusData.CensusID, censusData.URI, nil
 }
