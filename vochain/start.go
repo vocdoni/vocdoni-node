@@ -19,7 +19,6 @@ import (
 	"github.com/cometbft/cometbft/p2p"
 	"github.com/cometbft/cometbft/proxy"
 
-	tmlog "github.com/cometbft/cometbft/libs/log"
 	tmos "github.com/cometbft/cometbft/libs/os"
 	tmnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
@@ -44,70 +43,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
 	}
 	return app
-}
-
-// TenderLogger implements tendermint's Logger interface, with a couple of
-// modifications.
-//
-// First, it routes the logs to go-dvote's logger, so that we don't end up with
-// two loggers writing directly to stdout or stderr.
-//
-// Second, because we generally don't care about tendermint errors such as
-// failures to connect to peers, we route all log levels to our debug level.
-// They will only surface if dvote's log level is "debug".
-type TenderLogger struct {
-	keyvals  []any
-	Artifact string
-	logLevel int // 0:debug 1:info 2:error 3:disabled
-}
-
-var _ tmlog.Logger = (*TenderLogger)(nil)
-
-func (l *TenderLogger) SetLogLevel(logLevel string) {
-	switch logLevel {
-	case "debug":
-		l.logLevel = 0
-	case "info":
-		l.logLevel = 1
-	case "error":
-		l.logLevel = 2
-	case "disabled", "none":
-		l.logLevel = 3
-	}
-}
-
-func (l *TenderLogger) Debug(msg string, keyvals ...any) {
-	if l.logLevel == 0 {
-		log.Logger().Debug().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) Info(msg string, keyvals ...any) {
-	if l.logLevel <= 1 {
-		log.Logger().Info().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) Error(msg string, keyvals ...any) {
-	if l.logLevel <= 2 {
-		log.Logger().Error().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) With(keyvals ...any) tmlog.Logger {
-	// Make sure we copy the values, to avoid modifying the parent.
-	// TODO(mvdan): use zap's With method directly.
-	l2 := &TenderLogger{Artifact: l.Artifact, logLevel: l.logLevel}
-	l2.keyvals = append(l2.keyvals, l.keyvals...)
-	l2.keyvals = append(l2.keyvals, keyvals...)
-	return l2
-}
-
-// NewTenderLogger creates a Tendermint compatible logger for specified artifact
-func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
-	tl := &TenderLogger{Artifact: artifact}
-	tl.SetLogLevel(logLevel)
-	return tl
 }
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
@@ -238,8 +173,6 @@ func newTendermint(app *BaseApplication,
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
 
-	logger := NewTenderLogger("comet", tconfig.LogLevel)
-
 	// read or create local private validator
 	pv, err := NewPrivateValidator(
 		localConfig.MinerKey,
@@ -332,7 +265,7 @@ func newTendermint(app *BaseApplication,
 		tmnode.DefaultGenesisDocProviderFunc(tconfig),
 		tmcfg.DefaultDBProvider,
 		tmnode.DefaultMetricsProvider(tconfig.Instrumentation),
-		logger,
+		log.NewCometLogger("comet", tconfig.LogLevel),
 	)
 
 	if err != nil {
