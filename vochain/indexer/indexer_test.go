@@ -1020,7 +1020,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
-	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
+	qt.Assert(t, app.IsSynced(), qt.Equals, true)
 
 	err := app.State.AddProcess(&models.Process{
 		ProcessId:     pid,
