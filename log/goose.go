@@ -1,8 +1,12 @@
 package log
 
+import "github.com/pressly/goose/v3"
+
 // gooseLogger is a logger that implements goose.Logger interface,
 // hardcoded to log messages as Debug level
 type gooseLogger struct{}
+
+var _ goose.Logger = (*gooseLogger)(nil)
 
 func (*gooseLogger) Fatal(v ...any)                 { Fatal(v...) }
 func (*gooseLogger) Fatalf(format string, v ...any) { Fatalf(format, v...) }
