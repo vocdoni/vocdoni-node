@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -108,9 +107,8 @@ func NewKeyKeeper(dbPath string, v *vochain.BaseApplication, signer *ethereum.Si
 // RevealUnpublished is a rescue function for revealing keys that should be already revealed.
 func (k *KeyKeeper) RevealUnpublished() {
 	// Wait for the node to be synchronized
-	for k.vochain.IsSynchronizing() {
-		time.Sleep(10 * time.Second)
-	}
+	<-k.vochain.WaitUntilSynced()
+
 	// Acquire the lock
 	k.lock.Lock()
 	defer k.lock.Unlock()
