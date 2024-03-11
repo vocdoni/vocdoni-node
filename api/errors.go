@@ -112,4 +112,5 @@ var (
 	ErrCantCountVotes                   = apirest.APIerror{Code: 5029, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot count votes")}
 	ErrVochainOverloaded                = apirest.APIerror{Code: 5030, HTTPstatus: apirest.HTTPstatusServiceUnavailable, Err: fmt.Errorf("vochain overloaded")}
 	ErrGettingSIK                       = apirest.APIerror{Code: 5031, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error getting SIK")}
+	ErrCensusBuild                      = apirest.APIerror{Code: 5032, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error building census")}
 )
