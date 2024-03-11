@@ -3,12 +3,14 @@ package zkproof
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -34,6 +36,9 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	}
 	hashedPid := sha256.Sum256(process.ProcessId)
 	if !bytes.Equal(hashedPid[:], proofProcessID) {
+		log.Debugw("process id mismatch",
+			"processID", hex.EncodeToString(process.ProcessId),
+			"proofProcessID", hex.EncodeToString(proofProcessID))
 		return false, nil, fmt.Errorf("process id mismatch %x != %x", process.ProcessId, proofProcessID)
 	}
 	// verify the census root
@@ -51,6 +56,9 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	}
 	hashedVotePackage := sha256.Sum256(envelope.VotePackage)
 	if !bytes.Equal(hashedVotePackage[:], proofVoteHash) {
+		log.Debugw("process id mismatch",
+			"votPackage", hex.EncodeToString(envelope.VotePackage),
+			"proofVotePackage", hex.EncodeToString(proofVoteHash))
 		return false, nil, fmt.Errorf("vote hash mismatch")
 	}
 	// get vote weight from proof publicSignals

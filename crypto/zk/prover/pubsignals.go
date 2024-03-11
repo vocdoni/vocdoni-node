@@ -42,7 +42,7 @@ func (p *Proof) ElectionID() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return util.SplittedArboStrToBytes(electionID1str, electionID2str), nil
+	return util.SplittedArboStrToBytes(electionID1str, electionID2str, false, false), nil
 }
 
 // VoteHash returns the VoteHash included into the current proof.
@@ -55,7 +55,7 @@ func (p *Proof) VoteHash() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return util.SplittedArboStrToBytes(voteHash1str, voteHash2str), nil
+	return util.SplittedArboStrToBytes(voteHash1str, voteHash2str, false, true), nil
 }
 
 // CensusRoot returns the CensusRoot included into the current proof.
