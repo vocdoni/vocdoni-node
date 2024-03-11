@@ -7,7 +7,6 @@ services:
     env_file: env
     volumes:
       - "run:/app/run"
-      - "eth:/app/eth:ro"
     ports:
       - "443:9090"                      # REST API gateway
       - "9090:9090"                     # REST API gateway
@@ -33,4 +32,3 @@ services:
 
 volumes:
   run: {}
-  eth: {}
