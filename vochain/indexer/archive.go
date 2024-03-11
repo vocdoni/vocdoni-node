@@ -150,7 +150,12 @@ func (idx *Indexer) StartArchiveRetrieval(storage *downloader.Downloader, archiv
 			archive = append(archive, &p)
 		}
 
-		log.Debugw("archive processes unmarshaled", "processes", len(archive))
+		log.Debugw("archive processes unmarshaled, will wait until sync is finished and then import", "processes", len(archive))
+
+		<-idx.App.WaitUntilSynced()
+
+		log.Infof("running archive import after-sync")
+
 		added, err := idx.ImportArchive(archive)
 		if err != nil {
 			log.Warnw("cannot import archive", "err", err)
