@@ -46,7 +46,7 @@ type OffChainDataHandler struct {
 	queue         []importItem
 	queueLock     sync.Mutex
 	importOnlyNew bool
-	isFastSync    bool
+	isSynced      bool
 }
 
 // NewOffChainDataHandler creates a new instance of the off chain data downloader daemon.
@@ -68,7 +68,7 @@ func NewOffChainDataHandler(v *vochain.BaseApplication, d *downloader.Downloader
 func (d *OffChainDataHandler) Rollback() {
 	d.queueLock.Lock()
 	d.queue = make([]importItem, 0)
-	d.isFastSync = d.vochain.IsSynchronizing()
+	d.isSynced = d.vochain.IsSynced()
 	d.queueLock.Unlock()
 }
 
@@ -98,7 +98,7 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 func (d *OffChainDataHandler) OnProcess(pid, _ []byte, censusRoot, censusURI string, _ int32) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if d.importOnlyNew && d.isFastSync {
+	if d.importOnlyNew && !d.isSynced {
 		return
 	}
 	p, err := d.vochain.State.Process(pid, false)
@@ -125,7 +125,7 @@ func (d *OffChainDataHandler) OnProcess(pid, _ []byte, censusRoot, censusURI str
 
 // OnCensusUpdate is triggered when the census is updated during an election.
 func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
-	if d.importOnlyNew && d.isFastSync {
+	if d.importOnlyNew && !d.isSynced {
 		return
 	}
 	p, err := d.vochain.State.Process(pid, false)
@@ -151,7 +151,7 @@ func (*OffChainDataHandler) OnProcessesStart(_ [][]byte) {
 func (d *OffChainDataHandler) OnSetAccount(_ []byte, account *state.Account) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
-	if d.importOnlyNew && d.isFastSync {
+	if d.importOnlyNew && !d.isSynced {
 		return
 	}
 	// enqueue for import account metadata information

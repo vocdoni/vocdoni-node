@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 	"sync"
-	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
@@ -64,9 +63,8 @@ func NewKeyKeeper(v *vochain.BaseApplication, signer *ethereum.SignKeys, index i
 // This can happen when the node is stopped while there are pending keys to reveal.
 func (k *KeyKeeper) RevealUnpublished() {
 	// Wait for the node to be synchronized
-	for k.vochain.IsSynchronizing() {
-		time.Sleep(5 * time.Second)
-	}
+	<-k.vochain.WaitUntilSynced()
+
 	// Check for all if we have pending keys to reveal
 	pids, err := k.vochain.State.ListProcessIDs(true)
 	if err != nil {

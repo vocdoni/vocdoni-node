@@ -309,23 +309,10 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		return
 	}
 
-	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
-	// the chain is not synchronizing since it still does not have any peer and do not know the
-	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
-	// the Wait loop would pass.
-	syncSignals := 5
-	for !inTest {
-		// Add some grace time to avoid false positive on IsSynchronizing()
-		if !idx.App.IsSynchronizing() {
-			syncSignals--
-		} else {
-			syncSignals = 5
-		}
-		if syncSignals == 0 {
-			break
-		}
-		time.Sleep(time.Second * 1)
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
 	}
+
 	log.Infof("running indexer after-sync bootstrap")
 
 	// Note that holding blockMu means new votes aren't added until the recovery finishes.
@@ -570,7 +557,7 @@ func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
-	if !idx.App.IsSynchronizing() {
+	if idx.App.IsSynced() {
 		idx.addProcessToLiveResults(pid)
 	}
 	log.Debugw("new process", "processID", hex.EncodeToString(pid))

@@ -324,7 +324,7 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		ElectionCount:     a.indexer.CountTotalProcesses(),
 		OrganizationCount: a.indexer.CountTotalEntities(),
 		Height:            a.vocapp.Height(),
-		Syncing:           a.vocapp.IsSynchronizing(),
+		Syncing:           !a.vocapp.IsSynced(),
 		TransactionCount:  transactionCount,
 		ValidatorCount:    uint32(len(validators)),
 		Timestamp:         a.vocapp.Timestamp(),
