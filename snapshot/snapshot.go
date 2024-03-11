@@ -10,10 +10,12 @@ import (
 	"fmt"
 	"hash"
 	"io"
+	"io/fs"
 	"math"
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -25,6 +27,8 @@ const (
 	snapshotHeaderVersion = 1
 	snapshotHeaderLenSize = 32
 )
+
+const snapshotKeepNRecent = 10
 
 const (
 	snapshotBlobType_Tree = iota
@@ -233,7 +237,11 @@ func (s *Snapshot) Finish() error {
 // or handle removing the directory, in case the returned err != nil
 // It also restores the IndexerDB into dataDir/indexer (hardcoded)
 func (s *Snapshot) Restore(dbType, dataDir string) (string, error) {
-	log.Infof("installing snapshot %+v into dir %s using dbType %s", s.Header(), dataDir, dbType)
+	log.Infow("installing snapshot",
+		"dataDir", dataDir, "dbType", dbType,
+		"version", s.Header().Version, "blobs", len(s.Header().Blobs),
+		"chainID", s.Header().ChainID, "height", s.Header().Height,
+		"root", fmt.Sprintf("%x", s.Header().Root))
 
 	tmpDir, err := os.MkdirTemp(dataDir, "newState")
 	if err != nil {
@@ -319,6 +327,7 @@ func NewManager(dataDir string, chunkSize int64) (*SnapshotManager, error) {
 
 // Do performs a snapshot of the last committed state for all trees and dbs.
 // The snapshot is stored in disk and the file path is returned.
+// If the snapshot finishes successfully, it will trigger a prune of old snapshots from dataDir
 func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 	height, err := v.LastHeight()
 	if err != nil {
@@ -339,11 +348,17 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 	snap.SetHeight(height)
 	snap.SetChainID(v.ChainID())
 
+	logLastDumpedBlob := func() {
+		b := snap.header.Blobs[len(snap.header.Blobs)-1]
+		log.Debugw("dumped blob", "index", len(snap.header.Blobs)-1, "type", b.Type, "name", b.Name, "size", b.Size,
+			"parent", b.Parent, "key", fmt.Sprintf("%x", b.Key), "root", fmt.Sprintf("%x", b.Root))
+	}
+
 	// NoStateDB
 	if err := snap.DumpNoStateDB(v); err != nil {
 		return "", err
 	}
-	log.Debugf("dumped blob %d: %+v", len(snap.header.Blobs)-1, snap.header.Blobs[len(snap.header.Blobs)-1])
+	logLastDumpedBlob()
 
 	// State
 	list, err := v.DeepListStateTrees()
@@ -354,7 +369,7 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 		if err := snap.DumpTree(treedesc.Name, treedesc.Parent, treedesc.Key, treedesc.Tree); err != nil {
 			return "", err
 		}
-		log.Debugf("dumped blob %d: %+v", len(snap.header.Blobs)-1, snap.header.Blobs[len(snap.header.Blobs)-1])
+		logLastDumpedBlob()
 	}
 
 	// Indexer
@@ -362,10 +377,21 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 		if err := snap.DumpIndexer(FnExportIndexer()); err != nil {
 			return "", err
 		}
-		log.Debugf("dumped blob %d: %+v", len(snap.header.Blobs)-1, snap.header.Blobs[len(snap.header.Blobs)-1])
+		logLastDumpedBlob()
 	}
 
-	return snap.Path(), snap.Finish()
+	if err := snap.Finish(); err != nil {
+		return "", fmt.Errorf("couldn't finish snapshot: %w", err)
+	}
+
+	// Prune old snapshots
+	defer func() {
+		if err := sm.Prune(snapshotKeepNRecent); err != nil {
+			log.Warnf("couldn't prune snapshots: %s", err)
+		}
+	}()
+
+	return snap.Path(), nil
 }
 
 // New starts the creation of a new snapshot as a disk file.
@@ -416,6 +442,45 @@ func (*SnapshotManager) Open(filePath string) (*Snapshot, error) {
 		return nil, fmt.Errorf("snapshot version not compatible")
 	}
 	return s, nil
+}
+
+// Prune removes old snapshots stored on disk, keeping the N most recent ones
+func (sm *SnapshotManager) Prune(keepRecent int) error {
+	files, err := os.ReadDir(sm.dataDir)
+	if err != nil {
+		return fmt.Errorf("cannot read dataDir: %w", err)
+	}
+
+	// Convert fs.DirEntry to FileInfo and filter out directories.
+	var fileInfos []fs.FileInfo
+	for _, file := range files {
+		if file.IsDir() {
+			continue // Skip directories
+		}
+		info, err := file.Info()
+		if err != nil {
+			return fmt.Errorf("cannot read file %s: %w", file.Name(), err)
+		}
+		fileInfos = append(fileInfos, info)
+	}
+
+	// Sort files by modification time, newest first.
+	sort.Slice(fileInfos, func(i, j int) bool {
+		return fileInfos[i].ModTime().After(fileInfos[j].ModTime())
+	})
+
+	// Determine which files to delete.
+	if len(fileInfos) > keepRecent {
+		// Delete the older files.
+		for _, file := range fileInfos[keepRecent:] {
+			err := os.Remove(filepath.Join(sm.dataDir, file.Name()))
+			if err != nil {
+				return fmt.Errorf("cannot delete file %s: %w", file.Name(), err)
+			}
+			log.Debugf("pruned old snapshot %s", file.Name())
+		}
+	}
+	return nil
 }
 
 // List returns the list of the current snapshots stored on disk, indexed by height

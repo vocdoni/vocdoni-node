@@ -141,9 +141,9 @@ func newConfig() (*config.Config, config.Error) {
 		"do not wait for Vochain to synchronize (for testing only)")
 	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
-	conf.Vochain.SnapshotInterval = *flag.Int("vochainSnapshotInterval", 0,
+	conf.Vochain.SnapshotInterval = *flag.Int("vochainSnapshotInterval", 10000,
 		"create state snapshot every N blocks (0 to disable)")
-	conf.Vochain.StateSyncEnabled = *flag.Bool("vochainStateSyncEnabled", false,
+	conf.Vochain.StateSyncEnabled = *flag.Bool("vochainStateSyncEnabled", true,
 		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
 	conf.Vochain.StateSyncRPCServers = *flag.StringSlice("vochainStateSyncRPCServers", []string{},
 		"list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)")
@@ -627,8 +627,8 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		// start the service and block until finish fast sync
-		// State Sync (if enabled) also happens during this step
+		// start the service and block until finish sync:
+		// StateSync (if enabled) happens first, and then fastsync in all cases
 		if err := srv.Start(); err != nil {
 			log.Fatal(err)
 		}

@@ -3,6 +3,7 @@ package vochain
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	tmcli "github.com/cometbft/cometbft/rpc/client/local"
 	ctypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -47,6 +48,11 @@ func (app *BaseApplication) SetDefaultMethods() {
 	app.SetFnGetBlockByHeight(func(height int64) *tmtypes.Block {
 		resblock, err := app.NodeClient.Block(context.Background(), &height)
 		if err != nil {
+			if strings.Contains(err.Error(), "not available, lowest height is") {
+				// this error is frequent (and expected) after StateSync, log as Debug instead of Warn
+				log.Debugf("cannot fetch block by height: %v", err)
+				return nil
+			}
 			log.Warnf("cannot fetch block by height: %v", err)
 			return nil
 		}
