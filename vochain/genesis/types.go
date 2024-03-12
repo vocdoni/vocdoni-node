@@ -81,6 +81,8 @@ type ConsensusParams struct {
 	Evidence  EvidenceParams  `json:"evidence"`
 	Validator ValidatorParams `json:"validator"`
 	Version   VersionParams   `json:"version"`
+
+	Synchrony comettypes.SynchronyParams `json:"synchrony"`
 }
 
 // BlockParams define limits on the block size and gas plus minimum time

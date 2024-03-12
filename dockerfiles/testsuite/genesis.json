@@ -19,6 +19,10 @@
     },
     "version": {
       "app_version": "0"
+    },
+    "synchrony": {
+      "precision": "500000000",
+      "message_delay": "2000000000"
     }
   },
   "app_hash": "",

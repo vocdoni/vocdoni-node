@@ -3,6 +3,7 @@ package genesis
 import (
 	"time"
 
+	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/types"
 )
 
@@ -73,6 +74,7 @@ var devGenesis = Doc{
 		Version: VersionParams{
 			AppVersion: 1,
 		},
+		Synchrony: comettypes.DefaultSynchronyParams(),
 	},
 	AppState: AppState{
 		MaxElectionSize: 100000,
@@ -154,6 +156,7 @@ var stageGenesis = Doc{
 		Version: VersionParams{
 			AppVersion: 1,
 		},
+		Synchrony: comettypes.DefaultSynchronyParams(),
 	},
 	AppState: AppState{
 		MaxElectionSize: 500000,
@@ -252,6 +255,7 @@ var ltsGenesis = Doc{
 		Version: VersionParams{
 			AppVersion: 0,
 		},
+		Synchrony: comettypes.DefaultSynchronyParams(),
 	},
 	AppState: AppState{
 		MaxElectionSize: 1000000,
