@@ -160,7 +160,6 @@ e2etest_ballotelection() {
 }
 
 test_statesync() {
-	export VOCDONI_VOCHAIN_STATESYNCFETCHPARAMSFROMAPI=$APIHOST
 	$COMPOSE_CMD up gatewaySync -d
 	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
 	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"

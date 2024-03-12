@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -19,6 +20,7 @@ import (
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	cometp2p "github.com/cometbft/cometbft/p2p"
 	cometprivval "github.com/cometbft/cometbft/privval"
+	cometrpchttp "github.com/cometbft/cometbft/rpc/client/http"
 	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
@@ -182,4 +184,16 @@ func NewTemplateGenesisFile(dir string, validators int) (*comettypes.GenesisDoc,
 	}
 	gd.AppState = appStateBytes
 	return &gd, gd.SaveAs(filepath.Join(dir, "genesis.json"))
+}
+
+// newCometRPCClient sets up a new cometbft RPC client
+func newCometRPCClient(server string) (*cometrpchttp.HTTP, error) {
+	if !strings.Contains(server, "://") {
+		server = "http://" + server
+	}
+	c, err := cometrpchttp.New(server)
+	if err != nil {
+		return nil, err
+	}
+	return c, nil
 }

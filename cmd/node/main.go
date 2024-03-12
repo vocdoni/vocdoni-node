@@ -24,7 +24,6 @@ import (
 	urlapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/api/faucet"
-	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
@@ -195,13 +194,13 @@ func loadConfig() *config.Config {
 	flag.StringSlice("vochainStateSyncRPCServers", []string{},
 		"list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)")
 	flag.String("vochainStateSyncTrustHash", "",
-		"hash of the trusted block (takes precedence over API URL and hardcoded defaults)")
+		"hash of the trusted block (takes precedence over RPC and hardcoded defaults)")
 	flag.Int64("vochainStateSyncTrustHeight", 0,
-		"height of the trusted block (takes precedence over API URL and hardcoded defaults)")
+		"height of the trusted block (takes precedence over RPC and hardcoded defaults)")
 	flag.Int64("vochainStateSyncChunkSize", 10*(1<<20), // 10 MB
 		"cometBFT chunk size in bytes")
-	flag.String("vochainStateSyncFetchParamsFromAPI", "",
-		"API URL to fetch needed params from (by default, it will use hardcoded URLs, set to 'disabled' to skip this feature)")
+	flag.Bool("vochainStateSyncFetchParamsFromRPC", true,
+		"allow statesync to fetch TrustHash and TrustHeight from the first RPCServer")
 
 	flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
 		"vochain consensus block time target (in seconds)")
@@ -439,42 +438,6 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	}
-
-	// If StateSync is enabled but parameters are empty, try our best to populate them
-	// (cmdline flags take precedence if defined, of course)
-	if conf.Vochain.StateSyncEnabled &&
-		conf.Vochain.StateSyncTrustHeight == 0 && conf.Vochain.StateSyncTrustHash == "" {
-		conf.Vochain.StateSyncTrustHeight, conf.Vochain.StateSyncTrustHash = func() (int64, string) {
-			// first try to fetch params from remote API endpoint
-			switch strings.ToLower(conf.Vochain.StateSyncFetchParamsFromAPI) {
-			case "disabled":
-				// magic keyword to skip this feature, do nothing
-			case "":
-				height, hash, err := apiclient.FetchChainHeightAndHashFromDefaultAPI(conf.Vochain.Network)
-				if err != nil {
-					log.Warnw("couldn't fetch current state sync params", "err", err)
-				} else {
-					return height, hash.String()
-				}
-			default:
-				height, hash, err := apiclient.FetchChainHeightAndHash(conf.Vochain.StateSyncFetchParamsFromAPI)
-				if err != nil {
-					log.Warnw("couldn't fetch current state sync params", "err", err)
-				} else {
-					return height, hash.String()
-				}
-			}
-			// else, fallback to hardcoded params, if defined for the current network & chainID
-			if g, ok := genesis.Genesis[conf.Vochain.Network]; ok {
-				if statesync, ok := g.StateSync[g.Genesis.ChainID]; ok {
-					return statesync.TrustHeight, statesync.TrustHash.String()
-				}
-			}
-			return 0, ""
-		}()
-		log.Infow("automatically determined statesync params",
-			"height", conf.Vochain.StateSyncTrustHeight, "hash", conf.Vochain.StateSyncTrustHash)
 	}
 
 	//
