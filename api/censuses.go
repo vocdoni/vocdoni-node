@@ -791,7 +791,6 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 	if !ok {
 		return ErrCensusNotFound
 	}
-	log.Warnf("census publish status: %v", uriOrErrorAny)
 	uriOrError := uriOrErrorAny.(string)
 	if uriOrError == "" {
 		return ctx.Send(nil, apirest.HTTPstatusNoContent)
