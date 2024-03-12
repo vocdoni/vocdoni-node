@@ -173,10 +173,6 @@ services:
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
-      - VOCDONI_LOGLEVEL=debug
-      - VOCDONI_VOCHAIN_STATESYNCENABLED=true
-      - VOCDONI_VOCHAIN_STATESYNCRPCSERVERS=miner0:26657,miner0:26657
-      - VOCDONI_VOCHAIN_STATESYNCFETCHPARAMSFROMAPI
 
 networks:
   blockchain:

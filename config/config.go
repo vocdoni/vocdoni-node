@@ -151,9 +151,8 @@ type VochainCfg struct {
 	StateSyncTrustHash string
 	// StateSyncChunkSize defines the size of the chunks when splitting a Snapshot for sending via StateSync
 	StateSyncChunkSize int64
-	// StateSyncFetchParamsFromAPI defines an API URL to fetch the params from.
-	// If empty it will use default API urls, special keyword "disable" means to skip this feature altogether
-	StateSyncFetchParamsFromAPI string
+	// StateSyncFetchParamsFromRPC allows statesync to fetch TrustHash and TrustHeight from the first RPCServer
+	StateSyncFetchParamsFromRPC bool
 }
 
 // IndexerCfg handles the configuration options of the indexer

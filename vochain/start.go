@@ -158,6 +158,39 @@ func newTendermint(app *BaseApplication,
 
 		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
 		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
+
+		// If StateSync is enabled but parameters are empty, try our best to populate them
+		// first try to fetch params from remote API endpoint
+		if localConfig.StateSyncFetchParamsFromRPC &&
+			tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
+			tconfig.StateSync.TrustHeight, tconfig.StateSync.TrustHash = func() (int64, string) {
+				cli, err := newCometRPCClient(tconfig.StateSync.RPCServers[0])
+				if err != nil {
+					log.Warnf("cannot connect to remote RPC server: %v", err)
+					return 0, ""
+				}
+				status, err := cli.Status(context.TODO())
+				if err != nil {
+					log.Warnf("cannot fetch status from remote RPC server: %v", err)
+					return 0, ""
+				}
+				log.Infow("fetched statesync params from remote RPC",
+					"height", status.SyncInfo.LatestBlockHeight, "hash", status.SyncInfo.LatestBlockHash.String())
+				return status.SyncInfo.LatestBlockHeight, status.SyncInfo.LatestBlockHash.String()
+			}()
+		}
+
+		// if still empty, fallback to hardcoded params, if defined for the current network & chainID
+		if tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
+			if g, ok := vocdoniGenesis.Genesis[localConfig.Network]; ok {
+				if statesync, ok := g.StateSync[g.Genesis.ChainID]; ok {
+					tconfig.StateSync.TrustHeight = statesync.TrustHeight
+					tconfig.StateSync.TrustHash = statesync.TrustHash.String()
+					log.Infow("using hardcoded statesync params",
+						"height", tconfig.StateSync.TrustHeight, "hash", tconfig.StateSync.TrustHash)
+				}
+			}
+		}
 	}
 	tconfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 
