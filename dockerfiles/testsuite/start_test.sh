@@ -178,7 +178,7 @@ sleep 10
 $COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
 
 check_gw_is_up() {
-  height=$($COMPOSE_CMD_RUN test \
+  height=$($COMPOSE_CMD_RUN --rm test \
                curl -s --fail $APIHOST/chain/info 2>/dev/null \
                | grep -o '"height":[0-9]*' | grep -o '[0-9]*')
   log "height=$height"
