@@ -252,11 +252,19 @@ func loadConfig() *config.Config {
 	conf.DataDir = filepath.Join(viper.GetString("dataDir"), viper.GetString("chain"))
 	viper.Set("dataDir", conf.DataDir)
 
-	// set up the data subdirectories
-	viper.Set("TLS.DirCert", filepath.Join(conf.DataDir, "tls"))
-	viper.Set("ipfs.ConfigPath", filepath.Join(conf.DataDir, "ipfs"))
-	viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
-	viper.Set("vochain.ProcessArchiveDataDir", filepath.Join(conf.DataDir, "archive"))
+	// set up the data subdirectories (if no flag or env was passed)
+	if viper.GetString("TLS.DirCert") == "" {
+		viper.Set("TLS.DirCert", filepath.Join(conf.DataDir, "tls"))
+	}
+	if viper.GetString("ipfs.ConfigPath") == "" {
+		viper.Set("ipfs.ConfigPath", filepath.Join(conf.DataDir, "ipfs"))
+	}
+	if viper.GetString("vochain.DataDir") == "" {
+		viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
+	}
+	if viper.GetString("vochain.ProcessArchiveDataDir") == "" {
+		viper.Set("vochain.ProcessArchiveDataDir", filepath.Join(conf.DataDir, "archive"))
+	}
 
 	// propagate some keys to the vochain category
 	viper.Set("vochain.dbType", viper.GetString("dbType"))

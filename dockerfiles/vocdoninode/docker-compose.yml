@@ -5,8 +5,11 @@ services:
       context: ../../
     image: "ghcr.io/vocdoni/vocdoni-node:${VOCDONI_NODE_TAG:-main}"
     env_file: env
+    environment:
+      - VOCDONI_TLS_DIRCERT=/app/letsencrypt/
     volumes:
-      - "run:/app/run"
+      - ./letsencrypt/:/app/letsencrypt/
+      - run:/app/run
     ports:
       - "443:9090"                      # REST API gateway
       - "9090:9090"                     # REST API gateway
