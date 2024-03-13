@@ -2,6 +2,7 @@
 package vochain
 
 import (
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"

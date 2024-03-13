@@ -17,6 +17,7 @@ import (
 	abcitypes "github.com/cometbft/cometbft/abci/types"
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/cometbft/cometbft/proto/tendermint/types"
+	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/snapshot"
@@ -600,6 +601,39 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 		if err := app.RestoreStateFromSnapshot(s); err != nil {
 			log.Error(err)
 			return nil, err
+		}
+
+		// Fetch the block before the snapshot, we'll need it to bootstrap other nodes
+		fetchAndSaveBlock := func(height int64) error {
+			cli, err := newCometRPCClient(app.Node.Config().StateSync.RPCServers[0])
+			if err != nil {
+				return fmt.Errorf("cannot connect to remote RPC server: %w", err)
+			}
+
+			b, err := cli.Block(context.TODO(), &height)
+			if err != nil {
+				return fmt.Errorf("cannot fetch block %d from remote RPC: %w", height, err)
+			}
+
+			blockParts, err := b.Block.MakePartSet(comettypes.BlockPartSizeBytes)
+			if err != nil {
+				return err
+			}
+
+			c, err := cli.Commit(context.TODO(), &height)
+			if err != nil {
+				return fmt.Errorf("cannot fetch commit %d from remote RPC: %w", height, err)
+			}
+			app.Node.BlockStore().SaveBlock(b.Block, blockParts, c.Commit)
+
+			return nil
+		}
+
+		if err := fetchAndSaveBlock(snapshotFromComet.height.Load()); err != nil {
+			log.Error("couldn't fetch and save block, rejecting snapshot: ", err)
+			return &abcitypes.ResponseApplySnapshotChunk{
+				Result: abcitypes.ResponseApplySnapshotChunk_REJECT_SNAPSHOT,
+			}, nil
 		}
 	}
 
