@@ -3,6 +3,7 @@ package vochain
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	cometcli "github.com/cometbft/cometbft/rpc/client/local"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -34,11 +35,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 		return err
 	}
 	app.genesisInfo = nodeGenesis.Genesis
-
-	// immediately init isSynchronizing to true,
-	// else this will be (incorrectly) false until the first beginBlock, which can take some time
-	app.isSynchronizing.Store(true)
-
 	return nil
 }
 
@@ -57,6 +53,11 @@ func (app *BaseApplication) SetDefaultMethods() {
 	app.SetFnGetBlockByHeight(func(height int64) *comettypes.Block {
 		resblock, err := app.NodeClient.Block(context.Background(), &height)
 		if err != nil {
+			if strings.Contains(err.Error(), "not available, lowest height is") {
+				// this error is frequent (and expected) after StateSync, log as Debug instead of Warn
+				log.Debugf("cannot fetch block by height: %v", err)
+				return nil
+			}
 			log.Warnf("cannot fetch block by height: %v", err)
 			return nil
 		}

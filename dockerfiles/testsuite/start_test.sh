@@ -160,8 +160,7 @@ e2etest_ballotelection() {
 }
 
 test_statesync() {
-	export VOCDONI_VOCHAIN_STATESYNCFETCHPARAMSFROMAPI=$APIHOST
-	$COMPOSE_CMD --profile statesync up gatewaySync -d
+	$COMPOSE_CMD up gatewaySync -d
 	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
 	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"
 }
@@ -175,10 +174,10 @@ log "### Starting test suite ###"
 }
 $COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
 sleep 10
-$COMPOSE_CMD up -d
+$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
 
 check_gw_is_up() {
-  height=$($COMPOSE_CMD_RUN test \
+  height=$($COMPOSE_CMD_RUN --rm test \
                curl -s --fail $APIHOST/chain/info 2>/dev/null \
                | grep -o '"height":[0-9]*' | grep -o '[0-9]*')
   log "height=$height"
@@ -263,7 +262,7 @@ if $COMPOSE_CMD logs | grep -q "CONSENSUS FAILURE" ; then RET=3 ; log "### CONSE
 
 [ $CLEAN -eq 1 ] && {
 	log "### Cleaning docker environment ###"
-	$COMPOSE_CMD --profile statesync down -v --remove-orphans
+	$COMPOSE_CMD down -v --remove-orphans
 }
 
 if [ -n "$failed" ]; then

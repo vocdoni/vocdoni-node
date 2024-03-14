@@ -36,16 +36,6 @@ const (
 	DefaultTimeout = 10 * time.Second
 )
 
-// DefaultAPIUrls is a map of default API URLs for each network.
-var DefaultAPIUrls = map[string]string{
-	"dev":     "https://api-dev.vocdoni.net/v2/",
-	"develop": "https://api-dev.vocdoni.net/v2/",
-	"stg":     "https://api-stg.vocdoni.net/v2/",
-	"stage":   "https://api-stg.vocdoni.net/v2/",
-	"lts":     "https://api.vocdoni.io/v2/",
-	"prod":    "https://api.vocdoni.io/v2/",
-}
-
 // HTTPclient is the Vocdoni API HTTP client.
 type HTTPclient struct {
 	c       *http.Client
@@ -167,10 +157,12 @@ func (c *HTTPclient) SetHostAddr(addr *url.URL) error {
 	return nil
 }
 
+// SetRetries configures the number of retries for the HTTP client.
 func (c *HTTPclient) SetRetries(n int) {
 	c.retries = n
 }
 
+// SetTimeout configures the timeout for the HTTP client.
 func (c *HTTPclient) SetTimeout(d time.Duration) {
 	c.c.Timeout = d
 	if c.c.Transport != nil {
@@ -202,7 +194,12 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		}
 	}
 
-	log.Debugw("http request", "type", method, "path", u.Path, "body", jsonBody)
+	log.Debugw("http request", "type", method, "path", u.Path, "body", func() string {
+		if len(body) > 512 {
+			return string(body[:512]) + "..."
+		}
+		return string(body)
+	}())
 	var resp *http.Response
 	for i := 1; i <= c.retries; i++ {
 		resp, err = c.c.Do(&http.Request{
@@ -218,6 +215,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		})
 		if resp != nil && resp.StatusCode == apirest.HTTPstatusServiceUnavailable { // mempool is full
 			log.Warnf("mempool is full, will wait and retry (%d/%d)", i, c.retries)
+			_ = resp.Body.Close()
 			_ = c.WaitUntilNextBlock()
 			continue
 		}
@@ -226,6 +224,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 	if err != nil {
 		return nil, 0, err
 	}
+	defer resp.Body.Close()
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, 0, err

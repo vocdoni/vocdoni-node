@@ -67,7 +67,7 @@ type BaseApplication struct {
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
-	isSynchronizing atomic.Bool
+	isSynced atomic.Bool
 
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *comettypes.Block
@@ -234,7 +234,7 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 	// perform state snapshot
 	if app.snapshotInterval > 0 &&
 		app.Height()%uint32(app.snapshotInterval) == 0 &&
-		!app.IsSynchronizing() {
+		app.IsSynced() {
 		startTime := time.Now()
 		log.Infof("performing a snapshot on block %d", app.Height())
 		if _, err := app.Snapshots.Do(app.State); err != nil {
@@ -283,9 +283,9 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	if app.isSynchronizingFn != nil {
 		if app.isSynchronizingFn() {
-			app.isSynchronizing.Store(true)
+			app.isSynced.Store(false)
 		} else {
-			app.isSynchronizing.Store(false)
+			app.isSynced.Store(true)
 		}
 	}
 	app.State.Rollback()
@@ -416,10 +416,25 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	return app.Node.ConsensusReactor().WaitSync()
 }
 
-// IsSynchronizing informs if the blockchain is synchronizing or not.
+// IsSynced informs if the blockchain reached a synced state or not.
 // The value is updated every new block.
-func (app *BaseApplication) IsSynchronizing() bool {
-	return app.isSynchronizing.Load()
+func (app *BaseApplication) IsSynced() bool {
+	return app.isSynced.Load()
+}
+
+// WaitUntilSynced returns a chan that will be closed when the blockchain reachs a synced state.
+//
+// Example calls: `case <-app.WaitUntilSynced():` inside a select{} that may implement a timeout,
+// or simply  `<-app.WaitUntilSynced()` to wait indefinitely
+func (app *BaseApplication) WaitUntilSynced() chan any {
+	done := make(chan any)
+	go func() {
+		for !app.IsSynced() {
+			time.Sleep(time.Second * 1)
+		}
+		close(done)
+	}()
+	return done
 }
 
 // Height returns the current blockchain height, including the latest (under construction) block.

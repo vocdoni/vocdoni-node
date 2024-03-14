@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -108,6 +109,22 @@ func (a *API) enableCensusHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.censusPublishHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/{censusID}/publish/async",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.censusPublishHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/censuses/{censusID}/check",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.censusPublishCheckHandler,
 	); err != nil {
 		return err
 	}
@@ -615,7 +632,7 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Success				200			{object}	object{census=object{censusID=string,uri=string}}	"It return published censusID and the ipfs uri where its uploaded"
 //	@Param					censusID	path		string												true	"Census id"
 //	@Router					/censuses/{censusID}/publish [post]
-//	/censuses/{censusID}/publish/{root} [post] Endpoint docs generated on docs/models/model.go
+//	@Router					/censuses/{censusID}/publish/async [post]
 func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -625,6 +642,10 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 	if err != nil {
 		return err
 	}
+
+	// check if the request is async
+	url := strings.Split(ctx.Request.URL.Path, "/")
+	async := url[len(url)-1] == "async"
 
 	ref, err := a.censusdb.Load(censusID, &token)
 	defer a.censusdb.UnLoad()
@@ -665,6 +686,11 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 			}
 			return err
 		}
+		// if async, store the URI in the map for the check endpoint
+		if async {
+			a.censusPublishStatusMap.Store(hex.EncodeToString(root), ref.URI)
+		}
+
 		var data []byte
 		if data, err = json.Marshal(&Census{
 			CensusID: root,
@@ -675,36 +701,64 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		return ctx.Send(data, apirest.HTTPstatusOK)
 	}
 
-	// dump the current tree to import them after
-	dump, err := ref.Tree().Dump()
-	if err != nil {
-		return err
+	publishCensus := func() (string, error) {
+		// dump the current tree to import them after
+		dump, err := ref.Tree().Dump()
+		if err != nil {
+			return "", err
+		}
+
+		// export the tree to the remote storage (IPFS)
+		uri := ""
+		if a.storage != nil {
+			exportData, err := censusdb.BuildExportDump(root, dump,
+				models.Census_Type(ref.CensusType), ref.MaxLevels)
+			if err != nil {
+				return "", err
+			}
+			sctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			cid, err := a.storage.Publish(sctx, exportData)
+			if err != nil {
+				log.Errorf("could not export tree to storage: %v", err)
+			} else {
+				uri = a.storage.URIprefix() + cid
+			}
+		}
+
+		newRef, err := a.censusdb.New(root, models.Census_Type(ref.CensusType), uri,
+			nil, ref.MaxLevels)
+		if err != nil {
+			return "", err
+		}
+		return uri, newRef.Tree().ImportDump(dump)
 	}
 
-	// export the tree to the remote storage (IPFS)
-	uri := ""
-	if a.storage != nil {
-		exportData, err := censusdb.BuildExportDump(root, dump,
-			models.Census_Type(ref.CensusType), ref.MaxLevels)
-		if err != nil {
+	if async {
+		a.censusPublishStatusMap.Store(hex.EncodeToString(root), "")
+
+		go func() {
+			uri, err := publishCensus()
+			if err != nil {
+				log.Errorw(err, "could not publish census")
+				a.censusPublishStatusMap.Store(hex.EncodeToString(root), fmt.Sprintf("error: %v", err.Error()))
+				return
+			}
+			a.censusPublishStatusMap.Store(hex.EncodeToString(root), uri)
+		}()
+
+		var data []byte
+		if data, err = json.Marshal(&Census{
+			CensusID: root,
+		}); err != nil {
 			return err
 		}
-		sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		defer cancel()
-		cid, err := a.storage.Publish(sctx, exportData)
-		if err != nil {
-			log.Errorf("could not export tree to storage: %v", err)
-		} else {
-			uri = a.storage.URIprefix() + cid
-		}
+
+		return ctx.Send(data, apirest.HTTPstatusOK)
 	}
 
-	newRef, err := a.censusdb.New(root, models.Census_Type(ref.CensusType), uri,
-		nil, ref.MaxLevels)
+	uri, err := publishCensus()
 	if err != nil {
-		return err
-	}
-	if err := newRef.Tree().ImportDump(dump); err != nil {
 		return err
 	}
 
@@ -716,6 +770,42 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 		return err
 	}
 
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// censusPublishCheckHandler
+//
+//	@Summary				Check census publish status
+//	@Description.markdown	censusPublishCheckHandler
+//	@Tags					Censuses
+//	@Produce				json
+//	@Success				200			{object}	object{census=object{censusID=string,uri=string}}	"It return published censusID and the ipfs uri where its uploaded"
+//	@Param					censusID	path		string												true	"Census id"
+//	@Router					/censuses/{censusID}/check [get]
+func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	censusID, err := censusIDparse(ctx.URLParam("censusID"))
+	if err != nil {
+		return err
+	}
+	uriOrErrorAny, ok := a.censusPublishStatusMap.Load(hex.EncodeToString(censusID))
+	if !ok {
+		return ErrCensusNotFound
+	}
+	uriOrError := uriOrErrorAny.(string)
+	if uriOrError == "" {
+		return ctx.Send(nil, apirest.HTTPstatusNoContent)
+	}
+	if strings.HasPrefix(uriOrError, "error:") {
+		return ErrCensusBuild.With(uriOrError[7:])
+	}
+	var data []byte
+	if data, err = json.Marshal(&Census{
+		CensusID: censusID,
+		URI:      uriOrError,
+	}); err != nil {
+		return err
+	}
+	a.censusPublishStatusMap.Delete(hex.EncodeToString(censusID))
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 

@@ -20,7 +20,6 @@ import (
 	cometp2p "github.com/cometbft/cometbft/p2p"
 	cometproxy "github.com/cometbft/cometbft/proxy"
 
-	cometlog "github.com/cometbft/cometbft/libs/log"
 	cometnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
 )
@@ -44,70 +43,6 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		app.State.SetCacheSize(vochaincfg.MempoolSize)
 	}
 	return app
-}
-
-// TenderLogger implements tendermint's Logger interface, with a couple of
-// modifications.
-//
-// First, it routes the logs to go-dvote's logger, so that we don't end up with
-// two loggers writing directly to stdout or stderr.
-//
-// Second, because we generally don't care about tendermint errors such as
-// failures to connect to peers, we route all log levels to our debug level.
-// They will only surface if dvote's log level is "debug".
-type TenderLogger struct {
-	keyvals  []any
-	Artifact string
-	logLevel int // 0:debug 1:info 2:error 3:disabled
-}
-
-var _ cometlog.Logger = (*TenderLogger)(nil)
-
-func (l *TenderLogger) SetLogLevel(logLevel string) {
-	switch logLevel {
-	case "debug":
-		l.logLevel = 0
-	case "info":
-		l.logLevel = 1
-	case "error":
-		l.logLevel = 2
-	case "disabled", "none":
-		l.logLevel = 3
-	}
-}
-
-func (l *TenderLogger) Debug(msg string, keyvals ...any) {
-	if l.logLevel == 0 {
-		log.Logger().Debug().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) Info(msg string, keyvals ...any) {
-	if l.logLevel <= 1 {
-		log.Logger().Info().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) Error(msg string, keyvals ...any) {
-	if l.logLevel <= 2 {
-		log.Logger().Error().CallerSkipFrame(100).Fields(keyvals).Msg(l.Artifact + ": " + msg)
-	}
-}
-
-func (l *TenderLogger) With(keyvals ...any) cometlog.Logger {
-	// Make sure we copy the values, to avoid modifying the parent.
-	// TODO(mvdan): use zap's With method directly.
-	l2 := &TenderLogger{Artifact: l.Artifact, logLevel: l.logLevel}
-	l2.keyvals = append(l2.keyvals, l.keyvals...)
-	l2.keyvals = append(l2.keyvals, keyvals...)
-	return l2
-}
-
-// NewTenderLogger creates a Tendermint compatible logger for specified artifact
-func NewTenderLogger(artifact string, logLevel string) *TenderLogger {
-	tl := &TenderLogger{Artifact: artifact}
-	tl.SetLogLevel(logLevel)
-	return tl
 }
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
@@ -223,6 +158,39 @@ func newTendermint(app *BaseApplication,
 
 		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
 		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
+
+		// If StateSync is enabled but parameters are empty, try our best to populate them
+		// first try to fetch params from remote API endpoint
+		if localConfig.StateSyncFetchParamsFromRPC &&
+			tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
+			tconfig.StateSync.TrustHeight, tconfig.StateSync.TrustHash = func() (int64, string) {
+				cli, err := newCometRPCClient(tconfig.StateSync.RPCServers[0])
+				if err != nil {
+					log.Warnf("cannot connect to remote RPC server: %v", err)
+					return 0, ""
+				}
+				status, err := cli.Status(context.TODO())
+				if err != nil {
+					log.Warnf("cannot fetch status from remote RPC server: %v", err)
+					return 0, ""
+				}
+				log.Infow("fetched statesync params from remote RPC",
+					"height", status.SyncInfo.LatestBlockHeight, "hash", status.SyncInfo.LatestBlockHash.String())
+				return status.SyncInfo.LatestBlockHeight, status.SyncInfo.LatestBlockHash.String()
+			}()
+		}
+
+		// if still empty, fallback to hardcoded params, if defined for the current network & chainID
+		if tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
+			if g, ok := vocdoniGenesis.Genesis[localConfig.Network]; ok {
+				if statesync, ok := g.StateSync[g.Genesis.ChainID]; ok {
+					tconfig.StateSync.TrustHeight = statesync.TrustHeight
+					tconfig.StateSync.TrustHash = statesync.TrustHash.String()
+					log.Infow("using hardcoded statesync params",
+						"height", tconfig.StateSync.TrustHeight, "hash", tconfig.StateSync.TrustHash)
+				}
+			}
+		}
 	}
 	tconfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 
@@ -237,8 +205,6 @@ func newTendermint(app *BaseApplication,
 	if err := tconfig.ValidateBasic(); err != nil {
 		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
-
-	logger := NewTenderLogger("comet", tconfig.LogLevel)
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(
@@ -335,7 +301,7 @@ func newTendermint(app *BaseApplication,
 		cometnode.DefaultGenesisDocProviderFunc(tconfig),
 		cometconfig.DefaultDBProvider,
 		cometnode.DefaultMetricsProvider(tconfig.Instrumentation),
-		logger,
+		log.NewCometLogger("comet", tconfig.LogLevel),
 	)
 
 	if err != nil {

@@ -131,30 +131,35 @@ func (vs *VocdoniService) Start() error {
 
 	if !vs.Config.NoWaitSync || vs.Config.StateSyncEnabled {
 		log.Infof("waiting for vochain to synchronize")
-		var lastHeight uint64
-		i := 0
-		timeSyncCounter := time.Now()
-		timeCounter := time.Now()
-		syncCounter := 20
-		for syncCounter > 0 {
-			time.Sleep(time.Second * 1)
-			if i%10 == 0 {
-				log.Monitor("vochain fastsync", map[string]any{
-					"height":     vs.Stats.Height(),
-					"blocks/sec": fmt.Sprintf("%.2f", float64(vs.Stats.Height()-lastHeight)/time.Since(timeCounter).Seconds()),
-					"peers":      vs.Stats.NPeers(),
-				})
-				timeCounter = time.Now()
-				lastHeight = vs.Stats.Height()
-			}
-			i++
-			if vs.App.IsSynchronizing() {
-				syncCounter = 20
-			} else {
-				syncCounter--
-			}
+		if vs.Config.StateSyncEnabled {
+			log.Infof("temporarily setting comet loglevel to info, to see statesync progress")
+			oldTenderLogLevel := log.CometLogLevel()
+			log.SetCometLogLevel("info")
+			defer func() {
+				log.Infof("setting comet loglevel back to %q", oldTenderLogLevel)
+				log.SetCometLogLevel(oldTenderLogLevel)
+			}()
 		}
-		log.Infow("vochain fastsync completed", "height", vs.Stats.Height(), "duration", time.Since(timeSyncCounter).String())
+		timeSyncStarted := time.Now()
+		func() {
+			lastHeight := uint64(0)
+			timeCounter := time.Now()
+			for {
+				select {
+				case <-vs.App.WaitUntilSynced():
+					return
+				case <-time.After(10 * time.Second):
+					log.Monitor("vochain sync", map[string]any{
+						"height":     vs.Stats.Height(),
+						"blocks/sec": fmt.Sprintf("%.2f", float64(vs.Stats.Height()-lastHeight)/time.Since(timeCounter).Seconds()),
+						"peers":      vs.Stats.NPeers(),
+					})
+					timeCounter = time.Now()
+					lastHeight = vs.Stats.Height()
+				}
+			}
+		}()
+		log.Infow("vochain sync completed", "height", vs.Stats.Height(), "duration", time.Since(timeSyncStarted).String())
 	}
 	go VochainPrintInfo(20*time.Second, vs.Stats)
 
