@@ -358,8 +358,8 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			ID:       indxR.ProcessID,
 			Votes:    indexertypes.EncodeJSON(indxR.Votes),
 			Weight:   indexertypes.EncodeJSON(indxR.Weight),
-			VoteOpts: indexertypes.EncodeProtoJSON(indxR.VoteOpts),
-			Envelope: indexertypes.EncodeProtoJSON(indxR.EnvelopeType),
+			VoteOpts: indexertypes.EncodeProto(indxR.VoteOpts),
+			Envelope: indexertypes.EncodeProto(indxR.EnvelopeType),
 		}); err != nil {
 			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
