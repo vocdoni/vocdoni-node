@@ -67,9 +67,9 @@ type CreateProcessParams struct {
 	CensusOrigin      int64
 	Status            int64
 	Namespace         int64
-	Envelope          string
-	Mode              string
-	VoteOpts          string
+	Envelope          []byte
+	Mode              []byte
+	VoteOpts          []byte
 	PrivateKeys       string
 	PublicKeys        string
 	QuestionIndex     int64
@@ -431,8 +431,8 @@ WHERE id = ?5
 type UpdateProcessResultByIDParams struct {
 	Votes    string
 	Weight   string
-	VoteOpts string
-	Envelope string
+	VoteOpts []byte
+	Envelope []byte
 	ID       types.ProcessID
 }
 
