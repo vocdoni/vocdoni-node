@@ -550,6 +550,7 @@ func (app *BaseApplication) OfferSnapshot(_ context.Context,
 ) (*cometabcitypes.OfferSnapshotResponse, error) {
 	log.Debugw("cometbft offers us a snapshot",
 		"appHash", hex.EncodeToString(req.AppHash),
+		"snapHash", hex.EncodeToString(req.Snapshot.Hash),
 		"height", req.Snapshot.Height, "format", req.Snapshot.Format, "chunks", req.Snapshot.Chunks)
 
 	snapshotFromComet.height.Store(int64(req.Snapshot.Height))
