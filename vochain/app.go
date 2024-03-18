@@ -240,7 +240,7 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 		if _, err := app.Snapshots.Do(app.State); err != nil {
 			return hash, fmt.Errorf("cannot make snapshot: %w", err)
 		}
-		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
+		log.Infof("snapshot on block %d created successfully, took %s", app.Height(), time.Since(startTime))
 	}
 	return hash, err
 }
