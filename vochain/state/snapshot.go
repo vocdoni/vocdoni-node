@@ -127,8 +127,10 @@ type DBPair struct {
 }
 
 // ExportNoStateDB exports the no state db to a gob encoder and writes it to the given writer.
+// The resulting stream of bytes is deterministic.
 func (v *State) ExportNoStateDB(w io.Writer) error {
 	pairs := []DBPair{}
+	// Iterate traverses the db in order, lexicographically by key
 	err := v.NoState(true).Iterate(nil, func(key []byte, value []byte) bool {
 		pairs = append(pairs, DBPair{Key: bytes.Clone(key), Value: bytes.Clone(value)})
 		return true

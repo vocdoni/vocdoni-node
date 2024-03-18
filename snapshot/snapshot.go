@@ -209,7 +209,6 @@ func (s *Snapshot) Finish() error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("snapshot header size is %d bytes", hs)
 
 	// write the blobs (by copying the tmpFile)
 	if _, err := s.file.Seek(0, io.SeekStart); err != nil {
@@ -219,7 +218,8 @@ func (s *Snapshot) Finish() error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("snapshot blobs size is %d bytes", bs)
+	log.Debugw("snapshot finished", "ĥeight", s.header.Height, "headerSize", hs, "blobsSize", bs,
+		"snapHash", hex.EncodeToString(s.header.Hash), "appRoot", hex.EncodeToString(s.header.Root))
 
 	// close and remove the temporary file
 	if err := s.file.Close(); err != nil {
@@ -365,6 +365,17 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// In order for the snapshot to be deterministic,
+	// sort list by Name, then by Parent, and finally by Key
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].Name != list[j].Name {
+			return list[i].Name < list[j].Name
+		}
+		if list[i].Parent != list[j].Parent {
+			return list[i].Parent < list[j].Parent
+		}
+		return string(list[i].Key) < string(list[j].Key)
+	})
 	for _, treedesc := range list {
 		if err := snap.DumpTree(treedesc.Name, treedesc.Parent, treedesc.Key, treedesc.Tree); err != nil {
 			return "", err
