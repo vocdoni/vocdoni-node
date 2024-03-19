@@ -40,7 +40,7 @@ var Genesis = map[string]Vochain{
 
 	// LTS production network
 	"lts": {
-		AutoUpdateGenesis: true,
+		AutoUpdateGenesis: false,
 		SeedNodes: []string{
 			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
 			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
