@@ -90,8 +90,6 @@ services:
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
-      - VOCDONI_VOCHAIN_SNAPSHOTINTERVAL=3
-      - VOCDONI_VOCHAIN_STATESYNCCHUNKSIZE=2000
 
   test:
     image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
