@@ -156,6 +156,8 @@ func loadConfig() *config.Config {
 		"bearer token for admin API endpoints (leave empty to autogenerate)")
 	flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
+	flag.String("tlsDirCert", "",
+		"directory where LetsEncrypt data is stored")
 	flag.Uint64("enableFaucetWithAmount", 0,
 		"enable faucet for the current network and the specified amount (testing purposes only)")
 
