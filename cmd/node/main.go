@@ -217,6 +217,8 @@ func loadConfig() *config.Config {
 	flag.StringVar(&flagVochainCreateGenesis, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
+	flag.Bool("vochainIndexerDisabled", false,
+		"disables the vochain indexer component")
 
 	// metrics
 	flag.Bool("metricsEnabled", false, "enable prometheus metrics")
@@ -296,6 +298,7 @@ func loadConfig() *config.Config {
 	}
 	// Note that these Config.Vochain fields aren't bound via viper.
 	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
+	conf.Vochain.Indexer.Enabled = !viper.GetBool("vochainIndexerDisabled")
 	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 	conf.Vochain.Network = viper.GetString("chain")
 
@@ -458,8 +461,6 @@ func main() {
 		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
-		// do we need indexer?
-		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
 		// offchainDataDownload is only needed for gateways
 		conf.Vochain.OffChainDataDownload = conf.Vochain.OffChainDataDownload &&
 			conf.Mode == types.ModeGateway
