@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    paths:
+      - 'api/**/*'
 
 jobs:
   api-swagger:
@@ -38,27 +41,29 @@ jobs:
           name: vocdoni-api.yaml
           path: api/docs/vocdoni-api.yaml
 
-      - name: Get short commit hash
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
+  developer-portal-pr:
+    name: Open PR to developer-portal repo
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: api-swagger
+    steps:
       - name: Checkout developer-portal repo
         uses: actions/checkout@v4
         with:
           repository: vocdoni/developer-portal
           ref: main
-          path: developer-portal
+      - uses: actions/download-artifact@v4
+        with:
+          name: vocdoni-api.yaml
+          path: swaggers/vocdoni-api.yaml
 
-      - name: Copy generated docs
-        run: cp -f ./api/docs/vocdoni-api.yaml ./developer-portal/swaggers/vocdoni-api.yaml
-
+      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
       - name: Create PR to developer-portal repo
         id: cpr
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.VOCDONIBOT_PAT }}
-          path: developer-portal
-          commit-message: "Update vocdoni-api docs by commit ${{ steps.vars.outputs.sha_short }}"
+          commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
           committer: "Arabot-1 <arabot-1@users.noreply.github.com>"
           base: main
           branch: update-api-docs
