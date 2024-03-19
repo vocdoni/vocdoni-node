@@ -168,6 +168,8 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
+	flag.Bool("vochainIndexerDisabled", false,
+		"disables the vochain indexer component")
 
 	// metrics
 	conf.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
@@ -368,6 +370,11 @@ func newConfig() (*config.Config, config.Error) {
 			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
 		}
 	}
+	// Note that these Config.Vochain fields aren't bound via viper.
+	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
+	conf.Vochain.Indexer.Enabled = !viper.GetBool("vochainIndexerDisabled")
+	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
+	conf.Vochain.Network = viper.GetString("chain")
 
 	if conf.SigningKey == "" {
 		fmt.Println("no signing key, generating one...")
@@ -553,8 +560,6 @@ func main() {
 		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
-		// do we need indexer?
-		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
 		// offchainDataDownloader is only needed for gateways
 		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
 			conf.Mode == types.ModeGateway
