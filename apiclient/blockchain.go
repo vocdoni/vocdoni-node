@@ -13,10 +13,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	// ErrTransactionDoesNotExist is returned when the transaction does not exist
-	ErrTransactionDoesNotExist = fmt.Errorf("transaction does not exist")
-)
+// ErrTransactionDoesNotExist is returned when the transaction does not exist
+var ErrTransactionDoesNotExist = fmt.Errorf("transaction does not exist")
 
 // ChainInfo returns some information about the chain, such as block height.
 func (c *HTTPclient) ChainInfo() (*api.ChainInfo, error) {
@@ -123,7 +121,8 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 // OrganizationsBySearchTermPaginated returns a paginated list of organizations
 // that match the given search term.
 func (c *HTTPclient) OrganizationsBySearchTermPaginated(
-	organizationID types.HexBytes, page int) ([]types.HexBytes, error) {
+	organizationID types.HexBytes, page int,
+) ([]types.HexBytes, error) {
 	// make a post request to /chain/organizations/filter/page/<page> with the organizationID
 	// as the body and page as the url parameter
 	resp, code, err := c.Request(HTTPPOST,

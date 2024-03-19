@@ -85,7 +85,8 @@ func storageProofToModel(s *ethstorageproof.StorageResult) *models.ProofEthereum
 }
 
 func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr common.Address,
-	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
+	pid []byte, vp []byte, app *BaseApplication, expectedResult bool,
+) {
 	cktx := new(cometabcitypes.CheckTxRequest)
 	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx

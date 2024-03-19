@@ -33,7 +33,8 @@ func TestVocdoniSignature(t *testing.T) {
 			To:     toAddr,
 			Value:  value,
 			Nonce:  123,
-		}}}
+		},
+	}}
 
 	message, err := proto.Marshal(tx)
 	qt.Assert(t, err, qt.IsNil)
@@ -59,7 +60,8 @@ func TestVocdoniSignature(t *testing.T) {
 			InfoURI: &infoUri,
 			Account: s.Address().Bytes(),
 			Nonce:   &nonce,
-		}}}
+		},
+	}}
 
 	message, err = proto.Marshal(tx)
 	qt.Assert(t, err, qt.IsNil)

@@ -31,7 +31,8 @@ type FaucetAPI struct {
 // The networks map defines the amount of tokens to send for each network. Networks not defined are
 // considered invalid.
 func AttachFaucetAPI(signingKey *ethereum.SignKeys, amount uint64,
-	api *apirest.API, pathPrefix string) error {
+	api *apirest.API, pathPrefix string,
+) error {
 	f := &FaucetAPI{
 		signingKey: signingKey,
 		amount:     amount,

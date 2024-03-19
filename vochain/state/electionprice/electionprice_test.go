@@ -136,10 +136,14 @@ func TestCalculatorPriceTable(_ *testing.T) {
 	c.SetBasePrice(10)
 	hour := uint32(340)
 
-	maxCensusSizes := []uint64{100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000, 20000,
-		50000, 100000, 200000, 500000, 800000, 1000000}
-	electionDurations := []uint32{1 * hour, 12 * hour, 24 * hour, 24 * hour * 2, 24 * hour * 5,
-		24 * hour * 7, 24 * hour * 15}
+	maxCensusSizes := []uint64{
+		100, 200, 500, 1000, 1500, 2000, 2500, 3000, 5000, 10000, 20000,
+		50000, 100000, 200000, 500000, 800000, 1000000,
+	}
+	electionDurations := []uint32{
+		1 * hour, 12 * hour, 24 * hour, 24 * hour * 2, 24 * hour * 5,
+		24 * hour * 7, 24 * hour * 15,
+	}
 	encryptedVotes := true
 	anonymousVotes := true
 	maxVoteOverwrite := uint32(0)

@@ -209,7 +209,6 @@ func TestAPIaccount(t *testing.T) {
 
 	// compare the balance expected for the new account in the account list
 	qt.Assert(t, gotAcct.Balance, qt.Equals, initBalance)
-
 }
 
 func TestAPIElectionCost(t *testing.T) {
@@ -387,7 +386,6 @@ func TestAPIAccountTokentxs(t *testing.T) {
 
 	// compare the balance expected for the account 1 in the account list
 	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2)
-
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
@@ -573,7 +571,8 @@ func predictPriceForElection(t testing.TB, c *testutil.TestHTTPclient, electionP
 }
 
 func createAccount(t testing.TB, c *testutil.TestHTTPclient,
-	server testcommon.APIserver, initialBalance uint64) *ethereum.SignKeys {
+	server testcommon.APIserver, initialBalance uint64,
+) *ethereum.SignKeys {
 	signer := ethereum.SignKeys{}
 	qt.Assert(t, signer.Generate(), qt.IsNil)
 
@@ -620,7 +619,8 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 }
 
 func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
-	signerFrom, signerTo *ethereum.SignKeys, chainID string, nonce uint32, amount uint64) {
+	signerFrom, signerTo *ethereum.SignKeys, chainID string, nonce uint32, amount uint64,
+) {
 	var err error
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
@@ -632,7 +632,8 @@ func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
 				To:     signerTo.Address().Bytes(),
 				Value:  amount,
 			},
-		}})
+		},
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	stx.Signature, err = signerFrom.SignVocdoniTx(stx.Tx, chainID)

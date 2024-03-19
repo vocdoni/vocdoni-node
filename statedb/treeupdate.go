@@ -50,7 +50,7 @@ type TreeUpdate struct {
 	// is used in the TreeTx.Commit to traverse all opened subTrees in a
 	// TreeTx in order to propagate the roots upwards to update the
 	// corresponding parent leafs up to the mainTree.
-	//openSubs map[string]*TreeUpdate
+	// openSubs map[string]*TreeUpdate
 	openSubs sync.Map
 	// cfg points to this TreeUpdate configuration.
 	cfg TreeConfig

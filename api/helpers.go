@@ -118,7 +118,8 @@ func convertKeysToCamelInner(val any) any {
 // in this case we encode the organizationId the censusRoot and the results that will be translated in the EVM
 // contract to the corresponding struct{address, bytes32, uint256[][]}
 func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address, censusRoot common.Hash,
-	sourceContractAddress common.Address, results [][]*types.BigInt) (string, error) {
+	sourceContractAddress common.Address, results [][]*types.BigInt,
+) (string, error) {
 	address, _ := abi.NewType("address", "", nil)
 	bytes32, _ := abi.NewType("bytes32", "", nil)
 	uint256SliceNested, _ := abi.NewType("uint256[][]", "", nil)

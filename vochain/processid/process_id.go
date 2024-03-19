@@ -98,7 +98,6 @@ func (p *ProcessID) Unmarshal(pid []byte) error {
 func (p *ProcessID) String() string {
 	return fmt.Sprintf("[chID:%s/addr:%s/co:%d/et:%d/nc:%d]",
 		p.chainID, p.organizationAddr.Hex(), p.censusOrigin, p.envType, p.nonce)
-
 }
 
 // SetChainID sets the process blockchain identifier

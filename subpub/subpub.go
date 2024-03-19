@@ -141,7 +141,8 @@ func (s *SubPub) Stats() map[string]any {
 	return map[string]any{
 		"peers":   len(s.node.PeerHost.Network().Peers()),
 		"known":   len(s.node.PeerHost.Peerstore().PeersWithAddrs()),
-		"cluster": len(s.gossip.topic.ListPeers())}
+		"cluster": len(s.gossip.topic.ListPeers()),
+	}
 }
 
 // Address returns the node's ID.

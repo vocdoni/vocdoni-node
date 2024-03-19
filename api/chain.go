@@ -275,7 +275,6 @@ func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
-
 }
 
 // chainInfoHandler

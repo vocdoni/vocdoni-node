@@ -43,7 +43,6 @@ func censusIDparse(censusID string) ([]byte, error) {
 	censusID = util.TrimHex(censusID)
 	if len(censusID) != censusIDsize*2 {
 		return nil, ErrCensusIDLengthInvalid.Withf("(%d != %d)", len(censusID), censusIDsize*2)
-
 	}
 	return hex.DecodeString(censusID)
 }

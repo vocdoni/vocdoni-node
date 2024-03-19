@@ -195,7 +195,8 @@ func TestCSPproof(t *testing.T) {
 }
 
 func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
-	proof *models.ProofCA, app *BaseApplication, expectedResult bool) {
+	proof *models.ProofCA, app *BaseApplication, expectedResult bool,
+) {
 	cktx := new(cometabcitypes.CheckTxRequest)
 	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx

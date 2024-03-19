@@ -18,8 +18,10 @@ import (
 
 func TestImportWeighted(t *testing.T) {
 	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_BLAKE2B})
+	censusTree, err := New(Options{
+		Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
+		CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	rnd := testutil.NewRandom(0)
@@ -46,8 +48,10 @@ func TestImportWeighted(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// import into a new tree
-	censusTree2, err := New(Options{Name: "test2", ParentDB: db, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_BLAKE2B})
+	censusTree2, err := New(Options{
+		Name: "test2", ParentDB: db, MaxLevels: DefaultMaxLevels,
+		CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	err = censusTree2.ImportDump(dump)
@@ -74,8 +78,10 @@ func TestImportWeighted(t *testing.T) {
 
 func TestWeightedProof(t *testing.T) {
 	db := metadb.NewTest(t)
-	censusTree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_POSEIDON})
+	censusTree, err := New(Options{
+		Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
+		CensusType: models.Census_ARBO_POSEIDON,
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	rnd := testutil.NewRandom(0)
@@ -111,8 +117,10 @@ func TestWeightedProof(t *testing.T) {
 
 func TestGetCensusWeight(t *testing.T) {
 	db := metadb.NewTest(t)
-	tree, err := New(Options{Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_BLAKE2B})
+	tree, err := New(Options{
+		Name: "test", ParentDB: db, MaxLevels: DefaultMaxLevels,
+		CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	w, err := tree.GetCensusWeight()
@@ -196,8 +204,10 @@ func TestGetCensusWeight(t *testing.T) {
 	// dump the leaves & import them into a new empty tree, and check that
 	// the censusWeight is correctly recomputed
 	db2 := metadb.NewTest(t)
-	tree2, err := New(Options{Name: "test2", ParentDB: db2, MaxLevels: DefaultMaxLevels,
-		CensusType: models.Census_ARBO_BLAKE2B})
+	tree2, err := New(Options{
+		Name: "test2", ParentDB: db2, MaxLevels: DefaultMaxLevels,
+		CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	dump, err := tree.Dump()

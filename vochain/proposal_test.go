@@ -38,7 +38,8 @@ func TestTransactionsSorted(t *testing.T) {
 				From:  key.Address().Bytes(),
 				To:    keys[(i+1)%50].Address().Bytes(),
 				Value: 1,
-			}}}
+			}},
+		}
 		txBytes, err := proto.Marshal(&tx)
 		qt.Assert(err, quicktest.IsNil)
 
@@ -62,7 +63,8 @@ func TestTransactionsSorted(t *testing.T) {
 				From:  key.Address().Bytes(),
 				To:    keys[(i+1)%50].Address().Bytes(),
 				Value: 1,
-			}}}
+			}},
+		}
 		txBytes, err := proto.Marshal(&tx)
 		qt.Assert(err, quicktest.IsNil)
 

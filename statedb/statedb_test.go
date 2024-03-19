@@ -139,7 +139,6 @@ func TestStateDB(t *testing.T) {
 	root2, err = sdb.Hash()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, root2, qt.DeepEquals, root1)
-
 }
 
 // singleCfg is a test configuration for a singleton subTree
