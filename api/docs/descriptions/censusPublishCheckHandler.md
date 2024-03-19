@@ -1,0 +1,3 @@
+Returns the publish status of a specific census by its ID, including the IPFS URI where it's uploaded, if available. This handler checks whether a census has been published successfully and retrieves its access URI or any errors that occurred during the publication process.
+
+This endpoint can be useful for anyone looking to verify the publication status of a census, and it facilitates accessing the published data directly through the returned URI.
