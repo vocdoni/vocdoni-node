@@ -516,15 +516,18 @@ func (app *BaseApplication) ListSnapshots(_ context.Context,
 	list := app.Snapshots.List()
 
 	response := &abcitypes.ResponseListSnapshots{}
-	for height, dsi := range list {
-		chunks := uint32(math.Ceil(float64(dsi.Size) / float64(app.Snapshots.ChunkSize)))
-
+	for height, snap := range list {
+		chunks := uint32(math.Ceil(float64(snap.Size()) / float64(app.Snapshots.ChunkSize)))
+		metadataBytes, err := json.Marshal(snap.Header())
+		if err != nil {
+			return nil, fmt.Errorf("couldn't marshal metadata: %w", err)
+		}
 		response.Snapshots = append(response.Snapshots, &abcitypes.Snapshot{
 			Height:   uint64(height),
 			Format:   0,
 			Chunks:   chunks,
-			Hash:     dsi.Hash,
-			Metadata: []byte{},
+			Hash:     snap.Header().Hash,
+			Metadata: metadataBytes,
 		})
 	}
 	log.Debugf("cometbft requests our list of snapshots, we offer %d options", len(response.Snapshots))
@@ -546,6 +549,18 @@ func (app *BaseApplication) OfferSnapshot(_ context.Context,
 		"appHash", hex.EncodeToString(req.AppHash),
 		"snapHash", hex.EncodeToString(req.Snapshot.Hash),
 		"height", req.Snapshot.Height, "format", req.Snapshot.Format, "chunks", req.Snapshot.Chunks)
+
+	var metadata snapshot.SnapshotHeader
+	if err := json.Unmarshal(req.Snapshot.Metadata, &metadata); err != nil {
+		return nil, fmt.Errorf("couldn't unmarshal metadata: %w", err)
+	}
+	if metadata.Version > snapshot.Version {
+		log.Debugw("reject snapshot due to unsupported version",
+			"height", req.Snapshot.Height, "version", metadata.Version, "chunks", req.Snapshot.Chunks)
+		return &abcitypes.ResponseOfferSnapshot{
+			Result: abcitypes.ResponseOfferSnapshot_REJECT,
+		}, nil
+	}
 
 	snapshotFromComet.height.Store(int64(req.Snapshot.Height))
 	snapshotFromComet.chunks.Store(int32(req.Snapshot.Chunks))
@@ -598,6 +613,11 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 				Result: abcitypes.ResponseApplySnapshotChunk_REJECT_SNAPSHOT,
 			}, nil
 		}
+		defer func() {
+			if err := s.Close(); err != nil {
+				log.Error(err)
+			}
+		}()
 
 		if err := app.RestoreStateFromSnapshot(s); err != nil {
 			log.Error(err)
