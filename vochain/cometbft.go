@@ -520,7 +520,8 @@ func (app *BaseApplication) ListSnapshots(_ context.Context,
 		chunks := uint32(math.Ceil(float64(snap.Size()) / float64(app.Snapshots.ChunkSize)))
 		metadataBytes, err := json.Marshal(snap.Header())
 		if err != nil {
-			return nil, fmt.Errorf("couldn't marshal metadata: %w", err)
+			log.Errorw(err, "couldn't marshal snapshot metadata")
+			continue
 		}
 		response.Snapshots = append(response.Snapshots, &abcitypes.Snapshot{
 			Height:   uint64(height),
@@ -552,7 +553,10 @@ func (app *BaseApplication) OfferSnapshot(_ context.Context,
 
 	var metadata snapshot.SnapshotHeader
 	if err := json.Unmarshal(req.Snapshot.Metadata, &metadata); err != nil {
-		return nil, fmt.Errorf("couldn't unmarshal metadata: %w", err)
+		log.Errorw(err, "couldn't unmarshal snapshot metadata")
+		return &abcitypes.ResponseOfferSnapshot{
+			Result: abcitypes.ResponseOfferSnapshot_REJECT,
+		}, nil
 	}
 	if metadata.Version > snapshot.Version {
 		log.Debugw("reject snapshot due to unsupported version",
@@ -580,9 +584,8 @@ func (app *BaseApplication) LoadSnapshotChunk(_ context.Context,
 		"height", req.Height, "format", req.Format, "chunk", req.Chunk)
 
 	buf, err := app.Snapshots.SliceChunk(req.Height, req.Format, req.Chunk)
-
 	if err != nil {
-		return nil, err
+		return &abcitypes.ResponseLoadSnapshotChunk{}, err
 	}
 
 	return &abcitypes.ResponseLoadSnapshotChunk{
@@ -601,7 +604,9 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 		"index", req.Index, "size", len(req.Chunk))
 
 	if err := app.Snapshots.WriteChunkToDisk(req.Index, req.Chunk); err != nil {
-		return nil, err
+		return &abcitypes.ResponseApplySnapshotChunk{
+			Result: abcitypes.ResponseApplySnapshotChunk_RETRY,
+		}, nil
 	}
 
 	if app.Snapshots.CountChunksInDisk() == int(snapshotFromComet.chunks.Load()) {
@@ -621,7 +626,9 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 
 		if err := app.RestoreStateFromSnapshot(s); err != nil {
 			log.Error(err)
-			return nil, err
+			return &abcitypes.ResponseApplySnapshotChunk{
+				Result: abcitypes.ResponseApplySnapshotChunk_ABORT,
+			}, nil
 		}
 
 		// Fetch the block before the snapshot, we'll need it to bootstrap other nodes
