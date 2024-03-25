@@ -327,6 +327,28 @@ func newConfig() (*config.Config, config.Error) {
 		log.Fatalf("failed to bind offChainDataDownload flag to viper: %v", err)
 	}
 
+	if err := viper.BindPFlag("vochain.SnapshotInterval", flag.Lookup("vochainSnapshotInterval")); err != nil {
+		log.Fatalf("failed to bind vochainSnapshotInterval flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncEnabled", flag.Lookup("vochainStateSyncEnabled")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncEnabled flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncRPCServers", flag.Lookup("vochainStateSyncRPCServers")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncRPCServers flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncTrustHash", flag.Lookup("vochainStateSyncTrustHash")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncTrustHash flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncTrustHeight", flag.Lookup("vochainStateSyncTrustHeight")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncTrustHeight flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncChunkSize", flag.Lookup("vochainStateSyncChunkSize")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncChunkSize flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncFetchParamsFromRPC", flag.Lookup("vochainStateSyncFetchParamsFromRPC")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncFetchParamsFromRPC flag to viper: %v", err)
+	}
+
 	// metrics
 	if err := viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled")); err != nil {
 		log.Fatalf("failed to bind metricsEnabled flag to viper: %v", err)
