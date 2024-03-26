@@ -271,10 +271,13 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 			Info: tx.Info,
 		}
 	}
-	log.Debugw("finalize block", "height", height,
-		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-		"milliSeconds", time.Since(start).Milliseconds(),
-		"proposer", hex.EncodeToString(req.GetProposerAddress()))
+
+	if len(req.Txs) > 0 {
+		log.Debugw("finalize block", "height", height,
+			"txs", len(req.Txs), "hash", hex.EncodeToString(root),
+			"milliSeconds", time.Since(start).Milliseconds(),
+			"proposer", hex.EncodeToString(req.GetProposerAddress()))
+	}
 
 	// update validator score as an IST action for the next block. Note that at this point,
 	// we cannot modify the state or we would break ProcessProposal optimistic execution

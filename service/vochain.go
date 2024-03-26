@@ -131,15 +131,14 @@ func (vs *VocdoniService) Start() error {
 
 	if !vs.Config.NoWaitSync || vs.Config.StateSyncEnabled {
 		log.Infof("waiting for vochain to synchronize")
-		if vs.Config.StateSyncEnabled {
-			log.Infof("temporarily setting comet loglevel to info, to see statesync progress")
-			oldTenderLogLevel := log.CometLogLevel()
-			log.SetCometLogLevel("info")
-			defer func() {
-				log.Infof("setting comet loglevel back to %q", oldTenderLogLevel)
-				log.SetCometLogLevel(oldTenderLogLevel)
-			}()
-		}
+		log.Infof("temporarily setting comet loglevel to info, to see sync progress")
+		oldTenderLogLevel := log.CometLogLevel()
+		log.SetCometLogLevel("info")
+		defer func() {
+			log.Infof("setting comet loglevel back to %q", oldTenderLogLevel)
+			log.SetCometLogLevel(oldTenderLogLevel)
+		}()
+
 		timeSyncStarted := time.Now()
 		func() {
 			lastHeight := uint64(0)
