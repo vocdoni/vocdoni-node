@@ -189,7 +189,7 @@ func loadConfig() *config.Config {
 		"do not wait for Vochain to synchronize (for testing only)")
 	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
-	flag.Int("vochainSnapshotInterval", 10000,
+	flag.Int("vochainSnapshotInterval", 1000, // circa every 3hs (at 10s block interval)
 		"create state snapshot every N blocks (0 to disable)")
 	flag.Bool("vochainStateSyncEnabled", true,
 		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
