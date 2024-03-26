@@ -129,9 +129,9 @@ func (vs *VocdoniService) Start() error {
 		go vs.Stats.Start(10)
 	}
 
-	if !vs.Config.NoWaitSync || vs.Config.StateSyncEnabled {
+	if !vs.Config.NoWaitSync || vs.App.Node.Config().StateSync.Enable {
 		log.Infof("waiting for vochain to synchronize")
-		if vs.Config.StateSyncEnabled {
+		if vs.App.Node.Config().StateSync.Enable {
 			log.Infof("temporarily setting comet loglevel to info, to see statesync progress")
 			oldTenderLogLevel := log.CometLogLevel()
 			log.SetCometLogLevel("info")
