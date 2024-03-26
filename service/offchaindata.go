@@ -1,6 +1,7 @@
 package service
 
 import (
+	"io"
 	"path/filepath"
 	"time"
 
@@ -8,6 +9,7 @@ import (
 	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/vochain/offchaindatahandler"
 )
 
@@ -26,6 +28,17 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 		}
 		vs.CensusDB = censusdb.NewCensusDB(db)
 	}
+
+	snapshot.SetFnImportCensusDB(func(r io.Reader) error {
+		log.Debugf("restoring censusdb backup")
+		return vs.CensusDB.ImportCensusDB(r)
+	})
+
+	snapshot.SetFnExportCensusDB(func(w io.Writer) error {
+		log.Debugf("saving censusdb backup")
+		return vs.CensusDB.ExportCensusDB(w)
+	})
+
 	vs.OffChainData = offchaindatahandler.NewOffChainDataHandler(
 		vs.App,
 		vs.DataDownloader,

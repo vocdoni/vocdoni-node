@@ -34,6 +34,7 @@ const (
 	snapshotBlobType_Tree = iota
 	snapshotBlobType_NoStateDB
 	snapshotBlobType_IndexerDB
+	snapshotBlobType_CensusDB
 )
 
 const chunksDir = "chunks"
@@ -291,6 +292,20 @@ func (s *Snapshot) Restore(dbType, dataDir string) (string, error) {
 			if err := FnImportIndexer()(s.CurrentBlobReader()); err != nil {
 				return tmpDir, err
 			}
+		case snapshotBlobType_CensusDB:
+			if FnImportCensusDB() == nil {
+				log.Debug("restoring snapshot, found a CensusDB blob, but there's no censusdb on this node, skipping...")
+				// TODO: we need to io.ReadAll because s.SeekToNextBlob() does not actually Seek, despite its name,
+				// it only assumes the Seek happened because the blob was read.
+				_, _ = io.ReadAll(s.CurrentBlobReader())
+				continue
+			}
+			log.Debug("restoring snapshot, found a CensusDB blob, will import")
+			if err := FnImportCensusDB()(s.CurrentBlobReader()); err != nil {
+				return tmpDir, err
+			}
+		default:
+			log.Errorf("unrecognized blob type %d", h.Type)
 		}
 	}
 
@@ -389,6 +404,14 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 	// Indexer
 	if FnExportIndexer() != nil {
 		if err := snap.DumpIndexer(FnExportIndexer()); err != nil {
+			return "", err
+		}
+		logLastDumpedBlob()
+	}
+
+	// CensusDB
+	if FnExportCensusDB() != nil {
+		if err := snap.DumpCensusDB(FnExportCensusDB()); err != nil {
 			return "", err
 		}
 		logLastDumpedBlob()
