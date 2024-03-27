@@ -119,7 +119,15 @@ func newTendermint(app *BaseApplication,
 	tconfig.Mempool.MaxTxsBytes = int64(tconfig.Mempool.Size * tconfig.Mempool.MaxTxBytes)
 	tconfig.Mempool.CacheSize = 100000
 	tconfig.Mempool.Broadcast = true
+
 	tconfig.StateSync.Enable = localConfig.StateSyncEnabled
+	// if State is already init'ed (height > 0) then skip StateSync entirely
+	if app.State != nil {
+		if height, err := app.State.LastHeight(); err == nil && height > 0 {
+			tconfig.StateSync.Enable = false
+		}
+	}
+
 	if tconfig.StateSync.Enable {
 		tconfig.StateSync.RPCServers = func() []string {
 			// prefer the most the specific flag first
