@@ -15,6 +15,7 @@ import (
 type Vochain struct {
 	AutoUpdateGenesis bool
 	SeedNodes         []string
+	StateSync         map[string]StateSyncParams
 	Genesis           *Doc
 }
 
@@ -130,6 +131,12 @@ type AppStateValidators struct {
 	Power    uint64         `json:"power"`
 	Name     string         `json:"name"`
 	KeyIndex uint8          `json:"key_index"`
+}
+
+// StateSyncParams define the parameters used by StateSync
+type StateSyncParams struct {
+	TrustHeight int64
+	TrustHash   types.HexBytes
 }
 
 // StringifiedInt64 is a wrapper around int64 that marshals/unmarshals as a string.

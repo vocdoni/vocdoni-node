@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"embed"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"math/big"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
@@ -38,6 +40,8 @@ import (
 
 //go:embed migrations/*.sql
 var embedMigrations embed.FS
+
+const dbFilename = "db.sqlite"
 
 // EventListener is an interface used for executing custom functions during the
 // events of the tally of a process.
@@ -101,6 +105,7 @@ type Options struct {
 
 	// ExpectBackupRestore should be set to true if a call to Indexer.RestoreBackup
 	// will be made shortly after New is called, and before any indexing or queries happen.
+	// If the DB file on disk exists, this flag will be ignored and the existing DB will be loaded.
 	ExpectBackupRestore bool
 
 	IgnoreLiveResults bool
@@ -128,11 +133,16 @@ func New(app *vochain.BaseApplication, opts Options) (*Indexer, error) {
 	if err := os.MkdirAll(opts.DataDir, os.ModePerm); err != nil {
 		return nil, err
 	}
-	idx.dbPath = filepath.Join(opts.DataDir, "db.sqlite")
+	idx.dbPath = filepath.Join(opts.DataDir, dbFilename)
 
-	// If we are expecting a restore shortly after, that will initialize the DB.
-	if !opts.ExpectBackupRestore {
-		idx.startDB()
+	// if dbPath exists, always startDB (ExpectBackupRestore is ignored)
+	// if dbPath doesn't exist, and we're not expecting a BackupRestore, startDB
+	// if dbPath doesn't exist and we're expecting a backup, skip startDB, it will be triggered after the restore
+	if _, err := os.Stat(idx.dbPath); err == nil ||
+		(os.IsNotExist(err) && !opts.ExpectBackupRestore) {
+		if err := idx.startDB(); err != nil {
+			return nil, err
+		}
 	}
 
 	// Subscribe to events
@@ -225,7 +235,7 @@ func (idx *Indexer) Close() error {
 // BackupPath restores the database from a backup created via SaveBackup.
 // Note that this must be called with ExpectBackupRestore set to true,
 // and before any indexing or queries happen.
-func (idx *Indexer) RestoreBackup(ctx context.Context, path string) error {
+func (idx *Indexer) RestoreBackup(path string) error {
 	if idx.readWriteDB != nil {
 		panic("Indexer.RestoreBackup called after the database was initialized")
 	}
@@ -246,6 +256,29 @@ func (idx *Indexer) RestoreBackup(ctx context.Context, path string) error {
 func (idx *Indexer) SaveBackup(ctx context.Context, path string) error {
 	_, err := idx.readOnlyDB.ExecContext(ctx, `VACUUM INTO ?`, path)
 	return err
+}
+
+// ExportBackupAsBytes backs up the database, and returns the contents as []byte.
+//
+// Note that writes to the database may be blocked until the backup finishes.
+//
+// For sqlite, this is done via "VACUUM INTO", so the resulting file is also a database.
+func (idx *Indexer) ExportBackupAsBytes(ctx context.Context) ([]byte, error) {
+	tmpDir, err := os.MkdirTemp("", "indexer")
+	if err != nil {
+		return nil, fmt.Errorf("error creating tmpDir: %w", err)
+
+	}
+	tmpFilePath := filepath.Join(tmpDir, "indexer.sqlite3")
+	if err := idx.SaveBackup(ctx, tmpFilePath); err != nil {
+		return nil, fmt.Errorf("error saving indexer backup: %w", err)
+	}
+	defer func() {
+		if err := os.Remove(tmpFilePath); err != nil {
+			log.Warnw("error removing indexer backup file", "path", tmpFilePath, "err", err)
+		}
+	}()
+	return os.ReadFile(tmpFilePath)
 }
 
 // blockTxQueries assumes that lockPool is locked.
@@ -275,23 +308,10 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 		return
 	}
 
-	// During the first seconds/milliseconds of the Vochain startup, Tendermint might report that
-	// the chain is not synchronizing since it still does not have any peer and do not know the
-	// actual size of the blockchain. If afterSyncBootStrap is executed on this specific moment,
-	// the Wait loop would pass.
-	syncSignals := 5
-	for !inTest {
-		// Add some grace time to avoid false positive on IsSynchronizing()
-		if !idx.App.IsSynchronizing() {
-			syncSignals--
-		} else {
-			syncSignals = 5
-		}
-		if syncSignals == 0 {
-			break
-		}
-		time.Sleep(time.Second * 1)
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
 	}
+
 	log.Infof("running indexer after-sync bootstrap")
 
 	// Block the new votes addition until the recovery finishes.
@@ -338,8 +358,8 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			ID:       indxR.ProcessID,
 			Votes:    indexertypes.EncodeJSON(indxR.Votes),
 			Weight:   indexertypes.EncodeJSON(indxR.Weight),
-			VoteOpts: indexertypes.EncodeProtoJSON(indxR.VoteOpts),
-			Envelope: indexertypes.EncodeProtoJSON(indxR.EnvelopeType),
+			VoteOpts: indexertypes.EncodeProto(indxR.VoteOpts),
+			Envelope: indexertypes.EncodeProto(indxR.EnvelopeType),
 		}); err != nil {
 			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
@@ -352,12 +372,20 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			EnvelopeType: process.Envelope,
 		}
 		// Get the votes from the state
-		idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
+		if err := idx.App.State.IterateVotes(p, true, func(vote *models.StateDBVote) bool {
 			if err := idx.addLiveVote(process, vote.VotePackage, new(big.Int).SetBytes(vote.Weight), partialResults); err != nil {
 				log.Errorw(err, "could not add live vote")
 			}
 			return false
-		})
+		}); err != nil {
+			if errors.Is(err, statedb.ErrEmptyTree) {
+				log.Debugf("process %x doesn't have any votes yet, skipping", p)
+				continue
+			}
+			log.Errorw(err, "unexpected error during iterate votes")
+			continue
+		}
+
 		// Store the results on the persistent database
 		if err := idx.commitVotesUnsafe(queries, p, indxR, partialResults, nil, idx.App.Height()); err != nil {
 			log.Errorw(err, "could not commit live votes")
@@ -536,7 +564,7 @@ func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
-	if !idx.App.IsSynchronizing() {
+	if idx.App.IsSynced() {
 		idx.addProcessToLiveResults(pid)
 	}
 	log.Debugw("new process", "processID", hex.EncodeToString(pid))
@@ -641,7 +669,6 @@ func (idx *Indexer) OnSetAccount(accountAddress []byte, account *state.Account) 
 }
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
-	t := time.Now()
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
@@ -651,7 +678,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 		FromAccount:  tx.FromAddress.Bytes(),
 		ToAccount:    tx.ToAddress.Bytes(),
 		Amount:       int64(tx.Amount),
-		TransferTime: t,
+		TransferTime: time.Unix(idx.App.Timestamp(), 0),
 	}); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
@@ -692,7 +719,6 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 
 // OnSpendTokens indexes a token spending event.
 func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference string) {
-	t := time.Now()
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
@@ -701,7 +727,7 @@ func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uin
 		TxType:      strings.ToLower(txType.String()),
 		Cost:        int64(cost),
 		Reference:   reference,
-		SpendTime:   t,
+		SpendTime:   time.Unix(idx.App.Timestamp(), 0),
 		BlockHeight: int64(idx.App.Height()),
 	}); err != nil {
 		log.Errorw(err, "cannot index new token spending")

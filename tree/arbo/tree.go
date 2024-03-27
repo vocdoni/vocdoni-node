@@ -847,14 +847,24 @@ func (t *Tree) ImportDump(b []byte) error {
 // ImportDumpReader imports the leafs (that have been exported with the Dump
 // method) in the Tree, reading them from the given reader.
 func (t *Tree) ImportDumpReader(r io.Reader) error {
-	if !t.editable() {
-		return ErrSnapshotNotEditable
-	}
 	wTx := t.db.WriteTx()
 	defer wTx.Discard()
 
+	if err := t.ImportDumpReaderWithTx(wTx, r); err != nil {
+		return err
+	}
+	return wTx.Commit()
+}
+
+// ImportDumpReaderWithTx imports the leafs (that have been exported with the Dump
+// method) in the Tree (using the given db.WriteTx), reading them from the given reader.
+func (t *Tree) ImportDumpReaderWithTx(wTx db.WriteTx, r io.Reader) error {
+	if !t.editable() {
+		return ErrSnapshotNotEditable
+	}
+
 	// create the root node if it does not exist
-	_, err := t.db.Get(dbKeyRoot)
+	_, err := wTx.Get(dbKeyRoot)
 	if err == db.ErrKeyNotFound {
 		// store new root 0 (empty)
 		if err := t.setToEmptyTree(wTx); err != nil {
@@ -889,6 +899,7 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 		keys = append(keys, k)
 		values = append(values, v)
 	}
+
 	invalid, err := t.AddBatchWithTx(wTx, keys, values)
 	if err != nil {
 		return fmt.Errorf("error adding batch: %w", err)
@@ -896,7 +907,7 @@ func (t *Tree) ImportDumpReader(r io.Reader) error {
 	if len(invalid) > 0 {
 		return fmt.Errorf("%d invalid keys found in batch", len(invalid))
 	}
-	return wTx.Commit()
+	return nil
 }
 
 // Graphviz iterates across the full tree to generate a string Graphviz

@@ -22,6 +22,7 @@ COMPOSE_CMD_RUN="$COMPOSE_CMD run"
 
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-30}
 ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
+BUILD=${BUILD:-1}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-debug}
 CONCURRENT=${CONCURRENT:-1}
@@ -57,6 +58,7 @@ tests_to_run=(
   	"e2etest_lifecyclelection"
   	"e2etest_cspelection"
   	"e2etest_dynamicensuselection"
+	"test_statesync"
 )
 
 # print help
@@ -82,7 +84,7 @@ e2etest() {
 	shift
 	args=$@
 	id="${op}_$(echo $args | md5sum | awk '{print $1}')"
-	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 60000 \
+	$COMPOSE_CMD_RUN --name ${TEST_PREFIX}_${FUNCNAME[0]}-${id}_${RANDOMID} test timeout 300 \
 		./end2endtest --host $APIHOST --faucet=$FAUCET \
 		  --logLevel=$LOGLEVEL \
 		  --operation=$op \
@@ -151,14 +153,22 @@ e2etest_ballotelection() {
   e2etest ballotApproval
 }
 
+test_statesync() {
+	$COMPOSE_CMD up gatewaySync -d
+	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
+	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"
+}
+
 ### end tests definition
 
 log "### Starting test suite ###"
-$COMPOSE_CMD build
-$COMPOSE_CMD build test
+[ $BUILD -eq 1 ] && {
+	$COMPOSE_CMD build
+	$COMPOSE_CMD build test
+}
 $COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
 sleep 10
-$COMPOSE_CMD up -d
+$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
 
 check_gw_is_up() {
 	date
@@ -175,6 +185,9 @@ if [ i == 20 ] ; then
 	log "### Timed out waiting! Abort, don't even try running tests ###"
 	tests_to_run=()
 	GOCOVERDIR=
+	RET=30
+	log "### Post run logs ###"
+	$COMPOSE_CMD logs --tail 1000
 else
 	log "### Test suite ready ###"
 fi
@@ -184,7 +197,9 @@ results="/tmp/.vocdoni-test$RANDOM"
 mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
-	if [ $test == "e2etest_raceDuringCommit" ] || [ $CONCURRENT -eq 0 ] ; then
+	if [ $test == "e2etest_raceDuringCommit" ] || \
+	   [ $test == "test_statesync" ] || \
+	   [ $CONCURRENT -eq 0 ] ; then
 		log "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
 	else
@@ -228,6 +243,14 @@ if [ -n "$GOCOVERDIR" ] ; then
 	log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
 	log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
 fi
+
+if $COMPOSE_CMD logs | grep -q "^panic:" ; then
+	RET=2
+	log "### Panic detected! Look for panic in the logs above for full context, pasting here the 100 lines after panic ###"
+	$COMPOSE_CMD logs | grep -A 100 "^panic:"
+fi
+
+if $COMPOSE_CMD logs | grep -q "CONSENSUS FAILURE" ; then RET=3 ; log "### CONSENSUS FAILURE detected! Look for it in the logs above ###"; fi
 
 [ $CLEAN -eq 1 ] && {
 	log "### Cleaning docker environment ###"

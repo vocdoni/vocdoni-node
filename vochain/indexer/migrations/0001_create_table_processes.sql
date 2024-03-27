@@ -12,8 +12,8 @@ CREATE TABLE processes (
 
   have_results            BOOLEAN NOT NULL,
   final_results           BOOLEAN NOT NULL,
-  results_votes           TEXT NOT NULL, -- json integer-string matrix, e.g. [["3", "4"]]
-  results_weight          TEXT NOT NULL, -- json integer-string, e.g. "3"
+  results_votes           TEXT NOT NULL, -- encoding/json integer-string matrix, e.g. [["3", "4"]]
+  results_weight          TEXT NOT NULL, -- encoding/json integer-string, e.g. "3"
   results_block_height    INTEGER NOT NULL,
 
   census_root         BLOB NOT NULL,
@@ -24,12 +24,12 @@ CREATE TABLE processes (
   status              INTEGER NOT NULL,
   namespace           INTEGER NOT NULL,
 
-  envelope  TEXT NOT NULL, -- json object
-  mode      TEXT NOT NULL, -- json object
-  vote_opts TEXT NOT NULL, -- json object
+  envelope  BLOB NOT NULL, -- proto object from go.vocdoni.io/proto/build/go/models
+  mode      BLOB NOT NULL, -- proto object from go.vocdoni.io/proto/build/go/models
+  vote_opts BLOB NOT NULL, -- proto object from go.vocdoni.io/proto/build/go/models
 
-  private_keys TEXT NOT NULL, -- json array
-  public_keys  TEXT NOT NULL, -- json array
+  private_keys TEXT NOT NULL, -- encoding/json array
+  public_keys  TEXT NOT NULL, -- encoding/json array
 
   question_index      INTEGER NOT NULL,
   creation_time       DATETIME NOT NULL,

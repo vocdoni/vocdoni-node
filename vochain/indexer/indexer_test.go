@@ -110,7 +110,7 @@ func TestBackup(t *testing.T) {
 	idx.Close()
 	idx, err = New(app, Options{DataDir: t.TempDir(), ExpectBackupRestore: true})
 	qt.Assert(t, err, qt.IsNil)
-	err = idx.RestoreBackup(context.TODO(), backupPath)
+	err = idx.RestoreBackup(backupPath)
 	qt.Assert(t, err, qt.IsNil)
 	wantTotalVotes(10)
 
@@ -1020,7 +1020,7 @@ func TestAfterSyncBootStrap(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
-	qt.Assert(t, app.IsSynchronizing(), qt.Equals, false)
+	qt.Assert(t, app.IsSynced(), qt.Equals, true)
 
 	err := app.State.AddProcess(&models.Process{
 		ProcessId:     pid,
@@ -1615,8 +1615,8 @@ func TestTokenTransfers(t *testing.T) {
 	acc2Tokentx, err := idx.GetTokenTransfersByToAccount(keys[2].Address().Bytes(), 0, 10)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(acc2Tokentx), qt.Equals, 2)
-	qt.Assert(t, acc2Tokentx[0].Amount, qt.Equals, uint64(95))
-	qt.Assert(t, acc2Tokentx[1].Amount, qt.Equals, uint64(18))
+	qt.Assert(t, acc2Tokentx[0].Amount, qt.Equals, uint64(18))
+	qt.Assert(t, acc2Tokentx[1].Amount, qt.Equals, uint64(95))
 
 	// acct 0 must zero token transfers received
 	acc0Tokentx, err := idx.GetTokenTransfersByToAccount(keys[0].Address().Bytes(), 0, 10)

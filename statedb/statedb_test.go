@@ -16,7 +16,7 @@ import (
 var emptyHash = make([]byte, 32)
 
 func TestVersion(t *testing.T) {
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 	version, err := sdb.Version()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, version, qt.Equals, uint32(0))
@@ -43,7 +43,7 @@ func TestVersion(t *testing.T) {
 }
 
 func TestStateDB(t *testing.T) {
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 	version, err := sdb.Version()
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, version, qt.Equals, uint32(0))
@@ -210,7 +210,7 @@ func TestSubTree(t *testing.T) {
 	// - an instance of two non-singleton subTrees (multiACfg, multiBCfg)
 	//   in a single leaf at path `id`.  The leaf of the mainTree at path
 	//   `id` == multiA_id.Root | multiB_id.Root
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -311,7 +311,7 @@ func TestSubTree(t *testing.T) {
 }
 
 func TestNoState(t *testing.T) {
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -451,7 +451,7 @@ func TestTree(t *testing.T) {
 }
 
 func TestBigUpdate(t *testing.T) {
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)
@@ -468,7 +468,7 @@ func TestBigUpdate(t *testing.T) {
 }
 
 func TestBigUpdateDiscard(t *testing.T) {
-	sdb := NewStateDB(metadb.NewTest(t))
+	sdb := New(metadb.NewTest(t))
 
 	mainTree, err := sdb.BeginTx()
 	qt.Assert(t, err, qt.IsNil)

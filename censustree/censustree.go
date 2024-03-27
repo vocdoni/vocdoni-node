@@ -58,7 +58,7 @@ func DeleteCensusTreeFromDatabase(kv db.Database, name string) (int, error) {
 	database := prefixeddb.NewPrefixedDatabase(kv, []byte(name))
 	wTx := database.WriteTx()
 	i := 0
-	if err := database.Iterate(nil, func(k, v []byte) bool {
+	if err := database.Iterate(nil, func(k, _ []byte) bool {
 		if err := wTx.Delete(k); err != nil {
 			log.Warnf("could not remove key %x from database", k)
 		} else {

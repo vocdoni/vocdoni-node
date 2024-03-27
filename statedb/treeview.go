@@ -150,7 +150,7 @@ func (v *TreeView) SubTree(cfg TreeConfig) (treeView TreeViewer, err error) {
 	return &TreeView{
 		db:   db,
 		tree: tree,
-		cfg:  mainTreeCfg,
+		cfg:  MainTreeCfg,
 	}, nil
 }
 

@@ -17,6 +17,7 @@ import (
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -37,6 +38,13 @@ const (
 	// maxPendingTxAttempts is the number of times a transaction can be included in a block
 	// and fail before being removed from the mempool.
 	maxPendingTxAttempts = 3
+
+	// StateDataDir is the subdirectory inside app.DataDir where State data will be saved
+	StateDataDir = "vcstate"
+	// TxHandlerDataDir is the subdirectory inside app.DataDir where TransactionHandler data will be saved
+	TxHandlerDataDir = "txHandler"
+	// TxHandlerDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
+	SnapshotsDataDir = "snapshots"
 )
 
 var (
@@ -54,10 +62,11 @@ type BaseApplication struct {
 	NodeClient         *tmcli.Local
 	NodeAddress        ethcommon.Address
 	TransactionHandler *transaction.TransactionHandler
+	Snapshots          *snapshot.SnapshotManager
 	isSynchronizingFn  func() bool
 	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
 	// data races when querying about the sync status of the blockchain.
-	isSynchronizing atomic.Bool
+	isSynced atomic.Bool
 
 	// Callback blockchain functions
 	fnGetBlockByHeight func(height int64) *tmtypes.Block
@@ -72,6 +81,9 @@ type BaseApplication struct {
 	// was seen frist time and the number of attempts failed for including it into a block.
 	txReferences sync.Map
 
+	// snapshotInterval create state snapshot every N blocks (0 to disable)
+	snapshotInterval int
+
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
 	// startBlockTimestamp is the current block timestamp from tendermint's
@@ -79,6 +91,7 @@ type BaseApplication struct {
 	startBlockTimestamp atomic.Int64
 	chainID             string
 	dataDir             string
+	dbType              string
 	genesisInfo         *tmtypes.GenesisDoc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
@@ -123,7 +136,7 @@ type ExecuteBlockResponse struct {
 // Node still needs to be initialized with SetNode.
 // Callback functions still need to be initialized.
 func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error) {
-	state, err := vstate.NewState(vochainCfg.DBType, vochainCfg.DataDir)
+	state, err := vstate.New(vochainCfg.DBType, filepath.Join(vochainCfg.DataDir, StateDataDir))
 	if err != nil {
 		return nil, fmt.Errorf("cannot create state: (%v)", err)
 	}
@@ -133,8 +146,13 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	transactionHandler := transaction.NewTransactionHandler(
 		state,
 		istc,
-		filepath.Join(vochainCfg.DataDir, "txHandler"),
+		filepath.Join(vochainCfg.DataDir, TxHandlerDataDir),
 	)
+
+	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create snapshot manager: %w", err)
+	}
 
 	if err := circuit.Init(); err != nil {
 		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
@@ -148,8 +166,11 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		State:              state,
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
+		Snapshots:          snaps,
 		blockCache:         blockCache,
 		dataDir:            vochainCfg.DataDir,
+		dbType:             vochainCfg.DBType,
+		snapshotInterval:   vochainCfg.SnapshotInterval,
 		genesisInfo:        &tmtypes.GenesisDoc{},
 	}, nil
 }
@@ -201,15 +222,17 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-	// perform state snapshot (DISABLED)
-	if false && app.Height()%50000 == 0 && !app.IsSynchronizing() { // DISABLED
+
+	// perform state snapshot
+	if app.snapshotInterval > 0 &&
+		app.Height()%uint32(app.snapshotInterval) == 0 &&
+		app.IsSynced() {
 		startTime := time.Now()
-		log.Infof("performing a state snapshot on block %d", app.Height())
-		if _, err := app.State.Snapshot(); err != nil {
-			return hash, fmt.Errorf("cannot make state snapshot: %w", err)
+		log.Infof("performing a snapshot on block %d", app.Height())
+		if _, err := app.Snapshots.Do(app.State); err != nil {
+			return hash, fmt.Errorf("cannot make snapshot: %w", err)
 		}
-		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
-		log.Debugf("%+v", app.State.ListSnapshots())
+		log.Infof("snapshot on block %d created successfully, took %s", app.Height(), time.Since(startTime))
 	}
 	return hash, err
 }
@@ -251,9 +274,9 @@ func (app *BaseApplication) deliverTx(rawTx []byte) *DeliverTxResponse {
 func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	if app.isSynchronizingFn != nil {
 		if app.isSynchronizingFn() {
-			app.isSynchronizing.Store(true)
+			app.isSynced.Store(false)
 		} else {
-			app.isSynchronizing.Store(false)
+			app.isSynced.Store(true)
 		}
 	}
 	app.State.Rollback()
@@ -373,10 +396,25 @@ func (app *BaseApplication) isSynchronizingTendermint() bool {
 	return app.Node.ConsensusReactor().WaitSync()
 }
 
-// IsSynchronizing informs if the blockchain is synchronizing or not.
+// IsSynced informs if the blockchain reached a synced state or not.
 // The value is updated every new block.
-func (app *BaseApplication) IsSynchronizing() bool {
-	return app.isSynchronizing.Load()
+func (app *BaseApplication) IsSynced() bool {
+	return app.isSynced.Load()
+}
+
+// WaitUntilSynced returns a chan that will be closed when the blockchain reachs a synced state.
+//
+// Example calls: `case <-app.WaitUntilSynced():` inside a select{} that may implement a timeout,
+// or simply  `<-app.WaitUntilSynced()` to wait indefinitely
+func (app *BaseApplication) WaitUntilSynced() chan any {
+	done := make(chan any)
+	go func() {
+		for !app.IsSynced() {
+			time.Sleep(time.Second * 1)
+		}
+		close(done)
+	}()
+	return done
 }
 
 // Height returns the current blockchain height, including the latest (under construction) block.

@@ -140,6 +140,21 @@ func newConfig() (*config.Config, config.Error) {
 		"do not wait for Vochain to synchronize (for testing only)")
 	conf.Vochain.MempoolSize = *flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
+	conf.Vochain.SnapshotInterval = *flag.Int("vochainSnapshotInterval", 10000,
+		"create state snapshot every N blocks (0 to disable)")
+	conf.Vochain.StateSyncEnabled = *flag.Bool("vochainStateSyncEnabled", true,
+		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
+	conf.Vochain.StateSyncRPCServers = *flag.StringSlice("vochainStateSyncRPCServers", []string{},
+		"list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)")
+	conf.Vochain.StateSyncTrustHash = *flag.String("vochainStateSyncTrustHash", "",
+		"hash of the trusted block (takes precedence over RPC and hardcoded defaults)")
+	conf.Vochain.StateSyncTrustHeight = *flag.Int64("vochainStateSyncTrustHeight", 0,
+		"height of the trusted block (takes precedence over RPC and hardcoded defaults)")
+	conf.Vochain.StateSyncChunkSize = *flag.Int64("vochainStateSyncChunkSize", 10*(1<<20), // 10 MB
+		"cometBFT chunk size in bytes")
+	conf.Vochain.StateSyncFetchParamsFromRPC = *flag.Bool("vochainStateSyncFetchParamsFromRPC", true,
+		"allow statesync to fetch TrustHash and TrustHeight from the first RPCServer")
+
 	conf.Vochain.MinerTargetBlockTimeSeconds = *flag.Int("vochainBlockTime", 10,
 		"vochain consensus block time target (in seconds)")
 	conf.Vochain.SkipPreviousOffchainData = *flag.Bool("skipPreviousOffchainData", false,
@@ -153,6 +168,8 @@ func newConfig() (*config.Config, config.Error) {
 	flag.StringVar(&createVochainGenesisFile, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
+	flag.Bool("vochainIndexerDisabled", false,
+		"disables the vochain indexer component")
 
 	// metrics
 	conf.Metrics.Enabled = *flag.Bool("metricsEnabled", false, "enable prometheus metrics")
@@ -310,6 +327,28 @@ func newConfig() (*config.Config, config.Error) {
 		log.Fatalf("failed to bind offChainDataDownload flag to viper: %v", err)
 	}
 
+	if err := viper.BindPFlag("vochain.SnapshotInterval", flag.Lookup("vochainSnapshotInterval")); err != nil {
+		log.Fatalf("failed to bind vochainSnapshotInterval flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncEnabled", flag.Lookup("vochainStateSyncEnabled")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncEnabled flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncRPCServers", flag.Lookup("vochainStateSyncRPCServers")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncRPCServers flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncTrustHash", flag.Lookup("vochainStateSyncTrustHash")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncTrustHash flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncTrustHeight", flag.Lookup("vochainStateSyncTrustHeight")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncTrustHeight flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncChunkSize", flag.Lookup("vochainStateSyncChunkSize")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncChunkSize flag to viper: %v", err)
+	}
+	if err := viper.BindPFlag("vochain.StateSyncFetchParamsFromRPC", flag.Lookup("vochainStateSyncFetchParamsFromRPC")); err != nil {
+		log.Fatalf("failed to bind vochainStateSyncFetchParamsFromRPC flag to viper: %v", err)
+	}
+
 	// metrics
 	if err := viper.BindPFlag("metrics.Enabled", flag.Lookup("metricsEnabled")); err != nil {
 		log.Fatalf("failed to bind metricsEnabled flag to viper: %v", err)
@@ -353,6 +392,11 @@ func newConfig() (*config.Config, config.Error) {
 			Message: fmt.Sprintf("cannot unmarshal loaded config file: %s", err),
 		}
 	}
+	// Note that these Config.Vochain fields aren't bound via viper.
+	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
+	conf.Vochain.Indexer.Enabled = !viper.GetBool("vochainIndexerDisabled")
+	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
+	conf.Vochain.Network = viper.GetString("chain")
 
 	if conf.SigningKey == "" {
 		fmt.Println("no signing key, generating one...")
@@ -538,14 +582,17 @@ func main() {
 		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
-		// do we need indexer?
-		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
 		// offchainDataDownloader is only needed for gateways
 		conf.Vochain.OffChainDataDownloader = conf.Vochain.OffChainDataDownloader &&
 			conf.Mode == types.ModeGateway
 
-			// create the vochain service
-		if err = srv.Vochain(); err != nil {
+		// if there's no indexer, then never do snapshots because they would be incomplete
+		if !conf.Vochain.Indexer.Enabled {
+			conf.Vochain.SnapshotInterval = 0
+		}
+
+		// create the vochain service
+		if err := srv.Vochain(); err != nil {
 			log.Fatal(err)
 		}
 		// create the offchain data downloader service
@@ -570,7 +617,8 @@ func main() {
 				log.Fatal(err)
 			}
 		}
-		// start the service and block until finish fast sync
+		// start the service and block until finish sync:
+		// StateSync (if enabled) happens first, and then fastsync in all cases
 		if err := srv.Start(); err != nil {
 			log.Fatal(err)
 		}

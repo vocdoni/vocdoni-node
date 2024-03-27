@@ -207,7 +207,7 @@ func openStateAtHeight(height int64, stateDir string) *statedb.TreeView {
 	if err != nil {
 		log.Fatalf("Can't open DB: %v", err)
 	}
-	sdb := statedb.NewStateDB(database)
+	sdb := statedb.New(database)
 	lastHeight, err := sdb.Version()
 	if err != nil {
 		log.Fatal("Can't get last height")

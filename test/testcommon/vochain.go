@@ -51,7 +51,7 @@ var (
 )
 
 func NewVochainState(tb testing.TB) *state.State {
-	s, err := state.NewState(db.TypePebble, tb.TempDir())
+	s, err := state.New(db.TypePebble, tb.TempDir())
 	if err != nil {
 		tb.Fatal(err)
 	}

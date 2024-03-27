@@ -1,6 +1,7 @@
 package state
 
 import (
+	"bytes"
 	"encoding/binary"
 )
 
@@ -52,7 +53,7 @@ func (pbr *ProcessBlockRegistry) MinStartBlock(fromBlock uint32) (uint32, error)
 func (pbr *ProcessBlockRegistry) MaxEndBlock(fromBlock uint32) (uint32, error) {
 	maxEndBlock := fromBlock
 	if err := pbr.db.Iterate(pbrDBPrefix, func(pid, _ []byte) bool {
-		p, err := pbr.state.Process(pid, false)
+		p, err := pbr.state.Process(bytes.Clone(pid), false)
 		if err != nil {
 			return false
 		}

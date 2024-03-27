@@ -79,7 +79,7 @@ docker compose down
 
 #### Connecting
 
-Once the node has finished the blockchain fast sync process, you can connect query the API:
+Once the node has finished the blockchain sync process, you can connect query the API:
 
 `$ curl http://127.0.0.1:9090/v2/chain/info`
 
