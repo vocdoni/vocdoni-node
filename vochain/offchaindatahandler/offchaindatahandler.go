@@ -2,6 +2,7 @@ package offchaindatahandler
 
 import (
 	"encoding/hex"
+	"fmt"
 	"sync"
 
 	"go.vocdoni.io/dvote/api/censusdb"
@@ -95,15 +96,10 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 
 // OnProcess is triggered when a new election is created. It checks if the election contains offchain data
 // that needs to be imported and enqueues it for being handled by Commit.
-func (d *OffChainDataHandler) OnProcess(pid, _ []byte, censusRoot, censusURI string, _ int32) {
+func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 	d.queueLock.Lock()
 	defer d.queueLock.Unlock()
 	if d.importOnlyNew && !d.isSynced {
-		return
-	}
-	p, err := d.vochain.State.Process(pid, false)
-	if err != nil || p == nil {
-		log.Errorw(err, "onProcess: could get process from state")
 		return
 	}
 	// enqueue for import election metadata information
@@ -114,10 +110,10 @@ func (d *OffChainDataHandler) OnProcess(pid, _ []byte, censusRoot, censusURI str
 		})
 	}
 	// enqueue for download external census if needs to be imported
-	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(censusURI) > 0 {
+	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(p.GetCensusURI()) > 0 {
 		d.queue = append(d.queue, importItem{
-			censusRoot: util.TrimHex(censusRoot),
-			uri:        censusURI,
+			censusRoot: util.TrimHex(fmt.Sprintf("%x", p.CensusRoot)),
+			uri:        p.GetCensusURI(),
 			itemType:   itemTypeExternalCensus,
 		})
 	}
