@@ -97,14 +97,9 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, _ []byte, _, _ string, _ int32) {
+func (k *KeyKeeper) OnProcess(p *models.Process, _ int32) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	p, err := k.vochain.State.Process(pid, false)
-	if err != nil {
-		log.Errorf("cannot get process from state: (%s)", err)
-		return
-	}
 	if !p.EnvelopeType.EncryptedVotes {
 		return
 	}
@@ -114,7 +109,7 @@ func (k *KeyKeeper) OnProcess(pid, _ []byte, _, _ string, _ int32) {
 	}
 
 	// Add the process to the pool queue
-	k.pidsToAddKeys = append(k.pidsToAddKeys, pid)
+	k.pidsToAddKeys = append(k.pidsToAddKeys, p.GetProcessId())
 }
 
 // OnProcessStatusChange will publish the private
