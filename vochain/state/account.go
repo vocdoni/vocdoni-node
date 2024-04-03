@@ -116,6 +116,29 @@ func (v *State) CountAccounts(committed bool) (uint64, error) {
 	return accountsTree.Size()
 }
 
+// ListAccounts returns the full list of accounts the vochain has, as a map indexed by the account address
+func (v *State) ListAccounts(committed bool) (map[common.Address]*Account, error) {
+	if !committed {
+		v.tx.RLock()
+		defer v.tx.RUnlock()
+	}
+	accountsTree, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeAccounts))
+	if err != nil {
+		return nil, err
+	}
+	accts := make(map[common.Address]*Account)
+	if err := accountsTree.Iterate(func(key []byte, value []byte) bool {
+		accts[common.Address(key)] = &Account{}
+		if err := accts[common.Address(key)].Unmarshal(value); err != nil {
+			log.Errorf("couldn't unmarshal account %x: %v", key, err)
+		}
+		return false
+	}); err != nil {
+		return nil, err
+	}
+	return accts, nil
+}
+
 // AccountFromSignature extracts an address from a signed message and returns an account if exists
 func (v *State) AccountFromSignature(message, signature []byte) (*common.Address, *Account, error) {
 	pubKey, err := ethereum.PubKeyFromSignature(message, signature)
