@@ -560,7 +560,8 @@ func (idx *Indexer) Rollback() {
 }
 
 // OnProcess indexer stores the processID
-func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
+func (idx *Indexer) OnProcess(p *models.Process, _ int32) {
+	pid := p.GetProcessId()
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}

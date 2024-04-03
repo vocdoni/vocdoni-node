@@ -145,12 +145,9 @@ func (k *KeyKeeper) Rollback() {
 }
 
 // OnProcess creates the keys and add them to the pool queue, if the process requires it
-func (k *KeyKeeper) OnProcess(pid, _ []byte, _, _ string, _ int32) {
-	p, err := k.vochain.State.Process(pid, false)
-	if err != nil {
-		log.Errorf("cannot get process from state: (%s)", err)
-		return
-	}
+func (k *KeyKeeper) OnProcess(p *models.Process, _ int32) {
+	var err error
+	pid := p.GetProcessId()
 	if !p.EnvelopeType.EncryptedVotes {
 		return
 	}
