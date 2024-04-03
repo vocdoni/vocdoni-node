@@ -301,6 +301,22 @@ func (s *Snapshot) Restore(dbType, dataDir string) (string, error) {
 	if err := newState.Close(); err != nil {
 		return tmpDir, fmt.Errorf("error closing newState: %w", err)
 	}
+
+	if importOffChainData := FnImportOffChainData(); importOffChainData != nil {
+		newState, err := state.New(dbType, tmpDir)
+		if err != nil {
+			return tmpDir, fmt.Errorf("error reopening newState: %w", err)
+		}
+
+		if err := importOffChainData(newState); err != nil {
+			return tmpDir, fmt.Errorf("error importing offchain data: %w", err)
+		}
+
+		if err := newState.Close(); err != nil {
+			return tmpDir, fmt.Errorf("error reclosing newState: %w", err)
+		}
+	}
+
 	return tmpDir, nil
 }
 
