@@ -183,6 +183,15 @@ func newTendermint(app *BaseApplication,
 					log.Warnf("cannot fetch status from remote RPC server: %v", err)
 					return 0, ""
 				}
+				// try to get the hash exactly at the snapshot height, to avoid a long verification chain
+				height := status.SyncInfo.LatestBlockHeight - (status.SyncInfo.LatestBlockHeight % int64(localConfig.SnapshotInterval))
+				b, err := cli.Block(context.TODO(), &height)
+				if err == nil {
+					log.Infow("fetched statesync params from remote RPC",
+						"height", height, "hash", b.BlockID.Hash.String())
+					return height, b.BlockID.Hash.String()
+				}
+				// else at least fallback to the latest height and hash
 				log.Infow("fetched statesync params from remote RPC",
 					"height", status.SyncInfo.LatestBlockHeight, "hash", status.SyncInfo.LatestBlockHash.String())
 				return status.SyncInfo.LatestBlockHeight, status.SyncInfo.LatestBlockHash.String()
