@@ -8,7 +8,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"time"
 
 	flag "github.com/spf13/pflag"
@@ -160,7 +159,7 @@ func main() {
 				newp := tx.GetNewProcess()
 				fmt.Printf("Tx %d: newProcess %x\n", i, newp.Process.ProcessId)
 			default:
-				fmt.Printf("Tx %d is of type: %s", i, reflect.TypeOf(tx))
+				fmt.Printf("Tx %d is of type: %T", i, tx)
 			}
 			fmt.Println(log.FormatProto(tx))
 			fmt.Println("-------------END--------------")
