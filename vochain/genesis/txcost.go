@@ -30,11 +30,11 @@ type TransactionCosts struct {
 func (t *TransactionCosts) AsMap() map[models.TxType]uint64 {
 	b := make(map[models.TxType]uint64)
 
-	tType := reflect.TypeOf(*t)
-	tValue := reflect.ValueOf(*t)
-	for i := 0; i < tType.NumField(); i++ {
-		key := TxCostNameToTxType(tType.Field(i).Name)
-		b[key] = tValue.Field(i).Uint()
+	val := reflect.ValueOf(*t)
+	typ := val.Type()
+	for i := 0; i < val.NumField(); i++ {
+		key := TxCostNameToTxType(typ.Field(i).Name)
+		b[key] = val.Field(i).Uint()
 	}
 	return b
 }

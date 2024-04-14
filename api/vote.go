@@ -61,7 +61,7 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	}
 
 	// check if the transaction is of the correct type
-	if ok, err := isTransactionType(req.TxPayload, &models.Tx_Vote{}); err != nil {
+	if ok, err := isTransactionType[*models.Tx_Vote](req.TxPayload); err != nil {
 		return ErrCantCheckTxType.WithErr(err)
 	} else if !ok {
 		return ErrTxTypeMismatch.Withf("expected Tx_Vote")

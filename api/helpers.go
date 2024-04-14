@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"reflect"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -66,7 +65,7 @@ func protoFormat(tx []byte) string {
 
 // isTransactionType checks if the given transaction is of the given type.
 // t is expected to be a pointer to a protobuf transaction message.
-func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
+func isTransactionType[T any](signedTxBytes []byte) (bool, error) {
 	stx := &models.SignedTx{}
 	if err := proto.Unmarshal(signedTxBytes, stx); err != nil {
 		return false, err
@@ -75,7 +74,8 @@ func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
 	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
 		return false, err
 	}
-	return reflect.TypeOf(tx.Payload) == reflect.TypeOf(t), nil
+	_, ok := tx.Payload.(T)
+	return ok, nil
 }
 
 // convertKeysToCamel converts all keys in a JSON object to camelCase.
