@@ -64,7 +64,6 @@ func TestDecryptCiphersFromJS(t *testing.T) {
 	}
 
 	for _, test := range inputs {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			got, err := priv.Decrypt(test.jsCipher)
 			if err != nil {

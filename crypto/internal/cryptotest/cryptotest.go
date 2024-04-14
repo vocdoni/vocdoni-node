@@ -63,7 +63,6 @@ func TestGenerateEncryptDecrypt(t *testing.T, gen func() (crypto.Cipher, error))
 	}
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -110,7 +109,6 @@ func TestHash(t *testing.T, hash crypto.Hash) {
 	length := len(hash.Hash([]byte{0}))
 
 	for _, test := range tests {
-		test := test
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 

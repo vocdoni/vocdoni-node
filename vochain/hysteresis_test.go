@@ -78,7 +78,6 @@ func TestHysteresis(t *testing.T) {
 	mtx := sync.Mutex{}
 	for i := range accounts {
 		wg.Add(1)
-		i := i
 		go func() {
 			_, sikProof, err := sikTree.GenProof(accounts[i].Address().Bytes())
 			c.Assert(err, qt.IsNil)
