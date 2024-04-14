@@ -52,12 +52,6 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		name = "ipfsConnectKey"
 	case "ipfsSyncPeers":
 		name = "ipfsConnectPeers"
-	}
-	if oldName != name {
-		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
-	}
-	// These were just renamed; don't warn just yet.
-	switch name {
 	case "vochainBlockTime":
 		return "vochainMinerTargetBlockTimeSeconds"
 	case "skipPreviousOffchainData":
@@ -70,6 +64,9 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		return "vochainOffChainDataDownload"
 	case "pprof":
 		return "pprofPort"
+	}
+	if oldName != name {
+		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
 	}
 	return flag.NormalizedName(name)
 }
