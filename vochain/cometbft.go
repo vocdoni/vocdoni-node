@@ -20,6 +20,7 @@ import (
 	crypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/snapshot"
@@ -356,6 +357,10 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 		return nil, fmt.Errorf("nil request")
 	}
 	startTime := time.Now()
+
+	if f := config.ForksForChainID(app.chainID); req.GetHeight() >= int64(f.LTS13Fork) {
+		return nil, fmt.Errorf("current chain %q reached planned EOL at height %d", app.chainID, req.GetHeight())
+	}
 
 	type txInfo struct {
 		Data      []byte

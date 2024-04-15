@@ -4,10 +4,14 @@ package config
 type ForksCfg struct {
 	VoceremonyForkBlock  uint32
 	NullifierFromZkProof uint32
+	LTS13Fork            uint32
 }
 
 // Forks is a map of chainIDs
 var Forks = map[string]*ForksCfg{
+	"test-chain-1": {
+		LTS13Fork: 10, // after 1 minute
+	},
 	"vocdoni/DEV/29": {
 		VoceremonyForkBlock: 217200, // estimated 2023-12-05T11:33:31.426638381Z
 	},
