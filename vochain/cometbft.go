@@ -567,8 +567,8 @@ func (app *BaseApplication) OfferSnapshot(_ context.Context,
 			Result: cometabcitypes.OFFER_SNAPSHOT_RESULT_REJECT,
 		}, nil
 	}
-	if metadata.Version > snapshot.Version {
-		log.Debugw("reject snapshot due to unsupported version",
+	if metadata.Version != snapshot.Version {
+		log.Debugw("reject snapshot due to different version",
 			"height", req.Snapshot.Height, "version", metadata.Version, "chunks", req.Snapshot.Chunks)
 		return &cometabcitypes.OfferSnapshotResponse{
 			Result: cometabcitypes.OFFER_SNAPSHOT_RESULT_REJECT,

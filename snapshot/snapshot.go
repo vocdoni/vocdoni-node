@@ -24,7 +24,7 @@ import (
 
 const (
 	// Version is the version that is accepted
-	Version               = 2
+	Version               = 3
 	snapshotHeaderLenSize = 32
 )
 
@@ -474,8 +474,8 @@ func (*SnapshotManager) Open(filePath string) (*Snapshot, error) {
 	if err := decoder.Decode(&s.header); err != nil {
 		return nil, fmt.Errorf("cannot decode header: %w", err)
 	}
-	if s.header.Version > Version {
-		return nil, fmt.Errorf("snapshot version %d unsupported (must be <=%d)", s.header.Version, Version)
+	if s.header.Version != Version {
+		return nil, fmt.Errorf("snapshot version %d unsupported (must be equal to %d)", s.header.Version, Version)
 	}
 	return s, nil
 }
