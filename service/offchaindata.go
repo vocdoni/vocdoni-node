@@ -75,6 +75,12 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 			vs.OffChainData.OnProcess(p, 0)
 		}
 
+		if len(accts) > 0 || len(pids) > 0 {
+			if err := vs.OffChainData.Commit(0); err != nil {
+				log.Errorw(err, "offchaindata.Commit returned error")
+			}
+		}
+
 		return nil
 	})
 
