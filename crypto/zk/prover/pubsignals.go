@@ -46,16 +46,19 @@ func (p *Proof) ElectionID() ([]byte, error) {
 }
 
 // VoteHash returns the VoteHash included into the current proof.
-func (p *Proof) VoteHash() ([]byte, error) {
+func (p *Proof) VoteHash() ([]byte, []string, error) {
 	voteHash1str, err := p.extractPubSignal("voteHash[0]")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	voteHash2str, err := p.extractPubSignal("voteHash[1]")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return util.SplittedArboStrToBytes(voteHash1str, voteHash2str, false, true), nil
+	return util.SplittedArboStrToBytes(voteHash1str, voteHash2str, false, true), []string{
+		voteHash1str,
+		voteHash2str,
+	}, nil
 }
 
 // CensusRoot returns the CensusRoot included into the current proof.

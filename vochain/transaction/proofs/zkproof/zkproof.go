@@ -36,9 +36,10 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	}
 	hashedPid := sha256.Sum256(process.ProcessId)
 	if !bytes.Equal(hashedPid[:], proofProcessID) {
-		log.Debugw("process id mismatch",
-			"processID", hex.EncodeToString(process.ProcessId),
-			"proofProcessID", hex.EncodeToString(proofProcessID))
+		log.Warnw("process id mismatch",
+			"processID", fmt.Sprintf("%x", process.ProcessId),
+			"hashedPID", fmt.Sprintf("%x", hashedPid),
+			"proofPID", fmt.Sprintf("%x", proofProcessID))
 		return false, nil, fmt.Errorf("process id mismatch %x != %x", process.ProcessId, proofProcessID)
 	}
 	// verify the census root
@@ -50,14 +51,16 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 		return false, nil, fmt.Errorf("census root mismatch")
 	}
 	// verify the votePackage hash
-	proofVoteHash, err := proof.VoteHash()
+	proofVoteHash, strParts, err := proof.VoteHash()
 	if err != nil {
 		return false, nil, fmt.Errorf("failed on parsing vote hash from public inputs provided: %w", err)
 	}
 	hashedVotePackage := sha256.Sum256(envelope.VotePackage)
 	if !bytes.Equal(hashedVotePackage[:], proofVoteHash) {
-		log.Debugw("process id mismatch",
+		log.Warnw("voteHash id mismatch",
 			"votPackage", hex.EncodeToString(envelope.VotePackage),
+			"hashedVotePackage", hex.EncodeToString(hashedVotePackage[:]),
+			"proofParts", strParts,
 			"proofVotePackage", hex.EncodeToString(proofVoteHash))
 		return false, nil, fmt.Errorf("vote hash mismatch")
 	}
