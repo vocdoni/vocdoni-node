@@ -104,6 +104,7 @@ func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 	}
 	// enqueue for import election metadata information
 	if m := p.GetMetadata(); m != "" {
+		log.Debugf("adding election metadata %s to queue", m)
 		d.queue = append(d.queue, importItem{
 			uri:      m,
 			itemType: itemTypeElectionMetadata,
@@ -111,6 +112,7 @@ func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 	}
 	// enqueue for download external census if needs to be imported
 	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(p.GetCensusURI()) > 0 {
+		log.Debugf("adding election censusURI %s to queue", p.GetCensusURI())
 		d.queue = append(d.queue, importItem{
 			censusRoot: util.TrimHex(fmt.Sprintf("%x", p.CensusRoot)),
 			uri:        p.GetCensusURI(),
