@@ -62,7 +62,7 @@ require (
 	go.vocdoni.io/proto v1.15.6-0.20240209115732-27836380ccae
 	golang.org/x/crypto v0.21.0
 	golang.org/x/exp v0.0.0-20240213143201-ec583247a57a
-	golang.org/x/net v0.22.0
+	golang.org/x/net v0.23.0
 	google.golang.org/protobuf v1.33.0
 	lukechampine.com/blake3 v1.2.1
 )
