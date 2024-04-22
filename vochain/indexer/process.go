@@ -149,6 +149,9 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	procParams := indexerdb.CreateProcessParams{
 		ID:                pid,
 		EntityID:          nonNullBytes(eid),
+		StartBlock:        int64(p.StartBlock),
+		EndBlock:          int64(p.BlockCount + p.StartBlock),
+		BlockCount:        int64(p.BlockCount),
 		StartDate:         time.Unix(int64(p.StartTime), 0),
 		EndDate:           time.Unix(int64(p.StartTime+p.Duration), 0),
 		ManuallyEnded:     false,

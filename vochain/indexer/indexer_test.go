@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"path/filepath"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/pressly/goose/v3"
@@ -1082,6 +1083,110 @@ func TestAfterSyncBootStrap(t *testing.T) {
 		{"0", "0"},
 		{"0", "0"},
 	})
+}
+
+var zeroTimeInSqlite = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+
+func TestPopulateStartAndEndBlock(t *testing.T) {
+	log.Init("debug", "stdout", nil)
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+	pid := util.RandomBytes(32)
+	qt.Assert(t, app.IsSynced(), qt.Equals, true)
+
+	startBlock := 1
+	blockCount := 10
+	err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		StartBlock:    uint32(startBlock),
+		BlockCount:    uint32(blockCount),
+		MaxCensusSize: 1000,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 5,
+			MaxValue: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock() // block 1
+	tstamp := app.TimestampFromBlock(int64(app.Height()))
+	app.AdvanceTestBlock() // block 2, so that PopulateStartAndEndDate can find block 1
+
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.StartBlock, qt.Equals, uint64(startBlock))
+	qt.Assert(t, proc.BlockCount, qt.Equals, uint64(blockCount))
+	qt.Assert(t, proc.EndBlock, qt.Equals, uint64(startBlock+blockCount))
+	qt.Assert(t, proc.StartDate.UTC(), qt.Equals, zeroTimeInSqlite)
+	qt.Assert(t, proc.EndDate.UTC(), qt.Equals, zeroTimeInSqlite)
+
+	// Run the PopulateStartAndEndDate, which should update those fields.
+	idx.PopulateStartAndEndDate(true)
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.StartBlock, qt.Equals, uint64(0))
+	qt.Assert(t, proc.BlockCount, qt.Equals, uint64(0))
+	qt.Assert(t, proc.EndBlock, qt.Equals, uint64(0))
+	qt.Assert(t, proc.StartDate.UTC(), qt.Equals, tstamp.UTC())
+	qt.Assert(t, proc.EndDate.UTC(), qt.Equals, tstamp.Add(time.Duration(blockCount)*types.DefaultBlockTime).UTC())
+}
+func TestPopulateStartAndEndBlockInPast(t *testing.T) {
+	log.Init("debug", "stdout", nil)
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+	pid := util.RandomBytes(32)
+	qt.Assert(t, app.IsSynced(), qt.Equals, true)
+
+	startBlock := 2
+	blockCount := 5
+	err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		StartBlock:    uint32(startBlock),
+		BlockCount:    uint32(blockCount),
+		MaxCensusSize: 1000,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 5,
+			MaxValue: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock() // block 1
+	app.AdvanceTestBlock() // block 2
+	tstampStart := app.TimestampFromBlock(int64(app.Height()))
+	app.AdvanceTestBlock() // block 3
+	app.AdvanceTestBlock() // block 4
+	app.AdvanceTestBlock() // block 5
+	app.AdvanceTestBlock() // block 6
+	app.AdvanceTestBlock() // block 7
+	tstampEnd := app.TimestampFromBlock(int64(app.Height()))
+	app.AdvanceTestBlock() // block 8
+
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.StartBlock, qt.Equals, uint64(startBlock))
+	qt.Assert(t, proc.BlockCount, qt.Equals, uint64(blockCount))
+	qt.Assert(t, proc.EndBlock, qt.Equals, uint64(startBlock+blockCount))
+	qt.Assert(t, proc.StartDate.UTC(), qt.Equals, zeroTimeInSqlite)
+	qt.Assert(t, proc.EndDate.UTC(), qt.Equals, zeroTimeInSqlite)
+
+	// Run the PopulateStartAndEndDate, which should update those fields.
+	idx.PopulateStartAndEndDate(true)
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.StartBlock, qt.Equals, uint64(0))
+	qt.Assert(t, proc.BlockCount, qt.Equals, uint64(0))
+	qt.Assert(t, proc.EndBlock, qt.Equals, uint64(0))
+	qt.Assert(t, proc.StartDate.UTC(), qt.Equals, tstampStart.UTC())
+	qt.Assert(t, proc.EndDate.UTC(), qt.Equals, tstampEnd.UTC())
 }
 
 func TestCountVotes(t *testing.T) {
