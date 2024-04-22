@@ -26,6 +26,7 @@ func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessI
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
+	start_block, end_block, block_count,
 	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
@@ -38,6 +39,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
+	?, ?, ?,
 	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -57,6 +59,9 @@ type CreateProcessParams struct {
 	StartDate         time.Time
 	EndDate           time.Time
 	ManuallyEnded     bool
+	StartBlock        int64
+	EndBlock          int64
+	BlockCount        int64
 	VoteCount         int64
 	HaveResults       bool
 	FinalResults      bool
@@ -88,6 +93,9 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.StartDate,
 		arg.EndDate,
 		arg.ManuallyEnded,
+		arg.StartBlock,
+		arg.EndBlock,
+		arg.BlockCount,
 		arg.VoteCount,
 		arg.HaveResults,
 		arg.FinalResults,
@@ -125,7 +133,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive, manually_ended FROM processes
+SELECT id, entity_id, start_block, end_block, start_date, end_date, block_count, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive, manually_ended FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -136,8 +144,11 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 	err := row.Scan(
 		&i.ID,
 		&i.EntityID,
+		&i.StartBlock,
+		&i.EndBlock,
 		&i.StartDate,
 		&i.EndDate,
+		&i.BlockCount,
 		&i.VoteCount,
 		&i.ChainID,
 		&i.HaveResults,
@@ -187,6 +198,34 @@ WHERE final_results = ?
 
 func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults bool) ([]types.ProcessID, error) {
 	rows, err := q.query(ctx, q.getProcessIDsByFinalResultsStmt, getProcessIDsByFinalResults, finalResults)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getProcessIDsWithBlockCount = `-- name: GetProcessIDsWithBlockCount :many
+SELECT id FROM processes
+WHERE block_count > 0
+`
+
+func (q *Queries) GetProcessIDsWithBlockCount(ctx context.Context) ([]types.ProcessID, error) {
+	rows, err := q.query(ctx, q.getProcessIDsWithBlockCountStmt, getProcessIDsWithBlockCount)
 	if err != nil {
 		return nil, err
 	}
@@ -468,4 +507,24 @@ func (q *Queries) UpdateProcessResults(ctx context.Context, arg UpdateProcessRes
 		arg.BlockHeight,
 		arg.ID,
 	)
+}
+
+const updateProcessStartAndEndDate = `-- name: UpdateProcessStartAndEndDate :execresult
+UPDATE processes
+SET start_date = ?1,
+	end_date = ?2,
+	start_block = 0,
+	end_block = 0,
+	block_count = 0
+WHERE id = ?3
+`
+
+type UpdateProcessStartAndEndDateParams struct {
+	StartDate time.Time
+	EndDate   time.Time
+	ID        types.ProcessID
+}
+
+func (q *Queries) UpdateProcessStartAndEndDate(ctx context.Context, arg UpdateProcessStartAndEndDateParams) (sql.Result, error) {
+	return q.exec(ctx, q.updateProcessStartAndEndDateStmt, updateProcessStartAndEndDate, arg.StartDate, arg.EndDate, arg.ID)
 }

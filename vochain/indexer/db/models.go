@@ -25,8 +25,11 @@ type Block struct {
 type Process struct {
 	ID                 types.ProcessID
 	EntityID           types.EntityID
+	StartBlock         int64
+	EndBlock           int64
 	StartDate          time.Time
 	EndDate            time.Time
+	BlockCount         int64
 	VoteCount          int64
 	ChainID            string
 	HaveResults        bool

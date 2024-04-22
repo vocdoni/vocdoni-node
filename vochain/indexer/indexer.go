@@ -403,6 +403,100 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
 
+// PopulateStartAndEndDate is a blocking function that waits until the Vochain is synchronized
+// and then execute a set of migrations.
+// This method might be called on a goroutine after initializing the Indexer.
+func (idx *Indexer) PopulateStartAndEndDate(inTest bool) {
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
+	}
+
+	// Note that holding blockMu means new votes aren't added until the recovery finishes.
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+
+	log.Infof("running indexer post-sync migrations")
+
+	queries := idx.blockTxQueries()
+	ctx := context.TODO()
+
+	legacyPrcIDs, err := queries.GetProcessIDsWithBlockCount(ctx)
+	if err != nil {
+		log.Error(err)
+		return // no point in continuing further
+	}
+
+	log.Infof("found %d processes with non-zero block_count", len(legacyPrcIDs))
+	for _, p := range legacyPrcIDs {
+		log.Debugf("migrating process %x", p)
+		process, err := idx.ProcessInfo(p)
+		if err != nil {
+			log.Errorf("cannot fetch process: %v", err)
+			continue
+		}
+
+		// several possibilities:
+		// * [x] StartBlock or EndBlock is zero: should not happen. panic.
+		// * [x] StartBlock is in the past: startDate = the exact timestamp of the block
+		// * [x] StartBlock is in the future: estimate startDate: lastBlockTstamp + (StartBlock - lastBlockHeight) * 10 secs
+		// * [x] EndBlock is in the past: endDate = exact timestamp of the block
+		// * [x] EndBlock is in the future: estimate endDate = lastBlockTstamp + (EndBlock - lastBlockHeight) * 10 secs
+
+		if process.StartBlock == 0 || process.EndBlock == 0 {
+			log.Errorf("found legacy process with unsupported values: %+v", process)
+			continue
+		}
+
+		lastBlockHeight := int64(idx.App.Height() - 1)
+		lastBlockTstamp := idx.App.Timestamp()
+
+		startDate, err := idx.BlockTimestamp(int64(process.StartBlock))
+		if err != nil {
+			log.Warnf("will estimate startDate since i cannot fetch startBlock %d: %v", process.StartBlock, err)
+			remainingBlocks := int64(process.StartBlock) - lastBlockHeight
+			remainingSeconds := remainingBlocks * int64(types.DefaultBlockTime.Seconds())
+			startDate = time.Unix(lastBlockTstamp+remainingSeconds, 0)
+			log.Debugw("estimated startDate",
+				"p.startBlock", process.StartBlock,
+				"lastBlockHeight", lastBlockHeight,
+				"lastBlockTstamp", lastBlockTstamp,
+				"remainingBlocks", remainingBlocks,
+				"remainingSeconds", remainingSeconds,
+				"startDate", startDate)
+		}
+
+		endDate, err := idx.BlockTimestamp(int64(process.EndBlock))
+		if err != nil {
+			log.Warnf("will estimate endDate since i cannot fetch endBlock %d: %v", process.EndBlock, err)
+			remainingBlocks := int64(process.EndBlock) - lastBlockHeight
+			remainingSeconds := remainingBlocks * int64(types.DefaultBlockTime.Seconds())
+			endDate = time.Unix(lastBlockTstamp+remainingSeconds, 0)
+			log.Debugw("estimated endDate",
+				"p.endBlock", process.EndBlock,
+				"lastBlockHeight", lastBlockHeight,
+				"lastBlockTstamp", lastBlockTstamp,
+				"remainingBlocks", remainingBlocks,
+				"remainingSeconds", remainingSeconds,
+				"endDate", endDate)
+
+		}
+		if _, err := queries.UpdateProcessStartAndEndDate(ctx, indexerdb.UpdateProcessStartAndEndDateParams{
+			ID:        p,
+			StartDate: startDate,
+			EndDate:   endDate,
+		}); err != nil {
+			log.Errorw(err, "cannot UpdateProcessStartAndEndDate sql")
+			continue
+		}
+	}
+
+	// don't wait until the next Commit call to commit blockTx
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
+}
+
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (idx *Indexer) Commit(height uint32) error {
 	idx.blockMu.Lock()

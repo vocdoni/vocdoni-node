@@ -81,6 +81,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getProcessIDsByFinalResultsStmt, err = db.PrepareContext(ctx, getProcessIDsByFinalResults); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcessIDsByFinalResults: %w", err)
 	}
+	if q.getProcessIDsWithBlockCountStmt, err = db.PrepareContext(ctx, getProcessIDsWithBlockCount); err != nil {
+		return nil, fmt.Errorf("error preparing query GetProcessIDsWithBlockCount: %w", err)
+	}
 	if q.getProcessStatusStmt, err = db.PrepareContext(ctx, getProcessStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcessStatus: %w", err)
 	}
@@ -143,6 +146,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.updateProcessResultsStmt, err = db.PrepareContext(ctx, updateProcessResults); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProcessResults: %w", err)
+	}
+	if q.updateProcessStartAndEndDateStmt, err = db.PrepareContext(ctx, updateProcessStartAndEndDate); err != nil {
+		return nil, fmt.Errorf("error preparing query UpdateProcessStartAndEndDate: %w", err)
 	}
 	return &q, nil
 }
@@ -242,6 +248,11 @@ func (q *Queries) Close() error {
 	if q.getProcessIDsByFinalResultsStmt != nil {
 		if cerr := q.getProcessIDsByFinalResultsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getProcessIDsByFinalResultsStmt: %w", cerr)
+		}
+	}
+	if q.getProcessIDsWithBlockCountStmt != nil {
+		if cerr := q.getProcessIDsWithBlockCountStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getProcessIDsWithBlockCountStmt: %w", cerr)
 		}
 	}
 	if q.getProcessStatusStmt != nil {
@@ -349,6 +360,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateProcessResultsStmt: %w", cerr)
 		}
 	}
+	if q.updateProcessStartAndEndDateStmt != nil {
+		if cerr := q.updateProcessStartAndEndDateStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing updateProcessStartAndEndDateStmt: %w", cerr)
+		}
+	}
 	return err
 }
 
@@ -407,6 +423,7 @@ type Queries struct {
 	getProcessStmt                               *sql.Stmt
 	getProcessCountStmt                          *sql.Stmt
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
+	getProcessIDsWithBlockCountStmt              *sql.Stmt
 	getProcessStatusStmt                         *sql.Stmt
 	getTokenFeesStmt                             *sql.Stmt
 	getTokenFeesByFromAccountStmt                *sql.Stmt
@@ -428,51 +445,54 @@ type Queries struct {
 	updateProcessFromStateStmt                   *sql.Stmt
 	updateProcessResultByIDStmt                  *sql.Stmt
 	updateProcessResultsStmt                     *sql.Stmt
+	updateProcessStartAndEndDateStmt             *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                 tx,
-		tx:                                 tx,
-		computeProcessVoteCountStmt:        q.computeProcessVoteCountStmt,
-		countAccountsStmt:                  q.countAccountsStmt,
-		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
-		countTransactionsStmt:              q.countTransactionsStmt,
-		countVotesStmt:                     q.countVotesStmt,
-		createAccountStmt:                  q.createAccountStmt,
-		createBlockStmt:                    q.createBlockStmt,
-		createProcessStmt:                  q.createProcessStmt,
-		createTokenFeeStmt:                 q.createTokenFeeStmt,
-		createTokenTransferStmt:            q.createTokenTransferStmt,
-		createTransactionStmt:              q.createTransactionStmt,
-		createVoteStmt:                     q.createVoteStmt,
-		getBlockStmt:                       q.getBlockStmt,
-		getEntityCountStmt:                 q.getEntityCountStmt,
-		getLastTransactionsStmt:            q.getLastTransactionsStmt,
-		getListAccountsStmt:                q.getListAccountsStmt,
-		getProcessStmt:                     q.getProcessStmt,
-		getProcessCountStmt:                q.getProcessCountStmt,
-		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
-		getProcessStatusStmt:               q.getProcessStatusStmt,
-		getTokenFeesStmt:                   q.getTokenFeesStmt,
-		getTokenFeesByFromAccountStmt:      q.getTokenFeesByFromAccountStmt,
-		getTokenFeesByReferenceStmt:        q.getTokenFeesByReferenceStmt,
-		getTokenFeesByTxTypeStmt:           q.getTokenFeesByTxTypeStmt,
-		getTokenTransferStmt:               q.getTokenTransferStmt,
-		getTokenTransfersByFromAccountStmt: q.getTokenTransfersByFromAccountStmt,
-		getTokenTransfersByToAccountStmt:   q.getTokenTransfersByToAccountStmt,
-		getTransactionStmt:                 q.getTransactionStmt,
-		getTransactionByHashStmt:           q.getTransactionByHashStmt,
+		db:                                           tx,
+		tx:                                           tx,
+		computeProcessVoteCountStmt:                  q.computeProcessVoteCountStmt,
+		countAccountsStmt:                            q.countAccountsStmt,
+		countTokenTransfersByAccountStmt:             q.countTokenTransfersByAccountStmt,
+		countTransactionsStmt:                        q.countTransactionsStmt,
+		countVotesStmt:                               q.countVotesStmt,
+		createAccountStmt:                            q.createAccountStmt,
+		createBlockStmt:                              q.createBlockStmt,
+		createProcessStmt:                            q.createProcessStmt,
+		createTokenFeeStmt:                           q.createTokenFeeStmt,
+		createTokenTransferStmt:                      q.createTokenTransferStmt,
+		createTransactionStmt:                        q.createTransactionStmt,
+		createVoteStmt:                               q.createVoteStmt,
+		getBlockStmt:                                 q.getBlockStmt,
+		getEntityCountStmt:                           q.getEntityCountStmt,
+		getLastTransactionsStmt:                      q.getLastTransactionsStmt,
+		getListAccountsStmt:                          q.getListAccountsStmt,
+		getProcessStmt:                               q.getProcessStmt,
+		getProcessCountStmt:                          q.getProcessCountStmt,
+		getProcessIDsByFinalResultsStmt:              q.getProcessIDsByFinalResultsStmt,
+		getProcessIDsWithBlockCountStmt:              q.getProcessIDsWithBlockCountStmt,
+		getProcessStatusStmt:                         q.getProcessStatusStmt,
+		getTokenFeesStmt:                             q.getTokenFeesStmt,
+		getTokenFeesByFromAccountStmt:                q.getTokenFeesByFromAccountStmt,
+		getTokenFeesByReferenceStmt:                  q.getTokenFeesByReferenceStmt,
+		getTokenFeesByTxTypeStmt:                     q.getTokenFeesByTxTypeStmt,
+		getTokenTransferStmt:                         q.getTokenTransferStmt,
+		getTokenTransfersByFromAccountStmt:           q.getTokenTransfersByFromAccountStmt,
+		getTokenTransfersByToAccountStmt:             q.getTokenTransfersByToAccountStmt,
+		getTransactionStmt:                           q.getTransactionStmt,
+		getTransactionByHashStmt:                     q.getTransactionByHashStmt,
 		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
-		getVoteStmt:                    q.getVoteStmt,
-		searchEntitiesStmt:             q.searchEntitiesStmt,
-		searchProcessesStmt:            q.searchProcessesStmt,
-		searchVotesStmt:                q.searchVotesStmt,
-		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,
-		setProcessResultsReadyStmt:     q.setProcessResultsReadyStmt,
-		updateProcessEndDateStmt:       q.updateProcessEndDateStmt,
-		updateProcessFromStateStmt:     q.updateProcessFromStateStmt,
-		updateProcessResultByIDStmt:    q.updateProcessResultByIDStmt,
-		updateProcessResultsStmt:       q.updateProcessResultsStmt,
+		getVoteStmt:                                  q.getVoteStmt,
+		searchEntitiesStmt:                           q.searchEntitiesStmt,
+		searchProcessesStmt:                          q.searchProcessesStmt,
+		searchVotesStmt:                              q.searchVotesStmt,
+		setProcessResultsCancelledStmt:               q.setProcessResultsCancelledStmt,
+		setProcessResultsReadyStmt:                   q.setProcessResultsReadyStmt,
+		updateProcessEndDateStmt:                     q.updateProcessEndDateStmt,
+		updateProcessFromStateStmt:                   q.updateProcessFromStateStmt,
+		updateProcessResultByIDStmt:                  q.updateProcessResultByIDStmt,
+		updateProcessResultsStmt:                     q.updateProcessResultsStmt,
+		updateProcessStartAndEndDateStmt:             q.updateProcessStartAndEndDateStmt,
 	}
 }

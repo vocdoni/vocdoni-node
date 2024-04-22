@@ -1,6 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
+	start_block, end_block, block_count,
 	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
@@ -13,6 +14,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
+	?, ?, ?,
 	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -112,6 +114,19 @@ SET results_votes  = sqlc.arg(votes),
     results_weight = sqlc.arg(weight),
     vote_opts = sqlc.arg(vote_opts),
     envelope = sqlc.arg(envelope)
+WHERE id = sqlc.arg(id);
+
+-- name: GetProcessIDsWithBlockCount :many
+SELECT id FROM processes
+WHERE block_count > 0;
+
+-- name: UpdateProcessStartAndEndDate :execresult
+UPDATE processes
+SET start_date = sqlc.arg(start_date),
+	end_date = sqlc.arg(end_date),
+	start_block = 0,
+	end_block = 0,
+	block_count = 0
 WHERE id = sqlc.arg(id);
 
 -- name: UpdateProcessEndDate :execresult
