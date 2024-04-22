@@ -114,6 +114,17 @@ SET results_votes  = sqlc.arg(votes),
     envelope = sqlc.arg(envelope)
 WHERE id = sqlc.arg(id);
 
+-- name: GetProcessIDsWithBrokenDate :many
+SELECT id FROM processes
+WHERE strftime('%Y', end_date) = '1970'
+   OR strftime('%Y', start_date) = '1970';
+
+-- name: UpdateProcessStartAndEndDate :execresult
+UPDATE processes
+SET start_date = sqlc.arg(start_date),
+	end_date = sqlc.arg(end_date)
+WHERE id = sqlc.arg(id);
+
 -- name: UpdateProcessEndDate :execresult
 UPDATE processes
 SET end_date = sqlc.arg(end_date),

@@ -403,6 +403,59 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
 }
 
+// FixStartAndEndDate is a blocking function that waits until the Vochain is synchronized
+// and then execute a set of migrations.
+// This method might be called on a goroutine after initializing the Indexer.
+func (idx *Indexer) FixStartAndEndDate(inTest bool) {
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
+	}
+
+	// Note that holding blockMu means new votes aren't added until the recovery finishes.
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+
+	log.Infof("running indexer post-sync migrations")
+
+	queries := idx.blockTxQueries()
+	ctx := context.TODO()
+
+	legacyPrcIDs, err := queries.GetProcessIDsWithBrokenDate(ctx)
+	if err != nil {
+		log.Error(err)
+		return // no point in continuing further
+	}
+
+	log.Infof("found %d processes with broken endDate", len(legacyPrcIDs))
+	for _, p := range legacyPrcIDs {
+		process, err := idx.ProcessInfo(p)
+		if err != nil {
+			log.Errorf("cannot fetch process: %v", err)
+			continue
+		}
+
+		log.Warnf("found process %x with broken endDate:", process.ID)
+		log.Warnf("broken endDate: %s", process.EndDate)
+		log.Warnf("fixing endDate: %s", process.EndDate.Add(1713882000*time.Second))
+
+		_, err = idx.blockQueries.UpdateProcessStartAndEndDate(ctx, indexerdb.UpdateProcessStartAndEndDateParams{
+			StartDate: process.StartDate,
+			EndDate:   process.EndDate.Add(1713882000 * time.Second),
+			ID:        process.ID,
+		})
+		if err != nil {
+			log.Errorf("cannot update process: %v", err)
+			continue
+		}
+	}
+
+	// don't wait until the next Commit call to commit blockTx
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
+}
+
 // Commit is called by the APP when a block is confirmed and included into the chain
 func (idx *Indexer) Commit(height uint32) error {
 	idx.blockMu.Lock()

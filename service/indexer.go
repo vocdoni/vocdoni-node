@@ -28,6 +28,7 @@ func (vs *VocdoniService) VochainIndexer() error {
 	}
 	// launch the indexer after sync routine (executed when the blockchain is ready)
 	go vs.Indexer.AfterSyncBootstrap(false)
+	go vs.Indexer.FixStartAndEndDate(false)
 
 	snapshot.SetFnImportIndexer(func(r io.Reader) error {
 		log.Debugf("restoring indexer backup")

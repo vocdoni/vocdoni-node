@@ -208,6 +208,35 @@ func (q *Queries) GetProcessIDsByFinalResults(ctx context.Context, finalResults 
 	return items, nil
 }
 
+const getProcessIDsWithBrokenDate = `-- name: GetProcessIDsWithBrokenDate :many
+SELECT id FROM processes
+WHERE strftime('%Y', end_date) = '1970'
+   OR strftime('%Y', start_date) = '1970'
+`
+
+func (q *Queries) GetProcessIDsWithBrokenDate(ctx context.Context) ([]types.ProcessID, error) {
+	rows, err := q.query(ctx, q.getProcessIDsWithBrokenDateStmt, getProcessIDsWithBrokenDate)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.ProcessID
+	for rows.Next() {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getProcessStatus = `-- name: GetProcessStatus :one
 SELECT status FROM processes
 WHERE id = ?
@@ -468,4 +497,21 @@ func (q *Queries) UpdateProcessResults(ctx context.Context, arg UpdateProcessRes
 		arg.BlockHeight,
 		arg.ID,
 	)
+}
+
+const updateProcessStartAndEndDate = `-- name: UpdateProcessStartAndEndDate :execresult
+UPDATE processes
+SET start_date = ?1,
+	end_date = ?2
+WHERE id = ?3
+`
+
+type UpdateProcessStartAndEndDateParams struct {
+	StartDate time.Time
+	EndDate   time.Time
+	ID        types.ProcessID
+}
+
+func (q *Queries) UpdateProcessStartAndEndDate(ctx context.Context, arg UpdateProcessStartAndEndDateParams) (sql.Result, error) {
+	return q.exec(ctx, q.updateProcessStartAndEndDateStmt, updateProcessStartAndEndDate, arg.StartDate, arg.EndDate, arg.ID)
 }
