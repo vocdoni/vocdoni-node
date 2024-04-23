@@ -79,9 +79,11 @@ func newTendermint(app *BaseApplication,
 
 	if len(localConfig.Peers) > 0 {
 		tconfig.P2P.PersistentPeers = strings.Trim(strings.Join(localConfig.Peers, ","), "[]\"")
+		tconfig.P2P.MaxNumInboundPeers = 0
+		tconfig.P2P.MaxNumOutboundPeers = 0
 	}
 	if len(tconfig.P2P.PersistentPeers) > 0 {
-		log.Infof("persistent peers: %s", tconfig.P2P.PersistentPeers)
+		log.Warnf("this node will only connect to these peers: %s", tconfig.P2P.PersistentPeers)
 	}
 
 	// consensus config
