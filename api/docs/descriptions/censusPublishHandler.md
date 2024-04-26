@@ -1,6 +1,6 @@
-Register a census to the storage (IPFS in our case). After this, the census can't be edited. 
+Registers a census to storage (IPFS in our case). After this, the census can't be edited. 
         
-You could provide the census Merkle root to specify census publication at specific snapshot. See [censuses/{censusId}/participants](census-add-participants-to-census)
+You can optionally provide the census Merkle root to specify census publication at a specific snapshot. See [censuses/{censusId}/participants](census-add-participants-to-census)
 
 - Requires Bearer token
 - The census is copied to a new census identified by its Merkle Root

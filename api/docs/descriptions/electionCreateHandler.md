@@ -1,4 +1,4 @@
-It creates an election on the Vochain. 
+Creates an election on the Vochain. 
 
 To use this endpoint, you will need to provide a signed transaction that has been encoded on the client side using the **Vocdoni SDK**. This transaction, referred to as txPayload, must include the IPFS CID-formatted hash of the metadata for the election.
 
