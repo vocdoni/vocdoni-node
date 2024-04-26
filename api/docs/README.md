@@ -4,7 +4,7 @@
 
 This notes are a fast "how to" of how to document a new vocdoni node endpoint. 
 
-- Before merge any new endpoint some tags have to be added to the endpoint:
+- Before you can merge any new endpoint some tags have to be added to the endpoint:
 
 ```
 //    @Tags           Accounts

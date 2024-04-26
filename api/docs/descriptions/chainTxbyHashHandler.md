@@ -1,1 +1,1 @@
-Using transaction hash it return the `block` and `index` containing that contains the transaction. After, you could use this `block` and `index` to retrieve transaction full info using [transaction by block and index](transaction-by-block-index)
+Using a transaction's hash, returns the `block` and `index` that contains the transaction. You can use this `block` and `index` to retrieve the full transaction info using [transaction by block and index](transaction-by-block-index)

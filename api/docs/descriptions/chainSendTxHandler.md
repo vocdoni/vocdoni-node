@@ -1,4 +1,4 @@
-It submit a transaction. Depending of transaction type will return different kinds of responses:
+Submits a transaction. Depending on the transaction type, will return one of multiple response types:
 - For a NewElection transaction, `response` will be the `newElectionId`
 - For a Vote transaction, `response` will be the `voteID`
 
