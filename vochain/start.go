@@ -85,7 +85,7 @@ func newTendermint(app *BaseApplication,
 	}
 
 	// consensus config
-	blockTime := 8
+	blockTime := config.DefaultMinerTargetBlockTimeSeconds
 	if localConfig.MinerTargetBlockTimeSeconds > 0 {
 		blockTime = localConfig.MinerTargetBlockTimeSeconds
 	}
