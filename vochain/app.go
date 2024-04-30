@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
@@ -91,7 +92,7 @@ type BaseApplication struct {
 	chainID           string
 	dataDir           string
 	dbType            string
-	genesisInfo       *comettypes.GenesisDoc
+	genesisDoc        *genesis.Doc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
 	// can skip block re-execution on FinalizeBlock call.
@@ -169,7 +170,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		dataDir:            vochainCfg.DataDir,
 		dbType:             vochainCfg.DBType,
 		snapshotInterval:   vochainCfg.SnapshotInterval,
-		genesisInfo:        &comettypes.GenesisDoc{},
+		genesisDoc:         &genesis.Doc{},
 	}, nil
 }
 
@@ -387,9 +388,9 @@ func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 	}
 }
 
-// Genesis returns the tendermint genesis information
-func (app *BaseApplication) Genesis() *comettypes.GenesisDoc {
-	return app.genesisInfo
+// Genesis returns the genesis used by the app (and cometbft)
+func (app *BaseApplication) Genesis() *genesis.Doc {
+	return app.genesisDoc
 }
 
 // SetZkCircuit ensures the global ZkCircuit is the correct for a chain that implements forks

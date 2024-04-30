@@ -20,7 +20,6 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -62,7 +61,7 @@ func main() {
 		if blockHeight == 0 {
 			log.Fatal("listProcess requires a height value")
 		}
-		path := filepath.Join(dataDir, "data", "vcstate")
+		path := filepath.Join(dataDir, vochain.StateDataDir)
 		log.Infof("opening state database path %s", path)
 		listStateProcesses(int64(blockHeight), path)
 
@@ -70,7 +69,7 @@ func main() {
 		if blockHeight == 0 {
 			log.Fatal("listVotes requires a height value")
 		}
-		path := filepath.Join(dataDir, "data", "vcstate")
+		path := filepath.Join(dataDir, vochain.StateDataDir)
 		log.Infof("opening state database path %s", path)
 		listStateVotes(pid, int64(blockHeight), path)
 
@@ -84,7 +83,7 @@ func main() {
 		if blockHeight == 0 {
 			log.Fatal("stateGraph requires a height value")
 		}
-		path := filepath.Join(dataDir, "data", "vcstate")
+		path := filepath.Join(dataDir, vochain.StateDataDir)
 		graphVizMainTree(int64(blockHeight), path)
 
 	case "sync":
@@ -191,8 +190,7 @@ func newVochain(network, dataDir string) *vochain.BaseApplication {
 	}
 	log.Infof("external ip address %s", cfg.PublicAddr)
 	// Create the vochain node
-	genesisBytes := genesis.Genesis[network].Genesis.Marshal()
-	return vochain.NewVochain(cfg, genesisBytes)
+	return vochain.NewVochain(cfg)
 }
 
 func listBlockVotes(_ int64, _ string) {

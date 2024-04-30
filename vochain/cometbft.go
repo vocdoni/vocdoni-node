@@ -36,22 +36,36 @@ import (
 // The returned AppVersion will be included in the Header of every block.
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
-//
-// We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
 	req *cometabcitypes.InfoRequest) (*cometabcitypes.InfoResponse, error) {
+	// TODO: move SetElectionPriceCalc() somewhere else, also deduplicating from InitChain
+	if err := app.State.SetElectionPriceCalc(); err != nil {
+		return nil, fmt.Errorf("cannot set election price calc: %w", err)
+	}
+
+	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
+		req.P2PVersion, "blockVersion", req.BlockVersion)
+
+	appHash := app.State.CommittedHash()
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
-	app.State.SetHeight(lastHeight)
-	appHash := app.State.CommittedHash()
-	if err := app.State.SetElectionPriceCalc(); err != nil {
-		return nil, fmt.Errorf("cannot set election price calc: %w", err)
+	if lastHeight > 0 && lastHeight < uint32(app.Genesis().InitialHeight) {
+		// when the genesis has InitialHeight > 1, means we're doing a chain bump
+		// and we need cometbft to trigger InitChain, which only happens when the app reports lastHeight=0
+		log.Warnf("genesis initial height (%d) > our state lastHeight (%d), creating new chain on top of current one",
+			app.Genesis().InitialHeight, lastHeight)
+
+		if app.Genesis().InitialHeight != int64(lastHeight+1) {
+			log.Warn("genesis initial height is not lastHeight+1")
+		}
+		if !bytes.Equal(appHash, app.Genesis().AppHash) {
+			log.Fatalf("our current appHash (%x) doesn't match the genesis initial AppHash (%x), aborting...", appHash, app.Genesis().AppHash)
+		}
+		lastHeight = 0
 	}
 	// print some basic version info about tendermint components
-	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
-		req.P2PVersion, "blockVersion", req.BlockVersion)
 	log.Infow("telling cometbft our state",
 		"LastBlockHeight", lastHeight,
 		"LastBlockAppHash", hex.EncodeToString(appHash),
@@ -68,13 +82,33 @@ func (app *BaseApplication) Info(_ context.Context,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(_ context.Context,
 	req *cometabcitypes.InitChainRequest) (*cometabcitypes.InitChainResponse, error) {
+	// if our State is already initialized, but cometbft is calling InitChain
+	// it means the ChainID was bumped and cometbft is starting a chain on top of previous one.
+	// Skip all the init, just pass the current validator set and AppHash to cometbft
+	lastHeight, err := app.State.LastHeight()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
+	}
+	if lastHeight > 0 {
+		// pass current validators to cometbft
+		validators, err := app.State.Validators(false)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get validators: %w", err)
+		}
+
+		return &cometabcitypes.InitChainResponse{
+			Validators: validatorUpdate(validators),
+			AppHash:    app.State.CommittedHash(),
+		}, nil
+	}
+
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState genesis.AppState
-	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
-	if err != nil {
+	if err := json.Unmarshal(req.AppStateBytes, &genesisAppState); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
 	}
+
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
@@ -88,9 +122,8 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		}
 		log.Infow("created account", "addr", addr.Hex(), "tokens", acc.Balance)
 	}
-	// get validators
-	// TODO pau: unify this code with the one on apputils.go that essentially does the same
-	tendermintValidators := []cometabcitypes.ValidatorUpdate{}
+
+	// add validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
 		log.Infow("add genesis validator",
 			"signingAddress", genesisAppState.Validators[i].Address.String(),
@@ -107,7 +140,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 			Name:             genesisAppState.Validators[i].Name,
 			ValidatorAddress: crypto256k1.PubKey(genesisAppState.Validators[i].PubKey).Address().Bytes(),
 		}
-		if err = app.State.AddValidator(v); err != nil {
+		if err := app.State.AddValidator(v); err != nil {
 			return nil, fmt.Errorf("cannot add validator %s: %w", log.FormatProto(v), err)
 		}
 		addr := ethcommon.BytesToAddress(v.Address)
@@ -116,12 +149,6 @@ func (app *BaseApplication) InitChain(_ context.Context,
 				return nil, fmt.Errorf("cannot create validator acount %x: %w", addr, err)
 			}
 		}
-		tendermintValidators = append(tendermintValidators,
-			cometabcitypes.UpdateValidator(
-				genesisAppState.Validators[i].PubKey,
-				int64(genesisAppState.Validators[i].Power),
-				crypto256k1.KeyType,
-			))
 	}
 	myValidator, err := app.State.Validator(app.NodeAddress, false)
 	if err != nil {
@@ -174,8 +201,15 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	if _, err = app.State.Save(); err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
+
+	// pass current validators to cometbft
+	validators, err := app.State.Validators(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get validators: %w", err)
+	}
+
 	return &cometabcitypes.InitChainResponse{
-		Validators: tendermintValidators,
+		Validators: validatorUpdate(validators),
 		AppHash:    hash,
 	}, nil
 }
@@ -462,6 +496,16 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	if req == nil {
 		return nil, fmt.Errorf("nil request")
 	}
+	if g := genesis.HardcodedForChainID(app.ChainID()); g.EndOfChain > 0 &&
+		req.Height > g.EndOfChain {
+		log.Errorf("reached end of chain %s at height %d, rejecting new block for height %d", app.ChainID(), g.EndOfChain, req.Height)
+		log.Errorf("now you can deploy a new chain on top, with a different ChainID, InitialHeight %d and AppHash %x",
+			app.State.CurrentHeight()+1, app.State.CommittedHash())
+		return &cometabcitypes.ProcessProposalResponse{
+			Status: cometabcitypes.PROCESS_PROPOSAL_STATUS_REJECT,
+		}, nil
+	}
+
 	// Check if the node is a validator, if not, just accept the proposal and return (nothing to say)
 	validator, err := app.State.Validator(app.NodeAddress, true)
 	if err != nil {

@@ -172,6 +172,14 @@ func loadConfig() *config.Config {
 		"external address:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
+	flag.String("vochainGenesisChainID", "",
+		"override ChainID in genesis for the vochain")
+	flag.Int64("vochainGenesisInitialHeight", 0,
+		"override InitialHeight in genesis for the vochain")
+	flag.String("vochainGenesisAppHash", "",
+		"override AppHash in genesis for the vochain")
+	flag.Int64("vochainGenesisEndOfChain", 0,
+		"height at which this node will refuse adding new blocks to the chain")
 	flag.String("vochainLogLevel", "disabled",
 		"tendermint node log level (debug, info, error, disabled)")
 	flag.StringSlice("vochainPeers", []string{},

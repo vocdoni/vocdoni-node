@@ -10,8 +10,7 @@ services:
       - blockchain
     volumes:
       - data-seed:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-seed:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -24,8 +23,7 @@ services:
       - blockchain
     volumes:
       - data-miner0:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -38,8 +36,7 @@ services:
       - blockchain
     volumes:
       - data-miner1:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -52,8 +49,7 @@ services:
       - blockchain
     volumes:
       - data-miner2:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -66,8 +62,7 @@ services:
       - blockchain
     volumes:
       - data-miner3:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -82,8 +77,7 @@ services:
       - blockchain
     volumes:
       - data-gateway0:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -163,8 +157,7 @@ services:
       - blockchain
     volumes:
       - data-gatewaySync:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gatewaySync:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage

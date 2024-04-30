@@ -2,58 +2,18 @@ package genesis
 
 import (
 	"encoding/json"
-	"strconv"
-	"time"
 
+	comethash "github.com/cometbft/cometbft/crypto/tmhash"
 	comettypes "github.com/cometbft/cometbft/types"
 
-	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 )
 
-// Vochain is a struct containing the genesis details.
-type Vochain struct {
-	AutoUpdateGenesis bool
-	SeedNodes         []string
-	StateSync         map[string]StateSyncParams
-	Genesis           *Doc
-}
-
-// The genesis app state types are copied from
-// github.com/cometbft/cometbft/types, for the sake of making this package
-// lightweight and not have it import heavy indirect dependencies like grpc or
-// crypto/*.
-
-// Doc defines the initial conditions for a Vocdoni blockchain.
-// It is mostly a wrapper around the Tendermint GenesisDoc.
+// Doc is a wrapper around the CometBFT GenesisDoc,
+// that adds some useful methods like Hash
 type Doc struct {
-	GenesisTime     time.Time        `json:"genesis_time"`
-	ChainID         string           `json:"chain_id"`
-	ConsensusParams *ConsensusParams `json:"consensus_params,omitempty"`
-	AppHash         types.HexBytes   `json:"app_hash"`
-	AppState        AppState         `json:"app_state,omitempty"`
-}
-
-// TendermintDoc returns the Tendermint GenesisDoc from the Vocdoni genesis.Doc.
-func (g *Doc) TendermintDoc() comettypes.GenesisDoc {
-	appState, err := json.Marshal(g.AppState)
-	if err != nil {
-		// must never happen
-		panic(err)
-	}
-	return comettypes.GenesisDoc{
-		GenesisTime: g.GenesisTime,
-		ChainID:     g.ChainID,
-		ConsensusParams: &comettypes.ConsensusParams{
-			Block: comettypes.BlockParams{
-				MaxBytes: int64(g.ConsensusParams.Block.MaxBytes),
-				MaxGas:   int64(g.ConsensusParams.Block.MaxGas),
-			},
-		},
-		Validators: []comettypes.GenesisValidator{},
-		AppHash:    []byte(g.AppHash),
-		AppState:   appState,
-	}
+	comettypes.GenesisDoc
+	EndOfChain int64
 }
 
 // Marshal returns the JSON encoding of the genesis.Doc.
@@ -71,49 +31,10 @@ func (g *Doc) Hash() []byte {
 	if err != nil {
 		panic(err)
 	}
-	return ethereum.HashRaw(data)
-}
-
-// ConsensusParams defines the consensus critical parameters that determine the
-// validity of blocks. This comes from Tendermint.
-type ConsensusParams struct {
-	Block     BlockParams     `json:"block"`
-	Evidence  EvidenceParams  `json:"evidence"`
-	Validator ValidatorParams `json:"validator"`
-	Version   VersionParams   `json:"version"`
-}
-
-// BlockParams define limits on the block size and gas plus minimum time
-// between blocks. This comes from Tendermint.
-type BlockParams struct {
-	MaxBytes StringifiedInt64 `json:"max_bytes"`
-	MaxGas   StringifiedInt64 `json:"max_gas"`
-}
-
-// EvidenceParams define limits on max evidence age and max duration
-type EvidenceParams struct {
-	MaxAgeNumBlocks StringifiedInt64 `json:"max_age_num_blocks"`
-	// only accept new evidence more recent than this
-	MaxAgeDuration StringifiedInt64 `json:"max_age_duration"`
-}
-
-// ValidatorParams define the validator key
-type ValidatorParams struct {
-	PubKeyTypes []string `json:"pub_key_types"`
-}
-
-// VersionParams define the version app information
-type VersionParams struct {
-	AppVersion StringifiedInt64 `json:"app_version"`
+	return comethash.Sum(data)
 }
 
 // ________________________ GENESIS APP STATE ________________________
-
-// Account represents an account in the genesis app state
-type Account struct {
-	Address types.HexBytes `json:"address"`
-	Balance uint64         `json:"balance"`
-}
 
 // AppState is the main application state in the genesis file.
 type AppState struct {
@@ -133,33 +54,8 @@ type AppStateValidators struct {
 	KeyIndex uint8          `json:"key_index"`
 }
 
-// StateSyncParams define the parameters used by StateSync
-type StateSyncParams struct {
-	TrustHeight int64
-	TrustHash   types.HexBytes
-}
-
-// StringifiedInt64 is a wrapper around int64 that marshals/unmarshals as a string.
-// This is a dirty non-sense workaround. Blame Tendermint not me.
-// For some (unknown) reason Tendermint requires the integer values to be strings in
-// the JSON genesis file.
-type StringifiedInt64 int64
-
-// MarshalJSON implements the json.Marshaler interface.
-func (i StringifiedInt64) MarshalJSON() ([]byte, error) {
-	return json.Marshal(strconv.FormatInt(int64(i), 10))
-}
-
-// UnmarshalJSON implements the json.Unmarshaler interface.
-func (i *StringifiedInt64) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-	v, err := strconv.ParseInt(s, 10, 64)
-	if err != nil {
-		return err
-	}
-	*i = StringifiedInt64(v)
-	return nil
+// Account represents an account in the genesis app state
+type Account struct {
+	Address types.HexBytes `json:"address"`
+	Balance uint64         `json:"balance"`
 }
