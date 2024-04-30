@@ -201,7 +201,7 @@ func loadConfig() *config.Config {
 	flag.Bool("vochainStateSyncFetchParamsFromRPC", true,
 		"allow statesync to fetch TrustHash and TrustHeight from the first RPCServer")
 
-	flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
+	flag.Int("vochainMinerTargetBlockTimeSeconds", config.DefaultMinerTargetBlockTimeSeconds,
 		"vochain consensus block time target (in seconds)")
 	flag.Bool("vochainSkipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
