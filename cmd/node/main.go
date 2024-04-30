@@ -184,6 +184,10 @@ func loadConfig() *config.Config {
 		"user alternative vochain private key (hexstring[64])")
 	flag.Bool("vochainNoWaitSync", false,
 		"do not wait for Vochain to synchronize (for testing only)")
+	flag.Bool("vochainAutoWipeDataDir", false,
+		"wipe out the whole datadir when hardcoded genesis changes")
+	flag.Bool("vochainAutoWipeCometBFT", true,
+		"wipe out the cometbft datadir when hardcoded genesis changes")
 	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 	flag.Int("vochainSnapshotInterval", 1000, // circa every 3hs (at 10s block interval)

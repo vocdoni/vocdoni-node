@@ -20,9 +20,9 @@ const (
 )
 
 // SetNode initializes the cometbft consensus node service and client.
-func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byte) error {
+func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg) error {
 	var err error
-	if app.Node, err = newTendermint(app, vochaincfg, genesis); err != nil {
+	if app.Node, err = newTendermint(app, vochaincfg); err != nil {
 		return fmt.Errorf("could not set tendermint node service: %s", err)
 	}
 	if vochaincfg.IsSeedNode {
@@ -30,11 +30,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg, genesis []byt
 	}
 	// Note that cometcli.New logs any error rather than returning it.
 	app.NodeClient = cometcli.New(app.Node)
-	nodeGenesis, err := app.NodeClient.Genesis(context.TODO())
-	if err != nil {
-		return err
-	}
-	app.genesisInfo = nodeGenesis.Genesis
 	return nil
 }
 

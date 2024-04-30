@@ -21,8 +21,6 @@ the testnet is composed of:
  * four [miners](https://docs.vocdoni.io/architecture/services/vochain.html#miner) (aka [validator nodes](https://docs.tendermint.com/master/nodes/#validators) in tendermint jargon)
  * one [gateway](https://docs.vocdoni.io/architecture/components.html#gateway)
 
-the `genesis.json` file lists the public keys of all the miners, since vochain is a Proof-of-Authority.
-
 the seed node will serve to bootstrap the network: it'll just wait for incoming connections from other nodes, and provide them a list of peers which they can connect to.
 the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 3 miners online, they can reach consensus and start producing blocks.
 

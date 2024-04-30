@@ -21,7 +21,6 @@ import (
 	cometp2p "github.com/cometbft/cometbft/p2p"
 	cometprivval "github.com/cometbft/cometbft/privval"
 	cometrpchttp "github.com/cometbft/cometbft/rpc/client/http"
-	comettypes "github.com/cometbft/cometbft/types"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 )
 
@@ -91,49 +90,11 @@ func GenerateFaucetPackage(from *ethereum.SignKeys, to ethcommon.Address, amount
 // NewTemplateGenesisFile creates a genesis file with the given number of validators and its private keys.
 // Also includes faucet account.
 // The genesis document is returned.
-func NewTemplateGenesisFile(dir string, validators int) (*comettypes.GenesisDoc, error) {
-	gd := comettypes.GenesisDoc{}
+func NewTemplateGenesisFile(dir string, validators int) (*genesis.Doc, error) {
+	gd := genesis.HardcodedForNetwork("test")
 	gd.ChainID = "test-chain-1"
 	gd.GenesisTime = time.Now()
 	gd.InitialHeight = 0
-	gd.ConsensusParams = comettypes.DefaultConsensusParams()
-	gd.ConsensusParams.Block.MaxBytes = 5242880
-	gd.ConsensusParams.Block.MaxGas = -1
-	gd.ConsensusParams.Evidence.MaxAgeNumBlocks = 100000
-	gd.ConsensusParams.Evidence.MaxAgeDuration = 10000
-	gd.ConsensusParams.Validator.PubKeyTypes = []string{"secp256k1"}
-
-	// Create validators
-	appStateValidators := []genesis.AppStateValidators{}
-	for i := 0; i < validators; i++ {
-		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
-		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
-			return nil, err
-		}
-		pk := crypto256k1.GenPrivKey()
-		privKeyHex := hex.EncodeToString(pk.Bytes())
-		pv, err := NewPrivateValidator(privKeyHex,
-			filepath.Join(nodeDir, "priv_validator_key.json"),
-			filepath.Join(nodeDir, "priv_validator_state.json"),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
-		}
-		pv.Save()
-		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKeyHex), 0o600); err != nil {
-			return nil, err
-		}
-		signer := ethereum.SignKeys{}
-		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
-			return nil, err
-		}
-		appStateValidators = append(appStateValidators, genesis.AppStateValidators{
-			Address:  signer.Address().Bytes(),
-			PubKey:   pv.Key.PubKey.Bytes(),
-			Power:    10,
-			KeyIndex: uint8(i + 1), // zero is reserved for disabling validator key keeper capabilities
-		})
-	}
 
 	// Faucet
 	faucet := ethereum.SignKeys{}
@@ -168,7 +129,6 @@ func NewTemplateGenesisFile(dir string, validators int) (*comettypes.GenesisDoc,
 
 	// Build genesis app state and create genesis file
 	appState := genesis.AppState{
-		Validators: appStateValidators,
 		Accounts: []genesis.Account{
 			{
 				Address: faucet.Address().Bytes(),
@@ -178,12 +138,45 @@ func NewTemplateGenesisFile(dir string, validators int) (*comettypes.GenesisDoc,
 		TxCost: genesis.TransactionCosts{},
 	}
 	appState.MaxElectionSize = 100000
+
+	// Create validators
+	for i := 0; i < validators; i++ {
+		nodeDir := filepath.Join(dir, fmt.Sprintf("node%d", i))
+		if err := os.MkdirAll(nodeDir, 0o700); err != nil {
+			return nil, err
+		}
+		pk := crypto256k1.GenPrivKey()
+		privKeyHex := hex.EncodeToString(pk.Bytes())
+		pv, err := NewPrivateValidator(privKeyHex,
+			filepath.Join(nodeDir, "priv_validator_key.json"),
+			filepath.Join(nodeDir, "priv_validator_state.json"),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create validator key and state: (%v)", err)
+		}
+		pv.Save()
+		if err := os.WriteFile(filepath.Join(nodeDir, "hex_priv_key"), []byte(privKeyHex), 0o600); err != nil {
+			return nil, err
+		}
+		signer := ethereum.SignKeys{}
+		if err := signer.AddHexKey(hex.EncodeToString(pv.Key.PrivKey.Bytes())); err != nil {
+			return nil, err
+		}
+		appState.Validators = append(appState.Validators, genesis.AppStateValidators{
+			Address:  signer.Address().Bytes(),
+			PubKey:   pv.Key.PubKey.Bytes(),
+			Power:    10,
+			Name:     fmt.Sprintf("validator%d", i),
+			KeyIndex: uint8(i + 1), // zero is reserved for disabling validator key keeper capabilities
+		})
+	}
+
 	appStateBytes, err := json.Marshal(appState)
 	if err != nil {
 		return nil, err
 	}
 	gd.AppState = appStateBytes
-	return &gd, gd.SaveAs(filepath.Join(dir, "genesis.json"))
+	return gd, gd.SaveAs(filepath.Join(dir, "genesis.json"))
 }
 
 // newCometRPCClient sets up a new cometbft RPC client

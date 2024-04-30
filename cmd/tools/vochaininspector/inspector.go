@@ -20,7 +20,6 @@ import (
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
-	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -191,8 +190,7 @@ func newVochain(network, dataDir string) *vochain.BaseApplication {
 	}
 	log.Infof("external ip address %s", cfg.PublicAddr)
 	// Create the vochain node
-	genesisBytes := genesis.Genesis[network].Genesis.Marshal()
-	return vochain.NewVochain(cfg, genesisBytes)
+	return vochain.NewVochain(cfg)
 }
 
 func listBlockVotes(_ int64, _ string) {

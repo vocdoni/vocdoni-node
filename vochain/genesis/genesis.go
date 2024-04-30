@@ -1,106 +1,137 @@
 package genesis
 
 import (
+	"encoding/json"
 	"time"
 
+	comettypes "github.com/cometbft/cometbft/types"
+
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 )
 
-// Genesis is a map containing the default Genesis details
-var Genesis = map[string]Vochain{
+// genesis is a map containing the default GenesisDoc for each network
+var genesis = map[string]comettypes.GenesisDoc{
+	// testsuite test network
+	"test": testGenesis,
+
 	// Development network
-	"dev": {
-		AutoUpdateGenesis: true,
-		SeedNodes: []string{
-			"7440a5b086e16620ce7b13198479016aa2b07988@seed.dev.vocdoni.net:26656",
-		},
-		StateSync: map[string]StateSyncParams{
-			"vocdoni/DEV/32": {
-				TrustHeight: 10000,
-				TrustHash:   types.HexStringToHexBytes("0x2b430478c7867dc078c0380b81838d75358db7c8b65bfaf84ade85448a0abd54"),
-			},
-		},
-		Genesis: &devGenesis,
-	},
+	"dev": devGenesis,
 
 	// Staging network
-	"stage": {
-		AutoUpdateGenesis: true,
-		SeedNodes: []string{
-			"588133b8309363a2a852e853424251cd6e8c5330@seed.stg.vocdoni.net:26656",
-		},
-		StateSync: map[string]StateSyncParams{
-			"Vocdoni/STAGE/11": {
-				TrustHeight: 150000,
-				TrustHash:   types.HexStringToHexBytes("0xd964cd5ec4704d3b3e1864c174edd1331044926bb2e6d3fe0b239b1c59329ff2"),
-			},
-		},
-		Genesis: &stageGenesis,
-	},
+	"stage": stageGenesis,
 
 	// LTS production network
-	"lts": {
-		AutoUpdateGenesis: false,
-		SeedNodes: []string{
-			"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
-			"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
-		},
-		StateSync: map[string]StateSyncParams{
-			"Vocdoni/LTS/1.2": {
-				TrustHeight: 1000000,
-				TrustHash:   types.HexStringToHexBytes("0xd782c4a8e889a12fb326dd7f098336756f4238169a603501ae4a2b2f88c19db9"),
-			},
-		},
-		Genesis: &ltsGenesis,
-	},
+	"lts": ltsGenesis,
 }
 
-var devGenesis = Doc{
-	GenesisTime: time.Date(2024, time.April, 4, 1, 0, 0, 0, time.UTC),
-	ChainID:     "vocdoni/DEV/33",
-	ConsensusParams: &ConsensusParams{
-		Block: BlockParams{
-			MaxBytes: 2097152,
-			MaxGas:   -1,
-		},
-		Evidence: EvidenceParams{
-			MaxAgeNumBlocks: 100000,
-			MaxAgeDuration:  10000,
-		},
-		Validator: ValidatorParams{
-			PubKeyTypes: []string{"secp256k1"},
-		},
-		Version: VersionParams{
-			AppVersion: 1,
+var testGenesis = comettypes.GenesisDoc{
+	GenesisTime: time.Date(2024, time.May, 7, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/TEST/1",
+	ConsensusParams: &comettypes.ConsensusParams{
+		Block:     DefaultBlockParams(),
+		Evidence:  comettypes.DefaultEvidenceParams(),
+		Validator: DefaultValidatorParams(),
+		Version: comettypes.VersionParams{
+			App: 1,
 		},
 	},
-	AppState: AppState{
+	AppState: jsonRawMessage(AppState{
+		MaxElectionSize: 1000000,
+		NetworkCapacity: 10000,
+		Validators: []AppStateValidators{
+			{ // 0
+				Address:  ethereumAddrFromPubKey("038faa051e8a726597549bb057f1d296947bb54378443ec8fce030001ece678e14"),
+				PubKey:   types.HexStringToHexBytes("038faa051e8a726597549bb057f1d296947bb54378443ec8fce030001ece678e14"),
+				Power:    10,
+				Name:     "validator1",
+				KeyIndex: 1,
+			},
+			{ // 1
+				Address:  ethereumAddrFromPubKey("03cf8d0d1afa561e01145a275d1e41ed1a6d652361509a4c93dfc6488fdf5eca38"),
+				PubKey:   types.HexStringToHexBytes("03cf8d0d1afa561e01145a275d1e41ed1a6d652361509a4c93dfc6488fdf5eca38"),
+				Power:    10,
+				Name:     "validator2",
+				KeyIndex: 2,
+			},
+			{ // 2
+				Address:  ethereumAddrFromPubKey("031802916d945239a39a9a8ee3e2eb3fb91ee324ccdfd73659f482e644892b796f"),
+				PubKey:   types.HexStringToHexBytes("031802916d945239a39a9a8ee3e2eb3fb91ee324ccdfd73659f482e644892b796f"),
+				Power:    10,
+				Name:     "validator3",
+				KeyIndex: 3,
+			},
+			{ // 3
+				Address:  ethereumAddrFromPubKey("02a790726e98978b0ca2cde3a09cbb1af1b298191f46e051b86bcb1854deb58478"),
+				PubKey:   types.HexStringToHexBytes("02a790726e98978b0ca2cde3a09cbb1af1b298191f46e051b86bcb1854deb58478"),
+				Power:    10,
+				Name:     "validator4",
+				KeyIndex: 4,
+			},
+		},
+		Accounts: []Account{
+			{ // faucet
+				Address: types.HexStringToHexBytes("0x88a499cEf9D1330111b41360173967c9C1bf703f"),
+				Balance: 1000000000000,
+			},
+		},
+		TxCost: TransactionCosts{
+			SetProcessStatus:        1,
+			SetProcessCensus:        1,
+			SetProcessQuestionIndex: 1,
+			RegisterKey:             1,
+			NewProcess:              10,
+			SendTokens:              2,
+			SetAccountInfoURI:       2,
+			CreateAccount:           2,
+			AddDelegateForAccount:   2,
+			DelDelegateForAccount:   2,
+			CollectFaucet:           1,
+			SetAccountSIK:           1,
+			DelAccountSIK:           1,
+			SetAccountValidator:     100,
+		},
+	}),
+}
+
+var devGenesis = comettypes.GenesisDoc{
+	GenesisTime: time.Date(2024, time.April, 4, 1, 0, 0, 0, time.UTC),
+	ChainID:     "vocdoni/DEV/33",
+	ConsensusParams: &comettypes.ConsensusParams{
+		Block:     DefaultBlockParams(),
+		Evidence:  comettypes.DefaultEvidenceParams(),
+		Validator: DefaultValidatorParams(),
+		Version: comettypes.VersionParams{
+			App: 1,
+		},
+	},
+	AppState: jsonRawMessage(AppState{
 		MaxElectionSize: 100000,
 		NetworkCapacity: 20000,
 		Validators: []AppStateValidators{
 			{ // 0
-				Address:  types.HexStringToHexBytes("04cc36be85a0a6e2bfd09295396625e6302d7c60"),
+				Address:  ethereumAddrFromPubKey("03c61c8399828b0c5644455e43c946979272dc3ca0859267f798268802303015f7"),
 				PubKey:   types.HexStringToHexBytes("03c61c8399828b0c5644455e43c946979272dc3ca0859267f798268802303015f7"),
 				Power:    10,
 				Name:     "",
 				KeyIndex: 1,
 			},
 			{ // 1
-				Address:  types.HexStringToHexBytes("fc095a35338d96503b6fd1010475e45a3545fc25"),
+				Address:  ethereumAddrFromPubKey("0383fe95c5fddee9932ef0f77c180c3c5d0357dba566f2ee77de666a64d9d8c2a6"),
 				PubKey:   types.HexStringToHexBytes("0383fe95c5fddee9932ef0f77c180c3c5d0357dba566f2ee77de666a64d9d8c2a6"),
 				Power:    10,
 				Name:     "",
 				KeyIndex: 2,
 			},
 			{ // 2
-				Address:  types.HexStringToHexBytes("a9b1008f17654b36f2a9abd29323c53d344415a0"),
+				Address:  ethereumAddrFromPubKey("03503c0872bdcd804b1635cf187577ca1caddbbb14ec8eb3af68579fe4bedcf071"),
 				PubKey:   types.HexStringToHexBytes("03503c0872bdcd804b1635cf187577ca1caddbbb14ec8eb3af68579fe4bedcf071"),
 				Power:    10,
 				Name:     "",
 				KeyIndex: 3,
 			},
 			{ // 3
-				Address:  types.HexStringToHexBytes("234120598e3fcfcfae5d969254d371248b0cf8d1"),
+				Address:  ethereumAddrFromPubKey("02159b8dd9b1cea02cd0ff78ae26dc8aa4efc65f46511537d8550fe1ce407100c3"),
 				PubKey:   types.HexStringToHexBytes("02159b8dd9b1cea02cd0ff78ae26dc8aa4efc65f46511537d8550fe1ce407100c3"),
 				Power:    10,
 				Name:     "",
@@ -137,80 +168,68 @@ var devGenesis = Doc{
 			DelAccountSIK:           1,
 			SetAccountValidator:     10000,
 		},
-	},
+	}),
 }
 
-var stageGenesis = Doc{
+var stageGenesis = comettypes.GenesisDoc{
 	GenesisTime: time.Date(2024, time.January, 30, 1, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni/STAGE/11",
-	ConsensusParams: &ConsensusParams{
-		Block: BlockParams{
-			MaxBytes: 2097152,
-			MaxGas:   -1,
-		},
-		Evidence: EvidenceParams{
-			MaxAgeNumBlocks: 100000,
-			MaxAgeDuration:  10000,
-		},
-		Validator: ValidatorParams{
-			PubKeyTypes: []string{"secp256k1"},
-		},
-		Version: VersionParams{
-			AppVersion: 1,
+	ConsensusParams: &comettypes.ConsensusParams{
+		Block:     DefaultBlockParams(),
+		Evidence:  comettypes.DefaultEvidenceParams(),
+		Validator: DefaultValidatorParams(),
+		Version: comettypes.VersionParams{
+			App: 1,
 		},
 	},
-	AppState: AppState{
+	AppState: jsonRawMessage(AppState{
 		MaxElectionSize: 500000,
 		NetworkCapacity: 10000,
 		Validators: []AppStateValidators{
 			{ // 0
-				Address:  types.HexStringToHexBytes("321d141cf1fcb41d7844af611b5347afc380a03f"),
+				Address:  ethereumAddrFromPubKey("02420b2ee645b9509453cd3b99a6bd8e5e10c1d746fb0bb0ac5af79aba19bb9784"),
 				PubKey:   types.HexStringToHexBytes("02420b2ee645b9509453cd3b99a6bd8e5e10c1d746fb0bb0ac5af79aba19bb9784"),
 				Power:    10,
 				Name:     "vocdoni1",
 				KeyIndex: 1,
 			},
 			{ // 1
-				Address:  types.HexStringToHexBytes("5e6c49d98ff3b90ca46387d7c583d20cf99f29bd"),
-				PubKey:   types.HexStringToHexBytes("03e6c55195825f9736ce8a4553913bbadb26c7f094540e06aed9ccda0e6e26050d"),
-				Power:    10,
-				Name:     "vocdoni2",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("03e6c55195825f9736ce8a4553913bbadb26c7f094540e06aed9ccda0e6e26050d"),
+				PubKey:  types.HexStringToHexBytes("03e6c55195825f9736ce8a4553913bbadb26c7f094540e06aed9ccda0e6e26050d"),
+				Power:   10,
+				Name:    "vocdoni2",
 			},
 			{ // 2
-				Address:  types.HexStringToHexBytes("9d4c46f7485036faea5f15c3034e9e864b9415b5"),
-				PubKey:   types.HexStringToHexBytes("03cb39e1132eee0b25ec75d7dad1f2885460f9b2f200d108a923b78e648b783839"),
-				Power:    10,
-				Name:     "vocdoni3",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("03cb39e1132eee0b25ec75d7dad1f2885460f9b2f200d108a923b78e648b783839"),
+				PubKey:  types.HexStringToHexBytes("03cb39e1132eee0b25ec75d7dad1f2885460f9b2f200d108a923b78e648b783839"),
+				Power:   10,
+				Name:    "vocdoni3",
 			},
 			{ // 3
-				Address:  types.HexStringToHexBytes("52d74938f81569aba46f384c8108c370b5403585"),
+				Address:  ethereumAddrFromPubKey("03f6c246831a524e8214e9ceb61d3da2c3c4dbee09bcbe5d9d9878aaa085764d65"),
 				PubKey:   types.HexStringToHexBytes("03f6c246831a524e8214e9ceb61d3da2c3c4dbee09bcbe5d9d9878aaa085764d65"),
 				Power:    10,
 				Name:     "vocdoni4",
 				KeyIndex: 2,
 			},
 			{ // 4
-				Address:  types.HexStringToHexBytes("ad6ff21ccfb31002adc52714043e37da1b555b15"),
-				PubKey:   types.HexStringToHexBytes("02fd283ff5760958b4e59eac6b0647ed002669ef2862eb9361251376160aa72fe5"),
-				Power:    10,
-				Name:     "vocdoni5",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("02fd283ff5760958b4e59eac6b0647ed002669ef2862eb9361251376160aa72fe5"),
+				PubKey:  types.HexStringToHexBytes("02fd283ff5760958b4e59eac6b0647ed002669ef2862eb9361251376160aa72fe5"),
+				Power:   10,
+				Name:    "vocdoni5",
 			},
 			{ // 5
-				Address:  types.HexStringToHexBytes("8367a1488c3afda043a2a602c13f01d801d0270e"),
+				Address:  ethereumAddrFromPubKey("03369a8c595c70526baf8528b908591ec286e910b10796c3d6dfca0ef76a645167"),
 				PubKey:   types.HexStringToHexBytes("03369a8c595c70526baf8528b908591ec286e910b10796c3d6dfca0ef76a645167"),
 				Power:    10,
 				Name:     "vocdoni6",
 				KeyIndex: 3,
 			},
 			{ // 6
-				Address:  types.HexStringToHexBytes("4146598ff76009f45903958c4c7a3195683b2f61"),
-				PubKey:   types.HexStringToHexBytes("02b5005aeefdb8bb196d308df3fba157a7c1e84966f899a9def6aa97b086bc87e7"),
-				Power:    10,
-				Name:     "vocdoni7",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("02b5005aeefdb8bb196d308df3fba157a7c1e84966f899a9def6aa97b086bc87e7"),
+				PubKey:  types.HexStringToHexBytes("02b5005aeefdb8bb196d308df3fba157a7c1e84966f899a9def6aa97b086bc87e7"),
+				Power:   10,
+				Name:    "vocdoni7",
 			},
 		},
 		Accounts: []Account{
@@ -235,90 +254,77 @@ var stageGenesis = Doc{
 			DelAccountSIK:           1,
 			SetAccountValidator:     500000,
 		},
-	},
+	}),
 }
 
-var ltsGenesis = Doc{
-	GenesisTime: time.Date(2023, time.October, 24, 9, 0, 0, 0, time.UTC),
+var ltsGenesis = comettypes.GenesisDoc{
+	GenesisTime: time.Date(2024, time.April, 24, 9, 0, 0, 0, time.UTC),
 	ChainID:     "vocdoni/LTS/1.2",
-	ConsensusParams: &ConsensusParams{
-		Block: BlockParams{
-			MaxBytes: 2097152,
-			MaxGas:   -1,
-		},
-		Evidence: EvidenceParams{
-			MaxAgeNumBlocks: 100000,
-			MaxAgeDuration:  10000,
-		},
-		Validator: ValidatorParams{
-			PubKeyTypes: []string{"secp256k1"},
-		},
-		Version: VersionParams{
-			AppVersion: 0,
+	ConsensusParams: &comettypes.ConsensusParams{
+		Block:     DefaultBlockParams(),
+		Evidence:  comettypes.DefaultEvidenceParams(),
+		Validator: DefaultValidatorParams(),
+		Version: comettypes.VersionParams{
+			App: 0,
 		},
 	},
-	AppState: AppState{
+	AppState: jsonRawMessage(AppState{
 		MaxElectionSize: 1000000,
 		NetworkCapacity: 5000,
 		Validators: []AppStateValidators{
 			{ // 0
-				Address:  types.HexStringToHexBytes("8a67aa6e63ea24a029fade79b93f39aa2f935608"),
+				Address:  ethereumAddrFromPubKey("024e3fbcd7e1516ebbc332519a3602e39753c6dd49c46df307c1e60b976f0b29a5"),
 				PubKey:   types.HexStringToHexBytes("024e3fbcd7e1516ebbc332519a3602e39753c6dd49c46df307c1e60b976f0b29a5"),
 				Power:    10,
 				Name:     "vocdoni-validator0",
 				KeyIndex: 1,
 			},
 			{ // 1
-				Address:  types.HexStringToHexBytes("dd47c5e9db1be4f9c6fac3474b9d9aec5c00ecdd"),
-				PubKey:   types.HexStringToHexBytes("02364db3aedf05ffbf25e67e81de971f3a9965b9e1a2d066af06b634ba5c959152"),
-				Power:    10,
-				Name:     "vocdoni-validator1",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("02364db3aedf05ffbf25e67e81de971f3a9965b9e1a2d066af06b634ba5c959152"),
+				PubKey:  types.HexStringToHexBytes("02364db3aedf05ffbf25e67e81de971f3a9965b9e1a2d066af06b634ba5c959152"),
+				Power:   10,
+				Name:    "vocdoni-validator1",
 			},
 			{ // 2
-				Address:  types.HexStringToHexBytes("6bc0fe0ac7e7371294e3c2d39b0e1337b9757193"),
-				PubKey:   types.HexStringToHexBytes("037a2e3b3e7ae07cb75dbc73aff9c39b403e0ec58b596cf03fe99a27555285ef73"),
-				Power:    10,
-				Name:     "vocdoni-validator2",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("037a2e3b3e7ae07cb75dbc73aff9c39b403e0ec58b596cf03fe99a27555285ef73"),
+				PubKey:  types.HexStringToHexBytes("037a2e3b3e7ae07cb75dbc73aff9c39b403e0ec58b596cf03fe99a27555285ef73"),
+				Power:   10,
+				Name:    "vocdoni-validator2",
 			},
 			{ // 3
-				Address:  types.HexStringToHexBytes("d863a79bb3c019941de5ebfc10a136bbfbbc2982"),
+				Address:  ethereumAddrFromPubKey("03553d1b75cdda0a49136417daee453c3a00ed75af64ec6aa20476cf227dfd946c"),
 				PubKey:   types.HexStringToHexBytes("03553d1b75cdda0a49136417daee453c3a00ed75af64ec6aa20476cf227dfd946c"),
 				Power:    10,
 				Name:     "vocdoni-validator3",
 				KeyIndex: 2,
 			},
 			{ // 4
-				Address:  types.HexStringToHexBytes("d16a9fe63456ea0b3706a2855b98a3a20f10e308"),
-				PubKey:   types.HexStringToHexBytes("036e25b61605a04ef3cf5829e73a2c9db4a4b0958a8a6be0895c3df19b69e7ad45"),
-				Power:    10,
-				Name:     "vocdoni-validator4",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("036e25b61605a04ef3cf5829e73a2c9db4a4b0958a8a6be0895c3df19b69e7ad45"),
+				PubKey:  types.HexStringToHexBytes("036e25b61605a04ef3cf5829e73a2c9db4a4b0958a8a6be0895c3df19b69e7ad45"),
+				Power:   10,
+				Name:    "vocdoni-validator4",
 			},
 			{ // 5
-				Address:  types.HexStringToHexBytes("4ece41dd2b0f0ddd4ddef9fa83ad6d973c98a48c"),
+				Address:  ethereumAddrFromPubKey("027b034a05be20113cdf39eff609c5265d1575c5510bf3fcc611e6da0bed6d30b4"),
 				PubKey:   types.HexStringToHexBytes("027b034a05be20113cdf39eff609c5265d1575c5510bf3fcc611e6da0bed6d30b4"),
 				Power:    10,
 				Name:     "vocdoni-validator5",
 				KeyIndex: 3,
 			},
 			{ // 6
-				Address:  types.HexStringToHexBytes("2b617bad95bb36805512c76a02144c778d3cda20"),
-				PubKey:   types.HexStringToHexBytes("034105acd3392dffcfe08a7a2e1c48fb4f52c7f4cdce4477474afc0ddff023ec2d"),
-				Power:    10,
-				Name:     "vocdoni-validator6",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("034105acd3392dffcfe08a7a2e1c48fb4f52c7f4cdce4477474afc0ddff023ec2d"),
+				PubKey:  types.HexStringToHexBytes("034105acd3392dffcfe08a7a2e1c48fb4f52c7f4cdce4477474afc0ddff023ec2d"),
+				Power:   10,
+				Name:    "vocdoni-validator6",
 			},
 			{ // 7
-				Address:  types.HexStringToHexBytes("4945fd40d29870a931561b26a30a529081ded677"),
-				PubKey:   types.HexStringToHexBytes("038276c348971ef9d8b11abaf0cdce50e6cb89bd0f87df14301ef02d46db09db6d"),
-				Power:    10,
-				Name:     "vocdoni-validator7",
-				KeyIndex: 0,
+				Address: ethereumAddrFromPubKey("038276c348971ef9d8b11abaf0cdce50e6cb89bd0f87df14301ef02d46db09db6d"),
+				PubKey:  types.HexStringToHexBytes("038276c348971ef9d8b11abaf0cdce50e6cb89bd0f87df14301ef02d46db09db6d"),
+				Power:   10,
+				Name:    "vocdoni-validator7",
 			},
 			{ // 8
-				Address:  types.HexStringToHexBytes("34868fa6ef1b001b830a5a19a06c69f62f622410"),
+				Address:  ethereumAddrFromPubKey("02a94d4a25c0281980af65d014ce72d34b0aba6e5dff362da8b34c31e8b93b26a9"),
 				PubKey:   types.HexStringToHexBytes("02a94d4a25c0281980af65d014ce72d34b0aba6e5dff362da8b34c31e8b93b26a9"),
 				Power:    10,
 				Name:     "vocdoni-validator8",
@@ -351,14 +357,74 @@ var ltsGenesis = Doc{
 			DelAccountSIK:           1,
 			SetAccountValidator:     500000,
 		},
-	},
+	}),
+}
+
+// DefaultBlockParams returns different defaults than upstream DefaultBlockParams:
+// MaxBytes = 2 megabytes, and MaxGas = -1
+func DefaultBlockParams() comettypes.BlockParams {
+	return comettypes.BlockParams{
+		MaxBytes: 2097152,
+		MaxGas:   -1,
+	}
+}
+
+// DefaultValidatorParams returns different defaults than upstream DefaultValidatorParams:
+// allows only secp256k1 pubkeys.
+func DefaultValidatorParams() comettypes.ValidatorParams {
+	return comettypes.ValidatorParams{
+		PubKeyTypes: []string{comettypes.ABCIPubKeyTypeSecp256k1},
+	}
 }
 
 // AvailableNetworks returns the list of hardcoded networks
 func AvailableNetworks() []string {
 	networks := []string{}
-	for k := range Genesis {
+	for k := range genesis {
 		networks = append(networks, k)
 	}
 	return networks
+}
+
+// HardcodedForNetwork returns the hardcoded genesis.Doc of a specific network. Panics if not found
+func HardcodedForNetwork(network string) *Doc {
+	g, ok := genesis[network]
+	if !ok {
+		panic("no hardcoded genesis found for current network")
+	}
+	if err := g.ValidateAndComplete(); err != nil {
+		panic("hardcoded genesis is invalid")
+	}
+	return &Doc{g}
+}
+
+// LoadFromFile loads and unmarshals a genesis.json, returning a genesis.Doc
+func LoadFromFile(path string) (*Doc, error) {
+	gd, err := comettypes.GenesisDocFromFile(path)
+	if err != nil {
+		return nil, err
+	}
+	return &Doc{*gd}, nil
+}
+
+// ethereumAddrFromPubKey converts a hex string to a ethcommon.Address and returns its Bytes().
+// It strips a leading '0x' or '0X' if found, for backwards compatibility.
+// Panics if the string is not a valid hex string.
+func ethereumAddrFromPubKey(hexString string) []byte {
+	addr, err := ethereum.AddrFromPublicKey(types.HexStringToHexBytes(hexString))
+	if err != nil {
+		panic(err)
+	}
+	return addr.Bytes()
+}
+
+// jsonRawMessage marshals the appState into a json.RawMessage.
+// Panics on error.
+func jsonRawMessage(appState AppState) json.RawMessage {
+	jrm, err := json.Marshal(appState)
+	if err != nil {
+		// must never happen
+		panic(err)
+	}
+	return jrm
 }

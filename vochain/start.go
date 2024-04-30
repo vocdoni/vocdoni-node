@@ -4,7 +4,6 @@ package vochain
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,7 +13,7 @@ import (
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	vocdoniGenesis "go.vocdoni.io/dvote/vochain/genesis"
+	"go.vocdoni.io/dvote/vochain/genesis"
 
 	cometconfig "github.com/cometbft/cometbft/config"
 	cometp2p "github.com/cometbft/cometbft/p2p"
@@ -25,7 +24,7 @@ import (
 )
 
 // NewVochain starts a node with an ABCI application
-func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication {
+func NewVochain(vochaincfg *config.VochainCfg) *BaseApplication {
 	// creating new vochain app
 	c := *vochaincfg
 	c.DataDir = filepath.Join(vochaincfg.DataDir, "data")
@@ -34,7 +33,7 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 		log.Fatalf("cannot initialize vochain application: %s", err)
 	}
 	log.Info("creating tendermint node and application")
-	err = app.SetNode(vochaincfg, genesis)
+	err = app.SetNode(vochaincfg)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -46,16 +45,16 @@ func NewVochain(vochaincfg *config.VochainCfg, genesis []byte) *BaseApplication 
 }
 
 // newTendermint creates a new tendermint node attached to the given ABCI app
-func newTendermint(app *BaseApplication,
-	localConfig *config.VochainCfg, genesis []byte) (*cometnode.Node, error) {
+func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*cometnode.Node, error) {
 	var err error
 
 	tconfig := cometconfig.DefaultConfig()
-	tconfig.SetRoot(localConfig.DataDir)
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "config"), 0750); err != nil {
+
+	tconfig.SetRoot(filepath.Join(localConfig.DataDir, config.DefaultCometBFTPath))
+	if err := os.MkdirAll(filepath.Join(tconfig.RootDir, cometconfig.DefaultConfigDir), 0o750); err != nil {
 		log.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(localConfig.DataDir, "data"), 0750); err != nil {
+	if err := os.MkdirAll(filepath.Join(tconfig.RootDir, cometconfig.DefaultDataDir), 0o750); err != nil {
 		log.Fatal(err)
 	}
 
@@ -69,9 +68,10 @@ func newTendermint(app *BaseApplication,
 		tconfig.P2P.AddrBookStrict = false
 	}
 	tconfig.P2P.Seeds = strings.Trim(strings.Join(localConfig.Seeds, ","), "[]\"")
-	if _, ok := vocdoniGenesis.Genesis[localConfig.Network]; len(tconfig.P2P.Seeds) < 8 &&
-		!localConfig.IsSeedNode && ok {
-		tconfig.P2P.Seeds = strings.Join(vocdoniGenesis.Genesis[localConfig.Network].SeedNodes, ",")
+	if len(tconfig.P2P.Seeds) < 8 && !localConfig.IsSeedNode {
+		if seeds, ok := config.DefaultSeedNodes[localConfig.Network]; ok {
+			tconfig.P2P.Seeds = strings.Join(seeds, ",")
+		}
 	}
 	if len(tconfig.P2P.Seeds) > 0 {
 		log.Infof("seed nodes: %s", tconfig.P2P.Seeds)
@@ -149,8 +149,8 @@ func newTendermint(app *BaseApplication,
 			}
 
 			// if also no Seeds specified, fallback to genesis
-			if _, ok := vocdoniGenesis.Genesis[localConfig.Network]; ok {
-				return replacePorts(vocdoniGenesis.Genesis[localConfig.Network].SeedNodes)
+			if seeds, ok := config.DefaultSeedNodes[localConfig.Network]; ok {
+				return replacePorts(seeds)
 			}
 
 			return nil
@@ -167,8 +167,8 @@ func newTendermint(app *BaseApplication,
 		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
 		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
 
-		// If StateSync is enabled but parameters are empty, try our best to populate them
-		// first try to fetch params from remote API endpoint
+		// If StateSync is enabled but parameters are empty, populate them
+		//  fetching params from remote API endpoint
 		if localConfig.StateSyncFetchParamsFromRPC &&
 			tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
 			tconfig.StateSync.TrustHeight, tconfig.StateSync.TrustHash = func() (int64, string) {
@@ -196,18 +196,6 @@ func newTendermint(app *BaseApplication,
 				return status.SyncInfo.LatestBlockHeight, status.SyncInfo.LatestBlockHash.String()
 			}()
 		}
-
-		// if still empty, fallback to hardcoded params, if defined for the current network & chainID
-		if tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
-			if g, ok := vocdoniGenesis.Genesis[localConfig.Network]; ok {
-				if statesync, ok := g.StateSync[g.Genesis.ChainID]; ok {
-					tconfig.StateSync.TrustHeight = statesync.TrustHeight
-					tconfig.StateSync.TrustHash = statesync.TrustHash.String()
-					log.Infow("using hardcoded statesync params",
-						"height", tconfig.StateSync.TrustHeight, "hash", tconfig.StateSync.TrustHash)
-				}
-			}
-		}
 	}
 	tconfig.RPC.ListenAddress = "tcp://0.0.0.0:26657"
 
@@ -215,13 +203,25 @@ func newTendermint(app *BaseApplication,
 	// tmdbBackend defaults to goleveldb, but switches to cleveldb if
 	// -tags=cleveldb is used. See tmdb_*.go.
 	tconfig.DBBackend = string(tmdbBackend)
-	if localConfig.Genesis != "" {
-		tconfig.Genesis = localConfig.Genesis
+	tconfig.Genesis = localConfig.Genesis
+
+	if _, err := os.Stat(tconfig.Genesis); os.IsNotExist(err) {
+		log.Infof("writing hardcoded comet genesis to %s", tconfig.Genesis)
+		if err := genesis.HardcodedForNetwork(localConfig.Network).SaveAs(tconfig.Genesis); err != nil {
+			return nil, fmt.Errorf("cannot write genesis file: %w", err)
+		}
 	}
 
-	if err := tconfig.ValidateBasic(); err != nil {
-		return nil, fmt.Errorf("config is invalid: %w", err)
+	// We need to load the genesis already,
+	// to fetch chain_id in order to make Replay work, since signatures depend on it.
+	// and also to check InitialHeight to decide what to reply when cometbft ask for Info()
+	loadedGenesis, err := genesis.LoadFromFile(tconfig.GenesisFile())
+	if err != nil {
+		return nil, fmt.Errorf("cannot load genesis file: %w", err)
 	}
+	log.Infow("loaded genesis file", "genesis", tconfig.GenesisFile(), "chainID", loadedGenesis.ChainID)
+	app.genesisDoc = loadedGenesis
+	app.SetChainID(loadedGenesis.ChainID)
 
 	// read or create local private validator
 	pv, err := NewPrivateValidator(
@@ -256,25 +256,6 @@ func newTendermint(app *BaseApplication,
 			return nil, fmt.Errorf("cannot create or load node key: %w", err)
 		}
 	}
-	log.Infow("vochain initialized",
-		"db-backend", tconfig.DBBackend,
-		"publicKey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
-		"accountAddr", app.NodeAddress,
-		"validatorAddr", pv.Key.PubKey.Address(),
-		"external-address", tconfig.P2P.ExternalAddress,
-		"nodeId", nodeKey.ID(),
-		"seed", tconfig.P2P.SeedMode)
-
-	// read or create genesis file
-	if _, err := os.Stat(tconfig.GenesisFile()); err == nil {
-		log.Infof("found genesis file %s", tconfig.GenesisFile())
-	} else {
-		log.Debugf("loaded genesis: %s", string(genesis))
-		if err := os.WriteFile(tconfig.GenesisFile(), genesis, 0o600); err != nil {
-			return nil, err
-		}
-		log.Infof("new genesis created, stored at %s", tconfig.GenesisFile())
-	}
 
 	if localConfig.TendermintMetrics {
 		tconfig.Instrumentation = &cometconfig.InstrumentationConfig{
@@ -285,25 +266,22 @@ func newTendermint(app *BaseApplication,
 		}
 	}
 
-	// We need to fetch chain_id in order to make Replay work,
-	// since signatures depend on it.
-	type genesisChainID struct {
-		ChainID string `json:"chain_id"`
+	if err := tconfig.ValidateBasic(); err != nil {
+		return nil, fmt.Errorf("config is invalid: %w", err)
 	}
-	genesisData, err := os.ReadFile(tconfig.GenesisFile())
-	if err != nil {
-		return nil, fmt.Errorf("cannot read genesis file: %w", err)
-	}
-	genesisCID := &genesisChainID{}
-	if err := json.Unmarshal(genesisData, genesisCID); err != nil {
-		return nil, fmt.Errorf("cannot unmarshal genesis file for fetching chainID")
-	}
-	log.Infow("genesis file", "genesis", tconfig.GenesisFile(), "chainID", genesisCID.ChainID)
-	app.SetChainID(genesisCID.ChainID)
+
+	log.Infow("vochain initialized",
+		"db-backend", tconfig.DBBackend,
+		"publicKey", hex.EncodeToString(pv.Key.PubKey.Bytes()),
+		"accountAddr", app.NodeAddress,
+		"validatorAddr", pv.Key.PubKey.Address(),
+		"external-address", tconfig.P2P.ExternalAddress,
+		"nodeId", nodeKey.ID(),
+		"seed", tconfig.P2P.SeedMode)
 
 	// the chain might need additional ZkCircuits, now that we know the chainID ensure they are downloaded now,
 	// to avoid delays at beginBlock during a fork
-	if err := circuit.DownloadArtifactsForChainID(genesisCID.ChainID); err != nil {
+	if err := circuit.DownloadArtifactsForChainID(app.ChainID()); err != nil {
 		return nil, fmt.Errorf("cannot download zk circuits for chainID: %w", err)
 	}
 

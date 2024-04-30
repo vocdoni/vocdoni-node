@@ -105,6 +105,10 @@ type VochainCfg struct {
 	PrivValidatorListenAddr string
 	// NoWaitSync if enabled the Vochain synchronization won't be blocking
 	NoWaitSync bool
+	// AutoWipeDataDir enables wiping out the whole datadir when hardcoded genesis changes
+	AutoWipeDataDir bool
+	// AutoWipeCometBFT enables wiping out the cometbft datadir when hardcoded genesis changes
+	AutoWipeCometBFT bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
 	// SkipPreviousOffchainData if enabled, the node will skip downloading the previous off-chain data to the current block
