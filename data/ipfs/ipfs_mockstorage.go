@@ -17,7 +17,6 @@ func MockIPFS(t testing.TB) *Handler {
 	n, err := ipfscore.NewNode(context.Background(), &ipfscore.BuildCfg{
 		Online:    false,
 		Permanent: false,
-		NilRepo:   false,
 	})
 	qt.Assert(t, err, qt.IsNil)
 	storage.retrieveCache, err = lru.New[string, []byte](RetrievedFileCacheSize)
