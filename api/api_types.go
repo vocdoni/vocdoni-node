@@ -56,13 +56,13 @@ type ElectionResults struct {
 
 type Election struct {
 	ElectionSummary
-	Census       *ElectionCensus   `json:"census,omitempty"`
-	MetadataURL  string            `json:"metadataURL"`
-	CreationTime time.Time         `json:"creationTime"`
-	VoteMode     VoteMode          `json:"voteMode,omitempty"`
-	ElectionMode ElectionMode      `json:"electionMode,omitempty"`
-	TallyMode    TallyMode         `json:"tallyMode,omitempty"`
-	Metadata     *ElectionMetadata `json:"metadata,omitempty"`
+	Census       *ElectionCensus `json:"census,omitempty"`
+	MetadataURL  string          `json:"metadataURL"`
+	CreationTime time.Time       `json:"creationTime"`
+	VoteMode     VoteMode        `json:"voteMode,omitempty"`
+	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
+	TallyMode    TallyMode       `json:"tallyMode,omitempty"`
+	Metadata     any             `json:"metadata,omitempty"`
 }
 
 type ElectionKeys struct {
@@ -79,11 +79,12 @@ type ElectionCensus struct {
 }
 
 type ElectionCreate struct {
-	TxPayload   []byte         `json:"txPayload,omitempty"`
-	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash" `
-	ElectionID  types.HexBytes `json:"electionID" `
-	MetadataURL string         `json:"metadataURL"`
+	TxPayload                 []byte         `json:"txPayload,omitempty"`
+	Metadata                  []byte         `json:"metadata,omitempty"`
+	TxHash                    types.HexBytes `json:"txHash" `
+	ElectionID                types.HexBytes `json:"electionID" `
+	MetadataURL               string         `json:"metadataURL"`
+	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
 }
 
 type ElectionDescription struct {
