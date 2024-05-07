@@ -50,11 +50,11 @@ func TestAPIFarcasterVote(t *testing.T) {
 	// add the farcaster hardcoded voters
 	voter1PubKey, err := hex.DecodeString(frameVote1.pubkey)
 	qt.Assert(t, err, qt.IsNil)
-	voter1 := state.NewVoterID(state.VoterIDTypeEd25519, voter1PubKey)
+	voter1 := state.NewFarcasterVoterID(voter1PubKey, uint64(frameVote1.fid))
 
 	voter2PubKey, err := hex.DecodeString(frameVote2.pubkey)
 	qt.Assert(t, err, qt.IsNil)
-	voter2 := state.NewVoterID(state.VoterIDTypeEd25519, voter2PubKey)
+	voter2 := state.NewFarcasterVoterID(voter2PubKey, uint64(frameVote2.fid))
 
 	cparts := api.CensusParticipants{
 		Participants: []api.CensusParticipant{
