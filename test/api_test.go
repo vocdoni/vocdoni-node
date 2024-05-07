@@ -1,10 +1,12 @@
 package test
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"math/rand"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -82,7 +85,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID())
+	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -437,7 +440,7 @@ func runAPIElectionCostWithParams(t *testing.T,
 	qt.Assert(t, requestAccount(t, c, signer.Address().String()).Balance,
 		qt.Equals, initialBalance)
 
-	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID())
+	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID(), false)
 
 	// Block 3
 	server.VochainAPP.AdvanceTestBlock()
@@ -502,6 +505,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	censusRoot types.HexBytes,
 	startBlock uint32,
 	chainID string,
+	encryptedMetadata bool,
 ) api.ElectionCreate {
 	metadataBytes, err := json.Marshal(
 		&api.ElectionMetadata{
@@ -509,6 +513,14 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 			Description: map[string]string{"default": "test election description"},
 			Version:     "1.0",
 		})
+	var metadataEncryptionKey []byte
+	if encryptedMetadata {
+		sk, err := nacl.Generate(rand.New(rand.NewSource(1)))
+		qt.Assert(t, err, qt.IsNil)
+		metadataBytes, err = nacl.Anonymous.Encrypt(metadataBytes, sk.Public())
+		qt.Assert(t, err, qt.IsNil)
+		metadataEncryptionKey = sk.Bytes()
+	}
 
 	qt.Assert(t, err, qt.IsNil)
 	metadataURI := ipfs.CalculateCIDv1json(metadataBytes)
@@ -523,7 +535,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 				Status:       models.ProcessStatus_READY,
 				CensusRoot:   censusRoot,
 				CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
-				Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
+				Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true, EncryptedMetaData: encryptedMetadata},
 				VoteOptions: &models.ProcessVoteOptions{
 					MaxCount:          1,
 					MaxValue:          1,
@@ -555,7 +567,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &election)
 	qt.Assert(t, err, qt.IsNil)
-
+	election.MetadataEncryptionPrivKey = metadataEncryptionKey
 	return election
 }
 
@@ -708,14 +720,73 @@ func TestAPINextElectionID(t *testing.T) {
 
 	// create a new election
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID())
-
-	electionId := response.ElectionID
+	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false)
 
 	// Block 4
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 4)
 
 	// check next election id is the same as the election id created
-	qt.Assert(t, nextElectionID.ElectionID, qt.Equals, electionId.String())
+	qt.Assert(t, nextElectionID.ElectionID, qt.Equals, response.ElectionID.String())
+}
+
+func TestAPIEncryptedMetadata(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+
+	// create a new account
+	signer := createAccount(t, c, server, 80)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// create a new process
+	censusRoot := createCensus(t, c)
+
+	// Block 3
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	// create a new election
+	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
+	electionResponse := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), true)
+
+	// Block 4
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 4)
+	resp, code := c.Request("GET", nil, "elections", electionResponse.ElectionID.String())
+	qt.Assert(t, code, qt.Equals, 200)
+	var election api.Election
+	err := json.Unmarshal(resp, &election)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, election.Metadata, qt.Not(qt.IsNil))
+
+	// try to decrypt the metadata
+	sk, err := nacl.DecodePrivate(electionResponse.MetadataEncryptionPrivKey.String())
+	qt.Assert(t, err, qt.IsNil)
+	metadataBytes, err := base64.StdEncoding.DecodeString(election.Metadata.(string))
+	qt.Assert(t, err, qt.IsNil)
+	decryptedMetadata, err := sk.Decrypt(metadataBytes)
+	qt.Assert(t, err, qt.IsNil)
+
+	// check the metadata decrypted is the same as the metadata sent
+	var metadata api.ElectionMetadata
+	err = json.Unmarshal(decryptedMetadata, &metadata)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, metadata.Title["default"], qt.Equals, "test election")
 }
