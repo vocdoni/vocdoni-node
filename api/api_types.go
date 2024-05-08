@@ -206,6 +206,7 @@ type ChainInfo struct {
 	ElectionCount     uint64    `json:"electionCount" example:"120"`
 	OrganizationCount uint64    `json:"organizationCount" example:"20"`
 	GenesisTime       time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	InitialHeight     uint32    `json:"initialHeight"  example:"5467"`
 	Height            uint32    `json:"height" example:"5467"`
 	Syncing           bool      `json:"syncing" example:"true"`
 	Timestamp         int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
