@@ -12,6 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
+	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -142,4 +143,22 @@ func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address,
 		return "", ErrCantABIEncodeResults.WithErr(err)
 	}
 	return fmt.Sprintf("0x%s", hex.EncodeToString(abiEncodedResultsBytes)), nil
+}
+
+// decryptVotePackage decrypts a vote package using the given private keys and indexes.
+func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte, error) {
+	for i := len(indexes) - 1; i >= 0; i-- {
+		if indexes[i] >= uint32(len(privKeys)) {
+			return nil, fmt.Errorf("invalid key index %d", indexes[i])
+		}
+		priv, err := nacl.DecodePrivate(privKeys[indexes[i]])
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", indexes[i], err)
+		}
+		vp, err = priv.Decrypt(vp)
+		if err != nil {
+			return nil, fmt.Errorf("cannot decrypt votePackage: (%s)", err)
+		}
+	}
+	return vp, nil
 }

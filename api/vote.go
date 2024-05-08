@@ -7,6 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -120,13 +121,29 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		Date:                 &voteData.Date,
 	}
 
-	// If VotePackage is valid JSON, it's not encrypted, so we can include it.
+	// If VotePackage is valid JSON, it's not encrypted, so we can include it direcectly.
 	if json.Valid(voteData.VotePackage) {
 		vote.VotePackage = voteData.VotePackage
 	} else {
-		evp, err := json.Marshal(map[string][]byte{"encrypted": voteData.VotePackage})
+		// Otherwise, we need to decrypt it or include the encrypted version.
+		process, err := a.vocapp.State.Process(voteData.Meta.ProcessId, true)
 		if err != nil {
-			return err
+			return ErrCantFetchElection.WithErr(err)
+		}
+		// Try to decrypt the vote package
+		var evp []byte
+		if len(process.EncryptionPrivateKeys) >= len(voteData.EncryptionKeyIndexes) {
+			evp, err = decryptVotePackage(voteData.VotePackage, process.EncryptionPrivateKeys, voteData.EncryptionKeyIndexes)
+			if err != nil {
+				log.Warnw("failed to decrypt vote package, skipping", "err", err)
+			}
+		}
+		// If decryption failed, include the encrypted version
+		if evp == nil {
+			evp, err = json.Marshal(map[string][]byte{"encrypted": voteData.VotePackage})
+			if err != nil {
+				return ErrMarshalingJSONFailed
+			}
 		}
 		vote.VotePackage = evp
 	}
