@@ -330,6 +330,7 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		Timestamp:         a.vocapp.Timestamp(),
 		VoteCount:         voteCount,
 		GenesisTime:       a.vocapp.Genesis().GenesisTime,
+		InitialHeight:     uint32(a.vocapp.Genesis().InitialHeight),
 		CircuitVersion:    circuit.Version(),
 		MaxCensusSize:     maxCensusSize,
 		NetworkCapacity:   networkCapacity,
