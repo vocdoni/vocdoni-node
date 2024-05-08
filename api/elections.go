@@ -561,11 +561,6 @@ func (*API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
 	}
-	// check if the file is a valid JSON object
-	var js json.RawMessage
-	if err := json.Unmarshal(req.Payload, &js); err != nil {
-		return ErrCantParsePayloadAsJSON
-	}
 	data, err := json.Marshal(&File{
 		CID: "ipfs://" + ipfs.CalculateCIDv1json(req.Payload),
 	})
