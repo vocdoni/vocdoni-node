@@ -123,6 +123,12 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it.
 	if json.Valid(voteData.VotePackage) {
 		vote.VotePackage = voteData.VotePackage
+	} else {
+		evp, err := json.Marshal(map[string][]byte{"encrypted": voteData.VotePackage})
+		if err != nil {
+			return err
+		}
+		vote.VotePackage = evp
 	}
 
 	var data []byte
