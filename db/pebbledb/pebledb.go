@@ -1,6 +1,7 @@
 package pebbledb
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -29,8 +30,7 @@ func get(reader pebble.Reader, k []byte) ([]byte, error) {
 	// Note that the returned value slice is only valid until Close is called.
 	// Make a copy so we can return it.
 	// TODO(mvdan): write a dbtest test to ensure this property on all DBs.
-	v2 := make([]byte, len(v))
-	copy(v2, v)
+	v2 := bytes.Clone(v)
 
 	if err := closer.Close(); err != nil {
 		return nil, err
@@ -164,8 +164,7 @@ func (db *PebbleDB) Close() error {
 
 func keyUpperBound(b []byte) []byte {
 	// https://github.com/cockroachdb/pebble/blob/b2eb88a7182687c81d911c425309ef0e1f545452/iterator_example_test.go#L44
-	end := make([]byte, len(b))
-	copy(end, b)
+	end := bytes.Clone(b)
 	for i := len(end) - 1; i >= 0; i-- {
 		end[i] = end[i] + 1
 		if end[i] != 0 {

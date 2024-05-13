@@ -131,9 +131,7 @@ func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	}
 	var pids [][]byte
 	if err := processesTree.Iterate(func(key []byte, value []byte) bool {
-		p := make([]byte, len(key))
-		copy(p, key)
-		pids = append(pids, p)
+		pids = append(pids, bytes.Clone(key))
 		return false
 	}); err != nil {
 		return nil, err
