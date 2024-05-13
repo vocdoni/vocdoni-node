@@ -257,8 +257,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		root = result.Root
 		resp = result.Responses
 	} else {
-		root = make([]byte, len(app.lastRootHash))
-		copy(root, app.lastRootHash[:])
+		root = bytes.Clone(app.lastRootHash)
 		resp = app.lastDeliverTxResponse
 	}
 
@@ -314,8 +313,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 func validatorUpdate(validators map[string]*models.Validator) cometabcitypes.ValidatorUpdates {
 	validatorUpdate := []cometabcitypes.ValidatorUpdate{}
 	for _, v := range validators {
-		pubKey := make([]byte, len(v.PubKey))
-		copy(pubKey, v.PubKey)
+		pubKey := bytes.Clone(v.PubKey)
 		validatorUpdate = append(validatorUpdate, cometabcitypes.UpdateValidator(
 			pubKey,
 			int64(v.Power),

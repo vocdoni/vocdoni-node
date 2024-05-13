@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -137,8 +138,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 	var rawVote []byte
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
-		rawVote = make([]byte, len(VotePackage))
-		copy(rawVote, VotePackage)
+		rawVote = bytes.Clone(VotePackage)
 		for i := len(keys) - 1; i >= 0; i-- {
 			priv, err := nacl.DecodePrivate(keys[i])
 			if err != nil {
