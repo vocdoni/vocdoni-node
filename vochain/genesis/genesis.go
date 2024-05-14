@@ -47,27 +47,6 @@ var testGenesis = comettypes.GenesisDoc{
 				Name:     "validator1",
 				KeyIndex: 1,
 			},
-			{ // 1
-				Address:  ethereumAddrFromPubKey("03cf8d0d1afa561e01145a275d1e41ed1a6d652361509a4c93dfc6488fdf5eca38"),
-				PubKey:   types.HexStringToHexBytes("03cf8d0d1afa561e01145a275d1e41ed1a6d652361509a4c93dfc6488fdf5eca38"),
-				Power:    10,
-				Name:     "validator2",
-				KeyIndex: 2,
-			},
-			{ // 2
-				Address:  ethereumAddrFromPubKey("031802916d945239a39a9a8ee3e2eb3fb91ee324ccdfd73659f482e644892b796f"),
-				PubKey:   types.HexStringToHexBytes("031802916d945239a39a9a8ee3e2eb3fb91ee324ccdfd73659f482e644892b796f"),
-				Power:    10,
-				Name:     "validator3",
-				KeyIndex: 3,
-			},
-			{ // 3
-				Address:  ethereumAddrFromPubKey("02a790726e98978b0ca2cde3a09cbb1af1b298191f46e051b86bcb1854deb58478"),
-				PubKey:   types.HexStringToHexBytes("02a790726e98978b0ca2cde3a09cbb1af1b298191f46e051b86bcb1854deb58478"),
-				Power:    10,
-				Name:     "validator4",
-				KeyIndex: 4,
-			},
 		},
 		Accounts: []Account{
 			{ // faucet

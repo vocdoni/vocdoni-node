@@ -109,6 +109,8 @@ type VochainCfg struct {
 	AutoWipeDataDir bool
 	// AutoWipeCometBFT enables wiping out the cometbft datadir when hardcoded genesis changes
 	AutoWipeCometBFT bool
+	// EndOfChain is the height at which this node will refuse adding new blocks to the chain
+	EndOfChain int64
 	// MempoolSize is the size of the mempool
 	MempoolSize int
 	// SkipPreviousOffchainData if enabled, the node will skip downloading the previous off-chain data to the current block

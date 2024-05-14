@@ -285,6 +285,16 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 		return nil, fmt.Errorf("cannot download zk circuits for chainID: %w", err)
 	}
 
+	// if EndOfChain cmdline flag was passed, override ForksCfg
+	if localConfig.EndOfChain > 0 {
+		forks := config.ForksForChainID(app.ChainID())
+		forks.EndOfChain = uint32(localConfig.EndOfChain)
+		config.SetForksForChainID(app.ChainID(), forks)
+	}
+	if config.ForksForChainID(app.ChainID()).EndOfChain > 0 {
+		log.Warnf("this node will stop chain %s at height %d", app.ChainID(), config.ForksForChainID(app.ChainID()).EndOfChain)
+	}
+
 	// assign the default tendermint methods
 	app.SetDefaultMethods()
 	node, err := cometnode.NewNode(

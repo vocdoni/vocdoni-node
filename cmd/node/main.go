@@ -172,6 +172,12 @@ func loadConfig() *config.Config {
 		"external address:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
+	flag.String("vochainGenesisChainID", "",
+		"override ChainID in genesis for the vochain")
+	flag.Int64("vochainGenesisInitialHeight", 0,
+		"override InitialHeight in genesis for the vochain")
+	flag.String("vochainGenesisAppHash", "",
+		"override AppHash in genesis for the vochain")
 	flag.String("vochainLogLevel", "disabled",
 		"tendermint node log level (debug, info, error, disabled)")
 	flag.StringSlice("vochainPeers", []string{},
@@ -188,6 +194,8 @@ func loadConfig() *config.Config {
 		"wipe out the whole datadir when hardcoded genesis changes")
 	flag.Bool("vochainAutoWipeCometBFT", true,
 		"wipe out the cometbft datadir when hardcoded genesis changes")
+	flag.Int64("vochainEndOfChain", 0,
+		"height at which this node will refuse adding new blocks to the chain")
 	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
 	flag.Int("vochainSnapshotInterval", 1000, // circa every 3hs (at 10s block interval)
