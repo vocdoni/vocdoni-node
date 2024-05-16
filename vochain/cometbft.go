@@ -716,11 +716,7 @@ func (app *BaseApplication) RestoreStateFromSnapshot(snap *snapshot.Snapshot) er
 
 	istc := ist.NewISTC(newState)
 	// Create the transaction handler for checking and processing transactions
-	transactionHandler := transaction.NewTransactionHandler(
-		newState,
-		istc,
-		filepath.Join(app.dataDir, TxHandlerDataDir),
-	)
+	transactionHandler := transaction.NewTransactionHandler(newState, istc)
 
 	// This looks racy but actually it's OK, since State Sync happens during very early init,
 	// when the app is blocked waiting for cometbft to finish startup.
