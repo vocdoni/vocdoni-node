@@ -42,9 +42,7 @@ const (
 
 	// StateDataDir is the subdirectory inside app.DataDir where State data will be saved
 	StateDataDir = "vcstate"
-	// TxHandlerDataDir is the subdirectory inside app.DataDir where TransactionHandler data will be saved
-	TxHandlerDataDir = "txHandler"
-	// TxHandlerDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
+	// SnapshotsDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
 	SnapshotsDataDir = "snapshots"
 )
 
@@ -146,11 +144,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	istc := ist.NewISTC(state)
 
 	// Create the transaction handler for checking and processing transactions
-	transactionHandler := transaction.NewTransactionHandler(
-		state,
-		istc,
-		filepath.Join(vochainCfg.DataDir, TxHandlerDataDir),
-	)
+	transactionHandler := transaction.NewTransactionHandler(state, istc)
 
 	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
 	if err != nil {
