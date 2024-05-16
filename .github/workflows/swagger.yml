@@ -1,4 +1,3 @@
----
 name: API Swagger Docs
 
 on:
@@ -57,7 +56,7 @@ jobs:
           name: vocdoni-api.yaml
           path: swaggers/vocdoni-api.yaml
 
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Create PR to developer-portal repo
         id: cpr
         uses: peter-evans/create-pull-request@v4

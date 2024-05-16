@@ -1,4 +1,3 @@
----
 name: Build and Test
 
 on:
@@ -79,7 +78,7 @@ jobs:
       LOG_PANIC_ON_INVALIDCHARS: true # check that log lines contains no invalid chars (evidence of format mismatch)
     steps:
       - uses: actions/checkout@v4
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
@@ -111,7 +110,7 @@ jobs:
     runs-on: [self-hosted]
     steps:
       - uses: actions/checkout@v4
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Run compose script
         env:
           TESTSUITE_BUILD_TAG: ${{ github.sha }}
@@ -160,7 +159,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - uses: actions/download-artifact@v4
       - uses: actions/setup-go@v5
         with:
@@ -197,7 +196,7 @@ jobs:
     continue-on-error: true # never mark the whole CI as failed because of this job
     steps:
       - uses: actions/checkout@v4
-      - uses: benjlevesque/short-sha@v2.2 # sets env.SHA to the first 7 chars of github.sha
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - uses: actions/download-artifact@v4
         with:
           name: gocoverage-all-textfmt@${{ env.SHA }}
