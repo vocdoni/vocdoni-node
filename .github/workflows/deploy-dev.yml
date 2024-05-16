@@ -1,14 +1,15 @@
----
 name: Deploy dev
 
 on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
   push-to-dev:
     name: Git push main -> dev
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -20,6 +21,7 @@ jobs:
   call-docker-release:
     name: Docker
     needs: push-to-dev
+    if: always() && !cancelled() && !failure() # so if push-to-dev was skipped (because branch is dev) this still runs
     uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:

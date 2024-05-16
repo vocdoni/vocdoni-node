@@ -146,7 +146,9 @@ jobs:
   call-docker-release:
     name: Docker
     needs: [job_go_checks, job_go_test, job_compose_test]
-    if: github.event_name == 'push' # this is limited to selected branches at the beginning of this file
+    # docker releases are triggered only on push to the selected branches at the beginning of this file
+    if: github.event_name == 'push' &&
+        github.ref != 'refs/heads/dev'   # but pushes to dev trigger a release via a quicker workflow (deploy-dev.yml) which skips the tests
     uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:
