@@ -80,7 +80,8 @@ func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) time.Duration {
 
 	// Calculate the starting block height for the interval
 	startBlockHeight := currentHeight - intervalBlocks
-	if startBlockHeight < 0 {
+	if vi.vnode.Node != nil && vi.vnode.Node.BlockStore() != nil &&
+		startBlockHeight < vi.vnode.Node.BlockStore().Base() {
 		// We cannot calculate the average block time for the given interval
 		return 0
 	}
