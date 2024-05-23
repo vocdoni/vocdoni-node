@@ -43,6 +43,7 @@ var (
 				ConsensusParams: DefaultConsensusParams(),
 				AppState:        jsonRawMessage(initialAppStateForDev),
 			},
+			EndOfChain: 292920,
 		},
 
 		// Staging network
