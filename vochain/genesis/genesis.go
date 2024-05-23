@@ -16,7 +16,7 @@ import (
 // networks is a map containing the default chainID for each network
 var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
-	"dev":   "vocdoni/DEV/33",
+	"dev":   "vocdoni/DEV/34",
 	"stage": "vocdoni/STAGE/11",
 	"lts":   "vocdoni/LTS/1.2",
 }
@@ -44,6 +44,14 @@ var (
 				AppState:        jsonRawMessage(initialAppStateForDev),
 			},
 			EndOfChain: 292920,
+		},
+		"vocdoni/DEV/34": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(2024, time.May, 22, 8, 0, 0, 0, time.UTC),
+				InitialHeight:   292921,
+				ConsensusParams: DefaultConsensusParams(),
+				AppHash:         []byte(types.HexStringToHexBytes("715f476dbb73eebb8c6991198b3d91e63ad9975298ceae727e9663f2710e60cf")),
+			},
 		},
 
 		// Staging network
