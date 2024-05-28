@@ -60,8 +60,12 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 
 // GetEnvelopes retrieves all envelope metadata for a ProcessId.
 // Returns ErrVoteNotFound if the envelope reference is not found.
-func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
-	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
+func (idx *Indexer) GetEnvelopes(
+	processID []byte,
+	max,
+	from int,
+	searchTerm string,
+) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: from is invalid value %d", from)
 	}
@@ -70,7 +74,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 	}
 	envelopes := []*indexertypes.EnvelopeMetadata{}
 	txRefs, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
-		ProcessID:       processId,
+		ProcessID:       processID,
 		NullifierSubstr: searchTerm,
 		Limit:           int64(max),
 		Offset:          int64(from),
@@ -110,13 +114,22 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 	height := idx.App.Height()
 	processID := process.ProcessId
 	endDate := time.Unix(idx.App.Timestamp(), 0)
-	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height, "endDate", endDate.String())
 	// Get the results
 	r := results.ProtoToResults(process.Results)
+	weight := "0"
+	if r.Weight != nil {
+		weight = r.Weight.String()
+	}
+	log.Debugw("finalize results", "processID",
+		hex.EncodeToString(processID),
+		"height", height,
+		"endDate", endDate.String(),
+		"weight", weight,
+	)
 	if _, err := queries.SetProcessResultsReady(ctx, indexerdb.SetProcessResultsReadyParams{
 		ID:          processID,
 		Votes:       indexertypes.EncodeJSON(r.Votes),
-		Weight:      indexertypes.EncodeJSON(r.Weight),
+		Weight:      weight,
 		BlockHeight: int64(r.BlockHeight),
 		EndDate:     endDate,
 	}); err != nil {
@@ -215,11 +228,14 @@ func (*Indexer) commitVotesUnsafe(queries *indexerdb.Queries, pid []byte, result
 			return err
 		}
 	}
-
+	weight := "0"
+	if results.Weight != nil {
+		weight = results.Weight.String()
+	}
 	if _, err := queries.UpdateProcessResults(context.TODO(), indexerdb.UpdateProcessResultsParams{
 		ID:          pid,
 		Votes:       indexertypes.EncodeJSON(results.Votes),
-		Weight:      indexertypes.EncodeJSON(results.Weight),
+		Weight:      weight,
 		BlockHeight: int64(results.BlockHeight),
 	}); err != nil {
 		return err

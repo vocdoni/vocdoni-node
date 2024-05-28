@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strings"
 
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -108,11 +109,17 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrCantFetchEnvelope.WithErr(err)
 	}
 
+	// Temporary workaround to remove the backslashes and quotes from the weight field.
+	// At some point, the indexer was doing EncodeJSON(weight) which is not needed, since weight
+	// is a big.Int and can be marshaled directly calling weight.String().
+	// Until the database is not migrated to fix previous entries, we need to remove the backslashes and quotes here.
+	weight := strings.ReplaceAll(strings.ReplaceAll(voteData.Weight, `\`, ""), `"`, "")
+
 	vote := &Vote{
 		TxHash:               voteData.Meta.TxHash,
 		VoteID:               voteData.Meta.Nullifier,
 		EncryptionKeyIndexes: voteData.EncryptionKeyIndexes,
-		VoteWeight:           voteData.Weight,
+		VoteWeight:           weight,
 		BlockHeight:          voteData.Meta.Height,
 		ElectionID:           voteData.Meta.ProcessId,
 		VoterID:              voteData.Meta.VoterID,
