@@ -164,7 +164,7 @@ type EnvelopePackage struct {
 	Nonce                types.HexBytes   `json:"nonce"`
 	Signature            types.HexBytes   `json:"signature"`
 	VotePackage          []byte           `json:"votePackage"` // plaintext or encrypted JSON
-	Weight               string           `json:"weight"`
+	Weight               string           `json:"weight"`      // [math/big.Int.String]
 	OverwriteCount       uint32           `json:"overwriteCount"`
 	Date                 time.Time        `json:"date"`
 }

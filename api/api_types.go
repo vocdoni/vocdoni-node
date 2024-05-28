@@ -121,7 +121,7 @@ type Vote struct {
 	EncryptionKeyIndexes []uint32 `json:"encryptionKeys,omitempty" extensions:"x-omitempty"`
 	// For encrypted elections this will be codified
 	VotePackage      json.RawMessage `json:"package,omitempty" extensions:"x-omitempty"`
-	VoteWeight       string          `json:"weight,omitempty" extensions:"x-omitempty"`
+	VoteWeight       string          `json:"weight,omitempty" extensions:"x-omitempty"` // [math/big.Int.String]
 	VoteNumber       *uint32         `json:"number,omitempty" extensions:"x-omitempty"`
 	ElectionID       types.HexBytes  `json:"electionID,omitempty" extensions:"x-omitempty" `
 	VoterID          types.HexBytes  `json:"voterID,omitempty" extensions:"x-omitempty" `

@@ -1137,6 +1137,7 @@ func TestCountVotes(t *testing.T) {
 	ref, err := idx.GetEnvelope(nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, ref.Meta.Height, qt.CmpEquals(), blockHeight)
+	qt.Assert(t, ref.Weight, qt.Not(qt.Contains), `"`)
 
 	// Note that txIndex is 0, because the votes are added directly to the sate,
 	// while the txCounter only increments on DeliverTx() execution.
