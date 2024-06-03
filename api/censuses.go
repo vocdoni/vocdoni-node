@@ -213,7 +213,7 @@ func (a *API) enableCensusHandlers() error {
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Security				BasicAuth
+//	@Security				ApiKeyAuth
 //	@Param					type	path		string	true	"Census type"	Enums(weighted,zkweighted,csp)
 //	@Success				200		{object}	object{censusId=string}
 //	@Router					/censuses/{type} [post]
@@ -250,7 +250,7 @@ func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Security				BasicAuth
+//	@Security				ApiKeyAuth
 //	@Param					censusID	path	string				true	"Census id"
 //	@Param					transaction	body	CensusParticipants	true	"PublicKey - weight array "
 //	@Success				200			"(empty body)"
@@ -411,12 +411,12 @@ func (a *API) censusRootHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 //	@Summary		Export census
 //	@Description	Export census to JSON format. Requires Bearer token
 //	@Tags			Censuses
+//	@Security		ApiKeyAuth
 //	@Accept			json
 //	@Produce		json
-//	@Security		BasicAuth
-//	@Param			censusID	path		string	true	"Census id"
-//	@Success		200			{object}	censusdb.CensusDump
-//	@Router			/censuses/{censusID}/export [get]
+//	@Param			censusID path string true "Census id"
+//  @Success		200			{object}	censusdb.CensusDump
+//  @Router			/censuses/{censusID}/export [get]
 func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -461,7 +461,7 @@ func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Security		BasicAuth
+//	@Security		ApiKeyAuth
 //	@Param			censusID	path	string	true	"Census id"
 //	@Success		200			"(empty body)"
 //	@Router			/censuses/{censusID}/import [post]
@@ -597,7 +597,8 @@ func (a *API) censusSizeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 //	@Produce		json
 //	@Param			censusID	path	string	true	"Census id"
 //	@Success		200			"(empty body)"
-//	@Router			/censuses/{censusID} [delete]
+//	@Security		ApiKeyAuth
+//  @Router			/censuses/{censusID} [delete]
 func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -628,7 +629,7 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Security				BasicAuth
+//	@Security				ApiKeyAuth
 //	@Success				200			{object}	object{census=object{censusID=string,uri=string}}	"It return published censusID and the ipfs uri where its uploaded"
 //	@Param					censusID	path		string												true	"Census id"
 //	@Router					/censuses/{censusID}/publish [post]
@@ -816,7 +817,7 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Security				BasicAuth
+//	@Security				ApiKeyAuth
 //	@Param					censusID	path		string											true	"Census id"
 //	@Param					key			path		string											true	"Key to proof"
 //	@Success				200			{object}	object{weight=number,proof=string,value=string}	"where proof is Merkle tree siblings and value is Merkle tree leaf value"
@@ -950,14 +951,14 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 }
 
 // censusListHandler
-//
 //	@Summary		List all census references
 //	@Description	List all census references. Requires Admin Bearer token.
 //	@Tags			Censuses
+//  @Security       ApiKeyAuth
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	object{valid=bool}
-//	@Router			/censuses/list/ [get]
+//	@Success		200	{object}	[]censusdb.CensusList
+//	@Router			/censuses/list [get]
 func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	list, err := a.censusdb.List()
 	if err != nil {
@@ -976,9 +977,10 @@ func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 //	@Description	Export the whole census database to a JSON file. Requires Admin Bearer token.
 //	@Tags			Censuses
 //	@Accept			json
+//	@Security		ApiKeyAuth
 //	@Produce		json
 //	@Param			ipfs	path		string	true	"Export to IPFS. Blank to return the JSON file"
-//	@Success		200		{object}	object{valid=bool}
+//	@Success		200		{object}	object{uri=string}
 //	@Router			/censuses/export/{ipfs} [get]
 func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	isIPFSExport := strings.HasSuffix(ctx.Request.URL.Path, "ipfs")
@@ -1011,7 +1013,7 @@ func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	object{valid=bool}
+//	@Success		200	 "(empty body)"
 //	@Router			/censuses/import/{ipfscid} [post]
 func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	ipfscid := ctx.URLParam("ipfscid")

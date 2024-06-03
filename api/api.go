@@ -48,7 +48,9 @@ import (
 //	@host		api-dev.vocdoni.net
 //	@BasePath	/v2
 
-//	@securityDefinitions.basic	BasicAuth
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in header
+//	@name Authorization
 
 // MaxPageSize defines the maximum number of results returned by the paginated endpoints
 const MaxPageSize = 10
