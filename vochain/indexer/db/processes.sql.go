@@ -33,7 +33,7 @@ INSERT INTO processes (
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
-	from_archive, chain_id,
+	chain_id,
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
@@ -45,7 +45,7 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 	?, ?,
-	?, ?,
+	?,
 
 	?, '"0"', 0
 )
@@ -76,7 +76,6 @@ type CreateProcessParams struct {
 	CreationTime      time.Time
 	SourceBlockHeight int64
 	SourceNetworkID   int64
-	FromArchive       bool
 	ChainID           string
 	ResultsVotes      string
 }
@@ -107,7 +106,6 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.CreationTime,
 		arg.SourceBlockHeight,
 		arg.SourceNetworkID,
-		arg.FromArchive,
 		arg.ChainID,
 		arg.ResultsVotes,
 	)
@@ -125,7 +123,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, from_archive, manually_ended FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -161,7 +159,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.CreationTime,
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
-		&i.FromArchive,
 		&i.ManuallyEnded,
 	)
 	return i, err

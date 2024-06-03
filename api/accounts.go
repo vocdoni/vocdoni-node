@@ -160,40 +160,26 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		}
 		return accMetadata
 	}
-	// take the last word of the URL path to determine the type of request
-	// if the last word is "metadata" then return only the account metadata
-	// otherwise return the full account information
-	if strings.HasSuffix(ctx.Request.URL.Path, "/metadata") {
-		// If the account does not exist in state, try to retrieve it from the indexer.
-		// This is a fallback for the case where the account is not in state but it is in the process archive.
-		// We only return this information if the query is for the "metadata" endpoint.
-		var data []byte
-		if acc == nil {
-			indexerEntities := a.indexer.EntityList(1, 0, hex.EncodeToString(addr.Bytes()))
-			if len(indexerEntities) == 0 {
-				return ErrAccountNotFound.With(addr.Hex())
-			}
-			if data, err = json.Marshal(AccountMetadata{
-				Name: LanguageString{"default": addr.Hex()},
-			}); err != nil {
-				return err
-			}
-			return ctx.Send(data, apirest.HTTPstatusOK)
-		}
-		accMetadata := getAccountMetadata()
-		if accMetadata == nil {
-			return ErrAccountNotFound.With(addr.Hex())
-		}
-		if data, err = json.Marshal(accMetadata); err != nil {
-			return err
-		}
-		return ctx.Send(data, apirest.HTTPstatusOK)
-	}
 
 	if acc == nil {
 		return ErrAccountNotFound.With(addr.Hex())
 	}
+
 	accMetadata := getAccountMetadata()
+
+	// take the last word of the URL path to determine the type of request
+	// if the last word is "metadata" then return only the account metadata
+	// otherwise return the full account information
+	if strings.HasSuffix(ctx.Request.URL.Path, "/metadata") {
+		if accMetadata == nil {
+			return ErrAccountNotFound.With(addr.Hex())
+		}
+		data, err := json.Marshal(accMetadata)
+		if err != nil {
+			return err
+		}
+		return ctx.Send(data, apirest.HTTPstatusOK)
+	}
 
 	sik, err := a.vocapp.State.SIKFromAddress(addr)
 	if err != nil && !errors.Is(err, state.ErrSIKNotFound) {

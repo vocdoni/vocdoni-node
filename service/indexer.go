@@ -67,10 +67,5 @@ func (vs *VocdoniService) VochainIndexer() error {
 		return nil
 	})
 
-	if vs.Config.Indexer.ArchiveURL != "" && vs.Config.Indexer.ArchiveURL != "none" {
-		log.Infow("starting archive retrieval", "path", vs.Config.Indexer.ArchiveURL)
-		go vs.Indexer.StartArchiveRetrieval(vs.DataDownloader, vs.Config.Indexer.ArchiveURL)
-	}
-
 	return nil
 }

@@ -21,7 +21,6 @@ type Process struct {
 	StartDate         time.Time                  `json:"startDate,omitempty"`
 	EndDate           time.Time                  `json:"endDate,omitempty"`
 	ManuallyEnded     bool                       `json:"manuallyEnded"`
-	BlockCount        uint64                     `json:"blockCount"` // for backwards compatibility with archive
 	VoteCount         uint64                     `json:"voteCount"`
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
@@ -39,7 +38,6 @@ type Process struct {
 	SourceBlockHeight uint64                     `json:"sourceBlockHeight"`
 	SourceNetworkId   string                     `json:"sourceNetworkId"` // string form of the enum to be user friendly
 	MaxCensusSize     uint64                     `json:"maxCensusSize"`
-	FromArchive       bool                       `json:"fromArchive,omitempty"`
 	ChainID           string                     `json:"chainId,omitempty"`
 
 	PrivateKeys json.RawMessage `json:"-"` // json array
@@ -83,7 +81,6 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
 		ChainID:           dbproc.ChainID,
-		FromArchive:       dbproc.FromArchive,
 
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
 		PublicKeys:         json.RawMessage(dbproc.PublicKeys),

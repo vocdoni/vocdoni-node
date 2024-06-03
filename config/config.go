@@ -121,12 +121,6 @@ type VochainCfg struct {
 	TendermintMetrics bool
 	// Target block time in seconds (only for miners)
 	MinerTargetBlockTimeSeconds int
-	// Enables the process archiver component
-	ProcessArchive bool
-	// Base64 IPFS private key for using with the process archive
-	ProcessArchiveKey string
-	// Data directory for storing the process archive
-	ProcessArchiveDataDir string
 	// Indexer holds the configuration regarding the indexer component
 	Indexer IndexerCfg
 	// IsSeedNode specifies if the node is configured to act as a seed node
@@ -158,8 +152,6 @@ type IndexerCfg struct {
 	Enabled bool
 	// Disables live results computation on indexer
 	IgnoreLiveResults bool
-	// ArchiveURL is the URL where the archive is retrieved from (usually IPNS)
-	ArchiveURL string
 }
 
 // MetricsCfg initializes the metrics config

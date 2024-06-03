@@ -8,7 +8,7 @@ INSERT INTO processes (
 	private_keys, public_keys,
 	question_index, creation_time,
 	source_block_height, source_network_id,
-	from_archive, chain_id,
+	chain_id,
 
 	results_votes, results_weight, results_block_height
 ) VALUES (
@@ -20,7 +20,7 @@ INSERT INTO processes (
 	?, ?,
 	?, ?,
 	?, ?,
-	?, ?,
+	?,
 
 	?, '"0"', 0
 );

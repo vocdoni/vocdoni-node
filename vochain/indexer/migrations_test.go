@@ -51,7 +51,7 @@ func TestRestoreBackupAndMigrate(t *testing.T) {
 	// TODO: do "get all columns" queries on important tables like processes and votes,
 	// to sanity check that the data types match up as well.
 	totalProcs := idx.CountTotalProcesses()
-	qt.Assert(t, totalProcs, qt.Equals, uint64(629))
+	qt.Assert(t, totalProcs, qt.Equals, uint64(445))
 	totalVotes, _ := idx.CountTotalVotes()
 	qt.Assert(t, totalVotes, qt.Equals, uint64(5159))
 }

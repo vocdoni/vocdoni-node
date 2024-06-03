@@ -56,10 +56,6 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		return "vochainMinerTargetBlockTimeSeconds"
 	case "skipPreviousOffchainData":
 		return "vochainSkipPreviousOffchainData"
-	case "processArchive":
-		return "vochainProcessArchive"
-	case "processArchiveKey":
-		return "vochainProcessArchiveKey"
 	case "offChainDataDownload":
 		return "vochainOffChainDataDownload"
 	case "pprof":
@@ -163,7 +159,6 @@ func loadConfig() *config.Config {
 		"enable IPFS group synchronization using the given secret key")
 	flag.StringSlice("ipfsConnectPeers", []string{},
 		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
-	flag.String("archiveURL", types.ArchiveURL, "enable archive retrival from the given IPNS url (set \"none\" to disable)")
 
 	// vochain
 	flag.String("vochainP2PListen", "0.0.0.0:26656",
@@ -213,10 +208,6 @@ func loadConfig() *config.Config {
 		"vochain consensus block time target (in seconds)")
 	flag.Bool("vochainSkipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
-	flag.Bool("vochainProcessArchive", false,
-		"enables the process archiver component")
-	flag.String("vochainProcessArchiveKey", "",
-		"IPFS base64 encoded private key for process archive IPNS")
 	flag.Bool("vochainOffChainDataDownload", true,
 		"enables the off-chain data downloader component")
 	flag.StringVar(&flagVochainCreateGenesis, "vochainCreateGenesis", "",
@@ -270,9 +261,6 @@ func loadConfig() *config.Config {
 	if viper.GetString("vochain.DataDir") == "" {
 		viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
 	}
-	if viper.GetString("vochain.ProcessArchiveDataDir") == "" {
-		viper.Set("vochain.ProcessArchiveDataDir", filepath.Join(conf.DataDir, "archive"))
-	}
 
 	// propagate some keys to the vochain category
 	viper.Set("vochain.dbType", viper.GetString("dbType"))
@@ -302,9 +290,8 @@ func loadConfig() *config.Config {
 		log.Fatalf("cannot unmarshal loaded config file: %s", err)
 	}
 	// Note that these Config.Vochain fields aren't bound via viper.
-	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
+	// We could do that if we rename the flags.
 	conf.Vochain.Indexer.Enabled = !viper.GetBool("vochainIndexerDisabled")
-	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 	conf.Vochain.Network = viper.GetString("chain")
 
 	if conf.SigningKey == "" {
@@ -487,17 +474,7 @@ func main() {
 		}
 		// create the indexer service
 		if conf.Vochain.Indexer.Enabled {
-			// disable archive if process archive mode is enabled
-			if conf.Vochain.ProcessArchive {
-				conf.Vochain.Indexer.ArchiveURL = ""
-			}
 			if err := srv.VochainIndexer(); err != nil {
-				log.Fatal(err)
-			}
-		}
-		// create the process archiver service
-		if conf.Vochain.ProcessArchive {
-			if err := srv.ProcessArchiver(); err != nil {
 				log.Fatal(err)
 			}
 		}
