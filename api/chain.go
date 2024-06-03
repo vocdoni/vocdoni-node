@@ -1644,9 +1644,10 @@ func (a *API) transfersList(params *TransfersParams) (*TransfersList, error) {
 // chainIndexerExportHandler
 //
 //	@Summary		Exports the indexer database
-//	@Description	Exports the indexer SQL database in raw format
+//	@Description	Exports the indexer SQL database in raw format. Requires Admin Bearer token.
 //	@Tags			Indexer
 //	@Produce		json
+//	@Security		ApiKeyAuth
 //	@Success		200	{string}	raw-data
 //	@Router			/chain/export/indexer [get]
 func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {

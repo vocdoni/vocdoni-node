@@ -23,7 +23,7 @@ The `Accounts` tag refer to the namespace where the endpoint behalf, see
 //    @Param            address    path        string    true    "Account address"
 // For body objects 
 //    @Param                    transaction    body        object{txPayload=string,metadata=string}    true    "Transaction payload and metadata object encoded using base64 "
-//    @Security                BasicAuth
+//    @Security                ApiKeyAuth
 // If bearer token is needed (for some census ops for example)
 ```
 
