@@ -171,7 +171,6 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		Metadata:          p.GetMetadata(),
 		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(options)),
 		ChainID:           idx.App.ChainID(),
-		FromArchive:       false,
 	}
 
 	idx.blockMu.Lock()

@@ -31,7 +31,6 @@ func (a *API) electionSummary(pi *indexertypes.Process) ElectionSummary {
 		VoteCount:      pi.VoteCount,
 		ManuallyEnded:  pi.ManuallyEnded,
 		ChainID:        pi.ChainID,
-		FromArchive:    pi.FromArchive,
 	}
 }
 

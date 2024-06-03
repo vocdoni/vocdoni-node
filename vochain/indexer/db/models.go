@@ -50,7 +50,6 @@ type Process struct {
 	CreationTime       time.Time
 	SourceBlockHeight  int64
 	SourceNetworkID    int64
-	FromArchive        bool
 	ManuallyEnded      bool
 }
 
