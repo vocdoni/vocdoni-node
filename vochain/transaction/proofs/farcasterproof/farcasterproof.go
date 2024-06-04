@@ -3,15 +3,13 @@ package farcasterproof
 import (
 	"bytes"
 	"crypto/ed25519"
-	"encoding/base64"
 	"encoding/binary"
-	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"math/big"
-	"regexp"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 	"lukechampine.com/blake3"
@@ -22,22 +20,18 @@ import (
 )
 
 const (
-	frameHashSize           = 20
-	pollURLpattern          = `([0-9a-fA-F]{64})`
-	pollURLpatternShortened = `\/([0-9a-zA-Z+\/]{8})$`
+	frameHashSize = 20
 )
 
 var (
 	// DisableElectionIDVerification is a flag to dissable the election ID verification on the poll URL.
 	// This should be used only for testing purposes.
 	DisableElectionIDVerification = false
-	re                            *regexp.Regexp
-	reShortened                   *regexp.Regexp
 )
 
-func init() {
-	re = regexp.MustCompile(pollURLpattern)
-	reShortened = regexp.MustCompile(pollURLpatternShortened)
+// FarcasterState represents the data stored in the farcaster state message field.
+type FarcasterState struct {
+	ProcessID types.HexBytes
 }
 
 // FarcasterVerifier is a proof verifier for the Farcaster frame protocol.
@@ -50,12 +44,12 @@ func (*FarcasterVerifier) Verify(process *models.Process, envelope *models.VoteE
 		return false, nil, fmt.Errorf("farcaster proof is empty")
 	}
 	// Verify the frame signature and extract the public key
-	frameAction, pubkey, err := VerifyFrameSignature(proof.SignedFrameMessageBody)
+	frameAction, pubkey, fid, err := VerifyFrameSignature(proof.SignedFrameMessageBody)
 	if err != nil {
 		return false, nil, fmt.Errorf("failed to verify farcaster frame signature: %w", err)
 	}
 	// Verify the voter ID matches the frame action public key
-	frameVoterID := state.NewVoterID(state.VoterIDTypeEd25519, pubkey)
+	frameVoterID := state.NewFarcasterVoterID(pubkey, fid)
 	if !bytes.Equal(frameVoterID.Address(), vID.Address()) {
 		return false, nil, fmt.Errorf("voter ID mismatch (got %x, expected %x)", frameVoterID.Address(), vID.Address())
 	}
@@ -76,31 +70,18 @@ func (*FarcasterVerifier) Verify(process *models.Process, envelope *models.VoteE
 		return false, nil, fmt.Errorf("vote package button index mismatch (got %d, expected %d)", frameAction.ButtonIndex, vp.Votes[0]+1)
 	}
 
-	// Verify the vote URL matches with the process ID. We enforce the process ID to be present in the poll URL because it
-	// is the only way to ensure the process ID is correct.
+	// Verify the process ID matches the one in the frame message state data.
 	if !DisableElectionIDVerification {
-		matches := re.FindStringSubmatch(string(frameAction.Url))
-		// If a match is found, matches[1] contains the processID
-		if len(matches) > 1 {
-			votePID, err := hex.DecodeString(matches[1])
-			if err != nil {
-				return false, nil, fmt.Errorf("failed to decode process ID: %w", err)
-			}
-			if !bytes.Equal(votePID, envelope.ProcessId) {
-				return false, nil, fmt.Errorf("process ID mismatch (got %x, expected %x)", votePID, envelope.ProcessId)
-			}
-		} else {
-			// If no match is found, we try to match a shortened process ID
-			matches = reShortened.FindStringSubmatch(string(frameAction.Url))
-			if len(matches) > 1 {
-				if matches[1] != generateShortenedProcessID(envelope.ProcessId) {
-					return false, nil, fmt.Errorf("shortened process ID mismatch (got %s, expected %s)",
-						matches[1], generateShortenedProcessID(envelope.ProcessId))
-				}
-			} else {
-				// If no match is found, we return an error
-				return false, nil, fmt.Errorf("no process ID found on poll URL")
-			}
+		if frameAction.State == nil {
+			return false, nil, fmt.Errorf("frame action state is nil")
+		}
+		stateData := &FarcasterState{}
+		if err := json.Unmarshal(frameAction.State, stateData); err != nil {
+			return false, nil, fmt.Errorf("failed to unmarshal frame action state: %w", err)
+		}
+
+		if !bytes.Equal(stateData.ProcessID, envelope.ProcessId) {
+			return false, nil, fmt.Errorf("process ID mismatch (got %x, expected %x)", stateData.ProcessID, envelope.ProcessId)
 		}
 	}
 
@@ -144,39 +125,38 @@ func DecodeMessage(signedMessageBody []byte) (*farcasterpb.FrameActionBody, *far
 }
 
 // VerifyFrameSignature validates the frame message and returns de deserialized frame action and public key.
-func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed25519.PublicKey, error) {
+func VerifyFrameSignature(messageBody []byte) (*farcasterpb.FrameActionBody, ed25519.PublicKey, uint64, error) {
 	actionBody, msg, err := DecodeMessage(messageBody)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to decode message body: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to decode message body: %w", err)
 	}
 
 	pubkey := msg.GetSigner()
 	if pubkey == nil {
-		return nil, nil, fmt.Errorf("signer is nil")
+		return nil, nil, 0, fmt.Errorf("signer is nil")
 	}
 
 	// Verify the hash and signature
 	msgDataBytes, err := proto.Marshal(msg.Data)
 	if err != nil {
-		return nil, nil, fmt.Errorf("failed to marshal message data: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to marshal message data: %w", err)
 	}
 
-	log.Debugw("verifying message signature", "size", len(msgDataBytes))
 	h := blake3.New(160, nil)
 	if _, err := h.Write(msgDataBytes); err != nil {
-		return nil, nil, fmt.Errorf("failed to hash message: %w", err)
+		return nil, nil, 0, fmt.Errorf("failed to hash message: %w", err)
 	}
 	hashed := h.Sum(nil)[:frameHashSize]
 
 	if !bytes.Equal(msg.Hash, hashed) {
-		return nil, nil, fmt.Errorf("hash mismatch (got %x, expected %x)", hashed, msg.Hash)
+		return nil, nil, 0, fmt.Errorf("hash mismatch (got %x, expected %x)", hashed, msg.Hash)
 	}
 
 	if !ed25519.Verify(pubkey, hashed, msg.GetSignature()) {
-		return nil, nil, fmt.Errorf("signature verification failed")
+		return nil, nil, 0, fmt.Errorf("signature verification failed")
 	}
 
-	return actionBody, pubkey, nil
+	return actionBody, pubkey, msg.Data.Fid, nil
 }
 
 // InitializeFarcasterFrameVote initializes a farcaster frame vote. It does not check the proof nor includes the weight of the vote.
@@ -209,7 +189,7 @@ func InitializeFarcasterFrameVote(voteEnvelope *models.VoteEnvelope, height uint
 		return nil, fmt.Errorf("farcaster frame cast ID not found on transaction")
 	}
 	// Generate the voter ID and assign it to the vote
-	vote.VoterID = append([]byte{state.VoterIDTypeEd25519}, frameProof.PublicKey...)
+	vote.VoterID = state.NewFarcasterVoterID(frameProof.PublicKey, msg.Data.Fid)
 	// Generate the nullifier
 	vote.Nullifier = GenerateNullifier(msg.Data.Fid, voteEnvelope.ProcessId)
 	return vote, nil
@@ -222,12 +202,4 @@ func GenerateNullifier(farcasterID uint64, processID []byte) []byte {
 	fidBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(fidBytes, farcasterID)
 	return ethereum.HashRaw(append(fidBytes, processID...))
-}
-
-func generateShortenedProcessID(processID []byte) string {
-	// We take the 8 first chars of the base64 encoded hash of the processID.
-	// The probability of at least one collision among 100,000 generated hashes is approximately 0.0018%.
-	// The probability of at least one collision among 1,000,000 generated hashes is approximately 0.177%.
-	hash := blake3.Sum256(processID)
-	return base64.StdEncoding.EncodeToString(hash[:])[:8]
 }
