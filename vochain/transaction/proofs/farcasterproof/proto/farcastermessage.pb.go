@@ -20,7 +20,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-//* Type of hashing scheme used to produce a digest of MessageData
+// * Type of hashing scheme used to produce a digest of MessageData
 type HashScheme int32
 
 const (
@@ -67,7 +67,7 @@ func (HashScheme) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{0}
 }
 
-//* Type of signature scheme used to sign the Message hash
+// * Type of signature scheme used to sign the Message hash
 type SignatureScheme int32
 
 const (
@@ -117,7 +117,7 @@ func (SignatureScheme) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{1}
 }
 
-//* Type of the MessageBody
+// * Type of the MessageBody
 type MessageType int32
 
 const (
@@ -200,7 +200,7 @@ func (MessageType) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{2}
 }
 
-//* Farcaster network the message is intended for
+// * Farcaster network the message is intended for
 type FarcasterNetwork int32
 
 const (
@@ -253,7 +253,7 @@ func (FarcasterNetwork) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{3}
 }
 
-//* Type of UserData
+// * Type of UserData
 type UserDataType int32
 
 const (
@@ -312,7 +312,7 @@ func (UserDataType) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{4}
 }
 
-//* Type of Reaction
+// * Type of Reaction
 type ReactionType int32
 
 const (
@@ -362,7 +362,7 @@ func (ReactionType) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{5}
 }
 
-//* Type of Protocol to disambiguate verification addresses
+// * Type of Protocol to disambiguate verification addresses
 type Protocol int32
 
 const (
@@ -458,7 +458,7 @@ func (UserNameType) EnumDescriptor() ([]byte, []int) {
 	return file_farcastermessage_proto_rawDescGZIP(), []int{7}
 }
 
-//*
+// *
 // A Message is a delta operation on the Farcaster network. The message protobuf is an envelope
 // that wraps a MessageData object and contains a hash and signature which can verify its authenticity.
 type Message struct {
@@ -556,7 +556,7 @@ func (x *Message) GetDataBytes() []byte {
 	return nil
 }
 
-//*
+// *
 // A MessageData object contains properties common to all messages and wraps a body object which
 // contains properties specific to the MessageType.
 type MessageData struct {
@@ -786,7 +786,7 @@ func (*MessageData_FrameActionBody) isMessageData_Body() {}
 
 func (*MessageData_LinkCompactStateBody) isMessageData_Body() {}
 
-//* Adds metadata about a user
+// * Adds metadata about a user
 type UserDataBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -922,7 +922,7 @@ func (*Embed_Url) isEmbed_Embed() {}
 
 func (*Embed_CastId) isEmbed_Embed() {}
 
-//* Adds a new Cast
+// * Adds a new Cast
 type CastAddBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1043,7 +1043,7 @@ func (*CastAddBody_ParentCastId) isCastAddBody_Parent() {}
 
 func (*CastAddBody_ParentUrl) isCastAddBody_Parent() {}
 
-//* Removes an existing Cast
+// * Removes an existing Cast
 type CastRemoveBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1091,7 +1091,7 @@ func (x *CastRemoveBody) GetTargetHash() []byte {
 	return nil
 }
 
-//* Identifier used to look up a Cast
+// * Identifier used to look up a Cast
 type CastId struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1147,7 +1147,7 @@ func (x *CastId) GetHash() []byte {
 	return nil
 }
 
-//* Adds or removes a Reaction from a Cast
+// * Adds or removes a Reaction from a Cast
 type ReactionBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1236,7 +1236,7 @@ func (*ReactionBody_TargetCastId) isReactionBody_Target() {}
 
 func (*ReactionBody_TargetUrl) isReactionBody_Target() {}
 
-//* Adds a Verification of ownership of an Address based on Protocol
+// * Adds a Verification of ownership of an Address based on Protocol
 type VerificationAddAddressBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1324,7 +1324,7 @@ func (x *VerificationAddAddressBody) GetProtocol() Protocol {
 	return Protocol_PROTOCOL_ETHEREUM
 }
 
-//* Removes a Verification of a given protocol
+// * Removes a Verification of a given protocol
 type VerificationRemoveBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1380,7 +1380,7 @@ func (x *VerificationRemoveBody) GetProtocol() Protocol {
 	return Protocol_PROTOCOL_ETHEREUM
 }
 
-//* Adds or removes a Link
+// * Adds or removes a Link
 type LinkBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1463,7 +1463,7 @@ type LinkBody_TargetFid struct {
 
 func (*LinkBody_TargetFid) isLinkBody_Target() {}
 
-//* A Compaction message for the Link Store
+// * A Compaction message for the Link Store
 type LinkCompactStateBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -1519,7 +1519,7 @@ func (x *LinkCompactStateBody) GetTargetFids() []uint64 {
 	return nil
 }
 
-//* A Farcaster Frame action
+// * A Farcaster Frame action
 type FrameActionBody struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
