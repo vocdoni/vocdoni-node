@@ -353,7 +353,7 @@ func (v *State) LastHeight() (uint32, error) {
 	return v.store.Version()
 }
 
-// CurrentHeight returns the current state height (block count).
+// CurrentHeight returns the height of the current (not committed) block.
 func (v *State) CurrentHeight() uint32 {
 	return v.currentHeight.Load()
 }

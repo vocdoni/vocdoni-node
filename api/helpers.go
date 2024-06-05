@@ -6,13 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"reflect"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
+	"go.vocdoni.io/dvote/crypto/nacl"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -66,7 +66,7 @@ func protoFormat(tx []byte) string {
 
 // isTransactionType checks if the given transaction is of the given type.
 // t is expected to be a pointer to a protobuf transaction message.
-func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
+func isTransactionType[T any](signedTxBytes []byte) (bool, error) {
 	stx := &models.SignedTx{}
 	if err := proto.Unmarshal(signedTxBytes, stx); err != nil {
 		return false, err
@@ -75,7 +75,8 @@ func isTransactionType(signedTxBytes []byte, t any) (bool, error) {
 	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
 		return false, err
 	}
-	return reflect.TypeOf(tx.Payload) == reflect.TypeOf(t), nil
+	_, ok := tx.Payload.(T)
+	return ok, nil
 }
 
 // convertKeysToCamel converts all keys in a JSON object to camelCase.
@@ -142,4 +143,22 @@ func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address,
 		return "", ErrCantABIEncodeResults.WithErr(err)
 	}
 	return fmt.Sprintf("0x%s", hex.EncodeToString(abiEncodedResultsBytes)), nil
+}
+
+// decryptVotePackage decrypts a vote package using the given private keys and indexes.
+func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte, error) {
+	for i := len(indexes) - 1; i >= 0; i-- {
+		if indexes[i] >= uint32(len(privKeys)) {
+			return nil, fmt.Errorf("invalid key index %d", indexes[i])
+		}
+		priv, err := nacl.DecodePrivate(privKeys[indexes[i]])
+		if err != nil {
+			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", indexes[i], err)
+		}
+		vp, err = priv.Decrypt(vp)
+		if err != nil {
+			return nil, fmt.Errorf("cannot decrypt votePackage: (%s)", err)
+		}
+	}
+	return vp, nil
 }

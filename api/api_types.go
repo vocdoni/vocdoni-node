@@ -56,13 +56,13 @@ type ElectionResults struct {
 
 type Election struct {
 	ElectionSummary
-	Census       *ElectionCensus   `json:"census,omitempty"`
-	MetadataURL  string            `json:"metadataURL"`
-	CreationTime time.Time         `json:"creationTime"`
-	VoteMode     VoteMode          `json:"voteMode,omitempty"`
-	ElectionMode ElectionMode      `json:"electionMode,omitempty"`
-	TallyMode    TallyMode         `json:"tallyMode,omitempty"`
-	Metadata     *ElectionMetadata `json:"metadata,omitempty"`
+	Census       *ElectionCensus `json:"census,omitempty"`
+	MetadataURL  string          `json:"metadataURL"`
+	CreationTime time.Time       `json:"creationTime"`
+	VoteMode     VoteMode        `json:"voteMode,omitempty"`
+	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
+	TallyMode    TallyMode       `json:"tallyMode,omitempty"`
+	Metadata     any             `json:"metadata,omitempty"`
 }
 
 type ElectionKeys struct {
@@ -79,11 +79,12 @@ type ElectionCensus struct {
 }
 
 type ElectionCreate struct {
-	TxPayload   []byte         `json:"txPayload,omitempty"`
-	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash" `
-	ElectionID  types.HexBytes `json:"electionID" `
-	MetadataURL string         `json:"metadataURL"`
+	TxPayload                 []byte         `json:"txPayload,omitempty"`
+	Metadata                  []byte         `json:"metadata,omitempty"`
+	TxHash                    types.HexBytes `json:"txHash" `
+	ElectionID                types.HexBytes `json:"electionID" `
+	MetadataURL               string         `json:"metadataURL"`
+	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
 }
 
 type ElectionDescription struct {
@@ -120,7 +121,7 @@ type Vote struct {
 	EncryptionKeyIndexes []uint32 `json:"encryptionKeys,omitempty" extensions:"x-omitempty"`
 	// For encrypted elections this will be codified
 	VotePackage      json.RawMessage `json:"package,omitempty" extensions:"x-omitempty"`
-	VoteWeight       string          `json:"weight,omitempty" extensions:"x-omitempty"`
+	VoteWeight       string          `json:"weight,omitempty" extensions:"x-omitempty"` // [math/big.Int.String]
 	VoteNumber       *uint32         `json:"number,omitempty" extensions:"x-omitempty"`
 	ElectionID       types.HexBytes  `json:"electionID,omitempty" extensions:"x-omitempty" `
 	VoterID          types.HexBytes  `json:"voterID,omitempty" extensions:"x-omitempty" `
@@ -205,6 +206,7 @@ type ChainInfo struct {
 	ElectionCount     uint64    `json:"electionCount" example:"120"`
 	OrganizationCount uint64    `json:"organizationCount" example:"20"`
 	GenesisTime       time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
+	InitialHeight     uint32    `json:"initialHeight"  example:"5467"`
 	Height            uint32    `json:"height" example:"5467"`
 	Syncing           bool      `json:"syncing" example:"true"`
 	Timestamp         int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`

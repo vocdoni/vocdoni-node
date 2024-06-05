@@ -218,11 +218,17 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		if err != nil {
 			log.Warnf("cannot get metadata from %s: %v", election.MetadataURL, err)
 		} else {
-			electionMetadata := ElectionMetadata{}
-			if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
-				log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
+			// if metadata exists, add it to the election
+			// if the metadata is not encrypted, unmarshal it, otherwise store it as bytes
+			if !election.ElectionMode.EncryptedMetaData {
+				electionMetadata := ElectionMetadata{}
+				if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
+					log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
+				}
+				election.Metadata = &electionMetadata
+			} else {
+				election.Metadata = metadataBytes
 			}
-			election.Metadata = &electionMetadata
 		}
 	}
 	data, err := json.Marshal(election)
@@ -449,21 +455,25 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	// check if the transaction is of the correct type and extract metadata URI
-	metadataURI, err := func() (string, error) {
+	metadataURI, isEncryptedMetadata, err := func() (string, bool, error) {
 		stx := &models.SignedTx{}
 		if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
-			return "", err
+			return "", false, err
 		}
 		tx := &models.Tx{}
 		if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
-			return "", err
+			return "", false, err
 		}
 		if np := tx.GetNewProcess(); np != nil {
 			if p := np.GetProcess(); p != nil {
-				return p.GetMetadata(), nil
+				encryptedMeta := false
+				if p.GetMode() != nil {
+					encryptedMeta = p.GetMode().EncryptedMetaData
+				}
+				return p.GetMetadata(), encryptedMeta, nil
 			}
 		}
-		return "", ErrCantExtractMetadataURI
+		return "", false, ErrCantExtractMetadataURI
 	}()
 	if err != nil {
 		return err
@@ -478,10 +488,12 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 
 	var metadataCID string
 	if req.Metadata != nil {
-		// if election metadata defined, check the format
-		metadata := ElectionMetadata{}
-		if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
-			return ErrCantParseMetadataAsJSON.WithErr(err)
+		// if election metadata defined and not encrypted, check the format
+		if !isEncryptedMetadata {
+			metadata := ElectionMetadata{}
+			if err := json.Unmarshal(req.Metadata, &metadata); err != nil {
+				return ErrCantParseMetadataAsJSON.WithErr(err)
+			}
 		}
 
 		// set metadataCID from metadata bytes
@@ -548,11 +560,6 @@ func (*API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext)
 	req := &File{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
 		return err
-	}
-	// check if the file is a valid JSON object
-	var js json.RawMessage
-	if err := json.Unmarshal(req.Payload, &js); err != nil {
-		return ErrCantParsePayloadAsJSON
 	}
 	data, err := json.Marshal(&File{
 		CID: "ipfs://" + ipfs.CalculateCIDv1json(req.Payload),

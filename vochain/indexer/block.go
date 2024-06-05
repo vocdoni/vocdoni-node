@@ -2,10 +2,19 @@ package indexer
 
 import (
 	"context"
+	"database/sql"
+	"errors"
+	"fmt"
+	"time"
 
 	"go.vocdoni.io/dvote/log"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/state"
+)
+
+var (
+	// ErrBlockNotFound is returned if the block is not found in the indexer database.
+	ErrBlockNotFound = fmt.Errorf("block not found")
 )
 
 func (idx *Indexer) OnBeginBlock(bb state.BeginBlock) {
@@ -19,4 +28,16 @@ func (idx *Indexer) OnBeginBlock(bb state.BeginBlock) {
 	}); err != nil {
 		log.Errorw(err, "cannot index new block")
 	}
+}
+
+// BlockTimestamp returns the timestamp of the block at the given height
+func (idx *Indexer) BlockTimestamp(height int64) (time.Time, error) {
+	block, err := idx.readOnlyQuery.GetBlock(context.TODO(), height)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return time.Time{}, ErrBlockNotFound
+		}
+		return time.Time{}, err
+	}
+	return block.Time, nil
 }

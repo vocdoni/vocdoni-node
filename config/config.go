@@ -92,6 +92,14 @@ type VochainCfg struct {
 	DBType string
 	// Genesis path where the genesis file is stored
 	Genesis string
+	// GenesisChainID overrides ChainID in hardcoded genesis
+	GenesisChainID string
+	// GenesisInitialHeight overrides InitialHeight in hardcoded genesis
+	GenesisInitialHeight int64
+	// GenesisAppHash overrides AppHash in hardcoded genesis
+	GenesisAppHash string
+	// GenesisEndOfChain is the height at which this node will refuse adding new blocks to the chain
+	GenesisEndOfChain int64
 	// Peers peers with which the node tries to connect
 	Peers []string
 	// Seeds seeds with which the node tries to connect

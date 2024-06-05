@@ -36,22 +36,36 @@ import (
 // The returned AppVersion will be included in the Header of every block.
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
-//
-// We use this method to initialize some state variables.
 func (app *BaseApplication) Info(_ context.Context,
 	req *cometabcitypes.InfoRequest) (*cometabcitypes.InfoResponse, error) {
+	// TODO: move SetElectionPriceCalc() somewhere else, also deduplicating from InitChain
+	if err := app.State.SetElectionPriceCalc(); err != nil {
+		return nil, fmt.Errorf("cannot set election price calc: %w", err)
+	}
+
+	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
+		req.P2PVersion, "blockVersion", req.BlockVersion)
+
+	appHash := app.State.CommittedHash()
 	lastHeight, err := app.State.LastHeight()
 	if err != nil {
 		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
 	}
-	app.State.SetHeight(lastHeight)
-	appHash := app.State.CommittedHash()
-	if err := app.State.SetElectionPriceCalc(); err != nil {
-		return nil, fmt.Errorf("cannot set election price calc: %w", err)
+	if lastHeight > 0 && lastHeight < uint32(app.Genesis().InitialHeight) {
+		// when the genesis has InitialHeight > 1, means we're doing a chain bump
+		// and we need cometbft to trigger InitChain, which only happens when the app reports lastHeight=0
+		log.Warnf("genesis initial height (%d) > our state lastHeight (%d), creating new chain on top of current one",
+			app.Genesis().InitialHeight, lastHeight)
+
+		if app.Genesis().InitialHeight != int64(lastHeight+1) {
+			log.Warn("genesis initial height is not lastHeight+1")
+		}
+		if !bytes.Equal(appHash, app.Genesis().AppHash) {
+			log.Fatalf("our current appHash (%x) doesn't match the genesis initial AppHash (%x), aborting...", appHash, app.Genesis().AppHash)
+		}
+		lastHeight = 0
 	}
 	// print some basic version info about tendermint components
-	log.Infow("cometbft info", "cometVersion", req.Version, "p2pVersion",
-		req.P2PVersion, "blockVersion", req.BlockVersion)
 	log.Infow("telling cometbft our state",
 		"LastBlockHeight", lastHeight,
 		"LastBlockAppHash", hex.EncodeToString(appHash),
@@ -68,13 +82,33 @@ func (app *BaseApplication) Info(_ context.Context,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(_ context.Context,
 	req *cometabcitypes.InitChainRequest) (*cometabcitypes.InitChainResponse, error) {
+	// if our State is already initialized, but cometbft is calling InitChain
+	// it means the ChainID was bumped and cometbft is starting a chain on top of previous one.
+	// Skip all the init, just pass the current validator set and AppHash to cometbft
+	lastHeight, err := app.State.LastHeight()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get State.LastHeight: %w", err)
+	}
+	if lastHeight > 0 {
+		// pass current validators to cometbft
+		validators, err := app.State.Validators(false)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get validators: %w", err)
+		}
+
+		return &cometabcitypes.InitChainResponse{
+			Validators: validatorUpdate(validators),
+			AppHash:    app.State.CommittedHash(),
+		}, nil
+	}
+
 	// setting the app initial state with validators, height = 0 and empty apphash
 	// unmarshal app state from genesis
 	var genesisAppState genesis.AppState
-	err := json.Unmarshal(req.AppStateBytes, &genesisAppState)
-	if err != nil {
+	if err := json.Unmarshal(req.AppStateBytes, &genesisAppState); err != nil {
 		return nil, fmt.Errorf("cannot unmarshal app state bytes: %w", err)
 	}
+
 	// create accounts
 	for _, acc := range genesisAppState.Accounts {
 		addr := ethcommon.BytesToAddress(acc.Address)
@@ -88,9 +122,8 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		}
 		log.Infow("created account", "addr", addr.Hex(), "tokens", acc.Balance)
 	}
-	// get validators
-	// TODO pau: unify this code with the one on apputils.go that essentially does the same
-	tendermintValidators := []cometabcitypes.ValidatorUpdate{}
+
+	// add validators
 	for i := 0; i < len(genesisAppState.Validators); i++ {
 		log.Infow("add genesis validator",
 			"signingAddress", genesisAppState.Validators[i].Address.String(),
@@ -107,7 +140,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 			Name:             genesisAppState.Validators[i].Name,
 			ValidatorAddress: crypto256k1.PubKey(genesisAppState.Validators[i].PubKey).Address().Bytes(),
 		}
-		if err = app.State.AddValidator(v); err != nil {
+		if err := app.State.AddValidator(v); err != nil {
 			return nil, fmt.Errorf("cannot add validator %s: %w", log.FormatProto(v), err)
 		}
 		addr := ethcommon.BytesToAddress(v.Address)
@@ -116,12 +149,6 @@ func (app *BaseApplication) InitChain(_ context.Context,
 				return nil, fmt.Errorf("cannot create validator acount %x: %w", addr, err)
 			}
 		}
-		tendermintValidators = append(tendermintValidators,
-			cometabcitypes.UpdateValidator(
-				genesisAppState.Validators[i].PubKey,
-				int64(genesisAppState.Validators[i].Power),
-				crypto256k1.KeyType,
-			))
 	}
 	myValidator, err := app.State.Validator(app.NodeAddress, false)
 	if err != nil {
@@ -174,8 +201,15 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	if _, err = app.State.Save(); err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
+
+	// pass current validators to cometbft
+	validators, err := app.State.Validators(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get validators: %w", err)
+	}
+
 	return &cometabcitypes.InitChainResponse{
-		Validators: tendermintValidators,
+		Validators: validatorUpdate(validators),
 		AppHash:    hash,
 	}, nil
 }
@@ -257,8 +291,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		root = result.Root
 		resp = result.Responses
 	} else {
-		root = make([]byte, len(app.lastRootHash))
-		copy(root, app.lastRootHash[:])
+		root = bytes.Clone(app.lastRootHash)
 		resp = app.lastDeliverTxResponse
 	}
 
@@ -271,10 +304,13 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 			Info: tx.Info,
 		}
 	}
-	log.Debugw("finalize block", "height", height,
-		"txs", len(req.Txs), "hash", hex.EncodeToString(root),
-		"milliSeconds", time.Since(start).Milliseconds(),
-		"proposer", hex.EncodeToString(req.GetProposerAddress()))
+
+	if len(req.Txs) > 0 {
+		log.Debugw("finalize block", "height", height,
+			"txs", len(req.Txs), "hash", hex.EncodeToString(root),
+			"milliSeconds", time.Since(start).Milliseconds(),
+			"proposer", hex.EncodeToString(req.GetProposerAddress()))
+	}
 
 	// update validator score as an IST action for the next block. Note that at this point,
 	// we cannot modify the state or we would break ProcessProposal optimistic execution
@@ -311,8 +347,7 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 func validatorUpdate(validators map[string]*models.Validator) cometabcitypes.ValidatorUpdates {
 	validatorUpdate := []cometabcitypes.ValidatorUpdate{}
 	for _, v := range validators {
-		pubKey := make([]byte, len(v.PubKey))
-		copy(pubKey, v.PubKey)
+		pubKey := bytes.Clone(v.PubKey)
 		validatorUpdate = append(validatorUpdate, cometabcitypes.UpdateValidator(
 			pubKey,
 			int64(v.Power),
@@ -461,6 +496,16 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 	if req == nil {
 		return nil, fmt.Errorf("nil request")
 	}
+	if g := genesis.HardcodedForChainID(app.ChainID()); g.EndOfChain > 0 &&
+		req.Height > g.EndOfChain {
+		log.Errorf("reached end of chain %s at height %d, rejecting new block for height %d", app.ChainID(), g.EndOfChain, req.Height)
+		log.Errorf("now you can deploy a new chain on top, with a different ChainID, InitialHeight %d and AppHash %x",
+			app.State.CurrentHeight()+1, app.State.CommittedHash())
+		return &cometabcitypes.ProcessProposalResponse{
+			Status: cometabcitypes.PROCESS_PROPOSAL_STATUS_REJECT,
+		}, nil
+	}
+
 	// Check if the node is a validator, if not, just accept the proposal and return (nothing to say)
 	validator, err := app.State.Validator(app.NodeAddress, true)
 	if err != nil {
@@ -517,20 +562,24 @@ func (app *BaseApplication) ProcessProposal(_ context.Context,
 
 // ListSnapshots provides cometbft with a list of available snapshots.
 func (app *BaseApplication) ListSnapshots(_ context.Context,
-	req *cometabcitypes.ListSnapshotsRequest,
+	_ *cometabcitypes.ListSnapshotsRequest,
 ) (*cometabcitypes.ListSnapshotsResponse, error) {
 	list := app.Snapshots.List()
 
 	response := &cometabcitypes.ListSnapshotsResponse{}
-	for height, dsi := range list {
-		chunks := uint32(math.Ceil(float64(dsi.Size) / float64(app.Snapshots.ChunkSize)))
-
+	for height, snap := range list {
+		chunks := uint32(math.Ceil(float64(snap.Size()) / float64(app.Snapshots.ChunkSize)))
+		metadataBytes, err := json.Marshal(snap.Header())
+		if err != nil {
+			log.Errorw(err, "couldn't marshal snapshot metadata")
+			continue
+		}
 		response.Snapshots = append(response.Snapshots, &cometabcitypes.Snapshot{
 			Height:   uint64(height),
 			Format:   0,
 			Chunks:   chunks,
-			Hash:     dsi.Hash,
-			Metadata: []byte{},
+			Hash:     snap.Header().Hash,
+			Metadata: metadataBytes,
 		})
 	}
 	log.Debugf("cometbft requests our list of snapshots, we offer %d options", len(response.Snapshots))
@@ -550,7 +599,23 @@ func (app *BaseApplication) OfferSnapshot(_ context.Context,
 ) (*cometabcitypes.OfferSnapshotResponse, error) {
 	log.Debugw("cometbft offers us a snapshot",
 		"appHash", hex.EncodeToString(req.AppHash),
+		"snapHash", hex.EncodeToString(req.Snapshot.Hash),
 		"height", req.Snapshot.Height, "format", req.Snapshot.Format, "chunks", req.Snapshot.Chunks)
+
+	var metadata snapshot.SnapshotHeader
+	if err := json.Unmarshal(req.Snapshot.Metadata, &metadata); err != nil {
+		log.Errorw(err, "couldn't unmarshal snapshot metadata")
+		return &cometabcitypes.OfferSnapshotResponse{
+			Result: cometabcitypes.OFFER_SNAPSHOT_RESULT_REJECT,
+		}, nil
+	}
+	if metadata.Version != snapshot.Version {
+		log.Debugw("reject snapshot due to different version",
+			"height", req.Snapshot.Height, "version", metadata.Version, "chunks", req.Snapshot.Chunks)
+		return &cometabcitypes.OfferSnapshotResponse{
+			Result: cometabcitypes.OFFER_SNAPSHOT_RESULT_REJECT,
+		}, nil
+	}
 
 	snapshotFromComet.height.Store(int64(req.Snapshot.Height))
 	snapshotFromComet.chunks.Store(int32(req.Snapshot.Chunks))
@@ -570,9 +635,8 @@ func (app *BaseApplication) LoadSnapshotChunk(_ context.Context,
 		"height", req.Height, "format", req.Format, "chunk", req.Chunk)
 
 	buf, err := app.Snapshots.SliceChunk(req.Height, req.Format, req.Chunk)
-
 	if err != nil {
-		return nil, err
+		return &cometabcitypes.LoadSnapshotChunkResponse{}, err
 	}
 
 	return &cometabcitypes.LoadSnapshotChunkResponse{
@@ -591,7 +655,9 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 		"index", req.Index, "size", len(req.Chunk))
 
 	if err := app.Snapshots.WriteChunkToDisk(req.Index, req.Chunk); err != nil {
-		return nil, err
+		return &cometabcitypes.ApplySnapshotChunkResponse{
+			Result: cometabcitypes.APPLY_SNAPSHOT_CHUNK_RESULT_RETRY,
+		}, nil
 	}
 
 	if app.Snapshots.CountChunksInDisk() == int(snapshotFromComet.chunks.Load()) {
@@ -603,10 +669,17 @@ func (app *BaseApplication) ApplySnapshotChunk(_ context.Context,
 				Result: cometabcitypes.APPLY_SNAPSHOT_CHUNK_RESULT_REJECT_SNAPSHOT,
 			}, nil
 		}
+		defer func() {
+			if err := s.Close(); err != nil {
+				log.Error(err)
+			}
+		}()
 
 		if err := app.RestoreStateFromSnapshot(s); err != nil {
 			log.Error(err)
-			return nil, err
+			return &cometabcitypes.ApplySnapshotChunkResponse{
+				Result: cometabcitypes.APPLY_SNAPSHOT_CHUNK_RESULT_ABORT,
+			}, nil
 		}
 
 		// Fetch the block before the snapshot, we'll need it to bootstrap other nodes
@@ -687,11 +760,7 @@ func (app *BaseApplication) RestoreStateFromSnapshot(snap *snapshot.Snapshot) er
 
 	istc := ist.NewISTC(newState)
 	// Create the transaction handler for checking and processing transactions
-	transactionHandler := transaction.NewTransactionHandler(
-		newState,
-		istc,
-		filepath.Join(app.dataDir, TxHandlerDataDir),
-	)
+	transactionHandler := transaction.NewTransactionHandler(newState, istc)
 
 	// This looks racy but actually it's OK, since State Sync happens during very early init,
 	// when the app is blocked waiting for cometbft to finish startup.

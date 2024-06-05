@@ -1,10 +1,12 @@
----
 name: API Swagger Docs
 
 on:
   push:
     branches:
       - main
+  pull_request:
+    paths:
+      - 'api/**/*'
 
 jobs:
   api-swagger:
@@ -19,7 +21,7 @@ jobs:
           cache: false
       - name: Install swag
         run: |
-          curl -L https://github.com/swaggo/swag/releases/download/v1.8.12/swag_1.8.12_Linux_x86_64.tar.gz | tar -xzf -
+          curl -L https://github.com/swaggo/swag/releases/download/v1.16.3/swag_1.16.3_Linux_amd64.tar.gz | tar -xzf -
       - name: Run swag
         run: ./swag init --parseDependency --parseDepth 1 --parseInternal --md api/docs/descriptions --overridesFile api/docs/.swaggo -g api.go -d api/,api/docs/models/ -o api/docs --ot yaml
       - name: Install api-spec-converter
@@ -38,27 +40,29 @@ jobs:
           name: vocdoni-api.yaml
           path: api/docs/vocdoni-api.yaml
 
-      - name: Get short commit hash
-        id: vars
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
+  developer-portal-pr:
+    name: Open PR to developer-portal repo
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'pull_request' }}
+    needs: api-swagger
+    steps:
       - name: Checkout developer-portal repo
         uses: actions/checkout@v4
         with:
           repository: vocdoni/developer-portal
           ref: main
-          path: developer-portal
+      - uses: actions/download-artifact@v4
+        with:
+          name: vocdoni-api.yaml
+          path: swaggers/vocdoni-api.yaml
 
-      - name: Copy generated docs
-        run: cp -f ./api/docs/vocdoni-api.yaml ./developer-portal/swaggers/vocdoni-api.yaml
-
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Create PR to developer-portal repo
         id: cpr
         uses: peter-evans/create-pull-request@v4
         with:
           token: ${{ secrets.VOCDONIBOT_PAT }}
-          path: developer-portal
-          commit-message: "Update vocdoni-api docs by commit ${{ steps.vars.outputs.sha_short }}"
+          commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
           committer: "Arabot-1 <arabot-1@users.noreply.github.com>"
           base: main
           branch: update-api-docs

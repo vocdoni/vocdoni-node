@@ -43,16 +43,13 @@ type TransactionHandler struct {
 	state *vstate.State
 	// istc is the internal state transition controller
 	istc *ist.Controller
-	// dataDir is the path for storing some files
-	dataDir string
 }
 
 // NewTransactionHandler creates a new TransactionHandler.
-func NewTransactionHandler(state *vstate.State, istc *ist.Controller, dataDir string) *TransactionHandler {
+func NewTransactionHandler(state *vstate.State, istc *ist.Controller) *TransactionHandler {
 	return &TransactionHandler{
-		state:   state,
-		dataDir: dataDir,
-		istc:    istc,
+		state: state,
+		istc:  istc,
 	}
 }
 

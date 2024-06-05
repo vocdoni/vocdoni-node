@@ -52,12 +52,6 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		name = "ipfsConnectKey"
 	case "ipfsSyncPeers":
 		name = "ipfsConnectPeers"
-	}
-	if oldName != name {
-		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
-	}
-	// These were just renamed; don't warn just yet.
-	switch name {
 	case "vochainBlockTime":
 		return "vochainMinerTargetBlockTimeSeconds"
 	case "skipPreviousOffchainData":
@@ -70,6 +64,9 @@ func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 		return "vochainOffChainDataDownload"
 	case "pprof":
 		return "pprofPort"
+	}
+	if oldName != name {
+		log.Warnf("Flag --%s has been deprecated, please use --%s instead", oldName, name)
 	}
 	return flag.NormalizedName(name)
 }
@@ -156,6 +153,8 @@ func loadConfig() *config.Config {
 		"bearer token for admin API endpoints (leave empty to autogenerate)")
 	flag.String("tlsDomain", "",
 		"enable TLS-secure domain with LetsEncrypt (listenPort=443 is required)")
+	flag.String("tlsDirCert", "",
+		"directory where LetsEncrypt data is stored")
 	flag.Uint64("enableFaucetWithAmount", 0,
 		"enable faucet for the current network and the specified amount (testing purposes only)")
 
@@ -173,6 +172,14 @@ func loadConfig() *config.Config {
 		"external address:port to announce to other peers (automatically guessed if empty)")
 	flag.String("vochainGenesis", "",
 		"use alternative genesis file for the vochain")
+	flag.String("vochainGenesisChainID", "",
+		"override ChainID in genesis for the vochain")
+	flag.Int64("vochainGenesisInitialHeight", 0,
+		"override InitialHeight in genesis for the vochain")
+	flag.String("vochainGenesisAppHash", "",
+		"override AppHash in genesis for the vochain")
+	flag.Int64("vochainGenesisEndOfChain", 0,
+		"height at which this node will refuse adding new blocks to the chain")
 	flag.String("vochainLogLevel", "disabled",
 		"tendermint node log level (debug, info, error, disabled)")
 	flag.StringSlice("vochainPeers", []string{},
@@ -187,7 +194,7 @@ func loadConfig() *config.Config {
 		"do not wait for Vochain to synchronize (for testing only)")
 	flag.Int("vochainMempoolSize", 20000,
 		"vochain mempool size")
-	flag.Int("vochainSnapshotInterval", 10000,
+	flag.Int("vochainSnapshotInterval", 1000, // circa every 3hs (at 10s block interval)
 		"create state snapshot every N blocks (0 to disable)")
 	flag.Bool("vochainStateSyncEnabled", true,
 		"during startup, let cometBFT ask peers for available snapshots and use them to bootstrap the state")
@@ -202,7 +209,7 @@ func loadConfig() *config.Config {
 	flag.Bool("vochainStateSyncFetchParamsFromRPC", true,
 		"allow statesync to fetch TrustHash and TrustHeight from the first RPCServer")
 
-	flag.Int("vochainMinerTargetBlockTimeSeconds", 10,
+	flag.Int("vochainMinerTargetBlockTimeSeconds", config.DefaultMinerTargetBlockTimeSeconds,
 		"vochain consensus block time target (in seconds)")
 	flag.Bool("vochainSkipPreviousOffchainData", false,
 		"if enabled the census downloader will import all existing census")
@@ -215,6 +222,8 @@ func loadConfig() *config.Config {
 	flag.StringVar(&flagVochainCreateGenesis, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
+	flag.Bool("vochainIndexerDisabled", false,
+		"disables the vochain indexer component")
 
 	// metrics
 	flag.Bool("metricsEnabled", false, "enable prometheus metrics")
@@ -294,6 +303,7 @@ func loadConfig() *config.Config {
 	}
 	// Note that these Config.Vochain fields aren't bound via viper.
 	// We could do that if we rename the flags, e.g. vochainIndexerArchiveURL.
+	conf.Vochain.Indexer.Enabled = !viper.GetBool("vochainIndexerDisabled")
 	conf.Vochain.Indexer.ArchiveURL = viper.GetString("archiveURL")
 	conf.Vochain.Network = viper.GetString("chain")
 
@@ -456,8 +466,6 @@ func main() {
 		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
-		// do we need indexer?
-		conf.Vochain.Indexer.Enabled = conf.Mode == types.ModeGateway
 		// offchainDataDownload is only needed for gateways
 		conf.Vochain.OffChainDataDownload = conf.Vochain.OffChainDataDownload &&
 			conf.Mode == types.ModeGateway

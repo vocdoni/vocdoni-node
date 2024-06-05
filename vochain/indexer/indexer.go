@@ -357,8 +357,8 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			ID:       indxR.ProcessID,
 			Votes:    indexertypes.EncodeJSON(indxR.Votes),
 			Weight:   indexertypes.EncodeJSON(indxR.Weight),
-			VoteOpts: indexertypes.EncodeProtoJSON(indxR.VoteOpts),
-			Envelope: indexertypes.EncodeProtoJSON(indxR.EnvelopeType),
+			VoteOpts: indexertypes.EncodeProto(indxR.VoteOpts),
+			Envelope: indexertypes.EncodeProto(indxR.EnvelopeType),
 		}); err != nil {
 			log.Errorw(err, "cannot UpdateProcessResultByID sql")
 			continue
@@ -553,7 +553,8 @@ func (idx *Indexer) Rollback() {
 }
 
 // OnProcess indexer stores the processID
-func (idx *Indexer) OnProcess(pid, _ []byte, _, _ string, _ int32) {
+func (idx *Indexer) OnProcess(p *models.Process, _ int32) {
+	pid := p.GetProcessId()
 	if err := idx.newEmptyProcess(pid); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
@@ -679,7 +680,6 @@ func (idx *Indexer) OnSetAccount(accountAddress []byte, account *state.Account) 
 }
 
 func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
-	t := time.Now()
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
@@ -689,7 +689,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 		FromAccount:  tx.FromAddress.Bytes(),
 		ToAccount:    tx.ToAddress.Bytes(),
 		Amount:       int64(tx.Amount),
-		TransferTime: t,
+		TransferTime: time.Unix(idx.App.Timestamp(), 0),
 	}); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}
@@ -730,7 +730,6 @@ func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems
 
 // OnSpendTokens indexes a token spending event.
 func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference string) {
-	t := time.Now()
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	queries := idx.blockTxQueries()
@@ -739,7 +738,7 @@ func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uin
 		TxType:      strings.ToLower(txType.String()),
 		Cost:        int64(cost),
 		Reference:   reference,
-		SpendTime:   t,
+		SpendTime:   time.Unix(idx.App.Timestamp(), 0),
 		BlockHeight: int64(idx.App.Height()),
 	}); err != nil {
 		log.Errorw(err, "cannot index new token spending")

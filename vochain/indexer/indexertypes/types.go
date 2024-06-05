@@ -9,7 +9,6 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -77,9 +76,9 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		CensusOrigin:      int32(dbproc.CensusOrigin),
 		Status:            int32(dbproc.Status),
 		Namespace:         uint32(dbproc.Namespace),
-		Envelope:          DecodeProtoJSON(new(models.EnvelopeType), dbproc.Envelope),
-		Mode:              DecodeProtoJSON(new(models.ProcessMode), dbproc.Mode),
-		VoteOpts:          DecodeProtoJSON(new(models.ProcessVoteOptions), dbproc.VoteOpts),
+		Envelope:          DecodeProto(new(models.EnvelopeType), dbproc.Envelope),
+		Mode:              DecodeProto(new(models.ProcessMode), dbproc.Mode),
+		VoteOpts:          DecodeProto(new(models.ProcessVoteOptions), dbproc.VoteOpts),
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
@@ -119,19 +118,22 @@ func DecodeJSON[T any](s string) T {
 	return v
 }
 
-func EncodeProtoJSON(v proto.Message) string {
-	p, err := protojson.Marshal(v)
+func EncodeProto(v proto.Message) []byte {
+	p, err := proto.Marshal(v)
 	if err != nil {
 		panic(err) // should not happen
 	}
-	return string(p)
+	if p == nil {
+		return []byte{} // avoid issues with NOT NULL columns
+	}
+	return p
 }
 
-func DecodeProtoJSON[T proto.Message](newT T, s string) T {
+func DecodeProto[T proto.Message](newT T, p []byte) T {
 	// Note how proto.Message implementations are pointer types,
 	// so we can't use new(T) here as that would give us a double pointer.
 	// We can't "dereference" a type, so the caller has to pass us a new(T) value.
-	err := protojson.Unmarshal([]byte(s), newT)
+	err := proto.Unmarshal(p, newT)
 	if err != nil {
 		panic(err) // should not happen
 	}
@@ -162,7 +164,7 @@ type EnvelopePackage struct {
 	Nonce                types.HexBytes   `json:"nonce"`
 	Signature            types.HexBytes   `json:"signature"`
 	VotePackage          []byte           `json:"votePackage"` // plaintext or encrypted JSON
-	Weight               string           `json:"weight"`
+	Weight               string           `json:"weight"`      // [math/big.Int.String]
 	OverwriteCount       uint32           `json:"overwriteCount"`
 	Date                 time.Time        `json:"date"`
 }

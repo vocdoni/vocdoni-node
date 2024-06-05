@@ -33,10 +33,6 @@ func (v *State) AddProcess(p *models.Process) error {
 	if err != nil {
 		return err
 	}
-	censusURI := ""
-	if p.CensusURI != nil {
-		censusURI = *p.CensusURI
-	}
 	log.Infow("new election",
 		"processId", fmt.Sprintf("%x", p.ProcessId),
 		"entityId", fmt.Sprintf("%x", p.EntityId),
@@ -52,9 +48,9 @@ func (v *State) AddProcess(p *models.Process) error {
 		"maxCensusSize", p.MaxCensusSize,
 		"status", p.Status,
 		"height", v.CurrentHeight(),
-		"censusURI", censusURI)
+		"censusURI", p.GetCensusURI())
 	for _, l := range v.eventListeners {
-		l.OnProcess(p.ProcessId, p.EntityId, fmt.Sprintf("%x", p.CensusRoot), censusURI, v.txCounter.Load())
+		l.OnProcess(p, v.txCounter.Load())
 	}
 	return nil
 }
@@ -135,9 +131,7 @@ func (v *State) ListProcessIDs(committed bool) ([][]byte, error) {
 	}
 	var pids [][]byte
 	if err := processesTree.Iterate(func(key []byte, value []byte) bool {
-		p := make([]byte, len(key))
-		copy(p, key)
-		pids = append(pids, p)
+		pids = append(pids, bytes.Clone(key))
 		return false
 	}); err != nil {
 		return nil, err

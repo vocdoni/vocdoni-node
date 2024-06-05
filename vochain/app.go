@@ -20,6 +20,7 @@ import (
 	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction"
@@ -42,9 +43,7 @@ const (
 
 	// StateDataDir is the subdirectory inside app.DataDir where State data will be saved
 	StateDataDir = "vcstate"
-	// TxHandlerDataDir is the subdirectory inside app.DataDir where TransactionHandler data will be saved
-	TxHandlerDataDir = "txHandler"
-	// TxHandlerDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
+	// SnapshotsDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
 	SnapshotsDataDir = "snapshots"
 )
 
@@ -93,7 +92,7 @@ type BaseApplication struct {
 	chainID           string
 	dataDir           string
 	dbType            string
-	genesisInfo       *comettypes.GenesisDoc
+	genesisDoc        *genesis.Doc
 
 	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
 	// can skip block re-execution on FinalizeBlock call.
@@ -146,11 +145,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	istc := ist.NewISTC(state)
 
 	// Create the transaction handler for checking and processing transactions
-	transactionHandler := transaction.NewTransactionHandler(
-		state,
-		istc,
-		filepath.Join(vochainCfg.DataDir, TxHandlerDataDir),
-	)
+	transactionHandler := transaction.NewTransactionHandler(state, istc)
 
 	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
 	if err != nil {
@@ -175,7 +170,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		dataDir:            vochainCfg.DataDir,
 		dbType:             vochainCfg.DBType,
 		snapshotInterval:   vochainCfg.SnapshotInterval,
-		genesisInfo:        &comettypes.GenesisDoc{},
+		genesisDoc:         &genesis.Doc{},
 	}, nil
 }
 
@@ -240,7 +235,7 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 		if _, err := app.Snapshots.Do(app.State); err != nil {
 			return hash, fmt.Errorf("cannot make snapshot: %w", err)
 		}
-		log.Infof("snapshot created successfully, took %s", time.Since(startTime))
+		log.Infof("snapshot on block %d created successfully, took %s", app.Height(), time.Since(startTime))
 	}
 	return hash, err
 }
@@ -393,9 +388,9 @@ func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 	}
 }
 
-// Genesis returns the tendermint genesis information
-func (app *BaseApplication) Genesis() *comettypes.GenesisDoc {
-	return app.genesisInfo
+// Genesis returns the genesis used by the app (and cometbft)
+func (app *BaseApplication) Genesis() *genesis.Doc {
+	return app.genesisDoc
 }
 
 // SetZkCircuit ensures the global ZkCircuit is the correct for a chain that implements forks

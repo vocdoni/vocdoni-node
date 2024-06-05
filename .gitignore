@@ -22,6 +22,7 @@ gocoverage*
 env.local
 run
 env
+.env
 
 # VSCode
 .vscode

@@ -196,6 +196,8 @@ if [ $i -eq 30 ] ; then
 	tests_to_run=()
 	GOCOVERDIR=
 	RET=30
+	log "### Post run logs ###"
+	$COMPOSE_CMD logs --tail 1000
 else
 	log "### Test suite ready ###"
 fi

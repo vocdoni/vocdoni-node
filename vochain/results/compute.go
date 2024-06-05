@@ -1,6 +1,7 @@
 package results
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"math/big"
@@ -90,8 +91,7 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 // last one provided.
 func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error) {
 	var vote state.VotePackage
-	rawVote := make([]byte, len(VotePackage))
-	copy(rawVote, VotePackage)
+	rawVote := bytes.Clone(VotePackage)
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		for i := len(keys) - 1; i >= 0; i-- {

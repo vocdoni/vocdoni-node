@@ -1,16 +1,16 @@
-Get the content of an existing Vote. If is an encrypted election it return the `encryptionKeys` indexes and the package will be codified.
+Returns the content of an existing Vote. If the election is encrypted, returns the `encryptionKeys` indexes and codifies the package.
 
 
-The Vote is identified by its `voteId`, also called `nullifier`. The `nullifier` is deterministic and its hash could be computed as following (using `Keccak256`):
+Each Vote is identified by its `voteId`, also called `nullifier`. The `nullifier` is deterministic and its hash can be computed with the following (using `Keccak256`):
 
-- For signature based elections, is the hash of the `voterAddress` + `processId`
-- For anonymous elections, the `privateKey` + `processId`
-
-
-As well, on the response, the `voterId` won't be returned for anonymous elections, and the `encryptionKeyIndexes` only for finished encrypted elections.
+- For signature based elections, the nullifier is the hash of the `voterAddress` + `processId`
+- For anonymous elections, the nullifier is the hash of the `privateKey` + `processId`
 
 
-Height and txIndex refer to the block height and the index of the transaction where vote is registered.
+If an election is anonymous, the `voterId` will not be returned.
+If an election is encrypted, the `encryptionKeyIndexes` will only be returned once the election is complete.
+
+`Height` and `txIndex` refer to the block height and the index of the transaction where vote is registered.
 
 
-The `overwriteCount` refers to the number of vote overwrites already executed by the user. At election creation time, you can specify the `maxVoteOverwrites` parameter, which defines how many times a voter can submit a vote. Only last vote will be taken into election final results.
+The `overwriteCount` refers to the number of vote overwrites already executed by the user. At election creation time, you can specify the `maxVoteOverwrites` parameter, which defines how many times a voter can submit a vote. Only the most recent vote for any voter will be taken into an election's final results.

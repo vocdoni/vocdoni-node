@@ -1,8 +1,6 @@
-version: "3.7"
-
 services:
   seed:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     build: # reused by the other services
       context: ../../
       args:
@@ -12,71 +10,66 @@ services:
       - blockchain
     volumes:
       - data-seed:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-seed:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
 
   miner0:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
     networks:
       - blockchain
     volumes:
       - data-miner0:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
 
   miner1:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner1"
     networks:
       - blockchain
     volumes:
       - data-miner1:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
 
   miner2:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner2"
     networks:
       - blockchain
     volumes:
       - data-miner2:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
 
   miner3:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
     networks:
       - blockchain
     volumes:
       - data-miner3:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
 
   gateway0:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway0"
     ports:
       - "${COMPOSE_DVOTE_PORT_MAPPING:-9090:9090}"
@@ -84,17 +77,14 @@ services:
       - blockchain
     volumes:
       - data-gateway0:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
       - LOG_PANIC_ON_INVALIDCHARS
-      - VOCDONI_VOCHAIN_SNAPSHOTINTERVAL=3
-      - VOCDONI_VOCHAIN_STATESYNCCHUNKSIZE=2000
 
   test:
-    image: "dvotenode-test:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node-test:${TESTSUITE_BUILD_TAG:-latest}"
     build:
       context: ../../
       target: test
@@ -161,14 +151,13 @@ services:
       - grafana
 
   gatewaySync:
-    image: "dvotenode:${TESTSUITE_BUILD_TAG:-latest}"
+    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gatewaySync"
     networks:
       - blockchain
     volumes:
       - data-gatewaySync:/app/run/
-      - ${COMPOSE_HOST_PATH:-.}/genesis.json:/app/misc/genesis.json
-      - /tmp/.vochain-zkCircuits/:/app/run/dev/zkCircuits/
+      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gatewaySync:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage

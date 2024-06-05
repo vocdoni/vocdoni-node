@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/hex"
@@ -37,7 +38,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 	envelopePackage := &indexertypes.EnvelopePackage{
 		VotePackage:          []byte(voteRef.Package),
 		EncryptionKeyIndexes: indexertypes.DecodeJSON[[]uint32](voteRef.EncryptionKeyIndexes),
-		Weight:               voteRef.Weight,
+		Weight:               indexertypes.DecodeJSON[string](voteRef.Weight),
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime.Time,
 		Meta: indexertypes.EnvelopeMetadata{
@@ -108,11 +109,7 @@ func (idx *Indexer) CountTotalVotes() (uint64, error) {
 func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Queries, process *models.Process) error {
 	height := idx.App.Height()
 	processID := process.ProcessId
-	endDate := idx.App.TimestampFromBlock(int64(idx.App.Height()))
-	if endDate == nil {
-		endDate = new(time.Time)
-		*endDate = time.Now()
-	}
+	endDate := time.Unix(idx.App.Timestamp(), 0)
 	log.Debugw("finalize results", "processID", hex.EncodeToString(processID), "height", height, "endDate", endDate.String())
 	// Get the results
 	r := results.ProtoToResults(process.Results)
@@ -121,7 +118,7 @@ func (idx *Indexer) finalizeResults(ctx context.Context, queries *indexerdb.Quer
 		Votes:       indexertypes.EncodeJSON(r.Votes),
 		Weight:      indexertypes.EncodeJSON(r.Weight),
 		BlockHeight: int64(r.BlockHeight),
-		EndDate:     *endDate,
+		EndDate:     endDate,
 	}); err != nil {
 		return err
 	}
@@ -141,8 +138,7 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 	var rawVote []byte
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
-		rawVote = make([]byte, len(VotePackage))
-		copy(rawVote, VotePackage)
+		rawVote = bytes.Clone(VotePackage)
 		for i := len(keys) - 1; i >= 0; i-- {
 			priv, err := nacl.DecodePrivate(keys[i])
 			if err != nil {

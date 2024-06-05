@@ -1,4 +1,4 @@
-Return a filtered elections list, the available filters have to be sent on the request body. Available are: 
+Returns a filtered list of elections. The filters have to be sent on the request body. The valid filters are: 
         
 ```json
 {

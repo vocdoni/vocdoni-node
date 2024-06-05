@@ -17,14 +17,14 @@ import (
 	"path/filepath"
 	"sort"
 	"sync"
-	"time"
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
 const (
-	snapshotHeaderVersion = 1
+	// Version is the version that is accepted
+	Version               = 3
 	snapshotHeaderLenSize = 32
 )
 
@@ -55,6 +55,7 @@ const chunksDir = "chunks"
 // - blobN is the raw bytes dump of all trees and databases.
 type Snapshot struct {
 	path              string
+	size              int64
 	file              *os.File
 	lock              sync.Mutex
 	header            SnapshotHeader
@@ -84,14 +85,6 @@ type SnapshotBlobHeader struct {
 	Parent string
 	Key    []byte
 	Root   []byte
-}
-
-// DiskSnapshotInfo describes a file on disk
-type DiskSnapshotInfo struct {
-	Path    string
-	ModTime time.Time
-	Size    int64
-	Hash    []byte
 }
 
 func (h *SnapshotHeader) String() string {
@@ -172,6 +165,11 @@ func (s *Snapshot) Path() string {
 	return s.path
 }
 
+// Path returns the size of the snapshot file.
+func (s *Snapshot) Size() int64 {
+	return s.size
+}
+
 // Finish builds the snapshot started with `New` and stores in disk its contents.
 // After calling this method the snapshot is finished.
 func (s *Snapshot) Finish() error {
@@ -209,7 +207,6 @@ func (s *Snapshot) Finish() error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("snapshot header size is %d bytes", hs)
 
 	// write the blobs (by copying the tmpFile)
 	if _, err := s.file.Seek(0, io.SeekStart); err != nil {
@@ -219,16 +216,22 @@ func (s *Snapshot) Finish() error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("snapshot blobs size is %d bytes", bs)
+	log.Debugw("snapshot finished", "ĥeight", s.header.Height, "headerSize", hs, "blobsSize", bs,
+		"snapHash", hex.EncodeToString(s.header.Hash), "appRoot", hex.EncodeToString(s.header.Root))
 
 	// close and remove the temporary file
-	if err := s.file.Close(); err != nil {
+	if err := s.Close(); err != nil {
 		return err
 	}
 	if err := finalFile.Close(); err != nil {
 		return err
 	}
 	return os.Remove(s.file.Name())
+}
+
+// Close closes the file descriptor used by the snapshot
+func (s *Snapshot) Close() error {
+	return s.file.Close()
 }
 
 // Restore restores the State snapshot into a temp directory
@@ -298,6 +301,22 @@ func (s *Snapshot) Restore(dbType, dataDir string) (string, error) {
 	if err := newState.Close(); err != nil {
 		return tmpDir, fmt.Errorf("error closing newState: %w", err)
 	}
+
+	if importOffChainData := FnImportOffChainData(); importOffChainData != nil {
+		newState, err := state.New(dbType, tmpDir)
+		if err != nil {
+			return tmpDir, fmt.Errorf("error reopening newState: %w", err)
+		}
+
+		if err := importOffChainData(newState); err != nil {
+			return tmpDir, fmt.Errorf("error importing offchain data: %w", err)
+		}
+
+		if err := newState.Close(); err != nil {
+			return tmpDir, fmt.Errorf("error reclosing newState: %w", err)
+		}
+	}
+
 	return tmpDir, nil
 }
 
@@ -365,6 +384,17 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// In order for the snapshot to be deterministic,
+	// sort list by Name, then by Parent, and finally by Key
+	sort.Slice(list, func(i, j int) bool {
+		if list[i].Name != list[j].Name {
+			return list[i].Name < list[j].Name
+		}
+		if list[i].Parent != list[j].Parent {
+			return list[i].Parent < list[j].Parent
+		}
+		return string(list[i].Key) < string(list[j].Key)
+	})
 	for _, treedesc := range list {
 		if err := snap.DumpTree(treedesc.Name, treedesc.Parent, treedesc.Key, treedesc.Tree); err != nil {
 			return "", err
@@ -399,29 +429,34 @@ func (sm *SnapshotManager) Do(v *state.State) (string, error) {
 // To open an existing snapshot file, use `Open` instead.
 func (sm *SnapshotManager) New(height uint32) (*Snapshot, error) {
 	filePath := filepath.Join(sm.dataDir, fmt.Sprintf("%d", height))
-	file, err := os.Create(filePath + ".tmp")
+	tmpFile, err := os.Create(filePath + ".tmp")
 	if err != nil {
 		return nil, err
 	}
 	return &Snapshot{
 		path: filePath,
-		file: file,
+		file: tmpFile,
 		header: SnapshotHeader{
-			Version: snapshotHeaderVersion,
+			Version: Version,
 			hasher:  md5.New(),
 		},
 	}, nil
 }
 
-// Open reads an existing snapshot file, decodes the header and returns a Snapshot
+// Open reads an existing snapshot file, decodes the header and returns a Snapshot.
 // On the returned Snapshot, you are expected to call SeekToNextBlob(), read from CurrentBlobReader()
 // and iterate until SeekToNextBlob() returns io.EOF.
 //
+// When done, caller should call Close()
 // This method performs the opposite operation of `New`.
 func (*SnapshotManager) Open(filePath string) (*Snapshot, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
+	}
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch snapshot file info: %w", err)
 	}
 	headerSizeBytes := make([]byte, snapshotHeaderLenSize)
 	if _, err = io.ReadFull(file, headerSizeBytes); err != nil {
@@ -431,6 +466,7 @@ func (*SnapshotManager) Open(filePath string) (*Snapshot, error) {
 	s := &Snapshot{
 		path:        filePath,
 		file:        file,
+		size:        fileInfo.Size(),
 		headerSize:  binary.LittleEndian.Uint32(headerSizeBytes),
 		currentBlob: -1, // in order for the first SeekToNextBlob seek to blob 0
 	}
@@ -438,10 +474,15 @@ func (*SnapshotManager) Open(filePath string) (*Snapshot, error) {
 	if err := decoder.Decode(&s.header); err != nil {
 		return nil, fmt.Errorf("cannot decode header: %w", err)
 	}
-	if s.header.Version != snapshotHeaderVersion {
-		return nil, fmt.Errorf("snapshot version not compatible")
+	if s.header.Version != Version {
+		return nil, fmt.Errorf("snapshot version %d unsupported (must be equal to %d)", s.header.Version, Version)
 	}
 	return s, nil
+}
+
+// OpenByHeight reads an existing snapshot file, decodes the header and returns a Snapshot.
+func (sm *SnapshotManager) OpenByHeight(height int64) (*Snapshot, error) {
+	return sm.Open(filepath.Join(sm.dataDir, fmt.Sprintf("%d", height)))
 }
 
 // Prune removes old snapshots stored on disk, keeping the N most recent ones
@@ -484,21 +525,16 @@ func (sm *SnapshotManager) Prune(keepRecent int) error {
 }
 
 // List returns the list of the current snapshots stored on disk, indexed by height
-func (sm *SnapshotManager) List() map[uint32]DiskSnapshotInfo {
+func (sm *SnapshotManager) List() map[uint32]*Snapshot {
 	files, err := os.ReadDir(sm.dataDir)
 	if err != nil {
 		log.Fatal(err)
 	}
-	dsi := make(map[uint32]DiskSnapshotInfo)
+	snaps := make(map[uint32]*Snapshot)
 	for _, file := range files {
 		if !file.IsDir() {
 			if path.Ext(file.Name()) == ".tmp" {
 				// ignore incomplete snapshots
-				continue
-			}
-			fileInfo, err := file.Info()
-			if err != nil {
-				log.Errorw(err, "could not fetch snapshot file info")
 				continue
 			}
 			s, err := sm.Open(filepath.Join(sm.dataDir, file.Name()))
@@ -506,45 +542,35 @@ func (sm *SnapshotManager) List() map[uint32]DiskSnapshotInfo {
 				log.Errorw(err, fmt.Sprintf("could not open snapshot file %q", filepath.Join(sm.dataDir, file.Name())))
 				continue
 			}
-
-			dsi[uint32(s.header.Height)] = DiskSnapshotInfo{
-				Path:    filepath.Join(sm.dataDir, file.Name()),
-				Size:    fileInfo.Size(),
-				ModTime: fileInfo.ModTime(),
-				Hash:    s.header.Hash,
+			// for the list we don't need the file descriptors open
+			if err := s.Close(); err != nil {
+				log.Error(err)
 			}
+			snaps[uint32(s.header.Height)] = s
 		}
 	}
-	return dsi
+	return snaps
 }
 
 // SliceChunk returns a chunk of a snapshot
 func (sm *SnapshotManager) SliceChunk(height uint64, format uint32, chunk uint32) ([]byte, error) {
 	_ = format // TBD: we don't support different formats
 
-	dsi := sm.List()
-
-	snapshot, found := dsi[uint32(height)]
-	if !found {
+	s, err := sm.OpenByHeight(int64(height))
+	if err != nil {
 		return nil, fmt.Errorf("snapshot not found for height %d", height)
 	}
+	defer s.Close()
 
-	file, err := os.Open(snapshot.Path)
-	if err != nil {
-		return nil, err
-	}
-
-	defer file.Close()
-
-	chunks := int(math.Ceil(float64(snapshot.Size) / float64(sm.ChunkSize)))
-	partSize := int(math.Min(float64(sm.ChunkSize), float64(snapshot.Size-int64(chunk)*sm.ChunkSize)))
+	chunks := int(math.Ceil(float64(s.Size()) / float64(sm.ChunkSize)))
+	partSize := int(math.Min(float64(sm.ChunkSize), float64(s.Size()-int64(chunk)*sm.ChunkSize)))
 	partBuffer := make([]byte, partSize)
-	if _, err := file.ReadAt(partBuffer, int64(chunk)*sm.ChunkSize); err != nil && !errors.Is(err, io.EOF) {
+	if _, err := s.file.ReadAt(partBuffer, int64(chunk)*sm.ChunkSize); err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 
 	log.Debugf("splitting snapshot for height %d (size=%d, hash=%x), serving chunk %d of %d",
-		height, snapshot.Size, snapshot.Hash, chunk, chunks)
+		height, s.Size(), s.header.Hash, chunk, chunks)
 
 	return partBuffer, nil
 }
