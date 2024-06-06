@@ -54,10 +54,10 @@ func SplittedArboToBytes(input1, input2 *big.Int, swap, strict bool) []byte {
 	}
 	if strict {
 		for len(b1) < 16 {
-			b1 = append(b1, 0)
+			b1 = append([]byte{0}, b1...)
 		}
 		for len(b2) < 16 {
-			b2 = append(b2, 0)
+			b2 = append([]byte{0}, b2...)
 		}
 	}
 	return append(b1, b2...)

@@ -42,7 +42,7 @@ func (p *Proof) ElectionID() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return util.SplittedArboStrToBytes(electionID1str, electionID2str, false, false), nil
+	return util.SplittedArboStrToBytes(electionID1str, electionID2str, false, true), nil
 }
 
 // VoteHash returns the VoteHash included into the current proof.
