@@ -1,8 +1,8 @@
 -- name: CreateBlock :execresult
 INSERT INTO blocks(
-    height, time, data_hash
+    chain_id, height, time, hash, proposer_address, last_block_hash
 ) VALUES (
-	?, ?, ?
+	?, ?, ?, ?, ?, ?
 );
 
 -- name: GetBlock :one

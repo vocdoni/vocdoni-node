@@ -11,9 +11,12 @@ import (
 )
 
 type Block struct {
-	Height   int64
-	Time     time.Time
-	DataHash []byte
+	Height          int64
+	Time            time.Time
+	ChainID         string
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
 }
 
 type Process struct {
