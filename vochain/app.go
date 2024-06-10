@@ -290,10 +290,6 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	app.State.SetHeight(height)
 
 	go app.State.CachePurge(height)
-	app.State.OnBeginBlock(vstate.BeginBlock{
-		Height: int64(height),
-		Time:   t,
-	})
 }
 
 // endBlock is called at the end of every block.

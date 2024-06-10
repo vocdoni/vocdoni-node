@@ -183,7 +183,6 @@ type Listener struct {
 
 func (*Listener) OnVote(_ *Vote, _ int32)                                         {}
 func (*Listener) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32)                      {}
-func (*Listener) OnBeginBlock(BeginBlock)                                         {}
 func (*Listener) OnProcess(_ *models.Process, _ int32)                            {}
 func (*Listener) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32) {}
 func (*Listener) OnCancel(_ []byte, _ int32)                                      {}
