@@ -1392,6 +1392,7 @@ func TestTxIndexer(t *testing.T) {
 			idx.OnNewTx(&vochaintx.Tx{
 				TxID:        getTxID(i, j),
 				TxModelType: "setAccount",
+				Tx:          &models.Tx{Payload: &models.Tx_SetAccount{}},
 			}, uint32(i), int32(j))
 		}
 	}
@@ -1404,7 +1405,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			ref, err := idx.GetTxReferenceByBlockHeightAndBlockIndex(int64(i), int64(j))
+			ref, err := idx.GetTransactionByHeightAndIndex(int64(i), int64(j))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
@@ -1412,14 +1413,14 @@ func TestTxIndexer(t *testing.T) {
 			h := make([]byte, 32)
 			id := getTxID(i, j)
 			copy(h, id[:])
-			hashRef, err := idx.GetTxHashReference(h)
+			hashRef, err := idx.GetTxMetadataByHash(h)
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))
 		}
 	}
 
-	txs, _, err := idx.SearchTransactions(15, 0, 0, "")
+	txs, _, err := idx.SearchTransactions(15, 0, 0, "", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	for i, tx := range txs {
 		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
@@ -1428,7 +1429,7 @@ func TestTxIndexer(t *testing.T) {
 		qt.Assert(t, tx.TxType, qt.Equals, "setAccount")
 	}
 
-	txs, _, err = idx.SearchTransactions(1, 5, 0, "")
+	txs, _, err = idx.SearchTransactions(1, 5, 0, "", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
 }

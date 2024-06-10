@@ -275,8 +275,8 @@ type TransactionReference struct {
 
 // TransactionsList is used to return a paginated list to the client
 type TransactionsList struct {
-	Transactions []*indexertypes.Transaction `json:"transactions"`
-	Pagination   *Pagination                 `json:"pagination"`
+	Transactions []*indexertypes.TransactionMetadata `json:"transactions"`
+	Pagination   *Pagination                         `json:"pagination"`
 }
 
 // FeesList is used to return a paginated list to the client
