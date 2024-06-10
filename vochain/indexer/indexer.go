@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"embed"
@@ -172,6 +173,12 @@ func (idx *Indexer) startDB() error {
 	}
 	goose.SetLogger(log.GooseLogger())
 	goose.SetBaseFS(embedMigrations)
+
+	if gooseMigrationsPending(idx.readWriteDB, "migrations") {
+		log.Info("indexer db needs migration, scheduling a reindex after sync")
+		go idx.ReindexBlocks(false)
+	}
+
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
@@ -249,6 +256,27 @@ func (idx *Indexer) RestoreBackup(path string) error {
 	return nil
 }
 
+func gooseMigrationsPending(db *sql.DB, dir string) bool {
+	// Get the latest applied migration version
+	currentVersion, err := goose.GetDBVersion(db)
+	if err != nil {
+		log.Errorf("failed to get current database version: %v", err)
+		return false
+	}
+
+	// Collect migrations after the current version
+	migrations, err := goose.CollectMigrations(dir, currentVersion, goose.MaxVersion)
+	if err != nil {
+		if errors.Is(err, goose.ErrNoMigrationFiles) {
+			return false
+		}
+		log.Errorf("failed to collect migrations: %v", err)
+		return false
+	}
+
+	return len(migrations) > 0
+}
+
 // SaveBackup backs up the database to a file on disk.
 // Note that writes to the database may be blocked until the backup finishes,
 // and an error may occur if a file at path already exists.
@@ -268,7 +296,6 @@ func (idx *Indexer) ExportBackupAsBytes(ctx context.Context) ([]byte, error) {
 	tmpDir, err := os.MkdirTemp("", "indexer")
 	if err != nil {
 		return nil, fmt.Errorf("error creating tmpDir: %w", err)
-
 	}
 	tmpFilePath := filepath.Join(tmpDir, "indexer.sqlite3")
 	if err := idx.SaveBackup(ctx, tmpFilePath); err != nil {
@@ -401,6 +428,80 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	idx.blockTx = nil
 
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
+}
+
+// ReindexBlocks reindexes all blocks found in blockstore
+func (idx *Indexer) ReindexBlocks(inTest bool) {
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
+	}
+
+	// Note that holding blockMu means new votes aren't added until the reindex finishes.
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+
+	if idx.App.Node == nil || idx.App.Node.BlockStore() == nil {
+		return
+	}
+
+	idxBlockCount, err := idx.CountBlocks()
+	if err != nil {
+		log.Warnf("indexer CountBlocks returned error: %s", err)
+	}
+	log.Infow("start reindexing",
+		"blockStoreBase", idx.App.Node.BlockStore().Base(),
+		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
+		"indexerBlockCount", idxBlockCount,
+	)
+	queries := idx.blockTxQueries()
+	for height := idx.App.Node.BlockStore().Base(); height <= idx.App.Node.BlockStore().Height(); height++ {
+		if b := idx.App.GetBlockByHeight(int64(height)); b != nil {
+			// Blocks
+			func() {
+				idxBlock, err := idx.readOnlyQuery.GetBlockByHeight(context.TODO(), b.Height)
+				if err == nil && idxBlock.Time != b.Time {
+					log.Errorf("while reindexing blocks, block %d timestamp in db (%s) differs from blockstore (%s), leaving untouched", height, idxBlock.Time, b.Time)
+					return
+				}
+				if _, err := queries.CreateBlock(context.TODO(), indexerdb.CreateBlockParams{
+					ChainID:         b.ChainID,
+					Height:          b.Height,
+					Time:            b.Time,
+					Hash:            nonNullBytes(b.Hash()),
+					ProposerAddress: nonNullBytes(b.ProposerAddress),
+					LastBlockHash:   nonNullBytes(b.LastBlockID.Hash),
+				}); err != nil {
+					log.Errorw(err, "cannot index new block")
+				}
+			}()
+
+			// Transactions
+			func() {
+				for index, tx := range b.Data.Txs {
+					idxTx, err := idx.readOnlyQuery.GetTransactionByHeightAndIndex(context.TODO(), indexerdb.GetTransactionByHeightAndIndexParams{
+						BlockHeight: b.Height,
+						BlockIndex:  int64(index),
+					})
+					if err == nil && !bytes.Equal(idxTx.Hash, tx.Hash()) {
+						log.Errorf("while reindexing txs, tx %d/%d hash in db (%x) differs from blockstore (%x), leaving untouched", b.Height, index, idxTx.Hash, tx.Hash())
+						return
+					}
+					vtx := new(vochaintx.Tx)
+					if err := vtx.Unmarshal(tx, b.ChainID); err != nil {
+						log.Errorw(err, fmt.Sprintf("cannot unmarshal tx %d/%d", b.Height, index))
+						continue
+					}
+					idx.indexTx(vtx, uint32(b.Height), int32(index))
+				}
+			}()
+		}
+	}
+
+	log.Infow("finished reindexing",
+		"blockStoreBase", idx.App.Node.BlockStore().Base(),
+		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
+		"indexerBlockCount", idxBlockCount,
+	)
 }
 
 // Commit is called by the APP when a block is confirmed and included into the chain
@@ -883,7 +984,8 @@ func (idx *Indexer) GetTokenTransfersByAccount(acc []byte, offset, maxItems int3
 
 	return indexertypes.TokenTransfersAccount{
 		Received: transfersTo,
-		Sent:     transfersFrom}, nil
+		Sent:     transfersFrom,
+	}, nil
 }
 
 // CountTokenTransfersByAccount returns the count all the token transfers made from a given account

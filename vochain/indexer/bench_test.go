@@ -85,6 +85,7 @@ func BenchmarkIndexer(b *testing.B) {
 				tx := &vochaintx.Tx{
 					TxID:        rnd.Random32(),
 					TxModelType: "vote",
+					Tx:          &models.Tx{Payload: &models.Tx_Vote{}},
 				}
 				idx.OnNewTx(tx, height, txBlockIndex)
 				curTxs = append(curTxs, tx)
@@ -112,7 +113,7 @@ func BenchmarkIndexer(b *testing.B) {
 						qt.Check(b, bytes.Equal(voteRef.Meta.TxHash, tx.TxID[:]), qt.IsTrue)
 					}
 
-					txRef, err := idx.GetTxHashReference(tx.TxID[:])
+					txRef, err := idx.GetTxMetadataByHash(tx.TxID[:])
 					qt.Check(b, err, qt.IsNil)
 					if err == nil {
 						qt.Check(b, txRef.BlockHeight, qt.Equals, vote.Height)
@@ -138,7 +139,11 @@ func BenchmarkFetchTx(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < numTxs; j++ {
-			idx.OnNewTx(&vochaintx.Tx{TxID: util.Random32()}, uint32(i), int32(j))
+			idx.OnNewTx(&vochaintx.Tx{
+				TxID:        util.Random32(),
+				TxModelType: "vote",
+				Tx:          &models.Tx{Payload: &models.Tx_Vote{}},
+			}, uint32(i), int32(j))
 		}
 		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)
@@ -147,14 +152,14 @@ func BenchmarkFetchTx(b *testing.B) {
 
 		startTime := time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = idx.GetTxReferenceByBlockHeightAndBlockIndex(int64(i), int64(j))
+			_, err = idx.GetTransactionByHeightAndIndex(int64(i), int64(j))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by height+index, took %s",
 			numTxs, (i+1)*numTxs, time.Since(startTime))
 		startTime = time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = idx.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			_, err = idx.GetTxMetadataByHash([]byte(fmt.Sprintf("hash%d%d", i, j)))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by hash, took %s",

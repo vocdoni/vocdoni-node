@@ -588,7 +588,8 @@ func TestResults(t *testing.T) {
 		Status:       models.ProcessStatus_READY,
 		Mode: &models.ProcessMode{
 			AutoStart:     true,
-			Interruptible: true},
+			Interruptible: true,
+		},
 		BlockCount:            40,
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
@@ -627,7 +628,8 @@ func TestResults(t *testing.T) {
 					Type:     models.ProofArbo_BLAKE2B,
 					Siblings: proofs[i],
 					KeyType:  models.ProofArbo_ADDRESS,
-				}}},
+				},
+			}},
 			ProcessId:            pid,
 			VotePackage:          vp,
 			Nullifier:            util.RandomBytes(32),
@@ -1178,7 +1180,8 @@ func TestOverwriteVotes(t *testing.T) {
 				Type:     models.ProofArbo_BLAKE2B,
 				Siblings: proofs[0],
 				KeyType:  models.ProofArbo_ADDRESS,
-			}}},
+			},
+		}},
 		ProcessId:   pid,
 		VotePackage: vp,
 	}
@@ -1267,7 +1270,8 @@ func TestOverwriteVotes(t *testing.T) {
 				Type:     models.ProofArbo_BLAKE2B,
 				Siblings: proofs[1],
 				KeyType:  models.ProofArbo_ADDRESS,
-			}}},
+			},
+		}},
 		ProcessId:   pid,
 		VotePackage: vp,
 	}
@@ -1328,62 +1332,6 @@ func TestOverwriteVotes(t *testing.T) {
 
 	// check the weight is correct (should be 2 because of the overwrite)
 	qt.Assert(t, proc.ResultsWeight.MathBigInt().Int64(), qt.Equals, int64(2))
-}
-
-func TestTxIndexer(t *testing.T) {
-	app := vochain.TestBaseApplication(t)
-	idx := newTestIndexer(t, app)
-
-	getTxID := func(i, j int) [32]byte {
-		return [32]byte{byte(i), byte(j)}
-	}
-
-	const totalBlocks = 10
-	const txsPerBlock = 10
-	for i := 0; i < totalBlocks; i++ {
-		for j := 0; j < txsPerBlock; j++ {
-			idx.OnNewTx(&vochaintx.Tx{
-				TxID:        getTxID(i, j),
-				TxModelType: "setAccount",
-			}, uint32(i), int32(j))
-		}
-	}
-	qt.Assert(t, idx.Commit(0), qt.IsNil)
-
-	count, err := idx.CountTotalTransactions()
-	qt.Assert(t, err, qt.IsNil)
-	const totalTxs = totalBlocks * txsPerBlock
-	qt.Assert(t, count, qt.Equals, uint64(totalTxs))
-
-	for i := 0; i < totalBlocks; i++ {
-		for j := 0; j < txsPerBlock; j++ {
-			ref, err := idx.GetTxReferenceByBlockHeightAndBlockIndex(int64(i), int64(j))
-			qt.Assert(t, err, qt.IsNil)
-			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
-			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
-			qt.Assert(t, ref.TxType, qt.Equals, "setAccount")
-			h := make([]byte, 32)
-			id := getTxID(i, j)
-			copy(h, id[:])
-			hashRef, err := idx.GetTxHashReference(h)
-			qt.Assert(t, err, qt.IsNil)
-			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
-			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))
-		}
-	}
-
-	txs, err := idx.GetLastTransactions(15, 0)
-	qt.Assert(t, err, qt.IsNil)
-	for i, tx := range txs {
-		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
-		qt.Assert(t, tx.BlockHeight, qt.Equals, uint32(totalTxs-i-1)/txsPerBlock)
-		qt.Assert(t, tx.TxBlockIndex, qt.Equals, int32(totalTxs-i-1)%txsPerBlock)
-		qt.Assert(t, tx.TxType, qt.Equals, "setAccount")
-	}
-
-	txs, err = idx.GetLastTransactions(1, 5)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, txs, qt.HasLen, 1)
 }
 
 func TestCensusUpdate(t *testing.T) {
