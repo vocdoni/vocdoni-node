@@ -1427,7 +1427,7 @@ func TestCensusUpdate(t *testing.T) {
 	newCensusRoot := util.RandomBytes(32)
 	newCensusURI := new(string)
 	*newCensusURI = "ipfs://5678"
-	if err := app.State.SetProcessCensus(pid, newCensusRoot, *newCensusURI, true); err != nil {
+	if err := app.State.SetProcessCensus(pid, newCensusRoot, *newCensusURI, 0, true); err != nil {
 		t.Fatal(err)
 	}
 

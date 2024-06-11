@@ -313,7 +313,7 @@ func (v *State) GetProcessResults(pid []byte) ([][]*types.BigInt, error) {
 }
 
 // SetProcessCensus sets the census for a given process, only if that process enables dynamic census
-func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commit bool) error {
+func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censusSize uint64, commit bool) error {
 	process, err := v.Process(pid, false)
 	if err != nil {
 		return err
@@ -336,18 +336,29 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, commi
 			"cannot update census, process status must be READY or PAUSED and is: %s",
 			process.Status.String())
 	}
-	// check not same censusRoot
-	if bytes.Equal(censusRoot, process.CensusRoot) {
-		return fmt.Errorf("cannot update census, same censusRoot")
+
+	// if maxCensusSize is 0, then we're trying to update census rather than updating the maxCensusSize,
+	// so censusRoot must be different and the censusURI must be provided
+	if censusSize == 0 {
+		if bytes.Equal(censusRoot, process.CensusRoot) {
+			return fmt.Errorf("cannot update census, same censusRoot")
+		}
+		if CensusOrigins[process.CensusOrigin].NeedsURI && censusURI == "" {
+			return fmt.Errorf("process requires URI but an empty one was provided")
+		}
 	}
 
-	if CensusOrigins[process.CensusOrigin].NeedsURI && censusURI == "" {
-		return fmt.Errorf("process requires URI but an empty one was provided")
-	}
-
+	// commit the change
 	if commit {
-		process.CensusRoot = censusRoot
-		process.CensusURI = &censusURI
+		if censusRoot != nil {
+			process.CensusRoot = censusRoot
+		}
+		if censusURI != "" {
+			process.CensusURI = &censusURI
+		}
+		if censusSize > 0 {
+			process.MaxCensusSize = uint64(censusSize)
+		}
 		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
 			return err
 		}
