@@ -116,7 +116,7 @@ func (a *API) enableElectionHandlers() error {
 		"/elections/id",
 		"POST",
 		apirest.MethodAccessTypePublic,
-		a.nextElectionIDHandler,
+		a.buildElectionIDHandler,
 	); err != nil {
 		return err
 	}
@@ -684,18 +684,18 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// nextElectionIDHandler
+// buildElectionIDHandler
 //
-//	@Summary		Get next election ID
-//	@Description	nextElectionIDHandler
+//	@Summary		Build an election ID
+//	@Description	buildElectionIDHandler
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			transaction	body		NextElectionID	true	"OrganizationID, CensusOrigin and EnvelopeType"
+//	@Param			transaction	body		BuildElectionID	true	"Delta, OrganizationID, CensusOrigin and EnvelopeType"
 //	@Success		200			{object}	object{electionID=string}
 //	@Router			/elections/id [post]
-func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	body := &NextElectionID{}
+func (a *API) buildElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	body := &BuildElectionID{}
 	if err := json.Unmarshal(msg.Data, body); err != nil {
 		return err
 	}
@@ -710,10 +710,7 @@ func (a *API) nextElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 			CostFromWeight: body.EnvelopeType.CostFromWeight,
 		},
 	}
-	pid, err := processid.BuildProcessID(
-		process,
-		a.vocapp.State,
-	)
+	pid, err := processid.BuildProcessID(process, a.vocapp.State, body.Delta)
 	if err != nil {
 		return ErrCantParseElectionID.WithErr(err)
 	}

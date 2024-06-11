@@ -161,7 +161,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// build the deterministic process ID
-	pid, err := processid.BuildProcessID(tx.Process, t.state)
+	pid, err := processid.BuildProcessID(tx.Process, t.state, processid.BuildNextProcessID)
 	if err != nil {
 		return nil, ethereum.Address{}, fmt.Errorf("cannot build processID: %w", err)
 	}

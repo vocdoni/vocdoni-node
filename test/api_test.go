@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
@@ -659,7 +660,7 @@ func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 }
 
-func TestAPINextElectionID(t *testing.T) {
+func TestAPIBuildElectionID(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
@@ -692,7 +693,8 @@ func TestAPINextElectionID(t *testing.T) {
 	waitUntilHeight(t, c, 3)
 
 	// create request for calling api elections/id
-	body := api.NextElectionID{
+	body := api.BuildElectionID{
+		Delta:          processid.BuildNextProcessID,
 		OrganizationID: signer.Address().Bytes(),
 		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED.Number()),
 		EnvelopeType: struct {
@@ -718,6 +720,17 @@ func TestAPINextElectionID(t *testing.T) {
 	err := json.Unmarshal(resp, &nextElectionID)
 	qt.Assert(t, err, qt.IsNil)
 
+	// test building n+1 election ID
+	body.Delta = processid.BuildNextProcessID + 1
+	resp, code = c.Request("POST", body, "elections", "id")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	futureElectionID := struct {
+		ElectionID string `json:"electionID"`
+	}{}
+	err = json.Unmarshal(resp, &futureElectionID)
+	qt.Assert(t, err, qt.IsNil)
+
 	// create a new election
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
 	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false)
@@ -728,6 +741,33 @@ func TestAPINextElectionID(t *testing.T) {
 
 	// check next election id is the same as the election id created
 	qt.Assert(t, nextElectionID.ElectionID, qt.Equals, response.ElectionID.String())
+
+	// now build last processID, after election was created.
+	body.Delta = processid.BuildLastProcessID
+	resp, code = c.Request("POST", body, "elections", "id")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	lastElectionID := struct {
+		ElectionID string `json:"electionID"`
+	}{}
+	err = json.Unmarshal(resp, &lastElectionID)
+	qt.Assert(t, err, qt.IsNil)
+
+	qt.Assert(t, lastElectionID, qt.Equals, nextElectionID)
+
+	// and finally query again next processID, should match futureProcessID
+	body.Delta = processid.BuildNextProcessID
+	resp, code = c.Request("POST", body, "elections", "id")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	newNextElectionID := struct {
+		ElectionID string `json:"electionID"`
+	}{}
+	err = json.Unmarshal(resp, &newNextElectionID)
+	qt.Assert(t, err, qt.IsNil)
+
+	qt.Assert(t, newNextElectionID, qt.Equals, futureElectionID)
+
 }
 
 func TestAPIEncryptedMetadata(t *testing.T) {

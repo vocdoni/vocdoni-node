@@ -272,7 +272,8 @@ type Validator struct {
 	Score            uint32         `json:"score"`
 }
 
-type NextElectionID struct {
+type BuildElectionID struct {
+	Delta          int32          `json:"delta"` // 0 means build next ElectionID
 	OrganizationID types.HexBytes `json:"organizationId"`
 	CensusOrigin   int32          `json:"censusOrigin"`
 	EnvelopeType   struct {

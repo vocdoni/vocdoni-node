@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -454,7 +455,8 @@ func (c *HTTPclient) ElectionPrice(election *api.ElectionDescription) (uint64, e
 // NextElectionID gets the next election ID for an organization.
 // POST /elections/id
 func (c *HTTPclient) NextElectionID(organizationID types.HexBytes, censusOrigin int32, envelopeType *models.EnvelopeType) (string, error) {
-	body := &api.NextElectionID{
+	body := &api.BuildElectionID{
+		Delta:          processid.BuildNextProcessID,
 		OrganizationID: organizationID,
 		CensusOrigin:   censusOrigin,
 		EnvelopeType: struct {
