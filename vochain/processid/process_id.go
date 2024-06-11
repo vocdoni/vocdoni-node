@@ -13,6 +13,12 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// These consts are sugar for calling BuildProcessID
+const (
+	BuildNextProcessID = 0
+	BuildLastProcessID = -1
+)
+
 // ProcessID is a 32 bytes identifier that holds the following information about the voting process:
 //
 // - chainID: a 6 bytes trunked hash of the blockchain identifier
@@ -180,8 +186,11 @@ func (p *ProcessID) EnvelopeType() *models.EnvelopeType {
 	}
 }
 
-// BuildProcessID returns a ProcessID constructed in a deterministic way
-func BuildProcessID(proc *models.Process, state *state.State) (*ProcessID, error) {
+// BuildProcessID returns a ProcessID constructed in a deterministic way.
+//   - with delta == 0, it will return the next process id
+//   - with delta != 0, it will return the (next + delta) process id (past or future)
+//   - for example, with delta == -1 it will return the last process id
+func BuildProcessID(proc *models.Process, state *state.State, delta int32) (*ProcessID, error) {
 	pid := new(ProcessID)
 	pid.SetChainID(state.ChainID())
 	if err := pid.SetEnvelopeType(proc.EnvelopeType); err != nil {
@@ -199,6 +208,9 @@ func BuildProcessID(proc *models.Process, state *state.State) (*ProcessID, error
 		return nil, fmt.Errorf("account not found %s", addr.Hex())
 	}
 	pid.SetAddr(addr)
-	pid.SetNonce(acc.GetProcessIndex())
+	if int32(acc.GetProcessIndex())+delta < 0 {
+		return nil, fmt.Errorf("invalid delta")
+	}
+	pid.SetNonce(uint32(int32(acc.GetProcessIndex()) + delta))
 	return pid, nil
 }

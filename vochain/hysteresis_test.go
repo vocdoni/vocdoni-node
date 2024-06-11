@@ -57,7 +57,7 @@ func TestHysteresis(t *testing.T) {
 		MaxCensusSize: 10,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 	}
-	procID, err := processid.BuildProcessID(process, app.State)
+	procID, err := processid.BuildProcessID(process, app.State, processid.BuildNextProcessID)
 	c.Assert(err, qt.IsNil)
 	pid := procID.Marshal()
 	process.ProcessId = pid
