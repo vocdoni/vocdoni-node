@@ -51,7 +51,10 @@ jobs:
         with:
           repository: vocdoni/developer-portal
           ref: main
-      - uses: actions/download-artifact@v4
+      - name: Remove old yaml
+        run: rm swaggers/vocdoni-api.yaml
+      - name: Pull new yaml
+        uses: actions/download-artifact@v4
         with:
           name: vocdoni-api.yaml
           path: swaggers/vocdoni-api.yaml
