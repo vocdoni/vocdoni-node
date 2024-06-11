@@ -5,10 +5,6 @@ go 1.22.0
 // For testing purposes
 // replace go.vocdoni.io/proto => ../dvote-protobuf
 
-// Don't upgrade bazil.org/fuse past v0.0.0-20200407214033-5883e5a4b512 for now,
-// as it dropped support for GOOS=darwin.
-// If you change its version, ensure that "GOOS=darwin go build ./..." still works.
-
 require (
 	git.sr.ht/~sircmpwn/go-bare v0.0.0-20210406120253-ab86bc2846d9
 	github.com/766b/chi-prometheus v0.0.0-20211217152057-87afa9aa2ca8
