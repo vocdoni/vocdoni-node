@@ -138,8 +138,8 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				hex.EncodeToString(p.GetProcessId()),
 			)
 		}
-
 	case *models.Tx_SetProcess:
+		cost := uint64(0)
 		txSender, err := t.SetProcessTxCheck(vtx)
 		if err != nil {
 			return nil, fmt.Errorf("setProcessTx: %w", err)
@@ -173,16 +173,23 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					}
 				}
 			case models.TxType_SET_PROCESS_CENSUS:
-				if tx.GetCensusRoot() == nil {
-					return nil, fmt.Errorf("set process census, census root is nil")
+				// if census size is increased, cost must be applied
+				if tx.GetCensusSize() > 0 {
+					process, err := t.state.Process(tx.ProcessId, false)
+					if err != nil {
+						return nil, fmt.Errorf("setProcessCensus: %s", err)
+					}
+					cost = t.txCostIncreaseCensusSize(process, tx.GetCensusSize())
 				}
-				if err := t.state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), true); err != nil {
+				// update process census
+				if err := t.state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), tx.GetCensusSize(), true); err != nil {
 					return nil, fmt.Errorf("setProcessCensus: %s", err)
 				}
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
-			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, 0, hex.EncodeToString(tx.ProcessId))
+
+			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, cost, hex.EncodeToString(tx.ProcessId))
 		}
 
 	case *models.Tx_SetAccount:

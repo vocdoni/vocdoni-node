@@ -40,7 +40,7 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	}
 
 	// create process with entityID (should work)
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[0], app, process), qt.IsNil)
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
 	// all get accounts assume account is not nil
 	entityAcc, err := app.State.GetAccount(accounts[0].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
@@ -49,7 +49,7 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, entityAcc.ProcessIndex, qt.Equals, uint32(1))
 
 	// create process with delegate (should work)
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process), qt.IsNil)
+	qt.Assert(t, testCreateProcess(t, accounts[1], app, process), qt.IsNotNil)
 	entityAcc, err = app.State.GetAccount(accounts[0].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
@@ -62,7 +62,7 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, delegateAcc.ProcessIndex, qt.Equals, uint32(0))
 
 	// create process with a non delegate to another entityID (should not work)
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[2], app, process), qt.IsNotNil)
+	qt.Assert(t, testCreateProcess(t, accounts[2], app, process), qt.IsNil)
 	entityAcc, err = app.State.GetAccount(accounts[0].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, entityAcc.Balance, qt.Equals, uint64(9990))
@@ -76,48 +76,20 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 
 	// create process with status PAUSED (should work)
 	process.Status = models.ProcessStatus_PAUSED
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process), qt.IsNil)
+	qt.Assert(t, testCreateProcess(t, accounts[1], app, process), qt.IsNotNil)
 	// create process with status different than READY or PAUSED (should not work)
 	process.Status = models.ProcessStatus_CANCELED
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[1], app, process),
 		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
 	process.Status = models.ProcessStatus_PROCESS_UNKNOWN
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[1], app, process),
 		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
 	process.Status = models.ProcessStatus_ENDED
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[1], app, process),
 		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
 	process.Status = models.ProcessStatus_RESULTS
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[1], app, process),
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[1], app, process),
 		qt.ErrorMatches, ".*status must be READY or PAUSED.*")
-}
-
-func testNewProcess(t *testing.T, _ []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, process *models.Process) error {
-	var stx models.SignedTx
-	var err error
-
-	// assumes account is not nil
-	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
-	if err != nil {
-		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
-	}
-	// create tx
-	tx := &models.NewProcessTx{
-		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   txSenderAcc.Nonce,
-		Process: process,
-	}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: tx}})
-	if err != nil {
-		return fmt.Errorf("cannot mashal tx %w", err)
-	}
-	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
-	}
-
-	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
-	return err
 }
 
 func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
@@ -338,20 +310,20 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 	qt.Assert(t, app.State.AddProcess(process3), qt.IsNil)
 
 	// Set census  (should work)
-	qt.Assert(t, testSetProcessCensus(t, pid, keys[0], app, []byte{1, 2, 3}, &censusURI2), qt.IsNil)
+	qt.Assert(t, testSetProcessCensus(t, pid, keys[0], app, []byte{1, 2, 3}, &censusURI2, 0), qt.IsNil)
 
 	// Set census by delegate (should work)
-	qt.Assert(t, testSetProcessCensus(t, pid, keys[1], app, []byte{3, 2, 1}, &censusURI2), qt.IsNil)
+	qt.Assert(t, testSetProcessCensus(t, pid, keys[1], app, []byte{3, 2, 1}, &censusURI2, 0), qt.IsNil)
 
 	// Set census  (should not work)
-	qt.Assert(t, testSetProcessCensus(t, pid2, keys[0], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
+	qt.Assert(t, testSetProcessCensus(t, pid2, keys[0], app, []byte{1, 2, 3}, &censusURI2, 0), qt.IsNotNil)
 
 	// Set census  (should not work)
-	qt.Assert(t, testSetProcessCensus(t, pid3, keys[2], app, []byte{1, 2, 3}, &censusURI2), qt.IsNotNil)
+	qt.Assert(t, testSetProcessCensus(t, pid3, keys[2], app, []byte{1, 2, 3}, &censusURI2, 0), qt.IsNotNil)
 }
 
 func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, censusRoot []byte, censusURI *string) error {
+	app *BaseApplication, censusRoot []byte, censusURI *string, censusSize uint64) error {
 	var stx models.SignedTx
 	var err error
 
@@ -366,10 +338,9 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 		ProcessId:  pid,
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,
+		CensusSize: &censusSize,
 	}
-	if stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetProcess{SetProcess: tx}},
-	); err != nil {
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
 		return fmt.Errorf("cannot mashal tx %w", err)
 	}
 	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
@@ -437,7 +408,21 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 }
 
 // testCreateProcess creates a process with the given parameters via transaction.
+// It returns the process ID if the transaction was successful, or nil otherwise.
 func testCreateProcess(t *testing.T, txSender *ethereum.SignKeys, app *BaseApplication, process *models.Process) []byte {
+	pid, err := testCreateProcessWithErrAndData(t, txSender, app, process)
+	if err != nil {
+		return nil
+	}
+	return pid
+}
+
+func testCreateProcessWithErr(t *testing.T, txSender *ethereum.SignKeys, app *BaseApplication, process *models.Process) error {
+	_, err := testCreateProcessWithErrAndData(t, txSender, app, process)
+	return err
+}
+
+func testCreateProcessWithErrAndData(t *testing.T, txSender *ethereum.SignKeys, app *BaseApplication, process *models.Process) ([]byte, error) {
 	var stx models.SignedTx
 
 	// assume account is not nil
@@ -456,9 +441,7 @@ func testCreateProcess(t *testing.T, txSender *ethereum.SignKeys, app *BaseAppli
 	stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID)
 	qt.Assert(t, err, qt.IsNil, qt.Commentf("cannot sign tx %+v with error %w", tx, err))
 
-	data, err := testCheckTxDeliverTxCommit(t, app, &stx)
-	qt.Assert(t, err, qt.IsNil)
-	return data
+	return testCheckTxDeliverTxCommit(t, app, &stx)
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) ([]byte, error) {
@@ -494,9 +477,7 @@ func TestGlobalMaxProcessSize(t *testing.T) {
 
 	// define process
 	censusURI := ipfsUrlTest
-	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
-		ProcessId:     pid,
 		StartBlock:    1,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Mode:          &models.ProcessMode{Interruptible: true},
@@ -511,9 +492,78 @@ func TestGlobalMaxProcessSize(t *testing.T) {
 	}
 
 	// create process with entityID (should fail)
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[0], app, process), qt.IsNotNil)
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNil)
 
 	// create process with entityID (should work)
 	process.MaxCensusSize = 5
-	qt.Assert(t, testNewProcess(t, process.ProcessId, accounts[0], app, process), qt.IsNil)
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
+}
+
+func TestSetProcessCensusSize(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
+	app.State.ElectionPriceCalc.SetBasePrice(10)
+	app.State.ElectionPriceCalc.SetCapacity(2000)
+
+	// define process
+	censusURI := ipfsUrlTest
+	process := &models.Process{
+		StartBlock:    1,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Duration:      60 * 60,
+		MaxCensusSize: 2,
+	}
+
+	// create the process
+	pid := testCreateProcess(t, accounts[0], app, process)
+	app.AdvanceTestBlock()
+
+	proc, err := app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(2))
+
+	// Set census size and new root (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), &censusURI, 5), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(5))
+
+	// Set census size (without new root) (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 10), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
+	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
+
+	// Set smaller census size (should fail)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 5), qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
+
+	// Check cost is increased with larger census size (should work)
+	account, err := app.State.GetAccount(accounts[0].Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	oldBalance := account.Balance
+
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 20000), qt.IsNil)
+
+	account, err = app.State.GetAccount(accounts[0].Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	newBalance := account.Balance
+
+	// check that newBalance is at least 100 tokens less than oldBalance
+	qt.Assert(t, oldBalance-newBalance >= 100, qt.IsTrue)
 }

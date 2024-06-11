@@ -103,23 +103,8 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range
-	txMaxCensusSize := tx.Process.GetMaxCensusSize()
-	if txMaxCensusSize == 0 {
-		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize is zero")
-	}
-	maxProcessSize, err := t.state.MaxProcessSize()
-	if err != nil {
-		return nil, ethereum.Address{}, fmt.Errorf("cannot get maxProcessSize: %w", err)
-	}
-	if maxProcessSize > 0 && txMaxCensusSize > maxProcessSize {
-		return nil, ethereum.Address{},
-			fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
-	}
-	// check that the census size is not bigger than the circuit levels
-	if tx.Process.EnvelopeType.Anonymous && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
-		return nil, ethereum.Address{}, fmt.Errorf("maxCensusSize for anonymous envelope "+
-			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
-			circuit.Global().Config.MaxCensusSize().Int64(), txMaxCensusSize)
+	if err := t.checkMaxCensusSize(tx.Process); err != nil {
+		return nil, ethereum.Address{}, err
 	}
 
 	// check signature
@@ -189,18 +174,10 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		return ethereum.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetSetProcess()
-	// get tx cost
-	cost, err := t.state.TxBaseCost(tx.Txtype, false)
-	if err != nil {
-		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
-	}
+	// get account from signature
 	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
 		return ethereum.Address{}, err
-	}
-	// check balance and nonce
-	if acc.Balance < cost {
-		return ethereum.Address{}, vstate.ErrNotEnoughBalance
 	}
 	// get process
 	process, err := t.state.Process(tx.ProcessId, false)
@@ -223,6 +200,17 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			)
 		} // is delegate
 	}
+
+	// get tx base cost
+	cost, err := t.state.TxBaseCost(tx.Txtype, false)
+	if err != nil {
+		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
+	}
+	// check balance and nonce
+	if acc.Balance < cost {
+		return ethereum.Address{}, vstate.ErrNotEnoughBalance
+	}
+
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_STATUS:
 		if tx.GetStatus() == models.ProcessStatus_RESULTS {
@@ -231,10 +219,53 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		}
 		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:
-		return ethereum.Address(*addr), t.state.SetProcessCensus(process.ProcessId, tx.GetCensusRoot(), tx.GetCensusURI(), false)
+		// If the census size is increased, sanity check the new size and compute the cost increase
+		if tx.GetCensusSize() != 0 && (tx.GetCensusSize() != process.GetMaxCensusSize()) {
+			// if the new census size is smaller than the current census size, we return an error
+			if tx.GetCensusSize() < process.GetMaxCensusSize() {
+				return ethereum.Address{}, fmt.Errorf("new census size is smaller than the current census size")
+			}
+			// check if the maxCensusSize is within the allowed range
+			if err := t.checkMaxCensusSize(process); err != nil {
+				return ethereum.Address{}, err
+			}
+			// get Tx cost, since it is a new process, we should use the election price calculator
+			if acc.Balance < t.txCostIncreaseCensusSize(process, tx.GetCensusSize()) {
+				return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
+			}
+		}
+		return ethereum.Address(*addr), t.state.SetProcessCensus(
+			process.ProcessId,
+			tx.GetCensusRoot(),
+			tx.GetCensusURI(),
+			tx.GetCensusSize(),
+			false,
+		)
 	default:
 		return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
+}
+
+// checkMaxCensusSize checks if the maxCensusSize is within the allowed range.
+func (t *TransactionHandler) checkMaxCensusSize(proc *models.Process) error {
+	txMaxCensusSize := proc.GetMaxCensusSize()
+	if txMaxCensusSize == 0 {
+		return fmt.Errorf("maxCensusSize is zero")
+	}
+	maxProcessSize, err := t.state.MaxProcessSize()
+	if err != nil {
+		return fmt.Errorf("cannot get maxProcessSize: %w", err)
+	}
+	if maxProcessSize > 0 && txMaxCensusSize > maxProcessSize {
+		return fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
+	}
+	// check that the census size is not bigger than the circuit levels
+	if proc.EnvelopeType.Anonymous && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
+		return fmt.Errorf("maxCensusSize for anonymous envelope "+
+			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
+			circuit.Global().Config.MaxCensusSize().Int64(), txMaxCensusSize)
+	}
+	return nil
 }
 
 func checkAddProcessKeys(tx *models.AdminTx, process *models.Process) error {
@@ -291,6 +322,7 @@ func checkRevealProcessKeys(tx *models.AdminTx, process *models.Process) error {
 	return nil
 }
 
+// txElectionCostFromProcess calculates the cost of a new process based on the election price calculator.
 func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) uint64 {
 	return t.state.ElectionPriceCalc.Price(&electionprice.ElectionParameters{
 		MaxCensusSize:           process.GetMaxCensusSize(),
@@ -300,4 +332,24 @@ func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) 
 		AnonymousVotes:          process.GetEnvelopeType().Anonymous,
 		MaxVoteOverwrite:        process.GetVoteOptions().MaxVoteOverwrites,
 	})
+}
+
+// txCostIncreaseCensusSize calculates the cost increase of a process based on the new census size.
+func (t *TransactionHandler) txCostIncreaseCensusSize(process *models.Process, newSize uint64) uint64 {
+	oldCost := t.txElectionCostFromProcess(process)
+	oldSize := process.GetMaxCensusSize()
+	process.MaxCensusSize = newSize
+	newCost := t.txElectionCostFromProcess(process)
+	process.MaxCensusSize = oldSize
+
+	baseCost, err := t.state.TxBaseCost(models.TxType_SET_PROCESS_CENSUS, false)
+	if err != nil {
+		log.Errorw(err, "txCostIncreaseCensusSize: cannot get transaction base cost")
+		return 0
+	}
+	if newCost < oldCost {
+		log.Warnw("txCostIncreaseCensusSize: new cost is lower than the old cost", "oldCost", oldCost, "newCost", newCost)
+		return baseCost
+	}
+	return baseCost + (newCost - oldCost)
 }

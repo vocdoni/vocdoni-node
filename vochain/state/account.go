@@ -278,7 +278,7 @@ func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType m
 		if err := acc.Transfer(burnAcc, cost); err != nil {
 			return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
 		}
-		log.Debugf("burning fee for tx %s with cost %d from account %s", txType, cost, accountAddress)
+		log.Debugw("burning fee", "txType", txType.String(), "cost", cost, "account", accountAddress.String())
 		if err := v.SetAccount(BurnAddress, burnAcc); err != nil {
 			return fmt.Errorf("burnTxCostIncrementNonce: %w", err)
 		}
