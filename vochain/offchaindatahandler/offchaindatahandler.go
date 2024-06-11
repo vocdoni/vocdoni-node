@@ -122,7 +122,7 @@ func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 }
 
 // OnCensusUpdate is triggered when the census is updated during an election.
-func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI string) {
+func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI string, _ uint64) {
 	if d.importOnlyNew && !d.isSynced {
 		return
 	}

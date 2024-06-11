@@ -29,7 +29,7 @@ type EventListener interface {
 	OnSetAccount(addr []byte, account *Account)
 	OnTransferTokens(tx *vochaintx.TokenTransfer)
 	OnSpendTokens(addr []byte, txType models.TxType, cost uint64, reference string)
-	OnCensusUpdate(pid, censusRoot []byte, censusURI string)
+	OnCensusUpdate(pid, censusRoot []byte, censusURI string, censusSize uint64)
 	Commit(height uint32) (err error)
 	OnBeginBlock(BeginBlock)
 	Rollback()

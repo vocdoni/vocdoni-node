@@ -272,7 +272,7 @@ func (*KeyKeeper) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32) {}
 func (*KeyKeeper) OnBeginBlock(_ state.BeginBlock) {}
 
 // OnCensusUpdate is not used by the KeyKeeper
-func (*KeyKeeper) OnCensusUpdate(_, _ []byte, _ string) {}
+func (*KeyKeeper) OnCensusUpdate(_, _ []byte, _ string, _ uint64) {}
 
 // OnCancel does nothing
 func (k *KeyKeeper) OnCancel(_ []byte, _ int32) {}

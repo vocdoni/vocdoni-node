@@ -51,7 +51,8 @@ SET census_root         = sqlc.arg(census_root),
 	private_keys        = sqlc.arg(private_keys),
 	public_keys         = sqlc.arg(public_keys),
 	metadata            = sqlc.arg(metadata),
-	status              = sqlc.arg(status)
+	status              = sqlc.arg(status),
+	max_census_size	 	= sqlc.arg(max_census_size)
 WHERE id = sqlc.arg(id);
 
 -- name: GetProcessStatus :one

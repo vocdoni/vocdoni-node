@@ -697,7 +697,7 @@ func (idx *Indexer) OnTransferTokens(tx *vochaintx.TokenTransfer) {
 
 // OnCensusUpdate adds the process to blockUpdateProcs in order to update the census.
 // This function call is triggered by the SET_PROCESS_CENSUS tx.
-func (idx *Indexer) OnCensusUpdate(pid, _ []byte, _ string) {
+func (idx *Indexer) OnCensusUpdate(pid, _ []byte, _ string, _ uint64) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true

@@ -393,18 +393,20 @@ SET census_root         = ?1,
 	private_keys        = ?3,
 	public_keys         = ?4,
 	metadata            = ?5,
-	status              = ?6
-WHERE id = ?7
+	status              = ?6,
+	max_census_size	 	= ?7
+WHERE id = ?8
 `
 
 type UpdateProcessFromStateParams struct {
-	CensusRoot  types.CensusRoot
-	CensusUri   string
-	PrivateKeys string
-	PublicKeys  string
-	Metadata    string
-	Status      int64
-	ID          types.ProcessID
+	CensusRoot    types.CensusRoot
+	CensusUri     string
+	PrivateKeys   string
+	PublicKeys    string
+	Metadata      string
+	Status        int64
+	MaxCensusSize int64
+	ID            types.ProcessID
 }
 
 func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessFromStateParams) (sql.Result, error) {
@@ -415,6 +417,7 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.PublicKeys,
 		arg.Metadata,
 		arg.Status,
+		arg.MaxCensusSize,
 		arg.ID,
 	)
 }

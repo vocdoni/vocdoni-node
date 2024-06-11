@@ -202,13 +202,14 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 
 	// Update the process in the indexer database
 	if _, err := queries.UpdateProcessFromState(ctx, indexerdb.UpdateProcessFromStateParams{
-		ID:          pid,
-		CensusRoot:  nonNullBytes(p.CensusRoot),
-		CensusUri:   p.GetCensusURI(),
-		PrivateKeys: indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
-		PublicKeys:  indexertypes.EncodeJSON(p.EncryptionPublicKeys),
-		Metadata:    p.GetMetadata(),
-		Status:      int64(p.Status),
+		ID:            pid,
+		CensusRoot:    nonNullBytes(p.CensusRoot),
+		CensusUri:     p.GetCensusURI(),
+		PrivateKeys:   indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
+		PublicKeys:    indexertypes.EncodeJSON(p.EncryptionPublicKeys),
+		Metadata:      p.GetMetadata(),
+		Status:        int64(p.Status),
+		MaxCensusSize: int64(p.GetMaxCensusSize()),
 	}); err != nil {
 		return err
 	}

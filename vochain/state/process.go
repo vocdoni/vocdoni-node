@@ -363,7 +363,7 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 			return err
 		}
 		for _, l := range v.eventListeners {
-			l.OnCensusUpdate(process.ProcessId, process.CensusRoot, censusURI)
+			l.OnCensusUpdate(process.ProcessId, process.CensusRoot, censusURI, censusSize)
 		}
 	}
 
