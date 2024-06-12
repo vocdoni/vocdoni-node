@@ -13,6 +13,55 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+/*
+### Example of how to restart a chain from scratch
+### (on dev or stage, since on LTS this should never happen)
+
+	* add an item to the genesis map, after the current chain vocdoni/DEV/N
+		"vocdoni/DEV/N+1": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(XXXX, time.XXXX, X, 0, 0, 0, 0, time.UTC),
+				InitialHeight:   1,
+				ConsensusParams: DefaultConsensusParams(),
+				AppState:        jsonRawMessage(initialAppStateForDev), # or initialAppStateForStage
+			},
+		},
+
+	* bump the relevant networks map line, for example "dev":   "vocdoni/DEV/N+1",
+
+	* push both changes in a single commit and deploy on `dev`.
+	* nodes will discard all current state and blockstore from vocdoni/DEV/N and start vocdoni/DEV/N+1 from scratch
+
+	* NOTE: a majority of the deployed miners need to be running with VOCDONI_VOCHAIN_STATESYNCENABLED=false for this to work,
+		else they will endlessly try doing StateSync and never start the new chain
+
+### Example of how to deploy consensus breaking changes, by stopping a chain, and deploying a new one on top
+### (on dev, stage or LTS. will use LTS in this example)
+
+	* first set an EndOfChain: 123 on "vocdoni/LTS/N". (pick a height in the future)
+	* push that change in a oneliner commit and deploy on `lts` (release-lts-1)
+	* wait until all nodes reach that height, you'll see this on the logs
+		"reached end of chain vocdoni/LTS/N at height 123, rejecting new block for height 124"
+		"now you can deploy a new chain on top, with a different ChainID, InitialHeight 124 and AppHash fafafafaf...",
+
+	* now cherry-pick (or merge) all your consensus breaking changes on the same branch
+
+	* add an item to the genesis map, after the current chain vocdoni/LTS/N
+		"vocdoni/LTS/N+1": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(XXXX, time.XXXX, X, 0, 0, 0, 0, time.UTC),
+				InitialHeight:   124,
+				ConsensusParams: DefaultConsensusParams(),
+				AppHash:         []byte(types.HexStringToHexBytes("fafafafaf...")),
+			},
+		},
+
+	* bump the relevant networks map line "lts":   "vocdoni/LTS/N+1",
+	* make a commit with these 2 changes, on top of the consensus breaking commits, and deploy on `lts` (release-lts-1)
+	* nodes will keep current state (with AppHash fafafa...), start vocdoni/DEV/N+1
+		and discard cometbft blockstore from vocdoni/DEV/N
+*/
+
 // networks is a map containing the default chainID for each network
 var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
