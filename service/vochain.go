@@ -83,6 +83,9 @@ func (vs *VocdoniService) Vochain() error {
 						return err
 					}
 				} else { // hardcodedGenesis.InitialHeight <= 0
+					if vs.Config.Network == "lts" {
+						return fmt.Errorf("new hardcoded genesis would create a chain from scratch, but that should never happen in LTS")
+					}
 					log.Warnf("new hardcoded genesis creates a chain %q from scratch, wiping out current chain %q datadir",
 						hardcodedGenesis.ChainID, loadedGenesis.ChainID)
 					if err = os.RemoveAll(vs.Config.DataDir); err != nil {
