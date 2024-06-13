@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
@@ -180,11 +179,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		}
 		if !valid {
 			return nil, fmt.Errorf("proof not valid")
-		}
-		// soft-fork: get nullifier from proof publicSignals
-		if nullifierCheckForkBlock := config.ForksForChainID(t.state.ChainID()).NullifierFromZkProof; nullifierCheckForkBlock > 0 &&
-			t.state.CurrentHeight() < nullifierCheckForkBlock {
-			vote.Nullifier = voteEnvelope.Nullifier
 		}
 		log.Debugw("new vote",
 			"type", "zkSNARK",

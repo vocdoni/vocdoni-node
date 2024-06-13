@@ -289,10 +289,6 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 	}
 	app.State.SetHeight(height)
 
-	err := app.SetZkCircuit()
-	if err != nil {
-		log.Fatalf("failed to set ZkCircuit: %w", err)
-	}
 	go app.State.CachePurge(height)
 	app.State.OnBeginBlock(vstate.BeginBlock{
 		Height: int64(height),
@@ -391,16 +387,6 @@ func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 // Genesis returns the genesis used by the app (and cometbft)
 func (app *BaseApplication) Genesis() *genesis.Doc {
 	return app.genesisDoc
-}
-
-// SetZkCircuit ensures the global ZkCircuit is the correct for a chain that implements forks
-func (app *BaseApplication) SetZkCircuit() error {
-	switch {
-	case app.Height() < config.ForksForChainID(app.chainID).VoceremonyForkBlock:
-		return circuit.SetGlobal(circuit.PreVoceremonyForkZkCircuitVersion)
-	default: // for example, if VoceremonyForkBlock == 0, or if Height is past the fork
-		return circuit.SetGlobal(circuit.DefaultZkCircuitVersion)
-	}
 }
 
 // IsSynchronizing informs if the blockchain is synchronizing or not.

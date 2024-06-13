@@ -13,7 +13,6 @@ import (
 	"sync"
 	"time"
 
-	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/log"
 )
 
@@ -89,26 +88,6 @@ func IsLoaded() bool {
 // Init will load (or download) the default circuit artifacts into memory, ready to be used globally.
 func Init() error {
 	return SetGlobal(DefaultZkCircuitVersion)
-}
-
-// DownloadDefaultArtifacts ensures the default circuit is cached locally
-func DownloadDefaultArtifacts() error {
-	_, err := LoadVersion(DefaultZkCircuitVersion)
-	if err != nil {
-		return fmt.Errorf("could not load zk verification keys: %w", err)
-	}
-	return nil
-}
-
-// DownloadArtifactsForChainID ensures all circuits needed for chainID are cached locally
-func DownloadArtifactsForChainID(chainID string) error {
-	if config.ForksForChainID(chainID).VoceremonyForkBlock > 0 {
-		_, err := LoadVersion(PreVoceremonyForkZkCircuitVersion)
-		if err != nil {
-			return fmt.Errorf("could not load zk verification keys: %w", err)
-		}
-	}
-	return DownloadDefaultArtifacts()
 }
 
 // LoadVersion loads the circuit artifacts based on the version provided.
