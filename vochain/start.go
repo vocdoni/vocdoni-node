@@ -12,7 +12,6 @@ import (
 
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/vochain/genesis"
 
 	cometconfig "github.com/cometbft/cometbft/config"
@@ -280,12 +279,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 		"external-address", tconfig.P2P.ExternalAddress,
 		"nodeId", nodeKey.ID(),
 		"seed", tconfig.P2P.SeedMode)
-
-	// the chain might need additional ZkCircuits, now that we know the chainID ensure they are downloaded now,
-	// to avoid delays at beginBlock during a fork
-	if err := circuit.DownloadArtifactsForChainID(app.ChainID()); err != nil {
-		return nil, fmt.Errorf("cannot download zk circuits for chainID: %w", err)
-	}
 
 	// if GenesisEndOfChain cmdline flag was passed, override genesis
 	if localConfig.GenesisEndOfChain > 0 {
