@@ -318,16 +318,17 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if err != nil {
 		return err
 	}
-	// check valid state transition
-	// dynamic census
-	if !process.Mode.DynamicCensus {
-		return fmt.Errorf(
-			"cannot update census, only processes with dynamic census can update their census")
-	}
-	// census origin
-	if !CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
-		return fmt.Errorf(
-			"cannot update census, invalid census origin: %s", process.CensusOrigin)
+	// check dynamic census only if root is being updated
+	if censusRoot != nil {
+		if !process.Mode.DynamicCensus {
+			return fmt.Errorf(
+				"cannot update census, only processes with dynamic census can update their root")
+		}
+		// census origin
+		if !CensusOrigins[process.CensusOrigin].AllowCensusUpdate {
+			return fmt.Errorf(
+				"cannot update census, census origin %s does not allow update", process.CensusOrigin)
+		}
 	}
 	// status
 	if !(process.Status == models.ProcessStatus_READY) &&
@@ -352,8 +353,6 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if commit {
 		if censusRoot != nil {
 			process.CensusRoot = censusRoot
-		}
-		if censusURI != "" {
 			process.CensusURI = &censusURI
 		}
 		if censusSize > 0 {

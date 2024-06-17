@@ -509,7 +509,7 @@ func TestSetProcessCensusSize(t *testing.T) {
 	process := &models.Process{
 		StartBlock:    1,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
-		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: false},
 		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
 		Status:        models.ProcessStatus_READY,
 		EntityId:      accounts[0].Address().Bytes(),
@@ -528,8 +528,12 @@ func TestSetProcessCensusSize(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(2))
 
-	// Set census size and new root (should work)
-	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), &censusURI, 5), qt.IsNil)
+	// Set census size with root (should failg since dynamicCensus=false)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), nil, 5), qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	// Set census size (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 5), qt.IsNil)
 	app.AdvanceTestBlock()
 
 	proc, err = app.State.Process(pid, true)
