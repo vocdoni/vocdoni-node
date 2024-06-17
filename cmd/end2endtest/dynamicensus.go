@@ -267,7 +267,7 @@ func (t *E2EDynamicensusElection) Run() error {
 			CensusURL:    "http://test/census",
 		}); err != nil {
 			// check if the error is not expected
-			if !strings.Contains(err.Error(), "only processes with dynamic census can update their census") {
+			if !strings.Contains(err.Error(), "only processes with dynamic census can update their root") {
 				errCh <- fmt.Errorf("unexpected error when update the census %s", err)
 				return
 			}
