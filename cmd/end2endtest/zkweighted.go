@@ -38,13 +38,17 @@ func init() {
 	}
 }
 
-var _ VochainTest = (*E2EAnonElection)(nil)
-var _ VochainTest = (*E2EAnonElectionTempSIKs)(nil)
-var _ VochainTest = (*E2EAnonElectionEncrypted)(nil)
+var (
+	_ VochainTest = (*E2EAnonElection)(nil)
+	_ VochainTest = (*E2EAnonElectionTempSIKs)(nil)
+	_ VochainTest = (*E2EAnonElectionEncrypted)(nil)
+)
 
-type E2EAnonElection struct{ e2eElection }
-type E2EAnonElectionTempSIKs struct{ e2eElection }
-type E2EAnonElectionEncrypted struct{ e2eElection }
+type (
+	E2EAnonElection          struct{ e2eElection }
+	E2EAnonElectionTempSIKs  struct{ e2eElection }
+	E2EAnonElectionEncrypted struct{ e2eElection }
+)
 
 func (t *E2EAnonElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api

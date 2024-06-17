@@ -132,7 +132,6 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 		return nil, nil, err
 	}
 	return acc, accountApi, nil
-
 }
 
 func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, voterAccounts []*ethereum.SignKeys) error {
@@ -395,7 +394,6 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 					errorChan <- fmt.Errorf("unexpected invalid SIK for account %x", acc.Address())
 				}
 				log.Infof("valid SIK for the account %x", acc.Address())
-
 			}(i, acc)
 		}
 
@@ -818,5 +816,4 @@ func logElection(e *vapi.Election) {
 		"tallyMaxTotalCost", e.TallyMode.MaxTotalCost,
 		"tallyCostExponent", e.TallyMode.CostExponent,
 	)
-
 }

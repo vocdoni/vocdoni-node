@@ -74,8 +74,10 @@ func TestAddTestVectors(t *testing.T) {
 
 func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 	database := metadb.NewTest(c)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: hashFunc})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: hashFunc,
+	})
 	c.Assert(err, qt.IsNil)
 
 	root, err := tree.Root()
@@ -331,8 +333,10 @@ func TestRootOnTx(t *testing.T) {
 func TestAux(t *testing.T) { // TODO split in proper tests
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -369,8 +373,10 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 func TestGet(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -394,17 +400,21 @@ func TestBitmapBytes(t *testing.T) {
 
 	b := []byte{15}
 	bits := bytesToBitmap(b)
-	c.Assert(bits, qt.DeepEquals, []bool{true, true, true, true,
-		false, false, false, false})
+	c.Assert(bits, qt.DeepEquals, []bool{
+		true, true, true, true,
+		false, false, false, false,
+	})
 	b2 := bitmapToBytes(bits)
 	c.Assert(b2, qt.DeepEquals, b)
 
 	b = []byte{0, 15, 50}
 	bits = bytesToBitmap(b)
-	c.Assert(bits, qt.DeepEquals, []bool{false, false, false,
+	c.Assert(bits, qt.DeepEquals, []bool{
+		false, false, false,
 		false, false, false, false, false, true, true, true, true,
 		false, false, false, false, false, true, false, false, true,
-		true, false, false})
+		true, false, false,
+	})
 	b2 = bitmapToBytes(bits)
 	c.Assert(b2, qt.DeepEquals, b)
 
@@ -504,8 +514,10 @@ func TestPackAndUnpackSiblings(t *testing.T) {
 func TestGenProofAndVerify(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -543,8 +555,10 @@ func TestDumpAndImportDumpInFile(t *testing.T) {
 func testDumpAndImportDump(t *testing.T, inFile bool) {
 	c := qt.New(t)
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree1, err := NewTree(Config{
+		Database: database1, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -570,8 +584,10 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 	}
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		Database: database2, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	if inFile {
@@ -596,8 +612,10 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 func TestRWMutex(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -627,13 +645,17 @@ func TestAddBatchFullyUsed(t *testing.T) {
 	c := qt.New(t)
 
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{Database: database1, MaxLevels: 4,
-		HashFunction: HashFunctionPoseidon})
+	tree1, err := NewTree(Config{
+		Database: database1, MaxLevels: 4,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{Database: database2, MaxLevels: 4,
-		HashFunction: HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		Database: database2, MaxLevels: 4,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	var keys, values [][]byte
@@ -686,8 +708,10 @@ func TestAddBatchFullyUsed(t *testing.T) {
 func TestSetRoot(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	expectedRoot := "13742386369878513332697380582061714160370929283209286127733983161245560237407"
@@ -744,8 +768,10 @@ func TestSetRoot(t *testing.T) {
 func TestSnapshot(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// fill the tree
@@ -794,8 +820,10 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -815,8 +843,10 @@ func TestKeyLen(t *testing.T) {
 	database := metadb.NewTest(t)
 	// maxLevels is 100, keyPath length = ceil(maxLevels/8) = 13
 	maxLevels := 100
-	tree, err := NewTree(Config{Database: database, MaxLevels: maxLevels,
-		HashFunction: HashFunctionBlake2b})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: maxLevels,
+		HashFunction: HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// expect no errors when adding a key of only 4 bytes (when the
@@ -847,8 +877,10 @@ func TestKeyLen(t *testing.T) {
 	// tree: ceil(maxLevels/8)
 	maxLevels = 32
 	database = metadb.NewTest(t)
-	tree, err = NewTree(Config{Database: database, MaxLevels: maxLevels,
-		HashFunction: HashFunctionBlake2b})
+	tree, err = NewTree(Config{
+		Database: database, MaxLevels: maxLevels,
+		HashFunction: HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
@@ -917,8 +949,10 @@ func TestKeyLenBiggerThan32(t *testing.T) {
 	c := qt.New(t)
 	maxLevels := 264
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: maxLevels,
-		HashFunction: HashFunctionBlake2b})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: maxLevels,
+		HashFunction: HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 33
@@ -940,8 +974,10 @@ func TestKeyLenBiggerThan32(t *testing.T) {
 func TestDelete(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -1019,8 +1055,10 @@ func BenchmarkAdd(b *testing.B) {
 func benchmarkAdd(b *testing.B, hashFunc HashFunction, ks, vs [][]byte) {
 	c := qt.New(b)
 	database := metadb.NewTest(c)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 140,
-		HashFunction: hashFunc})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 140,
+		HashFunction: hashFunc,
+	})
 	c.Assert(err, qt.IsNil)
 
 	for i := 0; i < len(ks); i++ {
@@ -1059,7 +1097,7 @@ func TestDiskSizeBench(t *testing.T) {
 	countDBitems := func() int {
 		count := 0
 		if err := tree.db.Iterate(nil, func(_, _ []byte) bool {
-			//fmt.Printf("db item: %x\n", k)
+			// fmt.Printf("db item: %x\n", k)
 			count++
 			return true
 		}); err != nil {
@@ -1090,7 +1128,7 @@ func TestDiskSizeBench(t *testing.T) {
 	for i := 0; i < len(ks)/2; i++ {
 		err = tree.DeleteWithTx(tx, ks[i])
 		c.Assert(err, qt.IsNil)
-		//fmt.Printf("deleted %x\n", ks[i])
+		// fmt.Printf("deleted %x\n", ks[i])
 	}
 	c.Assert(tx.Commit(), qt.IsNil)
 	printRes("	Delete loop", time.Since(start))
@@ -1130,7 +1168,7 @@ func TestDiskSizeBench(t *testing.T) {
 	for i := 0; i < len(ks); i++ {
 		err = tree.UpdateWithTx(tx, ks[i], vs[len(ks)-i-1])
 		c.Assert(err, qt.IsNil, qt.Commentf("k=%x", ks[i]))
-		//fmt.Printf("updated %x\n", ks[i])
+		// fmt.Printf("updated %x\n", ks[i])
 	}
 	c.Assert(tx.Commit(), qt.IsNil)
 	printRes("	Update loop", time.Since(start))
@@ -1168,8 +1206,10 @@ func dirSize(path string) (int64, error) {
 func TestGetLeavesFromSubPath(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -1248,8 +1288,10 @@ func TestTreeAfterDeleteAndReconstruct(t *testing.T) {
 	database2 := metadb.NewTest(t)
 
 	// 1. A new tree (tree1) is created and filled with some data
-	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
-		HashFunction: HashFunctionBlake2b})
+	tree1, err := NewTree(Config{
+		Database: database1, MaxLevels: 256,
+		HashFunction: HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// prepare inputs
@@ -1274,8 +1316,10 @@ func TestTreeAfterDeleteAndReconstruct(t *testing.T) {
 	}
 
 	// 3. Create a second tree (tree2)
-	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
-		HashFunction: HashFunctionBlake2b})
+	tree2, err := NewTree(Config{
+		Database: database2, MaxLevels: 256,
+		HashFunction: HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// 4. Add the non-deleted keys from tree1 to tree2
@@ -1308,8 +1352,10 @@ func TestTreeWithSingleLeaf(t *testing.T) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// check empty root

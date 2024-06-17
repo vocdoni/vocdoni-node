@@ -98,7 +98,7 @@ func Init(level, output string, errorOutput io.Writer) {
 	case logTestWriterName:
 		out = logTestWriter
 	default:
-		f, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0600)
+		f, err := os.OpenFile(output, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
 		if err != nil {
 			panic(fmt.Sprintf("cannot create log output: %v", err))
 		}

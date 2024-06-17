@@ -12,8 +12,10 @@ import (
 func TestCircomVerifierProof(t *testing.T) {
 	c := qt.New(t)
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{Database: database, MaxLevels: 4,
-		HashFunction: HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		Database: database, MaxLevels: 4,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	testVector := [][]int64{

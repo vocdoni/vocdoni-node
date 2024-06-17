@@ -304,7 +304,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 		cometnode.DefaultMetricsProvider(tconfig.Instrumentation),
 		log.NewCometLogger("comet", tconfig.LogLevel),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}

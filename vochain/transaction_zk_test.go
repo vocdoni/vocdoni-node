@@ -119,7 +119,8 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 }
 
 func testBuildSignedRegisterSIKTx(t *testing.T, account *ethereum.SignKeys, pid,
-	proof, availableWeight []byte, chainID string) *vochaintx.Tx {
+	proof, availableWeight []byte, chainID string,
+) *vochaintx.Tx {
 	c := qt.New(t)
 
 	sik, err := account.AccountSIK(nil)

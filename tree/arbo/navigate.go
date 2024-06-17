@@ -10,7 +10,8 @@ import (
 
 // down goes down to the leaf recursively
 func (t *Tree) down(rTx db.Reader, newKey, currKey []byte, siblings [][]byte, intermediates *[][]byte,
-	path []bool, currLvl int, getLeaf bool) ([]byte, []byte, [][]byte, error) {
+	path []bool, currLvl int, getLeaf bool,
+) ([]byte, []byte, [][]byte, error) {
 	if currLvl > t.maxLevels {
 		return nil, nil, nil, ErrMaxLevel
 	}

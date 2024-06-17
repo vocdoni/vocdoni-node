@@ -53,7 +53,8 @@ type OffChainDataHandler struct {
 // NewOffChainDataHandler creates a new instance of the off chain data downloader daemon.
 // It will subscribe to Vochain events and perform data import.
 func NewOffChainDataHandler(v *vochain.BaseApplication, d *downloader.Downloader,
-	c *censusdb.CensusDB, importOnlyNew bool) *OffChainDataHandler {
+	c *censusdb.CensusDB, importOnlyNew bool,
+) *OffChainDataHandler {
 	od := OffChainDataHandler{
 		vochain:       v,
 		census:        c,
@@ -138,7 +139,6 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 			itemType:   itemTypeExternalCensus,
 		})
 	}
-
 }
 
 // OnProcessesStart is triggered when a process starts. Does nothing.

@@ -15,9 +15,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
-)
+var emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.

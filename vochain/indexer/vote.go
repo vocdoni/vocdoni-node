@@ -61,7 +61,8 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 // GetEnvelopes retrieves all envelope metadata for a ProcessId.
 // Returns ErrVoteNotFound if the envelope reference is not found.
 func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
-	searchTerm string) ([]*indexertypes.EnvelopeMetadata, error) {
+	searchTerm string,
+) ([]*indexertypes.EnvelopeMetadata, error) {
 	if from < 0 {
 		return nil, fmt.Errorf("GetEnvelopes: invalid value: from is invalid value %d", from)
 	}
@@ -95,7 +96,6 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 		envelopes = append(envelopes, envelopeMetadata)
 	}
 	return envelopes, nil
-
 }
 
 // CountTotalVotes returns the total number of envelopes.

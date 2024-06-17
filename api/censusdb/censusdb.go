@@ -96,12 +96,15 @@ func NewCensusDB(db db.Database) *CensusDB {
 
 // New creates a new census and adds it to the database.
 func (c *CensusDB) New(censusID []byte, censusType models.Census_Type,
-	uri string, authToken *uuid.UUID, maxLevels int) (*CensusRef, error) {
+	uri string, authToken *uuid.UUID, maxLevels int,
+) (*CensusRef, error) {
 	if c.Exists(censusID) {
 		return nil, ErrCensusAlreadyExists
 	}
-	tree, err := censustree.New(censustree.Options{Name: censusName(censusID),
-		ParentDB: c.db, MaxLevels: maxLevels, CensusType: censusType})
+	tree, err := censustree.New(censustree.Options{
+		Name:     censusName(censusID),
+		ParentDB: c.db, MaxLevels: maxLevels, CensusType: censusType,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +277,8 @@ func (c *CensusDB) importTreeCommon(censusID []byte, data []byte) error {
 
 // addCensusRefToDB adds a censusRef to the database.
 func (c *CensusDB) addCensusRefToDB(censusID []byte, authToken *uuid.UUID,
-	t models.Census_Type, uri string, maxLevels int) (*CensusRef, error) {
+	t models.Census_Type, uri string, maxLevels int,
+) (*CensusRef, error) {
 	wtx := c.db.WriteTx()
 	defer wtx.Discard()
 	refData := bytes.Buffer{}

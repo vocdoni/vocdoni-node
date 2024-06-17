@@ -296,7 +296,8 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetProcess{
 			SetProcess: &tx,
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +368,8 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 // POST /elections/filter/page/<page>
 // Returns a list of elections filtered by the given parameters.
 func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, electionID types.HexBytes,
-	status models.ProcessStatus, withResults bool, page int) (*[]api.ElectionSummary, error) {
+	status models.ProcessStatus, withResults bool, page int,
+) (*[]api.ElectionSummary, error) {
 	body := struct {
 		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
 		ElectionID     types.HexBytes `json:"electionId,omitempty"`

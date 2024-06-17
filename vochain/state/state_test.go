@@ -174,7 +174,6 @@ func TestBalanceTransfer(t *testing.T) {
 	b2, err = s.GetAccount(addr2.Address(), true)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, b2.Balance, qt.Equals, uint64(5))
-
 }
 
 type Listener struct {
@@ -198,6 +197,7 @@ func (*Listener) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ string)   
 func (l *Listener) OnProcessesStart(pids [][]byte) {
 	l.processStart = append(l.processStart, pids)
 }
+
 func (*Listener) Commit(_ uint32) (err error) {
 	return nil
 }
@@ -363,5 +363,4 @@ func TestNoState(t *testing.T) {
 	// check that the value is not in the nostate
 	_, err = ns.Get([]byte("foo"))
 	qt.Assert(t, err, qt.Equals, db.ErrKeyNotFound)
-
 }

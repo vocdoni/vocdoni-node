@@ -25,10 +25,8 @@ var DefaultFaucetURLs = map[string]string{
 	"prod":    "https://api-faucet.vocdoni.io/v2/open/claim/",
 }
 
-var (
-	// ErrAccountNotConfigured is returned when the client has not been configured with an account.
-	ErrAccountNotConfigured = fmt.Errorf("account not configured")
-)
+// ErrAccountNotConfigured is returned when the client has not been configured with an account.
+var ErrAccountNotConfigured = fmt.Errorf("account not configured")
 
 // Account returns the information about a Vocdoni account. If address is empty, it returns the information
 // about the account associated with the client.
@@ -103,7 +101,8 @@ func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce u
 				To:     to.Bytes(),
 				Value:  amount,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +142,8 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 				InfoURI:       &metadataURI,
 				SIK:           sik,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -367,7 +367,8 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 			DelSIK: &models.SIKTx{
 				Txtype: models.TxType_DEL_ACCOUNT_SIK,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}

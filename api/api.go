@@ -106,7 +106,8 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
 func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
-	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB) {
+	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB,
+) {
 	a.vocapp = vocdoniAPP
 	a.vocinfo = vocdoniInfo
 	a.indexer = indexer

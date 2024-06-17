@@ -268,7 +268,6 @@ func (idx *Indexer) ExportBackupAsBytes(ctx context.Context) ([]byte, error) {
 	tmpDir, err := os.MkdirTemp("", "indexer")
 	if err != nil {
 		return nil, fmt.Errorf("error creating tmpDir: %w", err)
-
 	}
 	tmpFilePath := filepath.Join(tmpDir, "indexer.sqlite3")
 	if err := idx.SaveBackup(ctx, tmpFilePath); err != nil {
@@ -890,7 +889,8 @@ func (idx *Indexer) GetTokenTransfersByAccount(acc []byte, offset, maxItems int3
 
 	return indexertypes.TokenTransfersAccount{
 		Received: transfersTo,
-		Sent:     transfersFrom}, nil
+		Sent:     transfersFrom,
+	}, nil
 }
 
 // CountTokenTransfersByAccount returns the count all the token transfers made from a given account

@@ -330,7 +330,8 @@ func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address)
 }
 
 func ensureAccountExists(api *apiclient.HTTPclient,
-	faucetPkg *models.FaucetPackage) (*apipkg.Account, error) {
+	faucetPkg *models.FaucetPackage,
+) (*apipkg.Account, error) {
 	for i := 0; i < retries; i++ {
 		acct, err := api.Account("")
 		if err != nil {

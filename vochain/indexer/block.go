@@ -12,10 +12,8 @@ import (
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
-var (
-	// ErrBlockNotFound is returned if the block is not found in the indexer database.
-	ErrBlockNotFound = fmt.Errorf("block not found")
-)
+// ErrBlockNotFound is returned if the block is not found in the indexer database.
+var ErrBlockNotFound = fmt.Errorf("block not found")
 
 func (idx *Indexer) OnBeginBlock(bb state.BeginBlock) {
 	idx.blockMu.Lock()

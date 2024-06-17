@@ -323,7 +323,8 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 }
 
 func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, censusRoot []byte, censusURI *string, censusSize uint64) error {
+	app *BaseApplication, censusRoot []byte, censusURI *string, censusSize uint64,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -352,7 +353,8 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 }
 
 func testSetProcessDuration(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, duration uint32) error {
+	app *BaseApplication, duration uint32,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -394,7 +396,8 @@ func TestCount(t *testing.T) {
 // the application will have the accounts of the keys already initialized, as well as
 // the burn account and all tx costs set to txCostNumber
 func createTestBaseApplicationAndAccounts(t *testing.T,
-	txCostNumber uint64) (*BaseApplication, []*ethereum.SignKeys) {
+	txCostNumber uint64,
+) (*BaseApplication, []*ethereum.SignKeys) {
 	app := TestBaseApplication(t)
 	keys := make([]*ethereum.SignKeys, 0)
 	for i := 0; i < 4; i++ {
@@ -428,7 +431,6 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	// set tx costs
 	for _, cost := range genesis.TxCostNameToTxTypeMap {
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
-
 	}
 	app.State.ElectionPriceCalc.SetBasePrice(10)
 	app.State.ElectionPriceCalc.SetCapacity(2000)

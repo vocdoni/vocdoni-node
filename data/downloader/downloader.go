@@ -146,7 +146,6 @@ func (d *Downloader) handleImport(item *DownloadItem) {
 	if item.Callback != nil {
 		go item.Callback(item.URI, file)
 	}
-
 }
 
 // importQueueDaemon fetches and imports remote files added via importQueue.

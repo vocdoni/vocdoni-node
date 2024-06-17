@@ -23,11 +23,9 @@ const (
 	frameHashSize = 20
 )
 
-var (
-	// DisableElectionIDVerification is a flag to dissable the election ID verification on the poll URL.
-	// This should be used only for testing purposes.
-	DisableElectionIDVerification = false
-)
+// DisableElectionIDVerification is a flag to dissable the election ID verification on the poll URL.
+// This should be used only for testing purposes.
+var DisableElectionIDVerification = false
 
 // FarcasterState represents the data stored in the farcaster state message field.
 type FarcasterState struct {

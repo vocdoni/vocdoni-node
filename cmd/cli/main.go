@@ -167,7 +167,6 @@ func main() {
 			errorp.Println("unknown option or not yet implemented")
 		}
 	}
-
 }
 
 func accountIsSet(c *VocdoniCLI) bool {
@@ -626,16 +625,21 @@ func electionHandler(cli *VocdoniCLI) error {
 		VoteType:     api.VoteType{MaxVoteOverwrites: 1},
 		ElectionType: api.ElectionType{Autostart: true, Interruptible: true},
 		Questions: []api.Question{
-			{Title: map[string]string{"default": "question title"},
+			{
+				Title:       map[string]string{"default": "question title"},
 				Description: map[string]string{"default": "question description"},
 				Choices: []api.ChoiceMetadata{
 					{
 						Title: map[string]string{"default": "1 choice title"},
-						Value: 0},
+						Value: 0,
+					},
 					{
 						Title: map[string]string{"default": "2 choice title"},
-						Value: 1},
-				}}},
+						Value: 1,
+					},
+				},
+			},
+		},
 		Census: api.CensusTypeDescription{
 			Type:     "weighted",
 			RootHash: make(types.HexBytes, 32),

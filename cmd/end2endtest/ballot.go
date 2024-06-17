@@ -51,21 +51,25 @@ func init() {
 	}
 }
 
-var _ VochainTest = (*E2EBallotRanked)(nil)
-var _ VochainTest = (*E2EBallotQuadratic)(nil)
-var _ VochainTest = (*E2EBallotRange)(nil)
-var _ VochainTest = (*E2EBallotApproval)(nil)
+var (
+	_ VochainTest = (*E2EBallotRanked)(nil)
+	_ VochainTest = (*E2EBallotQuadratic)(nil)
+	_ VochainTest = (*E2EBallotRange)(nil)
+	_ VochainTest = (*E2EBallotApproval)(nil)
+)
 
-type E2EBallotRanked struct{ e2eElection }
-type E2EBallotQuadratic struct{ e2eElection }
-type E2EBallotRange struct{ e2eElection }
-type E2EBallotApproval struct{ e2eElection }
+type (
+	E2EBallotRanked    struct{ e2eElection }
+	E2EBallotQuadratic struct{ e2eElection }
+	E2EBallotRange     struct{ e2eElection }
+	E2EBallotApproval  struct{ e2eElection }
+)
 
 func (t *E2EBallotRanked) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
-	//setup for ranked voting
+	// setup for ranked voting
 	p := newTestProcess()
 	p.VoteOptions = &models.ProcessVoteOptions{
 		MaxCount:     4,
@@ -275,9 +279,16 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 	// fill initial 10 votes to be sent by the ballot test
 	case rankedVote:
 		v = [][]int{
-			{0, 5, 0, 2}, {3, 1, 0, 2}, {3, 2, 0, 1}, {1, 0, 3, 2},
-			{2, 3, 1, 1}, {4, 1, 1, 0}, {0, 0, 2, 1}, {0, 2, 1, 3},
-			{1, 1, 1, 4}, {0, 3, 2, 1},
+			{0, 5, 0, 2},
+			{3, 1, 0, 2},
+			{3, 2, 0, 1},
+			{1, 0, 3, 2},
+			{2, 3, 1, 1},
+			{4, 1, 1, 0},
+			{0, 0, 2, 1},
+			{0, 2, 1, 3},
+			{1, 1, 1, 4},
+			{0, 3, 2, 1},
 		}
 		// default results on field 1,2,3,4 for 10 votes
 		resultsFields = append(resultsFields, votesToBigInt(20, 10, 0, 20),
@@ -286,9 +297,16 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 
 	case quadraticVote:
 		v = [][]int{
-			{2, 4, 2, 0}, {3, 3, 2, 2}, {2, 3, 0, 1}, {0, 2, 3, 3},
-			{1, 2, 1, 2}, {5, 0, 1, 0}, {0, 2, 2, 2}, {2, 1, 1, 2},
-			{1, 3, 0, 1}, {1, 3, 1, 1},
+			{2, 4, 2, 0},
+			{3, 3, 2, 2},
+			{2, 3, 0, 1},
+			{0, 2, 3, 3},
+			{1, 2, 1, 2},
+			{5, 0, 1, 0},
+			{0, 2, 2, 2},
+			{2, 1, 1, 2},
+			{1, 3, 0, 1},
+			{1, 3, 1, 1},
 		}
 		resultsFields = append(resultsFields, votesToBigInt(10, 30, 10, 0),
 			votesToBigInt(0, 10, 20, 20), votesToBigInt(10, 30, 10, 0),
@@ -296,9 +314,16 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 
 	case rangeVote:
 		v = [][]int{
-			{5, 0, 4, 2}, {3, 1, 2, 4}, {6, 0, 1, 3}, {0, 3, 2, 1},
-			{2, 1, 3, 0}, {3, 2, 1, 3}, {1, 3, 2, 0}, {2, 1, 1, 2},
-			{1, 2, 0, 3}, {4, 3, 1, 1},
+			{5, 0, 4, 2},
+			{3, 1, 2, 4},
+			{6, 0, 1, 3},
+			{0, 3, 2, 1},
+			{2, 1, 3, 0},
+			{3, 2, 1, 3},
+			{1, 3, 2, 0},
+			{2, 1, 1, 2},
+			{1, 2, 0, 3},
+			{4, 3, 1, 1},
 		}
 		resultsFields = append(resultsFields, votesToBigInt(10, 20, 10, 0),
 			votesToBigInt(0, 10, 10, 20), votesToBigInt(10, 0, 20, 10),
@@ -306,9 +331,16 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 
 	case approvalVote:
 		v = [][]int{
-			{1, 0, 0, 0}, {2, 1, 0, 1}, {0, 1, 2, 3}, {0, 0, 0, 1},
-			{0, 0, 1, 1}, {2, 2, 1, 0}, {1, 0, 1, 1}, {0, 0, 0, 0},
-			{1, 1, 0, 3}, {1, 1, 1, 1},
+			{1, 0, 0, 0},
+			{2, 1, 0, 1},
+			{0, 1, 2, 3},
+			{0, 0, 0, 1},
+			{0, 0, 1, 1},
+			{2, 2, 1, 0},
+			{1, 0, 1, 1},
+			{0, 0, 0, 0},
+			{1, 1, 0, 3},
+			{1, 1, 1, 1},
 		}
 		resultsFields = append(resultsFields, votesToBigInt(30, 30),
 			votesToBigInt(50, 10), votesToBigInt(30, 30),

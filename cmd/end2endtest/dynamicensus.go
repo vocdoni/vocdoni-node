@@ -155,7 +155,6 @@ func (t *E2EDynamicensusElection) Run() error {
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",
 		})
-
 		if err != nil {
 			errCh <- fmt.Errorf("unexpected error from set process census %s", err)
 			return
@@ -212,7 +211,6 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		log.Infof("election %s status is RESULTS", electionID.String())
 		log.Infof("election results: %v %x %s", elres.Results, elres.CensusRoot, t.elections[0].election.Census.CensusURL)
-
 	}()
 
 	// election with dynamic census disabled

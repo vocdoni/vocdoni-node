@@ -57,7 +57,8 @@ func ProtobufZKProofToProverProof(p *models.ProofZkSNARK) (*prover.Proof, error)
 // a defined public signals and any of the rest of the parameters is nil, the
 // resulting struct will not contains any defined PublicInputs value.
 func ProverProofToProtobufZKProof(p *prover.Proof, electionId, sikRoot,
-	censusRoot, nullifier types.HexBytes, voteWeight *big.Int) (*models.ProofZkSNARK, error) {
+	censusRoot, nullifier types.HexBytes, voteWeight *big.Int,
+) (*models.ProofZkSNARK, error) {
 	if len(p.Data.A) != proofALen || len(p.Data.B) != proofBEncLen || len(p.Data.C) != proofCLen {
 		return nil, fmt.Errorf("wrong ZkSnark prover proof format")
 	}

@@ -39,13 +39,17 @@ func debugTime(descr string, time1, time2 time.Duration) {
 
 func testInit(c *qt.C, n int) (*Tree, *Tree) {
 	database1 := metadb.NewTest(c)
-	tree1, err := NewTree(Config{Database: database1, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree1, err := NewTree(Config{
+		Database: database1, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(c)
-	tree2, err := NewTree(Config{Database: database2, MaxLevels: 256,
-		HashFunction: HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		Database: database2, MaxLevels: 256,
+		HashFunction: HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := HashFunctionPoseidon.Len()
@@ -116,8 +120,10 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	nLeafs := 1027
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -130,8 +136,10 @@ func TestAddBatchTreeEmptyNotPowerOf2(t *testing.T) {
 	}
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	var keys, values [][]byte
@@ -161,13 +169,17 @@ func randomBytes(n int) []byte {
 func TestAddBatchTestVector1(t *testing.T) {
 	c := qt.New(t)
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree1, err := NewTree(Config{
+		database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	// leafs in 2nd level subtrees: [ 6, 0, 1, 1]
@@ -199,13 +211,17 @@ func TestAddBatchTestVector1(t *testing.T) {
 
 	// 2nd test vectors
 	database1 = metadb.NewTest(t)
-	tree1, err = NewTree(Config{database1, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree1, err = NewTree(Config{
+		database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 = metadb.NewTest(t)
-	tree2, err = NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree2, err = NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	testvectorKeys = []string{
@@ -245,13 +261,17 @@ func TestAddBatchTestVector2(t *testing.T) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree1, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := tree1.HashFunction().Len()
@@ -288,13 +308,17 @@ func TestAddBatchTestVector3(t *testing.T) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree1, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree1, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := tree1.HashFunction().Len()
@@ -335,13 +359,17 @@ func TestAddBatchTreeEmptyRandomKeys(t *testing.T) {
 	nLeafs := 8
 
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree1, err := NewTree(Config{
+		database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	var keys, values [][]byte
@@ -683,8 +711,10 @@ func TestAddBatchNotEmptyUnbalanced(t *testing.T) {
 	time1 := time.Since(start)
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 	tree2.dbgInit()
 
@@ -777,8 +807,10 @@ func benchAddBatch(t *testing.T, ks, vs [][]byte) {
 	c := qt.New(t)
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	tree.dbgInit()
@@ -809,8 +841,10 @@ func TestDbgStats(t *testing.T) {
 
 	// 1
 	database1 := metadb.NewTest(t)
-	tree1, err := NewTree(Config{database1, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree1, err := NewTree(Config{
+		database1, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	tree1.dbgInit()
@@ -822,8 +856,10 @@ func TestDbgStats(t *testing.T) {
 
 	// 2
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	tree2.dbgInit()
@@ -834,8 +870,10 @@ func TestDbgStats(t *testing.T) {
 
 	// 3
 	database3 := metadb.NewTest(t)
-	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
-		HashFunctionBlake2b})
+	tree3, err := NewTree(Config{
+		database3, 256, DefaultThresholdNLeafs,
+		HashFunctionBlake2b,
+	})
 	c.Assert(err, qt.IsNil)
 
 	tree3.dbgInit()
@@ -868,8 +906,10 @@ func TestLoadVT(t *testing.T) {
 	nLeafs := 1024
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	var keys, values [][]byte
@@ -901,8 +941,10 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	nLeafs := 1024
 
 	database := metadb.NewTest(t)
-	tree, err := NewTree(Config{database, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree, err := NewTree(Config{
+		database, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
@@ -921,8 +963,10 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	}
 
 	database2 := metadb.NewTest(t)
-	tree2, err := NewTree(Config{database2, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree2, err := NewTree(Config{
+		database2, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 	tree2.dbgInit()
 
@@ -934,8 +978,10 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 
 	// use tree3 to add nil value array
 	database3 := metadb.NewTest(t)
-	tree3, err := NewTree(Config{database3, 256, DefaultThresholdNLeafs,
-		HashFunctionPoseidon})
+	tree3, err := NewTree(Config{
+		database3, 256, DefaultThresholdNLeafs,
+		HashFunctionPoseidon,
+	})
 	c.Assert(err, qt.IsNil)
 
 	invalids, err = tree3.AddBatch(keys, nil)
@@ -962,8 +1008,10 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	c.Check(verif, qt.IsTrue)
 
 	// check with array with 32 zeroes
-	e32 := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+	e32 := []byte{
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
 	c.Assert(len(e32), qt.Equals, 32)
 	verif, err = CheckProof(tree.hashFunction, keys[9], e32, root, siblings)
 	c.Assert(err, qt.IsNil)

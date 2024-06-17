@@ -89,7 +89,7 @@ func TestIterate(t *testing.T, d db.Database) {
 // TestConcurrentWriteTx validates the behaviour of badgerdb when multiple
 // write transactions modify the same key.
 func TestConcurrentWriteTx(t *testing.T, database db.Database) {
-	var key = []byte{1}
+	key := []byte{1}
 	wTx := database.WriteTx()
 	qt.Assert(t, wTx.Set(key, []byte{0}), qt.IsNil)
 	qt.Assert(t, wTx.Commit(), qt.IsNil)
@@ -97,7 +97,7 @@ func TestConcurrentWriteTx(t *testing.T, database db.Database) {
 	var wgSync sync.WaitGroup
 	wgSync.Add(2)
 	inc := func(t *testing.T, m *sync.Mutex, database db.Database) error {
-		var key = []byte{1}
+		key := []byte{1}
 		wTx := database.WriteTx()
 		// Sync here so that both goroutines have created a WriteTx
 		// before operating with it.
