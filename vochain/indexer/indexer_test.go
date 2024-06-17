@@ -2,13 +2,11 @@ package indexer
 
 import (
 	"bytes"
-	"context"
 	"encoding/hex"
 	"fmt"
 	"io"
 	stdlog "log"
 	"math/big"
-	"path/filepath"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -88,8 +86,8 @@ func TestBackup(t *testing.T) {
 	wantTotalVotes(10)
 
 	// Back up the database.
-	backupPath := filepath.Join(t.TempDir(), "backup")
-	err = idx.SaveBackup(context.TODO(), backupPath)
+	var bkp bytes.Buffer
+	err = idx.ExportBackup(&bkp)
 	qt.Assert(t, err, qt.IsNil)
 
 	// Add another 5 votes which aren't in the backup.
@@ -110,7 +108,7 @@ func TestBackup(t *testing.T) {
 	idx.Close()
 	idx, err = New(app, Options{DataDir: t.TempDir(), ExpectBackupRestore: true})
 	qt.Assert(t, err, qt.IsNil)
-	err = idx.RestoreBackup(backupPath)
+	err = idx.ImportBackup(&bkp)
 	qt.Assert(t, err, qt.IsNil)
 	wantTotalVotes(10)
 

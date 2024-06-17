@@ -50,6 +50,7 @@ require (
 	github.com/pressly/goose/v3 v3.20.0
 	github.com/prometheus/client_golang v1.19.0
 	github.com/rs/zerolog v1.31.0
+	github.com/schollz/sqlite3dump v1.3.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.18.2
 	github.com/syndtr/goleveldb v1.0.1-0.20220614013038-64ee5596c38a
