@@ -422,6 +422,14 @@ func (a *API) chainEstimateDateHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 		return err
 	}
 	timestamp := a.vocinfo.HeightTime(height)
+	if timestamp.IsZero() {
+		// if block was not found in store, the indexer might have it anyway
+		timestamp, err = a.indexer.BlockTimestamp(int64(height))
+		if err != nil {
+			return err
+		}
+	}
+
 	data, err := json.Marshal(struct {
 		Date time.Time `json:"date"`
 	}{Date: timestamp},
