@@ -57,7 +57,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vocdoni-api.yaml
-          path: swaggers/vocdoni-api.yaml
+          path: swaggers
 
       - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Create PR to developer-portal repo
