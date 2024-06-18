@@ -50,8 +50,13 @@ import (
 
 //	@securityDefinitions.basic	BasicAuth
 
-// MaxPageSize defines the maximum number of results returned by the paginated endpoints
-const MaxPageSize = 10
+const (
+	// MaxPageSize defines the maximum number of results returned by the paginated endpoints
+	MaxPageSize = 10
+
+	// These consts define the keywords for both query (?param=) and url (/url/param/) params
+	ParamPage = "page"
+)
 
 var (
 	ErrMissingModulesForHandler = fmt.Errorf("missing modules attached for enabling handler")

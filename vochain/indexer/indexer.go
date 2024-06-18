@@ -905,7 +905,7 @@ func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	return uint64(count), err
 }
 
-func (idx *Indexer) GetListAccounts(offset, maxItems int32) ([]indexertypes.Account, error) {
+func (idx *Indexer) AccountsList(offset, maxItems int) ([]indexertypes.Account, error) {
 	accsFromDB, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
 		Limit:  int64(maxItems),
 		Offset: int64(offset),

@@ -31,7 +31,7 @@ const (
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/page/{page}",
+		"/elections",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionFullListHandler,
@@ -121,7 +121,38 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 
+	// Legacy endpoints
+	if err := a.Endpoint.RegisterMethod(
+		"/elections/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionFullListLegacyHandler,
+	); err != nil {
+		return err
+	}
 	return nil
+}
+
+// electionFullListLegacyHandler
+//
+//	@Summary		List elections (using url params)
+//	@Description	Get a list of elections summaries. (Deprecated, in favor of /elections?page=)
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	ElectionsList
+//	@Router			/elections/page/{page} [get]
+func (a *API) electionFullListLegacyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	page := 0
+	if p := ctx.URLParam(ParamPage); p != "" {
+		var err error
+		page, err = strconv.Atoi(p)
+		if err != nil {
+			return ErrCantParsePageNumber.With(p)
+		}
+	}
+	return a.electionFullList(ctx, page)
 }
 
 // electionFullListHandler
@@ -131,36 +162,39 @@ func (a *API) enableElectionHandlers() error {
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	path		number	true	"Page "
-//	@Success		200		{object}	ElectionSummary
-//	@Router			/elections/page/{page} [get]
+//	@Param			page	query		number	false	"Page"
+//	@Success		200		{object}	ElectionsList
+//	@Router			/elections [get]
 func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
-	if ctx.URLParam("page") != "" {
+	if p := ctx.QueryParam(ParamPage); p != "" {
 		var err error
-		page, err = strconv.Atoi(ctx.URLParam("page"))
+		page, err = strconv.Atoi(p)
 		if err != nil {
-			return ErrCantParsePageNumber.With(ctx.URLParam("page"))
+			return ErrCantParsePageNumber.With(p)
 		}
 	}
-	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
+	return a.electionFullList(ctx, page)
+}
+
+// electionFullList sends a marshalled ElectionsList over ctx.Send
+func (a *API) electionFullList(ctx *httprouter.HTTPContext, page int) error {
+	elections, total, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
 	if err != nil {
 		return ErrCantFetchElectionList.WithErr(err)
 	}
 
-	list := []ElectionSummary{}
+	list := ElectionsList{
+		Total: total,
+	}
 	for _, eid := range elections {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
 			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
-		list = append(list, a.electionSummary(e))
+		list.Elections = append(list.Elections, a.electionSummary(e))
 	}
-	// wrap list in a struct to consistently return list in an object, return empty
-	// object if the list does not contains any result
-	data, err := json.Marshal(struct {
-		Elections []ElectionSummary `json:"elections"`
-	}{list})
+	data, err := json.Marshal(list)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
@@ -647,7 +681,8 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		withResults := false
 		body.WithResults = &withResults
 	}
-	elections, err := a.indexer.ProcessList(
+	// TODO: use returned total
+	elections, _, err := a.indexer.ProcessList(
 		body.OrganizationID,
 		page,
 		MaxPageSize,
@@ -664,20 +699,16 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 		return ErrElectionNotFound
 	}
 
-	var list []ElectionSummary
+	var list ElectionsList
 	// get election summary
 	for _, eid := range elections {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
 			return ErrCantFetchElection.WithErr(err)
 		}
-		list = append(list, a.electionSummary(e))
+		list.Elections = append(list.Elections, a.electionSummary(e))
 	}
-	data, err := json.Marshal(struct {
-		Elections []ElectionSummary `json:"elections"`
-	}{
-		Elections: list,
-	})
+	data, err := json.Marshal(list)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}

@@ -21,16 +21,27 @@ type TestHTTPclient struct {
 	t     testing.TB
 }
 
-func (c *TestHTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]byte, int) {
-	body, err := json.Marshal(jsonBody)
-	qt.Assert(c.t, err, qt.IsNil)
+func (c *TestHTTPclient) RequestWithQuery(method string, jsonBody any, query string, urlPath ...string) ([]byte, int) {
 	u, err := url.Parse(c.addr.String())
 	qt.Assert(c.t, err, qt.IsNil)
+	u.RawQuery = query
+	return c.request(method, u, jsonBody, urlPath...)
+}
+
+func (c *TestHTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]byte, int) {
+	u, err := url.Parse(c.addr.String())
+	qt.Assert(c.t, err, qt.IsNil)
+	return c.request(method, u, jsonBody, urlPath...)
+}
+
+func (c *TestHTTPclient) request(method string, u *url.URL, jsonBody any, urlPath ...string) ([]byte, int) {
 	u.Path = path.Join(u.Path, path.Join(urlPath...))
 	headers := http.Header{}
 	if c.token != nil {
 		headers = http.Header{"Authorization": []string{"Bearer " + c.token.String()}}
 	}
+	body, err := json.Marshal(jsonBody)
+	qt.Assert(c.t, err, qt.IsNil)
 	c.t.Logf("querying %s", u)
 	resp, err := c.c.Do(&http.Request{
 		Method: method,

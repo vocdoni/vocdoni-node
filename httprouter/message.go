@@ -44,6 +44,12 @@ func (h *HTTPContext) URLParam(key string) string {
 	return chi.URLParam(h.Request, key)
 }
 
+// QueryParam is a wrapper around go-chi to get the value of a query string parameter (like "?key=value").
+// If key is not present, returns the empty string.
+func (h *HTTPContext) QueryParam(key string) string {
+	return h.Request.URL.Query().Get(key)
+}
+
 // Send replies the request with the provided message.
 func (h *HTTPContext) Send(msg []byte, httpStatusCode int) error {
 	defer func() {

@@ -48,10 +48,9 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
-	srcNetworkId int32, status string, withResults bool,
-) ([][]byte, error) {
+	srcNetworkId int32, status string, withResults bool ) ([][]byte, uint64, error) {
 	if from < 0 {
-		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
+		return nil, 0, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
 	}
 	// For filtering on Status we use a badgerhold match function.
 	// If status is not defined, then the match function will return always true.
@@ -59,15 +58,14 @@ func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm strin
 	statusfound := false
 	if status != "" {
 		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
-			return nil, fmt.Errorf("processList: status %s is unknown", status)
+			return nil, 0, fmt.Errorf("processList: status %s is unknown", status)
 		}
 	}
 	// Filter match function for source network Id
 	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
-		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
+		return nil, 0, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
 	}
-
-	procs, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
+	results, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
 		EntityID:        nonNullBytes(entityID), // so that LENGTH never returns NULL
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
@@ -78,9 +76,16 @@ func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm strin
 		WithResults:     withResults,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return procs, nil
+	if len(results) == 0 {
+		return [][]byte{}, 0, nil
+	}
+	procs := [][]byte{}
+	for _, row := range results {
+		procs = append(procs, row.ID)
+	}
+	return procs, uint64(results[0].TotalProcessCount), nil
 }
 
 // CountTotalProcesses returns the total number of processes indexed.

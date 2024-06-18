@@ -109,7 +109,7 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/page/{page}",
+		"/accounts",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.accountListHandler,
@@ -117,6 +117,15 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 
+	// Legacy endpoints
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.accountListLegacyHandler,
+	); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -361,32 +370,32 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	var pids [][]byte
 	switch ctx.URLParam("status") {
 	case "ready":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
+		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
 	case "paused":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
+		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
 	case "canceled":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
+		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
 	case "ended", "results":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
+		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
-		pids2, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
+		pids2, _, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
 		pids = append(pids, pids2...)
 	case "":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
+		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
 		if err != nil {
 			return ErrCantFetchElectionList.WithErr(err)
 		}
@@ -577,6 +586,28 @@ func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
+// accountListLegacyHandler
+//
+//	@Summary		List of the existing accounts (using url params)
+//	@Description	Returns information (address, balance and nonce) of the existing accounts.  (Deprecated, in favor of /accounts?page=)
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page "
+//	@Success		200		{object}	object{accounts=[]indexertypes.Account}
+//	@Router			/accounts/page/{page} [get]
+func (a *API) accountListLegacyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	page := 0
+	if p := ctx.URLParam(ParamPage); p != "" {
+		var err error
+		page, err = strconv.Atoi(p)
+		if err != nil {
+			return ErrCantParsePageNumber.With(p)
+		}
+	}
+	return a.accountList(ctx, page)
+}
+
 // accountListHandler
 //
 //	@Summary		List of the existing accounts
@@ -584,20 +615,24 @@ func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	path		string	true	"Paginator page"
-//	@Success		200		{object}	object{accounts=[]indexertypes.Account}
-//	@Router			/accounts/page/{page} [get]
+//	@Param			page	query		number	false	"Page"
+//	@Success		200		{object}	AccountsList
+//	@Router			/accounts [get]
 func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
 	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
+	if p := ctx.QueryParam(ParamPage); p != "" {
+		var err error
+		page, err = strconv.Atoi(p)
 		if err != nil {
-			return ErrCantParsePageNumber
+			return ErrCantParsePageNumber.With(p)
 		}
 	}
-	page = page * MaxPageSize
-	accounts, err := a.indexer.GetListAccounts(int32(page), MaxPageSize)
+	return a.accountList(ctx, page)
+}
+
+// accountList sends a marshalled AccountsList over ctx.Send
+func (a *API) accountList(ctx *httprouter.HTTPContext, page int) error {
+	accounts, err := a.indexer.AccountsList(page*MaxPageSize, MaxPageSize)
 	if err != nil {
 		return ErrCantFetchTokenTransfers.WithErr(err)
 	}
