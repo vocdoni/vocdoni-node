@@ -276,3 +276,6 @@ func (*KeyKeeper) OnCensusUpdate(_, _ []byte, _ string, _ uint64) {}
 
 // OnCancel does nothing
 func (k *KeyKeeper) OnCancel(_ []byte, _ int32) {}
+
+// OnProcessDurationChange does nothing
+func (k *KeyKeeper) OnProcessDurationChange(_ []byte, _ uint32, _ int32) {}

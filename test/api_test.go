@@ -21,6 +21,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -189,9 +190,9 @@ func TestAPIaccount(t *testing.T) {
 	err := json.Unmarshal(resp, &countAccts)
 	qt.Assert(t, err, qt.IsNil)
 
-	// 2 accounts must exist: the previously new created account and the auxiliary
+	// 3 accounts must exist: the previously new created account plus burn + faucet
 	// account used to transfer to the new account
-	qt.Assert(t, countAccts.Count, qt.Equals, uint64(2))
+	qt.Assert(t, countAccts.Count, qt.Equals, uint64(3))
 
 	// get the accounts info
 	resp, code = c.Request("GET", nil, "accounts", "page", "0")
@@ -228,7 +229,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		10000, 5000,
 		5, 1000,
-		6)
+		2)
 
 	// bigger census size, duration, reduced network capacity, etc
 	runAPIElectionCostWithParams(t,
@@ -241,7 +242,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		200000, 6000,
 		10, 100,
-		762)
+		753)
 
 	// very expensive election
 	runAPIElectionCostWithParams(t,
@@ -254,7 +255,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		100000, 700000,
 		10, 100,
-		547026)
+		547017)
 }
 
 func TestAPIAccountTokentxs(t *testing.T) {
@@ -382,7 +383,8 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, gotAcct2.Address.String(), qt.Equals, hex.EncodeToString(signer2.Address().Bytes()))
 
 	// compare the balance expected for the account 2 in the account list
-	qt.Assert(t, gotAcct2.Balance, qt.Equals, initBalance+amountAcc1toAcct2-amountAcc2toAcct1)
+	txBasePrice := genesis.DefaultTransactionCosts().SendTokens
+	qt.Assert(t, gotAcct2.Balance, qt.Equals, initBalance+amountAcc1toAcct2-amountAcc2toAcct1-uint64(txBasePrice))
 
 	gotAcct1 := accts.Accounts[2]
 
@@ -390,7 +392,7 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, gotAcct1.Address.String(), qt.Equals, hex.EncodeToString(signer.Address().Bytes()))
 
 	// compare the balance expected for the account 1 in the account list
-	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2)
+	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2-uint64(txBasePrice))
 
 }
 
@@ -418,6 +420,7 @@ func runAPIElectionCostWithParams(t *testing.T,
 	err = server.VochainAPP.State.SetElectionPriceCalc()
 	qt.Assert(t, err, qt.IsNil)
 	server.VochainAPP.State.ElectionPriceCalc.SetCapacity(networkCapacity)
+	server.VochainAPP.State.ElectionPriceCalc.SetBasePrice(1)
 
 	// Block 1
 	server.VochainAPP.AdvanceTestBlock()

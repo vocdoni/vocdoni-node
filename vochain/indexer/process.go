@@ -209,6 +209,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		Metadata:      p.GetMetadata(),
 		Status:        int64(p.Status),
 		MaxCensusSize: int64(p.GetMaxCensusSize()),
+		EndDate:       time.Unix(int64(p.StartTime+p.Duration), 0),
 	}); err != nil {
 		return err
 	}

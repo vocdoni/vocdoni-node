@@ -49,6 +49,8 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 	if err != nil {
 		tb.Fatal(err)
 	}
+	app.State.ElectionPriceCalc.SetBasePrice(1)
+	app.State.ElectionPriceCalc.SetCapacity(10000)
 	// TODO: should this be a Close on the entire BaseApplication?
 	tb.Cleanup(func() {
 		if err := app.State.Close(); err != nil {

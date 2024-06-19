@@ -391,8 +391,9 @@ SET census_root         = ?1,
 	public_keys         = ?4,
 	metadata            = ?5,
 	status              = ?6,
-	max_census_size	 	= ?7
-WHERE id = ?8
+	max_census_size	 	= ?7,
+	end_date 			= ?8
+WHERE id = ?9
 `
 
 type UpdateProcessFromStateParams struct {
@@ -403,6 +404,7 @@ type UpdateProcessFromStateParams struct {
 	Metadata      string
 	Status        int64
 	MaxCensusSize int64
+	EndDate       time.Time
 	ID            types.ProcessID
 }
 
@@ -415,6 +417,7 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.Metadata,
 		arg.Status,
 		arg.MaxCensusSize,
+		arg.EndDate,
 		arg.ID,
 	)
 }
