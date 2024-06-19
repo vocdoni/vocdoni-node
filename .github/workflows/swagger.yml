@@ -62,7 +62,7 @@ jobs:
       - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Create PR to developer-portal repo
         id: cpr
-        uses: peter-evans/create-pull-request@v4
+        uses: peter-evans/create-pull-request@v6
         with:
           token: ${{ secrets.VOCDONIBOT_PAT }}
           commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
