@@ -179,22 +179,7 @@ var initialAppStateForTest = AppState{
 			Balance: 1000000000000,
 		},
 	},
-	TxCost: TransactionCosts{
-		SetProcessStatus:        1,
-		SetProcessCensus:        1,
-		SetProcessQuestionIndex: 1,
-		RegisterKey:             1,
-		NewProcess:              10,
-		SendTokens:              2,
-		SetAccountInfoURI:       2,
-		CreateAccount:           2,
-		AddDelegateForAccount:   2,
-		DelDelegateForAccount:   2,
-		CollectFaucet:           1,
-		SetAccountSIK:           1,
-		DelAccountSIK:           1,
-		SetAccountValidator:     100,
-	},
+	TxCost: DefaultTransactionCosts(),
 }
 
 var initialAppStateForDev = AppState{
@@ -244,22 +229,7 @@ var initialAppStateForDev = AppState{
 			Balance: 100000000,
 		},
 	},
-	TxCost: TransactionCosts{
-		SetProcessStatus:        2,
-		SetProcessCensus:        2,
-		SetProcessQuestionIndex: 1,
-		RegisterKey:             1,
-		NewProcess:              5,
-		SendTokens:              1,
-		SetAccountInfoURI:       1,
-		CreateAccount:           1,
-		AddDelegateForAccount:   1,
-		DelDelegateForAccount:   1,
-		CollectFaucet:           1,
-		SetAccountSIK:           1,
-		DelAccountSIK:           1,
-		SetAccountValidator:     10000,
-	},
+	TxCost: DefaultTransactionCosts(),
 }
 
 var initialAppStateForStage = AppState{
@@ -321,6 +291,7 @@ var initialAppStateForStage = AppState{
 	TxCost: TransactionCosts{
 		SetProcessStatus:        2,
 		SetProcessCensus:        1,
+		SetProcessDuration:      2,
 		SetProcessQuestionIndex: 1,
 		RegisterKey:             1,
 		NewProcess:              5,
@@ -412,6 +383,7 @@ var initialAppStateForLTS = AppState{
 	TxCost: TransactionCosts{
 		SetProcessStatus:        1,
 		SetProcessCensus:        5,
+		SetProcessDuration:      5,
 		SetProcessQuestionIndex: 1,
 		RegisterKey:             1,
 		NewProcess:              10,
@@ -459,6 +431,27 @@ func DefaultBlockParams() comettypes.BlockParams {
 func DefaultValidatorParams() comettypes.ValidatorParams {
 	return comettypes.ValidatorParams{
 		PubKeyTypes: []string{comettypes.ABCIPubKeyTypeSecp256k1},
+	}
+}
+
+// DefaultTransactionCosts returns a default set of transaction costs to use as template.
+func DefaultTransactionCosts() TransactionCosts {
+	return TransactionCosts{
+		SetProcessStatus:        2,
+		SetProcessCensus:        2,
+		SetProcessDuration:      2,
+		SetProcessQuestionIndex: 1,
+		RegisterKey:             1,
+		NewProcess:              5,
+		SendTokens:              1,
+		SetAccountInfoURI:       1,
+		CreateAccount:           1,
+		AddDelegateForAccount:   1,
+		DelDelegateForAccount:   1,
+		CollectFaucet:           1,
+		SetAccountSIK:           1,
+		DelAccountSIK:           1,
+		SetAccountValidator:     10000,
 	}
 }
 

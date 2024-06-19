@@ -93,6 +93,9 @@ func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, e
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal process (%s): %w", pid, err)
 	}
+	if process.Process == nil {
+		return nil, fmt.Errorf("process %x is nil", pid)
+	}
 	return process.Process, nil
 }
 
@@ -265,6 +268,54 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		}
 		for _, l := range v.eventListeners {
 			l.OnProcessStatusChange(process.ProcessId, newstatus, v.txCounter.Load())
+		}
+	}
+	return nil
+}
+
+// SetProcessDuration sets the duration for a given process.
+// If commit is true, the change is committed to the state and the event listeners are called.
+// The new duration must be greater than zero and different from the current one. If the process is
+// not interruptible, the new duration must be greater than the current one.
+// The process must be in READY or PAUSED status.
+func (v *State) SetProcessDuration(pid []byte, newDurationSeconds uint32, commit bool) error {
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	currentTime, err := v.Timestamp(false)
+	if err != nil {
+		return fmt.Errorf("setProcessStatus: cannot get current timestamp: %w", err)
+	}
+
+	if newDurationSeconds == 0 {
+		return fmt.Errorf("cannot set duration to zero")
+	}
+
+	if newDurationSeconds == process.Duration {
+		return fmt.Errorf("cannot set duration to the same value")
+	}
+
+	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
+		return fmt.Errorf("cannot set duration, invalid status: %s", process.Status)
+	}
+
+	if currentTime >= process.StartTime+newDurationSeconds {
+		return fmt.Errorf("cannot set duration to a value that has already passed")
+	}
+
+	if !process.Mode.Interruptible && newDurationSeconds < process.Duration {
+		return fmt.Errorf("cannot shorten duration of non-interruptible process")
+	}
+
+	// If all checks pass, the transition is valid
+	if commit {
+		process.Duration = newDurationSeconds
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+		for _, l := range v.eventListeners {
+			l.OnProcessDurationChange(process.ProcessId, newDurationSeconds, v.txCounter.Load())
 		}
 	}
 	return nil

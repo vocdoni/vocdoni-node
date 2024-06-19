@@ -21,6 +21,7 @@ type EventListener interface {
 	OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)
 	OnProcess(process *models.Process, txIndex int32)
 	OnProcessStatusChange(pid []byte, status models.ProcessStatus, txIndex int32)
+	OnProcessDurationChange(pid []byte, newDuration uint32, txIndex int32)
 	OnCancel(pid []byte, txIndex int32)
 	OnProcessKeys(pid []byte, encryptionPub string, txIndex int32)
 	OnRevealKeys(pid []byte, encryptionPriv string, txIndex int32)

@@ -631,6 +631,13 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, _ models.ProcessStatus, _ 
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
+// OnProcessDurationChange adds the process to blockUpdateProcs and, if ended, the resultsPool
+func (idx *Indexer) OnProcessDurationChange(pid []byte, _ uint32, _ int32) {
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+	idx.blockUpdateProcs[string(pid)] = true
+}
+
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (idx *Indexer) OnRevealKeys(pid []byte, _ string, _ int32) {

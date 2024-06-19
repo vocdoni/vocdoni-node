@@ -173,3 +173,4 @@ func (*OffChainDataHandler) OnProcessStatusChange(_ []byte, _ models.ProcessStat
 func (*OffChainDataHandler) OnTransferTokens(_ *vochaintx.TokenTransfer)                     {}
 func (*OffChainDataHandler) OnProcessResults(_ []byte, _ *models.ProcessResult, _ int32)     {}
 func (*OffChainDataHandler) OnSpendTokens(_ []byte, _ models.TxType, _ uint64, _ string)     {}
+func (*OffChainDataHandler) OnProcessDurationChange(_ []byte, _ uint32, _ int32)             {}

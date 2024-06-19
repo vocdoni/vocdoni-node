@@ -17,6 +17,7 @@ import (
 var (
 	TxTypeCostToStateKey = map[models.TxType]string{
 		models.TxType_SET_PROCESS_STATUS:         "c_setProcessStatus",
+		models.TxType_SET_PROCESS_DURATION:       "c_setProcessDuration",
 		models.TxType_SET_PROCESS_CENSUS:         "c_setProcessCensus",
 		models.TxType_SET_PROCESS_QUESTION_INDEX: "c_setProcessResults",
 		models.TxType_REGISTER_VOTER_KEY:         "c_registerKey",
