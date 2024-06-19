@@ -408,15 +408,15 @@ func (a *API) censusRootHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 
 // censusDumpHandler
 //
-//	@Summary		Export census
-//	@Description	Export census to JSON format. Requires Bearer token
-//	@Tags			Censuses
-//	@Security		ApiKeyAuth
-//	@Accept			json
-//	@Produce		json
-//	@Param			censusID path string true "Census id"
-//  @Success		200			{object}	censusdb.CensusDump
-//  @Router			/censuses/{censusID}/export [get]
+//		@Summary		Export census
+//		@Description	Export census to JSON format. Requires Bearer token
+//		@Tags			Censuses
+//		@Security		ApiKeyAuth
+//		@Accept			json
+//		@Produce		json
+//		@Param			censusID path string true "Census id"
+//	 @Success		200			{object}	censusdb.CensusDump
+//	 @Router			/censuses/{censusID}/export [get]
 func (a *API) censusDumpHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -587,18 +587,18 @@ func (a *API) censusSizeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 
 // censusDeleteHandler
 //
-//	@Summary		Delete census
-//	@Description	Delete unpublished census (not on the storage yet). See [publish census](census-publish)\n
-//	@Description	- Requires Bearer token
-//	@Description	- Deletes a census from the server storage
-//	@Description	- Published census cannot be deleted
-//	@Tags			Censuses
-//	@Accept			json
-//	@Produce		json
-//	@Param			censusID	path	string	true	"Census id"
-//	@Success		200			"(empty body)"
-//	@Security		ApiKeyAuth
-//  @Router			/censuses/{censusID} [delete]
+//		@Summary		Delete census
+//		@Description	Delete unpublished census (not on the storage yet). See [publish census](census-publish)\n
+//		@Description	- Requires Bearer token
+//		@Description	- Deletes a census from the server storage
+//		@Description	- Published census cannot be deleted
+//		@Tags			Censuses
+//		@Accept			json
+//		@Produce		json
+//		@Param			censusID	path	string	true	"Census id"
+//		@Success		200			"(empty body)"
+//		@Security		ApiKeyAuth
+//	 @Router			/censuses/{censusID} [delete]
 func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
@@ -951,14 +951,15 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 }
 
 // censusListHandler
-//	@Summary		List all census references
-//	@Description	List all census references. Requires Admin Bearer token.
-//	@Tags			Censuses
-//  @Security       ApiKeyAuth
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	[]censusdb.CensusList
-//	@Router			/censuses/list [get]
+//
+//		@Summary		List all census references
+//		@Description	List all census references. Requires Admin Bearer token.
+//		@Tags			Censuses
+//	 @Security       ApiKeyAuth
+//		@Accept			json
+//		@Produce		json
+//		@Success		200	{object}	[]censusdb.CensusList
+//		@Router			/censuses/list [get]
 func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	list, err := a.censusdb.List()
 	if err != nil {
