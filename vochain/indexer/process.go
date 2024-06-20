@@ -81,11 +81,11 @@ func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm strin
 	if len(results) == 0 {
 		return [][]byte{}, 0, nil
 	}
-	procs := [][]byte{}
+	list := [][]byte{}
 	for _, row := range results {
-		procs = append(procs, row.ID)
+		list = append(list, row.ID)
 	}
-	return procs, uint64(results[0].TotalCount), nil
+	return list, uint64(results[0].TotalCount), nil
 }
 
 // CountTotalProcesses returns the total number of processes indexed.
