@@ -358,63 +358,18 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrCantParseOrgID.Withf("%q", ctx.URLParam("organizationID"))
 	}
 
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
-
-	var pids [][]byte
-	switch ctx.URLParam("status") {
-	case "ready":
-		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "paused":
-		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "canceled":
-		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "ended", "results":
-		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-		pids2, _, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-		pids = append(pids, pids2...)
-	case "":
-		pids, _, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	default:
-		return ErrParamStatusMissing
+	list, err := a.electionList(
+		ctx.URLParam(ParamPage),
+		ctx.URLParam(ParamStatus),
+		organizationID,
+		"",
+		false,
+	)
+	if err != nil {
+		return err
 	}
 
-	elections := []*ElectionSummary{}
-	for _, pid := range pids {
-		procInfo, err := a.indexer.ProcessInfo(pid)
-		if err != nil {
-			return ErrCantFetchElection.WithErr(err)
-		}
-		summary := a.electionSummary(procInfo)
-		elections = append(elections, &summary)
-	}
-	data, err := json.Marshal(&Organization{
-		Elections: elections,
-	})
+	data, err := json.Marshal(list)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}

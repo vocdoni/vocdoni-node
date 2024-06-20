@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -144,15 +145,22 @@ func (a *API) enableElectionHandlers() error {
 //	@Success		200		{object}	ElectionsList
 //	@Router			/elections/page/{page} [get]
 func (a *API) electionFullListLegacyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page := 0
-	if p := ctx.URLParam(ParamPage); p != "" {
-		var err error
-		page, err = strconv.Atoi(p)
-		if err != nil {
-			return ErrCantParsePageNumber.With(p)
-		}
+	list, err := a.electionList(
+		ctx.URLParam(ParamPage),
+		"",
+		nil,
+		"",
+		false,
+	)
+	if err != nil {
+		return err
 	}
-	return a.electionFullList(ctx, page)
+
+	data, err := json.Marshal(list)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // electionFullListHandler
@@ -166,34 +174,17 @@ func (a *API) electionFullListLegacyHandler(_ *apirest.APIdata, ctx *httprouter.
 //	@Success		200		{object}	ElectionsList
 //	@Router			/elections [get]
 func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page := 0
-	if p := ctx.QueryParam(ParamPage); p != "" {
-		var err error
-		page, err = strconv.Atoi(p)
-		if err != nil {
-			return ErrCantParsePageNumber.With(p)
-		}
-	}
-	return a.electionFullList(ctx, page)
-}
-
-// electionFullList sends a marshalled ElectionsList over ctx.Send
-func (a *API) electionFullList(ctx *httprouter.HTTPContext, page int) error {
-	elections, total, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
+	list, err := a.electionList(
+		ctx.QueryParam(ParamPage),
+		"",
+		nil,
+		"",
+		false,
+	)
 	if err != nil {
-		return ErrCantFetchElectionList.WithErr(err)
+		return err
 	}
 
-	list := ElectionsList{
-		Total: total,
-	}
-	for _, eid := range elections {
-		e, err := a.indexer.ProcessInfo(eid)
-		if err != nil {
-			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
-		}
-		list.Elections = append(list.Elections, a.electionSummary(e))
-	}
 	data, err := json.Marshal(list)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
@@ -667,52 +658,76 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 	if body.OrganizationID == nil && body.ElectionID == nil && body.Status == "" && body.WithResults == nil {
 		return ErrMissingParameter
 	}
-	// get page
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber.WithErr(err)
-		}
-	}
-	page = page * MaxPageSize
+
 	if body.WithResults == nil {
 		withResults := false
 		body.WithResults = &withResults
 	}
-	// TODO: use returned total
-	elections, _, err := a.indexer.ProcessList(
-		body.OrganizationID,
-		page,
-		MaxPageSize,
-		body.ElectionID.String(),
-		0,
-		0,
+
+	list, err := a.electionList(
+		ctx.URLParam(ParamPage),
 		body.Status,
+		body.OrganizationID,
+		body.ElectionID.String(),
 		*body.WithResults,
 	)
 	if err != nil {
-		return ErrCantFetchElectionList.WithErr(err)
-	}
-	if len(elections) == 0 {
-		return ErrElectionNotFound
+		return err
 	}
 
-	var list ElectionsList
-	// get election summary
-	for _, eid := range elections {
-		e, err := a.indexer.ProcessInfo(eid)
-		if err != nil {
-			return ErrCantFetchElection.WithErr(err)
-		}
-		list.Elections = append(list.Elections, a.electionSummary(e))
-	}
 	data, err := json.Marshal(list)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// electionList queries the indexer and returns a filtered, paginated ElectionsList
+//
+// Errors returned are always of type APIerror.
+// TODO: turn this long list of args into a struct.
+func (a *API) electionList(pageStr, statusStr string,
+	orgID types.HexBytes, searchTerm string,
+	withResults bool,
+) (*ElectionsList, error) {
+	page, err := parseNumber(pageStr)
+	if err != nil {
+		return nil, err
+	}
+
+	status, err := parseStatus(statusStr)
+	if err != nil {
+		return nil, err
+	}
+
+	eids, total, err := a.indexer.ProcessList(
+		orgID,
+		page*MaxPageSize,
+		MaxPageSize,
+		searchTerm,
+		0,
+		0,
+		status,
+		withResults,
+	)
+	if err != nil {
+		return nil, ErrCantFetchElectionList.WithErr(err)
+	}
+	if len(eids) == 0 {
+		return nil, ErrElectionNotFound
+	}
+
+	list := &ElectionsList{
+		Total: total,
+	}
+	for _, eid := range eids {
+		e, err := a.indexer.ProcessInfo(eid)
+		if err != nil {
+			return nil, ErrCantFetchElection.Withf("(%x): %v", eid, err)
+		}
+		list.Elections = append(list.Elections, a.electionSummary(e))
+	}
+	return list, nil
 }
 
 // buildElectionIDHandler

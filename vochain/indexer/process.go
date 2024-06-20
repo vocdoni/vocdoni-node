@@ -48,18 +48,10 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // declared as zero-values will be ignored. SearchTerm is a partial or full PID.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
-	srcNetworkId int32, status string, withResults bool ) ([][]byte, uint64, error) {
+	srcNetworkId int32, status models.ProcessStatus, withResults bool,
+) ([][]byte, uint64, error) {
 	if from < 0 {
 		return nil, 0, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
-	}
-	// For filtering on Status we use a badgerhold match function.
-	// If status is not defined, then the match function will return always true.
-	statusnum := int32(0)
-	statusfound := false
-	if status != "" {
-		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
-			return nil, 0, fmt.Errorf("processList: status %s is unknown", status)
-		}
 	}
 	// Filter match function for source network Id
 	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
@@ -68,7 +60,7 @@ func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm strin
 	results, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
 		EntityID:        nonNullBytes(entityID), // so that LENGTH never returns NULL
 		Namespace:       int64(namespace),
-		Status:          int64(statusnum),
+		Status:          int64(status),
 		SourceNetworkID: int64(srcNetworkId),
 		IDSubstr:        searchTerm,
 		Offset:          int64(from),

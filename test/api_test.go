@@ -262,7 +262,8 @@ func TestAPIAccountsList(t *testing.T) {
 	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
 	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
 
-	qt.Assert(t, el["0"].Total, qt.Equals, uint64(1+20))
+	// 2 accounts pre-exist: the faucet account, and the burn address
+	qt.Assert(t, el["0"].Total, qt.Equals, uint64(2+20))
 	qt.Assert(t, el["1"].Total, qt.Equals, el["0"].Total)
 	qt.Assert(t, el["p0"].Total, qt.Equals, el["0"].Total)
 	qt.Assert(t, el["p1"].Total, qt.Equals, el["0"].Total)

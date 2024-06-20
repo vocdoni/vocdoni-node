@@ -55,7 +55,8 @@ const (
 	MaxPageSize = 10
 
 	// These consts define the keywords for both query (?param=) and url (/url/param/) params
-	ParamPage = "page"
+	ParamPage   = "page"
+	ParamStatus = "status"
 )
 
 var (
