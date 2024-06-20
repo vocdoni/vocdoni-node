@@ -264,7 +264,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 const searchProcesses = `-- name: SearchProcesses :many
 WITH filtered_processes AS (
     SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
-           COUNT(*) OVER() AS total_process_count
+           COUNT(*) OVER() AS total_count
     FROM processes
     WHERE (LENGTH(?3) = 0 OR entity_id = ?3)
         AND (?4 = 0 OR namespace = ?4)
@@ -274,7 +274,7 @@ WITH filtered_processes AS (
         AND (?7 = '' OR (INSTR(LOWER(HEX(id)), ?7) > 0))
         AND (?8 = FALSE OR have_results)
 )
-SELECT id, total_process_count
+SELECT id, total_count
 FROM filtered_processes
 ORDER BY creation_time DESC, id ASC
 LIMIT ?2
@@ -293,8 +293,8 @@ type SearchProcessesParams struct {
 }
 
 type SearchProcessesRow struct {
-	ID                []byte
-	TotalProcessCount int64
+	ID         []byte
+	TotalCount int64
 }
 
 func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]SearchProcessesRow, error) {
@@ -315,7 +315,7 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 	var items []SearchProcessesRow
 	for rows.Next() {
 		var i SearchProcessesRow
-		if err := rows.Scan(&i.ID, &i.TotalProcessCount); err != nil {
+		if err := rows.Scan(&i.ID, &i.TotalCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

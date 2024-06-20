@@ -5,7 +5,8 @@ REPLACE INTO accounts (
 ;
 
 -- name: GetListAccounts :many
-SELECT *
+SELECT *,
+       COUNT(*) OVER() AS total_count
 FROM accounts
 ORDER BY balance DESC
 LIMIT ? OFFSET ?

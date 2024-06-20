@@ -33,7 +33,7 @@ LIMIT 1;
 -- name: SearchProcesses :many
 WITH filtered_processes AS (
     SELECT *,
-           COUNT(*) OVER() AS total_process_count
+           COUNT(*) OVER() AS total_count
     FROM processes
     WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
         AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
@@ -43,7 +43,7 @@ WITH filtered_processes AS (
         AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
         AND (sqlc.arg(with_results) = FALSE OR have_results)
 )
-SELECT id, total_process_count
+SELECT id, total_count
 FROM filtered_processes
 ORDER BY creation_time DESC, id ASC
 LIMIT sqlc.arg(limit)
