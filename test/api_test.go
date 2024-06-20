@@ -242,7 +242,7 @@ func TestAPIAccountsList(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
-	// Get the list of elections and check it
+	// Get the list and check it
 	fetchAL := func(method string, jsonBody any, query string, urlPath ...string) api.AccountsList {
 		resp, code := c.RequestWithQuery(method, jsonBody, query, urlPath...)
 		list := api.AccountsList{}
@@ -262,7 +262,7 @@ func TestAPIAccountsList(t *testing.T) {
 	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
 	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
 
-	qt.Assert(t, el["0"].Total, qt.Equals, uint64(20))
+	qt.Assert(t, el["0"].Total, qt.Equals, uint64(1+20))
 	qt.Assert(t, el["1"].Total, qt.Equals, el["0"].Total)
 	qt.Assert(t, el["p0"].Total, qt.Equals, el["0"].Total)
 	qt.Assert(t, el["p1"].Total, qt.Equals, el["0"].Total)

@@ -235,15 +235,9 @@ type Account struct {
 	SIK           types.HexBytes   `json:"sik"`
 }
 
-type AccountSummary struct {
-	Address types.AccountID `json:"address"`
-	Nonce   uint32          `json:"nonce"`
-	Balance uint64          `json:"balance"`
-}
-
 type AccountsList struct {
-	Accounts []AccountSummary `json:"accounts"`
-	Total    uint64           `json:"total"`
+	Accounts []indexertypes.Account `json:"accounts"`
+	Total    uint64                 `json:"total"`
 }
 
 type AccountSet struct {

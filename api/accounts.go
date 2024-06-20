@@ -632,15 +632,14 @@ func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 
 // accountList sends a marshalled AccountsList over ctx.Send
 func (a *API) accountList(ctx *httprouter.HTTPContext, page int) error {
-	accounts, err := a.indexer.AccountsList(page*MaxPageSize, MaxPageSize)
+	accounts, total, err := a.indexer.AccountsList(page*MaxPageSize, MaxPageSize)
 	if err != nil {
 		return ErrCantFetchTokenTransfers.WithErr(err)
 	}
-	data, err := json.Marshal(
-		struct {
-			Accounts []indexertypes.Account `json:"accounts"`
-		}{Accounts: accounts},
-	)
+	data, err := json.Marshal(AccountsList{
+		Accounts: accounts,
+		Total:    total,
+	})
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
