@@ -367,8 +367,8 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if err != nil {
 		return err
 	}
-	// check dynamic census only if root is being updated
-	if censusRoot != nil {
+	// check dynamic census only if root or uri are being updated
+	if (censusRoot != nil && !bytes.Equal(process.CensusRoot, censusRoot)) || (censusURI != "" && censusURI != *process.CensusURI) {
 		if !process.Mode.DynamicCensus {
 			return fmt.Errorf(
 				"cannot update census, only processes with dynamic census can update their root")
@@ -402,6 +402,8 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if commit {
 		if censusRoot != nil {
 			process.CensusRoot = censusRoot
+		}
+		if censusURI != "" {
 			process.CensusURI = &censusURI
 		}
 		if censusSize > 0 {

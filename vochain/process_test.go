@@ -579,13 +579,32 @@ func TestSetProcessCensusSize(t *testing.T) {
 	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
 	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
 
+	// Set census size (with same root and no URI) (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, proc.CensusRoot, nil, 12), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
+	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
+
+	// Set census size (with same root and different URI) (should fail)
+	uri := "ipfs://987654321"
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, proc.CensusRoot, &uri, 13), qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
+	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
+
 	// Set smaller census size (should fail)
 	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 5), qt.IsNotNil)
 	app.AdvanceTestBlock()
 
 	proc, err = app.State.Process(pid, true)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
 
 	// Check cost is increased with larger census size (should work)
 	account, err := app.State.GetAccount(accounts[0].Address(), true)
@@ -600,6 +619,37 @@ func TestSetProcessCensusSize(t *testing.T) {
 
 	// check that newBalance is at least 100 tokens less than oldBalance
 	qt.Assert(t, oldBalance-newBalance >= 100, qt.IsTrue)
+
+	// define a new process, this time with dynamicCensus=true
+	process = &models.Process{
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Duration:      60 * 60,
+		MaxCensusSize: 2,
+	}
+
+	// create the process
+	pid = testCreateProcess(t, accounts[0], app, process)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(2))
+
+	// Set census size with root (should work since dynamicCensus=true)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), nil, 5), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// Set census size with root (should work since dynamicCensus=true)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), &uri, 5), qt.IsNil)
+	app.AdvanceTestBlock()
 }
 
 func TestSetProcessDuration(t *testing.T) {
