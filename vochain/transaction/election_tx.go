@@ -209,7 +209,7 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	if err != nil {
 		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
 	}
-	// check balance and nonce
+	// check base cost
 	if acc.Balance < cost {
 		return ethereum.Address{}, vstate.ErrNotEnoughBalance
 	}
@@ -232,8 +232,9 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			if err := t.checkMaxCensusSize(process); err != nil {
 				return ethereum.Address{}, err
 			}
+			cost = t.txCostIncreaseCensusSize(process, tx.GetCensusSize())
 			// get Tx cost, since it is a new census size, we should use the election price calculator
-			if acc.Balance < t.txCostIncreaseCensusSize(process, tx.GetCensusSize()) {
+			if acc.Balance < cost {
 				return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
 			}
 		}
@@ -246,7 +247,8 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		)
 	case models.TxType_SET_PROCESS_DURATION:
 		// get Tx cost, since it modifies the process duration, we should use the election price calculator
-		if acc.Balance < t.txCostIncreaseDuration(process, tx.GetDuration()) {
+		cost = t.txCostIncreaseDuration(process, tx.GetDuration())
+		if acc.Balance < cost {
 			return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
 		}
 		return ethereum.Address(*addr), t.state.SetProcessDuration(process.ProcessId, tx.GetDuration(), false)
