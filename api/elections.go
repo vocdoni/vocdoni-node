@@ -132,7 +132,7 @@ func (a *API) enableElectionHandlers() error {
 //	@Accept			json
 //	@Produce		json
 //	@Param			page	path		number	true	"Page "
-//	@Success		200		{object}	ElectionSummary
+//	@Success		200		{object}	object{elections=[]ElectionSummary}
 //	@Router			/elections/page/{page} [get]
 func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	page := 0
@@ -336,7 +336,7 @@ func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Produce		json
 //	@Param			electionID	path		string	true	"Election id"
 //	@Param			page		path		number	true	"Page "
-//	@Success		200			{object}	Vote
+//	@Success		200			{object}	object{votes=[]Vote}
 //	@Router			/elections/{electionID}/votes/page/{page} [get]
 func (a *API) electionVotesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
@@ -621,7 +621,7 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 //	@Produce				json
 //	@Param					page		path		number			true	"Page to paginate"
 //	@Param					transaction	body		ElectionFilter	true	"Filtered by partial organizationID, partial processID, process status and with results available or not"
-//	@Success				200			{object}	ElectionSummary
+//	@Success				200			{object}	object{elections=[]ElectionSummary}
 //	@Router					/elections/filter/page/{page} [post]
 func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	// get organizationId from the request body

@@ -46,7 +46,7 @@ func ElectionListByStatusHandler() {
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Security				BasicAuth
+//	@Security				ApiKeyAuth
 //	@Success				200			{object}	object{census=object{censusID=string,uri=string}}	"It return published censusID and the ipfs uri where its uploaded"
 //	@Param					censusID	path		string												true	"Census id"
 //	@Param					root		path		string												true	"Specific root where to publish the census. Not required"
