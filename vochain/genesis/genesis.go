@@ -66,7 +66,7 @@ import (
 var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
 	"dev":   "vocdoni/DEV/36",
-	"stage": "vocdoni/STAGE/11",
+	"stage": "vocdoni/STAGE/12",
 	"lts":   "vocdoni/LTS/1.2",
 }
 
@@ -126,6 +126,16 @@ var (
 				InitialHeight:   1,
 				ConsensusParams: DefaultConsensusParams(),
 				AppState:        jsonRawMessage(initialAppStateForStage),
+			},
+			EndOfChain: 1063400,
+		},
+		"vocdoni/STAGE/12": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(2024, time.June, 27, 1, 0, 0, 0, time.UTC),
+				InitialHeight:   1063401,
+				ConsensusParams: DefaultConsensusParams(),
+				AppState:        jsonRawMessage(initialAppStateForStage),
+				AppHash:         []byte(types.HexStringToHexBytes("7cb55a508f797d1d7fa7612855c5177726ea459c6c26056fe35ed6919fab5c3c")),
 			},
 		},
 
