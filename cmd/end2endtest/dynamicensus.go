@@ -150,7 +150,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		log.Debugf("election details before set a new census: %s %s %x", t.elections[0].election.Census.CensusOrigin,
 			t.elections[0].election.Census.CensusURL, t.elections[0].election.Census.CensusRoot)
 
-		hash, err := api.TransactionSetCensus(electionID, vapi.ElectionCensus{
+		hash, err := api.SetElectionCensus(electionID, vapi.ElectionCensus{
 			CensusOrigin: "OFF_CHAIN_TREE_WEIGHTED",
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",
@@ -259,7 +259,7 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		log.Debugf("election details before: %s %s %x", t.elections[1].election.Census.CensusOrigin, t.elections[1].election.Census.CensusURL, t.elections[1].election.Census.CensusRoot)
 
-		if _, err := api.TransactionSetCensus(election.ElectionID, vapi.ElectionCensus{
+		if _, err := api.SetElectionCensus(election.ElectionID, vapi.ElectionCensus{
 			CensusOrigin: "OFF_CHAIN_TREE_WEIGHTED",
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",

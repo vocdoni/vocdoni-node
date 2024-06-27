@@ -43,17 +43,26 @@ func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {
 	return h.Height, nil
 }
 
-func (c *HTTPclient) SignAndSendTx(stx *models.SignedTx) (types.HexBytes, []byte, error) {
-	var err error
-	if stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID()); err != nil {
-		return nil, nil, err
-	}
-	txData, err := proto.Marshal(stx)
+// SignAndSendTx signs the given transaction and sends it to the blockchain.
+// It returns the transaction hash and the blockchain response (if any).
+// Takes a protobuf marshaled transaction as input of type models.Tx
+func (c *HTTPclient) SignAndSendTx(marshaledTx []byte) (types.HexBytes, []byte, error) {
+	// Sign the transaction
+	sitnature, err := c.account.SignVocdoniTx(marshaledTx, c.ChainID())
 	if err != nil {
 		return nil, nil, err
 	}
-
-	tx := &api.Transaction{Payload: txData}
+	// Build the signed transaction
+	stx, err := proto.Marshal(
+		&models.SignedTx{
+			Tx:        marshaledTx,
+			Signature: sitnature,
+		})
+	if err != nil {
+		return nil, nil, err
+	}
+	// Send the signed transaction and fetch the response
+	tx := &api.Transaction{Payload: stx}
 	resp, code, err := c.Request(HTTPPOST, tx, "chain", "transactions")
 	if err != nil {
 		return nil, nil, err

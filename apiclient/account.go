@@ -90,9 +90,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 // TransferWithNonce sends tokens from the account associated with the client to the given address.
 // Returns the transaction hash.
 func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce uint32) (types.HexBytes, error) {
-	var err error
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	tx, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
 				Txtype: models.TxType_SET_ACCOUNT_INFO_URI,
@@ -106,7 +104,7 @@ func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce u
 	if err != nil {
 		return nil, err
 	}
-	txHash, _, err := c.SignAndSendTx(&stx)
+	txHash, _, err := c.SignAndSendTx(tx)
 	return txHash, err
 }
 
@@ -422,8 +420,7 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		return nil, fmt.Errorf("error generating SIK: %w", err)
 	}
 	// compose and encode the transaction
-	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	tx, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_RegisterSIK{
 			RegisterSIK: &models.RegisterSIKTx{
 				SIK:        sik,
@@ -445,7 +442,7 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		return nil, fmt.Errorf("error encoding RegisterSIKTx: %w", err)
 	}
 	// sign it and send it
-	hash, _, err := c.SignAndSendTx(stx)
+	hash, _, err := c.SignAndSendTx(tx)
 	if err != nil {
 		return nil, fmt.Errorf("error signing or sending the Tx: %w", err)
 	}
