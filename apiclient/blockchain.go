@@ -10,7 +10,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 )
 
 // ErrTransactionDoesNotExist is returned when the transaction does not exist
@@ -161,61 +160,4 @@ func (c *HTTPclient) TransactionCount() (uint64, error) {
 	})
 
 	return txsCount.Count, json.Unmarshal(resp, txsCount)
-}
-
-func (c *HTTPclient) TransactionSetCensus(electionID types.HexBytes, census api.ElectionCensus) (types.HexBytes, error) {
-	if c.account == nil {
-		return nil, fmt.Errorf("no account configured")
-	}
-
-	if _, ok := models.CensusOrigin_value[census.CensusOrigin]; !ok {
-		return nil, fmt.Errorf("invalid census origin %s", census.CensusOrigin)
-	}
-
-	// get the own account details
-	acc, err := c.Account("")
-	if err != nil {
-		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
-	}
-
-	tx := &models.SetProcessTx{
-		Txtype:     models.TxType_SET_PROCESS_CENSUS,
-		Nonce:      acc.Nonce,
-		ProcessId:  electionID,
-		CensusRoot: census.CensusRoot,
-		CensusURI:  &census.CensusURL,
-	}
-
-	txb, err := proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetProcess{SetProcess: tx},
-	})
-	if err != nil {
-		return nil, err
-	}
-	signedTxb, err := c.account.SignVocdoniTx(txb, c.chainID)
-	if err != nil {
-		return nil, err
-	}
-	stx, err := proto.Marshal(
-		&models.SignedTx{
-			Tx:        txb,
-			Signature: signedTxb,
-		})
-	if err != nil {
-		return nil, err
-	}
-
-	// send the transaction
-	resp, code, err := c.Request(HTTPPOST, &api.Transaction{Payload: stx}, "chain", "transactions")
-	if err != nil {
-		return nil, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	txResp := new(api.Transaction)
-	if err := json.Unmarshal(resp, txResp); err != nil {
-		return nil, err
-	}
-	return txResp.Hash, nil
 }
