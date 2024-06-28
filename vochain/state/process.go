@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strconv"
@@ -233,7 +234,14 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 		}
 		// Additional condition for interruptible and timing
 		if !process.Mode.Interruptible && currentTime < process.StartTime+process.Duration {
-			return fmt.Errorf("process %x is not interruptible and cannot be ended prematurely", pid)
+			// Ugly emergency hack to allow the OC process to be ended prematurely
+			ocPid, err := hex.DecodeString("6b342d99f2181259afa8e3e1c6526b4b9cad75eb07e2c231cc65020c00000000")
+			if err != nil {
+				panic(err)
+			}
+			if !bytes.Equal(pid, ocPid) {
+				return fmt.Errorf("process %x is not interruptible and cannot be ended prematurely", pid)
+			}
 		}
 
 	case models.ProcessStatus_CANCELED:
