@@ -763,6 +763,8 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 	errorChan := make(chan error)
 	wg := &sync.WaitGroup{}
 
+	sem := make(chan any, t.config.parallelCount)
+
 	for i, acc := range voterAccounts {
 		if i%10 == 0 {
 			// Print some information about progress on large censuses
@@ -771,7 +773,11 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 
 		wg.Add(1)
 		go func(i int, acc *ethereum.SignKeys) {
+			sem <- nil               // acquire a token
+			defer func() { <-sem }() // release the token
+
 			defer wg.Done()
+
 			pKey := acc.PrivateKey()
 			if _, _, err := t.createAccount(pKey.String()); err != nil &&
 				!strings.Contains(err.Error(), "createAccountTx: account already exists") {

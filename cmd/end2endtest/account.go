@@ -30,9 +30,21 @@ func init() {
 		example: os.Args[0] + " --operation=tokentxs " +
 			"--host http://127.0.0.1:9090/v2",
 	}
+
+	ops["createaccts"] = operation{
+		testFunc: func() VochainTest {
+			return &E2ECreateAccts{}
+		},
+		description: "Creates N accounts",
+		example: os.Args[0] + " --operation=createaccts --votes=1000  " +
+			"--host http://127.0.0.1:9090/v2",
+	}
 }
 
-var _ VochainTest = (*E2ETokenTxs)(nil)
+var (
+	_ VochainTest = (*E2ETokenTxs)(nil)
+	_ VochainTest = (*E2ECreateAccts)(nil)
+)
 
 type E2ETokenTxs struct {
 	api    *apiclient.HTTPclient
@@ -41,6 +53,8 @@ type E2ETokenTxs struct {
 	alice, bob *ethereum.SignKeys
 	aliceFP    *models.FaucetPackage
 }
+
+type E2ECreateAccts struct{ e2eElection }
 
 func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 	t.api = api
@@ -381,4 +395,33 @@ func ensureAccountMetadataEquals(api *apiclient.HTTPclient, metadata *apipkg.Acc
 		_ = api.WaitUntilNextBlock()
 	}
 	return nil, fmt.Errorf("cannot set account %s metadata after %d retries", api.MyAddress(), retries)
+}
+
+func (t *E2ECreateAccts) Setup(api *apiclient.HTTPclient, c *config) error {
+	t.api = api
+	t.config = c
+
+	return nil
+}
+
+func (*E2ECreateAccts) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2ECreateAccts) Run() error {
+	startTime := time.Now()
+
+	voterAccounts := ethereum.NewSignKeysBatch(t.config.nvotes)
+	if err := t.registerAnonAccts(voterAccounts); err != nil {
+		return err
+	}
+
+	log.Infow("accounts created successfully",
+		"n", t.config.nvotes, "time", time.Since(startTime),
+		"vps", int(float64(t.config.nvotes)/time.Since(startTime).Seconds()))
+
+	log.Infof("voterAccounts: %d", len(voterAccounts))
+
+	return nil
 }
