@@ -114,7 +114,7 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 		return nil, nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 	defer cancel()
 
 	if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
@@ -348,7 +348,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		}
 		t.election = election
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 		defer cancel()
 		if _, err := t.api.WaitUntilElectionCreated(ctx, electionID); err != nil {
 			return err
@@ -377,7 +377,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 					errorChan <- err
 				}
 				log.Infow("sik registered for anonymous census uncreated account", "index", i, "address", acc.AddressString())
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+				ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 				defer cancel()
 
 				if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {

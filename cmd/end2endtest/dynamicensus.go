@@ -161,7 +161,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		}
 		log.Debugw("process census set", "tx hash:", hash)
 
-		ctx, cancel := context.WithTimeout(context.Background(), apiclient.WaitTimeout*3)
+		ctx, cancel := context.WithTimeout(context.Background(), t.elections[0].config.timeout)
 		defer cancel()
 		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
 			errCh <- fmt.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
