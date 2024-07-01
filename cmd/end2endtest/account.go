@@ -80,7 +80,7 @@ func (*E2ETokenTxs) Teardown() error {
 
 func (t *E2ETokenTxs) Run() error {
 	// check send tokens
-	if err := testSendTokens(t.api, t.alice, t.bob); err != nil {
+	if err := testSendTokens(t.api, t.alice, t.bob, t.config.timeout); err != nil {
 		return fmt.Errorf("error in testSendTokens: %w", err)
 	}
 
@@ -129,7 +129,7 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	return nil
 }
 
-func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.SignKeys) error {
+func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.SignKeys, timeout time.Duration) error {
 	// if both alice and bob start with 50 tokens each
 	// alice sends 19 to bob
 	// and bob sends 23 to alice
@@ -207,7 +207,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		log.Infof("alice sent %d tokens to bob", amountAtoB)
 		log.Debugf("tx hash is %x", txhasha)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		txrefa, err := api.WaitUntilTxIsMined(ctx, txhasha)
 		if err != nil {
@@ -229,7 +229,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		log.Infof("bob sent %d tokens to alice", amountBtoA)
 		log.Debugf("tx hash is %x", txhashb)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		txrefb, err := api.WaitUntilTxIsMined(ctx, txhashb)
 		if err != nil {

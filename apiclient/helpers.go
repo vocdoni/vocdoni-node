@@ -12,6 +12,7 @@ import (
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/api/faucet"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -21,9 +22,8 @@ import (
 )
 
 const (
-	DefaultBlockInterval = 8 * time.Second
-	WaitTimeout          = 3 * DefaultBlockInterval
-	PollInterval         = DefaultBlockInterval / 2
+	WaitTimeout  = config.DefaultMinerTargetBlockTime * 3
+	PollInterval = config.DefaultMinerTargetBlockTime / 2
 )
 
 func (c *HTTPclient) DateToHeight(date time.Time) (uint32, error) {

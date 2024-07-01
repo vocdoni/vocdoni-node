@@ -1,10 +1,12 @@
 package config
 
+import "time"
+
 // These consts are defaults used in VochainCfg
 const (
-	DefaultMinerTargetBlockTimeSeconds = 10
-	DefaultCometBFTPath                = "cometbft"
-	DefaultGenesisPath                 = DefaultCometBFTPath + "/config/genesis.json"
+	DefaultMinerTargetBlockTime = 10 * time.Second
+	DefaultCometBFTPath         = "cometbft"
+	DefaultGenesisPath          = DefaultCometBFTPath + "/config/genesis.json"
 )
 
 // DefaultSeedNodes is a map indexed by network name
