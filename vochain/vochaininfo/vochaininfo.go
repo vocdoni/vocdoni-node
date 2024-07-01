@@ -33,6 +33,11 @@ func NewVochainInfo(node *vochain.BaseApplication) *VochainInfo {
 }
 
 func (vi *VochainInfo) updateCounters() {
+	if !vi.vnode.IsSynced() {
+		blocksyncHeight.Set(uint64(vi.vnode.Height()))
+		blocksyncBPM.Set(uint64(vi.BlocksLastMinute()))
+		return
+	}
 	height.Set(uint64(vi.vnode.Height()))
 
 	pc, err := vi.vnode.State.CountProcesses(true)
@@ -62,7 +67,6 @@ func (vi *VochainInfo) updateCounters() {
 	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
 	blockPeriodMinute.Set(uint64(vi.BlockTimes()[0].Milliseconds()))
-	blocksSyncLastMinute.Set(uint64(vi.BlocksLastMinute()))
 }
 
 // Height returns the current number of blocks of the blockchain.
@@ -259,7 +263,11 @@ func (vi *VochainInfo) Start(sleepSecs uint64) {
 		panic("sleepSecs cannot be zero")
 	}
 	log.Infof("starting vochain info service every %d seconds", sleepSecs)
-	metrics.NewGauge("vochain_tokens_burned",
+
+	metrics.UnregisterSet(viMetrics)
+	metrics.RegisterSet(blocksyncMetrics)
+
+	viMetrics.NewGauge("vochain_tokens_burned",
 		func() float64 { return float64(vi.TokensBurned()) })
 
 	var duration time.Duration
@@ -270,6 +278,9 @@ func (vi *VochainInfo) Start(sleepSecs uint64) {
 	duration = time.Second * time.Duration(sleepSecs)
 	for {
 		select {
+		case <-vi.vnode.WaitUntilSynced():
+			metrics.RegisterSet(viMetrics)
+			metrics.UnregisterSet(blocksyncMetrics)
 		case <-time.After(duration):
 			vi.updateCounters()
 			currentHeight = uint64(vi.vnode.Height())
