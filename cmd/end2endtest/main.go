@@ -117,7 +117,7 @@ func parseFlags(c *config) {
 	flag.IntVar(&c.parallelCount, "parallel", 4, "number of parallel requests")
 	flag.StringVar(&c.faucet, "faucet", "dev", "faucet URL for fetching tokens (special keyword 'dev' translates into hardcoded URL for dev faucet)")
 	flag.StringVar(&c.faucetAuthToken, "faucetAuthToken", "", "(optional) token passed as Bearer when fetching faucetURL")
-	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout*6, "timeout duration to wait for operations to complete")
+	flag.DurationVar(&c.timeout, "timeout", apiclient.WaitTimeout*2, "timeout duration to wait for operations to complete")
 	flag.IntVar(&c.parallelTests, "parallelTests", 1, "number of parallel tests to run (of the same type specified in --operation)")
 	flag.IntVar(&c.runs, "runs", 1, "number of tests to run (of the same type specified in --operation)")
 
