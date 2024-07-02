@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strconv"
+	"strings"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -161,4 +163,34 @@ func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte,
 		}
 	}
 	return vp, nil
+}
+
+// parseNumber returns the int parsed from the string.
+// If the string is not parseable, returns an APIerror.
+//
+// The empty string "" is treated specially, returns 0 with no error.
+func parseNumber(s string) (int, error) {
+	if s == "" {
+		return 0, nil
+	}
+	page, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, ErrCantParsePageNumber.With(s)
+	}
+	return page, nil
+}
+
+// parseStatus converts a string ("READY", "ready", "PAUSED", etc) to a models.ProcessStatus.
+// If the string doesn't map to a value, returns an APIerror.
+//
+// The empty string "" is treated specially, returns 0 with no error.
+func parseStatus(s string) (models.ProcessStatus, error) {
+	if s == "" {
+		return 0, nil
+	}
+	status, found := models.ProcessStatus_value[strings.ToUpper(s)]
+	if !found {
+		return 0, ErrParamStatusInvalid.With(s)
+	}
+	return models.ProcessStatus(status), nil
 }

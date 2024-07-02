@@ -324,10 +324,11 @@ func testProcessList(t *testing.T, procsCount int) {
 	procs := make(map[string]bool)
 	last := 0
 	for len(procs) < procsCount {
-		list, err := idx.ProcessList(eidProcsCount, last, 10, "", 0, 0, "", false)
+		list, total, err := idx.ProcessList(eidProcsCount, last, 10, "", 0, 0, 0, false)
 		if err != nil {
 			t.Fatal(err)
 		}
+		qt.Assert(t, total, qt.Equals, uint64(procsCount))
 		if len(list) < 1 {
 			t.Log("list is empty")
 			break
@@ -342,8 +343,9 @@ func testProcessList(t *testing.T, procsCount int) {
 	}
 	qt.Assert(t, procs, qt.HasLen, procsCount)
 
-	_, err := idx.ProcessList(nil, 0, 64, "", 0, 0, "", false)
+	_, total, err := idx.ProcessList(nil, 0, 64, "", 0, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(10+procsCount))
 
 	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
 	countEntityProcs := func(eid []byte) int64 {
@@ -356,6 +358,11 @@ func testProcessList(t *testing.T, procsCount int) {
 	qt.Assert(t, countEntityProcs(eidOneProcess), qt.Equals, int64(1))
 	qt.Assert(t, countEntityProcs(eidProcsCount), qt.Equals, int64(procsCount))
 	qt.Assert(t, countEntityProcs([]byte("not an entity id that exists")), qt.Equals, int64(-1))
+
+	// Past the end (from=10000) should return an empty list
+	emptyList, _, err := idx.ProcessList(nil, 10000, 64, "", 0, 0, 0, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, emptyList, qt.DeepEquals, [][]byte{})
 }
 
 func TestProcessSearch(t *testing.T) {
@@ -443,7 +450,7 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, err := idx.ProcessList(eidTest, 0, 10, pidExact, 0, 0, "", false)
+	list, _, err := idx.ProcessList(eidTest, 0, 10, pidExact, 0, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -452,7 +459,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Exact process search, with it being encrypted.
 	// This once caused a sqlite bug due to a mistake in the SQL query.
-	list, err = idx.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, 0, "", false)
+	list, _, err = idx.ProcessList(eidTest, 0, 10, pidExactEncrypted, 0, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -460,8 +467,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 1 process, got %d", len(list))
 	}
 	// Search for nonexistent process
-	list, err = idx.ProcessList(eidTest, 0, 10,
-		"4011d50537fa164b6fef261141797bbe4014526f", 0, 0, "", false)
+	list, _, err = idx.ProcessList(eidTest, 0, 10,
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,8 +476,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected 0 processes, got %d", len(list))
 	}
 	// Search containing part of all manually-defined processes
-	list, err = idx.ProcessList(eidTest, 0, 10,
-		"011d50537fa164b6fef261141797bbe4014526e", 0, 0, "", false)
+	list, _, err = idx.ProcessList(eidTest, 0, 10,
+		"011d50537fa164b6fef261141797bbe4014526e", 0, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -478,8 +485,8 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(processIds), len(list))
 	}
 
-	list, err = idx.ProcessList(eidTest, 0, 100,
-		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, 0, "ENDED", false)
+	list, _, err = idx.ProcessList(eidTest, 0, 100,
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, 0, models.ProcessStatus_ENDED, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -489,7 +496,7 @@ func TestProcessSearch(t *testing.T) {
 
 	// Search with an exact Entity ID, but starting with a null byte.
 	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
-	list, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, 0, "", false)
+	list, _, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, 0, 0, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -498,12 +505,12 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// list all processes, with a max of 10
-	list, err = idx.ProcessList(nil, 0, 10, "", 0, 0, "", false)
+	list, _, err = idx.ProcessList(nil, 0, 10, "", 0, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 10)
 
 	// list all processes, with a max of 1000
-	list, err = idx.ProcessList(nil, 0, 1000, "", 0, 0, "", false)
+	list, _, err = idx.ProcessList(nil, 0, 1000, "", 0, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 21)
 }
@@ -552,25 +559,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Get the process list for namespace 123
-	list, err := idx.ProcessList(eid20, 0, 100, "", 123, 0, "", false)
+	list, _, err := idx.ProcessList(eid20, 0, 100, "", 123, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, err = idx.ProcessList(nil, 0, 100, "", 0, 0, "", false)
+	list, _, err = idx.ProcessList(nil, 0, 100, "", 0, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, err = idx.ProcessList(nil, 0, 100, "", 10, 0, "", false)
+	list, _, err = idx.ProcessList(nil, 0, 100, "", 10, 0, 0, false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, err = idx.ProcessList(nil, 0, 100, "", 0, 0, "READY", false)
+	list, _, err = idx.ProcessList(nil, 0, 100, "", 0, 0, models.ProcessStatus_READY, false)
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
@@ -1522,7 +1529,7 @@ func TestAccountsList(t *testing.T) {
 
 	last := 0
 	for i := 0; i < int(totalAccs); i++ {
-		accts, err := idx.GetListAccounts(int32(last), 10)
+		accts, _, err := idx.AccountsList(last, 10)
 		qt.Assert(t, err, qt.IsNil)
 
 		for j, acc := range accts {
@@ -1545,7 +1552,7 @@ func TestAccountsList(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// verify the updated balance and nonce
-	accts, err := idx.GetListAccounts(int32(0), 5)
+	accts, _, err := idx.AccountsList(0, 5)
 	qt.Assert(t, err, qt.IsNil)
 	// the account in the position 0 must be the updated account balance due it has the major balance
 	// indexer query has order BY balance DESC

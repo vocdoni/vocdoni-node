@@ -905,21 +905,24 @@ func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	return uint64(count), err
 }
 
-func (idx *Indexer) GetListAccounts(offset, maxItems int32) ([]indexertypes.Account, error) {
-	accsFromDB, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
+func (idx *Indexer) AccountsList(offset, maxItems int) ([]indexertypes.Account, uint64, error) {
+	results, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
 		Limit:  int64(maxItems),
 		Offset: int64(offset),
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []indexertypes.Account{}
-	for _, acc := range accsFromDB {
-		tt = append(tt, indexertypes.Account{
-			Address: acc.Account,
-			Balance: uint64(acc.Balance),
-			Nonce:   uint32(acc.Nonce),
+	if len(results) == 0 {
+		return []indexertypes.Account{}, 0, nil
+	}
+	list := []indexertypes.Account{}
+	for _, row := range results {
+		list = append(list, indexertypes.Account{
+			Address: row.Account,
+			Balance: uint64(row.Balance),
+			Nonce:   uint32(row.Nonce),
 		})
 	}
-	return tt, nil
+	return list, uint64(results[0].TotalCount), nil
 }

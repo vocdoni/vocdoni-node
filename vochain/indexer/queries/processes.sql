@@ -31,14 +31,20 @@ WHERE id = ?
 LIMIT 1;
 
 -- name: SearchProcesses :many
-SELECT id FROM processes
-WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
-	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
-	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
-	AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
-	-- TODO(mvdan): consider keeping an id_hex column for faster searches
-	AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
-	AND (sqlc.arg(with_results) = FALSE OR have_results)
+WITH filtered_processes AS (
+    SELECT *,
+           COUNT(*) OVER() AS total_count
+    FROM processes
+    WHERE (LENGTH(sqlc.arg(entity_id)) = 0 OR entity_id = sqlc.arg(entity_id))
+        AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
+        AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
+        AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
+        -- TODO: consider keeping an id_hex column for faster searches
+        AND (sqlc.arg(id_substr) = '' OR (INSTR(LOWER(HEX(id)), sqlc.arg(id_substr)) > 0))
+        AND (sqlc.arg(with_results) = FALSE OR have_results)
+)
+SELECT id, total_count
+FROM filtered_processes
 ORDER BY creation_time DESC, id ASC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset)

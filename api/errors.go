@@ -56,7 +56,7 @@ var (
 	ErrCensusTypeMismatch               = apirest.APIerror{Code: 4028, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("census type mismatch")}
 	ErrCensusIndexedFlagMismatch        = apirest.APIerror{Code: 4029, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("census indexed flag mismatch")}
 	ErrCensusRootHashMismatch           = apirest.APIerror{Code: 4030, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("census root hash mismatch after importing dump")}
-	ErrParamStatusMissing               = apirest.APIerror{Code: 4031, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (status) missing or invalid")}
+	ErrParamStatusInvalid               = apirest.APIerror{Code: 4031, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (status) invalid")}
 	ErrParamParticipantsMissing         = apirest.APIerror{Code: 4032, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (participants) missing")}
 	ErrParamParticipantsTooBig          = apirest.APIerror{Code: 4033, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (participants) exceeds max length per call")}
 	ErrParamDumpOrRootMissing           = apirest.APIerror{Code: 4034, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (dump or root) missing")}

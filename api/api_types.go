@@ -37,6 +37,13 @@ type ElectionSummary struct {
 	ChainID        string            `json:"chainId"`
 }
 
+// ElectionsList wraps the elections list to consistently return the list inside an object,
+// return empty object if the list does not contains any result
+type ElectionsList struct {
+	Elections []ElectionSummary `json:"elections"`
+	Total     uint64            `json:"total"`
+}
+
 // ElectionResults is the struct used to wrap the results of an election
 type ElectionResults struct {
 	// ABIEncoded is the abi encoded election results
@@ -226,6 +233,11 @@ type Account struct {
 	Token         *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
 	Metadata      *AccountMetadata `json:"metadata,omitempty"`
 	SIK           types.HexBytes   `json:"sik"`
+}
+
+type AccountsList struct {
+	Accounts []indexertypes.Account `json:"accounts"`
+	Total    uint64                 `json:"total"`
 }
 
 type AccountSet struct {
