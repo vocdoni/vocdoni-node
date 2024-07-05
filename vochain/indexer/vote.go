@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -72,7 +73,7 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 	envelopes := []*indexertypes.EnvelopeMetadata{}
 	txRefs, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
 		ProcessID:       processId,
-		NullifierSubstr: searchTerm,
+		NullifierSubstr: strings.ToLower(searchTerm), // we search in lowercase
 		Limit:           int64(max),
 		Offset:          int64(from),
 	})
