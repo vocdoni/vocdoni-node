@@ -9,6 +9,7 @@ import (
 	stdlog "log"
 	"math/big"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	qt "github.com/frankban/quicktest"
@@ -255,20 +256,19 @@ func TestEntitySearch(t *testing.T) {
 	app.AdvanceTestBlock()
 	// Exact entity search
 	list := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
-	if len(list) < 1 {
-		t.Fatalf("expected 1 entity, got %d", len(list))
-	}
+	qt.Assert(t, list, qt.HasLen, 1)
 	// Search for nonexistent entity
 	list = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
-	if len(list) > 0 {
-		t.Fatalf("expected 0 entities, got %d", len(list))
-	}
+	qt.Assert(t, list, qt.HasLen, 0)
 	// Search containing part of all manually-defined entities
 	list = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
-	log.Info(list)
-	if len(list) < len(entityIds) {
-		t.Fatalf("expected %d entities, got %d", len(entityIds), len(list))
-	}
+	qt.Assert(t, list, qt.HasLen, len(entityIds))
+	// Partial entity search as mixed case hex
+	list = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452")
+	qt.Assert(t, list, qt.HasLen, len(entityIds))
+	// Partial entity search as uppercase hex
+	list = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452")
+	qt.Assert(t, list, qt.HasLen, len(entityIds))
 }
 
 func TestProcessList(t *testing.T) {
@@ -487,6 +487,15 @@ func TestProcessSearch(t *testing.T) {
 		t.Fatalf("expected %d processes, got %d", len(endedPIDs), len(list))
 	}
 
+	// Partial process search as uppercase hex
+	list, err = idx.ProcessList(eidTest, 0, 10, "011D50537FA164B6FEF261141797BBE4014526E", 0, 0, "", false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, len(processIds))
+	// Partial process search as mixed case hex
+	list, err = idx.ProcessList(eidTest, 0, 10, "011D50537fA164B6FeF261141797BbE4014526E", 0, 0, "", false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, len(processIds))
+
 	// Search with an exact Entity ID, but starting with a null byte.
 	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
 	list, err = idx.ProcessList([]byte("\x00foobar"), 0, 100, "", 0, 0, "", false)
@@ -703,6 +712,12 @@ func TestResults(t *testing.T) {
 
 	// GetEnvelopes with one match by partial nullifier
 	envelopes, err = idx.GetEnvelopes(pid, 10, 0, matchNullifier[:29])
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, envelopes, qt.HasLen, 1)
+	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)
+
+	// Partial vote search as uppercase hex
+	envelopes, err = idx.GetEnvelopes(pid, 10, 0, strings.ToUpper(matchNullifier[:29]))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, envelopes, qt.HasLen, 1)
 	qt.Assert(t, envelopes[0].Height, qt.Equals, matchHeight)

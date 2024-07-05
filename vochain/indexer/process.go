@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -72,7 +73,7 @@ func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm strin
 		Namespace:       int64(namespace),
 		Status:          int64(statusnum),
 		SourceNetworkID: int64(srcNetworkId),
-		IDSubstr:        searchTerm,
+		IDSubstr:        strings.ToLower(searchTerm), // we search in lowercase
 		Offset:          int64(from),
 		Limit:           int64(max),
 		WithResults:     withResults,
@@ -95,10 +96,10 @@ func (idx *Indexer) CountTotalProcesses() uint64 {
 
 // EntityList returns the list of entities indexed by the indexer
 // searchTerm is optional, if declared as zero-value
-// will be ignored. Searches against the ID field.
+// will be ignored. Searches against the ID field as lowercase hex.
 func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.SearchEntitiesRow {
 	rows, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
-		EntityIDSubstr: searchTerm,
+		EntityIDSubstr: strings.ToLower(searchTerm), // we search in lowercase
 		Offset:         int64(from),
 		Limit:          int64(max),
 	})
