@@ -85,6 +85,7 @@ func BenchmarkIndexer(b *testing.B) {
 				tx := &vochaintx.Tx{
 					TxID:        rnd.Random32(),
 					TxModelType: "vote",
+					Tx:          &models.Tx{Payload: &models.Tx_Vote{}},
 				}
 				idx.OnNewTx(tx, height, txBlockIndex)
 				curTxs = append(curTxs, tx)
@@ -138,7 +139,11 @@ func BenchmarkFetchTx(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := 0; j < numTxs; j++ {
-			idx.OnNewTx(&vochaintx.Tx{TxID: util.Random32()}, uint32(i), int32(j))
+			idx.OnNewTx(&vochaintx.Tx{
+				TxID:        util.Random32(),
+				TxModelType: "vote",
+				Tx:          &models.Tx{Payload: &models.Tx_Vote{}},
+			}, uint32(i), int32(j))
 		}
 		err := idx.Commit(uint32(i))
 		qt.Assert(b, err, qt.IsNil)

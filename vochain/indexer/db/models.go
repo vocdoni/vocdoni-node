@@ -65,4 +65,5 @@ type Transaction struct {
 	BlockHeight int64
 	BlockIndex  int64
 	Type        string
+	RawTx       []byte
 }

@@ -191,6 +191,7 @@ type Transaction struct {
 	BlockHeight  uint32         `json:"blockHeight" format:"int32" example:"64924"`
 	TxBlockIndex int32          `json:"transactionIndex" format:"int32" example:"0"`
 	TxType       string         `json:"transactionType" enums:"vote,newProcess,admin,setProcess,registerKey,mintTokens,sendTokens,setTransactionCosts,setAccount,collectFaucet,setKeykeeper" example:"Vote"`
+	RawTx        types.HexBytes `json:"rawTx"`
 }
 
 func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
@@ -200,6 +201,7 @@ func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
 		BlockHeight:  uint32(dbtx.BlockHeight),
 		TxBlockIndex: int32(dbtx.BlockIndex),
 		TxType:       dbtx.Type,
+		RawTx:        dbtx.RawTx,
 	}
 }
 

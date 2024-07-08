@@ -11,6 +11,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
+	"google.golang.org/protobuf/proto"
 )
 
 // ErrTransactionNotFound is returned if the transaction is not found.
@@ -99,12 +100,20 @@ func (idx *Indexer) SearchTransactions(limit, offset int, blockHeight uint64, tx
 func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
+
+	rawtx, err := proto.Marshal(tx.Tx)
+	if err != nil {
+		log.Errorw(err, "indexer cannot marshal new transaction")
+		return
+	}
+
 	queries := idx.blockTxQueries()
 	if _, err := queries.CreateTransaction(context.TODO(), indexerdb.CreateTransactionParams{
 		Hash:        tx.TxID[:],
 		BlockHeight: int64(blockHeight),
 		BlockIndex:  int64(txIndex),
 		Type:        tx.TxModelType,
+		RawTx:       rawtx,
 	}); err != nil {
 		log.Errorw(err, "cannot index new transaction")
 	}

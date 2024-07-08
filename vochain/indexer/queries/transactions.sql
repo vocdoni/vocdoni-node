@@ -1,8 +1,8 @@
 -- name: CreateTransaction :execresult
 INSERT INTO transactions (
-	hash, block_height, block_index, type
+	hash, block_height, block_index, type, raw_tx
 ) VALUES (
-	?, ?, ?, ?
+	?, ?, ?, ?, ?
 );
 
 -- name: GetTransaction :one

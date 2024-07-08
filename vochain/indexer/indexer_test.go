@@ -1392,6 +1392,7 @@ func TestTxIndexer(t *testing.T) {
 			idx.OnNewTx(&vochaintx.Tx{
 				TxID:        getTxID(i, j),
 				TxModelType: "setAccount",
+				Tx:          &models.Tx{Payload: &models.Tx_SetAccount{}},
 			}, uint32(i), int32(j))
 		}
 	}
