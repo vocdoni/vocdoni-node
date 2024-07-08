@@ -39,14 +39,34 @@ func (q *Queries) CreateBlock(ctx context.Context, arg CreateBlockParams) (sql.R
 	)
 }
 
-const getBlock = `-- name: GetBlock :one
+const getBlockByHash = `-- name: GetBlockByHash :one
+SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
+WHERE hash = ?
+LIMIT 1
+`
+
+func (q *Queries) GetBlockByHash(ctx context.Context, hash []byte) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHashStmt, getBlockByHash, hash)
+	var i Block
+	err := row.Scan(
+		&i.Height,
+		&i.Time,
+		&i.ChainID,
+		&i.Hash,
+		&i.ProposerAddress,
+		&i.LastBlockHash,
+	)
+	return i, err
+}
+
+const getBlockByHeight = `-- name: GetBlockByHeight :one
 SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
 WHERE height = ?
 LIMIT 1
 `
 
-func (q *Queries) GetBlock(ctx context.Context, height int64) (Block, error) {
-	row := q.queryRow(ctx, q.getBlockStmt, getBlock, height)
+func (q *Queries) GetBlockByHeight(ctx context.Context, height int64) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHeightStmt, getBlockByHeight, height)
 	var i Block
 	err := row.Scan(
 		&i.Height,

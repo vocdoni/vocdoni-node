@@ -5,7 +5,12 @@ INSERT INTO blocks(
 	?, ?, ?, ?, ?, ?
 );
 
--- name: GetBlock :one
+-- name: GetBlockByHeight :one
 SELECT * FROM blocks
 WHERE height = ?
+LIMIT 1;
+
+-- name: GetBlockByHash :one
+SELECT * FROM blocks
+WHERE hash = ?
 LIMIT 1;
