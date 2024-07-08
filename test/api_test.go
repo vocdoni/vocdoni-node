@@ -461,6 +461,41 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2-uint64(txBasePrice))
 }
 
+func TestAPIBlocks(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+
+	// create a new account
+	initBalance := uint64(80)
+	_ = createAccount(t, c, server, initBalance)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// check the txCount
+	resp, code := c.Request("GET", nil, "chain", "blocks", "1")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+
+	block := api.Block{}
+	err := json.Unmarshal(resp, &block)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, block.TxCount, qt.Equals, int64(1))
+}
+
 func runAPIElectionCostWithParams(t *testing.T,
 	electionParams electionprice.ElectionParameters,
 	startBlock uint32, initialBalance,

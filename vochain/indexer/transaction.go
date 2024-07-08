@@ -42,6 +42,18 @@ func (idx *Indexer) GetTxMetadataByHash(hash types.HexBytes) (*indexertypes.Tran
 	return indexertypes.TransactionMetadataFromDB(&sqlTxRef), nil
 }
 
+// GetTransactionByHash fetches the full tx for the given tx hash
+func (idx *Indexer) GetTransactionByHash(hash types.HexBytes) (*indexertypes.Transaction, error) {
+	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHash(context.TODO(), hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTransactionNotFound
+		}
+		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
+	}
+	return indexertypes.TransactionFromDB(&sqlTxRef), nil
+}
+
 // GetTransactionByHeightAndIndex fetches the full tx for the given tx height and block tx index
 func (idx *Indexer) GetTransactionByHeightAndIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHeightAndIndex(context.TODO(), indexerdb.GetTransactionByHeightAndIndexParams{

@@ -13,12 +13,9 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
@@ -119,7 +116,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/transactions/{height}/{index}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainTxHandler,
+		a.chainTxByHeightAndIndexHandler,
 	); err != nil {
 		return err
 	}
@@ -136,6 +133,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTxListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/transactions/{hash}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxByHashHandler,
 	); err != nil {
 		return err
 	}
@@ -159,7 +164,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/blocks/{height}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainBlockHandler,
+		a.chainBlockByHeightHandler,
 	); err != nil {
 		return err
 	}
@@ -642,7 +647,7 @@ func (a *API) chainTxCostHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Success				204		"See [errors](vocdoni-api#errors) section"
 //	@Router					/chain/transactions/reference/{hash} [get]
 func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
+	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamHash)))
 	if err != nil {
 		return err
 	}
@@ -661,10 +666,12 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// chainTxHandler
+// chainTxByHeightAndIndexHandler
 //
 //	@Summary		Transaction by block height and index
 //	@Description	Get transaction full information by block height and index. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transactions/{hash})
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
@@ -673,7 +680,7 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Success		200		{object}	GenericTransactionWithInfo
 //	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/{height}/{index} [get]
-func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxByHeightAndIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseInt(ctx.URLParam(ParamHeight), 10, 64)
 	if err != nil {
 		return err
@@ -682,15 +689,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	if err != nil {
 		return err
 	}
-	stx, err := a.vocapp.GetTx(uint32(height), int32(index))
-	if err != nil {
-		if errors.Is(err, vochain.ErrTransactionNotFound) {
-			return ErrTransactionNotFound
-		}
-		return ErrVochainGetTxFailed.WithErr(err)
-	}
-
-	ref, err := a.indexer.GetTransactionByHeightAndIndex(height, index)
+	itx, err := a.indexer.GetTransactionByHeightAndIndex(height, index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -698,9 +697,44 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	tx := &GenericTransactionWithInfo{
-		TxContent: protoTxAsJSON(stx.Tx),
-		Signature: stx.Signature,
-		TxInfo:    *ref,
+		TxContent: protoTxAsJSON(itx.RawTx),
+		Signature: itx.Signature,
+		TxInfo:    itx,
+	}
+	data, err := json.Marshal(tx)
+	if err != nil {
+		return err
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainTxByHashHandler
+//
+//	@Summary		Transaction by hash
+//	@Description	Get transaction full information by hash. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			hash	path		string	true	"Transaction hash"
+//	@Success		200		{object}	GenericTransactionWithInfo
+//	@Success		204		"See [errors](vocdoni-api#errors) section"
+//	@Router			/chain/transactions/{hash} [get]
+func (a *API) chainTxByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamHash)))
+	if err != nil {
+		return ErrCantParseHexString.WithErr(err)
+	}
+	itx, err := a.indexer.GetTransactionByHash(hash)
+	if err != nil {
+		if errors.Is(err, indexer.ErrTransactionNotFound) {
+			return ErrTransactionNotFound
+		}
+		return ErrVochainGetTxFailed.WithErr(err)
+	}
+	tx := &GenericTransactionWithInfo{
+		TxContent: protoTxAsJSON(itx.RawTx),
+		Signature: itx.Signature,
+		TxInfo:    itx,
 	}
 	data, err := json.Marshal(tx)
 	if err != nil {
@@ -712,22 +746,28 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 // chainTxListHandler
 //
 //	@Summary		List transactions
-//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
+//	@Description	To get full transaction information use  [/chain/transaction/{hash}](transaction-by-hash).
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
 //	@Param			page	query		number				false	"Page"
 //	@Param			limit	query		number				false	"Items per page"
+//	@Param			hash	query		string				false	"Tx hash"
 //	@Param			height	query		number				false	"Block height"
 //	@Param			type	query		string				false	"Tx type"
-//	@Success		200		{object}	TransactionsList	"List of transactions references"
+//	@Param			subtype	query		string				false	"Tx subtype"
+//	@Param			signer	query		string				false	"Tx signer"
+//	@Success		200		{object}	TransactionsList	"List of transactions (metadata only)"
 //	@Router			/chain/transactions [get]
 func (a *API) chainTxListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseTransactionParams(
 		ctx.QueryParam(ParamPage),
 		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamHash),
 		ctx.QueryParam(ParamHeight),
 		ctx.QueryParam(ParamType),
+		ctx.QueryParam(ParamSubtype),
+		ctx.QueryParam(ParamSigner),
 	)
 	if err != nil {
 		return err
@@ -743,7 +783,7 @@ func (a *API) chainTxListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 
 // chainTxListByPageHandler
 //
-//	@Summary		List transactions
+//	@Summary		List transactions (legacy)
 //	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
 //	@Deprecated
 //	@Description	(deprecated, in favor of /chain/transactions?page=xxx)
@@ -751,11 +791,14 @@ func (a *API) chainTxListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Accept			json
 //	@Produce		json
 //	@Param			page	path		number				true	"Page"
-//	@Success		200		{object}	TransactionsList	"List of transactions references"
+//	@Success		200		{object}	TransactionsList	"List of transactions (metadata only)"
 //	@Router			/chain/transactions/page/{page} [get]
 func (a *API) chainTxListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseTransactionParams(
 		ctx.URLParam(ParamPage),
+		"",
+		"",
+		"",
 		"",
 		"",
 		"",
@@ -795,6 +838,9 @@ func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprou
 		"",
 		ctx.URLParam(ParamHeight),
 		"",
+		"",
+		"",
+		"",
 	)
 	if err != nil {
 		return err
@@ -820,7 +866,10 @@ func (a *API) transactionList(params *TransactionParams) (*TransactionsList, err
 		params.Limit,
 		params.Page*params.Limit,
 		params.Height,
+		params.Hash,
 		params.Type,
+		params.Subtype,
+		params.Signer,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -873,7 +922,7 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// chainBlockHandler
+// chainBlockByHeightHandler
 //
 //	@Summary		Get block (by height)
 //	@Description	Returns the full block information at the given height
@@ -883,23 +932,34 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Param			height	path		int	true	"Block height"
 //	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/{height} [get]
-func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainBlockByHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	height, err := strconv.ParseUint(ctx.URLParam(ParamHeight), 10, 64)
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHeight(int64(height))
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHeight(int64(height))
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
+	}
+	txcount, err := a.indexer.CountTransactionsByHeight(int64(height))
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+		Header: comettypes.Header{
+			ChainID:         idxblock.ChainID,
+			Height:          idxblock.Height,
+			Time:            idxblock.Time,
+			ProposerAddress: []byte(idxblock.ProposerAddress),
+			LastBlockID: comettypes.BlockID{
+				Hash: []byte(idxblock.LastBlockHash),
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -923,18 +983,29 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHash(hash)
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHash(hash)
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
+	}
+	txcount, err := a.indexer.CountTransactionsByHeight(idxblock.Height)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+		Header: comettypes.Header{
+			ChainID:         idxblock.ChainID,
+			Height:          idxblock.Height,
+			Time:            idxblock.Time,
+			ProposerAddress: []byte(idxblock.ProposerAddress),
+			LastBlockID: comettypes.BlockID{
+				Hash: []byte(idxblock.LastBlockHash),
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -977,39 +1048,7 @@ func (a *API) chainBlockListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendBlockList(ctx *httprouter.HTTPContext, params *BlockParams) error {
-	// TODO: replace this by a.indexer.BlockList when it's available
-	blockList := func(limit, offset int, _, _, _ string) ([]*indexertypes.Block, uint64, error) {
-		if offset < 0 {
-			return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
-		}
-		if limit <= 0 {
-			return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
-		}
-		height := a.vocapp.Height()
-		total := uint64(height) - uint64(a.vocapp.Node.BlockStore().Base())
-		start := height - uint32(params.Page*params.Limit)
-		end := start - uint32(params.Limit)
-		list := []*indexertypes.Block{}
-		for h := start; h > end; h-- {
-			tmblock := a.vocapp.GetBlockByHeight(int64(h))
-			if tmblock == nil {
-				break
-			}
-			list = append(list, &indexertypes.Block{
-				ChainID:         tmblock.ChainID,
-				Height:          tmblock.Height,
-				Time:            tmblock.Time,
-				Hash:            types.HexBytes(tmblock.Hash()),
-				ProposerAddress: tmblock.ProposerAddress.Bytes(),
-				LastBlockHash:   tmblock.LastBlockID.Hash.Bytes(),
-				TxCount:         int64(len(tmblock.Txs)),
-			})
-		}
-
-		return list, uint64(total), nil
-	}
-
-	blocks, total, err := blockList(
+	blocks, total, err := a.indexer.BlockList(
 		params.Limit,
 		params.Page*params.Limit,
 		params.ChainID,
@@ -1363,7 +1402,7 @@ func parseTransfersParams(paramPage, paramLimit, paramAccountId, paramAccountIdF
 }
 
 // parseTransactionParams returns an TransactionParams filled with the passed params
-func parseTransactionParams(paramPage, paramLimit, paramHeight, paramType string) (*TransactionParams, error) {
+func parseTransactionParams(paramPage, paramLimit, paramHash, paramHeight, paramType, paramSubtype, paramSigner string) (*TransactionParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -1376,8 +1415,11 @@ func parseTransactionParams(paramPage, paramLimit, paramHeight, paramType string
 
 	return &TransactionParams{
 		PaginationParams: pagination,
+		Hash:             util.TrimHex(paramHash),
 		Height:           uint64(height),
 		Type:             paramType,
+		Subtype:          paramSubtype,
+		Signer:           util.TrimHex(paramSigner),
 	}, nil
 }
 
