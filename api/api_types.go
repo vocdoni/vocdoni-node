@@ -207,6 +207,7 @@ type ChainInfo struct {
 	GenesisTime       time.Time `json:"genesisTime"  format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
 	InitialHeight     uint32    `json:"initialHeight"  example:"5467"`
 	Height            uint32    `json:"height" example:"5467"`
+	BlockStoreBase    uint32    `json:"blockStoreBase" example:"5467"`
 	Syncing           bool      `json:"syncing" example:"true"`
 	Timestamp         int64     `json:"blockTimestamp" swaggertype:"string" format:"date-time" example:"2022-11-17T18:00:57.379551614Z"`
 	TransactionCount  uint64    `json:"transactionCount" example:"554"`
