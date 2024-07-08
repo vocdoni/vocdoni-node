@@ -317,6 +317,11 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		blockTimesInMs[0] = uint64(a.vocapp.BlockTimeTarget().Milliseconds())
 	}
 
+	blockStoreBase := uint32(0)
+	if a.vocapp.Node != nil && a.vocapp.Node.BlockStore() != nil {
+		blockStoreBase = uint32(a.vocapp.Node.BlockStore().Base())
+	}
+
 	data, err := json.Marshal(&ChainInfo{
 		ID:                a.vocapp.ChainID(),
 		BlockTime:         blockTimesInMs,
@@ -330,6 +335,7 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		VoteCount:         voteCount,
 		GenesisTime:       a.vocapp.Genesis().GenesisTime,
 		InitialHeight:     uint32(a.vocapp.Genesis().InitialHeight),
+		BlockStoreBase:    blockStoreBase,
 		CircuitVersion:    circuit.Version(),
 		MaxCensusSize:     maxCensusSize,
 		NetworkCapacity:   networkCapacity,
