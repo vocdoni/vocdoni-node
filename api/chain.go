@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
@@ -856,18 +855,26 @@ func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHeight(int64(height))
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHeight(int64(height))
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
 	}
 	block := &Block{
 		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+			Header: comettypes.Header{
+				ChainID:         idxblock.ChainID,
+				Height:          idxblock.Height,
+				Time:            idxblock.Time,
+				ProposerAddress: []byte(idxblock.ProposerAddress),
+				LastBlockID: comettypes.BlockID{
+					Hash: []byte(idxblock.LastBlockHash),
+				},
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash: idxblock.Hash,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -891,18 +898,26 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHash(hash)
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHash(hash)
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
 	}
 	block := &Block{
 		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+			Header: comettypes.Header{
+				ChainID:         idxblock.ChainID,
+				Height:          idxblock.Height,
+				Time:            idxblock.Time,
+				ProposerAddress: []byte(idxblock.ProposerAddress),
+				LastBlockID: comettypes.BlockID{
+					Hash: []byte(idxblock.LastBlockHash),
+				},
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash: idxblock.Hash,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
