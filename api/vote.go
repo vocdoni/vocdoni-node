@@ -26,7 +26,15 @@ func (a *API) enableVoteHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/votes/{voteID}",
+		"/votes",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.votesListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/votes/{voteId}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.getVoteHandler,
@@ -34,7 +42,7 @@ func (a *API) enableVoteHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/votes/verify/{electionID}/{voteID}",
+		"/votes/verify/{electionId}/{voteId}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.verifyVoteHandler,
@@ -90,9 +98,9 @@ func (a *API) submitVoteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Produce				json
 //	@Param					voteID	path		string	true	"Nullifier of the vote"
 //	@Success				200		{object}	Vote
-//	@Router					/votes/{voteID} [get]
+//	@Router					/votes/{voteId} [get]
 func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
+	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamVoteId)))
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)
 	}
@@ -162,22 +170,22 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 //	@Tags			Votes
 //	@Accept			json
 //	@Produce		json
-//	@Param			electionID	path	string	true	"Election id"
-//	@Param			voteID		path	string	true	"Nullifier of the vote"
+//	@Param			electionId	path	string	true	"Election id"
+//	@Param			voteId		path	string	true	"Nullifier of the vote"
 //	@Success		200			"(empty body)"
 //	@Failure		404			{object}	apirest.APIerror
-//	@Router			/votes/verify/{electionID}/{voteID} [get]
+//	@Router			/votes/verify/{electionId}/{voteId} [get]
 func (a *API) verifyVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("voteID")))
+	voteID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamVoteId)))
 	if err != nil {
 		return ErrCantParseVoteID.WithErr(err)
 	}
 	if len(voteID) == 0 {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
 	}
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
 	if err != nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	if len(voteID) != types.ProcessIDsize {
 		return ErrVoteIDMalformed.Withf("%x", voteID)
@@ -187,4 +195,78 @@ func (a *API) verifyVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 		return ErrVoteNotFound
 	}
 	return ctx.Send(nil, apirest.HTTPstatusOK)
+}
+
+// votesListHandler
+//
+//	@Summary		List votes
+//	@Description	Returns the list of votes
+//	@Tags			Votes
+//	@Accept			json
+//	@Produce		json
+//	@Param			page		query		number	false	"Page"
+//	@Param			limit		query		number	false	"Items per page"
+//	@Param			electionId	query		string	false	"Election id"
+//	@Success		200			{object}	VotesList
+//	@Router			/votes [get]
+func (a *API) votesListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseVoteParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamElectionId),
+	)
+	if err != nil {
+		return err
+	}
+	return a.sendVotesList(ctx, params)
+}
+
+// sendVotesList produces a filtered, paginated VotesList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendVotesList(ctx *httprouter.HTTPContext, params *VoteParams) error {
+	votes, total, err := a.indexer.VoteList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.ElectionID,
+		"",
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &VotesList{
+		Votes:      []*Vote{},
+		Pagination: pagination,
+	}
+	for _, vote := range votes {
+		list.Votes = append(list.Votes, &Vote{
+			ElectionID:       vote.ProcessId,
+			VoteID:           vote.Nullifier,
+			VoterID:          vote.VoterID,
+			TxHash:           vote.TxHash,
+			BlockHeight:      vote.Height,
+			TransactionIndex: &vote.TxIndex,
+		})
+	}
+	return marshalAndSend(ctx, list)
+}
+
+// parseVoteParams returns an VoteParams filled with the passed params
+func parseVoteParams(paramPage, paramLimit, paramElectionID string) (*VoteParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VoteParams{
+		PaginationParams: pagination,
+		ElectionID:       util.TrimHex(paramElectionID),
+	}, nil
 }

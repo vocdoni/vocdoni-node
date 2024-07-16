@@ -18,9 +18,6 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
-	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -29,10 +26,18 @@ const (
 
 func (a *API) enableChainHandlers() error {
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/organizations/page/{page}",
+		"/chain/organizations",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.organizationListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/organizations/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.organizationListByPageHandler,
 	); err != nil {
 		return err
 	}
@@ -96,7 +101,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/transactions/reference/{hash}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainTxbyHashHandler,
+		a.chainTxRefByHashHandler,
 	); err != nil {
 		return err
 	}
@@ -104,7 +109,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/transactions/reference/index/{index}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainTxByIndexHandler,
+		a.chainTxRefByIndexHandler,
 	); err != nil {
 		return err
 	}
@@ -112,7 +117,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/blocks/{height}/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainTxByHeightHandler,
+		a.chainTxListByHeightAndPageHandler,
 	); err != nil {
 		return err
 	}
@@ -133,10 +138,18 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/transactions",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTxListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainTxListPaginated,
+		a.chainTxListByPageHandler,
 	); err != nil {
 		return err
 	}
@@ -168,7 +181,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/organizations/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,
-		a.chainOrganizationsFilterPaginatedHandler,
+		a.organizationListByFilterAndPageHandler,
 	); err != nil {
 		return err
 	}
@@ -181,10 +194,18 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/fees",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainFeesListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/fees/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainListFeesHandler,
+		a.chainFeesListByPageHandler,
 	); err != nil {
 		return err
 	}
@@ -192,7 +213,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/fees/reference/{reference}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainListFeesByReferenceHandler,
+		a.chainFeesListByReferenceAndPageHandler,
 	); err != nil {
 		return err
 	}
@@ -200,7 +221,7 @@ func (a *API) enableChainHandlers() error {
 		"/chain/fees/type/{type}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.chainListFeesByTypeHandler,
+		a.chainFeesListByTypeAndPageHandler,
 	); err != nil {
 		return err
 	}
@@ -223,39 +244,111 @@ func (a *API) enableChainHandlers() error {
 //	@Tags					Chain
 //	@Accept					json
 //	@Produce				json
-//	@Param					page	path		int	true	"Page number"
-//	@Success				200		{object}	api.organizationListHandler.response
-//	@Router					/chain/organizations/page/{page} [get]
+//	@Param					page			query		number	false	"Page"
+//	@Param					limit			query		number	false	"Items per page"
+//	@Param					organizationId	query		string	false	"Filter by partial organizationId"
+//	@Success				200				{object}	OrganizationsList
+//	@Router					/chain/organizations [get]
 func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
+	params, err := parseOrganizationParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamOrganizationId),
+	)
+	if err != nil {
+		return err
 	}
-	page = page * MaxPageSize
-	organizations := []*OrganizationList{}
+	return a.sendOrganizationList(ctx, params)
+}
 
-	list := a.indexer.EntityList(MaxPageSize, page, "")
-	for _, org := range list {
-		organizations = append(organizations, &OrganizationList{
-			OrganizationID: org.EntityID,
-			ElectionCount:  uint64(org.ProcessCount),
-		})
+// organizationListByPageHandler
+//
+//	@Summary		List organizations
+//	@Description	List all organizations
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/organizations?page=xxx)
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	OrganizationsList
+//	@Router			/chain/organizations/page/{page} [get]
+func (a *API) organizationListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseOrganizationParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+	return a.sendOrganizationList(ctx, params)
+}
+
+// organizationListByFilterAndPageHandler
+//
+//	@Summary		List organizations (filtered)
+//	@Description	Returns a list of organizations filtered by its partial id, paginated by the given page
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/organizations?page=xxx&organizationId=xxx)
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			body	body		OrganizationParams	true	"Partial organizationId to filter by"
+//	@Param			page	path		number				true	"Page"
+//	@Success		200		{object}	OrganizationsList
+//	@Router			/chain/organizations/filter/page/{page} [post]
+func (a *API) organizationListByFilterAndPageHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get organizationId from the request params
+	params := &OrganizationParams{}
+
+	// but support legacy URLParam
+	urlParams, err := parsePaginationParams(ctx.URLParam(ParamPage), "")
+	if err != nil {
+		return err
+	}
+	params.PaginationParams = urlParams
+
+	if err := json.Unmarshal(msg.Data, &params); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+	if params == nil { // happens when client POSTs a literal `null` JSON
+		return ErrMissingParameter
 	}
 
-	type response struct {
-		Organizations []*OrganizationList `json:"organizations"`
+	return a.sendOrganizationList(ctx, params)
+}
+
+// sendOrganizationList produces a filtered, paginated OrganizationsList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendOrganizationList(ctx *httprouter.HTTPContext, params *OrganizationParams) error {
+	orgs, total, err := a.indexer.EntityList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.OrganizationID,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 
-	data, err := json.Marshal(response{organizations})
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
 	if err != nil {
 		return err
 	}
 
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	list := &OrganizationsList{
+		Organizations: []*OrganizationSummary{},
+		Pagination:    pagination,
+	}
+	for _, org := range orgs {
+		list.Organizations = append(list.Organizations, &OrganizationSummary{
+			OrganizationID: org.EntityID,
+			ElectionCount:  uint64(org.ProcessCount),
+		})
+	}
+	return marshalAndSend(ctx, list)
 }
 
 // organizationCountHandler
@@ -265,16 +358,11 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	object{count=int}	"Number of registered organizations"
+//	@Success		200	{object}	CountResult	"Number of registered organizations"
 //	@Router			/chain/organizations/count [get]
 func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.CountTotalEntities()
-	organization := &Organization{Count: &count}
-	data, err := json.Marshal(organization)
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, &CountResult{Count: count})
 }
 
 // chainInfoHandler
@@ -422,7 +510,7 @@ func (a *API) chainEstimateHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 //	@Success		200		{object}	object{date=string}
 //	@Router			/chain/blockToDate/{height} [get]
 func (a *API) chainEstimateDateHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
+	height, err := strconv.ParseUint(ctx.URLParam(ParamHeight), 10, 64)
 	if err != nil {
 		return err
 	}
@@ -502,49 +590,10 @@ func (a *API) chainTxCostHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// chainTxListPaginated
-//
-//	@Summary		List Transactions
-//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		int									true	"Page number"
-//	@Success		200		{object}	api.chainTxListPaginated.response	"It return a list of transactions references"
-//	@Router			/chain/transactions/page/{page} [get]
-func (a *API) chainTxListPaginated(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page := 0
-	if ctx.URLParam("page") != "" {
-		var err error
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return err
-		}
-	}
-	offset := int32(page * MaxPageSize)
-	refs, err := a.indexer.GetLastTransactions(MaxPageSize, offset)
-	if err != nil {
-		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ErrTransactionNotFound
-		}
-		return err
-	}
-	// wrap list in a struct to consistently return list in an object, return empty
-	// object if the list does not contains any result
-	type response struct {
-		Txs []*indexertypes.Transaction `json:"transactions"`
-	}
-	data, err := json.Marshal(response{refs})
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainTxbyHashHandler
+// chainTxRefByHashHandler
 //
 //	@Summary				Transaction by hash
-//	@Description.markdown	chainTxbyHashHandler
+//	@Description.markdown	chainTxRefByHashHandler
 //	@Accept					json
 //	@Produce				json
 //	@Tags					Chain
@@ -552,7 +601,7 @@ func (a *API) chainTxListPaginated(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Success				200		{object}	indexertypes.Transaction
 //	@Success				204		"See [errors](vocdoni-api#errors) section"
 //	@Router					/chain/transactions/reference/{hash} [get]
-func (a *API) chainTxbyHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam("hash")))
 	if err != nil {
 		return err
@@ -585,7 +634,7 @@ func (a *API) chainTxbyHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/{height}/{index} [get]
 func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseInt(ctx.URLParam("height"), 10, 64)
+	height, err := strconv.ParseInt(ctx.URLParam(ParamHeight), 10, 64)
 	if err != nil {
 		return err
 	}
@@ -620,7 +669,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// chainTxByIndexHandler
+// chainTxRefByIndexHandler
 //
 //	@Summary		Transaction by index
 //	@Description	Get transaction by its index. This is not transaction reference (hash), and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
@@ -631,7 +680,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 //	@Success		200		{object}	indexertypes.Transaction
 //	@Success		204		"See [errors](vocdoni-api#errors) section"
 //	@Router			/chain/transactions/reference/index/{index} [get]
-func (a *API) chainTxByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+func (a *API) chainTxRefByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
 	if err != nil {
 		return err
@@ -650,76 +699,111 @@ func (a *API) chainTxByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// chainTxByHeightHandler
+// chainTxListHandler
+//
+//	@Summary		List transactions
+//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	query		number				false	"Page"
+//	@Param			limit	query		number				false	"Items per page"
+//	@Param			height	query		number				false	"Block height"
+//	@Param			type	query		string				false	"Tx type"
+//	@Success		200		{object}	TransactionsList	"List of transactions references"
+//	@Router			/chain/transactions [get]
+func (a *API) chainTxListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseTransactionParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamHeight),
+		ctx.QueryParam(ParamType),
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendTransactionList(ctx, params)
+}
+
+// chainTxListByPageHandler
+//
+//	@Summary		List transactions
+//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transactions?page=xxx)
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number				true	"Page"
+//	@Success		200		{object}	TransactionsList	"List of transactions references"
+//	@Router			/chain/transactions/page/{page} [get]
+func (a *API) chainTxListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseTransactionParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendTransactionList(ctx, params)
+}
+
+// chainTxListByHeightAndPageHandler
 //
 //	@Summary		Transactions in a block
 //	@Description	Given a block returns the list of transactions for that block
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transactions?page=xxx&height=xxx)
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
 //	@Param			height	path		number	true	"Block height"
-//	@Param			page	path		number	true	"Page to paginate"
-//	@Success		200		{object}	[]TransactionMetadata
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	TransactionsList
 //	@Router			/chain/blocks/{height}/transactions/page/{page} [get]
-func (a *API) chainTxByHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
+func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseTransactionParams(
+		ctx.URLParam(ParamPage),
+		"",
+		ctx.URLParam(ParamHeight),
+		"",
+	)
 	if err != nil {
 		return err
 	}
-	block := a.vocapp.GetBlockByHeight(int64(height))
-	if block == nil {
-		return ErrBlockNotFound
-	}
-	blockTxs := &BlockTransactionsInfo{
-		BlockNumber:       height,
-		TransactionsCount: uint32(len(block.Txs)),
-		Transactions:      make([]TransactionMetadata, 0),
+
+	return a.sendTransactionList(ctx, params)
+}
+
+// sendTransactionList produces a filtered, paginated TransactionList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendTransactionList(ctx *httprouter.HTTPContext, params *TransactionParams) error {
+	txs, total, err := a.indexer.SearchTransactions(
+		params.Limit,
+		params.Page*params.Limit,
+		params.Height,
+		params.Type,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber.WithErr(err)
-		}
-	}
-	page = page * MaxPageSize
-	count := 0
-	for i := page; i < len(block.Txs); i++ {
-		if count >= MaxPageSize {
-			break
-		}
-		signedTx := new(models.SignedTx)
-		tx := new(models.Tx)
-		var err error
-		if err := proto.Unmarshal(block.Txs[i], signedTx); err != nil {
-			return ErrUnmarshalingServerProto.WithErr(err)
-		}
-		if err := proto.Unmarshal(signedTx.Tx, tx); err != nil {
-			return ErrUnmarshalingServerProto.WithErr(err)
-		}
-		txType := string(
-			tx.ProtoReflect().WhichOneof(
-				tx.ProtoReflect().Descriptor().Oneofs().Get(0)).Name())
-
-		// TODO: can we avoid indexer Get calls in a loop?
-		txRef, err := a.indexer.GetTxHashReference(block.Txs[i].Hash())
-		if err != nil {
-			return ErrTransactionNotFound
-		}
-		blockTxs.Transactions = append(blockTxs.Transactions, TransactionMetadata{
-			Type:   txType,
-			Index:  int32(i),
-			Number: uint32(txRef.Index),
-			Hash:   block.Txs[i].Hash(),
-		})
-		count++
-	}
-	data, err := json.Marshal(blockTxs)
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
 	if err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	list := &TransactionsList{
+		Transactions: txs,
+		Pagination:   pagination,
+	}
+	return marshalAndSend(ctx, list)
 }
 
 // chainValidatorsHandler
@@ -768,7 +852,7 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Success		200		{object}	api.Block
 //	@Router			/chain/blocks/{height} [get]
 func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseUint(ctx.URLParam("height"), 10, 64)
+	height, err := strconv.ParseUint(ctx.URLParam(ParamHeight), 10, 64)
 	if err != nil {
 		return err
 	}
@@ -827,59 +911,6 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
-// chainOrganizationsFilterPaginatedHandler
-//
-//	@Summary		List organizations (filtered)
-//	@Description	Returns a list of organizations filtered by its partial id, paginated by the given page
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			organizationId	body		object{organizationId=string}	true	"Partial organizationId to filter by"
-//	@Param			page			path		int								true	"Current page"
-//	@Success		200				{object}	object{organizations=[]api.OrganizationList}
-//	@Router			/chain/organizations/filter/page/{page} [post]
-func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// get organizationId from the request body
-	requestData := struct {
-		OrganizationId string `json:"organizationId"`
-	}{}
-	if err := json.Unmarshal(msg.Data, &requestData); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-	// get page
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber.WithErr(err)
-		}
-	}
-	page = page * MaxPageSize
-
-	organizations := []*OrganizationList{}
-	// get matching organization ids from the indexer
-	matchingOrganizationIds := a.indexer.EntityList(MaxPageSize, page, util.TrimHex(requestData.OrganizationId))
-	if len(matchingOrganizationIds) == 0 {
-		return ErrOrgNotFound
-	}
-
-	for _, org := range matchingOrganizationIds {
-		organizations = append(organizations, &OrganizationList{
-			OrganizationID: org.EntityID,
-			ElectionCount:  uint64(org.ProcessCount),
-		})
-	}
-
-	data, err := json.Marshal(struct {
-		Organizations []*OrganizationList `json:"organizations"`
-	}{organizations})
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
 // chainTransactionCountHandler
 //
 //	@Summary		Transactions count
@@ -887,144 +918,162 @@ func (a *API) chainOrganizationsFilterPaginatedHandler(msg *apirest.APIdata, ctx
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	uint64
-//	@Success		200	{object}	object{count=number}
+//	@Success		200	{object}	CountResult
 //	@Router			/chain/transactions/count [get]
 func (a *API) chainTxCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count, err := a.indexer.CountTotalTransactions()
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(
-		struct {
-			Count uint64 `json:"count"`
-		}{Count: count},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, &CountResult{Count: count})
 }
 
-// chainListFeesHandler
+// chainFeesListHandler
 //
 //	@Summary		List all token fees
 //	@Description	Returns the token fees list ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Tags			Accounts
+//	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	path		string	true	"Paginator page"
-//	@Success		200		{object}	object{fees=[]indexertypes.TokenFeeMeta}
-//	@Router			/chain/fees/page/{page} [get]
-func (a *API) chainListFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
-
-	fees, err := a.indexer.GetTokenFees(int32(page), MaxPageSize)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
-	}
-	data, err := json.Marshal(
-		struct {
-			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
-		}{Fees: fees},
+//	@Param			page		query		number	false	"Page"
+//	@Param			limit		query		number	false	"Items per page"
+//	@Param			reference	query		string	false	"Reference filter"
+//	@Param			type		query		string	false	"Type filter"
+//	@Param			accountId	query		string	false	"Specific accountId"
+//	@Success		200			{object}	FeesList
+//	@Router			/chain/fees [get]
+func (a *API) chainFeesListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseFeesParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamReference),
+		ctx.QueryParam(ParamType),
+		ctx.QueryParam(ParamAccountId),
 	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	return a.sendFeesList(ctx, params)
 }
 
-// chainListFeesByReferenceHandler
+// chainFeesListByPageHandler
+//
+//	@Summary		List all token fees
+//	@Description	Returns the token fees list ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	FeesList
+//	@Router			/chain/fees/page/{page} [get]
+func (a *API) chainFeesListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseFeesParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendFeesList(ctx, params)
+}
+
+// chainFeesListByReferenceAndPageHandler
 //
 //	@Summary		List all token fees by reference
 //	@Description	Returns the token fees list filtered by reference and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Tags			Accounts
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
+//	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
 //	@Param			reference	path		string	true	"Reference filter"
-//	@Param			page		path		string	true	"Paginator page"
-//	@Success		200			{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Param			page		path		number	true	"Page"
+//	@Success		200			{object}	FeesList
 //	@Router			/chain/fees/reference/{reference}/page/{page} [get]
-func (a *API) chainListFeesByReferenceHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
+func (a *API) chainFeesListByReferenceAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseFeesParams(
+		ctx.URLParam(ParamPage),
+		"",
+		ctx.URLParam(ParamReference),
+		"",
+		"",
+	)
+	if err != nil {
+		return err
 	}
-	page = page * MaxPageSize
 
-	reference := ctx.URLParam("reference")
-	if reference == "" {
+	if params.Reference == "" {
 		return ErrMissingParameter
 	}
 
-	fees, err := a.indexer.GetTokenFeesByReference(reference, int32(page), MaxPageSize)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
-	}
-	data, err := json.Marshal(
-		struct {
-			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
-		}{Fees: fees},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return a.sendFeesList(ctx, params)
 }
 
-// chainListFeesByTypeHandler
+// chainFeesListByTypeAndPageHandler
 //
 //	@Summary		List all token fees by type
 //	@Description	Returns the token fees list filtered by type and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Tags			Accounts
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
+//	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
 //	@Param			type	path		string	true	"Type filter"
-//	@Param			page	path		string	true	"Paginator page"
-//	@Success		200		{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	FeesList
 //	@Router			/chain/fees/type/{type}/page/{page} [get]
-func (a *API) chainListFeesByTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
+func (a *API) chainFeesListByTypeAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseFeesParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		ctx.URLParam(ParamType),
+		"",
+	)
+	if err != nil {
+		return err
 	}
-	page = page * MaxPageSize
 
-	typeFilter := ctx.URLParam("type")
-	if typeFilter == "" {
+	if params.Type == "" {
 		return ErrMissingParameter
 	}
 
-	fees, err := a.indexer.GetTokenFeesByType(typeFilter, int32(page), MaxPageSize)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
-	}
-	data, err := json.Marshal(
-		struct {
-			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
-		}{Fees: fees},
+	return a.sendFeesList(ctx, params)
+}
+
+// sendFeesList produces a filtered, paginated FeesList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendFeesList(ctx *httprouter.HTTPContext, params *FeesParams) error {
+	fees, total, err := a.indexer.TokenFeesList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.Type,
+		params.Reference,
+		params.AccountID,
 	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &FeesList{
+		Fees:       fees,
+		Pagination: pagination,
+	}
+	return marshalAndSend(ctx, list)
 }
 
 // chainIndexerExportHandler
@@ -1043,4 +1092,51 @@ func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 		return fmt.Errorf("error reading indexer backup: %w", err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// parseOrganizationParams returns an OrganizationParams filled with the passed params
+func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID string) (*OrganizationParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &OrganizationParams{
+		PaginationParams: pagination,
+		OrganizationID:   util.TrimHex(paramOrganizationID),
+	}, nil
+}
+
+// parseFeesParams returns an FeesParams filled with the passed params
+func parseFeesParams(paramPage, paramLimit, paramReference, paramType, paramAccountId string) (*FeesParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &FeesParams{
+		PaginationParams: pagination,
+		Reference:        util.TrimHex(paramReference),
+		Type:             paramType,
+		AccountID:        util.TrimHex(paramAccountId),
+	}, nil
+}
+
+// parseTransactionParams returns an TransactionParams filled with the passed params
+func parseTransactionParams(paramPage, paramLimit, paramHeight, paramType string) (*TransactionParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	height, err := parseNumber(paramHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TransactionParams{
+		PaginationParams: pagination,
+		Height:           uint64(height),
+		Type:             paramType,
+	}, nil
 }

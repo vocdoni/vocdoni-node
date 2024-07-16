@@ -107,43 +107,63 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 }
 
 const searchVotes = `-- name: SearchVotes :many
-SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash FROM votes AS v
-LEFT JOIN transactions AS t
-	ON  v.block_height = t.block_height
-	AND v.block_index  = t.block_index
-WHERE (?1 = '' OR process_id = ?1)
-	AND (?2 = '' OR (INSTR(LOWER(HEX(nullifier)), ?2) > 0))
-ORDER BY v.block_height DESC, v.nullifier ASC
-LIMIT ?4
-OFFSET ?3
+WITH results AS (
+	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
+	FROM votes AS v
+	LEFT JOIN transactions AS t
+		ON v.block_height = t.block_height
+		AND v.block_index = t.block_index
+	WHERE (
+		LENGTH(?3) <= 64 -- if passed arg is longer, then just abort the query
+		AND (
+			?3 = ''
+			OR (LENGTH(?3) = 64 AND LOWER(HEX(process_id)) = LOWER(?3))
+			OR (LENGTH(?3) < 64 AND INSTR(LOWER(HEX(process_id)), LOWER(?3)) > 0)
+			-- TODO: consider keeping an process_id_hex column for faster searches
+		)
+		AND LENGTH(?4) <= 64 -- if passed arg is longer, then just abort the query
+		AND (
+			?4 = ''
+			OR (LENGTH(?4) = 64 AND LOWER(HEX(nullifier)) = LOWER(?4))
+			OR (LENGTH(?4) < 64 AND INSTR(LOWER(HEX(nullifier)), LOWER(?4)) > 0)
+			-- TODO: consider keeping an nullifier_hex column for faster searches
+		)
+	)
+)
+SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, COUNT(*) OVER() AS total_count
+FROM results
+ORDER BY block_height DESC, nullifier ASC
+LIMIT ?2
+OFFSET ?1
 `
 
 type SearchVotesParams struct {
-	ProcessID       interface{}
-	NullifierSubstr interface{}
 	Offset          int64
 	Limit           int64
+	ProcessIDSubstr interface{}
+	NullifierSubstr interface{}
 }
 
 type SearchVotesRow struct {
-	Nullifier            types.Nullifier
-	ProcessID            types.ProcessID
+	Nullifier            []byte
+	ProcessID            []byte
 	BlockHeight          int64
 	BlockIndex           int64
 	Weight               string
-	VoterID              state.VoterID
+	VoterID              []byte
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
 	Package              string
-	Hash                 types.Hash
+	Hash                 []byte
+	TotalCount           int64
 }
 
 func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]SearchVotesRow, error) {
 	rows, err := q.query(ctx, q.searchVotesStmt, searchVotes,
-		arg.ProcessID,
-		arg.NullifierSubstr,
 		arg.Offset,
 		arg.Limit,
+		arg.ProcessIDSubstr,
+		arg.NullifierSubstr,
 	)
 	if err != nil {
 		return nil, err
@@ -163,6 +183,7 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.EncryptionKeyIndexes,
 			&i.Package,
 			&i.Hash,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

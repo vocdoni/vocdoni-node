@@ -176,8 +176,6 @@ func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
 }
 
 const getProcessIDsByFinalResults = `-- name: GetProcessIDsByFinalResults :many
-;
-
 SELECT id FROM processes
 WHERE final_results = ?
 `
@@ -219,27 +217,34 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 }
 
 const searchEntities = `-- name: SearchEntities :many
-SELECT entity_id, COUNT(id) AS process_count FROM processes
-WHERE (?1 = '' OR (INSTR(LOWER(HEX(entity_id)), ?1) > 0))
+WITH results AS (
+    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
+           COUNT(*) OVER() AS total_count
+    FROM processes
+    WHERE (?3 = '' OR (INSTR(LOWER(HEX(entity_id)), ?3) > 0))
+)
+SELECT entity_id, COUNT(id) AS process_count, total_count
+FROM results
 GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC
-LIMIT ?3
-OFFSET ?2
+LIMIT ?2
+OFFSET ?1
 `
 
 type SearchEntitiesParams struct {
-	EntityIDSubstr interface{}
 	Offset         int64
 	Limit          int64
+	EntityIDSubstr interface{}
 }
 
 type SearchEntitiesRow struct {
-	EntityID     types.EntityID
+	EntityID     []byte
 	ProcessCount int64
+	TotalCount   int64
 }
 
 func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
-	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities, arg.EntityIDSubstr, arg.Offset, arg.Limit)
+	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities, arg.Offset, arg.Limit, arg.EntityIDSubstr)
 	if err != nil {
 		return nil, err
 	}
@@ -247,7 +252,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 	var items []SearchEntitiesRow
 	for rows.Next() {
 		var i SearchEntitiesRow
-		if err := rows.Scan(&i.EntityID, &i.ProcessCount); err != nil {
+		if err := rows.Scan(&i.EntityID, &i.ProcessCount, &i.TotalCount); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -262,52 +267,94 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 }
 
 const searchProcesses = `-- name: SearchProcesses :many
-SELECT id FROM processes
-WHERE (LENGTH(?1) = 0 OR entity_id = ?1)
-	AND (?2 = 0 OR namespace = ?2)
-	AND (?3 = 0 OR status = ?3)
-	AND (?4 = 0 OR source_network_id = ?4)
-	-- TODO(mvdan): consider keeping an id_hex column for faster searches
-	AND (?5 = '' OR (INSTR(LOWER(HEX(id)), ?5) > 0))
-	AND (?6 = FALSE OR have_results)
+WITH results AS (
+	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
+			COUNT(*) OVER() AS total_count
+	FROM processes
+	WHERE (
+		LENGTH(?3) <= 40 -- if passed arg is longer, then just abort the query
+		AND (
+			?3 = ''
+			OR (LENGTH(?3) = 40 AND LOWER(HEX(entity_id)) = LOWER(?3))
+			OR (LENGTH(?3) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(?3)) > 0)
+			-- TODO: consider keeping an entity_id_hex column for faster searches
+		)
+		AND (?4 = 0 OR namespace = ?4)
+		AND (?5 = 0 OR status = ?5)
+		AND (?6 = 0 OR source_network_id = ?6)
+		AND LENGTH(?7) <= 64 -- if passed arg is longer, then just abort the query
+		AND (
+			?7 = ''
+			OR (LENGTH(?7) = 64 AND LOWER(HEX(id)) = LOWER(?7))
+			OR (LENGTH(?7) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?7)) > 0)
+			-- TODO: consider keeping an id_hex column for faster searches
+		)
+		AND (
+			?8 = -1
+			OR (?8 = 1 AND have_results = TRUE)
+			OR (?8 = 0 AND have_results = FALSE)
+		)
+		AND (
+			?9 = -1
+			OR (?9 = 1 AND final_results = TRUE)
+			OR (?9 = 0 AND final_results = FALSE)
+		)
+		AND (
+			?10 = -1
+			OR (?10 = 1 AND manually_ended = TRUE)
+			OR (?10 = 0 AND manually_ended = FALSE)
+		)
+	)
+)
+SELECT id, total_count
+FROM results
 ORDER BY creation_time DESC, id ASC
-LIMIT ?8
-OFFSET ?7
+LIMIT ?2
+OFFSET ?1
 `
 
 type SearchProcessesParams struct {
-	EntityID        interface{}
+	Offset          int64
+	Limit           int64
+	EntityIDSubstr  interface{}
 	Namespace       interface{}
 	Status          interface{}
 	SourceNetworkID interface{}
 	IDSubstr        interface{}
-	WithResults     interface{}
-	Offset          int64
-	Limit           int64
+	HaveResults     interface{}
+	FinalResults    interface{}
+	ManuallyEnded   interface{}
 }
 
-func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
+type SearchProcessesRow struct {
+	ID         []byte
+	TotalCount int64
+}
+
+func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]SearchProcessesRow, error) {
 	rows, err := q.query(ctx, q.searchProcessesStmt, searchProcesses,
-		arg.EntityID,
+		arg.Offset,
+		arg.Limit,
+		arg.EntityIDSubstr,
 		arg.Namespace,
 		arg.Status,
 		arg.SourceNetworkID,
 		arg.IDSubstr,
-		arg.WithResults,
-		arg.Offset,
-		arg.Limit,
+		arg.HaveResults,
+		arg.FinalResults,
+		arg.ManuallyEnded,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []types.ProcessID
+	var items []SearchProcessesRow
 	for rows.Next() {
-		var id types.ProcessID
-		if err := rows.Scan(&id); err != nil {
+		var i SearchProcessesRow
+		if err := rows.Scan(&i.ID, &i.TotalCount); err != nil {
 			return nil, err
 		}
-		items = append(items, id)
+		items = append(items, i)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err
@@ -382,8 +429,6 @@ func (q *Queries) UpdateProcessEndDate(ctx context.Context, arg UpdateProcessEnd
 }
 
 const updateProcessFromState = `-- name: UpdateProcessFromState :execresult
-;
-
 UPDATE processes
 SET census_root         = ?1,
 	census_uri          = ?2,

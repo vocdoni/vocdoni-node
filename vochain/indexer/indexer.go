@@ -751,103 +751,42 @@ func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uin
 	}
 }
 
-// GetTokenFeesByFromAccount returns all the token transfers made from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByFromAccount(context.TODO(), indexerdb.GetTokenFeesByFromAccountParams{
-		FromAccount: from,
-		Limit:       int64(maxItems),
+// TokenFeesList returns all the token fees associated with a given transaction type, reference and fromAccount
+// (all optional filters), ordered by timestamp and paginated by limit and offset
+func (idx *Indexer) TokenFeesList(limit, offset int, txType, reference, fromAccount string) (
+	[]*indexertypes.TokenFeeMeta, uint64, error,
+) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchTokenFees(context.TODO(), indexerdb.SearchTokenFeesParams{
+		Limit:       int64(limit),
 		Offset:      int64(offset),
+		TxType:      txType,
+		Reference:   reference,
+		FromAccount: fromAccount,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
+	list := []*indexertypes.TokenFeeMeta{}
+	for _, row := range results {
+		list = append(list, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(row.Cost),
+			From:      row.FromAccount,
+			TxType:    row.TxType,
+			Height:    uint64(row.BlockHeight),
+			Reference: row.Reference,
+			Timestamp: row.SpendTime,
 		})
 	}
-	return tt, nil
-}
-
-// GetTokenFees returns all the token transfers from the database, ordered
-// by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFees(offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFees(context.TODO(), indexerdb.GetTokenFeesParams{
-		Limit:  int64(maxItems),
-		Offset: int64(offset),
-	})
-	if err != nil {
-		return nil, err
+	if len(results) == 0 {
+		return list, 0, nil
 	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
-		})
-	}
-	return tt, nil
-}
-
-// GetTokenFeesByReference returns all the token fees associated with a given reference
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByReference(reference string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByReference(context.TODO(), indexerdb.GetTokenFeesByReferenceParams{
-		Reference: reference,
-		Limit:     int64(maxItems),
-		Offset:    int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
-		})
-	}
-	return tt, nil
-}
-
-// GetTokenFeesByType returns all the token fees associated with a given transaction type
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByType(txType string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByTxType(context.TODO(), indexerdb.GetTokenFeesByTxTypeParams{
-		TxType: txType,
-		Limit:  int64(maxItems),
-		Offset: int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
-		})
-	}
-	return tt, nil
+	return list, uint64(results[0].TotalCount), nil
 }
 
 // GetTokenTransfersByToAccount returns all the token transfers made to a given account
@@ -905,21 +844,31 @@ func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	return uint64(count), err
 }
 
-func (idx *Indexer) GetListAccounts(offset, maxItems int32) ([]indexertypes.Account, error) {
-	accsFromDB, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
-		Limit:  int64(maxItems),
+// AccountList retrieves all accounts.
+func (idx *Indexer) AccountList(limit, offset int) ([]*indexertypes.Account, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
+		Limit:  int64(limit),
 		Offset: int64(offset),
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []indexertypes.Account{}
-	for _, acc := range accsFromDB {
-		tt = append(tt, indexertypes.Account{
-			Address: acc.Account,
-			Balance: uint64(acc.Balance),
-			Nonce:   uint32(acc.Nonce),
+	list := []*indexertypes.Account{}
+	for _, row := range results {
+		list = append(list, &indexertypes.Account{
+			Address: row.Account,
+			Balance: uint64(row.Balance),
+			Nonce:   uint32(row.Nonce),
 		})
 	}
-	return tt, nil
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
 }

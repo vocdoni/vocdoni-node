@@ -23,13 +23,31 @@ LIMIT 1;
 SELECT COUNT(*) FROM votes;
 
 -- name: SearchVotes :many
-SELECT v.*, t.hash FROM votes AS v
-LEFT JOIN transactions AS t
-	ON  v.block_height = t.block_height
-	AND v.block_index  = t.block_index
-WHERE (sqlc.arg(process_id) = '' OR process_id = sqlc.arg(process_id))
-	AND (sqlc.arg(nullifier_substr) = '' OR (INSTR(LOWER(HEX(nullifier)), sqlc.arg(nullifier_substr)) > 0))
-ORDER BY v.block_height DESC, v.nullifier ASC
+WITH results AS (
+	SELECT v.*, t.hash
+	FROM votes AS v
+	LEFT JOIN transactions AS t
+		ON v.block_height = t.block_height
+		AND v.block_index = t.block_index
+	WHERE (
+		LENGTH(sqlc.arg(process_id_substr)) <= 64 -- if passed arg is longer, then just abort the query
+		AND (
+			sqlc.arg(process_id_substr) = ''
+			OR (LENGTH(sqlc.arg(process_id_substr)) = 64 AND LOWER(HEX(process_id)) = LOWER(sqlc.arg(process_id_substr)))
+			OR (LENGTH(sqlc.arg(process_id_substr)) < 64 AND INSTR(LOWER(HEX(process_id)), LOWER(sqlc.arg(process_id_substr))) > 0)
+			-- TODO: consider keeping an process_id_hex column for faster searches
+		)
+		AND LENGTH(sqlc.arg(nullifier_substr)) <= 64 -- if passed arg is longer, then just abort the query
+		AND (
+			sqlc.arg(nullifier_substr) = ''
+			OR (LENGTH(sqlc.arg(nullifier_substr)) = 64 AND LOWER(HEX(nullifier)) = LOWER(sqlc.arg(nullifier_substr)))
+			OR (LENGTH(sqlc.arg(nullifier_substr)) < 64 AND INSTR(LOWER(HEX(nullifier)), LOWER(sqlc.arg(nullifier_substr))) > 0)
+			-- TODO: consider keeping an nullifier_hex column for faster searches
+		)
+	)
+)
+SELECT *, COUNT(*) OVER() AS total_count
+FROM results
+ORDER BY block_height DESC, nullifier ASC
 LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
+OFFSET sqlc.arg(offset);

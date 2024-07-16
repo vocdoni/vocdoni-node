@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -34,12 +33,20 @@ func (a *API) enableElectionHandlers() error {
 		"/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionFullListHandler,
+		a.electionListByPageHandler,
 	); err != nil {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionID}",
+		"/elections",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/elections/{electionId}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionHandler,
@@ -47,7 +54,7 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionID}/keys",
+		"/elections/{electionId}/keys",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionKeysHandler,
@@ -55,7 +62,7 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionID}/votes/count",
+		"/elections/{electionId}/votes/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionVotesCountHandler,
@@ -63,15 +70,15 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionID}/votes/page/{page}",
+		"/elections/{electionId}/votes/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionVotesHandler,
+		a.electionVotesListByPageHandler,
 	); err != nil {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionID}/scrutiny",
+		"/elections/{electionId}/scrutiny",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionScrutinyHandler,
@@ -107,7 +114,15 @@ func (a *API) enableElectionHandlers() error {
 		"/elections/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,
-		a.electionFilterPaginatedHandler,
+		a.electionListByFilterAndPageHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/elections/filter",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.electionListByFilterHandler,
 	); err != nil {
 		return err
 	}
@@ -124,47 +139,167 @@ func (a *API) enableElectionHandlers() error {
 	return nil
 }
 
-// electionFullListHandler
+// electionListByFilterAndPageHandler
+//
+//	@Summary	List elections (filtered)
+//	@Deprecated
+//	@Description	(deprecated, in favor of /elections?page=xxx&organizationId=xxx&status=xxx)
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number			true	"Page"
+//	@Param			body	body		ElectionParams	true	"Filtered by partial organizationId, partial electionId, election status and with results available or not"
+//	@Success		200		{object}	ElectionsList
+//	@Router			/elections/filter/page/{page} [post]
+func (a *API) electionListByFilterAndPageHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get params from the request body
+	params := &ElectionParams{}
+
+	// but support legacy URLParam
+	urlParams, err := parsePaginationParams(ctx.URLParam(ParamPage), "")
+	if err != nil {
+		return err
+	}
+	params.PaginationParams = urlParams
+
+	if err := json.Unmarshal(msg.Data, &params); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+	if params == nil { // happens when client POSTs a literal `null` JSON
+		return ErrMissingParameter
+	}
+
+	return a.sendElectionList(ctx, params)
+}
+
+// electionListByFilterHandler
+//
+//	@Summary	List elections (filtered)
+//	@Deprecated
+//	@Description.markdown	electionListByFilterHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					page	query		number			false	"Page"
+//	@Param					body	body		ElectionParams	true	"Filtered by partial organizationId, partial electionId, election status and with results available or not"
+//	@Success				200		{object}	ElectionsList
+//	@Router					/elections/filter [post]
+func (a *API) electionListByFilterHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	// get params from the request body
+	params := &ElectionParams{}
+	if err := json.Unmarshal(msg.Data, &params); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+
+	return a.sendElectionList(ctx, params)
+}
+
+// electionListByPageHandler
+//
+//	@Summary		List elections
+//	@Description	Get a list of elections summaries
+//	@Deprecated
+//	@Description	(deprecated, in favor of /elections?page=xxx)
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	ElectionsList
+//	@Router			/elections/page/{page} [get]
+func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseElectionParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+	return a.sendElectionList(ctx, params)
+}
+
+// electionListHandler
 //
 //	@Summary		List elections
 //	@Description	Get a list of elections summaries.
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	path		number	true	"Page "
-//	@Success		200		{object}	ElectionSummary
-//	@Router			/elections/page/{page} [get]
-func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	page := 0
-	if ctx.URLParam("page") != "" {
-		var err error
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber.With(ctx.URLParam("page"))
-		}
-	}
-	elections, err := a.indexer.ProcessList(nil, page*MaxPageSize, MaxPageSize, "", 0, 0, "", false)
+//	@Param			page			query		number	false	"Page"
+//	@Param			limit			query		number	false	"Items per page"
+//	@Param			organizationId	query		string	false	"Filter by partial organizationId"
+//	@Param			status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
+//	@Param			electionId		query		string	false	"Filter by partial electionId"
+//	@Param			withResults		query		boolean	false	"Filter by (partial or final) results available or not"
+//	@Param			finalResults	query		boolean	false	"Filter by final results available or not"
+//	@Param			manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
+//	@Success		200				{object}	ElectionsList
+//	@Router			/elections [get]
+func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseElectionParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamStatus),
+		ctx.QueryParam(ParamOrganizationId),
+		ctx.QueryParam(ParamElectionId),
+		ctx.QueryParam(ParamWithResults),
+		ctx.QueryParam(ParamFinalResults),
+		ctx.QueryParam(ParamManuallyEnded),
+	)
 	if err != nil {
-		return ErrCantFetchElectionList.WithErr(err)
+		return err
+	}
+	return a.sendElectionList(ctx, params)
+}
+
+// sendElectionList produces a filtered, paginated ElectionsList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendElectionList(ctx *httprouter.HTTPContext, params *ElectionParams) error {
+	status, err := parseStatus(params.Status)
+	if err != nil {
+		return err
 	}
 
-	list := []ElectionSummary{}
-	for _, eid := range elections {
+	eids, total, err := a.indexer.ProcessList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.OrganizationID,
+		params.ElectionID,
+		0,
+		0,
+		status,
+		params.WithResults,
+		params.FinalResults,
+		params.ManuallyEnded,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &ElectionsList{
+		Elections:  []*ElectionSummary{},
+		Pagination: pagination,
+	}
+	for _, eid := range eids {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
 			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
-		list = append(list, a.electionSummary(e))
+		list.Elections = append(list.Elections, a.electionSummary(e))
 	}
-	// wrap list in a struct to consistently return list in an object, return empty
-	// object if the list does not contains any result
-	data, err := json.Marshal(struct {
-		Elections []ElectionSummary `json:"elections"`
-	}{list})
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, list)
 }
 
 // electionHandler
@@ -174,13 +309,13 @@ func (a *API) electionFullListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			electionID	path		string	true	"Election id"
+//	@Param			electionId	path		string	true	"Election id"
 //	@Success		200			{object}	Election
-//	@Router			/elections/{electionID} [get]
+//	@Router			/elections/{electionId} [get]
 func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
 	if err != nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	proc, err := a.indexer.ProcessInfo(electionID)
 	if err != nil {
@@ -191,7 +326,7 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 	}
 
 	election := Election{
-		ElectionSummary: a.electionSummary(proc),
+		ElectionSummary: *a.electionSummary(proc),
 		MetadataURL:     proc.Metadata,
 		CreationTime:    proc.CreationTime,
 		VoteMode:        VoteMode{EnvelopeType: proc.Envelope},
@@ -242,16 +377,18 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 //
 //	@Summary		Count election votes
 //	@Description	Get the number of votes for an election
+//	@Deprecated
+//	@Description	(deprecated, in favor of /votes?electionId=xxx which reports totalItems)
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			electionID	path		string	true	"Election id"
-//	@Success		200			{object}	object{count=number}
-//	@Router			/elections/{electionID}/votes/count [get]
+//	@Param			electionId	path		string	true	"Election id"
+//	@Success		200			{object}	CountResult
+//	@Router			/elections/{electionId}/votes/count [get]
 func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
 	if err != nil || electionID == nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	// check process exists and return 404 if not
 	// TODO: use the indexer to count votes
@@ -265,15 +402,7 @@ func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 	} else if err != nil {
 		return ErrCantCountVotes.WithErr(err)
 	}
-	data, err := json.Marshal(
-		struct {
-			Count uint64 `json:"count"`
-		}{Count: count},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, &CountResult{Count: count})
 }
 
 // electionKeysHandler
@@ -283,13 +412,13 @@ func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			electionID	path		string	true	"Election id"
+//	@Param			electionId	path		string	true	"Election id"
 //	@Success		200			{object}	ElectionKeys
-//	@Router			/elections/{electionID}/keys [get]
+//	@Router			/elections/{electionId}/keys [get]
 func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
 	if err != nil || electionID == nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	// TODO: sqlite also has public and private keys, consider using it instead
 	process, err := getElection(electionID, a.vocapp.State)
@@ -327,59 +456,29 @@ func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// electionVotesHandler
+// electionVotesListByPageHandler
 //
 //	@Summary		List election votes
 //	@Description	Returns the list of voteIDs for an election (paginated)
+//	@Deprecated
+//	@Description	(deprecated, in favor of /votes?page=xxx&electionId=xxx)
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			electionID	path		string	true	"Election id"
-//	@Param			page		path		number	true	"Page "
-//	@Success		200			{object}	Vote
-//	@Router			/elections/{electionID}/votes/page/{page} [get]
-func (a *API) electionVotesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
-	if err != nil || electionID == nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
-	}
-	// TODO: remove the getElection call?
-	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+//	@Param			electionId	path		string	true	"Election id"
+//	@Param			page		path		number	true	"Page"
+//	@Success		200			{object}	VotesList
+//	@Router			/elections/{electionId}/votes/page/{page} [get]
+func (a *API) electionVotesListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseVoteParams(
+		ctx.URLParam(ParamPage),
+		"",
+		ctx.URLParam(ParamElectionId),
+	)
+	if err != nil {
 		return err
 	}
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
-
-	votesRaw, err := a.indexer.GetEnvelopes(electionID, MaxPageSize, page, "")
-	if err != nil {
-		if errors.Is(err, indexer.ErrVoteNotFound) {
-			return ErrVoteNotFound
-		}
-		return ErrCantFetchEnvelope.WithErr(err)
-	}
-	votes := []Vote{}
-	for _, v := range votesRaw {
-		votes = append(votes, Vote{
-			VoteID:           v.Nullifier,
-			VoterID:          v.VoterID,
-			TxHash:           v.TxHash,
-			BlockHeight:      v.Height,
-			TransactionIndex: &v.TxIndex,
-		})
-	}
-	data, err := json.Marshal(struct {
-		Votes []Vote `json:"votes"`
-	}{votes})
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return a.sendVotesList(ctx, params)
 }
 
 // electionScrutinyHandler
@@ -389,13 +488,13 @@ func (a *API) electionVotesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Tags					Elections
 //	@Accept					json
 //	@Produce				json
-//	@Param					electionID	path		string	true	"Election id"
+//	@Param					electionId	path		string	true	"Election id"
 //	@Success				200			{object}	ElectionResults
-//	@Router					/elections/{electionID}/scrutiny [get]
+//	@Router					/elections/{electionId}/scrutiny [get]
 func (a *API) electionScrutinyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("electionID")))
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
 	if err != nil || electionID == nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam("electionID"), err)
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	process, err := getElection(electionID, a.vocapp.State)
 	if err != nil {
@@ -612,78 +711,6 @@ func getElection(electionID []byte, vs *state.State) (*models.Process, error) {
 	return process, nil
 }
 
-// electionFilterPaginatedHandler
-//
-//	@Summary				List elections (filtered)
-//	@Description.markdown	electionFilterPaginatedHandler
-//	@Tags					Elections
-//	@Accept					json
-//	@Produce				json
-//	@Param					page		path		number			true	"Page to paginate"
-//	@Param					transaction	body		ElectionFilter	true	"Filtered by partial organizationID, partial processID, process status and with results available or not"
-//	@Success				200			{object}	ElectionSummary
-//	@Router					/elections/filter/page/{page} [post]
-func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// get organizationId from the request body
-	body := &ElectionFilter{}
-	if err := json.Unmarshal(msg.Data, &body); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-	// check that at least one filter is set
-	if body.OrganizationID == nil && body.ElectionID == nil && body.Status == "" && body.WithResults == nil {
-		return ErrMissingParameter
-	}
-	// get page
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber.WithErr(err)
-		}
-	}
-	page = page * MaxPageSize
-	if body.WithResults == nil {
-		withResults := false
-		body.WithResults = &withResults
-	}
-	elections, err := a.indexer.ProcessList(
-		body.OrganizationID,
-		page,
-		MaxPageSize,
-		body.ElectionID.String(),
-		0,
-		0,
-		body.Status,
-		*body.WithResults,
-	)
-	if err != nil {
-		return ErrCantFetchElectionList.WithErr(err)
-	}
-	if len(elections) == 0 {
-		return ErrElectionNotFound
-	}
-
-	var list []ElectionSummary
-	// get election summary
-	for _, eid := range elections {
-		e, err := a.indexer.ProcessInfo(eid)
-		if err != nil {
-			return ErrCantFetchElection.WithErr(err)
-		}
-		list = append(list, a.electionSummary(e))
-	}
-	data, err := json.Marshal(struct {
-		Elections []ElectionSummary `json:"elections"`
-	}{
-		Elections: list,
-	})
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
 // buildElectionIDHandler
 //
 //	@Summary		Build an election ID
@@ -691,7 +718,7 @@ func (a *API) electionFilterPaginatedHandler(msg *apirest.APIdata, ctx *httprout
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
-//	@Param			transaction	body		BuildElectionID	true	"Delta, OrganizationID, CensusOrigin and EnvelopeType"
+//	@Param			transaction	body		BuildElectionID	true	"delta, organizationId, censusOrigin and envelopeType"
 //	@Success		200			{object}	object{electionID=string}
 //	@Router			/elections/id [post]
 func (a *API) buildElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -724,4 +751,40 @@ func (a *API) buildElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// parseElectionParams returns an ElectionParams filled with the passed params
+func parseElectionParams(paramPage, paramLimit, paramStatus,
+	paramOrganizationID, paramElectionID,
+	paramWithResults, paramFinalResults, paramManuallyEnded string,
+) (*ElectionParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	withResults, err := parseBool(paramWithResults)
+	if err != nil {
+		return nil, err
+	}
+
+	finalResults, err := parseBool(paramFinalResults)
+	if err != nil {
+		return nil, err
+	}
+
+	manuallyEnded, err := parseBool(paramManuallyEnded)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ElectionParams{
+		PaginationParams: pagination,
+		OrganizationID:   util.TrimHex(paramOrganizationID),
+		ElectionID:       util.TrimHex(paramElectionID),
+		Status:           paramStatus,
+		WithResults:      withResults,
+		FinalResults:     finalResults,
+		ManuallyEnded:    manuallyEnded,
+	}, nil
 }

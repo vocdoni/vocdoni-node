@@ -13,8 +13,6 @@ import (
 )
 
 const countTransactions = `-- name: CountTransactions :one
-;
-
 SELECT COUNT(*) FROM transactions
 `
 
@@ -47,47 +45,6 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		arg.BlockIndex,
 		arg.Type,
 	)
-}
-
-const getLastTransactions = `-- name: GetLastTransactions :many
-SELECT id, hash, block_height, block_index, type FROM transactions
-ORDER BY id DESC
-LIMIT ?
-OFFSET ?
-`
-
-type GetLastTransactionsParams struct {
-	Limit  int64
-	Offset int64
-}
-
-func (q *Queries) GetLastTransactions(ctx context.Context, arg GetLastTransactionsParams) ([]Transaction, error) {
-	rows, err := q.query(ctx, q.getLastTransactionsStmt, getLastTransactions, arg.Limit, arg.Offset)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []Transaction
-	for rows.Next() {
-		var i Transaction
-		if err := rows.Scan(
-			&i.ID,
-			&i.Hash,
-			&i.BlockHeight,
-			&i.BlockIndex,
-			&i.Type,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
 
 const getTransaction = `-- name: GetTransaction :one
@@ -150,4 +107,71 @@ func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, 
 		&i.Type,
 	)
 	return i, err
+}
+
+const searchTransactions = `-- name: SearchTransactions :many
+WITH results AS (
+  SELECT id, hash, block_height, block_index, type
+  FROM transactions
+  WHERE (
+    (?3 = 0 OR block_height = ?3)
+    AND (?4 = '' OR LOWER(type) = LOWER(?4))
+  )
+)
+SELECT id, hash, block_height, block_index, type, COUNT(*) OVER() AS total_count
+FROM results
+ORDER BY id DESC
+LIMIT ?2
+OFFSET ?1
+`
+
+type SearchTransactionsParams struct {
+	Offset      int64
+	Limit       int64
+	BlockHeight interface{}
+	TxType      interface{}
+}
+
+type SearchTransactionsRow struct {
+	ID          int64
+	Hash        []byte
+	BlockHeight int64
+	BlockIndex  int64
+	Type        string
+	TotalCount  int64
+}
+
+func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]SearchTransactionsRow, error) {
+	rows, err := q.query(ctx, q.searchTransactionsStmt, searchTransactions,
+		arg.Offset,
+		arg.Limit,
+		arg.BlockHeight,
+		arg.TxType,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchTransactionsRow
+	for rows.Next() {
+		var i SearchTransactionsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Hash,
+			&i.BlockHeight,
+			&i.BlockIndex,
+			&i.Type,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

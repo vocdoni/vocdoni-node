@@ -47,8 +47,34 @@ import (
 
 //	@securityDefinitions.basic	BasicAuth
 
-// MaxPageSize defines the maximum number of results returned by the paginated endpoints
-const MaxPageSize = 10
+const (
+	// DefaultItemsPerPage defines how many items per page are returned by the paginated endpoints,
+	// when the client doesn't specify a `limit` param
+	DefaultItemsPerPage = 10
+	// MaxItemsPerPage defines a ceiling for the `limit` param passed by the client
+	MaxItemsPerPage = 100
+)
+
+// These consts define the keywords for query (?param=), url (/url/param/) and POST params.
+// Note: In JS/TS acronyms like "ID" are camelCased as in "Id".
+//
+//nolint:revive
+const (
+	ParamAccountId      = "accountId"
+	ParamCensusId       = "censusId"
+	ParamElectionId     = "electionId"
+	ParamOrganizationId = "organizationId"
+	ParamVoteId         = "voteId"
+	ParamPage           = "page"
+	ParamLimit          = "limit"
+	ParamStatus         = "status"
+	ParamWithResults    = "withResults"
+	ParamFinalResults   = "finalResults"
+	ParamManuallyEnded  = "manuallyEnded"
+	ParamHeight         = "height"
+	ParamReference      = "reference"
+	ParamType           = "type"
+)
 
 var (
 	ErrMissingModulesForHandler = fmt.Errorf("missing modules attached for enabling handler")

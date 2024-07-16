@@ -59,31 +59,26 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 	return envelopePackage, nil
 }
 
-// GetEnvelopes retrieves all envelope metadata for a ProcessId.
-// Returns ErrVoteNotFound if the envelope reference is not found.
-func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
-	searchTerm string,
-) ([]*indexertypes.EnvelopeMetadata, error) {
-	if from < 0 {
-		return nil, fmt.Errorf("GetEnvelopes: invalid value: from is invalid value %d", from)
+// VoteList retrieves all envelope metadata for a processID and nullifier (both args do partial or full string match).
+func (idx *Indexer) VoteList(limit, offset int, processID string, nullifier string,
+) ([]*indexertypes.EnvelopeMetadata, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
-	if max <= 0 {
-		return nil, fmt.Errorf("GetEnvelopes: invalid value: max is invalid value %d", max)
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
 	}
-	envelopes := []*indexertypes.EnvelopeMetadata{}
-	txRefs, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
-		ProcessID:       processId,
-		NullifierSubstr: strings.ToLower(searchTerm), // we search in lowercase
-		Limit:           int64(max),
-		Offset:          int64(from),
+	results, err := idx.readOnlyQuery.SearchVotes(context.TODO(), indexerdb.SearchVotesParams{
+		ProcessIDSubstr: processID,
+		NullifierSubstr: strings.ToLower(nullifier), // we search in lowercase
+		Limit:           int64(limit),
+		Offset:          int64(offset),
 	})
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrVoteNotFound
-		}
-		return nil, err
+		return nil, 0, err
 	}
-	for _, txRef := range txRefs {
+	list := []*indexertypes.EnvelopeMetadata{}
+	for _, txRef := range results {
 		envelopeMetadata := &indexertypes.EnvelopeMetadata{
 			ProcessId: txRef.ProcessID,
 			Nullifier: txRef.Nullifier,
@@ -92,11 +87,14 @@ func (idx *Indexer) GetEnvelopes(processId []byte, max, from int,
 			TxHash:    txRef.Hash,
 		}
 		if len(txRef.VoterID) > 0 {
-			envelopeMetadata.VoterID = txRef.VoterID.Address()
+			envelopeMetadata.VoterID = state.VoterID(txRef.VoterID).Address()
 		}
-		envelopes = append(envelopes, envelopeMetadata)
+		list = append(list, envelopeMetadata)
 	}
-	return envelopes, nil
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
 }
 
 // CountTotalVotes returns the total number of envelopes.

@@ -236,3 +236,8 @@ type TokenTransfersAccount struct {
 	Received []*TokenTransferMeta `json:"received"`
 	Sent     []*TokenTransferMeta `json:"sent"`
 }
+
+type Entity struct {
+	EntityID     types.EntityID
+	ProcessCount int64
+}

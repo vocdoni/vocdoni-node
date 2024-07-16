@@ -13,8 +13,6 @@ import (
 )
 
 const countAccounts = `-- name: CountAccounts :one
-;
-
 SELECT COUNT(*) FROM accounts
 `
 
@@ -42,9 +40,8 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (s
 }
 
 const getListAccounts = `-- name: GetListAccounts :many
-;
-
-SELECT account, balance, nonce
+SELECT account, balance, nonce,
+       COUNT(*) OVER() AS total_count
 FROM accounts
 ORDER BY balance DESC
 LIMIT ? OFFSET ?
@@ -55,16 +52,28 @@ type GetListAccountsParams struct {
 	Offset int64
 }
 
-func (q *Queries) GetListAccounts(ctx context.Context, arg GetListAccountsParams) ([]Account, error) {
+type GetListAccountsRow struct {
+	Account    types.AccountID
+	Balance    int64
+	Nonce      int64
+	TotalCount int64
+}
+
+func (q *Queries) GetListAccounts(ctx context.Context, arg GetListAccountsParams) ([]GetListAccountsRow, error) {
 	rows, err := q.query(ctx, q.getListAccountsStmt, getListAccounts, arg.Limit, arg.Offset)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Account
+	var items []GetListAccountsRow
 	for rows.Next() {
-		var i Account
-		if err := rows.Scan(&i.Account, &i.Balance, &i.Nonce); err != nil {
+		var i GetListAccountsRow
+		if err := rows.Scan(
+			&i.Account,
+			&i.Balance,
+			&i.Nonce,
+			&i.TotalCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

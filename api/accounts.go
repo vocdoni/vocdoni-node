@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strconv"
 	"strings"
 	"time"
 
@@ -53,31 +52,31 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections/count",
+		"/accounts/{organizationId}/elections/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionCountHandler,
+		a.accountElectionsCountHandler,
 	); err != nil {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections/status/{status}/page/{page}",
+		"/accounts/{organizationId}/elections/status/{status}/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionListHandler,
+		a.accountElectionsListByStatusAndPageHandler,
 	); err != nil {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{organizationID}/elections/page/{page}",
+		"/accounts/{organizationId}/elections/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
-		a.electionListHandler,
+		a.accountElectionsListByPageHandler,
 	); err != nil {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{accountID}/transfers/page/{page}",
+		"/accounts/{accountId}/transfers/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenTransfersListHandler,
@@ -85,7 +84,7 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{accountID}/fees/page/{page}",
+		"/accounts/{accountId}/fees/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenFeesHandler,
@@ -93,7 +92,7 @@ func (a *API) enableAccountHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/accounts/{accountID}/transfers/count",
+		"/accounts/{accountId}/transfers/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.tokenTransfersCountHandler,
@@ -110,6 +109,14 @@ func (a *API) enableAccountHandlers() error {
 	}
 	if err := a.Endpoint.RegisterMethod(
 		"/accounts/page/{page}",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.accountListByPageHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/accounts",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.accountListHandler,
@@ -130,9 +137,9 @@ func (a *API) enableAccountHandlers() error {
 //	@Produce		json
 //	@Param			address	path		string	true	"Account address"
 //	@Success		200		{object}	Account
+//	@Success		200		{object}	AccountMetadata
 //	@Router			/accounts/{address} [get]
 //	@Router			/accounts/{address}/metadata [get]
-//	@Success		200	{object}	AccountMetadata
 func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	if len(util.TrimHex(ctx.URLParam("address"))) != common.AddressLength*2 {
 		return ErrAddressMalformed
@@ -311,122 +318,107 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Success		200	{object}	object{count=int}
+//	@Success		200	{object}	CountResult
 //	@Router			/accounts/count [get]
 func (a *API) accountCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count, err := a.indexer.CountTotalAccounts()
 	if err != nil {
 		return err
 	}
-
-	data, err := json.Marshal(
-		struct {
-			Count uint64 `json:"count"`
-		}{Count: count},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, &CountResult{Count: count})
 }
 
-// electionListHandler
+// accountElectionsListByPageHandler
 //
 //	@Summary		List organization elections
 //	@Description	List the elections of an organization
+//	@Deprecated
+//	@Description	(deprecated, in favor of /elections?page=xxx&organizationId=xxx)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			organizationID	path		string	true	"Specific organizationID"
-//	@Param			page			path		number	true	"Define de page number"
-//	@Success		200				{object}	object{elections=[]ElectionSummary}
-//	@Router			/accounts/{organizationID}/elections/page/{page} [get]
-//	/accounts/{organizationID}/elections/status/{status}/page/{page} [post] Endpoint docs generated on docs/models/model.go
-func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
-	if err != nil || organizationID == nil {
-		return ErrCantParseOrgID.Withf("%q", ctx.URLParam("organizationID"))
-	}
-
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
-
-	var pids [][]byte
-	switch ctx.URLParam("status") {
-	case "ready":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "READY", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "paused":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "PAUSED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "canceled":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "CANCELED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	case "ended", "results":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "RESULTS", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-		pids2, err := a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "ENDED", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-		pids = append(pids, pids2...)
-	case "":
-		pids, err = a.indexer.ProcessList(organizationID, page, MaxPageSize, "", 0, 0, "", false)
-		if err != nil {
-			return ErrCantFetchElectionList.WithErr(err)
-		}
-	default:
-		return ErrParamStatusMissing
-	}
-
-	elections := []*ElectionSummary{}
-	for _, pid := range pids {
-		procInfo, err := a.indexer.ProcessInfo(pid)
-		if err != nil {
-			return ErrCantFetchElection.WithErr(err)
-		}
-		summary := a.electionSummary(procInfo)
-		elections = append(elections, &summary)
-	}
-	data, err := json.Marshal(&Organization{
-		Elections: elections,
-	})
+//	@Param			organizationId	path		string	true	"Specific organizationId"
+//	@Param			page			path		number	true	"Page"
+//	@Success		200				{object}	ElectionsList
+//	@Router			/accounts/{organizationId}/elections/page/{page} [get]
+func (a *API) accountElectionsListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseElectionParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		ctx.URLParam(ParamOrganizationId),
+		"",
+		"",
+		"",
+		"",
+	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	if params.OrganizationID == "" {
+		return ErrMissingParameter
+	}
+
+	return a.sendElectionList(ctx, params)
 }
 
-// electionCountHandler
+// accountElectionsListByStatusAndPageHandler
+//
+//	@Summary		List organization elections by status
+//	@Description	List the elections of an organization by status
+//	@Deprecated
+//	@Description	(deprecated, in favor of /elections?page=xxx&organizationId=xxx&status=xxx)
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			organizationId	path		string	true	"Specific organizationId"
+//	@Param			status			path		string	true	"Election status"	Enums(ready, paused, canceled, ended, results)
+//	@Param			page			path		number	true	"Page"
+//	@Success		200				{object}	ElectionsList
+//	@Router			/accounts/{organizationId}/elections/status/{status}/page/{page} [get]
+func (a *API) accountElectionsListByStatusAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseElectionParams(
+		ctx.URLParam(ParamPage),
+		"",
+		ctx.URLParam(ParamStatus),
+		ctx.URLParam(ParamOrganizationId),
+		"",
+		"",
+		"",
+		"",
+	)
+	if err != nil {
+		return err
+	}
+
+	if params.OrganizationID == "" || params.Status == "" {
+		return ErrMissingParameter
+	}
+
+	return a.sendElectionList(ctx, params)
+}
+
+// accountElectionsCountHandler
 //
 //	@Summary		Count organization elections
 //	@Description	Returns the number of elections for an organization
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			organizationID	path		string	true	"Specific organizationID"
-//	@Success		200				{object}	object{count=number}
-//	@Router			/accounts/{organizationID}/elections/count [get]
-func (a *API) electionCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	organizationID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("organizationID")))
-	if err != nil || organizationID == nil {
-		return ErrCantParseOrgID.Withf("%q", ctx.URLParam("organizationID"))
+//	@Param			organizationId	path		string	true	"Specific organizationId"
+//	@Success		200				{object}	CountResult
+//	@Router			/accounts/{organizationId}/elections/count [get]
+func (a *API) accountElectionsCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	if ctx.URLParam(ParamOrganizationId) == "" {
+		return ErrMissingParameter
 	}
+
+	organizationID, err := parseHexString(ctx.URLParam(ParamOrganizationId))
+	if err != nil {
+		return err
+	}
+
 	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(organizationID), true)
 	if acc == nil {
 		return ErrOrgNotFound
@@ -434,15 +426,7 @@ func (a *API) electionCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(
-		struct {
-			Count uint32 `json:"count"`
-		}{Count: acc.GetProcessIndex()},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return marshalAndSend(ctx, &CountResult{Count: uint64(acc.GetProcessIndex())})
 }
 
 // tokenTransfersListHandler
@@ -452,14 +436,14 @@ func (a *API) electionCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			accountID	path		string	true	"Specific accountID"
-//	@Param			page		path		string	true	"Paginator page"
+//	@Param			accountId	path		string	true	"Specific accountId"
+//	@Param			page		path		number	true	"Page"
 //	@Success		200			{object}	object{transfers=indexertypes.TokenTransfersAccount}
-//	@Router			/accounts/{accountID}/transfers/page/{page} [get]
+//	@Router			/accounts/{accountId}/transfers/page/{page} [get]
 func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamAccountId)))
 	if err != nil || accountID == nil {
-		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
+		return ErrCantParseAccountID.Withf("%q", ctx.URLParam(ParamAccountId))
 	}
 	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
 	if acc == nil {
@@ -468,15 +452,13 @@ func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
+
+	page, err := parsePage(ctx.URLParam(ParamPage))
+	if err != nil {
+		return err
 	}
-	page = page * MaxPageSize
-	transfers, err := a.indexer.GetTokenTransfersByAccount(accountID, int32(page), MaxPageSize)
+
+	transfers, err := a.indexer.GetTokenTransfersByAccount(accountID, int32(page*DefaultItemsPerPage), DefaultItemsPerPage)
 	if err != nil {
 		return ErrCantFetchTokenTransfers.WithErr(err)
 	}
@@ -498,44 +480,27 @@ func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			accountID	path		string	true	"Specific accountID"
-//	@Param			page		path		string	true	"Paginator page"
+//	@Param			accountId	path		string	true	"Specific accountId"
+//	@Param			page		path		number	true	"Page"
 //	@Success		200			{object}	object{fees=[]indexertypes.TokenFeeMeta}
-//	@Router			/accounts/{accountID}/fees/page/{page} [get]
+//	@Router			/accounts/{accountId}/fees/page/{page} [get]
 func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
-	if err != nil || accountID == nil {
-		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
-	}
-	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
-	if acc == nil {
-		return ErrAccountNotFound
-	}
+	params, err := parseFeesParams(
+		ctx.URLParam(ParamPage),
+		"",
+		"",
+		"",
+		ctx.URLParam(ParamAccountId),
+	)
 	if err != nil {
 		return err
 	}
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
 
-	fees, err := a.indexer.GetTokenFeesByFromAccount(accountID, int32(page), MaxPageSize)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
+	if params.AccountID == "" {
+		return ErrMissingParameter
 	}
-	data, err := json.Marshal(
-		struct {
-			Fees []*indexertypes.TokenFeeMeta `json:"fees"`
-		}{Fees: fees},
-	)
-	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	return a.sendFeesList(ctx, params)
 }
 
 // tokenTransfersCountHandler
@@ -545,13 +510,13 @@ func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			accountID	path		string				true	"Specific accountID"
-//	@Success		200			{object}	object{count=int}	"Number of transaction sent and received for the account"
-//	@Router			/accounts/{accountID}/transfers/count [get]
+//	@Param			accountId	path		string		true	"Specific accountId"
+//	@Success		200			{object}	CountResult	"Number of transaction sent and received for the account"
+//	@Router			/accounts/{accountId}/transfers/count [get]
 func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam("accountID")))
+	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamAccountId)))
 	if err != nil || accountID == nil {
-		return ErrCantParseAccountID.Withf("%q", ctx.URLParam("accountID"))
+		return ErrCantParseAccountID.Withf("%q", ctx.URLParam(ParamAccountId))
 	}
 	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
 	if acc == nil {
@@ -565,16 +530,30 @@ func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(
-		struct {
-			Count uint64 `json:"count"`
-		}{Count: count},
+	return marshalAndSend(ctx, &CountResult{Count: count})
+}
+
+// accountListByPageHandler
+//
+//	@Summary		List of the existing accounts
+//	@Description	Returns information (address, balance and nonce) of the existing accounts.
+//	@Deprecated
+//	@Description	(deprecated, in favor of /accounts?page=xxx)
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Param			page	path		number	true	"Page"
+//	@Success		200		{object}	AccountsList
+//	@Router			/accounts/page/{page} [get]
+func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseAccountParams(
+		ctx.URLParam(ParamPage),
+		"",
 	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return err
 	}
-
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return a.sendAccountList(ctx, params)
 }
 
 // accountListHandler
@@ -584,30 +563,54 @@ func (a *API) tokenTransfersCountHandler(_ *apirest.APIdata, ctx *httprouter.HTT
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	path		string	true	"Paginator page"
-//	@Success		200		{object}	object{accounts=[]indexertypes.Account}
-//	@Router			/accounts/page/{page} [get]
+//	@Param			page	query		number	false	"Page"
+//	@Param			limit	query		number	false	"Items per page"
+//	@Success		200		{object}	AccountsList
+//	@Router			/accounts [get]
 func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	var err error
-	page := 0
-	if ctx.URLParam("page") != "" {
-		page, err = strconv.Atoi(ctx.URLParam("page"))
-		if err != nil {
-			return ErrCantParsePageNumber
-		}
-	}
-	page = page * MaxPageSize
-	accounts, err := a.indexer.GetListAccounts(int32(page), MaxPageSize)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
-	}
-	data, err := json.Marshal(
-		struct {
-			Accounts []indexertypes.Account `json:"accounts"`
-		}{Accounts: accounts},
+	params, err := parseAccountParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
 	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return a.sendAccountList(ctx, params)
+}
+
+// sendAccountList produces a paginated AccountsList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams) error {
+	accounts, total, err := a.indexer.AccountList(
+		params.Limit,
+		params.Page*params.Limit,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &AccountsList{
+		Accounts:   accounts,
+		Pagination: pagination,
+	}
+	return marshalAndSend(ctx, list)
+}
+
+// parseAccountParams returns an AccountParams filled with the passed params
+func parseAccountParams(paramPage, paramLimit string) (*AccountParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &AccountParams{
+		PaginationParams: pagination,
+	}, nil
 }

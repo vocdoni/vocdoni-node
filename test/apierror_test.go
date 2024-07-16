@@ -64,10 +64,6 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrFileSizeTooBig,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "elections", "status", "ready", "page", "0"}},
-			want: api.ErrCantParseOrgID,
-		},
-		{
 			args: args{"GET", nil, []string{"accounts", "totallyWrong!@#$", "transfers", "page", "0"}},
 			want: api.ErrCantParseAccountID,
 		},
@@ -110,11 +106,19 @@ func TestAPIerror(t *testing.T) {
 				"status", "ready",
 				"page", "-1",
 			}},
-			want: api.ErrCantFetchElectionList,
+			want: api.ErrPageNotFound,
 		},
 		{
 			args: args{"GET", nil, []string{"elections", "page", "thisIsTotallyNotAnInt"}},
-			want: api.ErrCantParsePageNumber,
+			want: api.ErrCantParseNumber,
+		},
+		{
+			args: args{"GET", nil, []string{"elections", "page", "1"}},
+			want: api.ErrPageNotFound,
+		},
+		{
+			args: args{"GET", nil, []string{"elections", "page", "-1"}},
+			want: api.ErrPageNotFound,
 		},
 	}
 	for _, tt := range tests {

@@ -12,16 +12,82 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
-type Organization struct {
-	OrganizationID types.HexBytes      `json:"organizationID,omitempty" `
-	Elections      []*ElectionSummary  `json:"elections,omitempty"`
-	Organizations  []*OrganizationList `json:"organizations,omitempty"`
-	Count          *uint64             `json:"count,omitempty" example:"1"`
+// ### Params accepted ###
+
+// PaginationParams allows the client to request a specific page, and how many items per page
+type PaginationParams struct {
+	Page  int `json:"page,omitempty"`
+	Limit int `json:"limit,omitempty"`
 }
 
-type OrganizationList struct {
+// ElectionParams allows the client to filter elections
+type ElectionParams struct {
+	PaginationParams
+	OrganizationID string `json:"organizationId,omitempty"`
+	ElectionID     string `json:"electionId,omitempty"`
+	Status         string `json:"status,omitempty"`
+	WithResults    *bool  `json:"withResults,omitempty"`
+	FinalResults   *bool  `json:"finalResults,omitempty"`
+	ManuallyEnded  *bool  `json:"manuallyEnded,omitempty"`
+}
+
+// OrganizationParams allows the client to filter organizations
+type OrganizationParams struct {
+	PaginationParams
+	OrganizationID string `json:"organizationId,omitempty"`
+}
+
+// AccountParams allows the client to filter accounts
+type AccountParams struct {
+	PaginationParams
+}
+
+// TransactionParams allows the client to filter transactions
+type TransactionParams struct {
+	PaginationParams
+	Height uint64 `json:"height,omitempty"`
+	Type   string `json:"type,omitempty"`
+}
+
+// FeesParams allows the client to filter fees
+type FeesParams struct {
+	PaginationParams
+	Reference string `json:"reference,omitempty"`
+	Type      string `json:"type,omitempty"`
+	AccountID string `json:"accountId,omitempty"`
+}
+
+// VoteParams allows the client to filter votes
+type VoteParams struct {
+	PaginationParams
+	ElectionID string `json:"electionId,omitempty"`
+}
+
+// ### Objects returned ###
+
+// CountResult wraps a count inside an object
+type CountResult struct {
+	Count uint64 `json:"count" example:"10"`
+}
+
+// Pagination contains all the values needed for the UI to easily organize the returned data
+type Pagination struct {
+	TotalItems   uint64  `json:"totalItems"`
+	PreviousPage *uint64 `json:"previousPage"`
+	CurrentPage  uint64  `json:"currentPage"`
+	NextPage     *uint64 `json:"nextPage"`
+	LastPage     uint64  `json:"lastPage"`
+}
+
+type OrganizationSummary struct {
 	OrganizationID types.HexBytes `json:"organizationID"  example:"0x370372b92514d81a0e3efb8eba9d036ae0877653"`
 	ElectionCount  uint64         `json:"electionCount" example:"1"`
+}
+
+// OrganizationsList is used to return a paginated list to the client
+type OrganizationsList struct {
+	Organizations []*OrganizationSummary `json:"organizations"`
+	Pagination    *Pagination            `json:"pagination"`
 }
 
 type ElectionSummary struct {
@@ -35,6 +101,12 @@ type ElectionSummary struct {
 	Results        [][]*types.BigInt `json:"result,omitempty"`
 	ManuallyEnded  bool              `json:"manuallyEnded"`
 	ChainID        string            `json:"chainId"`
+}
+
+// ElectionsList is used to return a paginated list to the client
+type ElectionsList struct {
+	Elections  []*ElectionSummary `json:"elections"`
+	Pagination *Pagination        `json:"pagination"`
 }
 
 // ElectionResults is the struct used to wrap the results of an election
@@ -100,13 +172,6 @@ type ElectionDescription struct {
 	TempSIKs     bool                  `json:"tempSIKs"`
 }
 
-type ElectionFilter struct {
-	OrganizationID types.HexBytes `json:"organizationId,omitempty" `
-	ElectionID     types.HexBytes `json:"electionId,omitempty" `
-	WithResults    *bool          `json:"withResults,omitempty"`
-	Status         string         `json:"status,omitempty"`
-}
-
 type Key struct {
 	Index int            `json:"index"`
 	Key   types.HexBytes `json:"key" `
@@ -115,7 +180,9 @@ type Key struct {
 type Vote struct {
 	TxPayload []byte         `json:"txPayload,omitempty"  extensions:"x-omitempty" swaggerignore:"true"`
 	TxHash    types.HexBytes `json:"txHash,omitempty"  extensions:"x-omitempty" `
-	VoteID    types.HexBytes `json:"voteID,omitempty"  extensions:"x-omitempty" `
+	// VoteID here produces a `voteID` over JSON that differs in casing from the rest of params and JSONs
+	// but is kept for backwards compatibility
+	VoteID types.HexBytes `json:"voteID,omitempty"  extensions:"x-omitempty" `
 	// Sent only for encrypted elections (no results until the end)
 	EncryptionKeyIndexes []uint32 `json:"encryptionKeys,omitempty" extensions:"x-omitempty"`
 	// For encrypted elections this will be codified
@@ -129,6 +196,11 @@ type Vote struct {
 	OverwriteCount   *uint32         `json:"overwriteCount,omitempty" extensions:"x-omitempty"`
 	// Date when the vote was emitted
 	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
+}
+
+type VotesList struct {
+	Votes      []*Vote     `json:"votes"`
+	Pagination *Pagination `json:"pagination"`
 }
 
 type CensusTypeDescription struct {
@@ -180,17 +252,16 @@ type TransactionReference struct {
 	Index  uint32 `json:"transactionIndex"`
 }
 
-type TransactionMetadata struct {
-	Type   string         `json:"transactionType"`
-	Number uint32         `json:"transactionNumber"`
-	Index  int32          `json:"transactionIndex"`
-	Hash   types.HexBytes `json:"transactionHash" `
+// TransactionsList is used to return a paginated list to the client
+type TransactionsList struct {
+	Transactions []*indexertypes.Transaction `json:"transactions"`
+	Pagination   *Pagination                 `json:"pagination"`
 }
 
-type BlockTransactionsInfo struct {
-	BlockNumber       uint64                `json:"blockNumber"`
-	TransactionsCount uint32                `json:"transactionCount"`
-	Transactions      []TransactionMetadata `json:"transactions"`
+// FeesList is used to return a paginated list to the client
+type FeesList struct {
+	Fees       []*indexertypes.TokenFeeMeta `json:"fees"`
+	Pagination *Pagination                  `json:"pagination"`
 }
 
 type GenericTransactionWithInfo struct {
@@ -229,6 +300,11 @@ type Account struct {
 	SIK           types.HexBytes   `json:"sik"`
 }
 
+type AccountsList struct {
+	Accounts   []*indexertypes.Account `json:"accounts"`
+	Pagination *Pagination             `json:"pagination"`
+}
+
 type AccountSet struct {
 	TxPayload   []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
 	Metadata    []byte         `json:"metadata,omitempty" swaggerignore:"true"`
@@ -237,6 +313,8 @@ type AccountSet struct {
 }
 
 type Census struct {
+	// CensusID here produces a `censusID` over JSON that differs in casing from the rest of params and JSONs
+	// but is kept for backwards compatibility
 	CensusID types.HexBytes `json:"censusID,omitempty"`
 	Type     string         `json:"type,omitempty"`
 	Weight   *types.BigInt  `json:"weight,omitempty"`

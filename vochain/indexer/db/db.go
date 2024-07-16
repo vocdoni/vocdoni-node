@@ -66,9 +66,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getEntityCountStmt, err = db.PrepareContext(ctx, getEntityCount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetEntityCount: %w", err)
 	}
-	if q.getLastTransactionsStmt, err = db.PrepareContext(ctx, getLastTransactions); err != nil {
-		return nil, fmt.Errorf("error preparing query GetLastTransactions: %w", err)
-	}
 	if q.getListAccountsStmt, err = db.PrepareContext(ctx, getListAccounts); err != nil {
 		return nil, fmt.Errorf("error preparing query GetListAccounts: %w", err)
 	}
@@ -83,18 +80,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getProcessStatusStmt, err = db.PrepareContext(ctx, getProcessStatus); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcessStatus: %w", err)
-	}
-	if q.getTokenFeesStmt, err = db.PrepareContext(ctx, getTokenFees); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenFees: %w", err)
-	}
-	if q.getTokenFeesByFromAccountStmt, err = db.PrepareContext(ctx, getTokenFeesByFromAccount); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenFeesByFromAccount: %w", err)
-	}
-	if q.getTokenFeesByReferenceStmt, err = db.PrepareContext(ctx, getTokenFeesByReference); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenFeesByReference: %w", err)
-	}
-	if q.getTokenFeesByTxTypeStmt, err = db.PrepareContext(ctx, getTokenFeesByTxType); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenFeesByTxType: %w", err)
 	}
 	if q.getTokenTransferStmt, err = db.PrepareContext(ctx, getTokenTransfer); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTokenTransfer: %w", err)
@@ -122,6 +107,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.searchProcessesStmt, err = db.PrepareContext(ctx, searchProcesses); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchProcesses: %w", err)
+	}
+	if q.searchTokenFeesStmt, err = db.PrepareContext(ctx, searchTokenFees); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchTokenFees: %w", err)
+	}
+	if q.searchTransactionsStmt, err = db.PrepareContext(ctx, searchTransactions); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchTransactions: %w", err)
 	}
 	if q.searchVotesStmt, err = db.PrepareContext(ctx, searchVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchVotes: %w", err)
@@ -219,11 +210,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getEntityCountStmt: %w", cerr)
 		}
 	}
-	if q.getLastTransactionsStmt != nil {
-		if cerr := q.getLastTransactionsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getLastTransactionsStmt: %w", cerr)
-		}
-	}
 	if q.getListAccountsStmt != nil {
 		if cerr := q.getListAccountsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getListAccountsStmt: %w", cerr)
@@ -247,26 +233,6 @@ func (q *Queries) Close() error {
 	if q.getProcessStatusStmt != nil {
 		if cerr := q.getProcessStatusStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getProcessStatusStmt: %w", cerr)
-		}
-	}
-	if q.getTokenFeesStmt != nil {
-		if cerr := q.getTokenFeesStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenFeesStmt: %w", cerr)
-		}
-	}
-	if q.getTokenFeesByFromAccountStmt != nil {
-		if cerr := q.getTokenFeesByFromAccountStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenFeesByFromAccountStmt: %w", cerr)
-		}
-	}
-	if q.getTokenFeesByReferenceStmt != nil {
-		if cerr := q.getTokenFeesByReferenceStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenFeesByReferenceStmt: %w", cerr)
-		}
-	}
-	if q.getTokenFeesByTxTypeStmt != nil {
-		if cerr := q.getTokenFeesByTxTypeStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenFeesByTxTypeStmt: %w", cerr)
 		}
 	}
 	if q.getTokenTransferStmt != nil {
@@ -312,6 +278,16 @@ func (q *Queries) Close() error {
 	if q.searchProcessesStmt != nil {
 		if cerr := q.searchProcessesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchProcessesStmt: %w", cerr)
+		}
+	}
+	if q.searchTokenFeesStmt != nil {
+		if cerr := q.searchTokenFeesStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchTokenFeesStmt: %w", cerr)
+		}
+	}
+	if q.searchTransactionsStmt != nil {
+		if cerr := q.searchTransactionsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchTransactionsStmt: %w", cerr)
 		}
 	}
 	if q.searchVotesStmt != nil {
@@ -402,16 +378,11 @@ type Queries struct {
 	createVoteStmt                               *sql.Stmt
 	getBlockStmt                                 *sql.Stmt
 	getEntityCountStmt                           *sql.Stmt
-	getLastTransactionsStmt                      *sql.Stmt
 	getListAccountsStmt                          *sql.Stmt
 	getProcessStmt                               *sql.Stmt
 	getProcessCountStmt                          *sql.Stmt
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
 	getProcessStatusStmt                         *sql.Stmt
-	getTokenFeesStmt                             *sql.Stmt
-	getTokenFeesByFromAccountStmt                *sql.Stmt
-	getTokenFeesByReferenceStmt                  *sql.Stmt
-	getTokenFeesByTxTypeStmt                     *sql.Stmt
 	getTokenTransferStmt                         *sql.Stmt
 	getTokenTransfersByFromAccountStmt           *sql.Stmt
 	getTokenTransfersByToAccountStmt             *sql.Stmt
@@ -421,6 +392,8 @@ type Queries struct {
 	getVoteStmt                                  *sql.Stmt
 	searchEntitiesStmt                           *sql.Stmt
 	searchProcessesStmt                          *sql.Stmt
+	searchTokenFeesStmt                          *sql.Stmt
+	searchTransactionsStmt                       *sql.Stmt
 	searchVotesStmt                              *sql.Stmt
 	setProcessResultsCancelledStmt               *sql.Stmt
 	setProcessResultsReadyStmt                   *sql.Stmt
@@ -448,16 +421,11 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createVoteStmt:                     q.createVoteStmt,
 		getBlockStmt:                       q.getBlockStmt,
 		getEntityCountStmt:                 q.getEntityCountStmt,
-		getLastTransactionsStmt:            q.getLastTransactionsStmt,
 		getListAccountsStmt:                q.getListAccountsStmt,
 		getProcessStmt:                     q.getProcessStmt,
 		getProcessCountStmt:                q.getProcessCountStmt,
 		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
 		getProcessStatusStmt:               q.getProcessStatusStmt,
-		getTokenFeesStmt:                   q.getTokenFeesStmt,
-		getTokenFeesByFromAccountStmt:      q.getTokenFeesByFromAccountStmt,
-		getTokenFeesByReferenceStmt:        q.getTokenFeesByReferenceStmt,
-		getTokenFeesByTxTypeStmt:           q.getTokenFeesByTxTypeStmt,
 		getTokenTransferStmt:               q.getTokenTransferStmt,
 		getTokenTransfersByFromAccountStmt: q.getTokenTransfersByFromAccountStmt,
 		getTokenTransfersByToAccountStmt:   q.getTokenTransfersByToAccountStmt,
@@ -467,6 +435,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getVoteStmt:                    q.getVoteStmt,
 		searchEntitiesStmt:             q.searchEntitiesStmt,
 		searchProcessesStmt:            q.searchProcessesStmt,
+		searchTokenFeesStmt:            q.searchTokenFeesStmt,
+		searchTransactionsStmt:         q.searchTransactionsStmt,
 		searchVotesStmt:                q.searchVotesStmt,
 		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,
 		setProcessResultsReadyStmt:     q.setProcessResultsReadyStmt,
