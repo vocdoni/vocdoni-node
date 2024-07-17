@@ -417,4 +417,5 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 type Block struct {
 	comettypes.Block `json:",inline"`
 	Hash             types.HexBytes `json:"hash" `
+	TxCount          int64          `json:"txCount"`
 }

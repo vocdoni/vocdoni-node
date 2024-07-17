@@ -862,6 +862,10 @@ func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 		}
 		return ErrBlockNotFound.WithErr(err)
 	}
+	txcount, err := a.indexer.CountTransactionsByHeight(int64(height))
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
 	block := &Block{
 		Block: comettypes.Block{
 			Header: comettypes.Header{
@@ -874,7 +878,8 @@ func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 				},
 			},
 		},
-		Hash: idxblock.Hash,
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -905,6 +910,10 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		}
 		return ErrBlockNotFound.WithErr(err)
 	}
+	txcount, err := a.indexer.CountTransactionsByHeight(idxblock.Height)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
 	block := &Block{
 		Block: comettypes.Block{
 			Header: comettypes.Header{
@@ -917,7 +926,8 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 				},
 			},
 		},
-		Hash: idxblock.Hash,
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
