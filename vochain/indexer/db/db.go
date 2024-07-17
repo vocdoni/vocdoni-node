@@ -36,6 +36,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countTransactionsStmt, err = db.PrepareContext(ctx, countTransactions); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactions: %w", err)
 	}
+	if q.countTransactionsByHeightStmt, err = db.PrepareContext(ctx, countTransactionsByHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTransactionsByHeight: %w", err)
+	}
 	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
 	}
@@ -161,6 +164,11 @@ func (q *Queries) Close() error {
 	if q.countTransactionsStmt != nil {
 		if cerr := q.countTransactionsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTransactionsStmt: %w", cerr)
+		}
+	}
+	if q.countTransactionsByHeightStmt != nil {
+		if cerr := q.countTransactionsByHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTransactionsByHeightStmt: %w", cerr)
 		}
 	}
 	if q.countVotesStmt != nil {
@@ -376,6 +384,7 @@ type Queries struct {
 	countAccountsStmt                            *sql.Stmt
 	countTokenTransfersByAccountStmt             *sql.Stmt
 	countTransactionsStmt                        *sql.Stmt
+	countTransactionsByHeightStmt                *sql.Stmt
 	countVotesStmt                               *sql.Stmt
 	createAccountStmt                            *sql.Stmt
 	createBlockStmt                              *sql.Stmt
@@ -420,6 +429,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		countAccountsStmt:                  q.countAccountsStmt,
 		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
 		countTransactionsStmt:              q.countTransactionsStmt,
+		countTransactionsByHeightStmt:      q.countTransactionsByHeightStmt,
 		countVotesStmt:                     q.countVotesStmt,
 		createAccountStmt:                  q.createAccountStmt,
 		createBlockStmt:                    q.createBlockStmt,

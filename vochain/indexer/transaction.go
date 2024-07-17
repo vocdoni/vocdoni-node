@@ -23,6 +23,11 @@ func (idx *Indexer) CountTotalTransactions() (uint64, error) {
 	return uint64(count), err
 }
 
+// CountTransactionsByHeight returns the number of transactions indexed for a given height
+func (idx *Indexer) CountTransactionsByHeight(height int64) (int64, error) {
+	return idx.readOnlyQuery.CountTransactionsByHeight(context.TODO(), height)
+}
+
 // GetTransaction fetches the txReference for the given tx height
 func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTransaction(context.TODO(), int64(id))
@@ -93,6 +98,27 @@ func (idx *Indexer) SearchTransactions(limit, offset int, blockHeight uint64, tx
 	}
 	if len(results) == 0 {
 		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
+}
+
+// TransactionListByHeight fetches the indexed transactions for a given height.
+// The first one returned has TxBlockIndex=0, so they are in ascending order.
+func (idx *Indexer) TransactionListByHeight(height, limit, offset int64) ([]*indexertypes.Transaction, uint64, error) {
+	results, err := idx.readOnlyQuery.SearchTransactions(context.TODO(), indexerdb.SearchTransactionsParams{
+		BlockHeight: height,
+		Limit:       limit,
+		Offset:      offset,
+	})
+	if err != nil || len(results) == 0 {
+		if errors.Is(err, sql.ErrNoRows) || len(results) == 0 {
+			return nil, 0, ErrTransactionNotFound
+		}
+		return nil, 0, fmt.Errorf("could not get %d txs for height %d: %v", limit, height, err)
+	}
+	list := make([]*indexertypes.Transaction, len(results))
+	for i, row := range results {
+		list[i] = indexertypes.TransactionFromDBRow(&row)
 	}
 	return list, uint64(results[0].TotalCount), nil
 }

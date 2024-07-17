@@ -205,6 +205,17 @@ func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
 	}
 }
 
+func TransactionFromDBRow(dbtx *indexerdb.SearchTransactionsRow) *Transaction {
+	return &Transaction{
+		Index:        uint64(dbtx.ID),
+		Hash:         dbtx.Hash,
+		BlockHeight:  uint32(dbtx.BlockHeight),
+		TxBlockIndex: int32(dbtx.BlockIndex),
+		TxType:       dbtx.Type,
+		RawTx:        dbtx.RawTx,
+	}
+}
+
 // TokenTransferMeta contains the information of a token transfer and some extra useful information.
 // The types are compatible with the SQL defined schema.
 type TokenTransferMeta struct {

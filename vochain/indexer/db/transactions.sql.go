@@ -23,6 +23,18 @@ func (q *Queries) CountTransactions(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countTransactionsByHeight = `-- name: CountTransactionsByHeight :one
+SELECT COUNT(*) FROM transactions
+WHERE block_height = ?
+`
+
+func (q *Queries) CountTransactionsByHeight(ctx context.Context, blockHeight int64) (int64, error) {
+	row := q.queryRow(ctx, q.countTransactionsByHeightStmt, countTransactionsByHeight, blockHeight)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTransaction = `-- name: CreateTransaction :execresult
 INSERT INTO transactions (
 	hash, block_height, block_index, type, raw_tx

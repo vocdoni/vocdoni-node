@@ -18,6 +18,10 @@ LIMIT 1;
 -- name: CountTransactions :one
 SELECT COUNT(*) FROM transactions;
 
+-- name: CountTransactionsByHeight :one
+SELECT COUNT(*) FROM transactions
+WHERE block_height = ?;
+
 -- name: GetTxReferenceByBlockHeightAndBlockIndex :one
 SELECT * FROM transactions
 WHERE block_height = ? AND block_index = ?
