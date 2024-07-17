@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"reflect"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -51,16 +52,20 @@ func (a *API) sendTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 }
 
 func protoFormat(tx []byte) string {
-	ptx := models.Tx{}
-	if err := proto.Unmarshal(tx, &ptx); err != nil {
+	ptx := &models.Tx{}
+	if err := proto.Unmarshal(tx, ptx); err != nil {
 		return ""
 	}
+
+	// Convert all []byte fields to HexBytes using reflection
+	ptxWithHexFields := convertProtoMessageBytesFieldsToHex(ptx)
+
 	pj := protojson.MarshalOptions{
 		Multiline:       false,
 		Indent:          "",
 		EmitUnpopulated: true,
 	}
-	return pj.Format(&ptx)
+	return pj.Format(ptxWithHexFields)
 }
 
 // isTransactionType checks if the given transaction is of the given type.
@@ -76,6 +81,40 @@ func isTransactionType[T any](signedTxBytes []byte) (bool, error) {
 	}
 	_, ok := tx.Payload.(T)
 	return ok, nil
+}
+
+// convertProtoMessageBytesFieldsToHex converts all []byte fields in a proto.Message to HexBytes
+func convertProtoMessageBytesFieldsToHex(message proto.Message) proto.Message {
+	tempStruct := reflect.New(reflect.TypeOf(message).Elem()).Interface()
+	proto.Merge(tempStruct.(proto.Message), message)
+	convertByteFieldsToHex(reflect.ValueOf(tempStruct))
+	return tempStruct.(proto.Message)
+}
+
+// convertByteFieldsToHex recursively converts all []byte fields to HexBytes using reflection
+func convertByteFieldsToHex(v reflect.Value) {
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+
+	if v.Kind() != reflect.Struct {
+		return
+	}
+
+	for i := 0; i < v.NumField(); i++ {
+		field := v.Field(i)
+		fieldType := v.Type().Field(i)
+
+		if field.Kind() == reflect.Ptr && !field.IsNil() {
+			convertByteFieldsToHex(field)
+		} else if field.Kind() == reflect.Struct {
+			convertByteFieldsToHex(field)
+		} else if field.Kind() == reflect.Slice && fieldType.Type.Elem().Kind() == reflect.Uint8 {
+			// This is a []byte field
+			hexBytes := types.HexBytes(field.Bytes())
+			field.Set(reflect.ValueOf(hexBytes))
+		}
+	}
 }
 
 // convertKeysToCamel converts all keys in a JSON object to camelCase.
