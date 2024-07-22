@@ -28,8 +28,8 @@ func (idx *Indexer) CountTransactionsByHeight(height int64) (int64, error) {
 	return idx.readOnlyQuery.CountTransactionsByHeight(context.TODO(), height)
 }
 
-// GetTransaction fetches the txReference for the given tx height
-func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error) {
+// GetTxReferenceByID fetches the txReference for the given tx height
+func (idx *Indexer) GetTxReferenceByID(id uint64) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTransaction(context.TODO(), int64(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -55,8 +55,8 @@ func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockI
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
-// GetTxHashReference fetches the txReference for the given tx hash
-func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Transaction, error) {
+// GetTxReferenceByHash fetches the txReference for the given tx hash
+func (idx *Indexer) GetTxReferenceByHash(hash types.HexBytes) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHash(context.TODO(), hash)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

@@ -113,7 +113,7 @@ func BenchmarkIndexer(b *testing.B) {
 						qt.Check(b, bytes.Equal(voteRef.Meta.TxHash, tx.TxID[:]), qt.IsTrue)
 					}
 
-					txRef, err := idx.GetTxHashReference(tx.TxID[:])
+					txRef, err := idx.GetTxReferenceByHash(tx.TxID[:])
 					qt.Check(b, err, qt.IsNil)
 					if err == nil {
 						qt.Check(b, txRef.BlockHeight, qt.Equals, vote.Height)
@@ -152,14 +152,14 @@ func BenchmarkFetchTx(b *testing.B) {
 
 		startTime := time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = idx.GetTransaction(uint64((i * numTxs) + j + 1))
+			_, err = idx.GetTxReferenceByID(uint64((i * numTxs) + j + 1))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by index, took %s",
 			numTxs, (i+1)*numTxs, time.Since(startTime))
 		startTime = time.Now()
 		for j := 0; j < numTxs; j++ {
-			_, err = idx.GetTxHashReference([]byte(fmt.Sprintf("hash%d%d", i, j)))
+			_, err = idx.GetTxReferenceByHash([]byte(fmt.Sprintf("hash%d%d", i, j)))
 			qt.Assert(b, err, qt.IsNil)
 		}
 		log.Infof("fetched %d transactions (out of %d total) by hash, took %s",

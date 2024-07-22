@@ -605,7 +605,7 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTxHashReference(hash)
+	ref, err := a.indexer.GetTxReferenceByHash(hash)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -684,7 +684,7 @@ func (a *API) chainTxRefByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTransaction(index)
+	ref, err := a.indexer.GetTxReferenceByID(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
