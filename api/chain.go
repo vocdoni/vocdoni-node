@@ -605,7 +605,7 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTxReferenceByHash(hash)
+	ref, err := a.indexer.GetTxMetadataByHash(hash)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -649,7 +649,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
 
-	ref, err := a.indexer.GetTxReferenceByBlockHeightAndBlockIndex(height, index)
+	ref, err := a.indexer.GetTxByBlockHeightAndBlockIndex(height, index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -670,8 +670,8 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 
 // chainTxRefByIndexHandler
 //
-//	@Summary		Transaction by index
-//	@Description	Get transaction by its index. This is not transaction reference (hash), and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
+//	@Summary		Transaction metadata (by db index)
+//	@Description	Get transaction by its internal index. This is not the transaction hash, and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
@@ -684,7 +684,7 @@ func (a *API) chainTxRefByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTxReferenceByID(index)
+	ref, err := a.indexer.GetTxMetadataByID(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound

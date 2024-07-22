@@ -1405,7 +1405,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			ref, err := idx.GetTxReferenceByID(uint64(i*txsPerBlock + j + 1))
+			ref, err := idx.GetTxMetadataByID(uint64(i*txsPerBlock + j + 1))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
@@ -1413,7 +1413,7 @@ func TestTxIndexer(t *testing.T) {
 			h := make([]byte, 32)
 			id := getTxID(i, j)
 			copy(h, id[:])
-			hashRef, err := idx.GetTxReferenceByHash(h)
+			hashRef, err := idx.GetTxMetadataByHash(h)
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, hashRef.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, hashRef.TxBlockIndex, qt.Equals, int32(j))

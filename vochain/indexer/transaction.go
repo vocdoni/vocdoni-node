@@ -28,8 +28,8 @@ func (idx *Indexer) CountTransactionsByHeight(height int64) (int64, error) {
 	return idx.readOnlyQuery.CountTransactionsByHeight(context.TODO(), height)
 }
 
-// GetTxReferenceByID fetches the txReference for the given tx height
-func (idx *Indexer) GetTxReferenceByID(id uint64) (*indexertypes.Transaction, error) {
+// GetTxMetadataByID fetches the tx metadata for the given tx height
+func (idx *Indexer) GetTxMetadataByID(id uint64) (*indexertypes.TransactionMetadata, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTransaction(context.TODO(), int64(id))
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -37,11 +37,23 @@ func (idx *Indexer) GetTxReferenceByID(id uint64) (*indexertypes.Transaction, er
 		}
 		return nil, fmt.Errorf("tx with id %d not found: %v", id, err)
 	}
-	return indexertypes.TransactionFromDB(&sqlTxRef), nil
+	return indexertypes.TransactionMetadataFromDB(&sqlTxRef), nil
 }
 
-// GetTxReferenceByBlockHeightAndBlockIndex fetches the txReference for the given tx height and block tx index
-func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
+// GetTxMetadataByHash fetches the tx metadata for the given tx hash
+func (idx *Indexer) GetTxMetadataByHash(hash types.HexBytes) (*indexertypes.TransactionMetadata, error) {
+	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHash(context.TODO(), hash)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrTransactionNotFound
+		}
+		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
+	}
+	return indexertypes.TransactionMetadataFromDB(&sqlTxRef), nil
+}
+
+// GetTxByBlockHeightAndBlockIndex fetches the txReference for the given tx height and block tx index
+func (idx *Indexer) GetTxByBlockHeightAndBlockIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTxReferenceByBlockHeightAndBlockIndex(context.TODO(), indexerdb.GetTxReferenceByBlockHeightAndBlockIndexParams{
 		BlockHeight: blockHeight,
 		BlockIndex:  blockIndex,
@@ -52,19 +64,11 @@ func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockI
 		}
 		return nil, fmt.Errorf("tx at block %d and index %d not found: %v", blockHeight, blockIndex, err)
 	}
-	return indexertypes.TransactionFromDB(&sqlTxRef), nil
-}
-
-// GetTxReferenceByHash fetches the txReference for the given tx hash
-func (idx *Indexer) GetTxReferenceByHash(hash types.HexBytes) (*indexertypes.Transaction, error) {
-	sqlTxRef, err := idx.readOnlyQuery.GetTransactionByHash(context.TODO(), hash)
+	block, err := idx.readOnlyQuery.GetBlockByHeight(context.TODO(), blockHeight)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrTransactionNotFound
-		}
-		return nil, fmt.Errorf("tx hash %x not found: %v", hash, err)
+		return nil, fmt.Errorf("block %d not found: %w", blockHeight, err)
 	}
-	return indexertypes.TransactionFromDB(&sqlTxRef), nil
+	return indexertypes.TransactionFromDB(&sqlTxRef, block.ChainID), nil
 }
 
 // SearchTransactions returns the list of transactions indexed.
@@ -118,7 +122,11 @@ func (idx *Indexer) TransactionListByHeight(height, limit, offset int64) ([]*ind
 	}
 	list := make([]*indexertypes.Transaction, len(results))
 	for i, row := range results {
-		list[i] = indexertypes.TransactionFromDBRow(&row)
+		block, err := idx.readOnlyQuery.GetBlockByHeight(context.TODO(), row.BlockHeight)
+		if err != nil {
+			return nil, 0, fmt.Errorf("block %d not found: %w", row.BlockHeight, err)
+		}
+		list[i] = indexertypes.TransactionFromDBRow(&row, block.ChainID)
 	}
 	return list, uint64(results[0].TotalCount), nil
 }
