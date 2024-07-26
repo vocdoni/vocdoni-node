@@ -11,9 +11,12 @@ import (
 )
 
 type Block struct {
-	Height   int64
-	Time     time.Time
-	DataHash []byte
+	Height          int64
+	Time            time.Time
+	ChainID         string
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
 }
 
 type Process struct {
@@ -62,4 +65,5 @@ type Transaction struct {
 	BlockHeight int64
 	BlockIndex  int64
 	Type        string
+	RawTx       []byte
 }

@@ -36,6 +36,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countTransactionsStmt, err = db.PrepareContext(ctx, countTransactions); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactions: %w", err)
 	}
+	if q.countTransactionsByHeightStmt, err = db.PrepareContext(ctx, countTransactionsByHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTransactionsByHeight: %w", err)
+	}
 	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
 	}
@@ -60,8 +63,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createVoteStmt, err = db.PrepareContext(ctx, createVote); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateVote: %w", err)
 	}
-	if q.getBlockStmt, err = db.PrepareContext(ctx, getBlock); err != nil {
-		return nil, fmt.Errorf("error preparing query GetBlock: %w", err)
+	if q.getBlockByHashStmt, err = db.PrepareContext(ctx, getBlockByHash); err != nil {
+		return nil, fmt.Errorf("error preparing query GetBlockByHash: %w", err)
+	}
+	if q.getBlockByHeightStmt, err = db.PrepareContext(ctx, getBlockByHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query GetBlockByHeight: %w", err)
 	}
 	if q.getEntityCountStmt, err = db.PrepareContext(ctx, getEntityCount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetEntityCount: %w", err)
@@ -160,6 +166,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing countTransactionsStmt: %w", cerr)
 		}
 	}
+	if q.countTransactionsByHeightStmt != nil {
+		if cerr := q.countTransactionsByHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTransactionsByHeightStmt: %w", cerr)
+		}
+	}
 	if q.countVotesStmt != nil {
 		if cerr := q.countVotesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countVotesStmt: %w", cerr)
@@ -200,9 +211,14 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createVoteStmt: %w", cerr)
 		}
 	}
-	if q.getBlockStmt != nil {
-		if cerr := q.getBlockStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getBlockStmt: %w", cerr)
+	if q.getBlockByHashStmt != nil {
+		if cerr := q.getBlockByHashStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getBlockByHashStmt: %w", cerr)
+		}
+	}
+	if q.getBlockByHeightStmt != nil {
+		if cerr := q.getBlockByHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getBlockByHeightStmt: %w", cerr)
 		}
 	}
 	if q.getEntityCountStmt != nil {
@@ -368,6 +384,7 @@ type Queries struct {
 	countAccountsStmt                            *sql.Stmt
 	countTokenTransfersByAccountStmt             *sql.Stmt
 	countTransactionsStmt                        *sql.Stmt
+	countTransactionsByHeightStmt                *sql.Stmt
 	countVotesStmt                               *sql.Stmt
 	createAccountStmt                            *sql.Stmt
 	createBlockStmt                              *sql.Stmt
@@ -376,7 +393,8 @@ type Queries struct {
 	createTokenTransferStmt                      *sql.Stmt
 	createTransactionStmt                        *sql.Stmt
 	createVoteStmt                               *sql.Stmt
-	getBlockStmt                                 *sql.Stmt
+	getBlockByHashStmt                           *sql.Stmt
+	getBlockByHeightStmt                         *sql.Stmt
 	getEntityCountStmt                           *sql.Stmt
 	getListAccountsStmt                          *sql.Stmt
 	getProcessStmt                               *sql.Stmt
@@ -411,6 +429,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		countAccountsStmt:                  q.countAccountsStmt,
 		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
 		countTransactionsStmt:              q.countTransactionsStmt,
+		countTransactionsByHeightStmt:      q.countTransactionsByHeightStmt,
 		countVotesStmt:                     q.countVotesStmt,
 		createAccountStmt:                  q.createAccountStmt,
 		createBlockStmt:                    q.createBlockStmt,
@@ -419,7 +438,8 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createTokenTransferStmt:            q.createTokenTransferStmt,
 		createTransactionStmt:              q.createTransactionStmt,
 		createVoteStmt:                     q.createVoteStmt,
-		getBlockStmt:                       q.getBlockStmt,
+		getBlockByHashStmt:                 q.getBlockByHashStmt,
+		getBlockByHeightStmt:               q.getBlockByHeightStmt,
 		getEntityCountStmt:                 q.getEntityCountStmt,
 		getListAccountsStmt:                q.getListAccountsStmt,
 		getProcessStmt:                     q.getProcessStmt,

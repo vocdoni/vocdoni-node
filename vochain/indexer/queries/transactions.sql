@@ -1,8 +1,8 @@
 -- name: CreateTransaction :execresult
 INSERT INTO transactions (
-	hash, block_height, block_index, type
+	hash, block_height, block_index, type, raw_tx
 ) VALUES (
-	?, ?, ?, ?
+	?, ?, ?, ?, ?
 );
 
 -- name: GetTransaction :one
@@ -17,6 +17,10 @@ LIMIT 1;
 
 -- name: CountTransactions :one
 SELECT COUNT(*) FROM transactions;
+
+-- name: CountTransactionsByHeight :one
+SELECT COUNT(*) FROM transactions
+WHERE block_height = ?;
 
 -- name: GetTxReferenceByBlockHeightAndBlockIndex :one
 SELECT * FROM transactions

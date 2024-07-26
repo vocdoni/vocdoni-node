@@ -13,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
@@ -606,7 +605,7 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTxHashReference(hash)
+	ref, err := a.indexer.GetTxMetadataByHash(hash)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -650,7 +649,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
 
-	ref, err := a.indexer.GetTxReferenceByBlockHeightAndBlockIndex(height, index)
+	ref, err := a.indexer.GetTxByBlockHeightAndBlockIndex(height, index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -671,8 +670,8 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 
 // chainTxRefByIndexHandler
 //
-//	@Summary		Transaction by index
-//	@Description	Get transaction by its index. This is not transaction reference (hash), and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
+//	@Summary		Transaction metadata (by db index)
+//	@Description	Get transaction by its internal index. This is not the transaction hash, and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
@@ -685,7 +684,7 @@ func (a *API) chainTxRefByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	ref, err := a.indexer.GetTransaction(index)
+	ref, err := a.indexer.GetTxMetadataByID(index)
 	if err != nil {
 		if errors.Is(err, indexer.ErrTransactionNotFound) {
 			return ErrTransactionNotFound
@@ -856,18 +855,31 @@ func (a *API) chainBlockHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHeight(int64(height))
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHeight(int64(height))
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
+	}
+	txcount, err := a.indexer.CountTransactionsByHeight(int64(height))
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
 		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+			Header: comettypes.Header{
+				ChainID:         idxblock.ChainID,
+				Height:          idxblock.Height,
+				Time:            idxblock.Time,
+				ProposerAddress: []byte(idxblock.ProposerAddress),
+				LastBlockID: comettypes.BlockID{
+					Hash: []byte(idxblock.LastBlockHash),
+				},
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {
@@ -891,18 +903,31 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	tmblock := a.vocapp.GetBlockByHash(hash)
-	if tmblock == nil {
-		return ErrBlockNotFound
+	idxblock, err := a.indexer.BlockByHash(hash)
+	if err != nil {
+		if errors.Is(err, indexer.ErrBlockNotFound) {
+			return ErrBlockNotFound
+		}
+		return ErrBlockNotFound.WithErr(err)
+	}
+	txcount, err := a.indexer.CountTransactionsByHeight(idxblock.Height)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
 		Block: comettypes.Block{
-			Header:     tmblock.Header,
-			Data:       tmblock.Data,
-			Evidence:   tmblock.Evidence,
-			LastCommit: tmblock.LastCommit,
+			Header: comettypes.Header{
+				ChainID:         idxblock.ChainID,
+				Height:          idxblock.Height,
+				Time:            idxblock.Time,
+				ProposerAddress: []byte(idxblock.ProposerAddress),
+				LastBlockID: comettypes.BlockID{
+					Hash: []byte(idxblock.LastBlockHash),
+				},
+			},
 		},
-		Hash: types.HexBytes(tmblock.Hash()),
+		Hash:    idxblock.Hash,
+		TxCount: txcount,
 	}
 	data, err := json.Marshal(block)
 	if err != nil {

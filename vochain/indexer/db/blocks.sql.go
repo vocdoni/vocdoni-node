@@ -13,31 +13,68 @@ import (
 
 const createBlock = `-- name: CreateBlock :execresult
 INSERT INTO blocks(
-    height, time, data_hash
+    chain_id, height, time, hash, proposer_address, last_block_hash
 ) VALUES (
-	?, ?, ?
+	?, ?, ?, ?, ?, ?
 )
 `
 
 type CreateBlockParams struct {
-	Height   int64
-	Time     time.Time
-	DataHash []byte
+	ChainID         string
+	Height          int64
+	Time            time.Time
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
 }
 
 func (q *Queries) CreateBlock(ctx context.Context, arg CreateBlockParams) (sql.Result, error) {
-	return q.exec(ctx, q.createBlockStmt, createBlock, arg.Height, arg.Time, arg.DataHash)
+	return q.exec(ctx, q.createBlockStmt, createBlock,
+		arg.ChainID,
+		arg.Height,
+		arg.Time,
+		arg.Hash,
+		arg.ProposerAddress,
+		arg.LastBlockHash,
+	)
 }
 
-const getBlock = `-- name: GetBlock :one
-SELECT height, time, data_hash FROM blocks
+const getBlockByHash = `-- name: GetBlockByHash :one
+SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
+WHERE hash = ?
+LIMIT 1
+`
+
+func (q *Queries) GetBlockByHash(ctx context.Context, hash []byte) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHashStmt, getBlockByHash, hash)
+	var i Block
+	err := row.Scan(
+		&i.Height,
+		&i.Time,
+		&i.ChainID,
+		&i.Hash,
+		&i.ProposerAddress,
+		&i.LastBlockHash,
+	)
+	return i, err
+}
+
+const getBlockByHeight = `-- name: GetBlockByHeight :one
+SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
 WHERE height = ?
 LIMIT 1
 `
 
-func (q *Queries) GetBlock(ctx context.Context, height int64) (Block, error) {
-	row := q.queryRow(ctx, q.getBlockStmt, getBlock, height)
+func (q *Queries) GetBlockByHeight(ctx context.Context, height int64) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHeightStmt, getBlockByHeight, height)
 	var i Block
-	err := row.Scan(&i.Height, &i.Time, &i.DataHash)
+	err := row.Scan(
+		&i.Height,
+		&i.Time,
+		&i.ChainID,
+		&i.Hash,
+		&i.ProposerAddress,
+		&i.LastBlockHash,
+	)
 	return i, err
 }

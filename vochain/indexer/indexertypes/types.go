@@ -8,6 +8,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/results"
+	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -176,16 +177,8 @@ type TxPackage struct {
 	Signature   types.HexBytes `json:"signature"`
 }
 
-// TxMetadata contains tx information for the TransactionList api
-type TxMetadata struct {
-	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"blockHeight,omitempty"`
-	Index       int32          `json:"index"`
-	Hash        types.HexBytes `json:"hash"`
-}
-
-// Transaction holds the db reference for a single transaction
-type Transaction struct {
+// TransactionMetadata contains tx information for the TransactionList api
+type TransactionMetadata struct {
 	Index        uint64         `json:"transactionNumber" format:"int64" example:"944"`
 	Hash         types.HexBytes `json:"transactionHash" swaggertype:"string" example:"75e8f822f5dd13973ac5158d600f0a2a5fea4bfefce9712ab5195bf17884cfad"`
 	BlockHeight  uint32         `json:"blockHeight" format:"int32" example:"64924"`
@@ -193,14 +186,53 @@ type Transaction struct {
 	TxType       string         `json:"transactionType" enums:"vote,newProcess,admin,setProcess,registerKey,mintTokens,sendTokens,setTransactionCosts,setAccount,collectFaucet,setKeykeeper" example:"Vote"`
 }
 
-func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
-	return &Transaction{
+func TransactionMetadataFromDB(dbtx *indexerdb.Transaction) *TransactionMetadata {
+	return &TransactionMetadata{
 		Index:        uint64(dbtx.ID),
 		Hash:         dbtx.Hash,
 		BlockHeight:  uint32(dbtx.BlockHeight),
 		TxBlockIndex: int32(dbtx.BlockIndex),
 		TxType:       dbtx.Type,
 	}
+}
+
+func TransactionMetadataFromDBRow(dbtx *indexerdb.SearchTransactionsRow) *TransactionMetadata {
+	return &TransactionMetadata{
+		Index:        uint64(dbtx.ID),
+		Hash:         dbtx.Hash,
+		BlockHeight:  uint32(dbtx.BlockHeight),
+		TxBlockIndex: int32(dbtx.BlockIndex),
+		TxType:       dbtx.Type,
+	}
+}
+
+// Transaction holds the db reference for a single transaction
+type Transaction struct {
+	*TransactionMetadata
+	RawTx types.HexBytes `json:"rawTx,omitempty"`
+	Tx    *vochaintx.Tx
+}
+
+func TransactionFromDB(dbtx *indexerdb.Transaction, chainID string) *Transaction {
+	tx := &Transaction{
+		TransactionMetadata: TransactionMetadataFromDB(dbtx),
+		RawTx:               dbtx.RawTx,
+	}
+	if err := tx.Tx.Unmarshal(tx.RawTx, chainID); err != nil {
+		log.Errorw(err, "couldn't unmarshal rawTx from indexer")
+	}
+	return tx
+}
+
+func TransactionFromDBRow(dbtx *indexerdb.TransactionListByHeightRow, chainID string) *Transaction {
+	tx := &Transaction{
+		TransactionMetadata: TransactionMetadataFromDBRow(dbtx),
+		RawTx:               dbtx.RawTx,
+	}
+	if err := tx.Tx.Unmarshal(tx.RawTx, chainID); err != nil {
+		log.Errorw(err, "couldn't unmarshal rawTx from indexer")
+	}
+	return tx
 }
 
 // TokenTransferMeta contains the information of a token transfer and some extra useful information.

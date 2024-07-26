@@ -414,6 +414,20 @@ func (idx *Indexer) Commit(height uint32) error {
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()
 
+	// index the new block
+	if b := idx.App.GetBlockByHeight(int64(height)); b != nil {
+		if _, err := queries.CreateBlock(context.TODO(), indexerdb.CreateBlockParams{
+			ChainID:         b.ChainID,
+			Height:          b.Height,
+			Time:            b.Time,
+			Hash:            nonNullBytes(b.Hash()),
+			ProposerAddress: nonNullBytes(b.ProposerAddress),
+			LastBlockHash:   nonNullBytes(b.LastBlockID.Hash),
+		}); err != nil {
+			log.Errorw(err, "cannot index new block")
+		}
+	}
+
 	for _, pidStr := range updateProcs {
 		pid := types.ProcessID(pidStr)
 		if err := idx.updateProcess(ctx, queries, pid); err != nil {
