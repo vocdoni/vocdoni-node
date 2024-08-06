@@ -209,7 +209,7 @@ type TokenTransferMeta struct {
 	Amount    uint64          `json:"amount"`
 	From      types.AccountID `json:"from"`
 	Height    uint64          `json:"height"`
-	TxHash    types.Hash      `json:"txHash"`
+	TxHash    types.HexBytes  `json:"txHash"`
 	Timestamp time.Time       `json:"timestamp"`
 	To        types.AccountID `json:"to"`
 }

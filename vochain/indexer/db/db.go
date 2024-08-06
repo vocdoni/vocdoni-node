@@ -84,12 +84,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getTokenTransferStmt, err = db.PrepareContext(ctx, getTokenTransfer); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTokenTransfer: %w", err)
 	}
-	if q.getTokenTransfersByFromAccountStmt, err = db.PrepareContext(ctx, getTokenTransfersByFromAccount); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenTransfersByFromAccount: %w", err)
-	}
-	if q.getTokenTransfersByToAccountStmt, err = db.PrepareContext(ctx, getTokenTransfersByToAccount); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTokenTransfersByToAccount: %w", err)
-	}
 	if q.getTransactionStmt, err = db.PrepareContext(ctx, getTransaction); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTransaction: %w", err)
 	}
@@ -110,6 +104,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.searchTokenFeesStmt, err = db.PrepareContext(ctx, searchTokenFees); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchTokenFees: %w", err)
+	}
+	if q.searchTokenTransfersStmt, err = db.PrepareContext(ctx, searchTokenTransfers); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchTokenTransfers: %w", err)
 	}
 	if q.searchTransactionsStmt, err = db.PrepareContext(ctx, searchTransactions); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchTransactions: %w", err)
@@ -240,16 +237,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getTokenTransferStmt: %w", cerr)
 		}
 	}
-	if q.getTokenTransfersByFromAccountStmt != nil {
-		if cerr := q.getTokenTransfersByFromAccountStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenTransfersByFromAccountStmt: %w", cerr)
-		}
-	}
-	if q.getTokenTransfersByToAccountStmt != nil {
-		if cerr := q.getTokenTransfersByToAccountStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTokenTransfersByToAccountStmt: %w", cerr)
-		}
-	}
 	if q.getTransactionStmt != nil {
 		if cerr := q.getTransactionStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getTransactionStmt: %w", cerr)
@@ -283,6 +270,11 @@ func (q *Queries) Close() error {
 	if q.searchTokenFeesStmt != nil {
 		if cerr := q.searchTokenFeesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchTokenFeesStmt: %w", cerr)
+		}
+	}
+	if q.searchTokenTransfersStmt != nil {
+		if cerr := q.searchTokenTransfersStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchTokenTransfersStmt: %w", cerr)
 		}
 	}
 	if q.searchTransactionsStmt != nil {
@@ -384,8 +376,6 @@ type Queries struct {
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
 	getProcessStatusStmt                         *sql.Stmt
 	getTokenTransferStmt                         *sql.Stmt
-	getTokenTransfersByFromAccountStmt           *sql.Stmt
-	getTokenTransfersByToAccountStmt             *sql.Stmt
 	getTransactionStmt                           *sql.Stmt
 	getTransactionByHashStmt                     *sql.Stmt
 	getTxReferenceByBlockHeightAndBlockIndexStmt *sql.Stmt
@@ -393,6 +383,7 @@ type Queries struct {
 	searchEntitiesStmt                           *sql.Stmt
 	searchProcessesStmt                          *sql.Stmt
 	searchTokenFeesStmt                          *sql.Stmt
+	searchTokenTransfersStmt                     *sql.Stmt
 	searchTransactionsStmt                       *sql.Stmt
 	searchVotesStmt                              *sql.Stmt
 	setProcessResultsCancelledStmt               *sql.Stmt
@@ -405,37 +396,36 @@ type Queries struct {
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                 tx,
-		tx:                                 tx,
-		computeProcessVoteCountStmt:        q.computeProcessVoteCountStmt,
-		countAccountsStmt:                  q.countAccountsStmt,
-		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
-		countTransactionsStmt:              q.countTransactionsStmt,
-		countVotesStmt:                     q.countVotesStmt,
-		createAccountStmt:                  q.createAccountStmt,
-		createBlockStmt:                    q.createBlockStmt,
-		createProcessStmt:                  q.createProcessStmt,
-		createTokenFeeStmt:                 q.createTokenFeeStmt,
-		createTokenTransferStmt:            q.createTokenTransferStmt,
-		createTransactionStmt:              q.createTransactionStmt,
-		createVoteStmt:                     q.createVoteStmt,
-		getBlockStmt:                       q.getBlockStmt,
-		getEntityCountStmt:                 q.getEntityCountStmt,
-		getListAccountsStmt:                q.getListAccountsStmt,
-		getProcessStmt:                     q.getProcessStmt,
-		getProcessCountStmt:                q.getProcessCountStmt,
-		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
-		getProcessStatusStmt:               q.getProcessStatusStmt,
-		getTokenTransferStmt:               q.getTokenTransferStmt,
-		getTokenTransfersByFromAccountStmt: q.getTokenTransfersByFromAccountStmt,
-		getTokenTransfersByToAccountStmt:   q.getTokenTransfersByToAccountStmt,
-		getTransactionStmt:                 q.getTransactionStmt,
-		getTransactionByHashStmt:           q.getTransactionByHashStmt,
+		db:                               tx,
+		tx:                               tx,
+		computeProcessVoteCountStmt:      q.computeProcessVoteCountStmt,
+		countAccountsStmt:                q.countAccountsStmt,
+		countTokenTransfersByAccountStmt: q.countTokenTransfersByAccountStmt,
+		countTransactionsStmt:            q.countTransactionsStmt,
+		countVotesStmt:                   q.countVotesStmt,
+		createAccountStmt:                q.createAccountStmt,
+		createBlockStmt:                  q.createBlockStmt,
+		createProcessStmt:                q.createProcessStmt,
+		createTokenFeeStmt:               q.createTokenFeeStmt,
+		createTokenTransferStmt:          q.createTokenTransferStmt,
+		createTransactionStmt:            q.createTransactionStmt,
+		createVoteStmt:                   q.createVoteStmt,
+		getBlockStmt:                     q.getBlockStmt,
+		getEntityCountStmt:               q.getEntityCountStmt,
+		getListAccountsStmt:              q.getListAccountsStmt,
+		getProcessStmt:                   q.getProcessStmt,
+		getProcessCountStmt:              q.getProcessCountStmt,
+		getProcessIDsByFinalResultsStmt:  q.getProcessIDsByFinalResultsStmt,
+		getProcessStatusStmt:             q.getProcessStatusStmt,
+		getTokenTransferStmt:             q.getTokenTransferStmt,
+		getTransactionStmt:               q.getTransactionStmt,
+		getTransactionByHashStmt:         q.getTransactionByHashStmt,
 		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
 		getVoteStmt:                    q.getVoteStmt,
 		searchEntitiesStmt:             q.searchEntitiesStmt,
 		searchProcessesStmt:            q.searchProcessesStmt,
 		searchTokenFeesStmt:            q.searchTokenFeesStmt,
+		searchTokenTransfersStmt:       q.searchTokenTransfersStmt,
 		searchTransactionsStmt:         q.searchTransactionsStmt,
 		searchVotesStmt:                q.searchVotesStmt,
 		setProcessResultsCancelledStmt: q.setProcessResultsCancelledStmt,

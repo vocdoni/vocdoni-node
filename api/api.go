@@ -74,6 +74,8 @@ const (
 	ParamHeight         = "height"
 	ParamReference      = "reference"
 	ParamType           = "type"
+	ParamAccountIdFrom  = "accountIdFrom"
+	ParamAccountIdTo    = "accountIdTo"
 )
 
 var (

@@ -57,6 +57,14 @@ type FeesParams struct {
 	AccountID string `json:"accountId,omitempty"`
 }
 
+// TransfersParams allows the client to filter transfers
+type TransfersParams struct {
+	PaginationParams
+	AccountID     string `json:"accountId,omitempty"`
+	AccountIDFrom string `json:"accountIdFrom,omitempty"`
+	AccountIDTo   string `json:"accountIdTo,omitempty"`
+}
+
 // VoteParams allows the client to filter votes
 type VoteParams struct {
 	PaginationParams
@@ -262,6 +270,12 @@ type TransactionsList struct {
 type FeesList struct {
 	Fees       []*indexertypes.TokenFeeMeta `json:"fees"`
 	Pagination *Pagination                  `json:"pagination"`
+}
+
+// TransfersList is used to return a paginated list to the client
+type TransfersList struct {
+	Transfers  []*indexertypes.TokenTransferMeta `json:"transfers"`
+	Pagination *Pagination                       `json:"pagination"`
 }
 
 type GenericTransactionWithInfo struct {

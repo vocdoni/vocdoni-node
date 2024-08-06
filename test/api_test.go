@@ -391,9 +391,7 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	tokenTxs := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
+	tokenTxs := &api.TransfersList{}
 	err := json.Unmarshal(resp, tokenTxs)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -407,18 +405,14 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	err = json.Unmarshal(resp, &countTnsAcc)
 	qt.Assert(t, err, qt.IsNil)
 
-	totalTokenTxs := uint64(len(tokenTxs.Transfers.Received) + len(tokenTxs.Transfers.Sent))
-
 	// compare count of total token transfers for the account 1 using the two response
-	qt.Assert(t, totalTokenTxs, qt.Equals, countTnsAcc.Count)
+	qt.Assert(t, tokenTxs.Pagination.TotalItems, qt.Equals, countTnsAcc.Count)
 
 	// get the token transfers received and sent for account 2
 	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	tokenTxs2 := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
+	tokenTxs2 := &api.TransfersList{}
 	err = json.Unmarshal(resp, tokenTxs2)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -432,9 +426,8 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	err = json.Unmarshal(resp, &countTnsAcc2)
 	qt.Assert(t, err, qt.IsNil)
 
-	totalTokenTxs2 := uint64(len(tokenTxs2.Transfers.Received) + len(tokenTxs2.Transfers.Sent))
 	// compare count of total token transfers for the account 2 using the two response
-	qt.Assert(t, totalTokenTxs2, qt.Equals, countTnsAcc2.Count)
+	qt.Assert(t, tokenTxs2.Pagination.TotalItems, qt.Equals, countTnsAcc2.Count)
 
 	resp, code = c.Request("GET", nil, "accounts", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))

@@ -1650,22 +1650,29 @@ func TestTokenTransfers(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// acct 1 must have only one token transfer received
-	acc1Tokentx, err := idx.GetTokenTransfersByToAccount(keys[1].Address().Bytes(), 0, 10)
+	acc1Tokentx, _, err := idx.TokenTransfersList(10, 0, "", "", hex.EncodeToString(keys[1].Address().Bytes()))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(acc1Tokentx), qt.Equals, 1)
 	qt.Assert(t, acc1Tokentx[0].Amount, qt.Equals, uint64(5))
 
 	// acct 2 must two token transfers received
-	acc2Tokentx, err := idx.GetTokenTransfersByToAccount(keys[2].Address().Bytes(), 0, 10)
+	acc2Tokentx, _, err := idx.TokenTransfersList(10, 0, "", "", hex.EncodeToString(keys[2].Address().Bytes()))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(acc2Tokentx), qt.Equals, 2)
 	qt.Assert(t, acc2Tokentx[0].Amount, qt.Equals, uint64(95))
 	qt.Assert(t, acc2Tokentx[1].Amount, qt.Equals, uint64(18))
 
 	// acct 0 must zero token transfers received
-	acc0Tokentx, err := idx.GetTokenTransfersByToAccount(keys[0].Address().Bytes(), 0, 10)
+	acc0Tokentx, _, err := idx.TokenTransfersList(10, 0, "", "", hex.EncodeToString(keys[0].Address().Bytes()))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(acc0Tokentx), qt.Equals, 0)
+
+	// acct 1 must have two token transfer received or sent
+	acc1TokentxFromOrTo, _, err := idx.TokenTransfersList(10, 0, hex.EncodeToString(keys[1].Address().Bytes()), "", "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, len(acc1TokentxFromOrTo), qt.Equals, 2)
+	qt.Assert(t, acc1TokentxFromOrTo[0].Amount, qt.Equals, uint64(5))
+	qt.Assert(t, acc1TokentxFromOrTo[1].Amount, qt.Equals, uint64(95))
 }
 
 // friendlyResults translates votes into a matrix of strings

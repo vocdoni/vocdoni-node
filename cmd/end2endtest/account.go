@@ -329,14 +329,12 @@ func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address)
 	if err != nil {
 		return err
 	}
-	countTokenTxs := uint64(len(tokenTxs.Received) + len(tokenTxs.Sent))
-
 	count, err := api.CountTokenTransfers(address)
 	if err != nil {
 		return err
 	}
-	if count != countTokenTxs {
-		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, countTokenTxs)
+	if count != tokenTxs.Pagination.TotalItems {
+		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, tokenTxs.Pagination.TotalItems)
 	}
 
 	log.Infow("current transfers count", "account", address.String(), "count", count)

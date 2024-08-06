@@ -290,21 +290,19 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 }
 
 // ListTokenTransfers returns the list of sent and received token transfers associated with an account
-func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (indexertypes.TokenTransfersAccount, error) {
+func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (*api.TransfersList, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "accounts", account.Hex(), "transfers", "page", strconv.Itoa(page))
 	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
+		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
-		return indexertypes.TokenTransfersAccount{}, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	tokenTxs := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
-	if err := json.Unmarshal(resp, &tokenTxs); err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
+	tokenTxs := &api.TransfersList{}
+	if err := json.Unmarshal(resp, tokenTxs); err != nil {
+		return nil, err
 	}
-	return tokenTxs.Transfers, nil
+	return tokenTxs, nil
 }
 
 // SetSIK function allows to update the Secret Identity Key for the current

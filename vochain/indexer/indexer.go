@@ -709,31 +709,6 @@ func (idx *Indexer) OnCensusUpdate(pid, _ []byte, _ string, _ uint64) {
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// GetTokenTransfersByFromAccount returns all the token transfers made from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
-		FromAccount: from,
-		Limit:       int64(maxItems),
-		Offset:      int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenTransferMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenTransferMeta{
-			Amount:    uint64(t.Amount),
-			From:      t.FromAccount,
-			To:        t.ToAccount,
-			Height:    uint64(t.BlockHeight),
-			TxHash:    t.TxHash,
-			Timestamp: t.TransferTime,
-		})
-	}
-	return tt, nil
-}
-
 // OnSpendTokens indexes a token spending event.
 func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference string) {
 	idx.blockMu.Lock()
@@ -789,47 +764,42 @@ func (idx *Indexer) TokenFeesList(limit, offset int, txType, reference, fromAcco
 	return list, uint64(results[0].TotalCount), nil
 }
 
-// GetTokenTransfersByToAccount returns all the token transfers made to a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByToAccount(to []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByToAccount(context.TODO(), indexerdb.GetTokenTransfersByToAccountParams{
-		ToAccount: to,
-		Limit:     int64(maxItems),
-		Offset:    int64(offset),
+// TokenTransfersList returns all the token transfers, made to and/or from a given account
+// (all optional filters), ordered by timestamp and paginated by limit and offset
+func (idx *Indexer) TokenTransfersList(limit, offset int, fromOrToAccount, fromAccount, toAccount string) (
+	[]*indexertypes.TokenTransferMeta, uint64, error,
+) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchTokenTransfers(context.TODO(), indexerdb.SearchTokenTransfersParams{
+		Limit:           int64(limit),
+		Offset:          int64(offset),
+		FromOrToAccount: fromOrToAccount,
+		FromAccount:     fromAccount,
+		ToAccount:       toAccount,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []*indexertypes.TokenTransferMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenTransferMeta{
-			Amount:    uint64(t.Amount),
-			From:      t.FromAccount,
-			To:        t.ToAccount,
-			Height:    uint64(t.BlockHeight),
-			TxHash:    t.TxHash,
-			Timestamp: t.TransferTime,
+	list := []*indexertypes.TokenTransferMeta{}
+	for _, row := range results {
+		list = append(list, &indexertypes.TokenTransferMeta{
+			Amount:    uint64(row.Amount),
+			From:      row.FromAccount,
+			To:        row.ToAccount,
+			Height:    uint64(row.BlockHeight),
+			TxHash:    row.TxHash,
+			Timestamp: row.TransferTime,
 		})
 	}
-	return tt, nil
-}
-
-// GetTokenTransfersByAccount returns all the token transfers made to and from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByAccount(acc []byte, offset, maxItems int32) (indexertypes.TokenTransfersAccount, error) {
-	transfersTo, err := idx.GetTokenTransfersByToAccount(acc, offset, maxItems)
-	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
+	if len(results) == 0 {
+		return list, 0, nil
 	}
-	transfersFrom, err := idx.GetTokenTransfersByFromAccount(acc, offset, maxItems)
-	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
-	}
-
-	return indexertypes.TokenTransfersAccount{
-		Received: transfersTo,
-		Sent:     transfersFrom,
-	}, nil
+	return list, uint64(results[0].TotalCount), nil
 }
 
 // CountTokenTransfersByAccount returns the count all the token transfers made from a given account

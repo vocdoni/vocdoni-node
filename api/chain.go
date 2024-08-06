@@ -226,6 +226,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/transfers",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainTransfersListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/export/indexer",
 		"GET",
 		apirest.MethodAccessTypeAdmin,
@@ -1076,6 +1084,63 @@ func (a *API) sendFeesList(ctx *httprouter.HTTPContext, params *FeesParams) erro
 	return marshalAndSend(ctx, list)
 }
 
+// chainTransfersListHandler
+//
+//	@Summary		List all token transfers
+//	@Description	Returns the token transfers list ordered by date.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page			query		number	false	"Page"
+//	@Param			limit			query		number	false	"Items per page"
+//	@Param			accountId		query		string	false	"Specific accountId that sent or received the tokens"
+//	@Param			accountIdFrom	query		string	false	"Specific accountId that sent the tokens"
+//	@Param			accountIdTo		query		string	false	"Specific accountId that received the tokens"
+//	@Success		200				{object}	TransfersList
+//	@Router			/chain/transfers [get]
+func (a *API) chainTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseTransfersParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamAccountId),
+		ctx.QueryParam(ParamAccountIdFrom),
+		ctx.QueryParam(ParamAccountIdTo),
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendTransfersList(ctx, params)
+}
+
+// sendTransfersList produces a filtered, paginated TokenTransfersList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendTransfersList(ctx *httprouter.HTTPContext, params *TransfersParams) error {
+	transfers, total, err := a.indexer.TokenTransfersList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.AccountID,
+		params.AccountIDFrom,
+		params.AccountIDTo,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &TransfersList{
+		Transfers:  transfers,
+		Pagination: pagination,
+	}
+	return marshalAndSend(ctx, list)
+}
+
 // chainIndexerExportHandler
 //
 //	@Summary		Exports the indexer database
@@ -1119,6 +1184,21 @@ func parseFeesParams(paramPage, paramLimit, paramReference, paramType, paramAcco
 		Reference:        util.TrimHex(paramReference),
 		Type:             paramType,
 		AccountID:        util.TrimHex(paramAccountId),
+	}, nil
+}
+
+// parseTransfersParams returns an TransfersParams filled with the passed params
+func parseTransfersParams(paramPage, paramLimit, paramAccountId, paramAccountIdFrom, paramAccountIdTo string) (*TransfersParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &TransfersParams{
+		PaginationParams: pagination,
+		AccountID:        util.TrimHex(paramAccountId),
+		AccountIDFrom:    util.TrimHex(paramAccountIdFrom),
+		AccountIDTo:      util.TrimHex(paramAccountIdTo),
 	}, nil
 }
 
