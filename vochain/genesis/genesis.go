@@ -65,7 +65,7 @@ import (
 // networks is a map containing the default chainID for each network
 var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
-	"dev":   "vocdoni/DEV/36",
+	"dev":   "vocdoni/DEV/37",
 	"stage": "vocdoni/STAGE/12",
 	"lts":   "vocdoni/LTS/1.2",
 }
@@ -113,6 +113,14 @@ var (
 		"vocdoni/DEV/36": {
 			GenesisDoc: comettypes.GenesisDoc{
 				GenesisTime:     time.Date(2024, time.June, 21, 8, 0, 0, 0, time.UTC),
+				InitialHeight:   1,
+				ConsensusParams: DefaultConsensusParams(),
+				AppState:        jsonRawMessage(initialAppStateForDev),
+			},
+		},
+		"vocdoni/DEV/37": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(2024, time.August, 6, 8, 0, 0, 0, time.UTC),
 				InitialHeight:   1,
 				ConsensusParams: DefaultConsensusParams(),
 				AppState:        jsonRawMessage(initialAppStateForDev),
