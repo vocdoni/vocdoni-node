@@ -814,17 +814,19 @@ func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	return uint64(count), err
 }
 
-// AccountList retrieves all accounts.
-func (idx *Indexer) AccountList(limit, offset int) ([]*indexertypes.Account, uint64, error) {
+// AccountList returns a list of accounts, accountID is a partial or full hex string,
+// and is optional (declared as zero-value will be ignored).
+func (idx *Indexer) AccountList(limit, offset int, accountID string) ([]*indexertypes.Account, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
 	if limit <= 0 {
 		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
 	}
-	results, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
-		Limit:  int64(limit),
-		Offset: int64(offset),
+	results, err := idx.readOnlyQuery.SearchAccounts(context.TODO(), indexerdb.SearchAccountsParams{
+		Limit:           int64(limit),
+		Offset:          int64(offset),
+		AccountIDSubstr: accountID,
 	})
 	if err != nil {
 		return nil, 0, err

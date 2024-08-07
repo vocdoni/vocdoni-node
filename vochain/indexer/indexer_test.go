@@ -1564,7 +1564,7 @@ func TestAccountsList(t *testing.T) {
 
 	last := 0
 	for i := 0; i < int(totalAccs); i++ {
-		accts, _, err := idx.AccountList(10, last)
+		accts, _, err := idx.AccountList(10, last, "")
 		qt.Assert(t, err, qt.IsNil)
 
 		for j, acc := range accts {
@@ -1587,7 +1587,7 @@ func TestAccountsList(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// verify the updated balance and nonce
-	accts, _, err := idx.AccountList(5, 0)
+	accts, _, err := idx.AccountList(5, 0, "")
 	qt.Assert(t, err, qt.IsNil)
 	// the account in the position 0 must be the updated account balance due it has the major balance
 	// indexer query has order BY balance DESC

@@ -39,35 +39,48 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (s
 	return q.exec(ctx, q.createAccountStmt, createAccount, arg.Account, arg.Balance, arg.Nonce)
 }
 
-const getListAccounts = `-- name: GetListAccounts :many
-SELECT account, balance, nonce,
-       COUNT(*) OVER() AS total_count
-FROM accounts
+const searchAccounts = `-- name: SearchAccounts :many
+WITH results AS (
+  SELECT account, balance, nonce
+  FROM accounts
+  WHERE (
+    (
+    ?3 = ''
+    OR (LENGTH(?3) = 40 AND LOWER(HEX(account)) = LOWER(?3))
+    OR (LENGTH(?3) < 40 AND INSTR(LOWER(HEX(account)), LOWER(?3)) > 0)
+    -- TODO: consider keeping an account_hex column for faster searches
+    )
+  )
+)
+SELECT account, balance, nonce, COUNT(*) OVER() AS total_count
+FROM results
 ORDER BY balance DESC
-LIMIT ? OFFSET ?
+LIMIT ?2
+OFFSET ?1
 `
 
-type GetListAccountsParams struct {
-	Limit  int64
-	Offset int64
+type SearchAccountsParams struct {
+	Offset          int64
+	Limit           int64
+	AccountIDSubstr interface{}
 }
 
-type GetListAccountsRow struct {
-	Account    types.AccountID
+type SearchAccountsRow struct {
+	Account    []byte
 	Balance    int64
 	Nonce      int64
 	TotalCount int64
 }
 
-func (q *Queries) GetListAccounts(ctx context.Context, arg GetListAccountsParams) ([]GetListAccountsRow, error) {
-	rows, err := q.query(ctx, q.getListAccountsStmt, getListAccounts, arg.Limit, arg.Offset)
+func (q *Queries) SearchAccounts(ctx context.Context, arg SearchAccountsParams) ([]SearchAccountsRow, error) {
+	rows, err := q.query(ctx, q.searchAccountsStmt, searchAccounts, arg.Offset, arg.Limit, arg.AccountIDSubstr)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetListAccountsRow
+	var items []SearchAccountsRow
 	for rows.Next() {
-		var i GetListAccountsRow
+		var i SearchAccountsRow
 		if err := rows.Scan(
 			&i.Account,
 			&i.Balance,

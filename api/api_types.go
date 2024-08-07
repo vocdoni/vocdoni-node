@@ -40,6 +40,7 @@ type OrganizationParams struct {
 // AccountParams allows the client to filter accounts
 type AccountParams struct {
 	PaginationParams
+	AccountID string `json:"accountId,omitempty"`
 }
 
 // TransactionParams allows the client to filter transactions

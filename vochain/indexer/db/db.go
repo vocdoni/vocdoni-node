@@ -66,9 +66,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getEntityCountStmt, err = db.PrepareContext(ctx, getEntityCount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetEntityCount: %w", err)
 	}
-	if q.getListAccountsStmt, err = db.PrepareContext(ctx, getListAccounts); err != nil {
-		return nil, fmt.Errorf("error preparing query GetListAccounts: %w", err)
-	}
 	if q.getProcessStmt, err = db.PrepareContext(ctx, getProcess); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcess: %w", err)
 	}
@@ -95,6 +92,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
+	}
+	if q.searchAccountsStmt, err = db.PrepareContext(ctx, searchAccounts); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchAccounts: %w", err)
 	}
 	if q.searchEntitiesStmt, err = db.PrepareContext(ctx, searchEntities); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchEntities: %w", err)
@@ -207,11 +207,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getEntityCountStmt: %w", cerr)
 		}
 	}
-	if q.getListAccountsStmt != nil {
-		if cerr := q.getListAccountsStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getListAccountsStmt: %w", cerr)
-		}
-	}
 	if q.getProcessStmt != nil {
 		if cerr := q.getProcessStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getProcessStmt: %w", cerr)
@@ -255,6 +250,11 @@ func (q *Queries) Close() error {
 	if q.getVoteStmt != nil {
 		if cerr := q.getVoteStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
+		}
+	}
+	if q.searchAccountsStmt != nil {
+		if cerr := q.searchAccountsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchAccountsStmt: %w", cerr)
 		}
 	}
 	if q.searchEntitiesStmt != nil {
@@ -370,7 +370,6 @@ type Queries struct {
 	createVoteStmt                               *sql.Stmt
 	getBlockStmt                                 *sql.Stmt
 	getEntityCountStmt                           *sql.Stmt
-	getListAccountsStmt                          *sql.Stmt
 	getProcessStmt                               *sql.Stmt
 	getProcessCountStmt                          *sql.Stmt
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
@@ -380,6 +379,7 @@ type Queries struct {
 	getTransactionByHashStmt                     *sql.Stmt
 	getTxReferenceByBlockHeightAndBlockIndexStmt *sql.Stmt
 	getVoteStmt                                  *sql.Stmt
+	searchAccountsStmt                           *sql.Stmt
 	searchEntitiesStmt                           *sql.Stmt
 	searchProcessesStmt                          *sql.Stmt
 	searchTokenFeesStmt                          *sql.Stmt
@@ -412,7 +412,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createVoteStmt:                   q.createVoteStmt,
 		getBlockStmt:                     q.getBlockStmt,
 		getEntityCountStmt:               q.getEntityCountStmt,
-		getListAccountsStmt:              q.getListAccountsStmt,
 		getProcessStmt:                   q.getProcessStmt,
 		getProcessCountStmt:              q.getProcessCountStmt,
 		getProcessIDsByFinalResultsStmt:  q.getProcessIDsByFinalResultsStmt,
@@ -422,6 +421,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTransactionByHashStmt:         q.getTransactionByHashStmt,
 		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
 		getVoteStmt:                    q.getVoteStmt,
+		searchAccountsStmt:             q.searchAccountsStmt,
 		searchEntitiesStmt:             q.searchEntitiesStmt,
 		searchProcessesStmt:            q.searchProcessesStmt,
 		searchTokenFeesStmt:            q.searchTokenFeesStmt,

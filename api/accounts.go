@@ -534,6 +534,7 @@ func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	params, err := parseAccountParams(
 		ctx.URLParam(ParamPage),
 		"",
+		"",
 	)
 	if err != nil {
 		return err
@@ -548,14 +549,16 @@ func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	query		number	false	"Page"
-//	@Param			limit	query		number	false	"Items per page"
-//	@Success		200		{object}	AccountsList
+//	@Param			page		query		number	false	"Page"
+//	@Param			limit		query		number	false	"Items per page"
+//	@Param			accountId	query		string	false	"Filter by partial accountId"
+//	@Success		200			{object}	AccountsList
 //	@Router			/accounts [get]
 func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseAccountParams(
 		ctx.QueryParam(ParamPage),
 		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamAccountId),
 	)
 	if err != nil {
 		return err
@@ -571,6 +574,7 @@ func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams
 	accounts, total, err := a.indexer.AccountList(
 		params.Limit,
 		params.Page*params.Limit,
+		params.AccountID,
 	)
 	if err != nil {
 		return ErrIndexerQueryFailed.WithErr(err)
@@ -589,7 +593,7 @@ func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams
 }
 
 // parseAccountParams returns an AccountParams filled with the passed params
-func parseAccountParams(paramPage, paramLimit string) (*AccountParams, error) {
+func parseAccountParams(paramPage, paramLimit, paramAccountID string) (*AccountParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -597,5 +601,6 @@ func parseAccountParams(paramPage, paramLimit string) (*AccountParams, error) {
 
 	return &AccountParams{
 		PaginationParams: pagination,
+		AccountID:        util.TrimHex(paramAccountID),
 	}, nil
 }
