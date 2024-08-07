@@ -193,15 +193,27 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrGettingSIK.WithErr(err)
 	}
 
+	_, transfersCount, err := a.indexer.TokenTransfersList(1, 0, hex.EncodeToString(addr.Bytes()), "", "")
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+
+	_, feesCount, err := a.indexer.TokenFeesList(1, 0, "", "", hex.EncodeToString(addr.Bytes()))
+	if err != nil {
+		return ErrCantFetchTokenFees.WithErr(err)
+	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
-		Address:       addr.Bytes(),
-		Nonce:         acc.GetNonce(),
-		Balance:       acc.GetBalance(),
-		ElectionIndex: acc.GetProcessIndex(),
-		InfoURL:       acc.GetInfoURI(),
-		Metadata:      accMetadata,
-		SIK:           types.HexBytes(sik),
+		Address:        addr.Bytes(),
+		Nonce:          acc.GetNonce(),
+		Balance:        acc.GetBalance(),
+		ElectionIndex:  acc.GetProcessIndex(),
+		TransfersCount: transfersCount,
+		FeesCount:      feesCount,
+		InfoURL:        acc.GetInfoURI(),
+		Metadata:       accMetadata,
+		SIK:            types.HexBytes(sik),
 	}); err != nil {
 		return err
 	}
