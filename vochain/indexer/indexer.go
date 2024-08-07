@@ -845,9 +845,12 @@ func (idx *Indexer) AccountList(limit, offset int, accountID string) ([]*indexer
 	return list, uint64(results[0].TotalCount), nil
 }
 
-// AccountExists returns whether the passed accountID matches at least one row in the db.
-// accountID is a partial or full hex string.
+// AccountExists returns whether the passed accountID exists in the db.
+// If passed arg is not the full hex string, returns false (i.e. no substring matching)
 func (idx *Indexer) AccountExists(accountID string) bool {
+	if len(accountID) != 40 {
+		return false
+	}
 	_, count, err := idx.AccountList(1, 0, accountID)
 	if err != nil {
 		log.Errorw(err, "indexer query failed")

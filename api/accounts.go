@@ -571,10 +571,6 @@ func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams) error {
-	if params.AccountID != "" && !a.indexer.AccountExists(params.AccountID) {
-		return ErrAccountNotFound
-	}
-
 	accounts, total, err := a.indexer.AccountList(
 		params.Limit,
 		params.Page*params.Limit,

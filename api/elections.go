@@ -262,10 +262,6 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendElectionList(ctx *httprouter.HTTPContext, params *ElectionParams) error {
-	if params.ElectionID != "" && !a.indexer.ProcessExists(params.ElectionID) {
-		return ErrElectionNotFound
-	}
-
 	if params.OrganizationID != "" && !a.indexer.EntityExists(params.OrganizationID) {
 		return ErrOrgNotFound
 	}
