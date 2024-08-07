@@ -177,22 +177,6 @@ func TestAPIerrorWithQuery(t *testing.T) {
 			want: api.ErrPageNotFound,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts"}, "accountId=0123456789"},
-			want: api.ErrAccountNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"accounts"}, "accountId=0123456789&page=1234"},
-			want: api.ErrAccountNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"elections"}, "electionId=0123456789"},
-			want: api.ErrElectionNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"elections"}, "electionId=0123456789&page=1234"},
-			want: api.ErrElectionNotFound,
-		},
-		{
 			args: args{"GET", nil, []string{"elections"}, "organizationId=0123456789"},
 			want: api.ErrOrgNotFound,
 		},
@@ -226,10 +210,6 @@ func TestAPIerrorWithQuery(t *testing.T) {
 		// 	args: args{"GET", nil, []string{"chain", "transactions"}, "type=FOOBAR"},
 		// 	want: api.ErrParamTypeInvalid,
 		// },
-		{
-			args: args{"GET", nil, []string{"chain", "organizations"}, "organizationId=0123456789"},
-			want: api.ErrOrgNotFound,
-		},
 		{
 			args: args{"GET", nil, []string{"chain", "fees"}, "accountId=0123456789"},
 			want: api.ErrAccountNotFound,

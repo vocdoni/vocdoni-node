@@ -115,4 +115,5 @@ var (
 	ErrGettingSIK                       = apirest.APIerror{Code: 5031, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error getting SIK")}
 	ErrCensusBuild                      = apirest.APIerror{Code: 5032, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error building census")}
 	ErrIndexerQueryFailed               = apirest.APIerror{Code: 5033, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("indexer query failed")}
+	ErrCantFetchTokenFees               = apirest.APIerror{Code: 5034, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch token fees")}
 )

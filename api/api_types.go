@@ -305,14 +305,16 @@ type ChainInfo struct {
 }
 
 type Account struct {
-	Address       types.HexBytes   `json:"address" `
-	Nonce         uint32           `json:"nonce"`
-	Balance       uint64           `json:"balance"`
-	ElectionIndex uint32           `json:"electionIndex"`
-	InfoURL       string           `json:"infoURL,omitempty"`
-	Token         *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
-	Metadata      *AccountMetadata `json:"metadata,omitempty"`
-	SIK           types.HexBytes   `json:"sik"`
+	Address        types.HexBytes   `json:"address" `
+	Nonce          uint32           `json:"nonce"`
+	Balance        uint64           `json:"balance"`
+	ElectionIndex  uint32           `json:"electionIndex"`
+	TransfersCount uint64           `json:"transfersCount,omitempty"`
+	FeesCount      uint64           `json:"feesCount,omitempty"`
+	InfoURL        string           `json:"infoURL,omitempty"`
+	Token          *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
+	Metadata       *AccountMetadata `json:"metadata,omitempty"`
+	SIK            types.HexBytes   `json:"sik"`
 }
 
 type AccountsList struct {

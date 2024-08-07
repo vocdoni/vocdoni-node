@@ -332,10 +332,6 @@ func (a *API) organizationListByFilterAndPageHandler(msg *apirest.APIdata, ctx *
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendOrganizationList(ctx *httprouter.HTTPContext, params *OrganizationParams) error {
-	if params.OrganizationID != "" && !a.indexer.EntityExists(params.OrganizationID) {
-		return ErrOrgNotFound
-	}
-
 	orgs, total, err := a.indexer.EntityList(
 		params.Limit,
 		params.Page*params.Limit,

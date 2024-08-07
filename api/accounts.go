@@ -193,15 +193,27 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrGettingSIK.WithErr(err)
 	}
 
+	_, transfersCount, err := a.indexer.TokenTransfersList(1, 0, hex.EncodeToString(addr.Bytes()), "", "")
+	if err != nil {
+		return ErrCantFetchTokenTransfers.WithErr(err)
+	}
+
+	_, feesCount, err := a.indexer.TokenFeesList(1, 0, "", "", hex.EncodeToString(addr.Bytes()))
+	if err != nil {
+		return ErrCantFetchTokenFees.WithErr(err)
+	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
-		Address:       addr.Bytes(),
-		Nonce:         acc.GetNonce(),
-		Balance:       acc.GetBalance(),
-		ElectionIndex: acc.GetProcessIndex(),
-		InfoURL:       acc.GetInfoURI(),
-		Metadata:      accMetadata,
-		SIK:           types.HexBytes(sik),
+		Address:        addr.Bytes(),
+		Nonce:          acc.GetNonce(),
+		Balance:        acc.GetBalance(),
+		ElectionIndex:  acc.GetProcessIndex(),
+		TransfersCount: transfersCount,
+		FeesCount:      feesCount,
+		InfoURL:        acc.GetInfoURI(),
+		Metadata:       accMetadata,
+		SIK:            types.HexBytes(sik),
 	}); err != nil {
 		return err
 	}
@@ -571,10 +583,6 @@ func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams) error {
-	if params.AccountID != "" && !a.indexer.AccountExists(params.AccountID) {
-		return ErrAccountNotFound
-	}
-
 	accounts, total, err := a.indexer.AccountList(
 		params.Limit,
 		params.Page*params.Limit,
