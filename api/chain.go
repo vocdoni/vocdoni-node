@@ -332,6 +332,10 @@ func (a *API) organizationListByFilterAndPageHandler(msg *apirest.APIdata, ctx *
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendOrganizationList(ctx *httprouter.HTTPContext, params *OrganizationParams) error {
+	if params.OrganizationID != "" && !a.indexer.EntityExists(params.OrganizationID) {
+		return ErrOrgNotFound
+	}
+
 	orgs, total, err := a.indexer.EntityList(
 		params.Limit,
 		params.Page*params.Limit,
@@ -1061,6 +1065,10 @@ func (a *API) chainFeesListByTypeAndPageHandler(_ *apirest.APIdata, ctx *httprou
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendFeesList(ctx *httprouter.HTTPContext, params *FeesParams) error {
+	if params.AccountID != "" && !a.indexer.AccountExists(params.AccountID) {
+		return ErrAccountNotFound
+	}
+
 	fees, total, err := a.indexer.TokenFeesList(
 		params.Limit,
 		params.Page*params.Limit,
@@ -1118,6 +1126,12 @@ func (a *API) chainTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendTransfersList(ctx *httprouter.HTTPContext, params *TransfersParams) error {
+	for _, param := range []string{params.AccountID, params.AccountIDFrom, params.AccountIDTo} {
+		if param != "" && !a.indexer.AccountExists(param) {
+			return ErrAccountNotFound.With(param)
+		}
+	}
+
 	transfers, total, err := a.indexer.TokenTransfersList(
 		params.Limit,
 		params.Page*params.Limit,

@@ -87,6 +87,16 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 	return list, uint64(results[0].TotalCount), nil
 }
 
+// ProcessExists returns whether the passed processID matches at least one row in the db.
+// processID is a partial or full hex string.
+func (idx *Indexer) ProcessExists(processID string) bool {
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil)
+	if err != nil {
+		log.Errorw(err, "indexer query failed")
+	}
+	return count > 0
+}
+
 // CountTotalProcesses returns the total number of processes indexed.
 func (idx *Indexer) CountTotalProcesses() uint64 {
 	count, err := idx.readOnlyQuery.GetProcessCount(context.TODO())
@@ -126,6 +136,16 @@ func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertyp
 		return list, 0, nil
 	}
 	return list, uint64(results[0].TotalCount), nil
+}
+
+// EntityExists returns whether the passed entityID matches at least one row in the db.
+// entityID is a partial or full hex string.
+func (idx *Indexer) EntityExists(entityID string) bool {
+	_, count, err := idx.EntityList(1, 0, entityID)
+	if err != nil {
+		log.Errorw(err, "indexer query failed")
+	}
+	return count > 0
 }
 
 // CountTotalEntities return the total number of entities indexed by the indexer
