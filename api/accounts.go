@@ -15,7 +15,6 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -433,56 +432,42 @@ func (a *API) accountElectionsCountHandler(_ *apirest.APIdata, ctx *httprouter.H
 //
 //	@Summary		List account received and sent token transfers
 //	@Description	Returns the token transfers for an account. A transfer is a token transference from one account to other (excepting the burn address).
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transfers?accountId=xxx&page=xxx)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			accountId	path		string	true	"Specific accountId"
+//	@Param			accountId	path		string	true	"Specific accountId that sent or received the tokens"
 //	@Param			page		path		number	true	"Page"
-//	@Success		200			{object}	object{transfers=indexertypes.TokenTransfersAccount}
+//	@Success		200			{object}	TransfersList
 //	@Router			/accounts/{accountId}/transfers/page/{page} [get]
 func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	accountID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamAccountId)))
-	if err != nil || accountID == nil {
-		return ErrCantParseAccountID.Withf("%q", ctx.URLParam(ParamAccountId))
-	}
-	acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(accountID), true)
-	if acc == nil {
-		return ErrAccountNotFound
-	}
-	if err != nil {
-		return err
-	}
-
-	page, err := parsePage(ctx.URLParam(ParamPage))
-	if err != nil {
-		return err
-	}
-
-	transfers, err := a.indexer.GetTokenTransfersByAccount(accountID, int32(page*DefaultItemsPerPage), DefaultItemsPerPage)
-	if err != nil {
-		return ErrCantFetchTokenTransfers.WithErr(err)
-	}
-	data, err := json.Marshal(
-		struct {
-			Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-		}{Transfers: transfers},
+	params, err := parseTransfersParams(
+		ctx.URLParam(ParamPage),
+		"",
+		ctx.URLParam(ParamAccountId),
+		"",
+		"",
 	)
 	if err != nil {
-		return ErrMarshalingServerJSONFailed.WithErr(err)
+		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+
+	return a.sendTransfersList(ctx, params)
 }
 
 // tokenFeesHandler
 //
 //	@Summary		List account token fees
 //	@Description	Returns the token fees for an account. A spending is an amount of tokens burnt from one account for executing transactions.
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transfers?accountId=xxx&page=xxx)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
 //	@Param			accountId	path		string	true	"Specific accountId"
 //	@Param			page		path		number	true	"Page"
-//	@Success		200			{object}	object{fees=[]indexertypes.TokenFeeMeta}
+//	@Success		200			{object}	FeesList
 //	@Router			/accounts/{accountId}/fees/page/{page} [get]
 func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseFeesParams(
@@ -549,6 +534,7 @@ func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	params, err := parseAccountParams(
 		ctx.URLParam(ParamPage),
 		"",
+		"",
 	)
 	if err != nil {
 		return err
@@ -563,14 +549,16 @@ func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
-//	@Param			page	query		number	false	"Page"
-//	@Param			limit	query		number	false	"Items per page"
-//	@Success		200		{object}	AccountsList
+//	@Param			page		query		number	false	"Page"
+//	@Param			limit		query		number	false	"Items per page"
+//	@Param			accountId	query		string	false	"Filter by partial accountId"
+//	@Success		200			{object}	AccountsList
 //	@Router			/accounts [get]
 func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseAccountParams(
 		ctx.QueryParam(ParamPage),
 		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamAccountId),
 	)
 	if err != nil {
 		return err
@@ -583,9 +571,14 @@ func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams) error {
+	if params.AccountID != "" && !a.indexer.AccountExists(params.AccountID) {
+		return ErrAccountNotFound
+	}
+
 	accounts, total, err := a.indexer.AccountList(
 		params.Limit,
 		params.Page*params.Limit,
+		params.AccountID,
 	)
 	if err != nil {
 		return ErrIndexerQueryFailed.WithErr(err)
@@ -604,7 +597,7 @@ func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams
 }
 
 // parseAccountParams returns an AccountParams filled with the passed params
-func parseAccountParams(paramPage, paramLimit string) (*AccountParams, error) {
+func parseAccountParams(paramPage, paramLimit, paramAccountID string) (*AccountParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -612,5 +605,6 @@ func parseAccountParams(paramPage, paramLimit string) (*AccountParams, error) {
 
 	return &AccountParams{
 		PaginationParams: pagination,
+		AccountID:        util.TrimHex(paramAccountID),
 	}, nil
 }

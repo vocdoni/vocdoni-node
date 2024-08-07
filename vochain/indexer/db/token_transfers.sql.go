@@ -14,9 +14,6 @@ import (
 )
 
 const countTokenTransfersByAccount = `-- name: CountTokenTransfersByAccount :one
-;
-
-
 SELECT COUNT(*) FROM token_transfers
 WHERE to_account = ?1 OR
 	  from_account = ?1
@@ -79,29 +76,59 @@ func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (Toke
 	return i, err
 }
 
-const getTokenTransfersByFromAccount = `-- name: GetTokenTransfersByFromAccount :many
-SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time FROM token_transfers
-WHERE from_account = ?1
+const searchTokenTransfers = `-- name: SearchTokenTransfers :many
+WITH results AS (
+  SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time
+  FROM token_transfers
+  WHERE (
+    (?3 = '' OR (
+		LOWER(HEX(from_account)) = LOWER(?3)
+		OR LOWER(HEX(to_account)) = LOWER(?3)
+	))
+    AND (?4 = '' OR LOWER(HEX(from_account)) = LOWER(?4))
+    AND (?5 = '' OR LOWER(HEX(to_account)) = LOWER(?5))
+  )
+)
+SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time, COUNT(*) OVER() AS total_count
+FROM results
 ORDER BY transfer_time DESC
-LIMIT ?3
-OFFSET ?2
+LIMIT ?2
+OFFSET ?1
 `
 
-type GetTokenTransfersByFromAccountParams struct {
-	FromAccount types.AccountID
-	Offset      int64
-	Limit       int64
+type SearchTokenTransfersParams struct {
+	Offset          int64
+	Limit           int64
+	FromOrToAccount interface{}
+	FromAccount     interface{}
+	ToAccount       interface{}
 }
 
-func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTokenTransfersByFromAccountParams) ([]TokenTransfer, error) {
-	rows, err := q.query(ctx, q.getTokenTransfersByFromAccountStmt, getTokenTransfersByFromAccount, arg.FromAccount, arg.Offset, arg.Limit)
+type SearchTokenTransfersRow struct {
+	TxHash       []byte
+	BlockHeight  int64
+	FromAccount  []byte
+	ToAccount    []byte
+	Amount       int64
+	TransferTime time.Time
+	TotalCount   int64
+}
+
+func (q *Queries) SearchTokenTransfers(ctx context.Context, arg SearchTokenTransfersParams) ([]SearchTokenTransfersRow, error) {
+	rows, err := q.query(ctx, q.searchTokenTransfersStmt, searchTokenTransfers,
+		arg.Offset,
+		arg.Limit,
+		arg.FromOrToAccount,
+		arg.FromAccount,
+		arg.ToAccount,
+	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TokenTransfer
+	var items []SearchTokenTransfersRow
 	for rows.Next() {
-		var i TokenTransfer
+		var i SearchTokenTransfersRow
 		if err := rows.Scan(
 			&i.TxHash,
 			&i.BlockHeight,
@@ -109,52 +136,7 @@ func (q *Queries) GetTokenTransfersByFromAccount(ctx context.Context, arg GetTok
 			&i.ToAccount,
 			&i.Amount,
 			&i.TransferTime,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const getTokenTransfersByToAccount = `-- name: GetTokenTransfersByToAccount :many
-;
-
-SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time FROM token_transfers
-WHERE to_account = ?1
-ORDER BY transfer_time DESC
-LIMIT ?3
-OFFSET ?2
-`
-
-type GetTokenTransfersByToAccountParams struct {
-	ToAccount types.AccountID
-	Offset    int64
-	Limit     int64
-}
-
-func (q *Queries) GetTokenTransfersByToAccount(ctx context.Context, arg GetTokenTransfersByToAccountParams) ([]TokenTransfer, error) {
-	rows, err := q.query(ctx, q.getTokenTransfersByToAccountStmt, getTokenTransfersByToAccount, arg.ToAccount, arg.Offset, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []TokenTransfer
-	for rows.Next() {
-		var i TokenTransfer
-		if err := rows.Scan(
-			&i.TxHash,
-			&i.BlockHeight,
-			&i.FromAccount,
-			&i.ToAccount,
-			&i.Amount,
-			&i.TransferTime,
+			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

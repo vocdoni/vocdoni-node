@@ -12,22 +12,24 @@ SELECT * FROM token_transfers
 WHERE tx_hash = ?
 LIMIT 1;
 
--- name: GetTokenTransfersByFromAccount :many
-SELECT * FROM token_transfers
-WHERE from_account = sqlc.arg(from_account)
+-- name: SearchTokenTransfers :many
+WITH results AS (
+  SELECT *
+  FROM token_transfers
+  WHERE (
+    (sqlc.arg(from_or_to_account) = '' OR (
+		LOWER(HEX(from_account)) = LOWER(sqlc.arg(from_or_to_account))
+		OR LOWER(HEX(to_account)) = LOWER(sqlc.arg(from_or_to_account))
+	))
+    AND (sqlc.arg(from_account) = '' OR LOWER(HEX(from_account)) = LOWER(sqlc.arg(from_account)))
+    AND (sqlc.arg(to_account) = '' OR LOWER(HEX(to_account)) = LOWER(sqlc.arg(to_account)))
+  )
+)
+SELECT *, COUNT(*) OVER() AS total_count
+FROM results
 ORDER BY transfer_time DESC
 LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
-
--- name: GetTokenTransfersByToAccount :many
-SELECT * FROM token_transfers
-WHERE to_account = sqlc.arg(to_account)
-ORDER BY transfer_time DESC
-LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
-
+OFFSET sqlc.arg(offset);
 
 -- name: CountTokenTransfersByAccount :one
 SELECT COUNT(*) FROM token_transfers

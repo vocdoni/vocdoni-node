@@ -226,6 +226,10 @@ func (a *API) votesListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendVotesList(ctx *httprouter.HTTPContext, params *VoteParams) error {
+	if params.ElectionID != "" && !a.indexer.ProcessExists(params.ElectionID) {
+		return ErrElectionNotFound
+	}
+
 	votes, total, err := a.indexer.VoteList(
 		params.Limit,
 		params.Page*params.Limit,
