@@ -207,15 +207,8 @@ func (a *API) electionListByFilterHandler(msg *apirest.APIdata, ctx *httprouter.
 //	@Success		200		{object}	ElectionsList
 //	@Router			/elections/page/{page} [get]
 func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseElectionParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
+	params, err := electionParams(ctx.URLParam,
+		ParamPage,
 	)
 	if err != nil {
 		return err
@@ -241,15 +234,19 @@ func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Success		200				{object}	ElectionsList
 //	@Router			/elections [get]
 func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseElectionParams(
-		ctx.QueryParam(ParamPage),
-		ctx.QueryParam(ParamLimit),
-		ctx.QueryParam(ParamStatus),
-		ctx.QueryParam(ParamOrganizationId),
-		ctx.QueryParam(ParamElectionId),
-		ctx.QueryParam(ParamWithResults),
-		ctx.QueryParam(ParamFinalResults),
-		ctx.QueryParam(ParamManuallyEnded),
+	params, err := electionParams(ctx.QueryParam,
+		ParamPage,
+		ParamLimit,
+		ParamStatus,
+		ParamOrganizationId,
+		ParamElectionId,
+		ParamWithResults,
+		ParamFinalResults,
+		ParamManuallyEnded,
+		ParamStartDateAfter,
+		ParamStartDateBefore,
+		ParamEndDateAfter,
+		ParamEndDateBefore,
 	)
 	if err != nil {
 		return err
@@ -757,38 +754,43 @@ func (a *API) buildElectionIDHandler(msg *apirest.APIdata, ctx *httprouter.HTTPC
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// parseElectionParams returns an ElectionParams filled with the passed params
-func parseElectionParams(paramPage, paramLimit, paramStatus,
-	paramOrganizationID, paramElectionID,
-	paramWithResults, paramFinalResults, paramManuallyEnded string,
-) (*ElectionParams, error) {
-	pagination, err := parsePaginationParams(paramPage, paramLimit)
+// electionParams produces an ElectionParams, calling the passed func (ctx.QueryParam or ctx.URLParam)
+// to retrieve all the values of all keys passed.
+func electionParams(f func(key string) string, keys ...string) (*ElectionParams, error) {
+	strings := paramsFromCtxFunc(f, keys...)
+
+	pagination, err := parsePaginationParams(strings[ParamPage], strings[ParamLimit])
 	if err != nil {
 		return nil, err
 	}
 
-	withResults, err := parseBool(paramWithResults)
-	if err != nil {
-		return nil, err
+	bools := make(map[string]*bool)
+	for _, v := range []string{ParamWithResults, ParamFinalResults, ParamManuallyEnded} {
+		bools[v], err = parseBool(strings[v])
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	finalResults, err := parseBool(paramFinalResults)
-	if err != nil {
-		return nil, err
-	}
-
-	manuallyEnded, err := parseBool(paramManuallyEnded)
-	if err != nil {
-		return nil, err
+	dates := make(map[string]*time.Time)
+	for _, v := range []string{ParamStartDateAfter, ParamStartDateBefore, ParamEndDateAfter, ParamEndDateBefore} {
+		dates[v], err = parseDate(strings[v])
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &ElectionParams{
 		PaginationParams: pagination,
-		OrganizationID:   util.TrimHex(paramOrganizationID),
-		ElectionID:       util.TrimHex(paramElectionID),
-		Status:           paramStatus,
-		WithResults:      withResults,
-		FinalResults:     finalResults,
-		ManuallyEnded:    manuallyEnded,
+		OrganizationID:   util.TrimHex(strings[ParamOrganizationId]),
+		ElectionID:       util.TrimHex(strings[ParamElectionId]),
+		Status:           strings[ParamStatus],
+		WithResults:      bools[ParamWithResults],
+		FinalResults:     bools[ParamFinalResults],
+		ManuallyEnded:    bools[ParamManuallyEnded],
+		StartDateAfter:   dates[ParamStartDateAfter],
+		StartDateBefore:  dates[ParamStartDateBefore],
+		EndDateAfter:     dates[ParamEndDateAfter],
+		EndDateBefore:    dates[ParamEndDateBefore],
 	}, nil
 }
