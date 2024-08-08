@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"strconv"
 	"strings"
+	"time"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -275,6 +276,24 @@ func parseBool(s string) (*bool, error) {
 	return &b, nil
 }
 
+// parseDate parses an RFC3339 string into a time.Time value.
+// As a convenience, accepts also time.DateOnly format (i.e. 2006-01-02).
+//
+// The empty string "" is treated specially, returns a nil pointer with no error.
+func parseDate(s string) (*time.Time, error) {
+	if s == "" {
+		return nil, nil
+	}
+	b, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		if b, err := time.Parse(time.DateOnly, s); err == nil {
+			return &b, nil
+		}
+		return nil, ErrCantParseDate.WithErr(err)
+	}
+	return &b, nil
+}
+
 // parsePaginationParams returns a PaginationParams filled with the passed params
 func parsePaginationParams(paramPage, paramLimit string) (PaginationParams, error) {
 	page, err := parsePage(paramPage)
@@ -324,4 +343,13 @@ func calculatePagination(page int, limit int, totalItems uint64) (*Pagination, e
 		NextPage:     nextp,
 		LastPage:     uint64(lastp),
 	}, nil
+}
+
+// paramsFromCtxFunc calls f(key) for each key passed, and the resulting value is saved in map[key] of the returned map
+func paramsFromCtxFunc(f func(key string) string, keys ...string) map[string]string {
+	m := make(map[string]string)
+	for _, key := range keys {
+		m[key] = f(key)
+	}
+	return m
 }

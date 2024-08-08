@@ -45,12 +45,13 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
-// entityID, processID, namespace, status, and withResults are optional filters, if
+// all args (entityID, processID, etc) are optional filters, if
 // declared as zero-values will be ignored. entityID and processID are partial or full hex strings.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
 func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID string,
 	namespace uint32, srcNetworkID int32, status models.ProcessStatus,
 	withResults, finalResults, manuallyEnded *bool,
+	startDateAfter, startDateBefore, endDateAfter, endDateBefore *time.Time,
 ) ([][]byte, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
@@ -73,6 +74,10 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		HaveResults:     boolToInt(withResults),
 		FinalResults:    boolToInt(finalResults),
 		ManuallyEnded:   boolToInt(manuallyEnded),
+		StartDateAfter:  startDateAfter,
+		StartDateBefore: startDateBefore,
+		EndDateAfter:    endDateAfter,
+		EndDateBefore:   endDateBefore,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -93,7 +98,7 @@ func (idx *Indexer) ProcessExists(processID string) bool {
 	if len(processID) != 64 {
 		return false
 	}
-	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil)
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}

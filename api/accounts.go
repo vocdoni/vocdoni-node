@@ -355,15 +355,9 @@ func (a *API) accountCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Success		200				{object}	ElectionsList
 //	@Router			/accounts/{organizationId}/elections/page/{page} [get]
 func (a *API) accountElectionsListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseElectionParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		ctx.URLParam(ParamOrganizationId),
-		"",
-		"",
-		"",
-		"",
+	params, err := electionParams(ctx.URLParam,
+		ParamPage,
+		ParamOrganizationId,
 	)
 	if err != nil {
 		return err
@@ -391,15 +385,10 @@ func (a *API) accountElectionsListByPageHandler(_ *apirest.APIdata, ctx *httprou
 //	@Success		200				{object}	ElectionsList
 //	@Router			/accounts/{organizationId}/elections/status/{status}/page/{page} [get]
 func (a *API) accountElectionsListByStatusAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseElectionParams(
-		ctx.URLParam(ParamPage),
-		"",
-		ctx.URLParam(ParamStatus),
-		ctx.URLParam(ParamOrganizationId),
-		"",
-		"",
-		"",
-		"",
+	params, err := electionParams(ctx.URLParam,
+		ParamPage,
+		ParamStatus,
+		ParamOrganizationId,
 	)
 	if err != nil {
 		return err

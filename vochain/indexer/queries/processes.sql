@@ -68,6 +68,10 @@ WITH results AS (
 			OR (sqlc.arg(manually_ended) = 1 AND manually_ended = TRUE)
 			OR (sqlc.arg(manually_ended) = 0 AND manually_ended = FALSE)
 		)
+		AND (sqlc.arg(start_date_after) IS NULL OR start_date >= sqlc.arg(start_date_after))
+		AND (sqlc.arg(start_date_before) IS NULL OR start_date <= sqlc.arg(start_date_before))
+		AND (sqlc.arg(end_date_after) IS NULL OR end_date >= sqlc.arg(end_date_after))
+		AND (sqlc.arg(end_date_before) IS NULL OR end_date <= sqlc.arg(end_date_before))
 	)
 )
 SELECT id, total_count

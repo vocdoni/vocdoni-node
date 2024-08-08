@@ -305,6 +305,10 @@ WITH results AS (
 			OR (?10 = 1 AND manually_ended = TRUE)
 			OR (?10 = 0 AND manually_ended = FALSE)
 		)
+		AND (?11 IS NULL OR start_date >= ?11)
+		AND (?12 IS NULL OR start_date <= ?12)
+		AND (?13 IS NULL OR end_date >= ?13)
+		AND (?14 IS NULL OR end_date <= ?14)
 	)
 )
 SELECT id, total_count
@@ -325,6 +329,10 @@ type SearchProcessesParams struct {
 	HaveResults     interface{}
 	FinalResults    interface{}
 	ManuallyEnded   interface{}
+	StartDateAfter  interface{}
+	StartDateBefore interface{}
+	EndDateAfter    interface{}
+	EndDateBefore   interface{}
 }
 
 type SearchProcessesRow struct {
@@ -344,6 +352,10 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		arg.HaveResults,
 		arg.FinalResults,
 		arg.ManuallyEnded,
+		arg.StartDateAfter,
+		arg.StartDateBefore,
+		arg.EndDateAfter,
+		arg.EndDateBefore,
 	)
 	if err != nil {
 		return nil, err
