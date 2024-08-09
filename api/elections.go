@@ -148,7 +148,7 @@ func (a *API) enableElectionHandlers() error {
 //	@Accept			json
 //	@Produce		json
 //	@Param			page	path		number			true	"Page"
-//	@Param			body	body		ElectionParams	true	"Filtered by partial organizationId, partial electionId, election status and with results available or not"
+//	@Param			body	body		ElectionParams	true	"Filtered by exact organizationId, partial electionId, election status, results available or not, etc"
 //	@Success		200		{object}	ElectionsList
 //	@Router			/elections/filter/page/{page} [post]
 func (a *API) electionListByFilterAndPageHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
