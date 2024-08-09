@@ -326,6 +326,8 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 //	@Summary		Total number of accounts
 //	@Description	Returns the count of total number of existing accounts
+//	@Deprecated
+//	@Description	(deprecated, in favor of /accounts which reports totalItems)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
@@ -414,6 +416,8 @@ func (a *API) accountElectionsListByStatusAndPageHandler(_ *apirest.APIdata, ctx
 //
 //	@Summary		Count organization elections
 //	@Description	Returns the number of elections for an organization
+//	@Deprecated
+//	@Description	(deprecated, in favor of /elections?organizationId=xxx which reports totalItems)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json
@@ -504,6 +508,8 @@ func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //
 //	@Summary		Total number of sent and received transactions
 //	@Description	Returns the count of total number of sent and received transactions for an account. A transaction is a token transfer from one account to another existing account
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transfers?accountId=xxx which reports totalItems)
 //	@Tags			Accounts
 //	@Accept			json
 //	@Produce		json

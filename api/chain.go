@@ -364,6 +364,8 @@ func (a *API) sendOrganizationList(ctx *httprouter.HTTPContext, params *Organiza
 //
 //	@Summary		Count organizations
 //	@Description	Return the number of organizations
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/organizations which reports totalItems)
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
@@ -928,6 +930,8 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 //
 //	@Summary		Transactions count
 //	@Description	Returns the number of transactions
+//	@Deprecated
+//	@Description	(deprecated, in favor of /chain/transactions which reports totalItems)
 //	@Tags			Chain
 //	@Accept			json
 //	@Produce		json
