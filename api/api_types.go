@@ -23,12 +23,16 @@ type PaginationParams struct {
 // ElectionParams allows the client to filter elections
 type ElectionParams struct {
 	PaginationParams
-	OrganizationID string `json:"organizationId,omitempty"`
-	ElectionID     string `json:"electionId,omitempty"`
-	Status         string `json:"status,omitempty"`
-	WithResults    *bool  `json:"withResults,omitempty"`
-	FinalResults   *bool  `json:"finalResults,omitempty"`
-	ManuallyEnded  *bool  `json:"manuallyEnded,omitempty"`
+	OrganizationID  string     `json:"organizationId,omitempty"`
+	ElectionID      string     `json:"electionId,omitempty"`
+	Status          string     `json:"status,omitempty"`
+	WithResults     *bool      `json:"withResults,omitempty"`
+	FinalResults    *bool      `json:"finalResults,omitempty"`
+	ManuallyEnded   *bool      `json:"manuallyEnded,omitempty"`
+	StartDateAfter  *time.Time `json:"startDateAfter,omitempty"`
+	StartDateBefore *time.Time `json:"startDateBefore,omitempty"`
+	EndDateAfter    *time.Time `json:"endDateAfter,omitempty"`
+	EndDateBefore   *time.Time `json:"endDateBefore,omitempty"`
 }
 
 // OrganizationParams allows the client to filter organizations
