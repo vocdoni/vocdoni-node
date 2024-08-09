@@ -129,12 +129,13 @@ SELECT COUNT(DISTINCT entity_id) FROM processes;
 
 -- name: SearchEntities :many
 WITH results AS (
-    SELECT *,
-           COUNT(*) OVER() AS total_count
+    SELECT *
     FROM processes
     WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
 )
-SELECT entity_id, COUNT(id) AS process_count, total_count
+SELECT entity_id,
+	COUNT(id) AS process_count,
+	COUNT(entity_id) OVER() AS total_count
 FROM results
 GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC

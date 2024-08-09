@@ -218,12 +218,13 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 
 const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
-    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
-           COUNT(*) OVER() AS total_count
+    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended
     FROM processes
     WHERE (?3 = '' OR (INSTR(LOWER(HEX(entity_id)), ?3) > 0))
 )
-SELECT entity_id, COUNT(id) AS process_count, total_count
+SELECT entity_id,
+	COUNT(id) AS process_count,
+	COUNT(entity_id) OVER() AS total_count
 FROM results
 GROUP BY entity_id
 ORDER BY creation_time DESC, id ASC
