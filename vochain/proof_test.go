@@ -2,7 +2,6 @@ package vochain
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
@@ -225,7 +224,7 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 	cktxresp, _ = app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("checkTx failed: %s", cktxresp.Data))
+			t.Fatalf("checkTx failed: %s", cktxresp.Data)
 		}
 	} else {
 		if !expectedResult {
@@ -237,7 +236,7 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 	detxresp := app.deliverTx(txb)
 	if detxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("deliverTx failed: %s", detxresp.Data))
+			t.Fatalf("deliverTx failed: %s", detxresp.Data)
 		}
 	} else {
 		if !expectedResult {

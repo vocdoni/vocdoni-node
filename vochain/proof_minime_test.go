@@ -3,7 +3,6 @@ package vochain
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
@@ -137,7 +136,7 @@ func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr comm
 	cktxresp, _ = app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("checkTx failed: %s", cktxresp.Data))
+			t.Fatalf("checkTx failed: %s", cktxresp.Data)
 		}
 	} else {
 		if !expectedResult {
@@ -151,7 +150,7 @@ func testMinimeSendVotes(t *testing.T, s ethstorageproof.StorageProof, addr comm
 	detxresp := app.deliverTx(txb)
 	if detxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("deliverTx failed: %s", detxresp.Data))
+			t.Fatalf("deliverTx failed: %s", detxresp.Data)
 		}
 	} else {
 		if !expectedResult {
