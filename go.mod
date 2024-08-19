@@ -11,9 +11,9 @@ require (
 	github.com/VictoriaMetrics/metrics v1.24.0
 	github.com/arnaucube/go-blindsecp256k1 v0.0.0-20211204171003-644e7408753f
 	github.com/cockroachdb/pebble v1.1.2
-	github.com/cometbft/cometbft v1.0.0-alpha.1
-	github.com/cometbft/cometbft-db v0.9.1
-	github.com/cometbft/cometbft/api v1.0.0-alpha.1
+	github.com/cometbft/cometbft v1.0.0-rc1
+	github.com/cometbft/cometbft-db v0.12.0
+	github.com/cometbft/cometbft/api v1.0.0-rc.1
 	github.com/ethereum/go-ethereum v1.14.7
 	github.com/fatih/color v1.16.0
 	github.com/frankban/quicktest v1.14.6
@@ -78,7 +78,6 @@ require (
 	github.com/btcsuite/btcd/chaincfg/chainhash v1.0.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/ceramicnetwork/go-dag-jose v0.1.0 // indirect
-	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cheggaaa/pb v1.0.29 // indirect
 	github.com/chzyer/readline v1.5.1 // indirect
@@ -91,6 +90,7 @@ require (
 	github.com/consensys/gnark-crypto v0.12.1 // indirect
 	github.com/containerd/cgroups v1.1.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/cosmos/crypto v0.0.0-20240309083813-82ed2537802e // indirect
 	github.com/cosmos/gogoproto v1.5.0 // indirect
 	github.com/crackcomm/go-gitignore v0.0.0-20231225121904-e25f5bc08668 // indirect
 	github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c // indirect
@@ -101,9 +101,8 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.3.0 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
-	github.com/dgraph-io/badger/v2 v2.2007.4 // indirect
+	github.com/dgraph-io/badger/v4 v4.2.0 // indirect
 	github.com/dgraph-io/ristretto v0.1.1 // indirect
-	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elastic/gosigar v0.14.2 // indirect
@@ -134,6 +133,7 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/btree v1.1.2 // indirect
+	github.com/google/flatbuffers v2.0.8+incompatible // indirect
 	github.com/google/gopacket v1.1.19 // indirect
 	github.com/google/orderedcode v0.0.1 // indirect
 	github.com/google/pprof v0.0.0-20240509144519-723abb6459b7 // indirect
