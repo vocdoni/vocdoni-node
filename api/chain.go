@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 const (
@@ -588,6 +589,10 @@ func (a *API) chainTxCostHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	for k, v := range genesis.TxCostNameToTxTypeMap {
 		txCosts.Costs[k], err = a.vocapp.State.TxBaseCost(v, true)
 		if err != nil {
+			if errors.Is(err, state.ErrTxCostNotFound) {
+				txCosts.Costs[k] = 0
+				continue
+			}
 			return err
 		}
 	}
