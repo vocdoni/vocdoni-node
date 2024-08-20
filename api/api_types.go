@@ -54,6 +54,14 @@ type TransactionParams struct {
 	Type   string `json:"type,omitempty"`
 }
 
+// BlockParams allows the client to filter blocks
+type BlockParams struct {
+	PaginationParams
+	ChainID         string `json:"chainId,omitempty"`
+	Hash            string `json:"hash,omitempty"`
+	ProposerAddress string `json:"proposerAddress,omitempty"`
+}
+
 // FeesParams allows the client to filter fees
 type FeesParams struct {
 	PaginationParams
@@ -438,4 +446,10 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 type Block struct {
 	comettypes.Block `json:",inline"`
 	Hash             types.HexBytes `json:"hash" `
+}
+
+// BlockList is used to return a paginated list to the client
+type BlockList struct {
+	Blocks     []*indexertypes.Block `json:"blocks"`
+	Pagination *Pagination           `json:"pagination"`
 }

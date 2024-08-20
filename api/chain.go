@@ -179,6 +179,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/blocks",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainBlockListHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/filter/page/{page}",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -972,6 +980,63 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
+// chainBlockListHandler
+//
+//	@Summary		List all blocks
+//	@Description	Returns the list of blocks, ordered by descending height.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page			query		number	false	"Page"
+//	@Param			limit			query		number	false	"Items per page"
+//	@Param			chainId			query		string	false	"Filter by exact chainId"
+//	@Param			hash			query		string	false	"Filter by partial hash"
+//	@Param			proposerAddress	query		string	false	"Filter by exact proposerAddress"
+//	@Success		200				{object}	BlockList
+//	@Router			/chain/blocks [get]
+func (a *API) chainBlockListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseBlockParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamChainId),
+		ctx.QueryParam(ParamHash),
+		ctx.QueryParam(ParamProposerAddress),
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendBlockList(ctx, params)
+}
+
+// sendBlockList produces a filtered, paginated BlockList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendBlockList(ctx *httprouter.HTTPContext, params *BlockParams) error {
+	blocks, total, err := a.indexer.BlockList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.ChainID,
+		params.Hash,
+		params.ProposerAddress,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &BlockList{
+		Blocks:     blocks,
+		Pagination: pagination,
+	}
+	return marshalAndSend(ctx, list)
+}
+
 // chainTransactionCountHandler
 //
 //	@Summary		Transactions count
@@ -1318,5 +1383,20 @@ func parseTransactionParams(paramPage, paramLimit, paramHeight, paramType string
 		PaginationParams: pagination,
 		Height:           uint64(height),
 		Type:             paramType,
+	}, nil
+}
+
+// parseBlockParams returns an BlockParams filled with the passed params
+func parseBlockParams(paramPage, paramLimit, paramChainId, paramHash, paramProposerAddress string) (*BlockParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BlockParams{
+		PaginationParams: pagination,
+		ChainID:          paramChainId,
+		Hash:             util.TrimHex(paramHash),
+		ProposerAddress:  util.TrimHex(paramProposerAddress),
 	}, nil
 }
