@@ -176,17 +176,8 @@ type TxPackage struct {
 	Signature   types.HexBytes `json:"signature"`
 }
 
-// TxMetadata contains tx information for the TransactionList api
-type TxMetadata struct {
-	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"blockHeight,omitempty"`
-	Index       int32          `json:"index"`
-	Hash        types.HexBytes `json:"hash"`
-}
-
 // Transaction holds the db reference for a single transaction
 type Transaction struct {
-	Index        uint64         `json:"transactionNumber" format:"int64" example:"944"`
 	Hash         types.HexBytes `json:"transactionHash" swaggertype:"string" example:"75e8f822f5dd13973ac5158d600f0a2a5fea4bfefce9712ab5195bf17884cfad"`
 	BlockHeight  uint32         `json:"blockHeight" format:"int32" example:"64924"`
 	TxBlockIndex int32          `json:"transactionIndex" format:"int32" example:"0"`
@@ -195,7 +186,6 @@ type Transaction struct {
 
 func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
 	return &Transaction{
-		Index:        uint64(dbtx.ID),
 		Hash:         dbtx.Hash,
 		BlockHeight:  uint32(dbtx.BlockHeight),
 		TxBlockIndex: int32(dbtx.BlockIndex),

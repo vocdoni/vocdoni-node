@@ -108,14 +108,6 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/transactions/reference/index/{index}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxRefByIndexHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/blocks/{height}/transactions/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -711,36 +703,6 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		TxInfo:    *ref,
 	}
 	data, err := json.Marshal(tx)
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainTxRefByIndexHandler
-//
-//	@Summary		Transaction by index
-//	@Description	Get transaction by its index. This is not transaction reference (hash), and neither the block height and block  index. The transaction index is an incremental counter for each transaction.  You could use the transaction `block` and `index` to retrieve full info using [transaction by block and index](transaction-by-block-index).
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			index	path		int	true	"Index of the transaction"
-//	@Success		200		{object}	indexertypes.Transaction
-//	@Success		204		"See [errors](vocdoni-api#errors) section"
-//	@Router			/chain/transactions/reference/index/{index} [get]
-func (a *API) chainTxRefByIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	index, err := strconv.ParseUint(ctx.URLParam("index"), 10, 64)
-	if err != nil {
-		return err
-	}
-	ref, err := a.indexer.GetTransaction(index)
-	if err != nil {
-		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ErrTransactionNotFound
-		}
-		return ErrVochainGetTxFailed.WithErr(err)
-	}
-	data, err := json.Marshal(ref)
 	if err != nil {
 		return err
 	}
