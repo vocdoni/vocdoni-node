@@ -74,7 +74,6 @@ type TokenTransfer struct {
 }
 
 type Transaction struct {
-	ID          int64
 	Hash        types.Hash
 	BlockHeight int64
 	BlockIndex  int64

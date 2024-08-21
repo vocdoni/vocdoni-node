@@ -22,18 +22,6 @@ func (idx *Indexer) CountTotalTransactions() (uint64, error) {
 	return uint64(count), err
 }
 
-// GetTransaction fetches the txReference for the given tx height
-func (idx *Indexer) GetTransaction(id uint64) (*indexertypes.Transaction, error) {
-	sqlTxRef, err := idx.readOnlyQuery.GetTransaction(context.TODO(), int64(id))
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrTransactionNotFound
-		}
-		return nil, fmt.Errorf("tx with id %d not found: %v", id, err)
-	}
-	return indexertypes.TransactionFromDB(&sqlTxRef), nil
-}
-
 // GetTxReferenceByBlockHeightAndBlockIndex fetches the txReference for the given tx height and block tx index
 func (idx *Indexer) GetTxReferenceByBlockHeightAndBlockIndex(blockHeight, blockIndex int64) (*indexertypes.Transaction, error) {
 	sqlTxRef, err := idx.readOnlyQuery.GetTxReferenceByBlockHeightAndBlockIndex(context.TODO(), indexerdb.GetTxReferenceByBlockHeightAndBlockIndexParams{

@@ -1357,7 +1357,7 @@ func TestTxIndexer(t *testing.T) {
 
 	for i := 0; i < totalBlocks; i++ {
 		for j := 0; j < txsPerBlock; j++ {
-			ref, err := idx.GetTransaction(uint64(i*txsPerBlock + j + 1))
+			ref, err := idx.GetTxReferenceByBlockHeightAndBlockIndex(int64(i), int64(j))
 			qt.Assert(t, err, qt.IsNil)
 			qt.Assert(t, ref.BlockHeight, qt.Equals, uint32(i))
 			qt.Assert(t, ref.TxBlockIndex, qt.Equals, int32(j))
@@ -1375,8 +1375,6 @@ func TestTxIndexer(t *testing.T) {
 	txs, err := idx.GetLastTransactions(15, 0)
 	qt.Assert(t, err, qt.IsNil)
 	for i, tx := range txs {
-		// Index is between 1 and totalCount.
-		qt.Assert(t, tx.Index, qt.Equals, uint64(totalTxs-i))
 		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
 		qt.Assert(t, tx.BlockHeight, qt.Equals, uint32(totalTxs-i-1)/txsPerBlock)
 		qt.Assert(t, tx.TxBlockIndex, qt.Equals, int32(totalTxs-i-1)%txsPerBlock)
@@ -1386,7 +1384,6 @@ func TestTxIndexer(t *testing.T) {
 	txs, err = idx.GetLastTransactions(1, 5)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
-	qt.Assert(t, txs[0].Index, qt.Equals, uint64(95))
 }
 
 func TestCensusUpdate(t *testing.T) {

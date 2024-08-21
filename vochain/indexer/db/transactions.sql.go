@@ -50,7 +50,7 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 }
 
 const getLastTransactions = `-- name: GetLastTransactions :many
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type FROM transactions
 ORDER BY id DESC
 LIMIT ?
 OFFSET ?
@@ -71,7 +71,6 @@ func (q *Queries) GetLastTransactions(ctx context.Context, arg GetLastTransactio
 	for rows.Next() {
 		var i Transaction
 		if err := rows.Scan(
-			&i.ID,
 			&i.Hash,
 			&i.BlockHeight,
 			&i.BlockIndex,
@@ -90,27 +89,8 @@ func (q *Queries) GetLastTransactions(ctx context.Context, arg GetLastTransactio
 	return items, nil
 }
 
-const getTransaction = `-- name: GetTransaction :one
-SELECT id, hash, block_height, block_index, type FROM transactions
-WHERE id = ?
-LIMIT 1
-`
-
-func (q *Queries) GetTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.queryRow(ctx, q.getTransactionStmt, getTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.Hash,
-		&i.BlockHeight,
-		&i.BlockIndex,
-		&i.Type,
-	)
-	return i, err
-}
-
 const getTransactionByHash = `-- name: GetTransactionByHash :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type FROM transactions
 WHERE hash = ?
 LIMIT 1
 `
@@ -119,7 +99,6 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 	row := q.queryRow(ctx, q.getTransactionByHashStmt, getTransactionByHash, hash)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,
@@ -129,7 +108,7 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 }
 
 const getTxReferenceByBlockHeightAndBlockIndex = `-- name: GetTxReferenceByBlockHeightAndBlockIndex :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type FROM transactions
 WHERE block_height = ? AND block_index = ?
 LIMIT 1
 `
@@ -143,7 +122,6 @@ func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, 
 	row := q.queryRow(ctx, q.getTxReferenceByBlockHeightAndBlockIndexStmt, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,

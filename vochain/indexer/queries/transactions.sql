@@ -5,11 +5,6 @@ INSERT INTO transactions (
 	?, ?, ?, ?
 );
 
--- name: GetTransaction :one
-SELECT * FROM transactions
-WHERE id = ?
-LIMIT 1;
-
 -- name: GetTransactionByHash :one
 SELECT * FROM transactions
 WHERE hash = ?
