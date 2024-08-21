@@ -169,7 +169,16 @@ func (a *API) electionListByFilterAndPageHandler(msg *apirest.APIdata, ctx *http
 		return ErrMissingParameter
 	}
 
-	return a.sendElectionList(ctx, params)
+	list, err := a.electionList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyElectionsList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // electionListByFilterHandler
@@ -191,7 +200,16 @@ func (a *API) electionListByFilterHandler(msg *apirest.APIdata, ctx *httprouter.
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 
-	return a.sendElectionList(ctx, params)
+	list, err := a.electionList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyElectionsList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // electionListByPageHandler
@@ -213,7 +231,17 @@ func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 	if err != nil {
 		return err
 	}
-	return a.sendElectionList(ctx, params)
+
+	list, err := a.electionList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyElectionsList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // electionListHandler
@@ -251,21 +279,26 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-	return a.sendElectionList(ctx, params)
+
+	list, err := a.electionList(params)
+	if err != nil {
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
-// sendElectionList produces a filtered, paginated ElectionsList,
-// and sends it marshalled over ctx.Send
+// electionList produces a filtered, paginated ElectionsList.
 //
 // Errors returned are always of type APIerror.
-func (a *API) sendElectionList(ctx *httprouter.HTTPContext, params *ElectionParams) error {
+func (a *API) electionList(params *ElectionParams) (*ElectionsList, error) {
 	if params.OrganizationID != "" && !a.indexer.EntityExists(params.OrganizationID) {
-		return ErrOrgNotFound
+		return nil, ErrOrgNotFound
 	}
 
 	status, err := parseStatus(params.Status)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	eids, total, err := a.indexer.ProcessList(
@@ -285,12 +318,12 @@ func (a *API) sendElectionList(ctx *httprouter.HTTPContext, params *ElectionPara
 		params.EndDateBefore,
 	)
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 
 	pagination, err := calculatePagination(params.Page, params.Limit, total)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	list := &ElectionsList{
@@ -300,11 +333,11 @@ func (a *API) sendElectionList(ctx *httprouter.HTTPContext, params *ElectionPara
 	for _, eid := range eids {
 		e, err := a.indexer.ProcessInfo(eid)
 		if err != nil {
-			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
+			return nil, ErrCantFetchElection.Withf("(%x): %v", eid, err)
 		}
 		list.Elections = append(list.Elections, a.electionSummary(e))
 	}
-	return marshalAndSend(ctx, list)
+	return list, nil
 }
 
 // electionHandler
@@ -483,7 +516,17 @@ func (a *API) electionVotesListByPageHandler(_ *apirest.APIdata, ctx *httprouter
 	if err != nil {
 		return err
 	}
-	return a.sendVotesList(ctx, params)
+
+	list, err := a.votesList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyVotesList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // electionScrutinyHandler

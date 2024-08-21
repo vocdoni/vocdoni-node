@@ -121,10 +121,6 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrCantParseNumber,
 		},
 		{
-			args: args{"GET", nil, []string{"elections", "page", "1"}},
-			want: api.ErrPageNotFound,
-		},
-		{
 			args: args{"GET", nil, []string{"elections", "page", "-1"}},
 			want: api.ErrPageNotFound,
 		},

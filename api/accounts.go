@@ -367,7 +367,16 @@ func (a *API) accountElectionsListByPageHandler(_ *apirest.APIdata, ctx *httprou
 		return ErrMissingParameter
 	}
 
-	return a.sendElectionList(ctx, params)
+	list, err := a.electionList(params)
+	if err != nil {
+		// keep the odd legacy behaviour of sending an empty json "{}"" rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, struct{}{})
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // accountElectionsListByStatusAndPageHandler
@@ -398,7 +407,16 @@ func (a *API) accountElectionsListByStatusAndPageHandler(_ *apirest.APIdata, ctx
 		return ErrMissingParameter
 	}
 
-	return a.sendElectionList(ctx, params)
+	list, err := a.electionList(params)
+	if err != nil {
+		// keep the odd legacy behaviour of sending an empty json "{}"" rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, struct{}{})
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // accountElectionsCountHandler
@@ -458,7 +476,16 @@ func (a *API) tokenTransfersListHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 		return err
 	}
 
-	return a.sendTransfersList(ctx, params)
+	list, err := a.transfersList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyTransfersList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // tokenFeesHandler
@@ -490,7 +517,16 @@ func (a *API) tokenFeesHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		return ErrMissingParameter
 	}
 
-	return a.sendFeesList(ctx, params)
+	list, err := a.feesList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyFeesList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // tokenTransfersCountHandler
@@ -546,7 +582,17 @@ func (a *API) accountListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 	if err != nil {
 		return err
 	}
-	return a.sendAccountList(ctx, params)
+
+	list, err := a.accountList(params)
+	if err != nil {
+		// keep legacy behaviour of sending an empty list rather than a 404
+		if errors.Is(err, ErrPageNotFound) {
+			return marshalAndSend(ctx, emptyAccountsList())
+		}
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
 // accountListHandler
@@ -570,33 +616,38 @@ func (a *API) accountListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	if err != nil {
 		return err
 	}
-	return a.sendAccountList(ctx, params)
+
+	list, err := a.accountList(params)
+	if err != nil {
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
-// sendAccountList produces a paginated AccountsList,
-// and sends it marshalled over ctx.Send
+// accountList produces a paginated AccountsList.
 //
 // Errors returned are always of type APIerror.
-func (a *API) sendAccountList(ctx *httprouter.HTTPContext, params *AccountParams) error {
+func (a *API) accountList(params *AccountParams) (*AccountsList, error) {
 	accounts, total, err := a.indexer.AccountList(
 		params.Limit,
 		params.Page*params.Limit,
 		params.AccountID,
 	)
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 
 	pagination, err := calculatePagination(params.Page, params.Limit, total)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	list := &AccountsList{
 		Accounts:   accounts,
 		Pagination: pagination,
 	}
-	return marshalAndSend(ctx, list)
+	return list, nil
 }
 
 // parseAccountParams returns an AccountParams filled with the passed params

@@ -218,16 +218,21 @@ func (a *API) votesListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	if err != nil {
 		return err
 	}
-	return a.sendVotesList(ctx, params)
+
+	list, err := a.votesList(params)
+	if err != nil {
+		return err
+	}
+
+	return marshalAndSend(ctx, list)
 }
 
-// sendVotesList produces a filtered, paginated VotesList,
-// and sends it marshalled over ctx.Send
+// votesList produces a filtered, paginated VotesList.
 //
 // Errors returned are always of type APIerror.
-func (a *API) sendVotesList(ctx *httprouter.HTTPContext, params *VoteParams) error {
+func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 	if params.ElectionID != "" && !a.indexer.ProcessExists(params.ElectionID) {
-		return ErrElectionNotFound
+		return nil, ErrElectionNotFound
 	}
 
 	votes, total, err := a.indexer.VoteList(
@@ -237,12 +242,12 @@ func (a *API) sendVotesList(ctx *httprouter.HTTPContext, params *VoteParams) err
 		"",
 	)
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 
 	pagination, err := calculatePagination(params.Page, params.Limit, total)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	list := &VotesList{
@@ -259,7 +264,7 @@ func (a *API) sendVotesList(ctx *httprouter.HTTPContext, params *VoteParams) err
 			TransactionIndex: &vote.TxIndex,
 		})
 	}
-	return marshalAndSend(ctx, list)
+	return list, nil
 }
 
 // parseVoteParams returns an VoteParams filled with the passed params
