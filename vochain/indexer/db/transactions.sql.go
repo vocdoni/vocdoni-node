@@ -47,27 +47,8 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 	)
 }
 
-const getTransaction = `-- name: GetTransaction :one
-SELECT id, hash, block_height, block_index, type FROM transactions
-WHERE id = ?
-LIMIT 1
-`
-
-func (q *Queries) GetTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.queryRow(ctx, q.getTransactionStmt, getTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.Hash,
-		&i.BlockHeight,
-		&i.BlockIndex,
-		&i.Type,
-	)
-	return i, err
-}
-
 const getTransactionByHash = `-- name: GetTransactionByHash :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type FROM transactions
 WHERE hash = ?
 LIMIT 1
 `
@@ -76,7 +57,6 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 	row := q.queryRow(ctx, q.getTransactionByHashStmt, getTransactionByHash, hash)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,
@@ -86,7 +66,7 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 }
 
 const getTxReferenceByBlockHeightAndBlockIndex = `-- name: GetTxReferenceByBlockHeightAndBlockIndex :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type FROM transactions
 WHERE block_height = ? AND block_index = ?
 LIMIT 1
 `
@@ -100,7 +80,6 @@ func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, 
 	row := q.queryRow(ctx, q.getTxReferenceByBlockHeightAndBlockIndexStmt, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,
@@ -111,16 +90,16 @@ func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, 
 
 const searchTransactions = `-- name: SearchTransactions :many
 WITH results AS (
-  SELECT id, hash, block_height, block_index, type
+  SELECT hash, block_height, block_index, type
   FROM transactions
   WHERE (
     (?3 = 0 OR block_height = ?3)
     AND (?4 = '' OR LOWER(type) = LOWER(?4))
   )
 )
-SELECT id, hash, block_height, block_index, type, COUNT(*) OVER() AS total_count
+SELECT hash, block_height, block_index, type, COUNT(*) OVER() AS total_count
 FROM results
-ORDER BY id DESC
+ORDER BY block_height DESC, block_index DESC
 LIMIT ?2
 OFFSET ?1
 `
@@ -133,7 +112,6 @@ type SearchTransactionsParams struct {
 }
 
 type SearchTransactionsRow struct {
-	ID          int64
 	Hash        []byte
 	BlockHeight int64
 	BlockIndex  int64
@@ -156,7 +134,6 @@ func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactions
 	for rows.Next() {
 		var i SearchTransactionsRow
 		if err := rows.Scan(
-			&i.ID,
 			&i.Hash,
 			&i.BlockHeight,
 			&i.BlockIndex,

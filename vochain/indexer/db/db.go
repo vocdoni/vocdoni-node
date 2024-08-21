@@ -81,9 +81,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getTokenTransferStmt, err = db.PrepareContext(ctx, getTokenTransfer); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTokenTransfer: %w", err)
 	}
-	if q.getTransactionStmt, err = db.PrepareContext(ctx, getTransaction); err != nil {
-		return nil, fmt.Errorf("error preparing query GetTransaction: %w", err)
-	}
 	if q.getTransactionByHashStmt, err = db.PrepareContext(ctx, getTransactionByHash); err != nil {
 		return nil, fmt.Errorf("error preparing query GetTransactionByHash: %w", err)
 	}
@@ -232,11 +229,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getTokenTransferStmt: %w", cerr)
 		}
 	}
-	if q.getTransactionStmt != nil {
-		if cerr := q.getTransactionStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing getTransactionStmt: %w", cerr)
-		}
-	}
 	if q.getTransactionByHashStmt != nil {
 		if cerr := q.getTransactionByHashStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getTransactionByHashStmt: %w", cerr)
@@ -375,7 +367,6 @@ type Queries struct {
 	getProcessIDsByFinalResultsStmt              *sql.Stmt
 	getProcessStatusStmt                         *sql.Stmt
 	getTokenTransferStmt                         *sql.Stmt
-	getTransactionStmt                           *sql.Stmt
 	getTransactionByHashStmt                     *sql.Stmt
 	getTxReferenceByBlockHeightAndBlockIndexStmt *sql.Stmt
 	getVoteStmt                                  *sql.Stmt
@@ -417,7 +408,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getProcessIDsByFinalResultsStmt:  q.getProcessIDsByFinalResultsStmt,
 		getProcessStatusStmt:             q.getProcessStatusStmt,
 		getTokenTransferStmt:             q.getTokenTransferStmt,
-		getTransactionStmt:               q.getTransactionStmt,
 		getTransactionByHashStmt:         q.getTransactionByHashStmt,
 		getTxReferenceByBlockHeightAndBlockIndexStmt: q.getTxReferenceByBlockHeightAndBlockIndexStmt,
 		getVoteStmt:                    q.getVoteStmt,
