@@ -7,33 +7,18 @@ INSERT INTO token_fees (
 	?, ?, ?
 );
 
--- name: GetTokenFees :many
-SELECT * FROM token_fees
+-- name: SearchTokenFees :many
+WITH results AS (
+  SELECT *
+  FROM token_fees
+  WHERE (
+    (sqlc.arg(from_account) = '' OR LOWER(HEX(from_account)) = LOWER(sqlc.arg(from_account)))
+    AND (sqlc.arg(tx_type) = '' OR LOWER(tx_type) = LOWER(sqlc.arg(tx_type)))
+    AND (sqlc.arg(reference) = '' OR LOWER(reference) = LOWER(sqlc.arg(reference)))
+  )
+)
+SELECT *, COUNT(*) OVER() AS total_count
+FROM results
 ORDER BY spend_time DESC
 LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
-
--- name: GetTokenFeesByFromAccount :many
-SELECT * FROM token_fees
-WHERE from_account = sqlc.arg(from_account)
-ORDER BY spend_time DESC
-LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
-
--- name: GetTokenFeesByTxType :many
-SELECT * FROM token_fees
-WHERE tx_type = sqlc.arg(tx_type)
-ORDER BY spend_time DESC
-LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
-
--- name: GetTokenFeesByReference :many
-SELECT * FROM token_fees
-WHERE reference = sqlc.arg(reference)
-ORDER BY spend_time DESC
-LIMIT sqlc.arg(limit)
-OFFSET sqlc.arg(offset)
-;
+OFFSET sqlc.arg(offset);

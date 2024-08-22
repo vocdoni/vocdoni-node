@@ -181,8 +181,22 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					}
 					cost = t.txCostIncreaseCensusSize(process, tx.GetCensusSize())
 				}
-				// update process census
+				// update process census on state
 				if err := t.state.SetProcessCensus(tx.ProcessId, tx.CensusRoot, tx.GetCensusURI(), tx.GetCensusSize(), true); err != nil {
+					return nil, fmt.Errorf("setProcessCensus: %s", err)
+				}
+			case models.TxType_SET_PROCESS_DURATION:
+				if tx.GetDuration() == 0 {
+					return nil, fmt.Errorf("setProcessDuration: duration cannot be 0")
+				}
+				// if duration is increased, cost must be applied
+				process, err := t.state.Process(tx.ProcessId, false)
+				if err != nil {
+					return nil, fmt.Errorf("setProcessDuration: %s", err)
+				}
+				cost = t.txCostIncreaseDuration(process, tx.GetDuration())
+				// update process duration on state
+				if err := t.state.SetProcessDuration(tx.ProcessId, tx.GetDuration(), true); err != nil {
 					return nil, fmt.Errorf("setProcessCensus: %s", err)
 				}
 			default:

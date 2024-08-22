@@ -150,19 +150,18 @@ func (t *E2EDynamicensusElection) Run() error {
 		log.Debugf("election details before set a new census: %s %s %x", t.elections[0].election.Census.CensusOrigin,
 			t.elections[0].election.Census.CensusURL, t.elections[0].election.Census.CensusRoot)
 
-		hash, err := api.TransactionSetCensus(electionID, vapi.ElectionCensus{
+		hash, err := api.SetElectionCensus(electionID, vapi.ElectionCensus{
 			CensusOrigin: "OFF_CHAIN_TREE_WEIGHTED",
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",
 		})
-
 		if err != nil {
 			errCh <- fmt.Errorf("unexpected error from set process census %s", err)
 			return
 		}
 		log.Debugw("process census set", "tx hash:", hash)
 
-		ctx, cancel := context.WithTimeout(context.Background(), apiclient.WaitTimeout*3)
+		ctx, cancel := context.WithTimeout(context.Background(), t.elections[0].config.timeout)
 		defer cancel()
 		if _, err := api.WaitUntilTxIsMined(ctx, hash); err != nil {
 			errCh <- fmt.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
@@ -212,7 +211,6 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		log.Infof("election %s status is RESULTS", electionID.String())
 		log.Infof("election results: %v %x %s", elres.Results, elres.CensusRoot, t.elections[0].election.Census.CensusURL)
-
 	}()
 
 	// election with dynamic census disabled
@@ -261,7 +259,7 @@ func (t *E2EDynamicensusElection) Run() error {
 
 		log.Debugf("election details before: %s %s %x", t.elections[1].election.Census.CensusOrigin, t.elections[1].election.Census.CensusURL, t.elections[1].election.Census.CensusRoot)
 
-		if _, err := api.TransactionSetCensus(election.ElectionID, vapi.ElectionCensus{
+		if _, err := api.SetElectionCensus(election.ElectionID, vapi.ElectionCensus{
 			CensusOrigin: "OFF_CHAIN_TREE_WEIGHTED",
 			CensusRoot:   censusRoot2,
 			CensusURL:    "http://test/census",

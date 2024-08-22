@@ -16,9 +16,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
-)
+var emptyVotesRoot = make([]byte, StateChildTreeCfg(ChildTreeVotes).HashFunc().Len())
 
 // AddProcess adds a new process to the vochain.  Adding a process with a
 // ProcessId that already exists will return an error.
@@ -93,6 +91,9 @@ func getProcess(mainTreeView statedb.TreeViewer, pid []byte) (*models.Process, e
 	err = proto.Unmarshal(processBytes, &process)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal process (%s): %w", pid, err)
+	}
+	if process.Process == nil {
+		return nil, fmt.Errorf("process %x is nil", pid)
 	}
 	return process.Process, nil
 }
@@ -278,6 +279,54 @@ func (v *State) SetProcessStatus(pid []byte, newstatus models.ProcessStatus, com
 	return nil
 }
 
+// SetProcessDuration sets the duration for a given process.
+// If commit is true, the change is committed to the state and the event listeners are called.
+// The new duration must be greater than zero and different from the current one. If the process is
+// not interruptible, the new duration must be greater than the current one.
+// The process must be in READY or PAUSED status.
+func (v *State) SetProcessDuration(pid []byte, newDurationSeconds uint32, commit bool) error {
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+	currentTime, err := v.Timestamp(false)
+	if err != nil {
+		return fmt.Errorf("setProcessStatus: cannot get current timestamp: %w", err)
+	}
+
+	if newDurationSeconds == 0 {
+		return fmt.Errorf("cannot set duration to zero")
+	}
+
+	if newDurationSeconds == process.Duration {
+		return fmt.Errorf("cannot set duration to the same value")
+	}
+
+	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
+		return fmt.Errorf("cannot set duration, invalid status: %s", process.Status)
+	}
+
+	if currentTime >= process.StartTime+newDurationSeconds {
+		return fmt.Errorf("cannot set duration to a value that has already passed")
+	}
+
+	if !process.Mode.Interruptible && newDurationSeconds < process.Duration {
+		return fmt.Errorf("cannot shorten duration of non-interruptible process")
+	}
+
+	// If all checks pass, the transition is valid
+	if commit {
+		process.Duration = newDurationSeconds
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+		for _, l := range v.eventListeners {
+			l.OnProcessDurationChange(process.ProcessId, newDurationSeconds, v.txCounter.Load())
+		}
+	}
+	return nil
+}
+
 // SetProcessResults sets the results for a given process and calls the event listeners.
 func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult) error {
 	process, err := v.Process(pid, false)
@@ -326,8 +375,8 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if err != nil {
 		return err
 	}
-	// check dynamic census only if root is being updated
-	if censusRoot != nil {
+	// check dynamic census only if root or uri are being updated
+	if (censusRoot != nil && !bytes.Equal(process.CensusRoot, censusRoot)) || (censusURI != "" && censusURI != *process.CensusURI) {
 		if !process.Mode.DynamicCensus {
 			return fmt.Errorf(
 				"cannot update census, only processes with dynamic census can update their root")
@@ -361,6 +410,8 @@ func (v *State) SetProcessCensus(pid, censusRoot []byte, censusURI string, censu
 	if commit {
 		if censusRoot != nil {
 			process.CensusRoot = censusRoot
+		}
+		if censusURI != "" {
 			process.CensusURI = &censusURI
 		}
 		if censusSize > 0 {

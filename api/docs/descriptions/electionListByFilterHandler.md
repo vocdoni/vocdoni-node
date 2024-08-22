@@ -12,3 +12,5 @@ Returns a filtered list of elections. The filters have to be sent on the request
 `electionId` can be partial. 
 
 See [elections list](elections-list)
+
+(deprecated, in favor of /elections?page=xxx&organizationId=xxx&status=xxx)

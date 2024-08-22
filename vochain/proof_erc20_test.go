@@ -3,7 +3,6 @@ package vochain
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"testing"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
@@ -64,7 +63,8 @@ func TestEthProof(t *testing.T) {
 }
 
 func testEthSendVotes(t *testing.T, s testStorageProof,
-	pid []byte, vp []byte, app *BaseApplication, expectedResult bool) {
+	pid []byte, vp []byte, app *BaseApplication, expectedResult bool,
+) {
 	cktx := new(cometabcitypes.CheckTxRequest)
 	var cktxresp *cometabcitypes.CheckTxResponse
 	var stx models.SignedTx
@@ -116,7 +116,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 	cktxresp, _ = app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("checkTx failed: %s", cktxresp.Data))
+			t.Fatalf("checkTx failed: %s", cktxresp.Data)
 		}
 	} else {
 		if !expectedResult {
@@ -131,7 +131,7 @@ func testEthSendVotes(t *testing.T, s testStorageProof,
 	detxresp := app.deliverTx(txb)
 	if detxresp.Code != 0 {
 		if expectedResult {
-			t.Fatalf(fmt.Sprintf("deliverTx failed: %s", detxresp.Data))
+			t.Fatalf("deliverTx failed: %s", detxresp.Data)
 		}
 	} else {
 		if !expectedResult {

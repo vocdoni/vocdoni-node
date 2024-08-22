@@ -21,10 +21,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-var (
-	// keys; not constants because of []byte
-	voteCountKey = []byte("voteCount")
-)
+// keys; not constants because of []byte
+var voteCountKey = []byte("voteCount")
 
 // Vote represents a vote in the Vochain state.
 type Vote struct {
@@ -297,7 +295,8 @@ func (s *State) VoteExists(processID, nullifier []byte, committed bool) (bool, e
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last committed version.
 func (s *State) iterateVotes(processID []byte,
-	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool) error {
+	fn func(vid []byte, sdbVote *models.StateDBVote) bool, committed bool,
+) error {
 	if !committed {
 		s.tx.RLock()
 		defer s.tx.RUnlock()
@@ -352,7 +351,8 @@ func (s *State) CountVotes(processID []byte, committed bool) (uint64, error) {
 // data from the currently open StateDB transaction.
 // When committed is true, the operation is executed on the last committed version.
 func (s *State) EnvelopeList(processID []byte, from, listSize int,
-	committed bool) (nullifiers [][]byte) {
+	committed bool,
+) (nullifiers [][]byte) {
 	idx := 0
 	s.iterateVotes(processID, func(vid []byte, sdbVote *models.StateDBVote) bool {
 		if idx >= from+listSize {

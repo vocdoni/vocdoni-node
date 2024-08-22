@@ -30,9 +30,21 @@ func init() {
 		example: os.Args[0] + " --operation=tokentxs " +
 			"--host http://127.0.0.1:9090/v2",
 	}
+
+	ops["createaccts"] = operation{
+		testFunc: func() VochainTest {
+			return &E2ECreateAccts{}
+		},
+		description: "Creates N accounts",
+		example: os.Args[0] + " --operation=createaccts --votes=1000  " +
+			"--host http://127.0.0.1:9090/v2",
+	}
 }
 
-var _ VochainTest = (*E2ETokenTxs)(nil)
+var (
+	_ VochainTest = (*E2ETokenTxs)(nil)
+	_ VochainTest = (*E2ECreateAccts)(nil)
+)
 
 type E2ETokenTxs struct {
 	api    *apiclient.HTTPclient
@@ -41,6 +53,8 @@ type E2ETokenTxs struct {
 	alice, bob *ethereum.SignKeys
 	aliceFP    *models.FaucetPackage
 }
+
+type E2ECreateAccts struct{ e2eElection }
 
 func (t *E2ETokenTxs) Setup(api *apiclient.HTTPclient, config *config) error {
 	t.api = api
@@ -80,7 +94,7 @@ func (*E2ETokenTxs) Teardown() error {
 
 func (t *E2ETokenTxs) Run() error {
 	// check send tokens
-	if err := testSendTokens(t.api, t.alice, t.bob); err != nil {
+	if err := testSendTokens(t.api, t.alice, t.bob, t.config.timeout); err != nil {
 		return fmt.Errorf("error in testSendTokens: %w", err)
 	}
 
@@ -129,7 +143,7 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	return nil
 }
 
-func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.SignKeys) error {
+func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.SignKeys, timeout time.Duration) error {
 	// if both alice and bob start with 50 tokens each
 	// alice sends 19 to bob
 	// and bob sends 23 to alice
@@ -207,7 +221,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		log.Infof("alice sent %d tokens to bob", amountAtoB)
 		log.Debugf("tx hash is %x", txhasha)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		txrefa, err := api.WaitUntilTxIsMined(ctx, txhasha)
 		if err != nil {
@@ -229,7 +243,7 @@ func testSendTokens(api *apiclient.HTTPclient, aliceKeys, bobKeys *ethereum.Sign
 		log.Infof("bob sent %d tokens to alice", amountBtoA)
 		log.Debugf("tx hash is %x", txhashb)
 
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		txrefb, err := api.WaitUntilTxIsMined(ctx, txhashb)
 		if err != nil {
@@ -315,14 +329,12 @@ func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address)
 	if err != nil {
 		return err
 	}
-	countTokenTxs := uint64(len(tokenTxs.Received) + len(tokenTxs.Sent))
-
 	count, err := api.CountTokenTransfers(address)
 	if err != nil {
 		return err
 	}
-	if count != countTokenTxs {
-		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, countTokenTxs)
+	if count != tokenTxs.Pagination.TotalItems {
+		return fmt.Errorf("expected %s to match transfers count %d and %d", address, count, tokenTxs.Pagination.TotalItems)
 	}
 
 	log.Infow("current transfers count", "account", address.String(), "count", count)
@@ -330,7 +342,8 @@ func checkTokenTransfersCount(api *apiclient.HTTPclient, address common.Address)
 }
 
 func ensureAccountExists(api *apiclient.HTTPclient,
-	faucetPkg *models.FaucetPackage) (*apipkg.Account, error) {
+	faucetPkg *models.FaucetPackage,
+) (*apipkg.Account, error) {
 	for i := 0; i < retries; i++ {
 		acct, err := api.Account("")
 		if err != nil {
@@ -380,4 +393,33 @@ func ensureAccountMetadataEquals(api *apiclient.HTTPclient, metadata *apipkg.Acc
 		_ = api.WaitUntilNextBlock()
 	}
 	return nil, fmt.Errorf("cannot set account %s metadata after %d retries", api.MyAddress(), retries)
+}
+
+func (t *E2ECreateAccts) Setup(api *apiclient.HTTPclient, c *config) error {
+	t.api = api
+	t.config = c
+
+	return nil
+}
+
+func (*E2ECreateAccts) Teardown() error {
+	// nothing to do here
+	return nil
+}
+
+func (t *E2ECreateAccts) Run() error {
+	startTime := time.Now()
+
+	voterAccounts := ethereum.NewSignKeysBatch(t.config.nvotes)
+	if err := t.registerAnonAccts(voterAccounts); err != nil {
+		return err
+	}
+
+	log.Infow("accounts created successfully",
+		"n", t.config.nvotes, "time", time.Since(startTime),
+		"vps", int(float64(t.config.nvotes)/time.Since(startTime).Seconds()))
+
+	log.Infof("voterAccounts: %d", len(voterAccounts))
+
+	return nil
 }

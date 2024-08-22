@@ -10,12 +10,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-type Account struct {
-	Account types.AccountID
-	Balance int64
-	Nonce   int64
-}
-
 type Block struct {
 	Height   int64
 	Time     time.Time
@@ -51,16 +45,6 @@ type Process struct {
 	SourceBlockHeight  int64
 	SourceNetworkID    int64
 	ManuallyEnded      bool
-}
-
-type TokenFee struct {
-	ID          int64
-	BlockHeight int64
-	FromAccount []byte
-	Reference   string
-	Cost        int64
-	TxType      string
-	SpendTime   time.Time
 }
 
 type TokenTransfer struct {

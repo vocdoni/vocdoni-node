@@ -21,6 +21,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -86,7 +87,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
 
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false)
+	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, 0)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -189,9 +190,9 @@ func TestAPIaccount(t *testing.T) {
 	err := json.Unmarshal(resp, &countAccts)
 	qt.Assert(t, err, qt.IsNil)
 
-	// 2 accounts must exist: the previously new created account and the auxiliary
+	// 3 accounts must exist: the previously new created account plus burn + faucet
 	// account used to transfer to the new account
-	qt.Assert(t, countAccts.Count, qt.Equals, uint64(2))
+	qt.Assert(t, countAccts.Count, qt.Equals, uint64(3))
 
 	// get the accounts info
 	resp, code = c.Request("GET", nil, "accounts", "page", "0")
@@ -213,7 +214,80 @@ func TestAPIaccount(t *testing.T) {
 
 	// compare the balance expected for the new account in the account list
 	qt.Assert(t, gotAcct.Balance, qt.Equals, initBalance)
+}
 
+func TestAPIAccountsList(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+
+	// create new accounts
+	for nonce := uint32(0); nonce < 20; nonce++ {
+		createAccount(t, c, server, uint64(80))
+	}
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// Get the list and check it
+	fetchAL := func(method string, jsonBody any, query string, urlPath ...string) api.AccountsList {
+		resp, code := c.RequestWithQuery(method, jsonBody, query, urlPath...)
+		list := api.AccountsList{}
+		qt.Assert(t, code, qt.Equals, 200)
+		err := json.Unmarshal(resp, &list)
+		qt.Assert(t, err, qt.IsNil)
+		return list
+	}
+
+	el := make(map[string]api.AccountsList)
+	el["0"] = fetchAL("GET", nil, "", "accounts")
+	el["1"] = fetchAL("GET", nil, "page=1", "accounts")
+	el["p0"] = fetchAL("GET", nil, "", "accounts", "page", "0")
+	el["p1"] = fetchAL("GET", nil, "", "accounts", "page", "1")
+
+	qt.Assert(t, el["0"], qt.Not(qt.DeepEquals), el["1"])
+	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
+	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
+
+	// 2 accounts pre-exist: the faucet account, and the burn address
+	qt.Assert(t, el["0"].Pagination.TotalItems, qt.Equals, uint64(2+20))
+	qt.Assert(t, el["1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+	qt.Assert(t, el["p0"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+	qt.Assert(t, el["p1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+
+	for _, item := range el {
+		qt.Assert(t, len(item.Accounts), qt.Equals, api.DefaultItemsPerPage)
+	}
+
+	// test different `limit` params
+	el["p0l2"] = fetchAL("GET", nil, "page=0&limit=2", "accounts")
+	qt.Assert(t, len(el["p0l2"].Accounts), qt.Equals, 2)
+	qt.Assert(t, el["p0l2"].Pagination.CurrentPage, qt.Equals, uint64(0))
+	qt.Assert(t, el["p0l2"].Pagination.LastPage, qt.Equals, uint64(10))
+	qt.Assert(t, *el["p0l2"].Pagination.NextPage, qt.Equals, uint64(1))
+	qt.Assert(t, el["p0l2"].Pagination.PreviousPage, qt.IsNil)
+	qt.Assert(t, el["p0l2"].Pagination.TotalItems, qt.Equals, uint64(2+20))
+
+	el["p1l3"] = fetchAL("GET", nil, "page=1&limit=3", "accounts")
+	qt.Assert(t, len(el["p1l3"].Accounts), qt.Equals, 3)
+	qt.Assert(t, el["p1l3"].Pagination.CurrentPage, qt.Equals, uint64(1))
+	qt.Assert(t, el["p1l3"].Pagination.LastPage, qt.Equals, uint64(7))
+	qt.Assert(t, *el["p1l3"].Pagination.NextPage, qt.Equals, uint64(2))
+	qt.Assert(t, *el["p1l3"].Pagination.PreviousPage, qt.Equals, uint64(0))
+	qt.Assert(t, el["p1l3"].Pagination.TotalItems, qt.Equals, uint64(2+20))
 }
 
 func TestAPIElectionCost(t *testing.T) {
@@ -228,7 +302,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		10000, 5000,
 		5, 1000,
-		6)
+		2)
 
 	// bigger census size, duration, reduced network capacity, etc
 	runAPIElectionCostWithParams(t,
@@ -241,7 +315,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		200000, 6000,
 		10, 100,
-		762)
+		753)
 
 	// very expensive election
 	runAPIElectionCostWithParams(t,
@@ -254,7 +328,7 @@ func TestAPIElectionCost(t *testing.T) {
 		},
 		100000, 700000,
 		10, 100,
-		547026)
+		547017)
 }
 
 func TestAPIAccountTokentxs(t *testing.T) {
@@ -317,9 +391,7 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	tokenTxs := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
+	tokenTxs := &api.TransfersList{}
 	err := json.Unmarshal(resp, tokenTxs)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -333,18 +405,14 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	err = json.Unmarshal(resp, &countTnsAcc)
 	qt.Assert(t, err, qt.IsNil)
 
-	totalTokenTxs := uint64(len(tokenTxs.Transfers.Received) + len(tokenTxs.Transfers.Sent))
-
 	// compare count of total token transfers for the account 1 using the two response
-	qt.Assert(t, totalTokenTxs, qt.Equals, countTnsAcc.Count)
+	qt.Assert(t, tokenTxs.Pagination.TotalItems, qt.Equals, countTnsAcc.Count)
 
 	// get the token transfers received and sent for account 2
 	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	tokenTxs2 := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
+	tokenTxs2 := &api.TransfersList{}
 	err = json.Unmarshal(resp, tokenTxs2)
 	qt.Assert(t, err, qt.IsNil)
 
@@ -358,9 +426,8 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	err = json.Unmarshal(resp, &countTnsAcc2)
 	qt.Assert(t, err, qt.IsNil)
 
-	totalTokenTxs2 := uint64(len(tokenTxs2.Transfers.Received) + len(tokenTxs2.Transfers.Sent))
 	// compare count of total token transfers for the account 2 using the two response
-	qt.Assert(t, totalTokenTxs2, qt.Equals, countTnsAcc2.Count)
+	qt.Assert(t, tokenTxs2.Pagination.TotalItems, qt.Equals, countTnsAcc2.Count)
 
 	resp, code = c.Request("GET", nil, "accounts", "page", "0")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
@@ -382,7 +449,8 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, gotAcct2.Address.String(), qt.Equals, hex.EncodeToString(signer2.Address().Bytes()))
 
 	// compare the balance expected for the account 2 in the account list
-	qt.Assert(t, gotAcct2.Balance, qt.Equals, initBalance+amountAcc1toAcct2-amountAcc2toAcct1)
+	txBasePrice := genesis.DefaultTransactionCosts().SendTokens
+	qt.Assert(t, gotAcct2.Balance, qt.Equals, initBalance+amountAcc1toAcct2-amountAcc2toAcct1-uint64(txBasePrice))
 
 	gotAcct1 := accts.Accounts[2]
 
@@ -390,8 +458,7 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, gotAcct1.Address.String(), qt.Equals, hex.EncodeToString(signer.Address().Bytes()))
 
 	// compare the balance expected for the account 1 in the account list
-	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2)
-
+	qt.Assert(t, gotAcct1.Balance, qt.Equals, initBalance+amountAcc2toAcct1-amountAcc1toAcct2-uint64(txBasePrice))
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
@@ -418,6 +485,7 @@ func runAPIElectionCostWithParams(t *testing.T,
 	err = server.VochainAPP.State.SetElectionPriceCalc()
 	qt.Assert(t, err, qt.IsNil)
 	server.VochainAPP.State.ElectionPriceCalc.SetCapacity(networkCapacity)
+	server.VochainAPP.State.ElectionPriceCalc.SetBasePrice(1)
 
 	// Block 1
 	server.VochainAPP.AdvanceTestBlock()
@@ -441,7 +509,7 @@ func runAPIElectionCostWithParams(t *testing.T,
 	qt.Assert(t, requestAccount(t, c, signer.Address().String()).Balance,
 		qt.Equals, initialBalance)
 
-	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID(), false)
+	createElection(t, c, signer, electionParams, censusRoot, startBlock, server.VochainAPP.ChainID(), false, 0)
 
 	// Block 3
 	server.VochainAPP.AdvanceTestBlock()
@@ -507,6 +575,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	startBlock uint32,
 	chainID string,
 	encryptedMetadata bool,
+	nonce uint32,
 ) api.ElectionCreate {
 	metadataBytes, err := json.Marshal(
 		&api.ElectionMetadata{
@@ -529,7 +598,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	tx := models.Tx_NewProcess{
 		NewProcess: &models.NewProcessTx{
 			Txtype: models.TxType_NEW_PROCESS,
-			Nonce:  0,
+			Nonce:  nonce,
 			Process: &models.Process{
 				StartBlock:   startBlock,
 				BlockCount:   electionParams.ElectionDuration,
@@ -586,7 +655,8 @@ func predictPriceForElection(t testing.TB, c *testutil.TestHTTPclient, electionP
 }
 
 func createAccount(t testing.TB, c *testutil.TestHTTPclient,
-	server testcommon.APIserver, initialBalance uint64) *ethereum.SignKeys {
+	server testcommon.APIserver, initialBalance uint64,
+) *ethereum.SignKeys {
 	signer := ethereum.SignKeys{}
 	qt.Assert(t, signer.Generate(), qt.IsNil)
 
@@ -633,7 +703,8 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 }
 
 func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
-	signerFrom, signerTo *ethereum.SignKeys, chainID string, nonce uint32, amount uint64) {
+	signerFrom, signerTo *ethereum.SignKeys, chainID string, nonce uint32, amount uint64,
+) {
 	var err error
 	stx := models.SignedTx{}
 	stx.Tx, err = proto.Marshal(&models.Tx{
@@ -645,7 +716,8 @@ func sendTokensTx(t testing.TB, c *testutil.TestHTTPclient,
 				To:     signerTo.Address().Bytes(),
 				Value:  amount,
 			},
-		}})
+		},
+	})
 	qt.Assert(t, err, qt.IsNil)
 
 	stx.Signature, err = signerFrom.SignVocdoniTx(stx.Tx, chainID)
@@ -733,7 +805,7 @@ func TestAPIBuildElectionID(t *testing.T) {
 
 	// create a new election
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false)
+	response := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false, 0)
 
 	// Block 4
 	server.VochainAPP.AdvanceTestBlock()
@@ -767,7 +839,6 @@ func TestAPIBuildElectionID(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	qt.Assert(t, newNextElectionID, qt.Equals, futureElectionID)
-
 }
 
 func TestAPIEncryptedMetadata(t *testing.T) {
@@ -804,7 +875,7 @@ func TestAPIEncryptedMetadata(t *testing.T) {
 
 	// create a new election
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	electionResponse := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), true)
+	electionResponse := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), true, 0)
 
 	// Block 4
 	server.VochainAPP.AdvanceTestBlock()
@@ -829,4 +900,99 @@ func TestAPIEncryptedMetadata(t *testing.T) {
 	err = json.Unmarshal(decryptedMetadata, &metadata)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, metadata.Title["default"], qt.Equals, "test election")
+}
+
+func TestAPIElectionsList(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+	// Block 1
+	server.VochainAPP.AdvanceTestBlock()
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	// create a new census
+	resp, code := c.Request("POST", nil, "censuses", "weighted")
+	qt.Assert(t, code, qt.Equals, 200)
+	censusData := &api.Census{}
+	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+
+	for nonce := uint32(0); nonce < 20; nonce++ {
+		createElection(t, c, server.Account, electionprice.ElectionParameters{
+			ElectionDuration: 100,
+			MaxCensusSize:    100,
+		}, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, nonce)
+	}
+
+	createElection(t, c, server.Account, electionprice.ElectionParameters{
+		ElectionDuration: 100,
+		MaxCensusSize:    100,
+		EncryptedVotes:   true,
+	}, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, 20)
+
+	// Block 2
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+
+	// Get the list of elections and check it
+	fetchEL := func(method string, jsonBody any, query string, urlPath ...string) api.ElectionsList {
+		resp, code := c.RequestWithQuery(method, jsonBody, query, urlPath...)
+		elections := api.ElectionsList{}
+		qt.Assert(t, code, qt.Equals, 200, qt.Commentf("resp: %q", resp))
+		err := json.Unmarshal(resp, &elections)
+		qt.Assert(t, err, qt.IsNil)
+		return elections
+	}
+
+	el := make(map[string]api.ElectionsList)
+	el["0"] = fetchEL("GET", nil, "", "elections")
+	el["1"] = fetchEL("GET", nil, "page=1", "elections")
+	el["p0"] = fetchEL("GET", nil, "", "elections", "page", "0")
+	el["p1"] = fetchEL("GET", nil, "", "elections", "page", "1")
+
+	qt.Assert(t, el["0"], qt.Not(qt.DeepEquals), el["1"])
+	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
+	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
+
+	qt.Assert(t, el["0"].Pagination.TotalItems, qt.Equals, uint64(20+1))
+	qt.Assert(t, el["1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+	qt.Assert(t, el["p0"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+	qt.Assert(t, el["p1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+
+	for _, item := range el {
+		qt.Assert(t, len(item.Elections), qt.Equals, api.DefaultItemsPerPage)
+	}
+
+	boolPtr := func(b bool) *bool { return &b }
+
+	// this will exclude the 1 ongoing EncryptedVotes election
+	el["post_wr"] = fetchEL("POST", api.ElectionParams{
+		WithResults:      boolPtr(true),
+		PaginationParams: api.PaginationParams{Limit: 100},
+	}, "", "elections", "filter")
+	qt.Assert(t, el["post_wr"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems-1)
+	el["get_wr"] = fetchEL("GET", nil, "withResults=true&limit=100", "elections")
+	qt.Assert(t, el["post_wr"], qt.DeepEquals, el["get_wr"])
+
+	// this should return all elections, since no election has FinalResults or was ManuallyEnded
+	el["no_fr_me"] = fetchEL("GET", nil, "limit=100", "elections")
+	for _, e := range el["no_fr_me"].Elections {
+		t.Logf("%+v", e)
+	}
+	qt.Assert(t, el["no_fr_me"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
+
+	// this should return no elections,
+	el["fr_true"] = fetchEL("GET", nil, "finalResults=true", "elections")
+	qt.Assert(t, el["fr_true"].Pagination.TotalItems, qt.Equals, uint64(0))
+
+	// this should return no elections,
+	el["me_true"] = fetchEL("GET", nil, "manuallyEnded=true", "elections")
+	qt.Assert(t, el["me_true"].Pagination.TotalItems, qt.Equals, uint64(0))
 }

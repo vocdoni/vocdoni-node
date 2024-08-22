@@ -33,9 +33,7 @@ const (
 	ChildTreeVotes = "Votes"
 )
 
-var (
-	ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unknown")
-)
+var ErrProcessChildLeafRootUnknown = fmt.Errorf("process child leaf root is unknown")
 
 // treeTxWithMutex is a wrapper over TreeTx with a mutex for convenient
 // RWLocking.

@@ -268,7 +268,6 @@ func (idx *Indexer) ExportBackupAsBytes(ctx context.Context) ([]byte, error) {
 	tmpDir, err := os.MkdirTemp("", "indexer")
 	if err != nil {
 		return nil, fmt.Errorf("error creating tmpDir: %w", err)
-
 	}
 	tmpFilePath := filepath.Join(tmpDir, "indexer.sqlite3")
 	if err := idx.SaveBackup(ctx, tmpFilePath); err != nil {
@@ -631,6 +630,13 @@ func (idx *Indexer) OnProcessStatusChange(pid []byte, _ models.ProcessStatus, _ 
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
+// OnProcessDurationChange adds the process to blockUpdateProcs and, if ended, the resultsPool
+func (idx *Indexer) OnProcessDurationChange(pid []byte, _ uint32, _ int32) {
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+	idx.blockUpdateProcs[string(pid)] = true
+}
+
 // OnRevealKeys checks if all keys have been revealed and in such case add the
 // process to the results queue
 func (idx *Indexer) OnRevealKeys(pid []byte, _ string, _ int32) {
@@ -703,31 +709,6 @@ func (idx *Indexer) OnCensusUpdate(pid, _ []byte, _ string, _ uint64) {
 	idx.blockUpdateProcs[string(pid)] = true
 }
 
-// GetTokenTransfersByFromAccount returns all the token transfers made from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByFromAccount(context.TODO(), indexerdb.GetTokenTransfersByFromAccountParams{
-		FromAccount: from,
-		Limit:       int64(maxItems),
-		Offset:      int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenTransferMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenTransferMeta{
-			Amount:    uint64(t.Amount),
-			From:      t.FromAccount,
-			To:        t.ToAccount,
-			Height:    uint64(t.BlockHeight),
-			TxHash:    t.TxHash,
-			Timestamp: t.TransferTime,
-		})
-	}
-	return tt, nil
-}
-
 // OnSpendTokens indexes a token spending event.
 func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uint64, reference string) {
 	idx.blockMu.Lock()
@@ -745,145 +726,80 @@ func (idx *Indexer) OnSpendTokens(address []byte, txType models.TxType, cost uin
 	}
 }
 
-// GetTokenFeesByFromAccount returns all the token transfers made from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByFromAccount(from []byte, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByFromAccount(context.TODO(), indexerdb.GetTokenFeesByFromAccountParams{
-		FromAccount: from,
-		Limit:       int64(maxItems),
+// TokenFeesList returns all the token fees associated with a given transaction type, reference and fromAccount
+// (all optional filters), ordered by timestamp and paginated by limit and offset
+func (idx *Indexer) TokenFeesList(limit, offset int, txType, reference, fromAccount string) (
+	[]*indexertypes.TokenFeeMeta, uint64, error,
+) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchTokenFees(context.TODO(), indexerdb.SearchTokenFeesParams{
+		Limit:       int64(limit),
 		Offset:      int64(offset),
+		TxType:      txType,
+		Reference:   reference,
+		FromAccount: fromAccount,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
+	list := []*indexertypes.TokenFeeMeta{}
+	for _, row := range results {
+		list = append(list, &indexertypes.TokenFeeMeta{
+			Cost:      uint64(row.Cost),
+			From:      row.FromAccount,
+			TxType:    row.TxType,
+			Height:    uint64(row.BlockHeight),
+			Reference: row.Reference,
+			Timestamp: row.SpendTime,
 		})
 	}
-	return tt, nil
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
 }
 
-// GetTokenFees returns all the token transfers from the database, ordered
-// by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFees(offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFees(context.TODO(), indexerdb.GetTokenFeesParams{
-		Limit:  int64(maxItems),
-		Offset: int64(offset),
+// TokenTransfersList returns all the token transfers, made to and/or from a given account
+// (all optional filters), ordered by timestamp and paginated by limit and offset
+func (idx *Indexer) TokenTransfersList(limit, offset int, fromOrToAccount, fromAccount, toAccount string) (
+	[]*indexertypes.TokenTransferMeta, uint64, error,
+) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchTokenTransfers(context.TODO(), indexerdb.SearchTokenTransfersParams{
+		Limit:           int64(limit),
+		Offset:          int64(offset),
+		FromOrToAccount: fromOrToAccount,
+		FromAccount:     fromAccount,
+		ToAccount:       toAccount,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
+	list := []*indexertypes.TokenTransferMeta{}
+	for _, row := range results {
+		list = append(list, &indexertypes.TokenTransferMeta{
+			Amount:    uint64(row.Amount),
+			From:      row.FromAccount,
+			To:        row.ToAccount,
+			Height:    uint64(row.BlockHeight),
+			TxHash:    row.TxHash,
+			Timestamp: row.TransferTime,
 		})
 	}
-	return tt, nil
-}
-
-// GetTokenFeesByReference returns all the token fees associated with a given reference
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByReference(reference string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByReference(context.TODO(), indexerdb.GetTokenFeesByReferenceParams{
-		Reference: reference,
-		Limit:     int64(maxItems),
-		Offset:    int64(offset),
-	})
-	if err != nil {
-		return nil, err
+	if len(results) == 0 {
+		return list, 0, nil
 	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
-		})
-	}
-	return tt, nil
-}
-
-// GetTokenFeesByType returns all the token fees associated with a given transaction type
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenFeesByType(txType string, offset, maxItems int32) ([]*indexertypes.TokenFeeMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenFeesByTxType(context.TODO(), indexerdb.GetTokenFeesByTxTypeParams{
-		TxType: txType,
-		Limit:  int64(maxItems),
-		Offset: int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenFeeMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenFeeMeta{
-			Cost:      uint64(t.Cost),
-			From:      t.FromAccount,
-			TxType:    t.TxType,
-			Height:    uint64(t.BlockHeight),
-			Reference: t.Reference,
-			Timestamp: t.SpendTime,
-		})
-	}
-	return tt, nil
-}
-
-// GetTokenTransfersByToAccount returns all the token transfers made to a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByToAccount(to []byte, offset, maxItems int32) ([]*indexertypes.TokenTransferMeta, error) {
-	ttFromDB, err := idx.readOnlyQuery.GetTokenTransfersByToAccount(context.TODO(), indexerdb.GetTokenTransfersByToAccountParams{
-		ToAccount: to,
-		Limit:     int64(maxItems),
-		Offset:    int64(offset),
-	})
-	if err != nil {
-		return nil, err
-	}
-	tt := []*indexertypes.TokenTransferMeta{}
-	for _, t := range ttFromDB {
-		tt = append(tt, &indexertypes.TokenTransferMeta{
-			Amount:    uint64(t.Amount),
-			From:      t.FromAccount,
-			To:        t.ToAccount,
-			Height:    uint64(t.BlockHeight),
-			TxHash:    t.TxHash,
-			Timestamp: t.TransferTime,
-		})
-	}
-	return tt, nil
-}
-
-// GetTokenTransfersByAccount returns all the token transfers made to and from a given account
-// from the database, ordered by timestamp and paginated by maxItems and offset
-func (idx *Indexer) GetTokenTransfersByAccount(acc []byte, offset, maxItems int32) (indexertypes.TokenTransfersAccount, error) {
-	transfersTo, err := idx.GetTokenTransfersByToAccount(acc, offset, maxItems)
-	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
-	}
-	transfersFrom, err := idx.GetTokenTransfersByFromAccount(acc, offset, maxItems)
-	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
-	}
-
-	return indexertypes.TokenTransfersAccount{
-		Received: transfersTo,
-		Sent:     transfersFrom}, nil
+	return list, uint64(results[0].TotalCount), nil
 }
 
 // CountTokenTransfersByAccount returns the count all the token transfers made from a given account
@@ -898,21 +814,46 @@ func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	return uint64(count), err
 }
 
-func (idx *Indexer) GetListAccounts(offset, maxItems int32) ([]indexertypes.Account, error) {
-	accsFromDB, err := idx.readOnlyQuery.GetListAccounts(context.TODO(), indexerdb.GetListAccountsParams{
-		Limit:  int64(maxItems),
-		Offset: int64(offset),
+// AccountList returns a list of accounts, accountID is a partial or full hex string,
+// and is optional (declared as zero-value will be ignored).
+func (idx *Indexer) AccountList(limit, offset int, accountID string) ([]*indexertypes.Account, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchAccounts(context.TODO(), indexerdb.SearchAccountsParams{
+		Limit:           int64(limit),
+		Offset:          int64(offset),
+		AccountIDSubstr: accountID,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	tt := []indexertypes.Account{}
-	for _, acc := range accsFromDB {
-		tt = append(tt, indexertypes.Account{
-			Address: acc.Account,
-			Balance: uint64(acc.Balance),
-			Nonce:   uint32(acc.Nonce),
+	list := []*indexertypes.Account{}
+	for _, row := range results {
+		list = append(list, &indexertypes.Account{
+			Address: row.Account,
+			Balance: uint64(row.Balance),
+			Nonce:   uint32(row.Nonce),
 		})
 	}
-	return tt, nil
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
+}
+
+// AccountExists returns whether the passed accountID exists in the db.
+// If passed arg is not the full hex string, returns false (i.e. no substring matching)
+func (idx *Indexer) AccountExists(accountID string) bool {
+	if len(accountID) != 40 {
+		return false
+	}
+	_, count, err := idx.AccountList(1, 0, accountID)
+	if err != nil {
+		log.Errorw(err, "indexer query failed")
+	}
+	return count > 0
 }

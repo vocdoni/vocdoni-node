@@ -37,7 +37,8 @@ import (
 // Tendermint expects LastBlockAppHash and LastBlockHeight to be updated during Commit,
 // ensuring that Commit is never called twice for the same block height.
 func (app *BaseApplication) Info(_ context.Context,
-	req *cometabcitypes.InfoRequest) (*cometabcitypes.InfoResponse, error) {
+	req *cometabcitypes.InfoRequest,
+) (*cometabcitypes.InfoResponse, error) {
 	// TODO: move SetElectionPriceCalc() somewhere else, also deduplicating from InitChain
 	if err := app.State.SetElectionPriceCalc(); err != nil {
 		return nil, fmt.Errorf("cannot set election price calc: %w", err)
@@ -81,7 +82,8 @@ func (app *BaseApplication) Info(_ context.Context,
 // InitChainResponse can return a list of validators. If the list is empty,
 // Tendermint will use the validators loaded in the genesis file.
 func (app *BaseApplication) InitChain(_ context.Context,
-	req *cometabcitypes.InitChainRequest) (*cometabcitypes.InitChainResponse, error) {
+	req *cometabcitypes.InitChainRequest,
+) (*cometabcitypes.InitChainResponse, error) {
 	// if our State is already initialized, but cometbft is calling InitChain
 	// it means the ChainID was bumped and cometbft is starting a chain on top of previous one.
 	// Skip all the init, just pass the current validator set and AppHash to cometbft
@@ -270,7 +272,8 @@ func (app *BaseApplication) CheckTx(_ context.Context, req *cometabcitypes.Check
 // Cryptographic commitments to the block and transaction results, returned via the corresponding
 // parameters in FinalizeBlockResponse, are included in the header of the next block.
 func (app *BaseApplication) FinalizeBlock(_ context.Context,
-	req *cometabcitypes.FinalizeBlockRequest) (*cometabcitypes.FinalizeBlockResponse, error) {
+	req *cometabcitypes.FinalizeBlockRequest,
+) (*cometabcitypes.FinalizeBlockResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -381,7 +384,8 @@ func (app *BaseApplication) Commit(_ context.Context, _ *cometabcitypes.CommitRe
 // order in which they appear, and returns the (potentially) modified proposal, called prepared proposal in
 // the PrepareProposalResponse call. The logic modifying the raw proposal MAY be non-deterministic.
 func (app *BaseApplication) PrepareProposal(ctx context.Context,
-	req *cometabcitypes.PrepareProposalRequest) (*cometabcitypes.PrepareProposalResponse, error) {
+	req *cometabcitypes.PrepareProposalRequest,
+) (*cometabcitypes.PrepareProposalResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -490,7 +494,8 @@ func (app *BaseApplication) PrepareProposal(ctx context.Context,
 // is invalid (e.g., an invalid transaction); the Application can ignore the invalid part of the prepared
 // proposal at block execution time. The logic in ProcessProposal MUST be deterministic.
 func (app *BaseApplication) ProcessProposal(_ context.Context,
-	req *cometabcitypes.ProcessProposalRequest) (*cometabcitypes.ProcessProposalResponse, error) {
+	req *cometabcitypes.ProcessProposalRequest,
+) (*cometabcitypes.ProcessProposalResponse, error) {
 	app.prepareProposalLock.Lock()
 	defer app.prepareProposalLock.Unlock()
 	if req == nil {
@@ -772,18 +777,21 @@ func (app *BaseApplication) RestoreStateFromSnapshot(snap *snapshot.Snapshot) er
 
 // Query does nothing
 func (*BaseApplication) Query(_ context.Context,
-	_ *cometabcitypes.QueryRequest) (*cometabcitypes.QueryResponse, error) {
+	_ *cometabcitypes.QueryRequest,
+) (*cometabcitypes.QueryResponse, error) {
 	return &cometabcitypes.QueryResponse{}, nil
 }
 
 // ExtendVote creates application specific vote extension
 func (*BaseApplication) ExtendVote(_ context.Context,
-	req *cometabcitypes.ExtendVoteRequest) (*cometabcitypes.ExtendVoteResponse, error) {
+	req *cometabcitypes.ExtendVoteRequest,
+) (*cometabcitypes.ExtendVoteResponse, error) {
 	return &cometabcitypes.ExtendVoteResponse{}, nil
 }
 
 // VerifyVoteExtension verifies application's vote extension data
 func (*BaseApplication) VerifyVoteExtension(context.Context,
-	*cometabcitypes.VerifyVoteExtensionRequest) (*cometabcitypes.VerifyVoteExtensionResponse, error) {
+	*cometabcitypes.VerifyVoteExtensionRequest,
+) (*cometabcitypes.VerifyVoteExtensionResponse, error) {
 	return &cometabcitypes.VerifyVoteExtensionResponse{}, nil
 }

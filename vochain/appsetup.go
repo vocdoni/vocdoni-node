@@ -94,7 +94,6 @@ func (app *BaseApplication) SetDefaultMethods() {
 		}
 		return result, err
 	})
-
 }
 
 func (app *BaseApplication) getTxTendermint(height uint32, txIndex int32) (*models.SignedTx, error) {

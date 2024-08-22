@@ -323,7 +323,8 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 }
 
 func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
-	app *BaseApplication, censusRoot []byte, censusURI *string, censusSize uint64) error {
+	app *BaseApplication, censusRoot []byte, censusURI *string, censusSize uint64,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -339,6 +340,34 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 		CensusRoot: censusRoot,
 		CensusURI:  censusURI,
 		CensusSize: &censusSize,
+	}
+	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
+		return fmt.Errorf("cannot mashal tx %w", err)
+	}
+	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
+		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
+	}
+
+	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
+	return err
+}
+
+func testSetProcessDuration(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
+	app *BaseApplication, duration uint32,
+) error {
+	var stx models.SignedTx
+	var err error
+
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
+	if err != nil {
+		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
+	}
+
+	tx := &models.SetProcessTx{
+		Txtype:    models.TxType_SET_PROCESS_DURATION,
+		Nonce:     txSenderAcc.Nonce,
+		ProcessId: pid,
+		Duration:  &duration,
 	}
 	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
 		return fmt.Errorf("cannot mashal tx %w", err)
@@ -367,7 +396,8 @@ func TestCount(t *testing.T) {
 // the application will have the accounts of the keys already initialized, as well as
 // the burn account and all tx costs set to txCostNumber
 func createTestBaseApplicationAndAccounts(t *testing.T,
-	txCostNumber uint64) (*BaseApplication, []*ethereum.SignKeys) {
+	txCostNumber uint64,
+) (*BaseApplication, []*ethereum.SignKeys) {
 	app := TestBaseApplication(t)
 	keys := make([]*ethereum.SignKeys, 0)
 	for i := 0; i < 4; i++ {
@@ -401,9 +431,11 @@ func createTestBaseApplicationAndAccounts(t *testing.T,
 	// set tx costs
 	for _, cost := range genesis.TxCostNameToTxTypeMap {
 		qt.Assert(t, app.State.SetTxBaseCost(cost, txCostNumber), qt.IsNil)
-
 	}
+	app.State.ElectionPriceCalc.SetBasePrice(10)
+	app.State.ElectionPriceCalc.SetCapacity(2000)
 	testCommitState(t, app)
+
 	return app, keys
 }
 
@@ -472,7 +504,7 @@ func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.
 
 func TestGlobalMaxProcessSize(t *testing.T) {
 	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
-	app.State.SetMaxProcessSize(10)
+	qt.Assert(t, app.State.SetMaxProcessSize(10), qt.IsNil)
 	app.AdvanceTestBlock()
 
 	// define process
@@ -487,22 +519,20 @@ func TestGlobalMaxProcessSize(t *testing.T) {
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
 		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
-		BlockCount:    1024,
-		MaxCensusSize: 20,
+		Duration:      60,
+		MaxCensusSize: 5,
 	}
 
-	// create process with entityID (should fail)
-	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNil)
+	// create process with maxcensussize < 10 (should work)
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[0], app, process), qt.IsNil)
 
-	// create process with entityID (should work)
-	process.MaxCensusSize = 5
-	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
+	// create process with maxcensussize > 10 (should fail)
+	process.MaxCensusSize = 20
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[0], app, process), qt.IsNotNil)
 }
 
 func TestSetProcessCensusSize(t *testing.T) {
 	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
-	app.State.ElectionPriceCalc.SetBasePrice(10)
-	app.State.ElectionPriceCalc.SetCapacity(2000)
 
 	// define process
 	censusURI := ipfsUrlTest
@@ -549,13 +579,32 @@ func TestSetProcessCensusSize(t *testing.T) {
 	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
 	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
 
+	// Set census size (with same root and no URI) (should work)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, proc.CensusRoot, nil, 12), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
+	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
+
+	// Set census size (with same root and different URI) (should fail)
+	uri := "ipfs://987654321"
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, proc.CensusRoot, &uri, 13), qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
+	qt.Assert(t, proc.CensusRoot, qt.IsNotNil)
+
 	// Set smaller census size (should fail)
 	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, nil, nil, 5), qt.IsNotNil)
 	app.AdvanceTestBlock()
 
 	proc, err = app.State.Process(pid, true)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(10))
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(12))
 
 	// Check cost is increased with larger census size (should work)
 	account, err := app.State.GetAccount(accounts[0].Address(), true)
@@ -570,4 +619,93 @@ func TestSetProcessCensusSize(t *testing.T) {
 
 	// check that newBalance is at least 100 tokens less than oldBalance
 	qt.Assert(t, oldBalance-newBalance >= 100, qt.IsTrue)
+
+	// define a new process, this time with dynamicCensus=true
+	process = &models.Process{
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Duration:      60 * 60,
+		MaxCensusSize: 2,
+	}
+
+	// create the process
+	pid = testCreateProcess(t, accounts[0], app, process)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MaxCensusSize, qt.Equals, uint64(2))
+
+	// Set census size with root (should work since dynamicCensus=true)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), nil, 5), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// Set census size with root (should work since dynamicCensus=true)
+	qt.Assert(t, testSetProcessCensus(t, pid, accounts[0], app, util.RandomBytes(32), &uri, 5), qt.IsNil)
+	app.AdvanceTestBlock()
+}
+
+func TestSetProcessDuration(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
+
+	// define process
+	censusURI := ipfsUrlTest
+	process := &models.Process{
+		StartBlock:    1,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true, DynamicCensus: false},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Duration:      60,
+		MaxCensusSize: 2,
+	}
+
+	// create the process
+	pid := testCreateProcess(t, accounts[0], app, process)
+	app.AdvanceTestBlock()
+
+	proc, err := app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Duration, qt.Equals, uint32(60))
+
+	// Set lower duration (should workd)
+	qt.Assert(t, testSetProcessDuration(t, pid, accounts[0], app, 50), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Duration, qt.Equals, uint32(50))
+
+	// Set higher duration (should work)
+	qt.Assert(t, testSetProcessDuration(t, pid, accounts[0], app, 80), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Duration, qt.Equals, uint32(80))
+
+	// Check cost is increased with larger duration (should work)
+	account, err := app.State.GetAccount(accounts[0].Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	oldBalance := account.Balance
+
+	qt.Assert(t, testSetProcessDuration(t, pid, accounts[0], app, 2000000), qt.IsNil)
+
+	account, err = app.State.GetAccount(accounts[0].Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	newBalance := account.Balance
+
+	// check that newBalance is at least 30 tokens less than oldBalance
+	qt.Assert(t, oldBalance-newBalance >= 30, qt.IsTrue)
 }

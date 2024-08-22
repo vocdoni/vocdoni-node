@@ -299,7 +299,8 @@ func (v *State) BurnTxCostIncrementNonce(accountAddress common.Address, txType m
 // SetAccountDelegate sets a set of delegates for a given account
 func (v *State) SetAccountDelegate(accountAddr common.Address,
 	delegateAddrs [][]byte,
-	txType models.TxType) error {
+	txType models.TxType,
+) error {
 	acc, err := v.GetAccount(accountAddr, false)
 	if err != nil {
 		return err

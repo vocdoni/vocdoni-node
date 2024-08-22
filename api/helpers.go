@@ -5,7 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
+	"strconv"
+	"strings"
+	"time"
 
 	cometpool "github.com/cometbft/cometbft/mempool"
 	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
@@ -13,15 +17,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
 	"go.vocdoni.io/dvote/crypto/nacl"
+	"go.vocdoni.io/dvote/httprouter"
+	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 )
 
-func (a *API) electionSummary(pi *indexertypes.Process) ElectionSummary {
-	return ElectionSummary{
+func (a *API) electionSummary(pi *indexertypes.Process) *ElectionSummary {
+	return &ElectionSummary{
 		ElectionID:     pi.ID,
 		OrganizationID: pi.EntityID,
 		Status:         models.ProcessStatus_name[pi.Status],
@@ -118,7 +125,8 @@ func convertKeysToCamelInner(val any) any {
 // in this case we encode the organizationId the censusRoot and the results that will be translated in the EVM
 // contract to the corresponding struct{address, bytes32, uint256[][]}
 func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address, censusRoot common.Hash,
-	sourceContractAddress common.Address, results [][]*types.BigInt) (string, error) {
+	sourceContractAddress common.Address, results [][]*types.BigInt,
+) (string, error) {
 	address, _ := abi.NewType("address", "", nil)
 	bytes32, _ := abi.NewType("bytes32", "", nil)
 	uint256SliceNested, _ := abi.NewType("uint256[][]", "", nil)
@@ -160,4 +168,188 @@ func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte,
 		}
 	}
 	return vp, nil
+}
+
+// marshalAndSend marshals any passed struct and sends it over ctx.Send()
+func marshalAndSend(ctx *httprouter.HTTPContext, v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// parseNumber parses a string into an int.
+//
+// If the string is not parseable, returns an APIerror.
+//
+// The empty string "" is treated specially, returns 0 with no error.
+func parseNumber(s string) (int, error) {
+	if s == "" {
+		return 0, nil
+	}
+	page, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, ErrCantParseNumber.With(s)
+	}
+	return page, nil
+}
+
+// parsePage parses a string into an int.
+//
+// If the resulting int is negative, returns ErrNoSuchPage.
+// If the string is not parseable, returns an APIerror.
+//
+// The empty string "" is treated specially, returns 0 with no error.
+func parsePage(s string) (int, error) {
+	page, err := parseNumber(s)
+	if err != nil {
+		return 0, err
+	}
+	if page < 0 {
+		return 0, ErrPageNotFound
+	}
+	return page, nil
+}
+
+// parseLimit parses a string into an int.
+//
+// The empty string "" is treated specially, returns DefaultItemsPerPage with no error.
+// If the resulting int is higher than MaxItemsPerPage, returns MaxItemsPerPage.
+// If the resulting int is 0 or negative, returns DefaultItemsPerPage.
+//
+// If the string is not parseable, returns an APIerror.
+func parseLimit(s string) (int, error) {
+	limit, err := parseNumber(s)
+	if err != nil {
+		return 0, err
+	}
+	if limit > MaxItemsPerPage {
+		limit = MaxItemsPerPage
+	}
+	if limit <= 0 {
+		limit = DefaultItemsPerPage
+	}
+	return limit, nil
+}
+
+// parseStatus converts a string ("READY", "ready", "PAUSED", etc)
+// to a models.ProcessStatus.
+//
+// If the string doesn't map to a value, returns an APIerror.
+//
+// The empty string "" is treated specially, returns 0 with no error.
+func parseStatus(s string) (models.ProcessStatus, error) {
+	if s == "" {
+		return 0, nil
+	}
+	status, found := models.ProcessStatus_value[strings.ToUpper(s)]
+	if !found {
+		return 0, ErrParamStatusInvalid.With(s)
+	}
+	return models.ProcessStatus(status), nil
+}
+
+// parseHexString converts a string like 0x1234cafe (or 1234cafe)
+// to a types.HexBytes.
+//
+// If the string can't be parsed, returns an APIerror.
+func parseHexString(s string) (types.HexBytes, error) {
+	orgID, err := hex.DecodeString(util.TrimHex(s))
+	if err != nil {
+		return nil, ErrCantParseHexString.Withf("%q", s)
+	}
+	return orgID, nil
+}
+
+// parseBool parses a string into a boolean value.
+//
+// The empty string "" is treated specially, returns a nil pointer with no error.
+func parseBool(s string) (*bool, error) {
+	if s == "" {
+		return nil, nil
+	}
+	b, err := strconv.ParseBool(s)
+	if err != nil {
+		return nil, ErrCantParseBoolean.With(s)
+	}
+	return &b, nil
+}
+
+// parseDate parses an RFC3339 string into a time.Time value.
+// As a convenience, accepts also time.DateOnly format (i.e. 2006-01-02).
+//
+// The empty string "" is treated specially, returns a nil pointer with no error.
+func parseDate(s string) (*time.Time, error) {
+	if s == "" {
+		return nil, nil
+	}
+	b, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		if b, err := time.Parse(time.DateOnly, s); err == nil {
+			return &b, nil
+		}
+		return nil, ErrCantParseDate.WithErr(err)
+	}
+	return &b, nil
+}
+
+// parsePaginationParams returns a PaginationParams filled with the passed params
+func parsePaginationParams(paramPage, paramLimit string) (PaginationParams, error) {
+	page, err := parsePage(paramPage)
+	if err != nil {
+		return PaginationParams{}, err
+	}
+
+	limit, err := parseLimit(paramLimit)
+	if err != nil {
+		return PaginationParams{}, err
+	}
+
+	return PaginationParams{
+		Page:  page,
+		Limit: limit,
+	}, nil
+}
+
+// calculatePagination calculates PreviousPage, NextPage and LastPage.
+//
+// If page is negative or higher than LastPage, returns an APIerror (ErrPageNotFound)
+func calculatePagination(page int, limit int, totalItems uint64) (*Pagination, error) {
+	// pages start at 0 index, for legacy reasons
+	lastp := int(math.Ceil(float64(totalItems)/float64(limit)) - 1)
+	if totalItems == 0 {
+		lastp = 0
+	}
+
+	if page > lastp || page < 0 {
+		return nil, ErrPageNotFound
+	}
+
+	var prevp, nextp *uint64
+	if page > 0 {
+		prevPage := uint64(page - 1)
+		prevp = &prevPage
+	}
+	if page < lastp {
+		nextPage := uint64(page + 1)
+		nextp = &nextPage
+	}
+
+	return &Pagination{
+		TotalItems:   totalItems,
+		PreviousPage: prevp,
+		CurrentPage:  uint64(page),
+		NextPage:     nextp,
+		LastPage:     uint64(lastp),
+	}, nil
+}
+
+// paramsFromCtxFunc calls f(key) for each key passed, and the resulting value is saved in map[key] of the returned map
+func paramsFromCtxFunc(f func(key string) string, keys ...string) map[string]string {
+	m := make(map[string]string)
+	for _, key := range keys {
+		m[key] = f(key)
+	}
+	return m
 }

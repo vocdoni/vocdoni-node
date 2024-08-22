@@ -1,10 +1,7 @@
 package api
 
-////// Disabled autoswag due to https://github.com/swaggo/swag/issues/1267
-////// TODO: re-enable when a fixed swaggo/swag is released
-////// and remove the workaround done by @selankon on docs/models/models.go
-////go:generate go run go.vocdoni.io/dvote/api/autoswag
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.8.10 fmt
+//go:generate go run go.vocdoni.io/dvote/api/autoswag
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.3 fmt
 
 import (
 	"fmt"
@@ -50,8 +47,40 @@ import (
 
 //	@securityDefinitions.basic	BasicAuth
 
-// MaxPageSize defines the maximum number of results returned by the paginated endpoints
-const MaxPageSize = 10
+const (
+	// DefaultItemsPerPage defines how many items per page are returned by the paginated endpoints,
+	// when the client doesn't specify a `limit` param
+	DefaultItemsPerPage = 10
+	// MaxItemsPerPage defines a ceiling for the `limit` param passed by the client
+	MaxItemsPerPage = 100
+)
+
+// These consts define the keywords for query (?param=), url (/url/param/) and POST params.
+// Note: In JS/TS acronyms like "ID" are camelCased as in "Id".
+//
+//nolint:revive
+const (
+	ParamAccountId       = "accountId"
+	ParamCensusId        = "censusId"
+	ParamElectionId      = "electionId"
+	ParamOrganizationId  = "organizationId"
+	ParamVoteId          = "voteId"
+	ParamPage            = "page"
+	ParamLimit           = "limit"
+	ParamStatus          = "status"
+	ParamWithResults     = "withResults"
+	ParamFinalResults    = "finalResults"
+	ParamManuallyEnded   = "manuallyEnded"
+	ParamHeight          = "height"
+	ParamReference       = "reference"
+	ParamType            = "type"
+	ParamAccountIdFrom   = "accountIdFrom"
+	ParamAccountIdTo     = "accountIdTo"
+	ParamStartDateAfter  = "startDateAfter"
+	ParamStartDateBefore = "startDateBefore"
+	ParamEndDateAfter    = "endDateAfter"
+	ParamEndDateBefore   = "endDateBefore"
+)
 
 var (
 	ErrMissingModulesForHandler = fmt.Errorf("missing modules attached for enabling handler")
@@ -106,7 +135,8 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
 func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
-	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB) {
+	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB,
+) {
 	a.vocapp = vocdoniAPP
 	a.vocinfo = vocdoniInfo
 	a.indexer = indexer

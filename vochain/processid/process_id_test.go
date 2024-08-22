@@ -9,8 +9,10 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-const test_vbAddr = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
-const test_chID = "vocdoni-bizono"
+const (
+	test_vbAddr = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+	test_chID   = "vocdoni-bizono"
+)
 
 func TestProcessID(t *testing.T) {
 	pid := ProcessID{}

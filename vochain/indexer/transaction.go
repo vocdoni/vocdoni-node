@@ -61,24 +61,39 @@ func (idx *Indexer) GetTxHashReference(hash types.HexBytes) (*indexertypes.Trans
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
-// GetLastTransactions fetches a number of the latest indexed transactions.
+// SearchTransactions returns the list of transactions indexed.
+// height and txType are optional, if declared as zero-value will be ignored.
 // The first one returned is the newest, so they are in descending order.
-func (idx *Indexer) GetLastTransactions(limit, offset int32) ([]*indexertypes.Transaction, error) {
-	sqlTxRefs, err := idx.readOnlyQuery.GetLastTransactions(context.TODO(), indexerdb.GetLastTransactionsParams{
-		Limit:  int64(limit),
-		Offset: int64(offset),
+func (idx *Indexer) SearchTransactions(limit, offset int, blockHeight uint64, txType string) ([]*indexertypes.Transaction, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchTransactions(context.TODO(), indexerdb.SearchTransactionsParams{
+		Limit:       int64(limit),
+		Offset:      int64(offset),
+		BlockHeight: blockHeight,
+		TxType:      txType,
 	})
-	if err != nil || len(sqlTxRefs) == 0 {
-		if errors.Is(err, sql.ErrNoRows) || len(sqlTxRefs) == 0 {
-			return nil, ErrTransactionNotFound
-		}
-		return nil, fmt.Errorf("could not get last %d tx refs: %v", limit, err)
+	if err != nil {
+		return nil, 0, err
 	}
-	txRefs := make([]*indexertypes.Transaction, len(sqlTxRefs))
-	for i, sqlTxRef := range sqlTxRefs {
-		txRefs[i] = indexertypes.TransactionFromDB(&sqlTxRef)
+	list := []*indexertypes.Transaction{}
+	for _, row := range results {
+		list = append(list, &indexertypes.Transaction{
+			Index:        uint64(row.ID),
+			Hash:         row.Hash,
+			BlockHeight:  uint32(row.BlockHeight),
+			TxBlockIndex: int32(row.BlockIndex),
+			TxType:       row.Type,
+		})
 	}
-	return txRefs, nil
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
 }
 
 func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {

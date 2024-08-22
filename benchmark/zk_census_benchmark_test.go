@@ -121,7 +121,6 @@ func zkCensusBenchmark(b *testing.B, cc, sc *testutil.TestHTTPclient, vapp *voch
 	qt.Assert(b, json.Unmarshal(resp, sikData), qt.IsNil)
 
 	genProofZk(b, electionID, admin, censusData, sikData)
-
 }
 
 func genProofZk(b *testing.B, electionID []byte, acc *ethereum.SignKeys, censusData, sikData *api.Census) {

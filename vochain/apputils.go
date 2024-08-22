@@ -134,7 +134,7 @@ func NewTemplateGenesisFile(dir string, validators int) (*genesis.Doc, error) {
 				Balance: 100000,
 			},
 		},
-		TxCost: genesis.TransactionCosts{},
+		TxCost: genesis.DefaultTransactionCosts(),
 	}
 	appState.MaxElectionSize = 100000
 

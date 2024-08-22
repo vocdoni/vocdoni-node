@@ -74,7 +74,7 @@ func DeleteCensusTreeFromDatabase(kv db.Database, name string) (int, error) {
 // New returns a new Tree, if there already is a Tree in the
 // database, it will load it.
 func New(opts Options) (*Tree, error) {
-	var maxLevels = opts.MaxLevels
+	maxLevels := opts.MaxLevels
 	if maxLevels > DefaultMaxLevels {
 		maxLevels = DefaultMaxLevels
 	}

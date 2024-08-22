@@ -114,7 +114,7 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 		return nil, nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+	ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 	defer cancel()
 
 	if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
@@ -132,7 +132,6 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 		return nil, nil, err
 	}
 	return acc, accountApi, nil
-
 }
 
 func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, voterAccounts []*ethereum.SignKeys) error {
@@ -349,7 +348,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		}
 		t.election = election
 	} else {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+		ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 		defer cancel()
 		if _, err := t.api.WaitUntilElectionCreated(ctx, electionID); err != nil {
 			return err
@@ -378,7 +377,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 					errorChan <- err
 				}
 				log.Infow("sik registered for anonymous census uncreated account", "index", i, "address", acc.AddressString())
-				ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
+				ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
 				defer cancel()
 
 				if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
@@ -395,7 +394,6 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 					errorChan <- fmt.Errorf("unexpected invalid SIK for account %x", acc.Address())
 				}
 				log.Infof("valid SIK for the account %x", acc.Address())
-
 			}(i, acc)
 		}
 
@@ -765,6 +763,8 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 	errorChan := make(chan error)
 	wg := &sync.WaitGroup{}
 
+	sem := make(chan any, t.config.parallelCount)
+
 	for i, acc := range voterAccounts {
 		if i%10 == 0 {
 			// Print some information about progress on large censuses
@@ -773,7 +773,11 @@ func (t *e2eElection) registerAnonAccts(voterAccounts []*ethereum.SignKeys) erro
 
 		wg.Add(1)
 		go func(i int, acc *ethereum.SignKeys) {
+			sem <- nil               // acquire a token
+			defer func() { <-sem }() // release the token
+
 			defer wg.Done()
+
 			pKey := acc.PrivateKey()
 			if _, _, err := t.createAccount(pKey.String()); err != nil &&
 				!strings.Contains(err.Error(), "createAccountTx: account already exists") {
@@ -818,5 +822,4 @@ func logElection(e *vapi.Election) {
 		"tallyMaxTotalCost", e.TallyMode.MaxTotalCost,
 		"tallyCostExponent", e.TallyMode.CostExponent,
 	)
-
 }

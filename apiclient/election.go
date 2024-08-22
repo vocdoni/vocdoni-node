@@ -296,36 +296,114 @@ func (c *HTTPclient) SetElectionStatus(electionID types.HexBytes, status string)
 	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetProcess{
 			SetProcess: &tx,
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-	signedTxb, err := c.account.SignVocdoniTx(txb, c.chainID)
+	hash, _, err := c.SignAndSendTx(txb)
+	return hash, err
+}
+
+// SetElectionCensusSize sets the new census size of an election.
+func (c *HTTPclient) SetElectionCensusSize(electionID types.HexBytes, newSize uint64) (types.HexBytes, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+	// get the own account details
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
+	}
+
+	// build the set process transaction
+	tx := models.SetProcessTx{
+		Txtype:     models.TxType_SET_PROCESS_CENSUS,
+		ProcessId:  electionID,
+		CensusSize: &newSize,
+		Nonce:      acc.Nonce,
+	}
+	txb, err := proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: &tx,
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-	stx, err := proto.Marshal(
-		&models.SignedTx{
-			Tx:        txb,
-			Signature: signedTxb,
-		})
+	hash, _, err := c.SignAndSendTx(txb)
+	return hash, err
+}
+
+// SetElectionDuration modify the duration of an election (in seconds).
+func (c *HTTPclient) SetElectionDuration(electionID types.HexBytes, newDuration uint32) (types.HexBytes, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+	// get the own account details
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
+	}
+
+	// build the set process transaction
+	tx := models.SetProcessTx{
+		Txtype:    models.TxType_SET_PROCESS_DURATION,
+		ProcessId: electionID,
+		Duration:  &newDuration,
+		Nonce:     acc.Nonce,
+	}
+	txb, err := proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: &tx,
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	hash, _, err := c.SignAndSendTx(txb)
+	return hash, err
+}
+
+// SetElectionCensus updates the census of an election. Root, URI and size can be updated.
+func (c *HTTPclient) SetElectionCensus(electionID types.HexBytes, census api.ElectionCensus) (types.HexBytes, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+
+	if _, ok := models.CensusOrigin_value[census.CensusOrigin]; !ok {
+		return nil, fmt.Errorf("invalid census origin %s", census.CensusOrigin)
+	}
+
+	// get the own account details
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account info: %s", acc.Address)
+	}
+
+	tx := &models.SetProcessTx{
+		Txtype:     models.TxType_SET_PROCESS_CENSUS,
+		Nonce:      acc.Nonce,
+		ProcessId:  electionID,
+		CensusRoot: census.CensusRoot,
+		CensusURI:  &census.CensusURL,
+		CensusSize: func() *uint64 {
+			if census.MaxCensusSize > 0 {
+				return &census.MaxCensusSize
+			}
+			return nil
+		}(),
+	}
+
+	txb, err := proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{SetProcess: tx},
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// send the transaction
-	resp, code, err := c.Request(HTTPPOST, &api.Transaction{Payload: stx}, "chain", "transactions")
-	if err != nil {
-		return nil, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	txResp := new(api.Transaction)
-	if err := json.Unmarshal(resp, txResp); err != nil {
-		return nil, err
-	}
-	return txResp.Hash, nil
+	hash, _, err := c.SignAndSendTx(txb)
+	return hash, err
 }
 
 // ElectionVoteCount returns the number of registered votes for a given election.
@@ -367,7 +445,8 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 // POST /elections/filter/page/<page>
 // Returns a list of elections filtered by the given parameters.
 func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, electionID types.HexBytes,
-	status models.ProcessStatus, withResults bool, page int) (*[]api.ElectionSummary, error) {
+	status models.ProcessStatus, withResults bool, page int,
+) (*[]api.ElectionSummary, error) {
 	body := struct {
 		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
 		ElectionID     types.HexBytes `json:"electionId,omitempty"`

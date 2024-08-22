@@ -23,8 +23,10 @@ import (
 // leaf value). It returns the keys, the census root and the proofs for each key.
 func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.Int) ([]*ethereum.SignKeys, []byte, [][]byte) {
 	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{Name: "testcensus", ParentDB: db,
-		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_POSEIDON})
+	tr, err := censustree.New(censustree.Options{
+		Name: "testcensus", ParentDB: db,
+		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_POSEIDON,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +57,10 @@ func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.
 // It returns the keys, the census root and the proofs for each key.
 func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []byte, [][]byte) {
 	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{Name: "testcensus", ParentDB: db,
-		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B})
+	tr, err := censustree.New(censustree.Options{
+		Name: "testcensus", ParentDB: db,
+		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +88,8 @@ func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys,
 }
 
 func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys,
-	proof []byte, votePackage []int, chainID string) *models.SignedTx {
+	proof []byte, votePackage []int, chainID string,
+) *models.SignedTx {
 	var stx models.SignedTx
 	var err error
 	vp, err := json.Marshal(votePackage)

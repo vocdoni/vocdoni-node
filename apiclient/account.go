@@ -25,10 +25,8 @@ var DefaultFaucetURLs = map[string]string{
 	"prod":    "https://api-faucet.vocdoni.io/v2/open/claim/",
 }
 
-var (
-	// ErrAccountNotConfigured is returned when the client has not been configured with an account.
-	ErrAccountNotConfigured = fmt.Errorf("account not configured")
-)
+// ErrAccountNotConfigured is returned when the client has not been configured with an account.
+var ErrAccountNotConfigured = fmt.Errorf("account not configured")
 
 // Account returns the information about a Vocdoni account. If address is empty, it returns the information
 // about the account associated with the client.
@@ -92,9 +90,7 @@ func (c *HTTPclient) Transfer(to common.Address, amount uint64) (types.HexBytes,
 // TransferWithNonce sends tokens from the account associated with the client to the given address.
 // Returns the transaction hash.
 func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce uint32) (types.HexBytes, error) {
-	var err error
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	tx, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SendTokens{
 			SendTokens: &models.SendTokensTx{
 				Txtype: models.TxType_SET_ACCOUNT_INFO_URI,
@@ -103,11 +99,12 @@ func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce u
 				To:     to.Bytes(),
 				Value:  amount,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
-	txHash, _, err := c.SignAndSendTx(&stx)
+	txHash, _, err := c.SignAndSendTx(tx)
 	return txHash, err
 }
 
@@ -143,7 +140,8 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 				InfoURI:       &metadataURI,
 				SIK:           sik,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -292,21 +290,19 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 }
 
 // ListTokenTransfers returns the list of sent and received token transfers associated with an account
-func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (indexertypes.TokenTransfersAccount, error) {
+func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (*api.TransfersList, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "accounts", account.Hex(), "transfers", "page", strconv.Itoa(page))
 	if err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
+		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
-		return indexertypes.TokenTransfersAccount{}, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	tokenTxs := new(struct {
-		Transfers indexertypes.TokenTransfersAccount `json:"transfers"`
-	})
-	if err := json.Unmarshal(resp, &tokenTxs); err != nil {
-		return indexertypes.TokenTransfersAccount{}, err
+	tokenTxs := &api.TransfersList{}
+	if err := json.Unmarshal(resp, tokenTxs); err != nil {
+		return nil, err
 	}
-	return tokenTxs.Transfers, nil
+	return tokenTxs, nil
 }
 
 // SetSIK function allows to update the Secret Identity Key for the current
@@ -367,7 +363,8 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 			DelSIK: &models.SIKTx{
 				Txtype: models.TxType_DEL_ACCOUNT_SIK,
 			},
-		}})
+		},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -421,8 +418,7 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		return nil, fmt.Errorf("error generating SIK: %w", err)
 	}
 	// compose and encode the transaction
-	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	tx, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_RegisterSIK{
 			RegisterSIK: &models.RegisterSIKTx{
 				SIK:        sik,
@@ -444,7 +440,7 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 		return nil, fmt.Errorf("error encoding RegisterSIKTx: %w", err)
 	}
 	// sign it and send it
-	hash, _, err := c.SignAndSendTx(stx)
+	hash, _, err := c.SignAndSendTx(tx)
 	if err != nil {
 		return nil, fmt.Errorf("error signing or sending the Tx: %w", err)
 	}

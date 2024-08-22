@@ -179,6 +179,9 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	if err != nil {
 		return ethereum.Address{}, err
 	}
+	if addr == nil || acc == nil {
+		return ethereum.Address{}, fmt.Errorf("cannot get account from signature")
+	}
 	// get process
 	process, err := t.state.Process(tx.ProcessId, false)
 	if err != nil {
@@ -206,7 +209,7 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	if err != nil {
 		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
 	}
-	// check balance and nonce
+	// check base cost
 	if acc.Balance < cost {
 		return ethereum.Address{}, vstate.ErrNotEnoughBalance
 	}
@@ -229,8 +232,9 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			if err := t.checkMaxCensusSize(process); err != nil {
 				return ethereum.Address{}, err
 			}
-			// get Tx cost, since it is a new process, we should use the election price calculator
-			if acc.Balance < t.txCostIncreaseCensusSize(process, tx.GetCensusSize()) {
+			cost = t.txCostIncreaseCensusSize(process, tx.GetCensusSize())
+			// get Tx cost, since it is a new census size, we should use the election price calculator
+			if acc.Balance < cost {
 				return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
 			}
 		}
@@ -241,6 +245,14 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			tx.GetCensusSize(),
 			false,
 		)
+	case models.TxType_SET_PROCESS_DURATION:
+		// get Tx cost, since it modifies the process duration, we should use the election price calculator
+		cost = t.txCostIncreaseDuration(process, tx.GetDuration())
+		if acc.Balance < cost {
+			return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
+		}
+		return ethereum.Address(*addr), t.state.SetProcessDuration(process.ProcessId, tx.GetDuration(), false)
+
 	default:
 		return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
 	}
@@ -349,6 +361,25 @@ func (t *TransactionHandler) txCostIncreaseCensusSize(process *models.Process, n
 	}
 	if newCost < oldCost {
 		log.Warnw("txCostIncreaseCensusSize: new cost is lower than the old cost", "oldCost", oldCost, "newCost", newCost)
+		return baseCost
+	}
+	return baseCost + (newCost - oldCost)
+}
+
+// txCostIncreaseDuration calculates the cost increase of a process based on the new  duration.
+func (t *TransactionHandler) txCostIncreaseDuration(process *models.Process, newDuration uint32) uint64 {
+	oldCost := t.txElectionCostFromProcess(process)
+	oldDuration := process.GetDuration()
+	process.Duration = newDuration
+	newCost := t.txElectionCostFromProcess(process)
+	process.Duration = oldDuration
+
+	baseCost, err := t.state.TxBaseCost(models.TxType_SET_PROCESS_DURATION, false)
+	if err != nil {
+		log.Errorw(err, "txCostIncreaseDuration: cannot get transaction base cost")
+		return 0
+	}
+	if newCost < oldCost {
 		return baseCost
 	}
 	return baseCost + (newCost - oldCost)

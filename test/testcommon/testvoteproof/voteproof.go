@@ -16,7 +16,8 @@ import (
 )
 
 func GetCSPproofBatch(signers []*ethereum.SignKeys,
-	csp *ethereum.SignKeys, pid []byte) ([]types.HexBytes, error) {
+	csp *ethereum.SignKeys, pid []byte,
+) ([]types.HexBytes, error) {
 	var proofs []types.HexBytes
 	for _, k := range signers {
 		bundle := &models.CAbundle{
@@ -50,8 +51,10 @@ func GetCSPproofBatch(signers []*ethereum.SignKeys,
 // It returns the keys, the census root and the proofs for each key.
 func CreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []byte, [][]byte) {
 	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{Name: "testcensus", ParentDB: db,
-		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B})
+	tr, err := censustree.New(censustree.Options{
+		Name: "testcensus", ParentDB: db,
+		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +83,8 @@ func CreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []b
 
 // BuildSignedVoteForOffChainTree builds a signed vote for an off-chain merkle-tree election.
 func BuildSignedVoteForOffChainTree(t *testing.T, electionID []byte, key *ethereum.SignKeys,
-	proof []byte, votePackage []int, chainID string) *models.SignedTx {
+	proof []byte, votePackage []int, chainID string,
+) *models.SignedTx {
 	var stx models.SignedTx
 	var err error
 	vp, err := json.Marshal(votePackage)

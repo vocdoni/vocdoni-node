@@ -83,17 +83,17 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 	}
 
 	// consensus config
-	blockTime := config.DefaultMinerTargetBlockTimeSeconds
+	blockTime := config.DefaultMinerTargetBlockTime
 	if localConfig.MinerTargetBlockTimeSeconds > 0 {
-		blockTime = localConfig.MinerTargetBlockTimeSeconds
+		blockTime = time.Duration(localConfig.MinerTargetBlockTimeSeconds) * time.Second
 	}
 	tconfig.Consensus.TimeoutProposeDelta = time.Millisecond * 200
-	tconfig.Consensus.TimeoutPropose = time.Second * time.Duration(float32(blockTime)*0.6)
+	tconfig.Consensus.TimeoutPropose = blockTime * 6 / 10
 	tconfig.Consensus.TimeoutPrevoteDelta = time.Millisecond * 200
 	tconfig.Consensus.TimeoutPrevote = time.Second * 1
 	tconfig.Consensus.TimeoutPrecommitDelta = time.Millisecond * 200
 	tconfig.Consensus.TimeoutPrecommit = time.Second * 1
-	tconfig.Consensus.TimeoutCommit = time.Second * time.Duration(blockTime)
+	tconfig.Consensus.TimeoutCommit = blockTime
 
 	// if seed node
 	if localConfig.IsSeedNode {
@@ -304,7 +304,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 		cometnode.DefaultMetricsProvider(tconfig.Instrumentation),
 		log.NewCometLogger("comet", tconfig.LogLevel),
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}

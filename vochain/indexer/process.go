@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.vocdoni.io/proto/build/go/models"
@@ -44,42 +45,64 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 }
 
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
-// EntityID, searchTerm, namespace, status, and withResults are optional filters, if
-// declared as zero-values will be ignored. SearchTerm is a partial or full PID.
+// all args (entityID, processID, etc) are optional filters, if
+// declared as zero-values will be ignored. entityID and processID are partial or full hex strings.
 // Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
-func (idx *Indexer) ProcessList(entityID []byte, from, max int, searchTerm string, namespace uint32,
-	srcNetworkId int32, status string, withResults bool) ([][]byte, error) {
-	if from < 0 {
-		return nil, fmt.Errorf("processList: invalid value: from is invalid value %d", from)
+func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID string,
+	namespace uint32, srcNetworkID int32, status models.ProcessStatus,
+	withResults, finalResults, manuallyEnded *bool,
+	startDateAfter, startDateBefore, endDateAfter, endDateBefore *time.Time,
+) ([][]byte, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
-	// For filtering on Status we use a badgerhold match function.
-	// If status is not defined, then the match function will return always true.
-	statusnum := int32(0)
-	statusfound := false
-	if status != "" {
-		if statusnum, statusfound = models.ProcessStatus_value[status]; !statusfound {
-			return nil, fmt.Errorf("processList: status %s is unknown", status)
-		}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
 	}
 	// Filter match function for source network Id
-	if _, ok := models.SourceNetworkId_name[srcNetworkId]; !ok {
-		return nil, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkId)
+	if _, ok := models.SourceNetworkId_name[srcNetworkID]; !ok {
+		return nil, 0, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkID)
 	}
-
-	procs, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
-		EntityID:        nonNullBytes(entityID), // so that LENGTH never returns NULL
+	results, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
+		EntityIDSubstr:  entityID,
 		Namespace:       int64(namespace),
-		Status:          int64(statusnum),
-		SourceNetworkID: int64(srcNetworkId),
-		IDSubstr:        searchTerm,
-		Offset:          int64(from),
-		Limit:           int64(max),
-		WithResults:     withResults,
+		Status:          int64(status),
+		SourceNetworkID: int64(srcNetworkID),
+		IDSubstr:        strings.ToLower(processID), // we search in lowercase
+		Offset:          int64(offset),
+		Limit:           int64(limit),
+		HaveResults:     boolToInt(withResults),
+		FinalResults:    boolToInt(finalResults),
+		ManuallyEnded:   boolToInt(manuallyEnded),
+		StartDateAfter:  startDateAfter,
+		StartDateBefore: startDateBefore,
+		EndDateAfter:    endDateAfter,
+		EndDateBefore:   endDateBefore,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return procs, nil
+	list := [][]byte{}
+	for _, row := range results {
+		list = append(list, row.ID)
+	}
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
+}
+
+// ProcessExists returns whether the passed processID exists in the db.
+// If passed arg is not the full hex string, returns false (i.e. no substring matching)
+func (idx *Indexer) ProcessExists(processID string) bool {
+	if len(processID) != 64 {
+		return false
+	}
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	if err != nil {
+		log.Errorw(err, "indexer query failed")
+	}
+	return count > 0
 }
 
 // CountTotalProcesses returns the total number of processes indexed.
@@ -93,19 +116,47 @@ func (idx *Indexer) CountTotalProcesses() uint64 {
 }
 
 // EntityList returns the list of entities indexed by the indexer
-// searchTerm is optional, if declared as zero-value
-// will be ignored. Searches against the ID field.
-func (idx *Indexer) EntityList(max, from int, searchTerm string) []indexerdb.SearchEntitiesRow {
-	rows, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
-		EntityIDSubstr: searchTerm,
-		Offset:         int64(from),
-		Limit:          int64(max),
+// entityID is optional, if declared as zero-value
+// will be ignored. Searches against the entityID field as lowercase hex.
+func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertypes.Entity, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	results, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
+		EntityIDSubstr: strings.ToLower(entityID), // we search in lowercase
+		Offset:         int64(offset),
+		Limit:          int64(limit),
 	})
 	if err != nil {
-		log.Errorf("error listing entities: %v", err)
-		return nil
+		return nil, 0, err
 	}
-	return rows
+	list := []indexertypes.Entity{}
+	for _, row := range results {
+		list = append(list, indexertypes.Entity{
+			EntityID:     row.EntityID,
+			ProcessCount: row.ProcessCount,
+		})
+	}
+	if len(results) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(results[0].TotalCount), nil
+}
+
+// EntityExists returns whether the passed entityID exists in the db.
+// If passed arg is not the full hex string, returns false (i.e. no substring matching)
+func (idx *Indexer) EntityExists(entityID string) bool {
+	if len(entityID) != 40 {
+		return false
+	}
+	_, count, err := idx.EntityList(1, 0, entityID)
+	if err != nil {
+		log.Errorw(err, "indexer query failed")
+	}
+	return count > 0
 }
 
 // CountTotalEntities return the total number of entities indexed by the indexer
@@ -121,6 +172,17 @@ func (idx *Indexer) CountTotalEntities() uint64 {
 // Return whether a process must have live results or not
 func isOpenProcess(process *indexertypes.Process) bool {
 	return !process.Envelope.EncryptedVotes
+}
+
+// boolToInt returns -1 if pointer is nil, or 1 for true and 0 for false
+func boolToInt(b *bool) int {
+	if b == nil {
+		return -1
+	}
+	if *b {
+		return 1
+	}
+	return 0
 }
 
 // newEmptyProcess creates a new empty process and stores it into the database.
@@ -209,6 +271,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		Metadata:      p.GetMetadata(),
 		Status:        int64(p.Status),
 		MaxCensusSize: int64(p.GetMaxCensusSize()),
+		EndDate:       time.Unix(int64(p.StartTime+p.Duration), 0),
 	}); err != nil {
 		return err
 	}

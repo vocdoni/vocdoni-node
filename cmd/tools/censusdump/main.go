@@ -140,7 +140,7 @@ func main() {
 		log.Fatalf("could not marshal census data: %s", err)
 	}
 
-	if err := os.WriteFile(*output, censusPrint, 0644); err != nil {
+	if err := os.WriteFile(*output, censusPrint, 0o644); err != nil {
 		log.Fatalf("could not write census data: %s", err)
 	}
 	log.Infow("census data exported", "file", *output)

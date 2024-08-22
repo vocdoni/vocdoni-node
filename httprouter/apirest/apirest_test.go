@@ -88,7 +88,6 @@ func TestRouterWithAPI(t *testing.T) {
 	qt.Check(t, resp, qt.DeepEquals, []byte("hello admin!\n"))
 	resp = doRequest(t, url+"/admin/do", "abcde", "POST", []byte("hello"))
 	qt.Check(t, string(resp), qt.Contains, "admin token not valid\n")
-
 }
 
 func doRequest(t *testing.T, url, authToken, method string, body []byte) []byte {

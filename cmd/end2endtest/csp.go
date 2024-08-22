@@ -30,7 +30,7 @@ func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	t.api = api
 	t.config = c
 
-	//setup for ranked voting
+	// setup for ranked voting
 	p := newTestProcess()
 	// update to use csp origin
 	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA
