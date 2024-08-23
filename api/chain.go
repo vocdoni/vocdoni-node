@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
@@ -1014,7 +1015,39 @@ func (a *API) chainBlockListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCont
 //
 // Errors returned are always of type APIerror.
 func (a *API) sendBlockList(ctx *httprouter.HTTPContext, params *BlockParams) error {
-	blocks, total, err := a.indexer.BlockList(
+	// TODO: replace this by a.indexer.BlockList when it's available
+	blockList := func(limit, offset int, _, _, _ string) ([]*indexertypes.Block, uint64, error) {
+		if offset < 0 {
+			return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+		}
+		if limit <= 0 {
+			return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+		}
+		height := a.vocapp.Height()
+		total := uint64(height) - uint64(a.vocapp.Node.BlockStore().Base())
+		start := height - uint32(params.Page*params.Limit)
+		end := start - uint32(params.Limit)
+		list := []*indexertypes.Block{}
+		for h := start; h > end; h-- {
+			tmblock := a.vocapp.GetBlockByHeight(int64(h))
+			if tmblock == nil {
+				break
+			}
+			list = append(list, &indexertypes.Block{
+				ChainID:         tmblock.ChainID,
+				Height:          tmblock.Height,
+				Time:            tmblock.Time,
+				Hash:            types.HexBytes(tmblock.Hash()),
+				ProposerAddress: tmblock.ProposerAddress.Bytes(),
+				LastBlockHash:   tmblock.LastBlockID.Hash.Bytes(),
+				TxCount:         int64(len(tmblock.Txs)),
+			})
+		}
+
+		return list, uint64(total), nil
+	}
+
+	blocks, total, err := blockList(
 		params.Limit,
 		params.Page*params.Limit,
 		params.ChainID,
