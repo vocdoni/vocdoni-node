@@ -18,6 +18,7 @@ import (
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
@@ -175,6 +176,14 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainBlockByHashHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/blocks",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainBlockListHandler,
 	); err != nil {
 		return err
 	}
@@ -972,6 +981,95 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	return ctx.Send(convertKeysToCamel(data), apirest.HTTPstatusOK)
 }
 
+// chainBlockListHandler
+//
+//	@Summary		List all blocks
+//	@Description	Returns the list of blocks, ordered by descending height.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			page			query		number	false	"Page"
+//	@Param			limit			query		number	false	"Items per page"
+//	@Param			chainId			query		string	false	"Filter by exact chainId"
+//	@Param			hash			query		string	false	"Filter by partial hash"
+//	@Param			proposerAddress	query		string	false	"Filter by exact proposerAddress"
+//	@Success		200				{object}	BlockList
+//	@Router			/chain/blocks [get]
+func (a *API) chainBlockListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	params, err := parseBlockParams(
+		ctx.QueryParam(ParamPage),
+		ctx.QueryParam(ParamLimit),
+		ctx.QueryParam(ParamChainId),
+		ctx.QueryParam(ParamHash),
+		ctx.QueryParam(ParamProposerAddress),
+	)
+	if err != nil {
+		return err
+	}
+
+	return a.sendBlockList(ctx, params)
+}
+
+// sendBlockList produces a filtered, paginated BlockList,
+// and sends it marshalled over ctx.Send
+//
+// Errors returned are always of type APIerror.
+func (a *API) sendBlockList(ctx *httprouter.HTTPContext, params *BlockParams) error {
+	// TODO: replace this by a.indexer.BlockList when it's available
+	blockList := func(limit, offset int, _, _, _ string) ([]*indexertypes.Block, uint64, error) {
+		if offset < 0 {
+			return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+		}
+		if limit <= 0 {
+			return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+		}
+		height := a.vocapp.Height()
+		total := uint64(height) - uint64(a.vocapp.Node.BlockStore().Base())
+		start := height - uint32(params.Page*params.Limit)
+		end := start - uint32(params.Limit)
+		list := []*indexertypes.Block{}
+		for h := start; h > end; h-- {
+			tmblock := a.vocapp.GetBlockByHeight(int64(h))
+			if tmblock == nil {
+				break
+			}
+			list = append(list, &indexertypes.Block{
+				ChainID:         tmblock.ChainID,
+				Height:          tmblock.Height,
+				Time:            tmblock.Time,
+				Hash:            types.HexBytes(tmblock.Hash()),
+				ProposerAddress: tmblock.ProposerAddress.Bytes(),
+				LastBlockHash:   tmblock.LastBlockID.Hash.Bytes(),
+				TxCount:         int64(len(tmblock.Txs)),
+			})
+		}
+
+		return list, uint64(total), nil
+	}
+
+	blocks, total, err := blockList(
+		params.Limit,
+		params.Page*params.Limit,
+		params.ChainID,
+		params.Hash,
+		params.ProposerAddress,
+	)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+
+	list := &BlockList{
+		Blocks:     blocks,
+		Pagination: pagination,
+	}
+	return marshalAndSend(ctx, list)
+}
+
 // chainTransactionCountHandler
 //
 //	@Summary		Transactions count
@@ -1318,5 +1416,20 @@ func parseTransactionParams(paramPage, paramLimit, paramHeight, paramType string
 		PaginationParams: pagination,
 		Height:           uint64(height),
 		Type:             paramType,
+	}, nil
+}
+
+// parseBlockParams returns an BlockParams filled with the passed params
+func parseBlockParams(paramPage, paramLimit, paramChainId, paramHash, paramProposerAddress string) (*BlockParams, error) {
+	pagination, err := parsePaginationParams(paramPage, paramLimit)
+	if err != nil {
+		return nil, err
+	}
+
+	return &BlockParams{
+		PaginationParams: pagination,
+		ChainID:          paramChainId,
+		Hash:             util.TrimHex(paramHash),
+		ProposerAddress:  util.TrimHex(paramProposerAddress),
 	}, nil
 }
