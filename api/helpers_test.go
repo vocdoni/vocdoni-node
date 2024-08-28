@@ -155,7 +155,7 @@ func TestConvertKeysToCamel(t *testing.T) {
 	}
 }
 
-func TestProtoFormat(t *testing.T) {
+func TestProtoTxAsJSON(t *testing.T) {
 	wantJSON := strings.TrimSpace(`
 {
 	"setProcess": {
@@ -176,7 +176,7 @@ func TestProtoFormat(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	var dst bytes.Buffer
-	err = json.Indent(&dst, []byte(protoFormat(asProto)), "", "\t")
+	err = json.Indent(&dst, protoTxAsJSON(asProto), "", "\t")
 	qt.Assert(t, err, qt.IsNil)
 	gotJSON := dst.String()
 
