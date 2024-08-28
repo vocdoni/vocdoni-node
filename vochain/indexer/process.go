@@ -52,6 +52,7 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 	namespace uint32, srcNetworkID int32, status models.ProcessStatus,
 	withResults, finalResults, manuallyEnded *bool,
 	startDateAfter, startDateBefore, endDateAfter, endDateBefore *time.Time,
+	title, description string,
 ) ([][]byte, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
@@ -78,6 +79,8 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		StartDateBefore: startDateBefore,
 		EndDateAfter:    endDateAfter,
 		EndDateBefore:   endDateBefore,
+		Title:           title,
+		Description:     description,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -98,7 +101,7 @@ func (idx *Indexer) ProcessExists(processID string) bool {
 	if len(processID) != 64 {
 		return false
 	}
-	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}

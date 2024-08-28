@@ -33,6 +33,8 @@ type ElectionParams struct {
 	StartDateBefore *time.Time `json:"startDateBefore,omitempty"`
 	EndDateAfter    *time.Time `json:"endDateAfter,omitempty"`
 	EndDateBefore   *time.Time `json:"endDateBefore,omitempty"`
+	Title           string     `json:"title,omitempty"`
+	Description     string     `json:"description,omitempty"`
 }
 
 // OrganizationParams allows the client to filter organizations
@@ -122,6 +124,8 @@ type ElectionSummary struct {
 	Results        [][]*types.BigInt `json:"result,omitempty"`
 	ManuallyEnded  bool              `json:"manuallyEnded"`
 	ChainID        string            `json:"chainId"`
+	Title          string            `json:"title"`
+	Description    string            `json:"description"`
 }
 
 // ElectionsList is used to return a paginated list to the client
