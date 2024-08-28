@@ -706,7 +706,7 @@ func (a *API) chainTxHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrVochainGetTxFailed.WithErr(err)
 	}
 	tx := &GenericTransactionWithInfo{
-		TxContent: []byte(protoFormat(stx.Tx)),
+		TxContent: protoTxAsJSON(stx.Tx),
 		Signature: stx.Signature,
 		TxInfo:    *ref,
 	}
