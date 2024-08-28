@@ -8,8 +8,10 @@ import (
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data/downloader"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -26,6 +28,7 @@ type importItem struct {
 	itemType   int
 	uri        string
 	censusRoot string
+	pid        types.HexBytes
 }
 
 var itemTypesToString = map[int]string{
@@ -42,6 +45,7 @@ var itemTypesToString = map[int]string{
 // offchain data (usually on IPFS).
 type OffChainDataHandler struct {
 	vochain       *vochain.BaseApplication
+	indexer       *indexer.Indexer
 	census        *censusdb.CensusDB
 	storage       *downloader.Downloader
 	queue         []importItem
@@ -52,11 +56,12 @@ type OffChainDataHandler struct {
 
 // NewOffChainDataHandler creates a new instance of the off chain data downloader daemon.
 // It will subscribe to Vochain events and perform data import.
-func NewOffChainDataHandler(v *vochain.BaseApplication, d *downloader.Downloader,
+func NewOffChainDataHandler(v *vochain.BaseApplication, i *indexer.Indexer, d *downloader.Downloader,
 	c *censusdb.CensusDB, importOnlyNew bool,
 ) *OffChainDataHandler {
 	od := OffChainDataHandler{
 		vochain:       v,
+		indexer:       i,
 		census:        c,
 		storage:       d,
 		importOnlyNew: importOnlyNew,
@@ -87,7 +92,7 @@ func (d *OffChainDataHandler) Commit(_ uint32) error {
 			go d.enqueueOffchainCensus(item.censusRoot, item.uri)
 		case itemTypeElectionMetadata, itemTypeAccountMetadata:
 			log.Infow("importing data", "type", itemTypesToString[item.itemType], "uri", item.uri)
-			go d.enqueueMetadata(item.uri)
+			go d.enqueueMetadata(item)
 		default:
 			log.Errorf("unknown import item %d", item.itemType)
 		}
@@ -107,6 +112,7 @@ func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 	if m := p.GetMetadata(); m != "" {
 		log.Debugf("adding election metadata %s to queue", m)
 		d.queue = append(d.queue, importItem{
+			pid:      p.GetProcessId(),
 			uri:      m,
 			itemType: itemTypeElectionMetadata,
 		})
