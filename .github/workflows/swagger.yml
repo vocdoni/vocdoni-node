@@ -15,6 +15,13 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
+      - name: Checkout developer-portal repo
+        uses: actions/checkout@v4
+        with:
+          repository: vocdoni/developer-portal
+          ref: main
+          path: developer-portal
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
@@ -33,37 +40,46 @@ jobs:
         with:
           cmd: |
             yq '.components.schemas."api.GenericTransactionWithInfo".properties.tx = load("api/docs/models/transactions.yaml").target' \
-              api/docs/oas3.yaml > api/docs/vocdoni-api.yaml
+              api/docs/oas3.yaml > developer-portal/swaggers/vocdoni-api.yaml
+
       - name: Publish Artifact
         uses: actions/upload-artifact@v4
         with:
           name: vocdoni-api.yaml
-          path: api/docs/vocdoni-api.yaml
+          path: developer-portal/swaggers/vocdoni-api.yaml
 
-  developer-portal-pr:
-    name: Open PR to developer-portal repo
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name != 'pull_request' }}
-    needs: api-swagger
-    steps:
-      - name: Checkout developer-portal repo
-        uses: actions/checkout@v4
+      - name: Check if there is a difference
+        uses: mathiasvr/command-output@v2.0.0
+        id: diff
         with:
-          repository: vocdoni/developer-portal
-          ref: main
-      - name: Remove old yaml
-        run: rm swaggers/vocdoni-api.yaml
-      - name: Pull new yaml
-        uses: actions/download-artifact@v4
-        with:
-          name: vocdoni-api.yaml
-          path: swaggers
+          run: git -C developer-portal diff --no-color swaggers/vocdoni-api.yaml
 
-      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
+      - name: Mark previous comment as outdated
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: diff
+          hide: true
+          hide_classify: "OUTDATED"
+
+      - name: Post comment with diff in original PR
+        if: ${{ github.event_name == 'pull_request' && steps.diff.outputs.stdout }}
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          header: diff
+          message: |
+            This PR introduces the following changes in the developer-portal documentation:
+            ```diff
+            ${{ steps.diff.outputs.stdout }}
+            ```
+
       - name: Create PR to developer-portal repo
         id: cpr
         uses: peter-evans/create-pull-request@v6
+        if: ${{ github.event_name == 'push' }}
         with:
+          path: developer-portal
           token: ${{ secrets.VOCDONIBOT_PAT }}
           commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
           committer: "Arabot-1 <arabot-1@users.noreply.github.com>"
