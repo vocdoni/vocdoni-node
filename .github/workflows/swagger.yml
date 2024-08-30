@@ -28,19 +28,20 @@ jobs:
           cache: false
       - name: Install swag
         run: |
-          curl -L https://github.com/swaggo/swag/releases/download/v1.16.3/swag_1.16.3_Linux_amd64.tar.gz | tar -xzf -
+          curl -L https://github.com/swaggo/swag/releases/download/v2.0.0-rc1/swag_2.0.0-rc1_Linux_x86_64.tar.gz | tar -xzf -
       - name: Run swag
-        run: ./swag init --parseDependency --parseDepth 1 --parseInternal --md api/docs/descriptions --overridesFile api/docs/.swaggo -g api.go -d api/,api/docs/models/ -o api/docs --ot yaml
-      - name: Install api-spec-converter
-        run: npm install -g api-spec-converter
-      - name: Convert the Swagger file to OAS3 format
-        run: api-spec-converter --from=swagger_2 --to=openapi_3 --syntax=yaml api/docs/swagger.yaml > api/docs/oas3.yaml
+        run: ./swag init --parseDependency --parseDepth 1 --parseInternal \
+                --md api/docs/descriptions \
+                --overridesFile api/docs/.swaggo \
+                -g api.go \
+                -d api/,api/docs/models/ \
+                -o api/docs --ot yaml --v3.1
       - name: yq - portable yaml processor
         uses: mikefarah/yq@v4.34.1
         with:
           cmd: |
             yq '.components.schemas."api.GenericTransactionWithInfo".properties.tx = load("api/docs/models/transactions.yaml").target' \
-              api/docs/oas3.yaml > developer-portal/swaggers/vocdoni-api.yaml
+              api/docs/swagger.yaml > developer-portal/swaggers/vocdoni-api.yaml
 
       - name: Publish Artifact
         uses: actions/upload-artifact@v4
