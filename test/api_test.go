@@ -702,7 +702,15 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 	metaData, err := json.Marshal(meta)
 	qt.Assert(t, err, qt.IsNil)
 
-	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), initialBalance)
+	// get the txCost for the create account transacction
+	data, statusCode := c.Request("GET", nil, "chain", "transactions", "cost")
+	qt.Assert(t, statusCode, qt.Equals, 200)
+	var txCosts api.Transaction
+	qt.Assert(t, json.Unmarshal(data, &txCosts), qt.IsNil)
+	txCost := txCosts.Costs[genesis.TxTypeToCostName(models.TxType_CREATE_ACCOUNT)]
+
+	// add the tx cost to the initialBalance for the faucet package
+	fp, err := vochain.GenerateFaucetPackage(server.Account, signer.Address(), initialBalance+txCost)
 	qt.Assert(t, err, qt.IsNil)
 
 	// transaction

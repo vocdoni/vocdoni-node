@@ -122,10 +122,16 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 		return err
 	}
 
+	// get the create account transaction cost
+	txCost, err := api.TransactionCost(models.TxType_CREATE_ACCOUNT)
+	if err != nil {
+		return fmt.Errorf("error fetching transaction cost: %w", err)
+	}
+
 	// create account for bob with faucet package from alice
 	afp, err := vochain.GenerateFaucetPackage(alice, bob.Address(), aliceAcc.Balance/2)
 	if err != nil {
-		return fmt.Errorf("error in GenerateFaucetPackage %v", err)
+		return fmt.Errorf("error in GenerateFaucetPackage %w", err)
 	}
 
 	bobAcc, err := ensureAccountExists(api.Clone(hex.EncodeToString(bob.PrivateKey())), afp)
@@ -134,9 +140,9 @@ func testCreateAndSetAccount(api *apiclient.HTTPclient, fp *models.FaucetPackage
 	}
 
 	// check balance added from payload
-	if bobAcc.Balance != aliceAcc.Balance/2 {
+	if bobAcc.Balance+txCost != aliceAcc.Balance/2 {
 		return fmt.Errorf("expected balance for bob (%s) is %d but got %d",
-			bob.Address(), aliceAcc.Balance/2, bobAcc.Balance)
+			bob.Address(), (aliceAcc.Balance/2)-txCost, bobAcc.Balance)
 	}
 	log.Infow("account for bob successfully created with payload signed by alice",
 		"alice", alice.Address(), "bob", bobAcc)

@@ -1,6 +1,8 @@
 package transaction
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 
@@ -131,13 +133,23 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}); err != nil {
 				return nil, fmt.Errorf("newProcessTx: cannot schedule end process: %w", err)
 			}
+
+			cost := t.txElectionCostFromProcess(p)
+
+			// check for a faucet package and transfer amount to sender account
+			sender := common.Address(txSender)
+			if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, cost, sender, vtx.TxID[:], true); err != nil {
+				return nil, err
+			}
+
 			return response, t.state.BurnTxCostIncrementNonce(
-				common.Address(txSender),
+				sender,
 				models.TxType_NEW_PROCESS,
-				t.txElectionCostFromProcess(p),
+				cost,
 				hex.EncodeToString(p.GetProcessId()),
 			)
 		}
+
 	case *models.Tx_SetProcess:
 		cost := uint64(0)
 		txSender, err := t.SetProcessTxCheck(vtx)
@@ -203,7 +215,13 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				return nil, fmt.Errorf("unknown set process tx type")
 			}
 
-			return response, t.state.BurnTxCostIncrementNonce(common.Address(txSender), tx.Txtype, cost, hex.EncodeToString(tx.ProcessId))
+			// check for a faucet package and transfer amount to sender account
+			sender := common.Address(txSender)
+			if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, cost, sender, vtx.TxID[:], true); err != nil {
+				return nil, err
+			}
+
+			return response, t.state.BurnTxCostIncrementNonce(sender, tx.Txtype, cost, hex.EncodeToString(tx.ProcessId))
 		}
 
 	case *models.Tx_SetAccount:
@@ -253,41 +271,24 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
 					}
 				}
-				if tx.FaucetPackage != nil {
-					faucetIssuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
-					if err != nil {
-						return nil, fmt.Errorf("createAccountTx: faucetIssuerAddress %w", err)
-					}
-					txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
-					if err != nil {
-						return nil, fmt.Errorf("createAccountTx: txCost %w", err)
-					}
-					if txCost != 0 {
-						if err := t.state.BurnTxCost(faucetIssuerAddress, txCost); err != nil {
-							return nil, fmt.Errorf("setAccountTx: burnTxCost %w", err)
-						}
-					}
-					faucetPayload := &models.FaucetPayload{}
-					if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
-						return nil, fmt.Errorf("createAccountTx: cannot unmarshal faucetPayload %w", err)
-					}
-					if err := t.state.ConsumeFaucetPayload(
-						faucetIssuerAddress,
-						faucetPayload,
-					); err != nil {
-						return nil, fmt.Errorf("setAccountTx: consumeFaucet %w", err)
-					}
-					if err := t.state.TransferBalance(&vochaintx.TokenTransfer{
-						FromAddress: faucetIssuerAddress,
-						ToAddress:   txSenderAddress,
-						Amount:      faucetPayload.Amount,
-						TxHash:      vtx.TxID[:],
-					}, false); err != nil {
-						return nil, fmt.Errorf("setAccountTx: transferBalance %w", err)
-					}
-					// transfer balance from faucet package issuer to created account
-					return response, nil
+				txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
+				if err != nil {
+					return nil, fmt.Errorf("createAccountTx: txCost %w", err)
 				}
+
+				// transfer balance from faucet package issuer to created account
+				canPayWithFaucet, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true)
+				if err != nil {
+					return nil, fmt.Errorf("could not verify the faucet package: %w", err)
+				}
+				if !canPayWithFaucet {
+					return nil, fmt.Errorf("faucet package is not enough for paying for the transaction cost")
+				}
+				// burn the cost of the transaction from the txSender account
+				if err := t.state.BurnTxCost(txSenderAddress, txCost); err != nil {
+					return nil, err
+				}
+
 				return response, nil
 
 			case models.TxType_SET_ACCOUNT_INFO_URI:
@@ -295,11 +296,19 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err != nil {
 					return nil, fmt.Errorf("setAccountInfo: txSenderAddress %w", err)
 				}
+				txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_INFO_URI, false)
+				if err != nil {
+					return nil, fmt.Errorf("setAccountInfoUriTx: txCost: %w", err)
+				}
+				// check for a faucet package and if exist, transfer the amount to the tx sender
+				if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true); err != nil {
+					return nil, err
+				}
 				// consume cost for setAccount
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_SET_ACCOUNT_INFO_URI,
-					0,
+					txCost,
 					tx.GetInfoURI(),
 				); err != nil {
 					return nil, fmt.Errorf("setAccountInfo: burnCostIncrementNonce %w", err)
@@ -321,10 +330,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err != nil {
 					return nil, fmt.Errorf("addDelegate: txSenderAddress %w", err)
 				}
+				txCost, err := t.state.TxBaseCost(models.TxType_ADD_DELEGATE_FOR_ACCOUNT, false)
+				if err != nil {
+					return nil, fmt.Errorf("addDelegate: txCost: %w", err)
+				}
+				// check for a faucet package and if exist, transfer the amount to the tx sender
+				if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true); err != nil {
+					return nil, err
+				}
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_ADD_DELEGATE_FOR_ACCOUNT,
-					0,
+					txCost,
 					"",
 				); err != nil {
 					return nil, fmt.Errorf("addDelegate: burnTxCostIncrementNonce %w", err)
@@ -341,10 +358,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err != nil {
 					return nil, fmt.Errorf("delDelegate: txSenderAddress %w", err)
 				}
+				txCost, err := t.state.TxBaseCost(models.TxType_DEL_DELEGATE_FOR_ACCOUNT, false)
+				if err != nil {
+					return nil, fmt.Errorf("delDelegate: txCost: %w", err)
+				}
+				// check for a faucet package and if exist, transfer the amount to the tx sender
+				if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true); err != nil {
+					return nil, err
+				}
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_DEL_DELEGATE_FOR_ACCOUNT,
-					0,
+					txCost,
 					"",
 				); err != nil {
 					return nil, fmt.Errorf("delDelegate: burnTxCostIncrementNonce %w", err)
@@ -361,6 +386,14 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err != nil {
 					return nil, fmt.Errorf("setValidator: txSenderAddress %w", err)
 				}
+				txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_VALIDATOR, false)
+				if err != nil {
+					return nil, fmt.Errorf("setValidator: txCost: %w", err)
+				}
+				// check for a faucet package and if exist, transfer the amount to the tx sender
+				if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true); err != nil {
+					return nil, err
+				}
 				validatorAddr, err := ethereum.AddrFromPublicKey(tx.GetPublicKey())
 				if err != nil {
 					return nil, fmt.Errorf("setValidator: %w", err)
@@ -368,7 +401,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err := t.state.BurnTxCostIncrementNonce(
 					txSenderAddress,
 					models.TxType_SET_ACCOUNT_VALIDATOR,
-					0,
+					txCost,
 					validatorAddr.Hex(),
 				); err != nil {
 					return nil, fmt.Errorf("setValidator: burnTxCostIncrementNonce %w", err)
@@ -456,10 +489,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return nil, fmt.Errorf("setSIKTx: %w", err)
 		}
 		if forCommit {
+			txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_SIK, false)
+			if err != nil {
+				return nil, fmt.Errorf("setAccountInfoUriTx: txCost: %w", err)
+			}
+			// check for a faucet package and if exist, transfer the amount to the tx sender
+			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
+				return nil, err
+			}
 			if err := t.state.BurnTxCostIncrementNonce(
 				txAddress,
 				models.TxType_SET_ACCOUNT_SIK,
-				0,
+				txCost,
 				newSIK.String(),
 			); err != nil {
 				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
@@ -476,10 +517,18 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return nil, fmt.Errorf("delSIKTx: %w", err)
 		}
 		if forCommit {
+			txCost, err := t.state.TxBaseCost(models.TxType_DEL_ACCOUNT_SIK, false)
+			if err != nil {
+				return nil, fmt.Errorf("delSIKTx: txCost: %w", err)
+			}
+			// check for a faucet package and if exist, transfer the amount to the tx sender
+			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
+				return nil, err
+			}
 			if err := t.state.BurnTxCostIncrementNonce(
 				txAddress,
 				models.TxType_DEL_ACCOUNT_SIK,
-				0,
+				txCost,
 				"",
 			); err != nil {
 				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
@@ -522,6 +571,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 
 // checkAccountCanPayCost checks if the account can pay the cost of the transaction.
 // It returns the account and the address of the sender.
+// It also checks if a faucet package is available in the transaction and can pay for it.
 func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *vochaintx.Tx) (*vstate.Account, *common.Address, error) {
 	// extract sender address from signature
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
@@ -544,9 +594,106 @@ func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *v
 	if err != nil {
 		return nil, nil, fmt.Errorf("cannot get tx cost for %s: %w", txType.String(), err)
 	}
-	// check tx sender balance
-	if txSenderAcc.Balance < cost {
-		return nil, nil, fmt.Errorf("unauthorized: %s", vstate.ErrNotEnoughBalance)
+
+	if cost > 0 {
+		// check if faucet package can pay for the transaction
+		canFaucetPackagePay, err := t.checkFaucetPackageAndTransfer(vtx.GetFaucetPackage(), cost, txSenderAddress, vtx.TxID[:], false)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// if faucet cannot pay for it, check tx sender balance
+		if !canFaucetPackagePay {
+			if txSenderAcc.Balance < cost {
+				return nil, nil, fmt.Errorf("unauthorized: %s", vstate.ErrNotEnoughBalance)
+			}
+		}
 	}
 	return txSenderAcc, &txSenderAddress, nil
+}
+
+// checkFaucetPackageAndTransfer checks if the txFaucetPackage is a valid Faucet package issued for txSenderAddress and the account signing the faucet package has
+// enough funds for paying for the txCost.
+// If forCommit is true, the faucet package balance is transferred to the txSender account.
+// Returns false and no error if the faucet package does not exist. If it exists but there is an issue, returns false and the error.
+func (t *TransactionHandler) checkFaucetPackageAndTransfer(txFaucetPackage *models.FaucetPackage, txCost uint64, txSenderAddress common.Address, txHash []byte, forCommit bool) (bool, error) {
+	if txFaucetPackage == nil {
+		if txCost == 0 {
+			return true, nil
+		}
+		return false, nil
+	}
+	if txFaucetPackage.Payload == nil {
+		return false, fmt.Errorf("invalid faucet package payload")
+	}
+	faucetPayload := &models.FaucetPayload{}
+	if err := proto.Unmarshal(txFaucetPackage.Payload, faucetPayload); err != nil {
+		return false, fmt.Errorf("could not unmarshal faucet package: %w", err)
+	}
+	if faucetPayload.Amount == 0 {
+		return false, fmt.Errorf("invalid faucet payload amount provided")
+	}
+	if faucetPayload.To == nil {
+		return false, fmt.Errorf("invalid to address provided")
+	}
+	if !bytes.Equal(faucetPayload.To, txSenderAddress.Bytes()) {
+		return false, fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
+			faucetPayload.To, txSenderAddress.Bytes())
+	}
+	issuerAddress, err := ethereum.AddrFromSignature(txFaucetPackage.Payload, txFaucetPackage.Signature)
+	if err != nil {
+		return false, fmt.Errorf("cannot extract issuer address from faucet package vtx.Signature: %w", err)
+	}
+	issuerBalance, err := t.state.AccountBalance(issuerAddress, false)
+	if err != nil {
+		return false, fmt.Errorf("cannot get faucet issuer balance: %w", err)
+	}
+	b := make([]byte, 8)
+	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
+	keyHash := ethereum.HashRaw(append(issuerAddress.Bytes(), b...))
+	used, err := t.state.FaucetNonce(keyHash, false)
+	if err != nil {
+		return false, fmt.Errorf("cannot check if faucet payload already used: %w", err)
+	}
+	if used {
+		return false, fmt.Errorf("faucet payload %x already used", keyHash)
+	}
+	if issuerBalance < faucetPayload.Amount {
+		return false, fmt.Errorf(
+			"issuer address does not have enough balance %d, required %d",
+			issuerBalance,
+			faucetPayload.Amount,
+		)
+	}
+
+	balance, err := t.state.AccountBalance(txSenderAddress, false)
+	if err != nil {
+		return false, fmt.Errorf("cannot get tx sender balance: %w", err)
+	}
+	if balance+faucetPayload.Amount < txCost {
+		return false, fmt.Errorf(
+			"account balance (%d) + faucet amount (%d) is not enough to pay the tx cost %d",
+			balance, faucetPayload.Amount, txCost,
+		)
+	}
+
+	// if forCommit, then the cost of the transaction is consumed from the faucet
+	if forCommit {
+		if err := t.state.ConsumeFaucetPayload(
+			issuerAddress,
+			faucetPayload,
+		); err != nil {
+			return false, fmt.Errorf("consumeFaucet: %w", err)
+		}
+		if err := t.state.TransferBalance(&vochaintx.TokenTransfer{
+			FromAddress: issuerAddress,
+			ToAddress:   txSenderAddress,
+			Amount:      faucetPayload.Amount,
+			TxHash:      txHash,
+		}, false); err != nil {
+			return false, fmt.Errorf("consumeFaucet: %w", err)
+		}
+	}
+
+	return true, nil
 }

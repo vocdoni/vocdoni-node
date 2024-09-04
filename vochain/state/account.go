@@ -2,6 +2,7 @@ package state
 
 import (
 	"bytes"
+	"encoding/hex"
 	"errors"
 	"fmt"
 
@@ -100,6 +101,20 @@ func (v *State) GetAccount(address common.Address, committed bool) (*Account, er
 		return nil, err
 	}
 	return &acc, acc.Unmarshal(raw)
+}
+
+// AccountBalance retrieves the Account.Balance for an address.
+// Returns 0 and no error if the account does not exist.
+// Committed is relative to the state on which the function is executed.
+func (v *State) AccountBalance(address common.Address, committed bool) (uint64, error) {
+	acc, err := v.GetAccount(address, committed)
+	if err != nil {
+		return 0, err
+	}
+	if acc == nil {
+		return 0, nil
+	}
+	return acc.Balance, nil
 }
 
 // CountAccounts returns the overall number of accounts the vochain has
@@ -310,16 +325,16 @@ func (v *State) SetAccountDelegate(accountAddr common.Address,
 	}
 	switch txType {
 	case models.TxType_ADD_DELEGATE_FOR_ACCOUNT:
-		log.Debugf("adding delegates %+v for account %s", delegateAddrs, accountAddr)
 		for _, delegate := range delegateAddrs {
+			log.Debugw("adding delegate", "account", accountAddr.Hex(), "delegate", hex.EncodeToString(delegate))
 			if err := acc.AddDelegate(common.BytesToAddress(delegate)); err != nil {
 				return fmt.Errorf("cannot add delegate, AddDelegate: %w", err)
 			}
 		}
 		return v.SetAccount(accountAddr, acc)
 	case models.TxType_DEL_DELEGATE_FOR_ACCOUNT:
-		log.Debugf("deleting delegates %+v for account %s", delegateAddrs, accountAddr)
 		for _, delegate := range delegateAddrs {
+			log.Debugw("deleting delegate", "account", accountAddr.Hex(), "delegate", hex.EncodeToString(delegate))
 			if err := acc.DelDelegate(common.BytesToAddress(delegate)); err != nil {
 				return fmt.Errorf("cannot delete delegate, DelDelegate: %w", err)
 			}

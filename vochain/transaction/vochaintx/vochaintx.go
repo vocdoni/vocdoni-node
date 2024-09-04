@@ -88,3 +88,23 @@ type TokenTransfer struct {
 	Amount      uint64
 	TxHash      []byte
 }
+
+// GetFaucetPackage returns the FaucetPackage found inside the tx.Tx.Payload, or nil if not found.
+func (tx *Tx) GetFaucetPackage() *models.FaucetPackage {
+	switch tx.Tx.Payload.(type) {
+	case *models.Tx_NewProcess:
+		return tx.Tx.GetNewProcess().GetFaucetPackage()
+	case *models.Tx_SetProcess:
+		return tx.Tx.GetSetProcess().GetFaucetPackage()
+	case *models.Tx_SetAccount:
+		return tx.Tx.GetSetAccount().GetFaucetPackage()
+	case *models.Tx_CollectFaucet:
+		return tx.Tx.GetCollectFaucet().GetFaucetPackage()
+	case *models.Tx_SetSIK:
+		return tx.Tx.GetSetSIK().GetFaucetPackage()
+	case *models.Tx_DelSIK:
+		return tx.Tx.GetDelSIK().GetFaucetPackage()
+	default:
+		return nil
+	}
+}
