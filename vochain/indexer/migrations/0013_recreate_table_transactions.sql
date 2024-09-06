@@ -10,7 +10,7 @@ CREATE TABLE transactions_new (
 );
 
 -- Copy data from the old table to the new table
-INSERT INTO transactions_new (hash, block_height, block_index, type)
+INSERT OR REPLACE INTO transactions_new (hash, block_height, block_index, type)
 SELECT hash, block_height, block_index, type
 FROM transactions;
 
