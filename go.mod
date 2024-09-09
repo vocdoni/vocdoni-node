@@ -56,7 +56,6 @@ require (
 	go.mongodb.org/mongo-driver v1.12.1
 	go.vocdoni.io/proto v1.15.10-0.20240903073233-86144b1e2165
 	golang.org/x/crypto v0.26.0
-	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa
 	golang.org/x/net v0.28.0
 	google.golang.org/protobuf v1.34.2
 	lukechampine.com/blake3 v1.3.0
@@ -327,6 +326,7 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	go4.org v0.0.0-20230225012048-214862532bf5 // indirect
+	golang.org/x/exp v0.0.0-20240808152545-0cdaa3abc0fa // indirect
 	golang.org/x/mod v0.20.0 // indirect
 	golang.org/x/oauth2 v0.22.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect

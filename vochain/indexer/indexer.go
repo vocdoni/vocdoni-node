@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -29,7 +30,6 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 
 	"github.com/pressly/goose/v3"
-	"golang.org/x/exp/maps"
 
 	// modernc is a pure-Go version, but its errors have less useful info.
 	// We use mattn while developing and testing, and we can swap them later.
@@ -510,8 +510,7 @@ func (idx *Indexer) Commit(height uint32) error {
 	defer idx.blockMu.Unlock()
 
 	// Update existing processes
-	updateProcs := maps.Keys(idx.blockUpdateProcs)
-	slices.Sort(updateProcs)
+	updateProcs := slices.Sorted(maps.Keys(idx.blockUpdateProcs))
 
 	queries := idx.blockTxQueries()
 	ctx := context.TODO()
