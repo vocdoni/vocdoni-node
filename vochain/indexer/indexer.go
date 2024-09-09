@@ -459,6 +459,10 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 			// Blocks
 			func() {
 				idxBlock, err := idx.readOnlyQuery.GetBlockByHeight(context.TODO(), b.Height)
+				if height%10000 == 1 {
+					log.Warnf("reindexing height %d, filling (%s, %x, %x, %x) on top of current %+v",
+						height, b.ChainID, b.Hash(), b.ProposerAddress, b.LastBlockID.Hash, idxBlock)
+				}
 				if err == nil && idxBlock.Time != b.Time {
 					log.Errorf("while reindexing blocks, block %d timestamp in db (%s) differs from blockstore (%s), leaving untouched", height, idxBlock.Time, b.Time)
 					return
