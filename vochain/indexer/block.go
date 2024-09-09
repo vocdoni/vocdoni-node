@@ -85,7 +85,11 @@ func (idx *Indexer) BlockList(limit, offset int, chainID, hash, proposerAddress 
 // CountBlocks returns how many blocks are indexed.
 func (idx *Indexer) CountBlocks() (uint64, error) {
 	results, err := idx.readOnlyQuery.SearchBlocks(context.TODO(), indexerdb.SearchBlocksParams{
-		Limit: 1,
+		ChainID:         "",
+		HashSubstr:      "",
+		ProposerAddress: "",
+		Offset:          0,
+		Limit:           1,
 	})
 	if err != nil {
 		return 0, err
