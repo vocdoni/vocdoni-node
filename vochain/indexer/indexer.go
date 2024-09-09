@@ -176,7 +176,7 @@ func (idx *Indexer) startDB() error {
 
 	if gooseMigrationsPending(idx.readWriteDB, "migrations") {
 		log.Info("indexer db needs migration, scheduling a reindex after sync")
-		go idx.ReindexBlocks(false)
+		defer func() { go idx.ReindexBlocks(false) }()
 	}
 
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
@@ -459,6 +459,15 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 			// Blocks
 			func() {
 				idxBlock, err := idx.readOnlyQuery.GetBlockByHeight(context.TODO(), b.Height)
+				if height%10000 == 1 {
+					log.Infof("reindexing height %d, updating values (%s, %x, %x, %x) on current row %+v",
+						height, b.ChainID, b.Hash(), b.ProposerAddress, b.LastBlockID.Hash, idxBlock)
+					if err := idx.blockTx.Commit(); err != nil {
+						log.Errorw(err, "could not commit tx")
+					}
+					idx.blockTx = nil
+					queries = idx.blockTxQueries()
+				}
 				if err == nil && idxBlock.Time != b.Time {
 					log.Errorf("while reindexing blocks, block %d timestamp in db (%s) differs from blockstore (%s), leaving untouched", height, idxBlock.Time, b.Time)
 					return
@@ -496,6 +505,11 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 			}()
 		}
 	}
+
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
 
 	log.Infow("finished reindexing",
 		"blockStoreBase", idx.App.Node.BlockStore().Base(),
