@@ -468,6 +468,11 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 				if height%10000 == 1 {
 					log.Warnf("reindexing height %d, filling (%s, %x, %x, %x) on top of current %+v",
 						height, b.ChainID, b.Hash(), b.ProposerAddress, b.LastBlockID.Hash, idxBlock)
+					if err := idx.blockTx.Commit(); err != nil {
+						log.Errorw(err, "could not commit tx")
+					}
+					idx.blockTx = nil
+					queries = idx.blockTxQueries()
 				}
 				if err == nil && idxBlock.Time != b.Time {
 					log.Errorf("while reindexing blocks, block %d timestamp in db (%s) differs from blockstore (%s), leaving untouched", height, idxBlock.Time, b.Time)
@@ -506,6 +511,11 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 			}()
 		}
 	}
+
+	if err := idx.blockTx.Commit(); err != nil {
+		log.Errorw(err, "could not commit tx")
+	}
+	idx.blockTx = nil
 
 	log.Infow("finished reindexing",
 		"blockStoreBase", idx.App.Node.BlockStore().Base(),
