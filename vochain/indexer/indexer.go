@@ -433,7 +433,18 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 // ReindexBlocks reindexes all blocks found in blockstore
 func (idx *Indexer) ReindexBlocks(inTest bool) {
 	if !inTest {
-		<-idx.App.WaitUntilSynced()
+		done := make(chan any)
+		go func() {
+			for idx.App == nil ||
+				idx.App.Node == nil ||
+				idx.App.Node.BlockStore() == nil {
+				log.Info("waiting for reindexing")
+				time.Sleep(time.Second * 1)
+			}
+			close(done)
+		}()
+
+		<-done
 	}
 
 	// Note that holding blockMu means new votes aren't added until the reindex finishes.
