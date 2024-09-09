@@ -455,14 +455,9 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 		return
 	}
 
-	idxBlockCount, err := idx.CountBlocks()
-	if err != nil {
-		log.Warnf("indexer CountBlocks returned error: %s", err)
-	}
 	log.Infow("start reindexing",
 		"blockStoreBase", idx.App.Node.BlockStore().Base(),
 		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
-		"indexerBlockCount", idxBlockCount,
 	)
 	queries := idx.blockTxQueries()
 	for height := idx.App.Node.BlockStore().Base(); height <= idx.App.Node.BlockStore().Height(); height++ {
@@ -515,7 +510,6 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 	log.Infow("finished reindexing",
 		"blockStoreBase", idx.App.Node.BlockStore().Base(),
 		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
-		"indexerBlockCount", idxBlockCount,
 	)
 }
 
