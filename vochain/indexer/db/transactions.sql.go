@@ -79,7 +79,7 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 
 const getLastTransactions = `-- name: GetLastTransactions :many
 SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer FROM transactions
-ORDER BY id DESC
+ORDER BY block_height DESC
 LIMIT ?
 OFFSET ?
 `
