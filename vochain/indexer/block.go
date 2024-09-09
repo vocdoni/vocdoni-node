@@ -71,22 +71,30 @@ func (idx *Indexer) BlockList(limit, offset int, chainID, hash, proposerAddress 
 	for _, row := range results {
 		list = append(list, indexertypes.BlockFromDBRow(&row))
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.CountBlocks(chainID, hash, proposerAddress)
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, count, nil
 }
 
 // CountBlocks returns how many blocks are indexed.
-func (idx *Indexer) CountBlocks() (uint64, error) {
-	results, err := idx.readOnlyQuery.SearchBlocks(context.TODO(), indexerdb.SearchBlocksParams{
-		Limit: 1,
+// If all args passed are empty ("") it will return the last block height, as an optimization.
+func (idx *Indexer) CountBlocks(chainID, hash, proposerAddress string) (uint64, error) {
+	if chainID == "" && hash == "" && proposerAddress == "" {
+		count, err := idx.readOnlyQuery.LastBlockHeight(context.TODO())
+		if err != nil {
+			return 0, err
+		}
+		return uint64(count), nil
+	}
+	count, err := idx.readOnlyQuery.CountBlocks(context.TODO(), indexerdb.CountBlocksParams{
+		ChainID:         chainID,
+		HashSubstr:      hash,
+		ProposerAddress: proposerAddress,
 	})
 	if err != nil {
 		return 0, err
 	}
-	if len(results) == 0 {
-		return 0, nil
-	}
-	return uint64(results[0].TotalCount), nil
+	return uint64(count), nil
 }

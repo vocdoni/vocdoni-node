@@ -21,11 +21,15 @@ SELECT * FROM blocks
 WHERE hash = ?
 LIMIT 1;
 
+-- name: LastBlockHeight :one
+SELECT height FROM blocks
+ORDER BY height DESC
+LIMIT 1;
+
 -- name: SearchBlocks :many
 SELECT
     b.*,
-    COUNT(t.block_index) AS tx_count,
-    COUNT(*) OVER() AS total_count
+    COUNT(t.block_index) AS tx_count
 FROM blocks AS b
 LEFT JOIN transactions AS t
     ON b.height = t.block_height
@@ -44,3 +48,18 @@ GROUP BY b.height
 ORDER BY b.height DESC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset);
+
+-- name: CountBlocks :one
+SELECT COUNT(*)
+FROM blocks AS b
+WHERE (
+    (sqlc.arg(chain_id) = '' OR b.chain_id = sqlc.arg(chain_id))
+    AND LENGTH(sqlc.arg(hash_substr)) <= 64 -- if passed arg is longer, then just abort the query
+    AND (
+        sqlc.arg(hash_substr) = ''
+        OR (LENGTH(sqlc.arg(hash_substr)) = 64 AND LOWER(HEX(b.hash)) = LOWER(sqlc.arg(hash_substr)))
+        OR (LENGTH(sqlc.arg(hash_substr)) < 64 AND INSTR(LOWER(HEX(b.hash)), LOWER(sqlc.arg(hash_substr))) > 0)
+        -- TODO: consider keeping an hash_hex column for faster searches
+    )
+    AND (sqlc.arg(proposer_address) = '' OR LOWER(HEX(b.proposer_address)) = LOWER(sqlc.arg(proposer_address)))
+);

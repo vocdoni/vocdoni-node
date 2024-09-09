@@ -11,6 +11,35 @@ import (
 	"time"
 )
 
+const countBlocks = `-- name: CountBlocks :one
+SELECT COUNT(*)
+FROM blocks AS b
+WHERE (
+    (?1 = '' OR b.chain_id = ?1)
+    AND LENGTH(?2) <= 64 -- if passed arg is longer, then just abort the query
+    AND (
+        ?2 = ''
+        OR (LENGTH(?2) = 64 AND LOWER(HEX(b.hash)) = LOWER(?2))
+        OR (LENGTH(?2) < 64 AND INSTR(LOWER(HEX(b.hash)), LOWER(?2)) > 0)
+        -- TODO: consider keeping an hash_hex column for faster searches
+    )
+    AND (?3 = '' OR LOWER(HEX(b.proposer_address)) = LOWER(?3))
+)
+`
+
+type CountBlocksParams struct {
+	ChainID         interface{}
+	HashSubstr      interface{}
+	ProposerAddress interface{}
+}
+
+func (q *Queries) CountBlocks(ctx context.Context, arg CountBlocksParams) (int64, error) {
+	row := q.queryRow(ctx, q.countBlocksStmt, countBlocks, arg.ChainID, arg.HashSubstr, arg.ProposerAddress)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createBlock = `-- name: CreateBlock :execresult
 INSERT INTO blocks(
     chain_id, height, time, hash, proposer_address, last_block_hash
@@ -85,11 +114,23 @@ func (q *Queries) GetBlockByHeight(ctx context.Context, height int64) (Block, er
 	return i, err
 }
 
+const lastBlockHeight = `-- name: LastBlockHeight :one
+SELECT height FROM blocks
+ORDER BY height DESC
+LIMIT 1
+`
+
+func (q *Queries) LastBlockHeight(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.lastBlockHeightStmt, lastBlockHeight)
+	var height int64
+	err := row.Scan(&height)
+	return height, err
+}
+
 const searchBlocks = `-- name: SearchBlocks :many
 SELECT
     b.height, b.time, b.chain_id, b.hash, b.proposer_address, b.last_block_hash,
-    COUNT(t.block_index) AS tx_count,
-    COUNT(*) OVER() AS total_count
+    COUNT(t.block_index) AS tx_count
 FROM blocks AS b
 LEFT JOIN transactions AS t
     ON b.height = t.block_height
@@ -126,7 +167,6 @@ type SearchBlocksRow struct {
 	ProposerAddress []byte
 	LastBlockHash   []byte
 	TxCount         int64
-	TotalCount      int64
 }
 
 func (q *Queries) SearchBlocks(ctx context.Context, arg SearchBlocksParams) ([]SearchBlocksRow, error) {
@@ -152,7 +192,6 @@ func (q *Queries) SearchBlocks(ctx context.Context, arg SearchBlocksParams) ([]S
 			&i.ProposerAddress,
 			&i.LastBlockHash,
 			&i.TxCount,
-			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

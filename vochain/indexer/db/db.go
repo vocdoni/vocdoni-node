@@ -30,6 +30,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countAccountsStmt, err = db.PrepareContext(ctx, countAccounts); err != nil {
 		return nil, fmt.Errorf("error preparing query CountAccounts: %w", err)
 	}
+	if q.countBlocksStmt, err = db.PrepareContext(ctx, countBlocks); err != nil {
+		return nil, fmt.Errorf("error preparing query CountBlocks: %w", err)
+	}
 	if q.countTokenTransfersByAccountStmt, err = db.PrepareContext(ctx, countTokenTransfersByAccount); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTokenTransfersByAccount: %w", err)
 	}
@@ -96,6 +99,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
 	}
+	if q.lastBlockHeightStmt, err = db.PrepareContext(ctx, lastBlockHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query LastBlockHeight: %w", err)
+	}
 	if q.searchAccountsStmt, err = db.PrepareContext(ctx, searchAccounts); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchAccounts: %w", err)
 	}
@@ -151,6 +157,11 @@ func (q *Queries) Close() error {
 	if q.countAccountsStmt != nil {
 		if cerr := q.countAccountsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countAccountsStmt: %w", cerr)
+		}
+	}
+	if q.countBlocksStmt != nil {
+		if cerr := q.countBlocksStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countBlocksStmt: %w", cerr)
 		}
 	}
 	if q.countTokenTransfersByAccountStmt != nil {
@@ -261,6 +272,11 @@ func (q *Queries) Close() error {
 	if q.getVoteStmt != nil {
 		if cerr := q.getVoteStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
+		}
+	}
+	if q.lastBlockHeightStmt != nil {
+		if cerr := q.lastBlockHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing lastBlockHeightStmt: %w", cerr)
 		}
 	}
 	if q.searchAccountsStmt != nil {
@@ -374,6 +390,7 @@ type Queries struct {
 	tx                                 *sql.Tx
 	computeProcessVoteCountStmt        *sql.Stmt
 	countAccountsStmt                  *sql.Stmt
+	countBlocksStmt                    *sql.Stmt
 	countTokenTransfersByAccountStmt   *sql.Stmt
 	countTransactionsStmt              *sql.Stmt
 	countTransactionsByHeightStmt      *sql.Stmt
@@ -396,6 +413,7 @@ type Queries struct {
 	getTransactionByHashStmt           *sql.Stmt
 	getTransactionByHeightAndIndexStmt *sql.Stmt
 	getVoteStmt                        *sql.Stmt
+	lastBlockHeightStmt                *sql.Stmt
 	searchAccountsStmt                 *sql.Stmt
 	searchBlocksStmt                   *sql.Stmt
 	searchEntitiesStmt                 *sql.Stmt
@@ -418,6 +436,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		tx:                                 tx,
 		computeProcessVoteCountStmt:        q.computeProcessVoteCountStmt,
 		countAccountsStmt:                  q.countAccountsStmt,
+		countBlocksStmt:                    q.countBlocksStmt,
 		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
 		countTransactionsStmt:              q.countTransactionsStmt,
 		countTransactionsByHeightStmt:      q.countTransactionsByHeightStmt,
@@ -440,6 +459,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTransactionByHashStmt:           q.getTransactionByHashStmt,
 		getTransactionByHeightAndIndexStmt: q.getTransactionByHeightAndIndexStmt,
 		getVoteStmt:                        q.getVoteStmt,
+		lastBlockHeightStmt:                q.lastBlockHeightStmt,
 		searchAccountsStmt:                 q.searchAccountsStmt,
 		searchBlocksStmt:                   q.searchBlocksStmt,
 		searchEntitiesStmt:                 q.searchEntitiesStmt,

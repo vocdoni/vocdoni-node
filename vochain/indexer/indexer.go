@@ -444,7 +444,7 @@ func (idx *Indexer) ReindexBlocks(inTest bool) {
 		return
 	}
 
-	idxBlockCount, err := idx.CountBlocks()
+	idxBlockCount, err := idx.CountBlocks("", "", "")
 	if err != nil {
 		log.Warnf("indexer CountBlocks returned error: %s", err)
 	}
