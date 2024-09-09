@@ -176,7 +176,7 @@ func (idx *Indexer) startDB() error {
 
 	if gooseMigrationsPending(idx.readWriteDB, "migrations") {
 		log.Info("indexer db needs migration, scheduling a reindex after sync")
-		go idx.ReindexBlocks(false)
+		defer func() { go idx.ReindexBlocks(false) }()
 	}
 
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
