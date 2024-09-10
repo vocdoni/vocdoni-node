@@ -77,6 +77,8 @@ const (
 	ParamHeight          = "height"
 	ParamReference       = "reference"
 	ParamType            = "type"
+	ParamSubtype         = "subtype"
+	ParamSigner          = "signer"
 	ParamAccountIdFrom   = "accountIdFrom"
 	ParamAccountIdTo     = "accountIdTo"
 	ParamStartDateAfter  = "startDateAfter"

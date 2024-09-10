@@ -166,7 +166,6 @@ func (d *OffChainDataHandler) OnSetAccount(_ []byte, account *state.Account) {
 func (*OffChainDataHandler) OnCancel(_ []byte, _ int32)                                      {}
 func (*OffChainDataHandler) OnVote(_ *state.Vote, _ int32)                                   {}
 func (*OffChainDataHandler) OnNewTx(_ *vochaintx.Tx, _ uint32, _ int32)                      {}
-func (*OffChainDataHandler) OnBeginBlock(state.BeginBlock)                                   {}
 func (*OffChainDataHandler) OnProcessKeys(_ []byte, _ string, _ int32)                       {}
 func (*OffChainDataHandler) OnRevealKeys(_ []byte, _ string, _ int32)                        {}
 func (*OffChainDataHandler) OnProcessStatusChange(_ []byte, _ models.ProcessStatus, _ int32) {}

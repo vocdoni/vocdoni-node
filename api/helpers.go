@@ -57,17 +57,21 @@ func (a *API) sendTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	return resp, nil
 }
 
-func protoFormat(tx []byte) string {
+func protoTxAsJSON(tx []byte) []byte {
 	ptx := models.Tx{}
 	if err := proto.Unmarshal(tx, &ptx); err != nil {
-		return ""
+		panic(err)
 	}
 	pj := protojson.MarshalOptions{
 		Multiline:       false,
 		Indent:          "",
 		EmitUnpopulated: true,
 	}
-	return pj.Format(&ptx)
+	asJSON, err := pj.Marshal(&ptx)
+	if err != nil {
+		panic(err)
+	}
+	return asJSON
 }
 
 // isTransactionType checks if the given transaction is of the given type.

@@ -23,12 +23,32 @@ func (q *Queries) CountTransactions(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+const countTransactionsByHeight = `-- name: CountTransactionsByHeight :one
+SELECT COUNT(*) FROM transactions
+WHERE block_height = ?
+`
+
+func (q *Queries) CountTransactionsByHeight(ctx context.Context, blockHeight int64) (int64, error) {
+	row := q.queryRow(ctx, q.countTransactionsByHeightStmt, countTransactionsByHeight, blockHeight)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTransaction = `-- name: CreateTransaction :execresult
 INSERT INTO transactions (
-	hash, block_height, block_index, type
+	hash, block_height, block_index, type, subtype, raw_tx, signature, signer
 ) VALUES (
-	?, ?, ?, ?
+	?, ?, ?, ?, ?, ?, ?, ?
 )
+ON CONFLICT(hash) DO UPDATE
+SET block_height = excluded.block_height,
+    block_index  = excluded.block_index,
+    type         = excluded.type,
+    subtype      = excluded.subtype,
+    raw_tx       = excluded.raw_tx,
+    signature    = excluded.signature,
+    signer       = excluded.signer
 `
 
 type CreateTransactionParams struct {
@@ -36,6 +56,10 @@ type CreateTransactionParams struct {
 	BlockHeight int64
 	BlockIndex  int64
 	Type        string
+	Subtype     string
+	RawTx       []byte
+	Signature   []byte
+	Signer      []byte
 }
 
 func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionParams) (sql.Result, error) {
@@ -44,30 +68,15 @@ func (q *Queries) CreateTransaction(ctx context.Context, arg CreateTransactionPa
 		arg.BlockHeight,
 		arg.BlockIndex,
 		arg.Type,
+		arg.Subtype,
+		arg.RawTx,
+		arg.Signature,
+		arg.Signer,
 	)
-}
-
-const getTransaction = `-- name: GetTransaction :one
-SELECT id, hash, block_height, block_index, type FROM transactions
-WHERE id = ?
-LIMIT 1
-`
-
-func (q *Queries) GetTransaction(ctx context.Context, id int64) (Transaction, error) {
-	row := q.queryRow(ctx, q.getTransactionStmt, getTransaction, id)
-	var i Transaction
-	err := row.Scan(
-		&i.ID,
-		&i.Hash,
-		&i.BlockHeight,
-		&i.BlockIndex,
-		&i.Type,
-	)
-	return i, err
 }
 
 const getTransactionByHash = `-- name: GetTransactionByHash :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer FROM transactions
 WHERE hash = ?
 LIMIT 1
 `
@@ -76,77 +85,95 @@ func (q *Queries) GetTransactionByHash(ctx context.Context, hash types.Hash) (Tr
 	row := q.queryRow(ctx, q.getTransactionByHashStmt, getTransactionByHash, hash)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,
 		&i.Type,
+		&i.Subtype,
+		&i.RawTx,
+		&i.Signature,
+		&i.Signer,
 	)
 	return i, err
 }
 
-const getTxReferenceByBlockHeightAndBlockIndex = `-- name: GetTxReferenceByBlockHeightAndBlockIndex :one
-SELECT id, hash, block_height, block_index, type FROM transactions
+const getTransactionByHeightAndIndex = `-- name: GetTransactionByHeightAndIndex :one
+SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer FROM transactions
 WHERE block_height = ? AND block_index = ?
 LIMIT 1
 `
 
-type GetTxReferenceByBlockHeightAndBlockIndexParams struct {
+type GetTransactionByHeightAndIndexParams struct {
 	BlockHeight int64
 	BlockIndex  int64
 }
 
-func (q *Queries) GetTxReferenceByBlockHeightAndBlockIndex(ctx context.Context, arg GetTxReferenceByBlockHeightAndBlockIndexParams) (Transaction, error) {
-	row := q.queryRow(ctx, q.getTxReferenceByBlockHeightAndBlockIndexStmt, getTxReferenceByBlockHeightAndBlockIndex, arg.BlockHeight, arg.BlockIndex)
+func (q *Queries) GetTransactionByHeightAndIndex(ctx context.Context, arg GetTransactionByHeightAndIndexParams) (Transaction, error) {
+	row := q.queryRow(ctx, q.getTransactionByHeightAndIndexStmt, getTransactionByHeightAndIndex, arg.BlockHeight, arg.BlockIndex)
 	var i Transaction
 	err := row.Scan(
-		&i.ID,
 		&i.Hash,
 		&i.BlockHeight,
 		&i.BlockIndex,
 		&i.Type,
+		&i.Subtype,
+		&i.RawTx,
+		&i.Signature,
+		&i.Signer,
 	)
 	return i, err
 }
 
 const searchTransactions = `-- name: SearchTransactions :many
-WITH results AS (
-  SELECT id, hash, block_height, block_index, type
-  FROM transactions
-  WHERE (
-    (?3 = 0 OR block_height = ?3)
-    AND (?4 = '' OR LOWER(type) = LOWER(?4))
+SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer, COUNT(*) OVER() AS total_count
+FROM transactions
+WHERE
+  (?1 = 0 OR block_height = ?1)
+  AND (?2 = '' OR LOWER(type) = LOWER(?2))
+  AND (?3 = '' OR LOWER(subtype) = LOWER(?3))
+  AND (?4 = '' OR LOWER(HEX(signer)) = LOWER(?4))
+  AND (
+    ?5 = ''
+    OR (LENGTH(?5) = 64 AND LOWER(HEX(hash)) = LOWER(?5))
+    OR (LENGTH(?5) < 64 AND INSTR(LOWER(HEX(hash)), LOWER(?5)) > 0)
+    -- TODO: consider keeping an hash_hex column for faster searches
   )
-)
-SELECT id, hash, block_height, block_index, type, COUNT(*) OVER() AS total_count
-FROM results
-ORDER BY id DESC
-LIMIT ?2
-OFFSET ?1
+ORDER BY block_height DESC, block_index DESC
+LIMIT ?7
+OFFSET ?6
 `
 
 type SearchTransactionsParams struct {
-	Offset      int64
-	Limit       int64
 	BlockHeight interface{}
 	TxType      interface{}
+	TxSubtype   interface{}
+	TxSigner    interface{}
+	HashSubstr  interface{}
+	Offset      int64
+	Limit       int64
 }
 
 type SearchTransactionsRow struct {
-	ID          int64
-	Hash        []byte
+	Hash        types.Hash
 	BlockHeight int64
 	BlockIndex  int64
 	Type        string
+	Subtype     string
+	RawTx       []byte
+	Signature   []byte
+	Signer      []byte
 	TotalCount  int64
 }
 
 func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]SearchTransactionsRow, error) {
 	rows, err := q.query(ctx, q.searchTransactionsStmt, searchTransactions,
-		arg.Offset,
-		arg.Limit,
 		arg.BlockHeight,
 		arg.TxType,
+		arg.TxSubtype,
+		arg.TxSigner,
+		arg.HashSubstr,
+		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -156,11 +183,14 @@ func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactions
 	for rows.Next() {
 		var i SearchTransactionsRow
 		if err := rows.Scan(
-			&i.ID,
 			&i.Hash,
 			&i.BlockHeight,
 			&i.BlockIndex,
 			&i.Type,
+			&i.Subtype,
+			&i.RawTx,
+			&i.Signature,
+			&i.Signer,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

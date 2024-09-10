@@ -11,33 +11,197 @@ import (
 	"time"
 )
 
-const createBlock = `-- name: CreateBlock :execresult
-INSERT INTO blocks(
-    height, time, data_hash
-) VALUES (
-	?, ?, ?
+const countBlocks = `-- name: CountBlocks :one
+SELECT COUNT(*)
+FROM blocks AS b
+WHERE (
+    (?1 = '' OR b.chain_id = ?1)
+    AND LENGTH(?2) <= 64 -- if passed arg is longer, then just abort the query
+    AND (
+        ?2 = ''
+        OR (LENGTH(?2) = 64 AND LOWER(HEX(b.hash)) = LOWER(?2))
+        OR (LENGTH(?2) < 64 AND INSTR(LOWER(HEX(b.hash)), LOWER(?2)) > 0)
+        -- TODO: consider keeping an hash_hex column for faster searches
+    )
+    AND (?3 = '' OR LOWER(HEX(b.proposer_address)) = LOWER(?3))
 )
 `
 
+type CountBlocksParams struct {
+	ChainID         interface{}
+	HashSubstr      interface{}
+	ProposerAddress interface{}
+}
+
+func (q *Queries) CountBlocks(ctx context.Context, arg CountBlocksParams) (int64, error) {
+	row := q.queryRow(ctx, q.countBlocksStmt, countBlocks, arg.ChainID, arg.HashSubstr, arg.ProposerAddress)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createBlock = `-- name: CreateBlock :execresult
+INSERT INTO blocks(
+    chain_id, height, time, hash, proposer_address, last_block_hash
+) VALUES (
+	?, ?, ?, ?, ?, ?
+)
+ON CONFLICT(height) DO UPDATE
+SET chain_id         = excluded.chain_id,
+    time             = excluded.time,
+    hash             = excluded.hash,
+    proposer_address = excluded.proposer_address,
+    last_block_hash  = excluded.last_block_hash
+`
+
 type CreateBlockParams struct {
-	Height   int64
-	Time     time.Time
-	DataHash []byte
+	ChainID         string
+	Height          int64
+	Time            time.Time
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
 }
 
 func (q *Queries) CreateBlock(ctx context.Context, arg CreateBlockParams) (sql.Result, error) {
-	return q.exec(ctx, q.createBlockStmt, createBlock, arg.Height, arg.Time, arg.DataHash)
+	return q.exec(ctx, q.createBlockStmt, createBlock,
+		arg.ChainID,
+		arg.Height,
+		arg.Time,
+		arg.Hash,
+		arg.ProposerAddress,
+		arg.LastBlockHash,
+	)
 }
 
-const getBlock = `-- name: GetBlock :one
-SELECT height, time, data_hash FROM blocks
+const getBlockByHash = `-- name: GetBlockByHash :one
+SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
+WHERE hash = ?
+LIMIT 1
+`
+
+func (q *Queries) GetBlockByHash(ctx context.Context, hash []byte) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHashStmt, getBlockByHash, hash)
+	var i Block
+	err := row.Scan(
+		&i.Height,
+		&i.Time,
+		&i.ChainID,
+		&i.Hash,
+		&i.ProposerAddress,
+		&i.LastBlockHash,
+	)
+	return i, err
+}
+
+const getBlockByHeight = `-- name: GetBlockByHeight :one
+SELECT height, time, chain_id, hash, proposer_address, last_block_hash FROM blocks
 WHERE height = ?
 LIMIT 1
 `
 
-func (q *Queries) GetBlock(ctx context.Context, height int64) (Block, error) {
-	row := q.queryRow(ctx, q.getBlockStmt, getBlock, height)
+func (q *Queries) GetBlockByHeight(ctx context.Context, height int64) (Block, error) {
+	row := q.queryRow(ctx, q.getBlockByHeightStmt, getBlockByHeight, height)
 	var i Block
-	err := row.Scan(&i.Height, &i.Time, &i.DataHash)
+	err := row.Scan(
+		&i.Height,
+		&i.Time,
+		&i.ChainID,
+		&i.Hash,
+		&i.ProposerAddress,
+		&i.LastBlockHash,
+	)
 	return i, err
+}
+
+const lastBlockHeight = `-- name: LastBlockHeight :one
+SELECT height FROM blocks
+ORDER BY height DESC
+LIMIT 1
+`
+
+func (q *Queries) LastBlockHeight(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.lastBlockHeightStmt, lastBlockHeight)
+	var height int64
+	err := row.Scan(&height)
+	return height, err
+}
+
+const searchBlocks = `-- name: SearchBlocks :many
+SELECT
+    b.height, b.time, b.chain_id, b.hash, b.proposer_address, b.last_block_hash,
+    COUNT(t.block_index) AS tx_count
+FROM blocks AS b
+LEFT JOIN transactions AS t
+    ON b.height = t.block_height
+WHERE (
+    (?1 = '' OR b.chain_id = ?1)
+    AND LENGTH(?2) <= 64 -- if passed arg is longer, then just abort the query
+    AND (
+        ?2 = ''
+        OR (LENGTH(?2) = 64 AND LOWER(HEX(b.hash)) = LOWER(?2))
+        OR (LENGTH(?2) < 64 AND INSTR(LOWER(HEX(b.hash)), LOWER(?2)) > 0)
+        -- TODO: consider keeping an hash_hex column for faster searches
+    )
+    AND (?3 = '' OR LOWER(HEX(b.proposer_address)) = LOWER(?3))
+)
+GROUP BY b.height
+ORDER BY b.height DESC
+LIMIT ?5
+OFFSET ?4
+`
+
+type SearchBlocksParams struct {
+	ChainID         interface{}
+	HashSubstr      interface{}
+	ProposerAddress interface{}
+	Offset          int64
+	Limit           int64
+}
+
+type SearchBlocksRow struct {
+	Height          int64
+	Time            time.Time
+	ChainID         string
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
+	TxCount         int64
+}
+
+func (q *Queries) SearchBlocks(ctx context.Context, arg SearchBlocksParams) ([]SearchBlocksRow, error) {
+	rows, err := q.query(ctx, q.searchBlocksStmt, searchBlocks,
+		arg.ChainID,
+		arg.HashSubstr,
+		arg.ProposerAddress,
+		arg.Offset,
+		arg.Limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SearchBlocksRow
+	for rows.Next() {
+		var i SearchBlocksRow
+		if err := rows.Scan(
+			&i.Height,
+			&i.Time,
+			&i.ChainID,
+			&i.Hash,
+			&i.ProposerAddress,
+			&i.LastBlockHash,
+			&i.TxCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

@@ -25,9 +25,6 @@ func (app *BaseApplication) SetNode(vochaincfg *config.VochainCfg) error {
 	if app.Node, err = newTendermint(app, vochaincfg); err != nil {
 		return fmt.Errorf("could not set tendermint node service: %s", err)
 	}
-	if vochaincfg.IsSeedNode {
-		return nil
-	}
 	// Note that cometcli.New logs any error rather than returning it.
 	app.NodeClient = cometcli.New(app.Node)
 	return nil

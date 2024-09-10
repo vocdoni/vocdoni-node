@@ -11,9 +11,12 @@ import (
 )
 
 type Block struct {
-	Height   int64
-	Time     time.Time
-	DataHash []byte
+	Height          int64
+	Time            time.Time
+	ChainID         string
+	Hash            []byte
+	ProposerAddress []byte
+	LastBlockHash   []byte
 }
 
 type Process struct {
@@ -57,9 +60,12 @@ type TokenTransfer struct {
 }
 
 type Transaction struct {
-	ID          int64
 	Hash        types.Hash
 	BlockHeight int64
 	BlockIndex  int64
 	Type        string
+	Subtype     string
+	RawTx       []byte
+	Signature   []byte
+	Signer      []byte
 }

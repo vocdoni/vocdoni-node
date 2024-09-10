@@ -1,5 +1,11 @@
 
-The Vocdoni API is a REST API that substitutes the previous RPCs in order to make it easier for  developers/integrators to build on top of the voting protocol. This API facilitates the creation of voting processes with Vocdoni, without the hassle of integrating with a complex distributed stack with blockchain components. The API allows integrators to perform all the features enabled by the Vocdoni voting protocol, such as creating accounts, organizations, voting processes, and censuses, as well as casting votes. The API is designed to abstract away the complexity of the Vocdoni protocol as much as possible, offering a simple and straightforward way to performing these actions. 
+The Vocdoni API is a REST API that substitutes the previous RPCs in order to make it easier for  developers/integrators to build on top of the voting protocol. This API facilitates the creation of voting processes with Vocdoni, without the hassle of integrating with a complex distributed stack with blockchain components. The API allows integrators to perform all the features enabled by the Vocdoni voting protocol, such as creating accounts, organizations, voting processes, and censuses, as well as casting votes. The API is designed to abstract away the complexity of the Vocdoni protocol as much as possible, offering a simple and straightforward way to performing these actions.
+
+Vocdoni API URLs: 
+
+- **Production**: https://api.vocdoni.io/v2
+- **Staging**: https://api-stg.vocdoni.net/v2
+- **Development**: https://api-dev.vocdoni.net/v2
 
 The API contains the following endpoints: 
 
