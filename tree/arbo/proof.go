@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"slices"
 
 	"go.vocdoni.io/dvote/db"
 )
@@ -173,21 +174,15 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 	}
 
 	path := getPath(len(siblings), keyPath)
-	for i := len(siblings) - 1; i >= 0; i-- {
+	for i, sibling := range slices.Backward(siblings) {
 		if path[i] {
-			key, _, err = newIntermediate(hashFunc, siblings[i], key)
-			if err != nil {
-				return false, err
-			}
+			key, _, err = newIntermediate(hashFunc, sibling, key)
 		} else {
-			key, _, err = newIntermediate(hashFunc, key, siblings[i])
-			if err != nil {
-				return false, err
-			}
+			key, _, err = newIntermediate(hashFunc, key, sibling)
+		}
+		if err != nil {
+			return false, err
 		}
 	}
-	if bytes.Equal(key, root) {
-		return true, nil
-	}
-	return false, nil
+	return bytes.Equal(key, root), nil
 }

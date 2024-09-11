@@ -10,6 +10,7 @@ import (
 	"math"
 	"math/big"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -206,13 +207,13 @@ func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address,
 
 // decryptVotePackage decrypts a vote package using the given private keys and indexes.
 func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte, error) {
-	for i := len(indexes) - 1; i >= 0; i-- {
-		if indexes[i] >= uint32(len(privKeys)) {
-			return nil, fmt.Errorf("invalid key index %d", indexes[i])
+	for _, index := range slices.Backward(indexes) {
+		if index >= uint32(len(privKeys)) {
+			return nil, fmt.Errorf("invalid key index %d", index)
 		}
-		priv, err := nacl.DecodePrivate(privKeys[indexes[i]])
+		priv, err := nacl.DecodePrivate(privKeys[index])
 		if err != nil {
-			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", indexes[i], err)
+			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", index, err)
 		}
 		vp, err = priv.Decrypt(vp)
 		if err != nil {
