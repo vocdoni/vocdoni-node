@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -18,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/types"
@@ -31,6 +33,7 @@ import (
 
 	"github.com/pressly/goose/v3"
 
+	"github.com/schollz/sqlite3dump"
 	// modernc is a pure-Go version, but its errors have less useful info.
 	// We use mattn while developing and testing, and we can swap them later.
 	// _ "modernc.org/sqlite"
@@ -240,7 +243,8 @@ func (idx *Indexer) Close() error {
 	return nil
 }
 
-// BackupPath restores the database from a backup created via SaveBackup.
+// RestoreBackup restores the indexer by copying the file (raw binary format)
+// from the passed path.
 // Note that this must be called with ExpectBackupRestore set to true,
 // and before any indexing or queries happen.
 func (idx *Indexer) RestoreBackup(path string) error {
@@ -277,36 +281,111 @@ func gooseMigrationsPending(db *sql.DB, dir string) bool {
 	return len(migrations) > 0
 }
 
-// SaveBackup backs up the database to a file on disk.
-// Note that writes to the database may be blocked until the backup finishes,
-// and an error may occur if a file at path already exists.
-//
-// For sqlite, this is done via "VACUUM INTO", so the resulting file is also a database.
-func (idx *Indexer) SaveBackup(ctx context.Context, path string) error {
-	_, err := idx.readOnlyDB.ExecContext(ctx, `VACUUM INTO ?`, path)
-	return err
+// ImportBackup restores the database from a backup created via ExportBackup.
+// Note that this must be called with ExpectBackupRestore set to true,
+// and before any indexing or queries happen.
+func (idx *Indexer) ImportBackup(r io.Reader) error {
+	if idx.readWriteDB != nil {
+		panic("Indexer.RestoreBackup called after the database was initialized")
+	}
+	log.Debugf("restoring indexer backup")
+
+	zr, err := compressor.NewReader(r)
+	if err != nil {
+		return fmt.Errorf("could not init decompressor: %w", err)
+	}
+	defer zr.Close()
+
+	if err := restoreDBFromSQLDump(idx.dbPath, zr); err != nil {
+		return fmt.Errorf("could not restore indexer backup: %w", err)
+	}
+	if err := idx.startDB(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func restoreDBFromSQLDump(dbPath string, r io.Reader) error {
+	db, err := sql.Open("sqlite3", fmt.Sprintf("file:%s?mode=rwc&_journal_mode=wal&_txlock=immediate&_synchronous=normal&_foreign_keys=true", dbPath))
+	if err != nil {
+		return fmt.Errorf("could not open indexer db: %w", err)
+	}
+	defer db.Close()
+
+	scanner := bufio.NewScanner(r)
+	var statement strings.Builder
+	for scanner.Scan() {
+		line := scanner.Text()
+		statement.WriteString(line)
+		statement.WriteString("\n")
+
+		if strings.HasSuffix(line, ";") {
+			_, err := db.Exec(statement.String())
+			if err != nil {
+				return fmt.Errorf("failed to execute statement: %s (error: %w)", statement.String(), err)
+			}
+			statement.Reset()
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error during restore: %w", err)
+	}
+
+	return nil
+}
+
+// ExportBackup exports a (compressed) deterministic set of SQL statements.
+// Note that writes to the database may be blocked until the method finishes.
+func (idx *Indexer) ExportBackup(w io.Writer) error {
+	log.Debugf("exporting indexer backup")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+
+	tmpDB, err := os.CreateTemp("", "indexer*.sqlite3")
+	if err != nil {
+		return fmt.Errorf("could not create tmpdb file: %w", err)
+	}
+	defer os.Remove(tmpDB.Name())
+
+	if _, err := idx.readOnlyDB.ExecContext(ctx, `VACUUM INTO ?`, tmpDB.Name()); err != nil {
+		return fmt.Errorf("could not vacuum into tmpdb: %w", err)
+	}
+
+	db, err := sql.Open("sqlite3", tmpDB.Name())
+	if err != nil {
+		return fmt.Errorf("could not open tmpDB: %w", err)
+	}
+	defer db.Close()
+
+	// first drop stats table
+	if _, err := db.ExecContext(ctx, `DROP TABLE IF EXISTS sqlite_stat1;`); err != nil {
+		return fmt.Errorf("could not drop table sqlite_stat1: %w", err)
+	}
+
+	// make goose_db_version table deterministic
+	if _, err := db.ExecContext(ctx, `UPDATE goose_db_version SET tstamp = '1970-01-01 00:00:00';`); err != nil {
+		return fmt.Errorf("could not update goose_db_version: %w", err)
+	}
+
+	zw, err := compressor.NewWriter(w)
+	if err != nil {
+		return fmt.Errorf("could not init compressor: %w", err)
+	}
+	defer zw.Close()
+
+	return sqlite3dump.DumpDB(db, zw)
 }
 
 // ExportBackupAsBytes backs up the database, and returns the contents as []byte.
 //
 // Note that writes to the database may be blocked until the backup finishes.
-//
-// For sqlite, this is done via "VACUUM INTO", so the resulting file is also a database.
 func (idx *Indexer) ExportBackupAsBytes(ctx context.Context) ([]byte, error) {
-	tmpDir, err := os.MkdirTemp("", "indexer")
-	if err != nil {
-		return nil, fmt.Errorf("error creating tmpDir: %w", err)
-	}
-	tmpFilePath := filepath.Join(tmpDir, "indexer.sqlite3")
-	if err := idx.SaveBackup(ctx, tmpFilePath); err != nil {
+	var buf bytes.Buffer
+	if err := idx.ExportBackup(&buf); err != nil {
 		return nil, fmt.Errorf("error saving indexer backup: %w", err)
 	}
-	defer func() {
-		if err := os.Remove(tmpFilePath); err != nil {
-			log.Warnw("error removing indexer backup file", "path", tmpFilePath, "err", err)
-		}
-	}()
-	return os.ReadFile(tmpFilePath)
+	return buf.Bytes(), nil
 }
 
 // blockTxQueries assumes that lockPool is locked.

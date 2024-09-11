@@ -1,11 +1,23 @@
 package compressor
 
 import (
+	"io"
 	"time"
 
 	"github.com/klauspost/compress/zstd"
 	"go.vocdoni.io/dvote/log"
 )
+
+// NewWriter creates a new writer that uses zstd
+func NewWriter(w io.Writer) (io.WriteCloser, error) {
+	return zstd.NewWriter(w)
+}
+
+// NewReader creates a new reader that uses zstd
+func NewReader(r io.Reader) (io.ReadCloser, error) {
+	zr, err := zstd.NewReader(r)
+	return zr.IOReadCloser(), err
+}
 
 // Compressor is a data compressor that uses zstd.
 type Compressor struct {
