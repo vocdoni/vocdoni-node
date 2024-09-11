@@ -1,6 +1,7 @@
 package indexer
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"database/sql"
@@ -179,6 +180,12 @@ func (idx *Indexer) startDB() error {
 		defer func() { go idx.ReindexBlocks(false) }()
 	}
 
+	if file, err := os.Open(idx.dbPath + ".import"); err == nil {
+		defer func() { go idx.insertSQLstatements(file) }()
+	} else {
+		log.Errorf("couldn't open %s: %v", idx.dbPath+".import", err)
+	}
+
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
 		return fmt.Errorf("goose up: %w", err)
 	}
@@ -285,6 +292,43 @@ func gooseMigrationsPending(db *sql.DB, dir string) bool {
 func (idx *Indexer) SaveBackup(ctx context.Context, path string) error {
 	_, err := idx.readOnlyDB.ExecContext(ctx, `VACUUM INTO ?`, path)
 	return err
+}
+
+func (idx *Indexer) insertSQLstatements(r io.Reader) {
+	log.Infof("starting to import SQL statements")
+
+	if idx.readWriteDB == nil {
+		log.Error("database is not yet initialized")
+		return
+	}
+	scanner := bufio.NewScanner(r)
+	var statement strings.Builder
+	l, n := 0, 0
+	for scanner.Scan() {
+		l++
+		line := scanner.Text()
+		statement.WriteString(line)
+		statement.WriteString("\n")
+
+		if strings.HasSuffix(line, ";") {
+			n++
+			if n%10000 == 1 {
+				log.Infof("executing %q", statement.String())
+			}
+			_, err := idx.readWriteDB.Exec(statement.String())
+			if err != nil {
+				log.Errorf("failed to execute statement: %s (error: %v)", statement.String(), err)
+				return
+			}
+			statement.Reset()
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Errorf("error during restore: %s", err)
+	}
+
+	log.Infof("finished parsing %d lines, executed %d SQL statements", l, n)
 }
 
 // ExportBackupAsBytes backs up the database, and returns the contents as []byte.
