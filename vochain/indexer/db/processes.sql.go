@@ -23,6 +23,96 @@ func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessI
 	return q.exec(ctx, q.computeProcessVoteCountStmt, computeProcessVoteCount, id)
 }
 
+const countProcesses = `-- name: CountProcesses :one
+SELECT COUNT(*)
+FROM processes
+WHERE (
+	LENGTH(?1) <= 40 -- if passed arg is longer, then just abort the query
+	AND (
+		?1 = ''
+		OR (LENGTH(?1) = 40 AND LOWER(HEX(entity_id)) = LOWER(?1))
+		OR (LENGTH(?1) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(?1)) > 0)
+		-- TODO: consider keeping an entity_id_hex column for faster searches
+	)
+	AND (?2 = 0 OR namespace = ?2)
+	AND (?3 = 0 OR status = ?3)
+	AND (?4 = 0 OR source_network_id = ?4)
+	AND LENGTH(?5) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?5 = ''
+		OR (LENGTH(?5) = 64 AND LOWER(HEX(id)) = LOWER(?5))
+		OR (LENGTH(?5) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?5)) > 0)
+		-- TODO: consider keeping an id_hex column for faster searches
+	)
+	AND (
+		?6 = -1
+		OR (?6 = 1 AND have_results = TRUE)
+		OR (?6 = 0 AND have_results = FALSE)
+	)
+	AND (
+		?7 = -1
+		OR (?7 = 1 AND final_results = TRUE)
+		OR (?7 = 0 AND final_results = FALSE)
+	)
+	AND (
+		?8 = -1
+		OR (?8 = 1 AND manually_ended = TRUE)
+		OR (?8 = 0 AND manually_ended = FALSE)
+	)
+	AND (?9 IS NULL OR start_date >= ?9)
+	AND (?10 IS NULL OR start_date <= ?10)
+	AND (?11 IS NULL OR end_date >= ?11)
+	AND (?12 IS NULL OR end_date <= ?12)
+)
+`
+
+type CountProcessesParams struct {
+	EntityIDSubstr  interface{}
+	Namespace       interface{}
+	Status          interface{}
+	SourceNetworkID interface{}
+	IDSubstr        interface{}
+	HaveResults     interface{}
+	FinalResults    interface{}
+	ManuallyEnded   interface{}
+	StartDateAfter  interface{}
+	StartDateBefore interface{}
+	EndDateAfter    interface{}
+	EndDateBefore   interface{}
+}
+
+func (q *Queries) CountProcesses(ctx context.Context, arg CountProcessesParams) (int64, error) {
+	row := q.queryRow(ctx, q.countProcessesStmt, countProcesses,
+		arg.EntityIDSubstr,
+		arg.Namespace,
+		arg.Status,
+		arg.SourceNetworkID,
+		arg.IDSubstr,
+		arg.HaveResults,
+		arg.FinalResults,
+		arg.ManuallyEnded,
+		arg.StartDateAfter,
+		arg.StartDateBefore,
+		arg.EndDateAfter,
+		arg.EndDateBefore,
+	)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTotalProcesses = `-- name: CountTotalProcesses :one
+SELECT COUNT(*)
+FROM processes
+`
+
+func (q *Queries) CountTotalProcesses(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countTotalProcessesStmt, countTotalProcesses)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
@@ -164,17 +254,6 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 	return i, err
 }
 
-const getProcessCount = `-- name: GetProcessCount :one
-SELECT COUNT(*) FROM processes
-`
-
-func (q *Queries) GetProcessCount(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.getProcessCountStmt, getProcessCount)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const getProcessIDsByFinalResults = `-- name: GetProcessIDsByFinalResults :many
 SELECT id FROM processes
 WHERE final_results = ?
@@ -268,59 +347,52 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 }
 
 const searchProcesses = `-- name: SearchProcesses :many
-WITH results AS (
-	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
-			COUNT(*) OVER() AS total_count
-	FROM processes
-	WHERE (
-		LENGTH(?3) <= 40 -- if passed arg is longer, then just abort the query
-		AND (
-			?3 = ''
-			OR (LENGTH(?3) = 40 AND LOWER(HEX(entity_id)) = LOWER(?3))
-			OR (LENGTH(?3) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(?3)) > 0)
-			-- TODO: consider keeping an entity_id_hex column for faster searches
-		)
-		AND (?4 = 0 OR namespace = ?4)
-		AND (?5 = 0 OR status = ?5)
-		AND (?6 = 0 OR source_network_id = ?6)
-		AND LENGTH(?7) <= 64 -- if passed arg is longer, then just abort the query
-		AND (
-			?7 = ''
-			OR (LENGTH(?7) = 64 AND LOWER(HEX(id)) = LOWER(?7))
-			OR (LENGTH(?7) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?7)) > 0)
-			-- TODO: consider keeping an id_hex column for faster searches
-		)
-		AND (
-			?8 = -1
-			OR (?8 = 1 AND have_results = TRUE)
-			OR (?8 = 0 AND have_results = FALSE)
-		)
-		AND (
-			?9 = -1
-			OR (?9 = 1 AND final_results = TRUE)
-			OR (?9 = 0 AND final_results = FALSE)
-		)
-		AND (
-			?10 = -1
-			OR (?10 = 1 AND manually_ended = TRUE)
-			OR (?10 = 0 AND manually_ended = FALSE)
-		)
-		AND (?11 IS NULL OR start_date >= ?11)
-		AND (?12 IS NULL OR start_date <= ?12)
-		AND (?13 IS NULL OR end_date >= ?13)
-		AND (?14 IS NULL OR end_date <= ?14)
+SELECT id
+FROM processes
+WHERE (
+	LENGTH(?1) <= 40 -- if passed arg is longer, then just abort the query
+	AND (
+		?1 = ''
+		OR (LENGTH(?1) = 40 AND LOWER(HEX(entity_id)) = LOWER(?1))
+		OR (LENGTH(?1) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(?1)) > 0)
+		-- TODO: consider keeping an entity_id_hex column for faster searches
 	)
+	AND (?2 = 0 OR namespace = ?2)
+	AND (?3 = 0 OR status = ?3)
+	AND (?4 = 0 OR source_network_id = ?4)
+	AND LENGTH(?5) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?5 = ''
+		OR (LENGTH(?5) = 64 AND LOWER(HEX(id)) = LOWER(?5))
+		OR (LENGTH(?5) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?5)) > 0)
+		-- TODO: consider keeping an id_hex column for faster searches
+	)
+	AND (
+		?6 = -1
+		OR (?6 = 1 AND have_results = TRUE)
+		OR (?6 = 0 AND have_results = FALSE)
+	)
+	AND (
+		?7 = -1
+		OR (?7 = 1 AND final_results = TRUE)
+		OR (?7 = 0 AND final_results = FALSE)
+	)
+	AND (
+		?8 = -1
+		OR (?8 = 1 AND manually_ended = TRUE)
+		OR (?8 = 0 AND manually_ended = FALSE)
+	)
+	AND (?9 IS NULL OR start_date >= ?9)
+	AND (?10 IS NULL OR start_date <= ?10)
+	AND (?11 IS NULL OR end_date >= ?11)
+	AND (?12 IS NULL OR end_date <= ?12)
 )
-SELECT id, total_count
-FROM results
 ORDER BY creation_time DESC, id ASC
-LIMIT ?2
-OFFSET ?1
+LIMIT ?14
+OFFSET ?13
 `
 
 type SearchProcessesParams struct {
-	Offset          int64
-	Limit           int64
 	EntityIDSubstr  interface{}
 	Namespace       interface{}
 	Status          interface{}
@@ -333,17 +405,12 @@ type SearchProcessesParams struct {
 	StartDateBefore interface{}
 	EndDateAfter    interface{}
 	EndDateBefore   interface{}
+	Offset          int64
+	Limit           int64
 }
 
-type SearchProcessesRow struct {
-	ID         []byte
-	TotalCount int64
-}
-
-func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]SearchProcessesRow, error) {
+func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams) ([]types.ProcessID, error) {
 	rows, err := q.query(ctx, q.searchProcessesStmt, searchProcesses,
-		arg.Offset,
-		arg.Limit,
 		arg.EntityIDSubstr,
 		arg.Namespace,
 		arg.Status,
@@ -356,18 +423,20 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		arg.StartDateBefore,
 		arg.EndDateAfter,
 		arg.EndDateBefore,
+		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchProcessesRow
+	var items []types.ProcessID
 	for rows.Next() {
-		var i SearchProcessesRow
-		if err := rows.Scan(&i.ID, &i.TotalCount); err != nil {
+		var id types.ProcessID
+		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, id)
 	}
 	if err := rows.Close(); err != nil {
 		return nil, err

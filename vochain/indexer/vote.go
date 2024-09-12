@@ -91,15 +91,19 @@ func (idx *Indexer) VoteList(limit, offset int, processID string, nullifier stri
 		}
 		list = append(list, envelopeMetadata)
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.readOnlyQuery.CountVotes(context.TODO(), indexerdb.CountVotesParams{
+		ProcessIDSubstr: processID,
+		NullifierSubstr: strings.ToLower(nullifier), // we search in lowercase
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 // CountTotalVotes returns the total number of envelopes.
 func (idx *Indexer) CountTotalVotes() (uint64, error) {
-	height, err := idx.readOnlyQuery.CountVotes(context.TODO())
+	height, err := idx.readOnlyQuery.CountTotalVotes(context.TODO())
 	return uint64(height), err
 }
 

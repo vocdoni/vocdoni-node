@@ -19,8 +19,25 @@ SELECT * FROM transactions
 WHERE hash = ?
 LIMIT 1;
 
+-- name: CountTotalTransactions :one
+SELECT COUNT(*)
+FROM transactions;
+
 -- name: CountTransactions :one
-SELECT COUNT(*) FROM transactions;
+SELECT COUNT(*)
+FROM transactions
+WHERE (
+  (sqlc.arg(block_height) = 0 OR block_height = sqlc.arg(block_height))
+  AND (sqlc.arg(tx_type) = '' OR LOWER(type) = LOWER(sqlc.arg(tx_type)))
+  AND (sqlc.arg(tx_subtype) = '' OR LOWER(subtype) = LOWER(sqlc.arg(tx_subtype)))
+  AND (sqlc.arg(tx_signer) = '' OR LOWER(HEX(signer)) = LOWER(sqlc.arg(tx_signer)))
+  AND (
+    sqlc.arg(hash_substr) = ''
+    OR (LENGTH(sqlc.arg(hash_substr)) = 64 AND LOWER(HEX(hash)) = LOWER(sqlc.arg(hash_substr)))
+    OR (LENGTH(sqlc.arg(hash_substr)) < 64 AND INSTR(LOWER(HEX(hash)), LOWER(sqlc.arg(hash_substr))) > 0)
+    -- TODO: consider keeping an hash_hex column for faster searches
+  )
+);
 
 -- name: CountTransactionsByHeight :one
 SELECT COUNT(*) FROM transactions
@@ -32,7 +49,7 @@ WHERE block_height = ? AND block_index = ?
 LIMIT 1;
 
 -- name: SearchTransactions :many
-SELECT *, COUNT(*) OVER() AS total_count
+SELECT *
 FROM transactions
 WHERE
   (sqlc.arg(block_height) = 0 OR block_height = sqlc.arg(block_height))

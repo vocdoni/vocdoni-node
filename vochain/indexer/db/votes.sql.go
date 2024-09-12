@@ -13,12 +13,46 @@ import (
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
-const countVotes = `-- name: CountVotes :one
-SELECT COUNT(*) FROM votes
+const countTotalVotes = `-- name: CountTotalVotes :one
+SELECT COUNT(*)
+FROM votes
 `
 
-func (q *Queries) CountVotes(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.countVotesStmt, countVotes)
+func (q *Queries) CountTotalVotes(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countTotalVotesStmt, countTotalVotes)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countVotes = `-- name: CountVotes :one
+SELECT COUNT(*)
+FROM votes
+WHERE (
+	LENGTH(?1) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?1 = ''
+		OR (LENGTH(?1) = 64 AND LOWER(HEX(process_id)) = LOWER(?1))
+		OR (LENGTH(?1) < 64 AND INSTR(LOWER(HEX(process_id)), LOWER(?1)) > 0)
+		-- TODO: consider keeping an process_id_hex column for faster searches
+	)
+	AND LENGTH(?2) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?2 = ''
+		OR (LENGTH(?2) = 64 AND LOWER(HEX(nullifier)) = LOWER(?2))
+		OR (LENGTH(?2) < 64 AND INSTR(LOWER(HEX(nullifier)), LOWER(?2)) > 0)
+		-- TODO: consider keeping an nullifier_hex column for faster searches
+	)
+)
+`
+
+type CountVotesParams struct {
+	ProcessIDSubstr interface{}
+	NullifierSubstr interface{}
+}
+
+func (q *Queries) CountVotes(ctx context.Context, arg CountVotesParams) (int64, error) {
+	row := q.queryRow(ctx, q.countVotesStmt, countVotes, arg.ProcessIDSubstr, arg.NullifierSubstr)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -107,63 +141,58 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 }
 
 const searchVotes = `-- name: SearchVotes :many
-WITH results AS (
-	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
-	FROM votes AS v
-	LEFT JOIN transactions AS t
-		ON v.block_height = t.block_height
-		AND v.block_index = t.block_index
-	WHERE (
-		LENGTH(?3) <= 64 -- if passed arg is longer, then just abort the query
-		AND (
-			?3 = ''
-			OR (LENGTH(?3) = 64 AND LOWER(HEX(process_id)) = LOWER(?3))
-			OR (LENGTH(?3) < 64 AND INSTR(LOWER(HEX(process_id)), LOWER(?3)) > 0)
-			-- TODO: consider keeping an process_id_hex column for faster searches
-		)
-		AND LENGTH(?4) <= 64 -- if passed arg is longer, then just abort the query
-		AND (
-			?4 = ''
-			OR (LENGTH(?4) = 64 AND LOWER(HEX(nullifier)) = LOWER(?4))
-			OR (LENGTH(?4) < 64 AND INSTR(LOWER(HEX(nullifier)), LOWER(?4)) > 0)
-			-- TODO: consider keeping an nullifier_hex column for faster searches
-		)
+SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
+FROM votes AS v
+LEFT JOIN transactions AS t
+	ON v.block_height = t.block_height
+	AND v.block_index = t.block_index
+WHERE (
+	LENGTH(?1) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?1 = ''
+		OR (LENGTH(?1) = 64 AND LOWER(HEX(process_id)) = LOWER(?1))
+		OR (LENGTH(?1) < 64 AND INSTR(LOWER(HEX(process_id)), LOWER(?1)) > 0)
+		-- TODO: consider keeping an process_id_hex column for faster searches
+	)
+	AND LENGTH(?2) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		?2 = ''
+		OR (LENGTH(?2) = 64 AND LOWER(HEX(nullifier)) = LOWER(?2))
+		OR (LENGTH(?2) < 64 AND INSTR(LOWER(HEX(nullifier)), LOWER(?2)) > 0)
+		-- TODO: consider keeping an nullifier_hex column for faster searches
 	)
 )
-SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, COUNT(*) OVER() AS total_count
-FROM results
-ORDER BY block_height DESC, nullifier ASC
-LIMIT ?2
-OFFSET ?1
+ORDER BY v.block_height DESC, v.nullifier ASC
+LIMIT ?4
+OFFSET ?3
 `
 
 type SearchVotesParams struct {
-	Offset          int64
-	Limit           int64
 	ProcessIDSubstr interface{}
 	NullifierSubstr interface{}
+	Offset          int64
+	Limit           int64
 }
 
 type SearchVotesRow struct {
-	Nullifier            []byte
-	ProcessID            []byte
+	Nullifier            types.Nullifier
+	ProcessID            types.ProcessID
 	BlockHeight          int64
 	BlockIndex           int64
 	Weight               string
-	VoterID              []byte
+	VoterID              state.VoterID
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
 	Package              string
-	Hash                 []byte
-	TotalCount           int64
+	Hash                 types.Hash
 }
 
 func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]SearchVotesRow, error) {
 	rows, err := q.query(ctx, q.searchVotesStmt, searchVotes,
-		arg.Offset,
-		arg.Limit,
 		arg.ProcessIDSubstr,
 		arg.NullifierSubstr,
+		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
@@ -183,7 +212,6 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.EncryptionKeyIndexes,
 			&i.Package,
 			&i.Hash,
-			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
