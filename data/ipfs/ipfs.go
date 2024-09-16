@@ -37,7 +37,7 @@ import (
 
 const (
 	// MaxFileSizeBytes is the maximum size of a file to be published to IPFS
-	MaxFileSizeBytes = 1024 * 1024 * 100 // 100 MB
+	MaxFileSizeBytes = 1024 * 1024 * 1024 // 1 GB
 	// RetrievedFileCacheSize is the maximum number of files to be cached in memory
 	RetrievedFileCacheSize = 128
 )
