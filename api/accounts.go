@@ -289,11 +289,14 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 		}
 	}
 
+	log.Warn("pre sendTx")
+
 	// send the transaction to the blockchain
 	res, err := a.sendTx(req.TxPayload)
 	if err != nil {
 		return err
 	}
+	log.Warn("post sendTx")
 
 	// prepare the reply
 	resp := &AccountSet{
@@ -304,17 +307,20 @@ func (a *API) accountSetHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContex
 	if a.storage != nil && req.Metadata != nil {
 		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
+		log.Warn("pre Publish")
 		cid, err := a.storage.Publish(sctx, req.Metadata)
 		if err != nil {
 			log.Errorf("could not publish to storage: %v", err)
 		} else {
 			resp.MetadataURL = a.storage.URIprefix() + cid
 		}
+		log.Warnf("post Publish, metadata: %s", resp.MetadataURL)
+
 		if !ipfs.CIDequals(cid, metadataCID) {
 			log.Errorf("metadata CID does not match metadata content (%s != %s)", cid, metadataCID)
 		}
 	}
-
+	log.Warn("pre Marshal")
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
 		return err

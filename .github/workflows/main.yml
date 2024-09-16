@@ -140,6 +140,15 @@ jobs:
     with:
       image-tag: ${{ github.ref_name }}
 
+  immediate-docker-release:
+    name: Docker (immediate)
+    if: github.event_name == 'pull_request' &&
+        github.base_ref == 'release-lts-1'   # these pull requests trigger a release via a quicker workflow which skips the tests
+    uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
+    secrets: inherit
+    with:
+      image-tag: ${{ github.head_ref }}
+
   job_gocoverage_textfmt:
     name: Convert coverage (bin->txt)
     continue-on-error: true # never mark the whole CI as failed because of this job
