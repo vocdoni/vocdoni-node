@@ -36,7 +36,7 @@ const (
 	MaxCensusAddBatchSize = 8192
 
 	censusIDsize          = 32
-	censusRetrieveTimeout = 5 * time.Minute
+	censusRetrieveTimeout = 10 * time.Minute
 )
 
 func (a *API) enableCensusHandlers() error {
@@ -171,6 +171,14 @@ func (a *API) enableCensusHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/censuses/export/ipfs/list",
+		"GET",
+		apirest.MethodAccessTypeAdmin,
+		a.censusExportIPFSListDBHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/censuses/export",
 		"GET",
 		apirest.MethodAccessTypeAdmin,
@@ -202,6 +210,9 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
+
+	// Initialize the map to store the status of the async export to ipfs
+	censusIPFSExports = make(map[string]time.Time)
 
 	return nil
 }
@@ -972,6 +983,9 @@ func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
+// censusIPFSExports is a map of ipfs uri to the time when the export was requested
+var censusIPFSExports = map[string]time.Time{}
+
 // censusExportDBHandler
 //
 //	@Summary		Export census database
@@ -986,23 +1000,54 @@ func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	isIPFSExport := strings.HasSuffix(ctx.Request.URL.Path, "ipfs")
 	buf := bytes.Buffer{}
-	if err := a.censusdb.ExportCensusDB(&buf); err != nil {
-		return err
-	}
 	var data []byte
 	if isIPFSExport {
-		uri, err := a.storage.PublishReader(ctx.Request.Context(), &buf)
-		if err != nil {
-			return err
-		}
+		go func() {
+			log.Infow("exporting census database to ipfs async")
+			startTime := time.Now()
+			if err := a.censusdb.ExportCensusDB(&buf); err != nil {
+				log.Errorw(err, "could not export census database")
+				return
+			}
+			log.Infow("census database exported", "duration (s)", time.Since(startTime).Seconds())
+			startTime = time.Now()
+			uri, err := a.storage.PublishReader(context.Background(), &buf)
+			if err != nil {
+				log.Errorw(err, "could not publish census database to ipfs")
+				return
+			}
+			log.Infow("census database published to ipfs", "uri", uri, "duration (s)", time.Since(startTime).Seconds())
+			censusIPFSExports[uri] = time.Now()
+		}()
+		var err error
 		data, err = json.Marshal(map[string]string{
-			"uri": uri,
+			"message": "scheduled, check /censuses/export/ipfs/list",
 		})
 		if err != nil {
-			return err
+			log.Errorw(err, "could not marshal response")
 		}
 	} else {
+		if err := a.censusdb.ExportCensusDB(&buf); err != nil {
+			return err
+		}
 		data = buf.Bytes()
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// censusExportIPFSListDBHandler
+//
+//	@Summary		List export census database to IPFS
+//	@Description	List the IPFS URIs of the census database exports
+//	@Tags			Censuses
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	object{valid=bool}
+//	@Router			/censuses/export/ipfs/list [get]
+func (a *API) censusExportIPFSListDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	data, err := json.Marshal(censusIPFSExports)
+	if err != nil {
+		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
