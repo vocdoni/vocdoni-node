@@ -156,7 +156,7 @@ func TestConvertKeysToCamel(t *testing.T) {
 }
 
 func TestProtoTxAsJSON(t *testing.T) {
-	wantJSON := strings.TrimSpace(`
+	inputJSON := strings.TrimSpace(`
 {
 	"setProcess": {
 		"txtype": "SET_PROCESS_CENSUS",
@@ -168,8 +168,20 @@ func TestProtoTxAsJSON(t *testing.T) {
 	}
 }
 `)
+	wantJSON := strings.TrimSpace(`
+{
+	"setProcess": {
+		"txtype": "SET_PROCESS_CENSUS",
+		"nonce": 1,
+		"processId": "b31dff61814dab90d6c3a9b65d6c90830480e4b75ad32e747942020000000000",
+		"censusRoot": "cd453d05c4cb0429ee5ee1aefed016f553b8026b4ced5b0c352905bfa53c7e81",
+		"censusURI": "ipfs://bafybeicyfukarcryrvy5oe37ligmxwf55sbfiojori4t25wencma4ymxfa",
+		"censusSize": "1000"
+	}
+}
+`)
 	var ptx models.Tx
-	err := protojson.Unmarshal([]byte(wantJSON), &ptx)
+	err := protojson.Unmarshal([]byte(inputJSON), &ptx)
 	qt.Assert(t, err, qt.IsNil)
 
 	asProto, err := proto.Marshal(&ptx)
