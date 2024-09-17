@@ -63,15 +63,24 @@ func NewVochainStateWithValidators(tb testing.TB) *state.State {
 	s := NewVochainState(tb)
 	vals := make([]*cometprivval.FilePV, 2)
 	rint := rand.Int()
-	vals[0] = cometprivval.GenFilePV(
+	var err error
+	vals[0], err = cometprivval.GenFilePV(
 		"/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
+		nil,
 	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	rint = rand.Int()
-	vals[1] = cometprivval.GenFilePV(
+	vals[1], err = cometprivval.GenFilePV(
 		"/tmp/"+strconv.Itoa(rint),
 		"/tmp/"+strconv.Itoa(rint),
+		nil,
 	)
+	if err != nil {
+		tb.Fatal(err)
+	}
 	validator0 := &models.Validator{
 		Address: vals[0].Key.Address.Bytes(),
 		PubKey:  vals[0].Key.PubKey.Bytes(),

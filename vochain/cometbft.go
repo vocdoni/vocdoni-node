@@ -350,12 +350,11 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 func validatorUpdate(validators map[string]*models.Validator) cometabcitypes.ValidatorUpdates {
 	validatorUpdate := []cometabcitypes.ValidatorUpdate{}
 	for _, v := range validators {
-		pubKey := bytes.Clone(v.PubKey)
-		validatorUpdate = append(validatorUpdate, cometabcitypes.UpdateValidator(
-			pubKey,
-			int64(v.Power),
-			crypto256k1.KeyType,
-		))
+		validatorUpdate = append(validatorUpdate, cometabcitypes.ValidatorUpdate{
+			Power:       int64(v.Power),
+			PubKeyBytes: bytes.Clone(v.PubKey),
+			PubKeyType:  crypto256k1.KeyType,
+		})
 	}
 	return validatorUpdate
 }
