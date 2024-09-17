@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"slices"
 	"sync"
 	"time"
 
@@ -93,15 +94,13 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 	var vote state.VotePackage
 	rawVote := bytes.Clone(VotePackage)
 	// if encryption keys, decrypt the vote
-	if len(keys) > 0 {
-		for i := len(keys) - 1; i >= 0; i-- {
-			priv, err := nacl.DecodePrivate(keys[i])
-			if err != nil {
-				return nil, fmt.Errorf("cannot create private key cipher: (%s)", err)
-			}
-			if rawVote, err = priv.Decrypt(rawVote); err != nil {
-				return nil, fmt.Errorf("cannot decrypt vote with index key %d: %w", i, err)
-			}
+	for i, key := range slices.Backward(keys) {
+		priv, err := nacl.DecodePrivate(key)
+		if err != nil {
+			return nil, fmt.Errorf("cannot create private key cipher: (%s)", err)
+		}
+		if rawVote, err = priv.Decrypt(rawVote); err != nil {
+			return nil, fmt.Errorf("cannot decrypt vote with index key %d: %w", i, err)
 		}
 	}
 	if err := vote.Decode(rawVote); err != nil {

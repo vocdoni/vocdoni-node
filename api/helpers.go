@@ -1,12 +1,16 @@
 package api
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"math/big"
+	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -71,7 +75,52 @@ func protoTxAsJSON(tx []byte) []byte {
 	if err != nil {
 		panic(err)
 	}
+	// protojson follows protobuf's json mapping behavior,
+	// which requires bytes to be encoded as base64:
+	// https://protobuf.dev/programming-guides/proto3/#json
+	//
+	// We want hex rather than base64 for consistency with our REST API
+	// protojson does not expose any option to configure its behavior,
+	// and as the Go types are code generated, we cannot use our HexBytes type.
+	//
+	// Do a bit of a hack: walk the protobuf value with reflection,
+	// find all []byte values, and search-and-replace their base64 encoding with hex
+	// in the protojson bytes. This can be slow if we have many byte slices,
+	// but in general the protobuf message will be small so there will be few.
+	bytesValues := collectBytesValues(nil, reflect.ValueOf(&ptx))
+	for _, bv := range bytesValues {
+		asBase64 := base64.StdEncoding.AppendEncode(nil, bv)
+		asHex := hex.AppendEncode(nil, bv)
+		asJSON = bytes.Replace(asJSON, asBase64, asHex, 1)
+	}
 	return asJSON
+}
+
+var typBytes = reflect.TypeFor[[]byte]()
+
+func collectBytesValues(result [][]byte, val reflect.Value) [][]byte {
+	typ := val.Type()
+	if typ == typBytes {
+		return append(result, val.Bytes())
+	}
+	switch typ.Kind() {
+	case reflect.Pointer, reflect.Interface:
+		if !val.IsNil() {
+			result = collectBytesValues(result, val.Elem())
+		}
+	case reflect.Struct:
+		for i := 0; i < val.NumField(); i++ {
+			if !typ.Field(i).IsExported() {
+				continue
+			}
+			result = collectBytesValues(result, val.Field(i))
+		}
+	case reflect.Slice, reflect.Array:
+		for i := 0; i < val.Len(); i++ {
+			result = collectBytesValues(result, val.Index(i))
+		}
+	}
+	return result
 }
 
 // isTransactionType checks if the given transaction is of the given type.
@@ -158,13 +207,13 @@ func encodeEVMResultsArgs(electionId common.Hash, organizationId common.Address,
 
 // decryptVotePackage decrypts a vote package using the given private keys and indexes.
 func decryptVotePackage(vp []byte, privKeys []string, indexes []uint32) ([]byte, error) {
-	for i := len(indexes) - 1; i >= 0; i-- {
-		if indexes[i] >= uint32(len(privKeys)) {
-			return nil, fmt.Errorf("invalid key index %d", indexes[i])
+	for _, index := range slices.Backward(indexes) {
+		if index >= uint32(len(privKeys)) {
+			return nil, fmt.Errorf("invalid key index %d", index)
 		}
-		priv, err := nacl.DecodePrivate(privKeys[indexes[i]])
+		priv, err := nacl.DecodePrivate(privKeys[index])
 		if err != nil {
-			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", indexes[i], err)
+			return nil, fmt.Errorf("cannot decode encryption key with index %d: (%s)", index, err)
 		}
 		vp, err = priv.Decrypt(vp)
 		if err != nil {
