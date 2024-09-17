@@ -197,17 +197,6 @@ func TransactionMetadataFromDB(dbtx *indexerdb.Transaction) *TransactionMetadata
 	}
 }
 
-func TransactionMetadataFromDBRow(dbtx *indexerdb.SearchTransactionsRow) *TransactionMetadata {
-	return &TransactionMetadata{
-		Hash:         dbtx.Hash,
-		BlockHeight:  uint32(dbtx.BlockHeight),
-		TxBlockIndex: int32(dbtx.BlockIndex),
-		TxType:       dbtx.Type,
-		TxSubtype:    dbtx.Subtype,
-		Signer:       dbtx.Signer,
-	}
-}
-
 // Transaction holds a single transaction
 type Transaction struct {
 	*TransactionMetadata
