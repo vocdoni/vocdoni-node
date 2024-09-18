@@ -75,7 +75,7 @@ To run a Vocdoni-node as a gateway, it's recommended to have at least 4 GiB of R
 
 #### Compile and run
 
-Compile from source in a golang environment (Go>1.23 required):
+Compile from source in a golang environment (Go>1.22 required):
 
 ```bash
 git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
