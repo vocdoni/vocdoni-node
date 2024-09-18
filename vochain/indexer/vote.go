@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"slices"
 	"strings"
 	"time"
 
@@ -139,8 +138,8 @@ func unmarshalVote(VotePackage []byte, keys []string) (*state.VotePackage, error
 	// if encryption keys, decrypt the vote
 	if len(keys) > 0 {
 		rawVote = bytes.Clone(VotePackage)
-		for i, key := range slices.Backward(keys) {
-			priv, err := nacl.DecodePrivate(key)
+		for i := len(keys) - 1; i >= 0; i-- {
+			priv, err := nacl.DecodePrivate(keys[i])
 			if err != nil {
 				return nil, fmt.Errorf("cannot create private key cipher: (%s)", err)
 			}
