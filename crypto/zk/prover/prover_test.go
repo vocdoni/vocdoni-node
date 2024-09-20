@@ -387,7 +387,7 @@ func parseVKForGnark(vkjson []byte) (*groth16_bn254.VerifyingKey, error) {
 	var vkStr vkJSON
 	err := json.Unmarshal(vkjson, &vkStr)
 	if err != nil {
-		return nil, fmt.Errorf("Error parsing verification key JSON:", err)
+		return nil, fmt.Errorf("Error parsing verification key JSON: %w", err)
 	}
 
 	vk := new(groth16_bn254.VerifyingKey)
