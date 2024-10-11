@@ -6,6 +6,7 @@ import (
 
 	"github.com/iden3/go-iden3-crypto/poseidon"
 	"golang.org/x/crypto/blake2b"
+	"lukechampine.com/blake3"
 )
 
 var (
@@ -16,6 +17,8 @@ var (
 	TypeHashPoseidon = []byte("poseidon")
 	// TypeHashBlake2b represents the label for the HashFunction of Blake2b
 	TypeHashBlake2b = []byte("blake2b")
+	// TypeHashBlake3 represents the label for the HashFunction of Blake3
+	TypeHashBlake3 = []byte("blake3")
 
 	// HashFunctionSha256 contains the HashSha256 struct which implements
 	// the HashFunction interface
@@ -26,6 +29,9 @@ var (
 	// HashFunctionBlake2b contains the HashBlake2b struct which implements
 	// the HashFunction interface
 	HashFunctionBlake2b HashBlake2b
+	// HashFunctionBlake3 contains the HashBlake3 struct which implements
+	// the HashFunction interface
+	HashFunctionBlake3 HashBlake3
 )
 
 // Once Generics are at Go, this will be updated (August 2021
@@ -115,6 +121,30 @@ func (HashBlake2b) Hash(b ...[]byte) ([]byte, error) {
 	}
 	for i := 0; i < len(b); i++ {
 		if _, err = hasher.Write(b[i]); err != nil {
+			return nil, err
+		}
+	}
+	return hasher.Sum(nil), nil
+}
+
+// HashBlake3 implements the HashFunction interface for the Blake3 hash
+type HashBlake3 struct{}
+
+// Type returns the type of HashFunction for the HashBlake3
+func (HashBlake3) Type() []byte {
+	return TypeHashBlake3
+}
+
+// Len returns the length of the Hash output
+func (HashBlake3) Len() int {
+	return 32
+}
+
+// Hash implements the hash method for the HashFunction HashBlake3
+func (HashBlake3) Hash(b ...[]byte) ([]byte, error) {
+	hasher := blake3.New(32, nil)
+	for i := 0; i < len(b); i++ {
+		if _, err := hasher.Write(b[i]); err != nil {
 			return nil, err
 		}
 	}
