@@ -93,20 +93,20 @@ func ProverProofToProtobufZKProof(p *prover.Proof, electionId, sikRoot,
 func zkProofPublicInputs(electionId, sikRoot, censusRoot, nullifier types.HexBytes, voteWeight *big.Int) []string {
 	pubInputs := []string{}
 	// 0. electionId[0]
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[:16]).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(electionId[:16]).String())
 	// 1. electionId[1]
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(electionId[16:]).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(electionId[16:]).String())
 	// 2. nullifier
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(nullifier).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(nullifier).String())
 	voteHash := sha256.Sum256(voteWeight.Bytes())
 	// 3. voteHash[0]
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[:16]).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(voteHash[:16]).String())
 	// 4. voteHash[1]
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(voteHash[16:]).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(voteHash[16:]).String())
 	// 5. sikRoot
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(sikRoot).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(sikRoot).String())
 	// 6. censusRoot
-	pubInputs = append(pubInputs, arbo.BytesToBigInt(censusRoot).String())
+	pubInputs = append(pubInputs, arbo.BytesLEToBigInt(censusRoot).String())
 	// 7. availableWeight
 	pubInputs = append(pubInputs, voteWeight.String())
 
@@ -133,7 +133,7 @@ func ProofToCircomSiblings(proof []byte) ([]string, error) {
 	siblings := make([]string, censustree.DefaultMaxLevels+1)
 	for i := 0; i < len(siblings); i++ {
 		if i < len(rawSiblings) {
-			siblings[i] = arbo.BytesToBigInt(rawSiblings[i]).String()
+			siblings[i] = arbo.BytesLEToBigInt(rawSiblings[i]).String()
 		} else {
 			siblings[i] = "0"
 		}

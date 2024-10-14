@@ -82,7 +82,7 @@ func (r *Random) RandomInZKField() []byte {
 			panic(err)
 		}
 		b[31] &= 0b00111111
-		if iden3cryptoutils.CheckBigIntInField(arbo.BytesToBigInt(b)) {
+		if iden3cryptoutils.CheckBigIntInField(arbo.BytesLEToBigInt(b)) {
 			return b
 		}
 	}

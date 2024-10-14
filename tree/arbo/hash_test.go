@@ -27,12 +27,12 @@ func TestHashPoseidon(t *testing.T) {
 	hashFunc := &HashPoseidon{}
 	bLen := hashFunc.Len()
 	h, err := hashFunc.Hash(
-		BigIntToBytes(bLen, big.NewInt(1)),
-		BigIntToBytes(bLen, big.NewInt(2)))
+		BigIntToBytesLE(bLen, big.NewInt(1)),
+		BigIntToBytesLE(bLen, big.NewInt(2)))
 	if err != nil {
 		t.Fatal(err)
 	}
-	hBI := BytesToBigInt(h)
+	hBI := BytesLEToBigInt(h)
 	// value checked with circomlib
 	c := qt.New(t)
 	c.Assert(hBI.String(),

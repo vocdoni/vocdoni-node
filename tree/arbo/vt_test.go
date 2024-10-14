@@ -51,16 +51,16 @@ func TestVirtualTreeTestVectors(t *testing.T) {
 	maxLevels := 32
 	keyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
 	keys := [][]byte{
-		BigIntToBytes(keyLen, big.NewInt(1)),
-		BigIntToBytes(keyLen, big.NewInt(33)),
-		BigIntToBytes(keyLen, big.NewInt(1234)),
-		BigIntToBytes(keyLen, big.NewInt(123456789)),
+		BigIntToBytesLE(keyLen, big.NewInt(1)),
+		BigIntToBytesLE(keyLen, big.NewInt(33)),
+		BigIntToBytesLE(keyLen, big.NewInt(1234)),
+		BigIntToBytesLE(keyLen, big.NewInt(123456789)),
 	}
 	values := [][]byte{
-		BigIntToBytes(keyLen, big.NewInt(2)),
-		BigIntToBytes(keyLen, big.NewInt(44)),
-		BigIntToBytes(keyLen, big.NewInt(9876)),
-		BigIntToBytes(keyLen, big.NewInt(987654321)),
+		BigIntToBytesLE(keyLen, big.NewInt(2)),
+		BigIntToBytesLE(keyLen, big.NewInt(44)),
+		BigIntToBytesLE(keyLen, big.NewInt(9876)),
+		BigIntToBytesLE(keyLen, big.NewInt(987654321)),
 	}
 
 	// check the root for different batches of leafs
@@ -159,7 +159,7 @@ func TestVirtualTreeAddBatchFullyUsed(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 128; i++ {
-		k := BigIntToBytes(1, big.NewInt(int64(i)))
+		k := BigIntToBytesLE(1, big.NewInt(int64(i)))
 		v := k
 
 		keys = append(keys, k)

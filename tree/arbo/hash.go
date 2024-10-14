@@ -89,14 +89,14 @@ func (HashPoseidon) Len() int {
 func (f HashPoseidon) Hash(b ...[]byte) ([]byte, error) {
 	var toHash []*big.Int
 	for i := 0; i < len(b); i++ {
-		bi := BytesToBigInt(b[i])
+		bi := BytesLEToBigInt(b[i])
 		toHash = append(toHash, bi)
 	}
 	h, err := poseidon.Hash(toHash)
 	if err != nil {
 		return nil, err
 	}
-	hB := BigIntToBytes(f.Len(), h)
+	hB := BigIntToBytesLE(f.Len(), h)
 	return hB, nil
 }
 

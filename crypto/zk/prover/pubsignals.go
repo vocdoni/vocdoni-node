@@ -68,7 +68,7 @@ func (p *Proof) CensusRoot() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), bi), nil
+	return arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), bi), nil
 }
 
 // VoteWeight returns the VoteWeight included into the current proof.
@@ -108,5 +108,5 @@ func (p *Proof) SIKRoot() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), bi), nil
+	return arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), bi), nil
 }

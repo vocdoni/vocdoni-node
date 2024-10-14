@@ -125,12 +125,12 @@ func (t *Tree) Hash(data []byte) ([]byte, error) {
 
 // BytesToBigInt unmarshals a slice of bytes into a bigInt following the censusTree encoding rules
 func (*Tree) BytesToBigInt(data []byte) *big.Int {
-	return arbo.BytesToBigInt(data)
+	return arbo.BytesLEToBigInt(data)
 }
 
 // BigIntToBytes marshals a bigInt following the censusTree encoding rules
 func (t *Tree) BigIntToBytes(b *big.Int) []byte {
-	return arbo.BigIntToBytes(t.hashLen, b)
+	return arbo.BigIntToBytesLE(t.hashLen, b)
 }
 
 // FromRoot returns a new read-only Tree for the given root, that uses the same

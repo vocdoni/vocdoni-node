@@ -122,7 +122,7 @@ func main() {
 	}
 
 	if err := censusRef.Tree().IterateLeaves(func(key, value []byte) bool {
-		balance := arbo.BytesToBigInt(value)
+		balance := arbo.BytesLEToBigInt(value)
 		census.Data = append(census.Data, struct {
 			Address common.Address `json:"address"`
 			Balance string         `json:"balance"`

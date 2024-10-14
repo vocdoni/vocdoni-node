@@ -61,12 +61,12 @@ func (*ProofVerifierArbo) Verify(process *models.Process, envelope *models.VoteE
 			return true, bigOne, nil
 		}
 
-		availableWeight := arbo.BytesToBigInt(p.AvailableWeight)
+		availableWeight := arbo.BytesLEToBigInt(p.AvailableWeight)
 		if p.VoteWeight == nil {
 			return true, availableWeight, nil
 		}
 
-		voteWeight := arbo.BytesToBigInt(p.VoteWeight)
+		voteWeight := arbo.BytesLEToBigInt(p.VoteWeight)
 		if voteWeight.Cmp(availableWeight) == 1 {
 			return false, nil, fmt.Errorf("assigned weight exceeded")
 		}

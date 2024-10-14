@@ -187,7 +187,7 @@ func TestMaxCensusSizeRegisterSIKTx(t *testing.T) {
 	c.Assert(app.State.AddProcess(process), qt.IsNil)
 	app.AdvanceTestBlock()
 
-	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), testWeight)
+	encWeight := arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), testWeight)
 	tx := testBuildSignedRegisterSIKTx(t, accounts[0], pid, proofs[0], encWeight, app.chainID)
 	_, _, _, _, err := app.TransactionHandler.RegisterSIKTxCheck(tx)
 	c.Assert(err, qt.IsNil)
