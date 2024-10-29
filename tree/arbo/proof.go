@@ -3,6 +3,7 @@ package arbo
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"slices"
@@ -161,32 +162,113 @@ func bytesToBitmap(b []byte) []bool {
 // HashFunction passed as parameter.
 // Returns nil if the proof is valid, or an error otherwise.
 func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) error {
-	siblings, err := UnpackSiblings(hashFunc, packedSiblings)
+	hashes, err := CalculateProofNodes(hashFunc, k, v, packedSiblings, nil, false)
 	if err != nil {
 		return err
+	}
+	if !bytes.Equal(hashes[0], root) {
+		return fmt.Errorf("calculated vs expected root mismatch")
+	}
+	return nil
+}
+
+// CalculateProofNodes calculates the chain of hashes in the path of the given proof.
+// In the returned list, first item is the root, and last item is the hash of the leaf.
+func CalculateProofNodes(hashFunc HashFunction, k, v, packedSiblings, oldKey []byte, exclusion bool) ([][]byte, error) {
+	siblings, err := UnpackSiblings(hashFunc, packedSiblings)
+	if err != nil {
+		return nil, err
 	}
 
 	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8))))
 	copy(keyPath, k)
+	path := getPath(len(siblings), keyPath)
 
-	key, _, err := newLeafValue(hashFunc, k, v)
-	if err != nil {
-		return err
+	key := slices.Clone(k)
+
+	if exclusion {
+		if slices.Equal(k, oldKey) {
+			return nil, fmt.Errorf("exclusion proof invalid, key and oldKey are equal")
+		}
+		// we'll prove the path to the existing key (passed as oldKey)
+		key = slices.Clone(oldKey)
 	}
 
-	path := getPath(len(siblings), keyPath)
+	hash, _, err := newLeafValue(hashFunc, key, v)
+	if err != nil {
+		return nil, err
+	}
+	hashes := [][]byte{hash}
 	for i, sibling := range slices.Backward(siblings) {
 		if path[i] {
-			key, _, err = newIntermediate(hashFunc, sibling, key)
+			hash, _, err = newIntermediate(hashFunc, sibling, hash)
 		} else {
-			key, _, err = newIntermediate(hashFunc, key, sibling)
+			hash, _, err = newIntermediate(hashFunc, hash, sibling)
 		}
 		if err != nil {
-			return err
+			return nil, err
+		}
+		hashes = append(hashes, hash)
+	}
+	slices.Reverse(hashes)
+	return hashes, nil
+}
+
+// CheckProofBatch verifies a batch of N proofs pairs (old and new). The proof verification depends on the
+// HashFunction passed as parameter.
+// Returns nil if the batch is valid, or an error otherwise.
+//
+// TODO: doesn't support removing leaves (newProofs can only update or add new leaves)
+func CheckProofBatch(hashFunc HashFunction, oldProofs, newProofs []*CircomVerifierProof) error {
+	newBranches := make(map[string]int)
+	newSiblings := make(map[string]int)
+
+	if len(oldProofs) != len(newProofs) {
+		return fmt.Errorf("batch of proofs incomplete")
+	}
+
+	if len(oldProofs) == 0 {
+		return fmt.Errorf("empty batch")
+	}
+
+	for i := range oldProofs {
+		// Map all old branches
+		oldNodes, err := oldProofs[i].CalculateProofNodes(hashFunc)
+		if err != nil {
+			return fmt.Errorf("old proof invalid: %w", err)
+		}
+		// and check they are valid
+		if !bytes.Equal(oldProofs[i].Root, oldNodes[0]) {
+			return fmt.Errorf("old proof invalid: root doesn't match")
+		}
+
+		// Map all new branches
+		newNodes, err := newProofs[i].CalculateProofNodes(hashFunc)
+		if err != nil {
+			return fmt.Errorf("new proof invalid: %w", err)
+		}
+		// and check they are valid
+		if !bytes.Equal(newProofs[i].Root, newNodes[0]) {
+			return fmt.Errorf("new proof invalid: root doesn't match")
+		}
+
+		for level, hash := range newNodes {
+			newBranches[hex.EncodeToString(hash)] = level
+		}
+
+		for level := range newProofs[i].Siblings {
+			if !slices.Equal(oldProofs[i].Siblings[level], newProofs[i].Siblings[level]) {
+				// since in newBranch the root is level 0, we shift siblings to level + 1
+				newSiblings[hex.EncodeToString(newProofs[i].Siblings[level])] = level + 1
+			}
 		}
 	}
-	if !bytes.Equal(key, root) {
-		return fmt.Errorf("calculated vs expected root mismatch")
+
+	for hash, level := range newSiblings {
+		if newBranches[hash] != newSiblings[hash] {
+			return fmt.Errorf("sibling %s (at level %d) changed but there's no proof why", hash, level)
+		}
 	}
+
 	return nil
 }
