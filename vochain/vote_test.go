@@ -31,7 +31,7 @@ func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.
 		t.Fatal(err)
 	}
 
-	encWeight := arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), weight)
+	encWeight := arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), weight)
 	keys := ethereum.NewSignKeysBatch(size)
 	for _, k := range keys {
 		qt.Check(t, err, qt.IsNil)
