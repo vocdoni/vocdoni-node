@@ -110,9 +110,8 @@ func TestWeightedProof(t *testing.T) {
 	root, err := censusTree.Root()
 	qt.Assert(t, err, qt.IsNil)
 
-	verified, err := censusTree.VerifyProof(userKey, value, siblings, root)
+	err = censusTree.VerifyProof(userKey, value, siblings, root)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, verified, qt.IsTrue)
 }
 
 func TestGetCensusWeight(t *testing.T) {

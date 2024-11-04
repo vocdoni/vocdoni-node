@@ -52,8 +52,8 @@ func (*ProofVerifierArbo) Verify(process *models.Process, envelope *models.VoteE
 				key = key[:censustree.DefaultMaxKeyLen]
 			}
 		}
-		valid, err := tree.VerifyProof(hashFunc, key, p.AvailableWeight, p.Siblings, process.CensusRoot)
-		if !valid || err != nil {
+
+		if err := tree.VerifyProof(hashFunc, key, p.AvailableWeight, p.Siblings, process.CensusRoot); err != nil {
 			return false, nil, err
 		}
 		// Legacy: support p.LeafWeight == nil, assume then value=1

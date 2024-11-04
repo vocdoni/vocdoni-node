@@ -945,15 +945,15 @@ func (a *API) censusVerifyHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 		}
 	}
 
-	valid, err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.CensusRoot)
-	if err != nil {
+	if err := ref.Tree().VerifyProof(leafKey, cdata.Value, cdata.CensusProof, cdata.CensusRoot); err != nil {
+		if strings.Contains(err.Error(), "calculated vs expected root mismatch") {
+			return ctx.Send(nil, apirest.HTTPstatusBadRequest)
+		}
 		return ErrCensusProofVerificationFailed.WithErr(err)
 	}
-	if !valid {
-		return ctx.Send(nil, apirest.HTTPstatusBadRequest)
-	}
+
 	response := Census{
-		Valid: valid,
+		Valid: true,
 	}
 	var data []byte
 	if data, err = json.Marshal(&response); err != nil {

@@ -46,9 +46,8 @@ func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.
 		_, proof, err := tr.GenProof(k.Address().Bytes())
 		qt.Check(t, err, qt.IsNil)
 		proofs = append(proofs, proof)
-		valid, err := tr.VerifyProof(k.Address().Bytes(), encWeight, proof, root)
+		err = tr.VerifyProof(k.Address().Bytes(), encWeight, proof, root)
 		qt.Check(t, err, qt.IsNil)
-		qt.Check(t, valid, qt.IsTrue)
 	}
 	return keys, root, proofs
 }

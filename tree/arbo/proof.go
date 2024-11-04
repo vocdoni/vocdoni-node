@@ -159,10 +159,11 @@ func bytesToBitmap(b []byte) []bool {
 
 // CheckProof verifies the given proof. The proof verification depends on the
 // HashFunction passed as parameter.
-func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool, error) {
+// Returns nil if the proof is valid, or an error otherwise.
+func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) error {
 	siblings, err := UnpackSiblings(hashFunc, packedSiblings)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	keyPath := make([]byte, int(math.Ceil(float64(len(siblings))/float64(8))))
@@ -170,7 +171,7 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 
 	key, _, err := newLeafValue(hashFunc, k, v)
 	if err != nil {
-		return false, err
+		return err
 	}
 
 	path := getPath(len(siblings), keyPath)
@@ -181,8 +182,11 @@ func CheckProof(hashFunc HashFunction, k, v, root, packedSiblings []byte) (bool,
 			key, _, err = newIntermediate(hashFunc, key, sibling)
 		}
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
-	return bytes.Equal(key, root), nil
+	if !bytes.Equal(key, root) {
+		return fmt.Errorf("calculated vs expected root mismatch")
+	}
+	return nil
 }
