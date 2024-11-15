@@ -22,17 +22,17 @@ type CircomVerifierProof struct {
 func (cvp CircomVerifierProof) MarshalJSON() ([]byte, error) {
 	m := make(map[string]any)
 
-	m["root"] = BytesToBigInt(cvp.Root).String()
+	m["root"] = BytesLEToBigInt(cvp.Root).String()
 	m["siblings"] = siblingsToStringArray(cvp.Siblings)
-	m["oldKey"] = BytesToBigInt(cvp.OldKey).String()
-	m["oldValue"] = BytesToBigInt(cvp.OldValue).String()
+	m["oldKey"] = BytesLEToBigInt(cvp.OldKey).String()
+	m["oldValue"] = BytesLEToBigInt(cvp.OldValue).String()
 	if cvp.IsOld0 {
 		m["isOld0"] = "1"
 	} else {
 		m["isOld0"] = "0"
 	}
-	m["key"] = BytesToBigInt(cvp.Key).String()
-	m["value"] = BytesToBigInt(cvp.Value).String()
+	m["key"] = BytesLEToBigInt(cvp.Key).String()
+	m["value"] = BytesLEToBigInt(cvp.Value).String()
 	m["fnc"] = cvp.Fnc
 
 	return json.Marshal(m)
@@ -41,7 +41,7 @@ func (cvp CircomVerifierProof) MarshalJSON() ([]byte, error) {
 func siblingsToStringArray(s [][]byte) []string {
 	var r []string
 	for i := 0; i < len(s); i++ {
-		r = append(r, BytesToBigInt(s[i]).String())
+		r = append(r, BytesLEToBigInt(s[i]).String())
 	}
 	return r
 }

@@ -33,12 +33,14 @@ type Question struct {
 	Choices     []ChoiceMetadata `json:"choices"`
 	Description LanguageString   `json:"description"`
 	Title       LanguageString   `json:"title"`
+	Meta        any              `json:"meta,omitempty"`
 }
 
 // ChoiceMetadata contains metadata for one choice of a question
 type ChoiceMetadata struct {
 	Title LanguageString `json:"title"`
 	Value uint32         `json:"value"`
+	Meta  any            `json:"meta,omitempty"`
 }
 
 // AccountMetadata is the metadata for an organization

@@ -21,7 +21,7 @@ import (
 func checkRootBIString(c *qt.C, tree *Tree, expected string) {
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
-	rootBI := BytesToBigInt(root)
+	rootBI := BytesLEToBigInt(root)
 	c.Check(rootBI.String(), qt.Equals, expected)
 }
 
@@ -86,20 +86,20 @@ func testAdd(c *qt.C, hashFunc HashFunction, testVectors []string) {
 
 	bLen := 32
 	err = tree.Add(
-		BigIntToBytes(bLen, big.NewInt(1)),
-		BigIntToBytes(bLen, big.NewInt(2)))
+		BigIntToBytesLE(bLen, big.NewInt(1)),
+		BigIntToBytesLE(bLen, big.NewInt(2)))
 	c.Assert(err, qt.IsNil)
 	checkRootBIString(c, tree, testVectors[1])
 
 	err = tree.Add(
-		BigIntToBytes(bLen, big.NewInt(33)),
-		BigIntToBytes(bLen, big.NewInt(44)))
+		BigIntToBytesLE(bLen, big.NewInt(33)),
+		BigIntToBytesLE(bLen, big.NewInt(44)))
 	c.Assert(err, qt.IsNil)
 	checkRootBIString(c, tree, testVectors[2])
 
 	err = tree.Add(
-		BigIntToBytes(bLen, big.NewInt(1234)),
-		BigIntToBytes(bLen, big.NewInt(9876)))
+		BigIntToBytesLE(bLen, big.NewInt(1234)),
+		BigIntToBytesLE(bLen, big.NewInt(9876)))
 	c.Assert(err, qt.IsNil)
 	checkRootBIString(c, tree, testVectors[3])
 }
@@ -112,8 +112,8 @@ func TestAddBatch(t *testing.T) {
 
 	bLen := 32
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(0))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(0))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -128,8 +128,8 @@ func TestAddBatch(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(0))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(0))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -149,8 +149,8 @@ func TestAddDifferentOrder(t *testing.T) {
 
 	bLen := 32
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(0))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(0))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -161,8 +161,8 @@ func TestAddDifferentOrder(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	for i := 16 - 1; i >= 0; i-- {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(0))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(0))
 		if err := tree2.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -184,8 +184,8 @@ func TestAddRepeatedIndex(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
-	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(3)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(12)))
 
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
@@ -200,13 +200,13 @@ func TestUpdate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
-	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(20)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
 
-	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
+	v = BigIntToBytesLE(bLen, big.NewInt(int64(11)))
 	err = tree.Update(k, v)
 	c.Assert(err, qt.IsNil)
 
@@ -217,21 +217,21 @@ func TestUpdate(t *testing.T) {
 
 	// add more leafs to the tree to do another test
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k = BigIntToBytes(bLen, big.NewInt(int64(3)))
-	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(3)))
+	v = BigIntToBytesLE(bLen, big.NewInt(int64(11)))
 	// check that before the Update, value for 3 is !=11
 	gettedKey, gettedValue, err = tree.Get(k)
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
 	c.Check(gettedValue, qt.Not(qt.DeepEquals), v)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(6)))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytesLE(bLen, big.NewInt(6)))
 
 	err = tree.Update(k, v)
 	c.Assert(err, qt.IsNil)
@@ -241,7 +241,7 @@ func TestUpdate(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
 	c.Check(gettedValue, qt.DeepEquals, v)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(11)))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytesLE(bLen, big.NewInt(11)))
 }
 
 func TestRootOnTx(t *testing.T) {
@@ -251,8 +251,8 @@ func TestRootOnTx(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
-	k := BigIntToBytes(bLen, big.NewInt(int64(20)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(12)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(20)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(12)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +263,7 @@ func TestRootOnTx(t *testing.T) {
 	tx := database.WriteTx()
 
 	// Update the value of the key
-	v = BigIntToBytes(bLen, big.NewInt(int64(11)))
+	v = BigIntToBytesLE(bLen, big.NewInt(int64(11)))
 	err = tree.UpdateWithTx(tx, k, v)
 	c.Assert(err, qt.IsNil)
 
@@ -286,8 +286,8 @@ func TestRootOnTx(t *testing.T) {
 	c.Assert(rootAfter, qt.DeepEquals, newRoot)
 
 	// Add a new key-value pair
-	k2 := BigIntToBytes(bLen, big.NewInt(int64(30)))
-	v2 := BigIntToBytes(bLen, big.NewInt(int64(40)))
+	k2 := BigIntToBytesLE(bLen, big.NewInt(int64(30)))
+	v2 := BigIntToBytesLE(bLen, big.NewInt(int64(40)))
 	if err := tree.AddWithTx(tx, k2, v2); err != nil {
 		t.Fatal(err)
 	}
@@ -340,29 +340,29 @@ func TestAux(t *testing.T) { // TODO split in proper tests
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
-	k := BigIntToBytes(bLen, big.NewInt(int64(1)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(0)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(1)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(0)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(bLen, big.NewInt(int64(256)))
-	err = tree.Add(k, v)
-	c.Assert(err, qt.IsNil)
-
-	k = BigIntToBytes(bLen, big.NewInt(int64(257)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(256)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 
-	k = BigIntToBytes(bLen, big.NewInt(int64(515)))
-	err = tree.Add(k, v)
-	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(bLen, big.NewInt(int64(770)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(257)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 
-	k = BigIntToBytes(bLen, big.NewInt(int64(388)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(515)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
-	k = BigIntToBytes(bLen, big.NewInt(int64(900)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(770)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(388)))
+	err = tree.Add(k, v)
+	c.Assert(err, qt.IsNil)
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(900)))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 	//
@@ -381,18 +381,18 @@ func TestGet(t *testing.T) {
 
 	bLen := 32
 	for i := 0; i < 10; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k := BigIntToBytes(bLen, big.NewInt(int64(7)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(7)))
 	gettedKey, gettedValue, err := tree.Get(k)
 	c.Assert(err, qt.IsNil)
 	c.Check(gettedKey, qt.DeepEquals, k)
-	c.Check(gettedValue, qt.DeepEquals, BigIntToBytes(bLen, big.NewInt(int64(7*2))))
+	c.Check(gettedValue, qt.DeepEquals, BigIntToBytesLE(bLen, big.NewInt(int64(7*2))))
 }
 
 func TestBitmapBytes(t *testing.T) {
@@ -522,15 +522,15 @@ func TestGenProofAndVerify(t *testing.T) {
 
 	bLen := 32
 	for i := 0; i < 10; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i*2)))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	k := BigIntToBytes(bLen, big.NewInt(int64(7)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(14)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(7)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(14)))
 	kAux, proofV, siblings, existence, err := tree.GenProof(k)
 	c.Assert(err, qt.IsNil)
 	c.Assert(proofV, qt.DeepEquals, v)
@@ -563,8 +563,8 @@ func testDumpAndImportDump(t *testing.T, inFile bool) {
 
 	bLen := 32
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i*2)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i*2)))
 		if err := tree1.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
@@ -621,8 +621,8 @@ func TestRWMutex(t *testing.T) {
 	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(0))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(0))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -634,8 +634,8 @@ func TestRWMutex(t *testing.T) {
 	}()
 
 	time.Sleep(500 * time.Millisecond)
-	k := BigIntToBytes(bLen, big.NewInt(int64(99999)))
-	v := BigIntToBytes(bLen, big.NewInt(int64(99999)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(99999)))
+	v := BigIntToBytesLE(bLen, big.NewInt(int64(99999)))
 	if err := tree.Add(k, v); err != nil {
 		t.Fatal(err)
 	}
@@ -660,7 +660,7 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	var keys, values [][]byte
 	for i := 0; i < 16; i++ {
-		k := BigIntToBytes(1, big.NewInt(int64(i)))
+		k := BigIntToBytesLE(1, big.NewInt(int64(i)))
 		v := k
 
 		keys = append(keys, k)
@@ -683,10 +683,10 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	// get all key-values and check that are equal between both trees
 	for i := 0; i < 16; i++ {
-		auxK1, auxV1, err := tree1.Get(BigIntToBytes(1, big.NewInt(int64(i))))
+		auxK1, auxV1, err := tree1.Get(BigIntToBytesLE(1, big.NewInt(int64(i))))
 		c.Assert(err, qt.IsNil)
 
-		auxK2, auxV2, err := tree2.Get(BigIntToBytes(1, big.NewInt(int64(i))))
+		auxK2, auxV2, err := tree2.Get(BigIntToBytesLE(1, big.NewInt(int64(i))))
 		c.Assert(err, qt.IsNil)
 
 		c.Assert(auxK1, qt.DeepEquals, auxK2)
@@ -695,7 +695,7 @@ func TestAddBatchFullyUsed(t *testing.T) {
 
 	// try adding one more key to both trees (through Add & AddBatch) and
 	// expect not being added due the tree is already full
-	k := BigIntToBytes(1, big.NewInt(int64(16)))
+	k := BigIntToBytesLE(1, big.NewInt(int64(16)))
 	v := k
 	err = tree1.Add(k, v)
 	c.Assert(err, qt.Equals, ErrMaxVirtualLevel)
@@ -720,8 +720,8 @@ func TestSetRoot(t *testing.T) {
 	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -733,8 +733,8 @@ func TestSetRoot(t *testing.T) {
 		expectedRoot)
 
 	// add one more k-v
-	k := BigIntToBytes(bLen, big.NewInt(1000))
-	v := BigIntToBytes(bLen, big.NewInt(1000))
+	k := BigIntToBytesLE(bLen, big.NewInt(1000))
+	v := BigIntToBytesLE(bLen, big.NewInt(1000))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 	checkRootBIString(c, tree,
@@ -751,9 +751,9 @@ func TestSetRoot(t *testing.T) {
 	c.Assert(string(root), qt.Equals, string(roots[0]))
 
 	// check that the tree can be updated
-	err = tree.Add(BigIntToBytes(bLen, big.NewInt(int64(1024))), []byte("test"))
+	err = tree.Add(BigIntToBytesLE(bLen, big.NewInt(int64(1024))), []byte("test"))
 	c.Assert(err, qt.IsNil)
-	err = tree.Update(BigIntToBytes(bLen, big.NewInt(int64(1024))), []byte("test2"))
+	err = tree.Update(BigIntToBytesLE(bLen, big.NewInt(int64(1024))), []byte("test2"))
 	c.Assert(err, qt.IsNil)
 
 	// check that the k-v '1000' does not exist in the new tree
@@ -778,8 +778,8 @@ func TestSnapshot(t *testing.T) {
 	bLen := 32
 	var keys, values [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
 		keys = append(keys, k)
 		values = append(values, v)
 	}
@@ -827,7 +827,7 @@ func TestGetFromSnapshotExpectArboErrKeyNotFound(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	bLen := 32
-	k := BigIntToBytes(bLen, big.NewInt(int64(3)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(3)))
 
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
@@ -852,8 +852,8 @@ func TestKeyLen(t *testing.T) {
 	// expect no errors when adding a key of only 4 bytes (when the
 	// required length of keyPath for 100 levels would be 13 bytes)
 	bLen := 4
-	k := BigIntToBytes(bLen, big.NewInt(1))
-	v := BigIntToBytes(bLen, big.NewInt(1))
+	k := BigIntToBytesLE(bLen, big.NewInt(1))
+	v := BigIntToBytesLE(bLen, big.NewInt(1))
 
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
@@ -867,8 +867,8 @@ func TestKeyLen(t *testing.T) {
 	_, _, err = tree.Get(k)
 	c.Assert(err, qt.IsNil)
 
-	k = BigIntToBytes(bLen, big.NewInt(2))
-	v = BigIntToBytes(bLen, big.NewInt(2))
+	k = BigIntToBytesLE(bLen, big.NewInt(2))
+	v = BigIntToBytesLE(bLen, big.NewInt(2))
 	invalids, err := tree.AddBatch([][]byte{k}, [][]byte{v})
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(invalids), qt.Equals, 0)
@@ -884,8 +884,8 @@ func TestKeyLen(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	maxKeyLen := int(math.Ceil(float64(maxLevels) / float64(8)))
-	k = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
-	v = BigIntToBytes(maxKeyLen+1, big.NewInt(1))
+	k = BigIntToBytesLE(maxKeyLen+1, big.NewInt(1))
+	v = BigIntToBytesLE(maxKeyLen+1, big.NewInt(1))
 
 	expectedErrMsg := "len(k) can not be bigger than ceil(maxLevels/8)," +
 		" where len(k): 5, maxLevels: 32, max key len=ceil(maxLevels/8): 4." +
@@ -914,15 +914,15 @@ func TestKeyLen(t *testing.T) {
 	nKVs := nCPU + 1
 	var ks, vs [][]byte
 	for i := 0; i < nKVs; i++ {
-		ks = append(ks, BigIntToBytes(maxKeyLen+1, big.NewInt(1)))
-		vs = append(vs, BigIntToBytes(maxKeyLen+1, big.NewInt(1)))
+		ks = append(ks, BigIntToBytesLE(maxKeyLen+1, big.NewInt(1)))
+		vs = append(vs, BigIntToBytesLE(maxKeyLen+1, big.NewInt(1)))
 	}
 	invalids, err = tree.AddBatch(ks, vs)
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(invalids), qt.Equals, nKVs)
 
 	// check that with maxKeyLen it can be added
-	k = BigIntToBytes(maxKeyLen, big.NewInt(1))
+	k = BigIntToBytesLE(maxKeyLen, big.NewInt(1))
 	err = tree.Add(k, v)
 	c.Assert(err, qt.IsNil)
 
@@ -983,16 +983,16 @@ func TestDelete(t *testing.T) {
 	bLen := 32
 	// Add multiple key/value pairs to the tree
 	keys := [][]byte{
-		BigIntToBytes(bLen, big.NewInt(int64(1))),
-		BigIntToBytes(bLen, big.NewInt(int64(2))),
-		BigIntToBytes(bLen, big.NewInt(int64(3))),
-		BigIntToBytes(bLen, big.NewInt(int64(4))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(1))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(2))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(3))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(4))),
 	}
 	values := [][]byte{
-		BigIntToBytes(bLen, big.NewInt(int64(10))),
-		BigIntToBytes(bLen, big.NewInt(int64(20))),
-		BigIntToBytes(bLen, big.NewInt(int64(30))),
-		BigIntToBytes(bLen, big.NewInt(int64(40))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(10))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(20))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(30))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(40))),
 	}
 	for i, key := range keys {
 		err := tree.Add(key, values[i])
@@ -1038,8 +1038,8 @@ func BenchmarkAdd(b *testing.B) {
 	// prepare inputs
 	var ks, vs [][]byte
 	for i := 0; i < 1000; i++ {
-		k := BigIntToBytes(bLen, big.NewInt(int64(i)))
-		v := BigIntToBytes(bLen, big.NewInt(int64(i)))
+		k := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
+		v := BigIntToBytesLE(bLen, big.NewInt(int64(i)))
 		ks = append(ks, k)
 		vs = append(vs, v)
 	}
@@ -1216,20 +1216,20 @@ func TestGetLeavesFromSubPath(t *testing.T) {
 	// Add keys with shared prefix and some without shared prefix
 	keys := [][]byte{
 		// Shared prefix keys
-		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(1)))...),
-		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(2)))...),
-		append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(3)))...),
+		append([]byte{0xFF, 0xFF}, BigIntToBytesLE(bLen-2, big.NewInt(int64(1)))...),
+		append([]byte{0xFF, 0xFF}, BigIntToBytesLE(bLen-2, big.NewInt(int64(2)))...),
+		append([]byte{0xFF, 0xFF}, BigIntToBytesLE(bLen-2, big.NewInt(int64(3)))...),
 		// Non-shared prefix keys
-		BigIntToBytes(bLen, big.NewInt(int64(4))),
-		BigIntToBytes(bLen, big.NewInt(int64(5))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(4))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(5))),
 	}
-	sharedPrefixKeyNotAdded := append([]byte{0xFF, 0xFF}, BigIntToBytes(bLen-2, big.NewInt(int64(4)))...)
+	sharedPrefixKeyNotAdded := append([]byte{0xFF, 0xFF}, BigIntToBytesLE(bLen-2, big.NewInt(int64(4)))...)
 	values := [][]byte{
-		BigIntToBytes(bLen, big.NewInt(int64(10))),
-		BigIntToBytes(bLen, big.NewInt(int64(20))),
-		BigIntToBytes(bLen, big.NewInt(int64(30))),
-		BigIntToBytes(bLen, big.NewInt(int64(40))),
-		BigIntToBytes(bLen, big.NewInt(int64(50))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(10))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(20))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(30))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(40))),
+		BigIntToBytesLE(bLen, big.NewInt(int64(50))),
 	}
 	for i, key := range keys {
 		err := tree.Add(key, values[i])
@@ -1487,7 +1487,7 @@ func generateKV(bLen, count, offset int) ([][]byte, [][]byte) {
 
 	for i := 0; i < count; i++ {
 		// Convert integer i to a byte slice
-		key := BigIntToBytes(bLen, big.NewInt(int64(offset+i)))
+		key := BigIntToBytesLE(bLen, big.NewInt(int64(offset+i)))
 		value := randomBytes(bLen)
 
 		keys = append(keys, key)

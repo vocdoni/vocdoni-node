@@ -37,7 +37,7 @@ func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
 		return nil, fmt.Errorf("error signing sik payload: %w", err)
 	}
 	seed := []*big.Int{
-		arbo.BytesToBigInt(k.Address().Bytes()),
+		arbo.BytesLEToBigInt(k.Address().Bytes()),
 		util.BigToFF(new(big.Int).SetBytes(secret)),
 		util.BigToFF(new(big.Int).SetBytes(sign)),
 	}
@@ -45,7 +45,7 @@ func (k *SignKeys) AccountSIK(secret []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return arbo.BigIntToBytes(arbo.HashFunctionPoseidon.Len(), hash), nil
+	return arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), hash), nil
 }
 
 // AccountSIKnullifier method composes the nullifier of the current SignKeys
