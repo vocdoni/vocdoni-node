@@ -27,7 +27,10 @@ import (
 // NewPrivateValidator returns a tendermint file private validator (key and state)
 // if tmPrivKey not specified, uses the existing one or generates a new one
 func NewPrivateValidator(tmPrivKey, keyFilePath, stateFilePath string) (*cometprivval.FilePV, error) {
-	pv := cometprivval.LoadOrGenFilePV(keyFilePath, stateFilePath)
+	pv, err := cometprivval.LoadOrGenFilePV(keyFilePath, stateFilePath, nil)
+	if err != nil {
+		return nil, fmt.Errorf("cannot load or generate private validator file: (%s)", err)
+	}
 	if len(tmPrivKey) > 0 {
 		var privKey crypto256k1.PrivKey
 		keyBytes, err := hex.DecodeString(util.TrimHex(tmPrivKey))
