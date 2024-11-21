@@ -256,6 +256,8 @@ func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Param			organizationId	query		string	false	"Filter by partial organizationId"
 //	@Param			status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
 //	@Param			electionId		query		string	false	"Filter by partial electionId"
+//	@Param			title			query		string	false	"Filter by election title"
+//	@Param			descrition		query		string	false	"Filter by election description"
 //	@Param			withResults		query		boolean	false	"Filter by (partial or final) results available or not"
 //	@Param			finalResults	query		boolean	false	"Filter by final results available or not"
 //	@Param			manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
@@ -268,6 +270,8 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		ParamStatus,
 		ParamOrganizationId,
 		ParamElectionId,
+		ParamTitle,
+		ParamDescription,
 		ParamWithResults,
 		ParamFinalResults,
 		ParamManuallyEnded,
@@ -316,6 +320,8 @@ func (a *API) electionList(params *ElectionParams) (*ElectionsList, error) {
 		params.StartDateBefore,
 		params.EndDateAfter,
 		params.EndDateBefore,
+		params.Title,
+		params.Description,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -831,6 +837,8 @@ func electionParams(f func(key string) string, keys ...string) (*ElectionParams,
 		PaginationParams: pagination,
 		OrganizationID:   util.TrimHex(strings[ParamOrganizationId]),
 		ElectionID:       util.TrimHex(strings[ParamElectionId]),
+		Title:            strings[ParamTitle],
+		Description:      strings[ParamDescription],
 		Status:           strings[ParamStatus],
 		WithResults:      bools[ParamWithResults],
 		FinalResults:     bools[ParamFinalResults],

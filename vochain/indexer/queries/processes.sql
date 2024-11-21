@@ -1,6 +1,7 @@
 -- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
+	title, description,
 	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
@@ -13,6 +14,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
+	?, ?,
 	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -43,6 +45,10 @@ WITH results AS (
 			OR (LENGTH(sqlc.arg(entity_id_substr)) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(sqlc.arg(entity_id_substr))) > 0)
 			-- TODO: consider keeping an entity_id_hex column for faster searches
 		)
+		-- TODO: replace this simple INSTR of title and description with something better
+		-- like https://www.sqlite.org/fts5.html
+		AND (sqlc.arg(title) = '' OR INSTR(LOWER(title), LOWER(sqlc.arg(title))) > 0)
+		AND (sqlc.arg(description) = '' OR INSTR(LOWER(description), LOWER(sqlc.arg(description))) > 0)
 		AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
 		AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
 		AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
