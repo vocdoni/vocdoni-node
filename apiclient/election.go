@@ -18,6 +18,50 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// Votes returns the list of votes for a given election.
+// If untilPage is set different from 0, it will fetch votes until that page.
+func (c *HTTPclient) Votes(electionID types.HexBytes, untilPage int) ([]api.Vote, error) {
+	fullVotes := []api.Vote{}
+	page := 0
+	for {
+		resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "votes", "page", fmt.Sprintf("%d", page))
+		if err != nil {
+			return nil, err
+		}
+		if code != apirest.HTTPstatusOK {
+			return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+		}
+		// Unmarshal vote list
+		voteList := api.VotesList{}
+		if err := json.Unmarshal(resp, &voteList); err != nil {
+			return nil, err
+		}
+		if len(voteList.Votes) == 0 || (untilPage > 0 && page >= untilPage) {
+			// no more votes
+			break
+		}
+
+		for _, v := range voteList.Votes {
+			// For each vote, fetch the vote details
+			resp, code, err := c.Request(HTTPGET, nil, "votes", v.VoteID.String())
+			if err != nil {
+				return nil, err
+			}
+			if code != apirest.HTTPstatusOK {
+				return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+			}
+			vote := api.Vote{}
+			if err := json.Unmarshal(resp, &vote); err != nil {
+				return nil, err
+			}
+			fullVotes = append(fullVotes, vote)
+		}
+
+		page++
+	}
+	return fullVotes, nil
+}
+
 // Election returns the election details given its ID.
 func (c *HTTPclient) Election(electionID types.HexBytes) (*api.Election, error) {
 	if electionID == nil {
