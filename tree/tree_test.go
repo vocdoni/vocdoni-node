@@ -84,9 +84,8 @@ func TestGenProof(t *testing.T) {
 	root, err := tree.Root(wTx)
 	qt.Assert(t, err, qt.IsNil)
 
-	verif, err := tree.VerifyProof(k, v, proof, root)
+	err = tree.VerifyProof(k, v, proof, root)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, verif, qt.IsTrue)
 
 	err = wTx.Commit()
 	qt.Assert(t, err, qt.IsNil)
