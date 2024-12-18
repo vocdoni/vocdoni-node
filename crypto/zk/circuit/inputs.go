@@ -84,10 +84,10 @@ func GenerateCircuitInput(p CircuitInputsParameters) (*CircuitInputs, error) {
 		Nullifier:       new(big.Int).SetBytes(nullifier).String(),
 		AvailableWeight: p.AvailableWeight.String(),
 		VoteHash:        util.BytesToArboSplitStr(p.VotePackage),
-		SIKRoot:         arbo.BytesToBigInt(p.SIKRoot).String(),
-		CensusRoot:      arbo.BytesToBigInt(p.CensusRoot).String(),
+		SIKRoot:         arbo.BytesLEToBigInt(p.SIKRoot).String(),
+		CensusRoot:      arbo.BytesLEToBigInt(p.CensusRoot).String(),
 
-		Address:   arbo.BytesToBigInt(p.Account.Address().Bytes()).String(),
+		Address:   arbo.BytesLEToBigInt(p.Account.Address().Bytes()).String(),
 		Password:  ffPassword.String(),
 		Signature: util.BigToFF(new(big.Int).SetBytes(signature)).String(),
 

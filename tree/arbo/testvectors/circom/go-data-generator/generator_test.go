@@ -28,15 +28,15 @@ func TestGenerator(t *testing.T) {
 	}
 	bLen := 1
 	for i := 0; i < len(testVector); i++ {
-		k := arbo.BigIntToBytes(bLen, big.NewInt(testVector[i][0]))
-		v := arbo.BigIntToBytes(bLen, big.NewInt(testVector[i][1]))
+		k := arbo.BigIntToBytesLE(bLen, big.NewInt(testVector[i][0]))
+		v := arbo.BigIntToBytesLE(bLen, big.NewInt(testVector[i][1]))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// proof of existence
-	k := arbo.BigIntToBytes(bLen, big.NewInt(int64(2)))
+	k := arbo.BigIntToBytesLE(bLen, big.NewInt(int64(2)))
 	cvp, err := tree.GenerateCircomVerifierProof(k)
 	c.Assert(err, qt.IsNil)
 	jCvp, err := json.Marshal(cvp)
@@ -46,7 +46,7 @@ func TestGenerator(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 
 	// proof of non-existence
-	k = arbo.BigIntToBytes(bLen, big.NewInt(int64(5)))
+	k = arbo.BigIntToBytesLE(bLen, big.NewInt(int64(5)))
 	cvp, err = tree.GenerateCircomVerifierProof(k)
 	c.Assert(err, qt.IsNil)
 	jCvp, err = json.Marshal(cvp)

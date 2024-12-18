@@ -176,30 +176,51 @@ type TxPackage struct {
 	Signature   types.HexBytes `json:"signature"`
 }
 
-// TxMetadata contains tx information for the TransactionList api
-type TxMetadata struct {
-	Type        string         `json:"type"`
-	BlockHeight uint32         `json:"blockHeight,omitempty"`
-	Index       int32          `json:"index"`
-	Hash        types.HexBytes `json:"hash"`
+// TransactionMetadata contains tx information for the TransactionList api
+type TransactionMetadata struct {
+	Hash         types.HexBytes `json:"hash" swaggertype:"string" example:"75e8f822f5dd13973ac5158d600f0a2a5fea4bfefce9712ab5195bf17884cfad"`
+	BlockHeight  uint32         `json:"height" format:"int32" example:"64924"`
+	TxBlockIndex int32          `json:"index" format:"int32" example:"0"`
+	TxType       string         `json:"type" enums:"vote,newProcess,admin,setProcess,registerKey,mintTokens,sendTokens,setTransactionCosts,setAccount,collectFaucet,setKeykeeper" example:"Vote"`
+	TxSubtype    string         `json:"subtype" example:"set_process_census"`
+	Signer       types.HexBytes `json:"signer" swaggertype:"string" example:"0e45513942cf95330fc5e9020851b8bdd9b9c9df"`
 }
 
-// Transaction holds the db reference for a single transaction
-type Transaction struct {
-	Index        uint64         `json:"transactionNumber" format:"int64" example:"944"`
-	Hash         types.HexBytes `json:"transactionHash" swaggertype:"string" example:"75e8f822f5dd13973ac5158d600f0a2a5fea4bfefce9712ab5195bf17884cfad"`
-	BlockHeight  uint32         `json:"blockHeight" format:"int32" example:"64924"`
-	TxBlockIndex int32          `json:"transactionIndex" format:"int32" example:"0"`
-	TxType       string         `json:"transactionType" enums:"vote,newProcess,admin,setProcess,registerKey,mintTokens,sendTokens,setTransactionCosts,setAccount,collectFaucet,setKeykeeper" example:"Vote"`
-}
-
-func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
-	return &Transaction{
-		Index:        uint64(dbtx.ID),
+func TransactionMetadataFromDB(dbtx *indexerdb.Transaction) *TransactionMetadata {
+	return &TransactionMetadata{
 		Hash:         dbtx.Hash,
 		BlockHeight:  uint32(dbtx.BlockHeight),
 		TxBlockIndex: int32(dbtx.BlockIndex),
 		TxType:       dbtx.Type,
+		TxSubtype:    dbtx.Subtype,
+		Signer:       dbtx.Signer,
+	}
+}
+
+func TransactionMetadataFromDBRow(dbtx *indexerdb.SearchTransactionsRow) *TransactionMetadata {
+	return &TransactionMetadata{
+		Hash:         dbtx.Hash,
+		BlockHeight:  uint32(dbtx.BlockHeight),
+		TxBlockIndex: int32(dbtx.BlockIndex),
+		TxType:       dbtx.Type,
+		TxSubtype:    dbtx.Subtype,
+		Signer:       dbtx.Signer,
+	}
+}
+
+// Transaction holds a single transaction
+type Transaction struct {
+	*TransactionMetadata
+	RawTx     types.HexBytes `json:"-"`
+	Signature types.HexBytes `json:"-"`
+}
+
+// TransactionFromDB converts an indexerdb.Transaction into a Transaction
+func TransactionFromDB(dbtx *indexerdb.Transaction) *Transaction {
+	return &Transaction{
+		TransactionMetadata: TransactionMetadataFromDB(dbtx),
+		RawTx:               dbtx.RawTx,
+		Signature:           dbtx.Signature,
 	}
 }
 

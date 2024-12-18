@@ -50,7 +50,7 @@ func TestGenerateCircuitInput(t *testing.T) {
 		SIKRoot:         "7714269703880573582519379213888374390024853519732158909852028066903886590497",
 		CensusRoot:      "7714269703880573582519379213888374390024853519732158909852028066903886590497",
 
-		Address:   arbo.BytesToBigInt(acc.Address().Bytes()).String(),
+		Address:   arbo.BytesLEToBigInt(acc.Address().Bytes()).String(),
 		Password:  "0",
 		Signature: util.BigToFF(new(big.Int).SetBytes(signature)).String(),
 

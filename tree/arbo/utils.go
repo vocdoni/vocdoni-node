@@ -18,17 +18,46 @@ func SwapEndianness(b []byte) []byte {
 }
 
 // BigIntToBytes converts a *big.Int into a byte array in Little-Endian
+//
+// Deprecated: use BigIntToBytesLE or BigIntToBytesBE
 func BigIntToBytes(blen int, bi *big.Int) []byte {
+	return BigIntToBytesLE(blen, bi)
+}
+
+// BigIntToBytesLE converts a *big.Int into a byte array in Little-Endian
+func BigIntToBytesLE(blen int, bi *big.Int) []byte {
 	// TODO make the length depending on the tree.hashFunction.Len()
 	b := make([]byte, blen)
 	copy(b, SwapEndianness(bi.Bytes()))
 	return b
 }
 
+// BigIntToBytesBE converts a *big.Int into a byte array in Big-Endian
+func BigIntToBytesBE(blen int, bi *big.Int) []byte {
+	// TODO make the length depending on the tree.hashFunction.Len()
+	b := make([]byte, blen)
+	copy(b, bi.Bytes())
+	return b
+}
+
 // BytesToBigInt converts a byte array in Little-Endian representation into
 // *big.Int
+//
+// Deprecated: use BytesLEToBigInt or BytesBEToBigInt
 func BytesToBigInt(b []byte) *big.Int {
+	return BytesLEToBigInt(b)
+}
+
+// BytesLEToBigInt converts a byte array in Little-Endian representation into
+// *big.Int
+func BytesLEToBigInt(b []byte) *big.Int {
 	return new(big.Int).SetBytes(SwapEndianness(b))
+}
+
+// BytesBEToBigInt converts a byte array in Big-Endian representation into
+// *big.Int
+func BytesBEToBigInt(b []byte) *big.Int {
+	return new(big.Int).SetBytes(b)
 }
 
 // newLeafValue takes a key & value from a leaf, and computes the leaf hash,

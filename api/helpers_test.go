@@ -3,11 +3,16 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
+	qt "github.com/frankban/quicktest"
 	"github.com/google/go-cmp/cmp"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestAPIHelpers_encodeEVMResultsArgs(t *testing.T) {
@@ -148,4 +153,44 @@ func TestConvertKeysToCamel(t *testing.T) {
 	if diff := cmp.Diff(want, got); diff != "" {
 		t.Fatal(diff)
 	}
+}
+
+func TestProtoTxAsJSON(t *testing.T) {
+	inputJSON := strings.TrimSpace(`
+{
+	"setProcess": {
+		"txtype": "SET_PROCESS_CENSUS",
+		"nonce": 1,
+		"processId": "sx3/YYFNq5DWw6m2XWyQgwSA5Lda0y50eUICAAAAAAA=",
+		"censusRoot": "zUU9BcTLBCnuXuGu/tAW9VO4AmtM7VsMNSkFv6U8foE=",
+		"censusURI": "ipfs://bafybeicyfukarcryrvy5oe37ligmxwf55sbfiojori4t25wencma4ymxfa",
+		"censusSize": "1000"
+	}
+}
+`)
+	wantJSON := strings.TrimSpace(`
+{
+	"setProcess": {
+		"txtype": "SET_PROCESS_CENSUS",
+		"nonce": 1,
+		"processId": "b31dff61814dab90d6c3a9b65d6c90830480e4b75ad32e747942020000000000",
+		"censusRoot": "cd453d05c4cb0429ee5ee1aefed016f553b8026b4ced5b0c352905bfa53c7e81",
+		"censusURI": "ipfs://bafybeicyfukarcryrvy5oe37ligmxwf55sbfiojori4t25wencma4ymxfa",
+		"censusSize": "1000"
+	}
+}
+`)
+	var ptx models.Tx
+	err := protojson.Unmarshal([]byte(inputJSON), &ptx)
+	qt.Assert(t, err, qt.IsNil)
+
+	asProto, err := proto.Marshal(&ptx)
+	qt.Assert(t, err, qt.IsNil)
+
+	var dst bytes.Buffer
+	err = json.Indent(&dst, protoTxAsJSON(asProto), "", "\t")
+	qt.Assert(t, err, qt.IsNil)
+	gotJSON := dst.String()
+
+	qt.Assert(t, gotJSON, qt.Equals, wantJSON)
 }

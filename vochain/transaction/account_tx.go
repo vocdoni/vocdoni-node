@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
@@ -13,7 +12,6 @@ import (
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 // CreateAccountTxCheck checks if an account creation tx is valid
@@ -56,56 +54,13 @@ func (t *TransactionHandler) CreateAccountTxCheck(vtx *vochaintx.Tx) error {
 	if err != nil {
 		return fmt.Errorf("cannot get tx cost: %w", err)
 	}
-	if txCost == 0 {
-		return nil
-	}
-	if tx.FaucetPackage == nil {
-		return fmt.Errorf("invalid faucet package provided")
-	}
-	if tx.FaucetPackage.Payload == nil {
-		return fmt.Errorf("invalid faucet package payload")
-	}
-	faucetPayload := &models.FaucetPayload{}
-	if err := proto.Unmarshal(tx.FaucetPackage.Payload, faucetPayload); err != nil {
-		return fmt.Errorf("could not unmarshal faucet package: %w", err)
-	}
-	if faucetPayload.Amount == 0 {
-		return fmt.Errorf("invalid faucet payload amount provided")
-	}
-	if faucetPayload.To == nil {
-		return fmt.Errorf("invalid to address provided")
-	}
-	if !bytes.Equal(faucetPayload.To, txSenderAddress.Bytes()) {
-		return fmt.Errorf("payload to and tx sender missmatch (%x != %x)",
-			faucetPayload.To, txSenderAddress.Bytes())
-	}
-	issuerAddress, err := ethereum.AddrFromSignature(tx.FaucetPackage.Payload, tx.FaucetPackage.Signature)
+	// Check the faucet package
+	canPayForTx, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], false)
 	if err != nil {
-		return fmt.Errorf("cannot extract issuer address from faucet package vtx.Signature: %w", err)
+		return err
 	}
-	issuerAcc, err := t.state.GetAccount(issuerAddress, false)
-	if err != nil {
-		return fmt.Errorf("cannot get faucet issuer address account: %w", err)
-	}
-	if issuerAcc == nil {
-		return fmt.Errorf("the account signing the faucet payload does not exist (%s)", issuerAddress)
-	}
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, faucetPayload.Identifier)
-	keyHash := ethereum.HashRaw(append(issuerAddress.Bytes(), b...))
-	used, err := t.state.FaucetNonce(keyHash, false)
-	if err != nil {
-		return fmt.Errorf("cannot check if faucet payload already used: %w", err)
-	}
-	if used {
-		return fmt.Errorf("faucet payload %x already used", keyHash)
-	}
-	if issuerAcc.Balance < faucetPayload.Amount+txCost {
-		return fmt.Errorf(
-			"issuer address does not have enough balance %d, required %d",
-			issuerAcc.Balance,
-			faucetPayload.Amount+txCost,
-		)
+	if !canPayForTx {
+		return fmt.Errorf("faucet package is not enough for paying for the transaction cost")
 	}
 	return nil
 }
@@ -126,6 +81,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 	if len(tx.Delegates) == 0 {
 		return fmt.Errorf("invalid delegates")
 	}
+
 	txSenderAccount, txSenderAddr, err := t.checkAccountCanPayCost(tx.Txtype, vtx)
 	if err != nil {
 		return err

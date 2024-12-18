@@ -292,7 +292,7 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 //
 // Errors returned are always of type APIerror.
 func (a *API) electionList(params *ElectionParams) (*ElectionsList, error) {
-	if params.OrganizationID != "" && !a.indexer.EntityExists(params.OrganizationID) {
+	if params.OrganizationID != "" && !a.indexer.AccountExists(params.OrganizationID) {
 		return nil, ErrOrgNotFound
 	}
 

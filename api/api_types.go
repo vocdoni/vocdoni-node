@@ -50,8 +50,19 @@ type AccountParams struct {
 // TransactionParams allows the client to filter transactions
 type TransactionParams struct {
 	PaginationParams
-	Height uint64 `json:"height,omitempty"`
-	Type   string `json:"type,omitempty"`
+	Hash    string `json:"hash,omitempty"`
+	Height  uint64 `json:"height,omitempty"`
+	Type    string `json:"type,omitempty"`
+	Subtype string `json:"subtype,omitempty"`
+	Signer  string `json:"signer,omitempty"`
+}
+
+// BlockParams allows the client to filter blocks
+type BlockParams struct {
+	PaginationParams
+	ChainID         string `json:"chainId,omitempty"`
+	Hash            string `json:"hash,omitempty"`
+	ProposerAddress string `json:"proposerAddress,omitempty"`
 }
 
 // FeesParams allows the client to filter fees
@@ -267,8 +278,8 @@ type TransactionReference struct {
 
 // TransactionsList is used to return a paginated list to the client
 type TransactionsList struct {
-	Transactions []*indexertypes.Transaction `json:"transactions"`
-	Pagination   *Pagination                 `json:"pagination"`
+	Transactions []*indexertypes.TransactionMetadata `json:"transactions"`
+	Pagination   *Pagination                         `json:"pagination"`
 }
 
 // FeesList is used to return a paginated list to the client
@@ -284,9 +295,9 @@ type TransfersList struct {
 }
 
 type GenericTransactionWithInfo struct {
-	TxContent json.RawMessage          `json:"tx"`
-	TxInfo    indexertypes.Transaction `json:"txInfo"`
-	Signature types.HexBytes           `json:"signature"`
+	TxContent json.RawMessage           `json:"tx"`
+	TxInfo    *indexertypes.Transaction `json:"txInfo"`
+	Signature types.HexBytes            `json:"signature"`
 }
 
 type ChainInfo struct {
@@ -436,6 +447,13 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 }
 
 type Block struct {
-	comettypes.Block `json:",inline"`
-	Hash             types.HexBytes `json:"hash" `
+	comettypes.Header `json:"header"`
+	Hash              types.HexBytes `json:"hash" `
+	TxCount           int64          `json:"txCount"`
+}
+
+// BlockList is used to return a paginated list to the client
+type BlockList struct {
+	Blocks     []*indexertypes.Block `json:"blocks"`
+	Pagination *Pagination           `json:"pagination"`
 }

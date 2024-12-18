@@ -26,15 +26,15 @@ func TestCircomVerifierProof(t *testing.T) {
 	}
 	bLen := 1
 	for i := 0; i < len(testVector); i++ {
-		k := BigIntToBytes(bLen, big.NewInt(testVector[i][0]))
-		v := BigIntToBytes(bLen, big.NewInt(testVector[i][1]))
+		k := BigIntToBytesLE(bLen, big.NewInt(testVector[i][0]))
+		v := BigIntToBytesLE(bLen, big.NewInt(testVector[i][1]))
 		if err := tree.Add(k, v); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	// proof of existence
-	k := BigIntToBytes(bLen, big.NewInt(int64(2)))
+	k := BigIntToBytesLE(bLen, big.NewInt(int64(2)))
 	cvp, err := tree.GenerateCircomVerifierProof(k)
 	c.Assert(err, qt.IsNil)
 	jCvp, err := json.Marshal(cvp)
@@ -48,7 +48,7 @@ func TestCircomVerifierProof(t *testing.T) {
 		`,"0"],"value":"22"}`)
 
 	// proof of non-existence
-	k = BigIntToBytes(bLen, big.NewInt(int64(5)))
+	k = BigIntToBytesLE(bLen, big.NewInt(int64(5)))
 	cvp, err = tree.GenerateCircomVerifierProof(k)
 	c.Assert(err, qt.IsNil)
 	jCvp, err = json.Marshal(cvp)
