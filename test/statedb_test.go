@@ -19,11 +19,12 @@ func TestAddValidator(t *testing.T) {
 	s := testcommon.NewVochainStateWithValidators(t)
 	rint := rand.Int()
 	tmp := t.TempDir()
-	val := cometprivval.GenFilePV(
+	val, err := cometprivval.GenFilePV(
 		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
 		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
+		nil,
 	)
-
+	qt.Assert(t, err, qt.IsNil)
 	pubk, err := val.GetPubKey()
 	qt.Assert(t, err, qt.IsNil)
 	validator := &models.Validator{
