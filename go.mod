@@ -57,7 +57,7 @@ require (
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.mongodb.org/mongo-driver v1.12.1
 	go.vocdoni.io/proto v1.15.10-0.20240903073233-86144b1e2165
-	golang.org/x/crypto v0.30.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/net v0.32.0
 	google.golang.org/protobuf v1.35.2
 	lukechampine.com/blake3 v1.3.0
