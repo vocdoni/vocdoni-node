@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -105,8 +107,11 @@ func (vs *VocdoniService) Vochain() error {
 
 // Start the vochain node and the vochaininfo service. Blocks until the node is ready if config.NoWaitSync is false.
 func (vs *VocdoniService) Start() error {
+	seedRetryIndex := 0
+	var startFunc func() error
+	startFunc = vs.App.Node.Start
 	for {
-		if err := vs.App.Node.Start(); err != nil {
+		if err := startFunc(); err != nil {
 			// failed to start PEX: address book is empty and couldn't resolve any seed nodes
 			// may happen if the seed nodes are down or there are issues with the network.
 			// So we retry until it works.
@@ -115,7 +120,26 @@ func (vs *VocdoniService) Start() error {
 				time.Sleep(time.Second * 1)
 				continue
 			}
-			return err
+			// This is a trick to avoid the "context deadline exceeded" error when the node is trying to state sync with the seed nodes.
+			// We stop the node and start it again with the next seed node.
+			if errors.Is(err, context.DeadlineExceeded) {
+				vs.App.Node.OnStop()
+				vs.App.Node.Stop()
+				for vs.App.Node.IsRunning() {
+					time.Sleep(1 * time.Second)
+				}
+				if err := vs.App.SetNode(vs.Config); err != nil {
+					return fmt.Errorf("failed to reset vochain node: %w", err)
+				}
+				startFunc = vs.App.Node.Start
+				cfg := vs.App.Node.Config()
+				cfg.StateSync.RPCServers = []string{config.DefaultSeedNodes[vs.Config.Network][seedRetryIndex], config.DefaultSeedNodes[vs.Config.Network][seedRetryIndex]}
+				log.Warnf("could not connect to state sync servers, force retry with %q", cfg.StateSync.RPCServers)
+				seedRetryIndex = (seedRetryIndex + 1) % len(config.DefaultSeedNodes[vs.Config.Network])
+				continue
+			}
+			return fmt.Errorf("failed to start vochain node: %w", err)
+
 		}
 		break
 	}

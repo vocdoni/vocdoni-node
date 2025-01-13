@@ -17,6 +17,8 @@ import (
 	cometconfig "github.com/cometbft/cometbft/config"
 	cometp2p "github.com/cometbft/cometbft/p2p"
 	cometproxy "github.com/cometbft/cometbft/proxy"
+	"github.com/cometbft/cometbft/rpc/client/http"
+	coretypes "github.com/cometbft/cometbft/rpc/core/types"
 
 	cometnode "github.com/cometbft/cometbft/node"
 	"go.vocdoni.io/dvote/log"
@@ -164,20 +166,29 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 
 		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
 		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
-
+		tconfig.StateSync.ChunkFetchers = 10
 		// If StateSync is enabled but parameters are empty, populate them
 		//  fetching params from remote API endpoint
 		if localConfig.StateSyncFetchParamsFromRPC &&
 			tconfig.StateSync.TrustHeight == 0 && tconfig.StateSync.TrustHash == "" {
 			tconfig.StateSync.TrustHeight, tconfig.StateSync.TrustHash = func() (int64, string) {
-				cli, err := newCometRPCClient(tconfig.StateSync.RPCServers[0])
-				if err != nil {
-					log.Warnf("cannot connect to remote RPC server: %v", err)
-					return 0, ""
+				var status *coretypes.ResultStatus
+				var cli *http.HTTP
+				for _, rpc := range tconfig.StateSync.RPCServers {
+					cli, err = newCometRPCClient(rpc)
+					if err != nil {
+						log.Warnf("cannot connect to remote RPC server: %v", err)
+						continue
+					}
+					status, err = cli.Status(context.TODO())
+					if err != nil {
+						log.Warnf("cannot fetch status from remote RPC server: %v", err)
+						continue
+					}
+					break
 				}
-				status, err := cli.Status(context.TODO())
-				if err != nil {
-					log.Warnf("cannot fetch status from remote RPC server: %v", err)
+				if status == nil || cli == nil {
+					log.Warn("could not fetch statesync params from any RPC server")
 					return 0, ""
 				}
 				// try to get the hash exactly at the snapshot height, to avoid a long verification chain
@@ -307,7 +318,6 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
-
 	return node, nil
 }
 
