@@ -13,6 +13,32 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+const countTokenTransfers = `-- name: CountTokenTransfers :one
+SELECT COUNT(*)
+FROM token_transfers
+WHERE (
+	(?1 = ''
+		OR LOWER(HEX(from_account)) = LOWER(?1)
+		OR LOWER(HEX(to_account)) = LOWER(?1)
+	)
+	AND (?2 = '' OR LOWER(HEX(from_account)) = LOWER(?2))
+	AND (?3 = '' OR LOWER(HEX(to_account)) = LOWER(?3))
+)
+`
+
+type CountTokenTransfersParams struct {
+	FromOrToAccount interface{}
+	FromAccount     interface{}
+	ToAccount       interface{}
+}
+
+func (q *Queries) CountTokenTransfers(ctx context.Context, arg CountTokenTransfersParams) (int64, error) {
+	row := q.queryRow(ctx, q.countTokenTransfersStmt, countTokenTransfers, arg.FromOrToAccount, arg.FromAccount, arg.ToAccount)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countTokenTransfersByAccount = `-- name: CountTokenTransfersByAccount :one
 SELECT COUNT(*) FROM token_transfers
 WHERE to_account = ?1 OR
@@ -77,58 +103,44 @@ func (q *Queries) GetTokenTransfer(ctx context.Context, txHash types.Hash) (Toke
 }
 
 const searchTokenTransfers = `-- name: SearchTokenTransfers :many
-WITH results AS (
-  SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time
-  FROM token_transfers
-  WHERE (
-    (?3 = '' OR (
-		LOWER(HEX(from_account)) = LOWER(?3)
-		OR LOWER(HEX(to_account)) = LOWER(?3)
-	))
-    AND (?4 = '' OR LOWER(HEX(from_account)) = LOWER(?4))
-    AND (?5 = '' OR LOWER(HEX(to_account)) = LOWER(?5))
-  )
+SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time
+FROM token_transfers
+WHERE (
+	(?1 = ''
+		OR LOWER(HEX(from_account)) = LOWER(?1)
+		OR LOWER(HEX(to_account)) = LOWER(?1)
+	)
+	AND (?2 = '' OR LOWER(HEX(from_account)) = LOWER(?2))
+	AND (?3 = '' OR LOWER(HEX(to_account)) = LOWER(?3))
 )
-SELECT tx_hash, block_height, from_account, to_account, amount, transfer_time, COUNT(*) OVER() AS total_count
-FROM results
 ORDER BY transfer_time DESC
-LIMIT ?2
-OFFSET ?1
+LIMIT ?5
+OFFSET ?4
 `
 
 type SearchTokenTransfersParams struct {
-	Offset          int64
-	Limit           int64
 	FromOrToAccount interface{}
 	FromAccount     interface{}
 	ToAccount       interface{}
+	Offset          int64
+	Limit           int64
 }
 
-type SearchTokenTransfersRow struct {
-	TxHash       []byte
-	BlockHeight  int64
-	FromAccount  []byte
-	ToAccount    []byte
-	Amount       int64
-	TransferTime time.Time
-	TotalCount   int64
-}
-
-func (q *Queries) SearchTokenTransfers(ctx context.Context, arg SearchTokenTransfersParams) ([]SearchTokenTransfersRow, error) {
+func (q *Queries) SearchTokenTransfers(ctx context.Context, arg SearchTokenTransfersParams) ([]TokenTransfer, error) {
 	rows, err := q.query(ctx, q.searchTokenTransfersStmt, searchTokenTransfers,
-		arg.Offset,
-		arg.Limit,
 		arg.FromOrToAccount,
 		arg.FromAccount,
 		arg.ToAccount,
+		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchTokenTransfersRow
+	var items []TokenTransfer
 	for rows.Next() {
-		var i SearchTokenTransfersRow
+		var i TokenTransfer
 		if err := rows.Scan(
 			&i.TxHash,
 			&i.BlockHeight,
@@ -136,7 +148,6 @@ func (q *Queries) SearchTokenTransfers(ctx context.Context, arg SearchTokenTrans
 			&i.ToAccount,
 			&i.Amount,
 			&i.TransferTime,
-			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}
