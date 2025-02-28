@@ -28,7 +28,7 @@ jobs:
       - name: Set up Go environment
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       - name: Tidy go module
         run: |
           go mod tidy
@@ -54,7 +54,7 @@ jobs:
           fi
       - name: Run staticcheck
         run: |
-          go install honnef.co/go/tools/cmd/staticcheck@2024.1.1
+          go install honnef.co/go/tools/cmd/staticcheck@2025.1
           staticcheck -debug.version
           staticcheck ./... 2> staticcheck-stderr
       - name: Check staticcheck stderr (this step isn't needed because we are using actions/setup-go@v5 on GitHub hosted runner)
@@ -81,7 +81,7 @@ jobs:
       - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
       - run: mkdir -p "$PWD/gocoverage-unit/"
       - name: Run Go test -race
         id: go-test-race
@@ -151,7 +151,7 @@ jobs:
       - uses: actions/download-artifact@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
           cache: false
       - name: Convert gocoverage format
         run: |
@@ -190,7 +190,7 @@ jobs:
           name: gocoverage-all-textfmt@${{ env.SHA }}
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.23'
+          go-version: '1.24'
           cache: false
       - name: Send coverage to coveralls.io (unit)
         if: ${{ always() }}
