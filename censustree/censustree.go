@@ -162,12 +162,12 @@ func (t *Tree) Get(key []byte) ([]byte, error) {
 // VerifyProof verifies a census proof.
 // If the census is indexed key can be nil (value provides the key already).
 // If root is nil the last merkle root is used for verify.
-func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
+func (t *Tree) VerifyProof(key, value, proof, root []byte) error {
 	var err error
 	if root == nil {
 		root, err = t.Root()
 		if err != nil {
-			return false, fmt.Errorf("cannot get tree root: %w", err)
+			return fmt.Errorf("cannot get tree root: %w", err)
 		}
 	}
 	// If the provided key is longer than the defined maximum length truncate it
@@ -176,7 +176,10 @@ func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
 	if len(leafKey) > DefaultMaxKeyLen {
 		leafKey = leafKey[:DefaultMaxKeyLen]
 	}
-	return t.tree.VerifyProof(leafKey, value, proof, root)
+	if err := t.tree.VerifyProof(leafKey, value, proof, root); err != nil {
+		return err
+	}
+	return nil
 }
 
 // GenProof generates a census proof for the provided key.
