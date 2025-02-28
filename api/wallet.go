@@ -439,7 +439,7 @@ func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		Metadata:     &metadataURI,
 	}
 
-	log.Debugf(log.FormatProto(process))
+	log.Debugf("%s", log.FormatProto(process))
 
 	stx := models.SignedTx{}
 	if stx.Tx, err = proto.Marshal(&models.Tx{

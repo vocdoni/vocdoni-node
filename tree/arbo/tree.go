@@ -920,9 +920,7 @@ func (t *Tree) Graphviz(w io.Writer, fromRoot []byte) error {
 // generate a string Graphviz representation of the first NLevels of the tree
 // and writes it to w
 func (t *Tree) GraphvizFirstNLevels(rTx db.Reader, w io.Writer, fromRoot []byte, untilLvl int) error {
-	fmt.Fprintf(w, `digraph hierarchy {
-node [fontname=Monospace,fontsize=10,shape=box]
-`)
+	fmt.Fprint(w, "digraph hierarchy {\nnode [fontname=Monospace,fontsize=10,shape=box]\n")
 
 	if fromRoot == nil {
 		var err error
@@ -946,39 +944,33 @@ node [fontname=Monospace,fontsize=10,shape=box]
 		switch v[0] {
 		case PrefixValueEmpty:
 		case PrefixValueLeaf:
-			fmt.Fprintf(w, "\"%v\" [style=filled];\n", firstChars(k))
+			fmt.Fprint(w, "\"", firstChars(k), "\" [style=filled];\n")
 			// key & value from the leaf
 			kB, vB := ReadLeafValue(v)
-			fmt.Fprintf(w, "\"%v\" -> {\"k:%v\\nv:%v\"}\n",
-				firstChars(k), firstChars(kB),
-				firstChars(vB))
-			fmt.Fprintf(w, "\"k:%v\\nv:%v\" [style=dashed]\n",
-				firstChars(kB), firstChars(vB))
+			fmt.Fprint(w, "\"", firstChars(k), "\" -> {\"k:", firstChars(kB), "\\nv:", firstChars(vB), "\"}\n")
+			fmt.Fprint(w, "\"k:", firstChars(kB), "\\nv:", firstChars(vB), "\" [style=dashed]\n")
 		case PrefixValueIntermediate:
 			l, r := ReadIntermediateChilds(v)
 			lStr := firstChars(l)
 			rStr := firstChars(r)
 			eStr := ""
 			if bytes.Equal(l, t.emptyHash) {
-				lStr = fmt.Sprintf("empty%v", nEmpties)
-				eStr += fmt.Sprintf("\"%v\" [style=dashed,label=0];\n",
-					lStr)
+				lStr = "empty" + fmt.Sprint(nEmpties)
+				eStr += "\"" + lStr + "\" [style=dashed,label=0];\n"
 				nEmpties++
 			}
 			if bytes.Equal(r, t.emptyHash) {
-				rStr = fmt.Sprintf("empty%v", nEmpties)
-				eStr += fmt.Sprintf("\"%v\" [style=dashed,label=0];\n",
-					rStr)
+				rStr = "empty" + fmt.Sprint(nEmpties)
+				eStr += "\"" + rStr + "\" [style=dashed,label=0];\n"
 				nEmpties++
 			}
-			fmt.Fprintf(w, "\"%v\" -> {\"%v\" \"%v\"}\n", firstChars(k),
-				lStr, rStr)
+			fmt.Fprint(w, "\"", firstChars(k), "\" -> {\"", lStr, "\" \"", rStr, "\"}\n")
 			fmt.Fprint(w, eStr)
 		default:
 		}
 		return false
 	})
-	fmt.Fprintf(w, "}\n")
+	fmt.Fprint(w, "}\n")
 	return err
 }
 
@@ -1007,15 +999,13 @@ func (t *Tree) PrintGraphvizFirstNLevels(rTx db.Reader, fromRoot []byte, untilLv
 		untilLvl = t.maxLevels
 	}
 	w := bytes.NewBufferString("")
-	fmt.Fprintf(w,
-		"--------\nGraphviz of the Tree with Root "+hex.EncodeToString(fromRoot)+":\n")
+	fmt.Fprint(w, "--------\nGraphviz of the Tree with Root ", hex.EncodeToString(fromRoot), ":\n")
 	err := t.GraphvizFirstNLevels(rTx, w, fromRoot, untilLvl)
 	if err != nil {
 		fmt.Println(w)
 		return err
 	}
-	fmt.Fprintf(w,
-		"End of Graphviz of the Tree with Root "+hex.EncodeToString(fromRoot)+"\n--------\n")
+	fmt.Fprint(w, "End of Graphviz of the Tree with Root ", hex.EncodeToString(fromRoot), "\n--------\n")
 
 	fmt.Println(w)
 	return nil

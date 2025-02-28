@@ -61,8 +61,8 @@ func main() {
 			account = fmt.Sprintf("%s [%s]", a.Memo, a.Address.String())
 		}
 		return fmt.Sprintf("%s | %s",
-			color.New(color.FgHiGreen, color.Bold, color.Underline).Sprintf(cli.chainID),
-			color.New(color.FgHiBlue).Sprintf(account),
+			color.New(color.FgHiGreen, color.Bold, color.Underline).Sprint(cli.chainID),
+			color.New(color.FgHiBlue).Sprint(account),
 		)
 	}
 
@@ -93,7 +93,7 @@ func main() {
 
 		option, _, err := prompt.Run()
 		if err != nil {
-			errorp.Printf("prompt failed: %v\n", err)
+			errorp.Print("prompt failed: ", err, "\n")
 			os.Exit(1)
 		}
 		switch option {
@@ -196,7 +196,7 @@ func accountHandler(c *VocdoniCLI) error {
 			return err
 		}
 	default:
-		infoPrint.Printf("using account %d\n", opt)
+		infoPrint.Print("using account ", opt, "\n")
 		if err := c.useAccount(opt); err != nil {
 			return err
 		}
@@ -219,7 +219,7 @@ func accountSet(c *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("set account %s\n", key)
+	infoPrint.Print("set account ", key, "\n")
 	return c.setAPIaccount(key, memo)
 }
 
@@ -232,7 +232,7 @@ func accountGen(c *VocdoniCLI) error {
 		return err
 	}
 	key := fmt.Sprintf("%x", util.RandomBytes(32))
-	infoPrint.Printf("set account %s\n", memo)
+	infoPrint.Print("set account ", memo, "\n")
 	return c.setAPIaccount(key, memo)
 }
 
@@ -242,21 +242,21 @@ func accountInfo(c *VocdoniCLI) error {
 		return err
 	}
 	localAcc := c.getCurrentAccount()
-	infoPrint.Printf("details for account %s\n", localAcc.Memo)
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ address"), valuesPrint.Sprintf(acc.Address.String()))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ public key"), valuesPrint.Sprintf(localAcc.PublicKey.String()))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ balance"), valuesPrint.Sprintf("%d", acc.Balance))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ nonce"), valuesPrint.Sprintf("%d", acc.Nonce))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ electionIndex"), valuesPrint.Sprintf("%d", acc.ElectionIndex))
+	infoPrint.Print("details for account ", localAcc.Memo, "\n")
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ address"), valuesPrint.Sprint(acc.Address.String()))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ public key"), valuesPrint.Sprint(localAcc.PublicKey.String()))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ balance"), valuesPrint.Sprint(acc.Balance))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ nonce"), valuesPrint.Sprint(acc.Nonce))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ electionIndex"), valuesPrint.Sprint(acc.ElectionIndex))
 	if acc.InfoURL != "" && acc.InfoURL != "none" {
-		fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ info URL"), valuesPrint.Sprintf(acc.InfoURL))
+		fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ info URL"), valuesPrint.Sprint(acc.InfoURL))
 	}
 	if acc.Metadata != nil {
 		accMetadata, err := json.MarshalIndent(acc.Metadata, "", "  ")
 		if err != nil {
 			log.Debug("account metadata cannot be unmarshal")
 		} else {
-			fmt.Printf("%s:\n%s\n", keysPrint.Sprintf(" ➥ metadata"), valuesPrint.Sprintf("%s", accMetadata))
+			fmt.Printf("%s:\n%s\n", keysPrint.Sprint(" ➥ metadata"), valuesPrint.Sprint(string(accMetadata)))
 		}
 	}
 
@@ -268,11 +268,11 @@ func networkInfo(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ API host"), valuesPrint.Sprintf(cli.config.Host.Host))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ chainID"), valuesPrint.Sprintf(info.ID))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ height"), valuesPrint.Sprintf("%d", info.Height))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ block time"), valuesPrint.Sprintf("%v", info.BlockTime))
-	fmt.Printf("%s: %s\n", keysPrint.Sprintf(" ➥ timestamp"), valuesPrint.Sprintf("%d", info.Timestamp))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ API host"), valuesPrint.Sprint(cli.config.Host.Host))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ chainID"), valuesPrint.Sprint(info.ID))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ height"), valuesPrint.Sprint(info.Height))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ block time"), valuesPrint.Sprint(info.BlockTime))
+	fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ timestamp"), valuesPrint.Sprint(info.Timestamp))
 	return nil
 }
 
@@ -308,15 +308,15 @@ func bootStrapAccount(cli *VocdoniCLI) error {
 		if err != nil {
 			return err
 		}
-		infoPrint.Printf("trying to fetch faucet package from default remote service...\n")
+		infoPrint.Print("trying to fetch faucet package from default remote service...\n")
 		faucetPkg, err = apiclient.GetFaucetPackageFromDefaultService(cli.api.MyAddress().Hex(), info.ID)
 		if err != nil {
 			return err
 		}
-		infoPrint.Printf("got faucet package!")
+		infoPrint.Print("got faucet package!")
 	}
 
-	infoPrint.Printf("bootstraping account...\n")
+	infoPrint.Print("bootstraping account...\n")
 
 	txHash, err := cli.api.AccountBootstrap(faucetPkg, &api.AccountMetadata{
 		Name: map[string]string{"default": "vocdoni cli account " + cli.getCurrentAccount().Address.Hex()},
@@ -324,13 +324,13 @@ func bootStrapAccount(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("transaction sent! hash %s\n", txHash.String())
-	infoPrint.Printf("waiting for confirmation...")
+	infoPrint.Print("transaction sent! hash ", txHash.String(), "\n")
+	infoPrint.Print("waiting for confirmation...")
 	ok := cli.waitForTransaction(txHash)
 	if !ok {
 		return fmt.Errorf("transaction was not included")
 	}
-	infoPrint.Printf(" transaction confirmed!\n")
+	infoPrint.Print(" transaction confirmed!\n")
 	return nil
 }
 
@@ -390,7 +390,7 @@ func transfer(cli *VocdoniCLI) error {
 		return err
 	}
 	if item == "N" {
-		log.Infof("transfer canceled")
+		log.Info("transfer canceled")
 		return nil
 	}
 
@@ -398,13 +398,13 @@ func transfer(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("transaction sent! hash %s\n", txHash.String())
-	infoPrint.Printf("waiting for confirmation...")
+	infoPrint.Print("transaction sent! hash ", txHash.String(), "\n")
+	infoPrint.Print("waiting for confirmation...")
 	ok := cli.waitForTransaction(txHash)
 	if !ok {
 		return fmt.Errorf("transaction was not included")
 	}
-	infoPrint.Printf(" transaction confirmed!\n")
+	infoPrint.Print(" transaction confirmed!\n")
 	return nil
 }
 
@@ -450,13 +450,13 @@ func faucetPkg(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("faucet package for %s with amount %d: [ %s ]\n", to.Hex(), amount, base64.StdEncoding.EncodeToString(fpackageBytes))
+	infoPrint.Print("faucet package for ", to.Hex(), " with amount ", amount, ": [ ", base64.StdEncoding.EncodeToString(fpackageBytes), " ]\n")
 	return nil
 }
 
 func hostHandler(cli *VocdoniCLI) error {
 	validateFunc := func(url string) error {
-		log.Debugf("performing ping test to %s", url)
+		log.Debug("performing ping test to ", url)
 		_, err := http.NewRequest("GET", url+"/ping", http.NoBody)
 		return err
 	}
@@ -471,7 +471,7 @@ func hostHandler(cli *VocdoniCLI) error {
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("configuring API host to %s\n", host)
+	infoPrint.Print("configuring API host to ", host, "\n")
 	if err := cli.setHost(host); err != nil {
 		return err
 	}
@@ -489,7 +489,7 @@ func hostHandler(cli *VocdoniCLI) error {
 }
 
 func accountSetValidator(cli *VocdoniCLI) error {
-	infoPrint.Printf("enter the name and a public key of the validator, leave it bank for using the selected account\n")
+	infoPrint.Print("enter the name and a public key of the validator, leave it bank for using the selected account\n")
 
 	n := ui.Prompt{
 		Label: "name",
@@ -519,13 +519,13 @@ func accountSetValidator(cli *VocdoniCLI) error {
 		return err
 	}
 
-	infoPrint.Printf("transaction sent! hash %s\n", hash.String())
-	infoPrint.Printf("waiting for confirmation...")
+	infoPrint.Print("transaction sent! hash ", hash.String(), "\n")
+	infoPrint.Print("waiting for confirmation...")
 	ok := cli.waitForTransaction(hash)
 	if !ok {
 		return fmt.Errorf("transaction was not included")
 	}
-	infoPrint.Printf(" transaction confirmed!\n")
+	infoPrint.Print(" transaction confirmed!\n")
 
 	return nil
 }
@@ -551,7 +551,7 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 	}
 
 	if currentAccount.Metadata != nil {
-		log.Infof("account has metadata (%s) let's update it", currentAccount.InfoURL)
+		log.Info("account has metadata (", currentAccount.InfoURL, ") let's update it")
 		accMeta = *currentAccount.Metadata
 	}
 
@@ -600,13 +600,13 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 		return err
 	}
 
-	infoPrint.Printf("set account metadata...\n")
+	infoPrint.Print("set account metadata...\n")
 	txHash, err := cli.api.AccountSetMetadata(&accMeta)
 	if err != nil {
 		return err
 	}
-	infoPrint.Printf("account transaction sent! hash is %s\n", txHash.String())
-	infoPrint.Printf("waiting for confirmation...\n")
+	infoPrint.Print("account transaction sent! hash is ", txHash.String(), "\n")
+	infoPrint.Print("waiting for confirmation...\n")
 	if !cli.waitForTransaction(txHash) {
 		return fmt.Errorf("transaction was not included")
 	}
@@ -614,7 +614,7 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 }
 
 func electionHandler(cli *VocdoniCLI) error {
-	infoPrint.Printf("preparing the election template...\n")
+	infoPrint.Print("preparing the election template...\n")
 	description := api.ElectionDescription{
 		Title:        map[string]string{"default": "election title"},
 		Description:  map[string]string{"default": "election description"},
@@ -691,12 +691,12 @@ func electionHandler(cli *VocdoniCLI) error {
 		return err
 	}
 
-	infoPrint.Printf("creating new election...\n")
+	infoPrint.Print("creating new election...\n")
 	electionID, err := cli.api.NewElection(&description, true)
 	if err != nil {
 		return err
 	}
 
-	infoPrint.Printf("election transaction sent! electionID is %s\n", electionID.String())
+	infoPrint.Print("election transaction sent! electionID is ", electionID.String(), "\n")
 	return nil
 }

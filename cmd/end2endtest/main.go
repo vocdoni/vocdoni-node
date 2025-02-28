@@ -100,7 +100,7 @@ func (c *config) Clone() *config {
 	for i, key := range c.accountKeys {
 		newKey := ethereum.SignKeys{}
 		if err := newKey.AddHexKey(hex.EncodeToString(key.PrivateKey())); err != nil {
-			log.Fatalf("could not clone account private key")
+			log.Fatal("could not clone account private key")
 		}
 		cloned.accountKeys[i] = &newKey
 	}
@@ -122,17 +122,17 @@ func parseFlags(c *config) {
 	flag.IntVar(&c.runs, "runs", 1, "number of tests to run (of the same type specified in --operation)")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
+		fmt.Fprint(os.Stderr, "Usage of ", os.Args[0], ":\n")
 		flag.PrintDefaults()
-		fmt.Fprintf(os.Stderr, "\nSome examples of different operation modes:\n")
+		fmt.Fprint(os.Stderr, "\nSome examples of different operation modes:\n")
 		for name, op := range ops {
-			fmt.Fprintf(os.Stderr, "### %s\n", name)
-			fmt.Fprintf(os.Stderr, "\t"+op.description+"\n")
-			fmt.Fprintf(os.Stderr, op.example+"\n")
-			fmt.Fprintf(os.Stderr, "\n")
+			fmt.Fprint(os.Stderr, "### ", name, "\n")
+			fmt.Fprint(os.Stderr, "\t", op.description, "\n")
+			fmt.Fprint(os.Stderr, op.example, "\n")
+			fmt.Fprint(os.Stderr, "\n")
 		}
-		fmt.Fprintf(os.Stderr, "If the network is deployed locally using the docker test suite, ")
-		fmt.Fprintf(os.Stderr, "the faucet URL might be configured as `--faucet=http://localhost:9090/v2/open/claim`\n")
+		fmt.Fprint(os.Stderr, "If the network is deployed locally using the docker test suite, ")
+		fmt.Fprint(os.Stderr, "the faucet URL might be configured as `--faucet=http://localhost:9090/v2/open/claim`\n")
 	}
 
 	flag.CommandLine.SortFlags = false
@@ -158,7 +158,7 @@ func createSignKeys(c *config) error {
 			return err
 		}
 		c.accountKeys[i] = ak
-		log.Infof("privkey %x = account %s", ak.PrivateKey(), ak.AddressString())
+		log.Info("privkey ", fmt.Sprintf("%x", ak.PrivateKey()), " = account ", ak.AddressString())
 	}
 	return nil
 }
@@ -198,14 +198,14 @@ func privKeyToSigner(key string) (*ethereum.SignKeys, error) {
 	if len(key) > 0 {
 		skey = ethereum.NewSignKeys()
 		if err := skey.AddHexKey(key); err != nil {
-			return nil, fmt.Errorf("cannot create key %s with err %s", key, err)
+			return nil, fmt.Errorf("cannot create key %s: %v", key, err)
 		}
 	}
 	return skey, nil
 }
 
 func main() {
-	fmt.Fprintf(os.Stderr, "vocdoni version %q\n", internal.Version)
+	fmt.Fprint(os.Stderr, "vocdoni version \"", internal.Version, "\"\n")
 
 	mainConfig := &config{}
 	parseFlags(mainConfig)
@@ -214,7 +214,7 @@ func main() {
 	createAccount := func(c *config) (*apiclient.HTTPclient, error) {
 		if len(c.accountPrivKeys) == 0 {
 			c.accountPrivKeys = []string{util.RandomHex(32)}
-			log.Infof("no keys passed, generated random private key: %s", c.accountPrivKeys)
+			log.Info("no keys passed, generated random private key: ", c.accountPrivKeys)
 		}
 		if err := createSignKeys(c); err != nil {
 			log.Fatal(err)
@@ -226,7 +226,7 @@ func main() {
 		defer wg.Done()
 		api, err := createAccount(c)
 		if err != nil {
-			log.Fatalf("could not create account: %v", err)
+			log.Fatal("could not create account: ", err)
 		}
 		if err := setupAndRun(op, api, c); err != nil {
 			log.Fatal(err)
