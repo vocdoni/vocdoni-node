@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	vapi "go.vocdoni.io/dvote/api"
@@ -92,12 +91,9 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 
 	if _, err := t.api.Vote(votes[0]); err != nil {
 		// check the error expected for maxCensusSize
-		if strings.Contains(err.Error(), "maxCensusSize reached") {
-			log.Infof("error expected: %s", err.Error())
-		} else {
-			// any other error is not expected
-			return err
-		}
+		log.Infof("error expected: %s", err.Error())
+	} else {
+		return fmt.Errorf("expected maxCensusSize limit error")
 	}
 
 	// one vote is not valid

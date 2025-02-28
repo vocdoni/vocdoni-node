@@ -250,7 +250,7 @@ func (app *BaseApplication) CheckTx(_ context.Context, req *cometabcitypes.Check
 	// unmarshal tx and check it
 	tx := new(vochaintx.Tx)
 	if err := tx.Unmarshal(req.Tx, app.ChainID()); err != nil {
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error()), Log: err.Error()}, nil
 	}
 	response, err := app.TransactionHandler.CheckTx(tx, false)
 	if err != nil {
@@ -258,7 +258,7 @@ func (app *BaseApplication) CheckTx(_ context.Context, req *cometabcitypes.Check
 			return &cometabcitypes.CheckTxResponse{Code: 0}, nil
 		}
 		log.Errorw(err, "checkTx")
-		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error())}, nil
+		return &cometabcitypes.CheckTxResponse{Code: 1, Data: []byte(err.Error()), Log: err.Error()}, nil
 	}
 	return &cometabcitypes.CheckTxResponse{
 		Code: 0,
@@ -350,12 +350,12 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 func validatorUpdate(validators map[string]*models.Validator) cometabcitypes.ValidatorUpdates {
 	validatorUpdate := []cometabcitypes.ValidatorUpdate{}
 	for _, v := range validators {
-		pubKey := bytes.Clone(v.PubKey)
-		validatorUpdate = append(validatorUpdate, cometabcitypes.UpdateValidator(
+		var pubKey crypto256k1.PubKey = bytes.Clone(v.PubKey)
+		validatorUpdate = append(validatorUpdate, cometabcitypes.NewValidatorUpdate(
 			pubKey,
 			int64(v.Power),
-			crypto256k1.KeyType,
-		))
+		),
+		)
 	}
 	return validatorUpdate
 }

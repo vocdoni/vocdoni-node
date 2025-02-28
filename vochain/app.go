@@ -293,7 +293,7 @@ func (app *BaseApplication) beginBlock(t time.Time, height uint32) {
 }
 
 // endBlock is called at the end of every block.
-func (app *BaseApplication) endBlock(t time.Time, h uint32) {
+func (app *BaseApplication) endBlock(t time.Time, _ uint32) {
 	app.endBlockTimestamp.Store(t.Unix())
 }
 
