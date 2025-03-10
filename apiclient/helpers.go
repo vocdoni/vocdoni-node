@@ -76,6 +76,25 @@ func (c *HTTPclient) SignAndSendTx(marshaledTx []byte) (types.HexBytes, []byte, 
 	return tx.Hash, tx.Response, nil
 }
 
+// SendTx sends a transaction to the blockchain.
+// It returns the transaction hash and the blockchain response (if any).
+// Takes a protobuf marshaled transaction as input of type models.SignedTx
+func (c *HTTPclient) SendTx(marshaledSignedTx []byte) (types.HexBytes, []byte, error) {
+	// Send the signed transaction and fetch the response
+	tx := &api.Transaction{Payload: marshaledSignedTx}
+	resp, code, err := c.Request(HTTPPOST, tx, "chain", "transactions")
+	if err != nil {
+		return nil, nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	if err := json.Unmarshal(resp, tx); err != nil {
+		return nil, nil, fmt.Errorf("could not decode response: %w", err)
+	}
+	return tx.Hash, tx.Response, nil
+}
+
 // WaitUntilNextBlock waits until next block, and returns nil
 //
 // It uses a context.WithTimeout(24s) before giving up and returning ctx.Err()
