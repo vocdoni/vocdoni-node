@@ -82,7 +82,7 @@ func (t *TransactionHandler) SetAccountDelegateTxCheck(vtx *vochaintx.Tx) error 
 		return fmt.Errorf("invalid delegates")
 	}
 
-	txSenderAccount, txSenderAddr, err := t.checkAccountCanPayCost(tx.Txtype, vtx)
+	txSenderAccount, txSenderAddr, err := t.checkAccountCanPayCost(tx.Txtype, vtx, 0)
 	if err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	if tx == nil {
 		return fmt.Errorf("invalid transaction")
 	}
-	txSenderAccount, txSenderAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_INFO_URI, vtx)
+	txSenderAccount, txSenderAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_INFO_URI, vtx, 0)
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ func (t *TransactionHandler) SetSIKTxCheck(vtx *vochaintx.Tx) (common.Address, v
 	if tx == nil {
 		return common.Address{}, nil, fmt.Errorf("invalid transaction")
 	}
-	_, txAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_SIK, vtx)
+	_, txAddress, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_SIK, vtx, 0)
 	if err != nil {
 		return common.Address{}, nil, err
 	}
@@ -321,7 +321,7 @@ func (t *TransactionHandler) SetAccountValidatorTxCheck(vtx *vochaintx.Tx) error
 	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
 		return ErrNilTx
 	}
-	_, _, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_VALIDATOR, vtx)
+	_, _, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_VALIDATOR, vtx, 0)
 	if err != nil {
 		return err
 	}
