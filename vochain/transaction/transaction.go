@@ -134,6 +134,7 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				return nil, fmt.Errorf("newProcessTx: cannot schedule end process: %w", err)
 			}
 
+			// get the cost of the transaction
 			cost := t.txElectionCostFromProcess(p)
 
 			// check for a faucet package and transfer amount to sender account
@@ -572,7 +573,8 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 // checkAccountCanPayCost checks if the account can pay the cost of the transaction.
 // It returns the account and the address of the sender.
 // It also checks if a faucet package is available in the transaction and can pay for it.
-func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *vochaintx.Tx) (*vstate.Account, *common.Address, error) {
+// The cost parameter is optional, if not provided, the transaction base cost for the txType is used.
+func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *vochaintx.Tx, cost uint64) (*vstate.Account, *common.Address, error) {
 	// extract sender address from signature
 	pubKey, err := ethereum.PubKeyFromSignature(vtx.SignedBody, vtx.Signature)
 	if err != nil {
@@ -590,9 +592,11 @@ func (t *TransactionHandler) checkAccountCanPayCost(txType models.TxType, vtx *v
 		return nil, nil, vstate.ErrAccountNotExist
 	}
 	// get setAccount tx cost
-	cost, err := t.state.TxBaseCost(txType, false)
-	if err != nil {
-		return nil, nil, fmt.Errorf("cannot get tx cost for %s: %w", txType.String(), err)
+	if cost == 0 {
+		cost, err = t.state.TxBaseCost(txType, false)
+		if err != nil {
+			return nil, nil, fmt.Errorf("cannot get tx cost for %s: %w", txType.String(), err)
+		}
 	}
 
 	if cost > 0 {

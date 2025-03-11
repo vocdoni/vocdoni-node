@@ -12,7 +12,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
-	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -107,21 +106,13 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		return nil, ethereum.Address{}, err
 	}
 
-	// check signature
-	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
-	if err != nil {
-		return nil, ethereum.Address{}, fmt.Errorf("could not get account: %w", err)
-	}
-	if addr == nil {
-		return nil, ethereum.Address{}, fmt.Errorf("cannot get account from vtx.Signature, nil result")
-	}
-
 	// get Tx cost, since it is a new process, we should use the election price calculator
 	cost := t.txElectionCostFromProcess(tx.Process)
 
-	// check balance and nonce
-	if acc.Balance < cost {
-		return nil, ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
+	// extract address from signature and check if the account can pay the cost
+	_, addr, err := t.checkAccountCanPayCost(tx.Txtype, vtx, cost)
+	if err != nil {
+		return nil, ethereum.Address{}, err
 	}
 
 	// if organization ID is not set, use the sender address
@@ -174,14 +165,19 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		return ethereum.Address{}, ErrNilTx
 	}
 	tx := vtx.Tx.GetSetProcess()
-	// get account from signature
-	addr, acc, err := t.state.AccountFromSignature(vtx.SignedBody, vtx.Signature)
+
+	// get tx base cost
+	cost, err := t.state.TxBaseCost(tx.Txtype, false)
+	if err != nil {
+		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
+	}
+
+	// check base cost and extract address from signature
+	_, addr, err := t.checkAccountCanPayCost(tx.Txtype, vtx, cost)
 	if err != nil {
 		return ethereum.Address{}, err
 	}
-	if addr == nil || acc == nil {
-		return ethereum.Address{}, fmt.Errorf("cannot get account from signature")
-	}
+
 	// get process
 	process, err := t.state.Process(tx.ProcessId, false)
 	if err != nil {
@@ -204,16 +200,6 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		} // is delegate
 	}
 
-	// get tx base cost
-	cost, err := t.state.TxBaseCost(tx.Txtype, false)
-	if err != nil {
-		return ethereum.Address{}, fmt.Errorf("cannot get %s transaction cost: %w", tx.Txtype, err)
-	}
-	// check base cost
-	if acc.Balance < cost {
-		return ethereum.Address{}, vstate.ErrNotEnoughBalance
-	}
-
 	switch tx.Txtype {
 	case models.TxType_SET_PROCESS_STATUS:
 		if tx.GetStatus() == models.ProcessStatus_RESULTS {
@@ -233,9 +219,9 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 				return ethereum.Address{}, err
 			}
 			cost = t.txCostIncreaseCensusSize(process, tx.GetCensusSize())
-			// get Tx cost, since it is a new census size, we should use the election price calculator
-			if acc.Balance < cost {
-				return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
+			// check the Tx cost again, since it is a new census size, we should use the election price calculator
+			if _, _, err := t.checkAccountCanPayCost(tx.Txtype, vtx, cost); err != nil {
+				return ethereum.Address{}, err
 			}
 		}
 		return ethereum.Address(*addr), t.state.SetProcessCensus(
@@ -246,10 +232,10 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			false,
 		)
 	case models.TxType_SET_PROCESS_DURATION:
-		// get Tx cost, since it modifies the process duration, we should use the election price calculator
+		// check the Tx cost again, since it modifies the process duration, we should use the election price calculator
 		cost = t.txCostIncreaseDuration(process, tx.GetDuration())
-		if acc.Balance < cost {
-			return ethereum.Address{}, fmt.Errorf("%w: required %d, got %d", vstate.ErrNotEnoughBalance, cost, acc.Balance)
+		if _, _, err := t.checkAccountCanPayCost(tx.Txtype, vtx, cost); err != nil {
+			return ethereum.Address{}, err
 		}
 		return ethereum.Address(*addr), t.state.SetProcessDuration(process.ProcessId, tx.GetDuration(), false)
 
