@@ -166,7 +166,10 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 
 		tconfig.StateSync.TrustHeight = localConfig.StateSyncTrustHeight
 		tconfig.StateSync.TrustHash = localConfig.StateSyncTrustHash
-		tconfig.StateSync.ChunkFetchers = 10
+		tconfig.StateSync.ChunkFetchers = 5
+		tconfig.StateSync.ChunkRequestTimeout = 30 * time.Second
+		tconfig.StateSync.DiscoveryTime = 30 * time.Second
+
 		// If StateSync is enabled but parameters are empty, populate them
 		//  fetching params from remote API endpoint
 		if localConfig.StateSyncFetchParamsFromRPC &&
