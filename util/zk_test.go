@@ -22,17 +22,13 @@ func TestBytesToArboStr(t *testing.T) {
 }
 
 func TestConversionConsistency(t *testing.T) {
-	originalInput := []byte("test input")
-
+	originalInput := RandomBytes(20)
 	// Convert to strings
 	strParts := BytesToArboSplitStr(originalInput)
-
 	// Convert strings back to bytes
-	reconstructedBytes := SplittedArboStrToBytes(strParts[0], strParts[1])
-
+	reconstructedBytes := SplittedArboStrToBytes(strParts[0], strParts[1], true, true)
 	// Hash the original input to compare with reconstructed bytes
 	expectedHash := sha256.Sum256(originalInput)
-
 	// Check if reconstructed bytes match the hash of the original input
 	qt.Assert(t, bytes.Equal(reconstructedBytes, expectedHash[:]), qt.IsTrue)
 }
