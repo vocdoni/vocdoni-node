@@ -229,13 +229,13 @@ func (t *Tree) GenProof(rTx db.Reader, key []byte) ([]byte, []byte, error) {
 
 // VerifyProof checks the proof for the given key, value and root, using the
 // passed hash function
-func VerifyProof(hashFunc arbo.HashFunction, key, value, proof, root []byte) (bool, error) {
+func VerifyProof(hashFunc arbo.HashFunction, key, value, proof, root []byte) error {
 	return arbo.CheckProof(hashFunc, key, value, root, proof)
 }
 
 // VerifyProof checks the proof for the given key, value and root, using the
 // hash function of the Tree
-func (t *Tree) VerifyProof(key, value, proof, root []byte) (bool, error) {
+func (t *Tree) VerifyProof(key, value, proof, root []byte) error {
 	return VerifyProof(t.tree.HashFunction(), key, value, proof, root)
 }
 

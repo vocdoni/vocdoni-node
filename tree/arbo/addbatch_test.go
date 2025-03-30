@@ -998,14 +998,12 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 	// check with empty array
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
-	verif, err := CheckProof(tree.hashFunction, keys[9], []byte{}, root, siblings)
+	err = CheckProof(tree.hashFunction, keys[9], []byte{}, root, siblings)
 	c.Assert(err, qt.IsNil)
-	c.Check(verif, qt.IsTrue)
 
 	// check with array with only 1 zero
-	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0}, root, siblings)
+	err = CheckProof(tree.hashFunction, keys[9], []byte{0}, root, siblings)
 	c.Assert(err, qt.IsNil)
-	c.Check(verif, qt.IsTrue)
 
 	// check with array with 32 zeroes
 	e32 := []byte{
@@ -1013,12 +1011,10 @@ func TestAddKeysWithEmptyValues(t *testing.T) {
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 	c.Assert(len(e32), qt.Equals, 32)
-	verif, err = CheckProof(tree.hashFunction, keys[9], e32, root, siblings)
+	err = CheckProof(tree.hashFunction, keys[9], e32, root, siblings)
 	c.Assert(err, qt.IsNil)
-	c.Check(verif, qt.IsTrue)
 
 	// check with array with value!=0 returns false at verification
-	verif, err = CheckProof(tree.hashFunction, keys[9], []byte{0, 1}, root, siblings)
-	c.Assert(err, qt.IsNil)
-	c.Check(verif, qt.IsFalse)
+	err = CheckProof(tree.hashFunction, keys[9], []byte{0, 1}, root, siblings)
+	c.Assert(err, qt.ErrorMatches, "calculated vs expected root mismatch")
 }
