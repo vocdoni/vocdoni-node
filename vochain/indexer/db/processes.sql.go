@@ -26,6 +26,7 @@ func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessI
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
+	title, description,
 	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata,
 	census_origin, status, namespace,
@@ -38,6 +39,7 @@ INSERT INTO processes (
 	results_votes, results_weight, results_block_height
 ) VALUES (
 	?, ?, ?, ?, ?,
+	?, ?,
 	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
@@ -57,6 +59,8 @@ type CreateProcessParams struct {
 	StartDate         time.Time
 	EndDate           time.Time
 	ManuallyEnded     bool
+	Title             string
+	Description       string
 	VoteCount         int64
 	HaveResults       bool
 	FinalResults      bool
@@ -87,6 +91,8 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.StartDate,
 		arg.EndDate,
 		arg.ManuallyEnded,
+		arg.Title,
+		arg.Description,
 		arg.VoteCount,
 		arg.HaveResults,
 		arg.FinalResults,
@@ -123,7 +129,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, title, description FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -160,6 +166,8 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
 		&i.ManuallyEnded,
+		&i.Title,
+		&i.Description,
 	)
 	return i, err
 }
@@ -218,7 +226,7 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 
 const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
-    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended
+    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, title, description
     FROM processes
     WHERE (?3 = '' OR (INSTR(LOWER(HEX(entity_id)), ?3) > 0))
 )
@@ -269,7 +277,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 
 const searchProcesses = `-- name: SearchProcesses :many
 WITH results AS (
-	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
+	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, title, description,
 			COUNT(*) OVER() AS total_count
 	FROM processes
 	WHERE (
@@ -280,35 +288,39 @@ WITH results AS (
 			OR (LENGTH(?3) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(?3)) > 0)
 			-- TODO: consider keeping an entity_id_hex column for faster searches
 		)
-		AND (?4 = 0 OR namespace = ?4)
-		AND (?5 = 0 OR status = ?5)
-		AND (?6 = 0 OR source_network_id = ?6)
-		AND LENGTH(?7) <= 64 -- if passed arg is longer, then just abort the query
+		-- TODO: replace this simple INSTR of title and description with something better
+		-- like https://www.sqlite.org/fts5.html
+		AND (?4 = '' OR INSTR(LOWER(title), LOWER(?4)) > 0)
+		AND (?5 = '' OR INSTR(LOWER(description), LOWER(?5)) > 0)
+		AND (?6 = 0 OR namespace = ?6)
+		AND (?7 = 0 OR status = ?7)
+		AND (?8 = 0 OR source_network_id = ?8)
+		AND LENGTH(?9) <= 64 -- if passed arg is longer, then just abort the query
 		AND (
-			?7 = ''
-			OR (LENGTH(?7) = 64 AND LOWER(HEX(id)) = LOWER(?7))
-			OR (LENGTH(?7) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?7)) > 0)
+			?9 = ''
+			OR (LENGTH(?9) = 64 AND LOWER(HEX(id)) = LOWER(?9))
+			OR (LENGTH(?9) < 64 AND INSTR(LOWER(HEX(id)), LOWER(?9)) > 0)
 			-- TODO: consider keeping an id_hex column for faster searches
 		)
 		AND (
-			?8 = -1
-			OR (?8 = 1 AND have_results = TRUE)
-			OR (?8 = 0 AND have_results = FALSE)
-		)
-		AND (
-			?9 = -1
-			OR (?9 = 1 AND final_results = TRUE)
-			OR (?9 = 0 AND final_results = FALSE)
-		)
-		AND (
 			?10 = -1
-			OR (?10 = 1 AND manually_ended = TRUE)
-			OR (?10 = 0 AND manually_ended = FALSE)
+			OR (?10 = 1 AND have_results = TRUE)
+			OR (?10 = 0 AND have_results = FALSE)
 		)
-		AND (?11 IS NULL OR start_date >= ?11)
-		AND (?12 IS NULL OR start_date <= ?12)
-		AND (?13 IS NULL OR end_date >= ?13)
-		AND (?14 IS NULL OR end_date <= ?14)
+		AND (
+			?11 = -1
+			OR (?11 = 1 AND final_results = TRUE)
+			OR (?11 = 0 AND final_results = FALSE)
+		)
+		AND (
+			?12 = -1
+			OR (?12 = 1 AND manually_ended = TRUE)
+			OR (?12 = 0 AND manually_ended = FALSE)
+		)
+		AND (?13 IS NULL OR start_date >= ?13)
+		AND (?14 IS NULL OR start_date <= ?14)
+		AND (?15 IS NULL OR end_date >= ?15)
+		AND (?16 IS NULL OR end_date <= ?16)
 	)
 )
 SELECT id, total_count
@@ -322,6 +334,8 @@ type SearchProcessesParams struct {
 	Offset          int64
 	Limit           int64
 	EntityIDSubstr  interface{}
+	Title           interface{}
+	Description     interface{}
 	Namespace       interface{}
 	Status          interface{}
 	SourceNetworkID interface{}
@@ -345,6 +359,8 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		arg.Offset,
 		arg.Limit,
 		arg.EntityIDSubstr,
+		arg.Title,
+		arg.Description,
 		arg.Namespace,
 		arg.Status,
 		arg.SourceNetworkID,

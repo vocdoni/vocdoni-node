@@ -3,6 +3,7 @@ package indexer
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +11,8 @@ import (
 
 	"go.vocdoni.io/proto/build/go/models"
 
+	"go.vocdoni.io/dvote/api"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
@@ -52,6 +55,7 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 	namespace uint32, srcNetworkID int32, status models.ProcessStatus,
 	withResults, finalResults, manuallyEnded *bool,
 	startDateAfter, startDateBefore, endDateAfter, endDateBefore *time.Time,
+	title, description string,
 ) ([][]byte, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
@@ -78,6 +82,8 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		StartDateBefore: startDateBefore,
 		EndDateAfter:    endDateAfter,
 		EndDateBefore:   endDateBefore,
+		Title:           title,
+		Description:     description,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -98,7 +104,7 @@ func (idx *Indexer) ProcessExists(processID string) bool {
 	if len(processID) != 64 {
 		return false
 	}
-	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}
@@ -311,4 +317,30 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		}
 	}
 	return nil
+}
+
+// updateProcessMetadata synchronize title and description
+// with the information fetched over IPFS.
+func (idx *Indexer) UpdateProcessMetadata(d data.Storage, pid []byte, uri string) error {
+	// Try to retrieve the election metadata
+	if d != nil {
+		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		// TODO: abstract all of this somewhere else and just call from here
+		metadataBytes, err := d.Retrieve(stgCtx, uri, MaxOffchainFileSize)
+		if err != nil {
+			log.Warnf("cannot get metadata from %s: %v", election.MetadataURL, err)
+		} else {
+			// if metadata exists and is not encrypted, add it to the indexed election
+			// if the metadata is not encrypted, unmarshal it, otherwise store it as bytes
+			if !election.ElectionMode.EncryptedMetaData {
+				electionMetadata := api.ElectionMetadata{}
+				if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
+					log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
+				}
+				election.Metadata = &electionMetadata
+			}
+		}
+	}
 }
