@@ -887,10 +887,15 @@ func (idx *Indexer) TokenFeesList(limit, offset int, txType, reference, fromAcco
 			Timestamp: row.SpendTime,
 		})
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.readOnlyQuery.CountTokenFees(context.TODO(), indexerdb.CountTokenFeesParams{
+		TxType:      txType,
+		Reference:   reference,
+		FromAccount: fromAccount,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 // TokenTransfersList returns all the token transfers, made to and/or from a given account
@@ -925,10 +930,15 @@ func (idx *Indexer) TokenTransfersList(limit, offset int, fromOrToAccount, fromA
 			Timestamp: row.TransferTime,
 		})
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.readOnlyQuery.CountTokenTransfers(context.TODO(), indexerdb.CountTokenTransfersParams{
+		FromOrToAccount: fromOrToAccount,
+		FromAccount:     fromAccount,
+		ToAccount:       toAccount,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 // CountTokenTransfersByAccount returns the count all the token transfers made from a given account
@@ -939,7 +949,7 @@ func (idx *Indexer) CountTokenTransfersByAccount(acc []byte) (uint64, error) {
 
 // CountTotalAccounts returns the total number of accounts indexed.
 func (idx *Indexer) CountTotalAccounts() (uint64, error) {
-	count, err := idx.readOnlyQuery.CountAccounts(context.TODO())
+	count, err := idx.readOnlyQuery.CountTotalAccounts(context.TODO())
 	return uint64(count), err
 }
 
@@ -968,10 +978,11 @@ func (idx *Indexer) AccountList(limit, offset int, accountID string) ([]*indexer
 			Nonce:   uint32(row.Nonce),
 		})
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.readOnlyQuery.CountAccounts(context.TODO(), accountID)
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 // AccountExists returns whether the passed accountID exists in the db.

@@ -862,7 +862,7 @@ func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprou
 //
 // Errors returned are always of type APIerror.
 func (a *API) transactionList(params *TransactionParams) (*TransactionsList, error) {
-	txs, total, err := a.indexer.SearchTransactions(
+	txs, total, err := a.indexer.TransactionList(
 		params.Limit,
 		params.Page*params.Limit,
 		params.Height,

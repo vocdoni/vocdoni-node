@@ -64,13 +64,13 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		return nil, 0, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkID)
 	}
 	results, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
+		Offset:          int64(offset),
+		Limit:           int64(limit),
 		EntityIDSubstr:  entityID,
 		Namespace:       int64(namespace),
 		Status:          int64(status),
 		SourceNetworkID: int64(srcNetworkID),
 		IDSubstr:        strings.ToLower(processID), // we search in lowercase
-		Offset:          int64(offset),
-		Limit:           int64(limit),
 		HaveResults:     boolToInt(withResults),
 		FinalResults:    boolToInt(finalResults),
 		ManuallyEnded:   boolToInt(manuallyEnded),
@@ -82,14 +82,25 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 	if err != nil {
 		return nil, 0, err
 	}
-	list := [][]byte{}
-	for _, row := range results {
-		list = append(list, row.ID)
+	list := append([][]byte{}, results...) // ensure an empty list is returned even if results is nil
+	count, err := idx.readOnlyQuery.CountProcesses(context.TODO(), indexerdb.CountProcessesParams{
+		EntityIDSubstr:  entityID,
+		Namespace:       int64(namespace),
+		Status:          int64(status),
+		SourceNetworkID: int64(srcNetworkID),
+		IDSubstr:        strings.ToLower(processID), // we search in lowercase
+		HaveResults:     boolToInt(withResults),
+		FinalResults:    boolToInt(finalResults),
+		ManuallyEnded:   boolToInt(manuallyEnded),
+		StartDateAfter:  startDateAfter,
+		StartDateBefore: startDateBefore,
+		EndDateAfter:    endDateAfter,
+		EndDateBefore:   endDateBefore,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	if len(results) == 0 {
-		return list, 0, nil
-	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 // ProcessExists returns whether the passed processID exists in the db.
@@ -107,7 +118,7 @@ func (idx *Indexer) ProcessExists(processID string) bool {
 
 // CountTotalProcesses returns the total number of processes indexed.
 func (idx *Indexer) CountTotalProcesses() uint64 {
-	count, err := idx.readOnlyQuery.GetProcessCount(context.TODO())
+	count, err := idx.readOnlyQuery.CountTotalProcesses(context.TODO())
 	if err != nil {
 		log.Errorf("could not get the process count: %v", err)
 		return 0
