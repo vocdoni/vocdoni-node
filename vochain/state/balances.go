@@ -12,6 +12,9 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
+// FailbackTxCost is the cost of a transaction that is not committed to the state.
+const FailbackTxCost = 1
+
 // TxTypeCostToStateKey translates models.TxType to a string which the State uses
 // as a key internally under the Extra tree
 var (
@@ -69,7 +72,8 @@ func (v *State) TxBaseCost(txType models.TxType, committed bool) (uint64, error)
 	}
 	var costBytes []byte
 	if costBytes, err = extraTree.Get([]byte(key)); err != nil {
-		return 0, ErrTxCostNotFound
+		log.Warnw("transaction cost not defined, going to failback", "txType", txType.String())
+		return FailbackTxCost, nil
 	}
 	return binary.LittleEndian.Uint64(costBytes), nil
 }
