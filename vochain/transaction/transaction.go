@@ -212,6 +212,15 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				if err := t.state.SetProcessDuration(tx.ProcessId, tx.GetDuration(), true); err != nil {
 					return nil, fmt.Errorf("setProcessCensus: %s", err)
 				}
+
+				// [Soft-fork] for LTS 1.2, remove the condition after some time to let the chain advance and forget old blocks
+				if !(t.state.ChainID() == "vocdoni/LTS/1.2" && t.state.CurrentHeight() < 4138989) {
+					// schedule the new duration on the ISTC
+					if err := t.istc.Reschedule(tx.ProcessId, process.StartTime+tx.GetDuration(), false, 0); err != nil {
+						return nil, fmt.Errorf("setProcessDuration: cannot reschedule IST action: %w", err)
+					}
+				}
+
 			default:
 				return nil, fmt.Errorf("unknown set process tx type")
 			}

@@ -123,7 +123,9 @@ func (c *Controller) Schedule(action Action) error {
 }
 
 // Reschedule reschedules an IST action to the given new height or timestamp.
-func (c *Controller) Reschedule(id []byte, new uint32, isHeight bool) error {
+// If isHeight is true, the new value is treated as a block height. Else it is treated as a timestamp.
+// It also increases the attempts of the action if attemptsDelta is greater than 0.
+func (c *Controller) Reschedule(id []byte, new uint32, isHeight bool, attemptsDelta uint32) error {
 	if len(id) == 0 {
 		return fmt.Errorf("cannot reschedule IST action: nil id")
 	}
@@ -132,22 +134,30 @@ func (c *Controller) Reschedule(id []byte, new uint32, isHeight bool) error {
 		return err
 	}
 	// increase attempts
-	action.Attempts++
+	action.Attempts += attemptsDelta
 	// set the new height or timestamp
 	var old uint32
 	if isHeight {
+		if new <= c.state.CurrentHeight() {
+			return fmt.Errorf("new height (%d) <= current height (%d)", new, c.state.CurrentHeight())
+		}
 		old = action.Height
 		action.Height = new
 		action.TimeStamp = 0
 	} else {
+		ts, err := c.state.Timestamp(false)
+		if err != nil {
+			return fmt.Errorf("cannot get current timestamp: %w", err)
+		}
+		if new <= ts {
+			return fmt.Errorf("new timestamp (%d) <= current timestamp (%d)", new, ts)
+		}
 		old = action.TimeStamp
 		action.TimeStamp = new
 		action.Height = 0
 	}
-	// check that the new value is greater than the old one
-	if old >= new {
-		return fmt.Errorf("cannot reschedule IST action: old (%d) >= new (%d)", old, new)
-	}
+
+	log.Debugw("reschedule action", "id", fmt.Sprintf("%x", action.ID), "old", old, "new", new, "attempts", action.Attempts)
 	// store the IST action
 	return c.addAction(action)
 }
@@ -186,7 +196,7 @@ func (c *Controller) Commit(height, timestamp uint32) error {
 				newHeight := height + (1 + action.Attempts*2)
 				log.Infow("missing encryption keys, rescheduling IST action", "newHeight", newHeight, "id",
 					fmt.Sprintf("%x", action.ID), "action", ActionsToString[action.TypeID], "attempt", action.Attempts)
-				if err := c.Reschedule(action.ID, newHeight, true); err != nil {
+				if err := c.Reschedule(action.ID, newHeight, true, 1); err != nil {
 					return fmt.Errorf("cannot reschedule IST action: %w", err)
 				}
 				continue
