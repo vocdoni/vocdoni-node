@@ -14,7 +14,8 @@ func (c *Controller) removeAction(id []byte) error {
 	return c.state.NoState(true).Delete(addPrefix(id))
 }
 
-// addAction adds an action to the pending actions list.
+// addAction adds an action to the pending actions list. If the action already exists,
+// it will be replaced with the new one.
 func (c *Controller) addAction(act *Action) error {
 	if act.ID == nil {
 		return fmt.Errorf("action ID is nil")
