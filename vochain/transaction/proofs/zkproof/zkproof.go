@@ -3,12 +3,14 @@ package zkproof
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 
 	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/crypto/zk/prover"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -34,6 +36,10 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 	}
 	hashedPid := sha256.Sum256(process.ProcessId)
 	if !bytes.Equal(hashedPid[:], proofProcessID) {
+		log.Warnw("process id mismatch",
+			"processID", fmt.Sprintf("%x", process.ProcessId),
+			"hashedPID", fmt.Sprintf("%x", hashedPid),
+			"proofPID", fmt.Sprintf("%x", proofProcessID))
 		return false, nil, fmt.Errorf("process id mismatch %x != %x", process.ProcessId, proofProcessID)
 	}
 	// verify the census root
@@ -45,12 +51,17 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 		return false, nil, fmt.Errorf("census root mismatch")
 	}
 	// verify the votePackage hash
-	proofVoteHash, err := proof.VoteHash()
+	proofVoteHash, strParts, err := proof.VoteHash()
 	if err != nil {
 		return false, nil, fmt.Errorf("failed on parsing vote hash from public inputs provided: %w", err)
 	}
 	hashedVotePackage := sha256.Sum256(envelope.VotePackage)
 	if !bytes.Equal(hashedVotePackage[:], proofVoteHash) {
+		log.Warnw("voteHash id mismatch",
+			"votPackage", hex.EncodeToString(envelope.VotePackage),
+			"hashedVotePackage", hex.EncodeToString(hashedVotePackage[:]),
+			"proofParts", strParts,
+			"proofVotePackage", hex.EncodeToString(proofVoteHash))
 		return false, nil, fmt.Errorf("vote hash mismatch")
 	}
 	// get vote weight from proof publicSignals
