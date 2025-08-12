@@ -14,10 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Checkout developer-portal repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: vocdoni/developer-portal
           ref: main
