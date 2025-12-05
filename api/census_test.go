@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/util"
+	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data/ipfs"
@@ -25,6 +26,8 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+const testParticipantWeight = int64(42)
 
 func TestCensus(t *testing.T) {
 	router := httprouter.HTTProuter{}
@@ -156,7 +159,7 @@ func TestCensus(t *testing.T) {
 	qt.Assert(t, code, qt.Equals, 404)
 }
 
-func TestCensusProof(t *testing.T) {
+func TestCensusProofVerifierArbo(t *testing.T) {
 	router := httprouter.HTTProuter{}
 	router.Init("127.0.0.1", 0)
 	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "censuses"))
@@ -200,7 +203,7 @@ func TestCensusProof(t *testing.T) {
 	qt.Assert(t, key.Generate(), qt.IsNil)
 	_, code = c.Request("POST", &CensusParticipants{Participants: []CensusParticipant{{
 		Key:    key.Address().Bytes(),
-		Weight: (*types.BigInt)(big.NewInt(1)),
+		Weight: (*types.BigInt)(big.NewInt(testParticipantWeight)),
 	}}}, id1, "participants")
 	qt.Assert(t, code, qt.Equals, 200)
 
@@ -213,7 +216,7 @@ func TestCensusProof(t *testing.T) {
 	resp, code = c.Request("GET", nil, root, "proof", key.Address().String())
 	qt.Assert(t, code, qt.Equals, 200)
 	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
+	qt.Assert(t, censusData.Weight.MathBigInt().Int64(), qt.Equals, testParticipantWeight)
 
 	// verify the proof
 	electionID := rnd.RandomBytes(32)
@@ -241,7 +244,7 @@ func TestCensusProof(t *testing.T) {
 	)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
-	qt.Assert(t, weight.Uint64(), qt.Equals, uint64(1))
+	qt.Assert(t, weight.Int64(), qt.Equals, testParticipantWeight)
 }
 
 func TestCensusZk(t *testing.T) {
@@ -354,4 +357,155 @@ func TestCensusZk(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
 	qt.Assert(t, newWeight.Uint64(), qt.Equals, uint64(1))
+}
+
+func TestCensusProofVerifierCSP(t *testing.T) {
+	router := httprouter.HTTProuter{}
+	router.Init("127.0.0.1", 0)
+
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
+	qt.Assert(t, err, qt.IsNil)
+	// Create local key value database
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
+
+	app := vochain.TestBaseApplication(t)
+	api.Attach(app, nil, nil, nil, censusDB)
+	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
+
+	csp := ethereum.SignKeys{}
+	err = csp.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          new(models.ProcessMode),
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    csp.PublicKey(),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		BlockCount:    1024,
+		MaxCensusSize: 1000,
+	}
+	t.Logf("adding process %x", process.ProcessId)
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+
+	// Test valid vote
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	k := ethereum.SignKeys{}
+	qt.Assert(t, k.Generate(), qt.IsNil)
+	bundle := &models.CAbundle{
+		ProcessId:  pid,
+		Address:    k.Address().Bytes(),
+		VoteWeight: big.NewInt(testParticipantWeight).Bytes(),
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	qt.Assert(t, err, qt.IsNil)
+
+	signature, err := csp.SignEthereum(bundleBytes)
+	qt.Assert(t, err, qt.IsNil)
+
+	// verify the proof
+	valid, weight, err := transaction.VerifyProof(
+		process,
+		&models.VoteEnvelope{
+			Nonce:     util.RandomBytes(32),
+			ProcessId: pid,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Ca{
+					Ca: &models.ProofCA{
+						Bundle:    bundle,
+						Type:      models.ProofCA_ECDSA,
+						Signature: signature,
+					},
+				},
+			},
+			VotePackage: vp,
+		},
+		state.NewVoterID(state.VoterIDTypeECDSA, k.PublicKey()),
+	)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, valid, qt.IsTrue)
+	qt.Assert(t, weight.Int64(), qt.Equals, testParticipantWeight)
+}
+
+func TestCensusProofVerifierCSPLegacy(t *testing.T) {
+	router := httprouter.HTTProuter{}
+	router.Init("127.0.0.1", 0)
+
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
+	qt.Assert(t, err, qt.IsNil)
+	// Create local key value database
+	db, err := metadb.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(db)
+
+	app := vochain.TestBaseApplication(t)
+	api.Attach(app, nil, nil, nil, censusDB)
+	qt.Assert(t, api.EnableHandlers(CensusHandler), qt.IsNil)
+
+	csp := ethereum.SignKeys{}
+	err = csp.Generate()
+	qt.Assert(t, err, qt.IsNil)
+
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          new(models.ProcessMode),
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    csp.PublicKey(),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		BlockCount:    1024,
+		MaxCensusSize: 1000,
+	}
+	t.Logf("adding process %x", process.ProcessId)
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+
+	// Test valid vote
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	k := ethereum.SignKeys{}
+	qt.Assert(t, k.Generate(), qt.IsNil)
+	bundle := &models.CAbundle{
+		ProcessId: pid,
+		Address:   k.Address().Bytes(),
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	qt.Assert(t, err, qt.IsNil)
+
+	signature, err := csp.SignEthereum(bundleBytes)
+	qt.Assert(t, err, qt.IsNil)
+
+	// verify the proof
+	valid, weight, err := transaction.VerifyProof(
+		process,
+		&models.VoteEnvelope{
+			Nonce:     util.RandomBytes(32),
+			ProcessId: pid,
+			Proof: &models.Proof{
+				Payload: &models.Proof_Ca{
+					Ca: &models.ProofCA{
+						Bundle:    bundle,
+						Type:      models.ProofCA_ECDSA,
+						Signature: signature,
+					},
+				},
+			},
+			VotePackage: vp,
+		},
+		state.NewVoterID(state.VoterIDTypeECDSA, k.PublicKey()),
+	)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, valid, qt.IsTrue)
+	qt.Assert(t, weight.Int64(), qt.Equals, int64(1))
 }

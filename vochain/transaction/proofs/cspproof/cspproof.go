@@ -9,13 +9,10 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
-
-var bigOne = big.NewInt(1)
 
 // ProofVerifierCSP defines the interface for CSP (Credential Service Provider) proof verification systems.
 type ProofVerifierCSP struct{}
@@ -92,16 +89,16 @@ func (*ProofVerifierCSP) Verify(process *models.Process, envelope *models.VoteEn
 			}
 		}
 		if !blind.Verify(new(big.Int).SetBytes(ethereum.HashRaw(cspBundle)), signature, rootPub) {
-			cspbundleDec := &models.CAbundle{}
-			if err := proto.Unmarshal(cspBundle, cspbundleDec); err != nil {
-				log.Warnf("cannot unmarshal CSP bundle: %v", err)
-			}
 			return false, nil, fmt.Errorf("blind CSP verification failed for "+
-				"pid %x with CSP key %x. CSP bundle {pid:%x, addr:%x}. CSP signature %x",
-				envelope.ProcessId, rootPub.Bytes(), cspbundleDec.ProcessId, cspbundleDec.Address, signature.Bytes())
+				"pid %x with CSP key %x. CSP bundle {pid:%x, addr:%x, weight:%x}. CSP signature %x",
+				envelope.ProcessId, rootPub.Bytes(), p.Bundle.ProcessId, p.Bundle.Address, p.Bundle.VoteWeight,
+				signature.Bytes())
 		}
 	default:
 		return false, nil, fmt.Errorf("CSP proof %s type not supported", p.Type)
 	}
-	return true, bigOne, nil
+	if p.Bundle.GetVoteWeight() == nil {
+		return true, big.NewInt(1), nil // since VoteWeight is optional, keep legacy behaviour if missing
+	}
+	return true, new(big.Int).SetBytes(p.Bundle.GetVoteWeight()), nil
 }
