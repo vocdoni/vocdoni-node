@@ -13,9 +13,6 @@ import (
 	"time"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
-	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
@@ -34,77 +31,105 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
-	"google.golang.org/protobuf/proto"
 )
 
 const (
 	DefaultTxsPerBlock     = 500
 	DefaultBlockTimeTarget = time.Second * 5
 	DefaultTxCosts         = 10
-	mempoolSize            = 100 << 10
+	DefaultMempoolSize     = 8192 // maximum number of pending transactions
+
+	// Key prefixes for the block store KV database.
+	prefixTx        = "tx/"        // tx/<height_8B>/<txIndex_4B> → raw tx bytes
+	prefixMeta      = "meta/"      // meta/<height_8B> → blockMeta JSON
+	prefixBlockHash = "blockhash/" // blockhash/<hash> → height (8B BE)
+
+	// Key prefixes for the mempool KV database.
+	prefixMempool = "mp/"   // mp/<seq_8B> → raw tx bytes
+	keyMempoolSeq = "mpseq" // last sequence number (8B BE)
 )
 
 // Vocone is an implementation of the Vocdoni protocol run by a single (atomic) node.
 type Vocone struct {
 	service.VocdoniService
 
-	mempool         chan []byte // a buffered channel acts like a FIFO with a fixed size
-	blockStore      db.Database
-	height          atomic.Int64
-	blockTimestamps sync.Map
+	blockStore  db.Database
+	mempoolDB   db.Database
+	height      atomic.Int64
+	txsPerBlock int
+	closed      atomic.Bool
+
+	// mempoolMtx protects mempoolKeys and mempoolSeq.
+	mempoolMtx  sync.Mutex
+	mempoolKeys [][]byte // ordered list of db keys for pending txs
+	mempoolSeq  uint64   // monotonic sequence for mempool key generation
+
+	// vcMtx serializes block production and state modifications.
+	vcMtx           sync.Mutex
 	lastBlockTime   time.Time
-	txsPerBlock     int
-	// vcMtx is a lock on modification to the app state.
-	// this enables direct calls to vochain functions from the vocone
-	//  without causing race conditions
-	vcMtx sync.Mutex
+	proposerAddress []byte // address of the solo validator
 }
 
-// NewVocone returns a ready Vocone instance.
-func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, connectKey string, connectPeers []string) (*Vocone, error) {
-	var err error
-
+// NewVocone creates and returns a ready Vocone instance.
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
+	connectKey string, connectPeers []string,
+) (*Vocone, error) {
 	vc := &Vocone{}
 	vc.Config = &config.VochainCfg{}
 	vc.Config.DataDir = dataDir
 	vc.Config.DBType = db.TypePebble
+
+	var err error
 	vc.App, err = vochain.NewBaseApplication(vc.Config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create base application: %w", err)
 	}
-	vc.mempool = make(chan []byte, mempoolSize)
 	vc.txsPerBlock = DefaultTxsPerBlock
-	version, err := vc.App.State.LastHeight()
+
+	// Recover height from persisted state.
+	lastHeight, err := vc.App.State.LastHeight()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get last height: %w", err)
 	}
-	vc.height.Store(int64(version))
-	if vc.blockStore, err = metadb.New(db.TypePebble,
-		filepath.Join(dataDir, "blockstore")); err != nil {
-		return nil, err
+	vc.height.Store(int64(lastHeight))
+
+	// Open the block store database.
+	vc.blockStore, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "blockstore"))
+	if err != nil {
+		return nil, fmt.Errorf("could not open blockstore: %w", err)
+	}
+
+	// Open the mempool database and reload pending transactions.
+	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "mempool"))
+	if err != nil {
+		return nil, fmt.Errorf("could not open mempool db: %w", err)
+	}
+	if err := vc.loadMempool(); err != nil {
+		return nil, fmt.Errorf("could not load mempool: %w", err)
 	}
 
 	vc.setDefaultMethods()
 	vc.App.State.SetHeight(uint32(vc.height.Load()))
 	vc.App.SetBlockTimeTarget(DefaultBlockTimeTarget)
 
-	// Create indexer
-	if vc.Indexer, err = indexer.New(vc.App, indexer.Options{
+	// Create indexer.
+	vc.Indexer, err = indexer.New(vc.App, indexer.Options{
 		DataDir: filepath.Join(dataDir, "indexer"),
-	}); err != nil {
-		return nil, err
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not create indexer: %w", err)
 	}
 
-	// Create key keeper
+	// Create key keeper (also adds the validator).
 	if err := vc.SetKeyKeeper(keymanager); err != nil {
 		return nil, fmt.Errorf("could not create keykeeper: %w", err)
 	}
 
-	// Create vochain metrics collector
+	// Create vochain metrics collector.
 	vc.Stats = vochaininfo.NewVochainInfo(vc.App)
 	go vc.Stats.Start(10)
 
-	// Create the IPFS storage layer
+	// Create the IPFS storage layer.
 	if !disableIPFS {
 		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
 			ConfigPath:   filepath.Join(dataDir, "ipfs"),
@@ -112,28 +137,26 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool, 
 			ConnectPeers: connectPeers,
 		})
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not create IPFS storage: %w", err)
 		}
-
-		// Create the data downloader and offchain data handler
 		if err := vc.OffChainDataHandler(); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not create offchain data handler: %w", err)
 		}
 	}
 
-	// Disable election ID verification on the farcaster proof for testing purposes
+	// Disable election ID verification on the farcaster proof for testing purposes.
 	farcasterproof.DisableElectionIDVerification = true
 
-	return vc, err
+	return vc, nil
 }
 
 // EnableAPI starts the HTTP API server. It is not enabled by default.
-func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, error) {
+func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, error) {
 	vc.Router = new(httprouter.HTTProuter)
 	if err := vc.Router.Init(host, port); err != nil {
 		return nil, err
 	}
-	uAPI, err := api.NewAPI(vc.Router, URLpath, vc.Config.DataDir, db.TypePebble)
+	uAPI, err := api.NewAPI(vc.Router, urlPath, vc.Config.DataDir, db.TypePebble)
 	if err != nil {
 		return nil, err
 	}
@@ -159,60 +182,134 @@ func (vc *Vocone) EnableAPI(host string, port int, URLpath string) (*api.API, er
 	)
 }
 
-// Start starts the Vocone node. This function is blocking.
-func (vc *Vocone) Start() {
+// Start runs the block production loop. It blocks until ctx is cancelled.
+// Returns an error if initialization fails; block production errors are logged and skipped.
+func (vc *Vocone) Start(ctx context.Context) error {
 	vc.lastBlockTime = time.Now()
-	go vochainPrintInfo(10*time.Second, vc.Stats)
+	go vochainPrintInfo(ctx, 10*time.Second, vc.Stats)
+
 	if vc.App.Height() == 0 {
-		log.Infof("initializing new blockchain")
+		log.Infow("initializing new blockchain")
 		genesisAppData, err := json.Marshal(&genesis.AppState{
 			MaxElectionSize: 1000000,
 			NetworkCapacity: uint64(vc.txsPerBlock),
 			TxCost:          defaultTxCosts(),
 		})
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("could not marshal genesis app state: %w", err)
 		}
-		if _, err = vc.App.InitChain(context.Background(), &cometabcitypes.InitChainRequest{
+		if _, err = vc.App.InitChain(ctx, &cometabcitypes.InitChainRequest{
 			ChainId:       vc.App.ChainID(),
 			AppStateBytes: genesisAppData,
 			Time:          time.Now(),
 		}); err != nil {
-			panic(err)
+			return fmt.Errorf("could not init chain: %w", err)
 		}
 		time.Sleep(1 * time.Second)
 	}
+
 	for {
-		// Begin block
-		vc.vcMtx.Lock()
-		startTime := time.Now()
-		height := vc.height.Load()
-
-		// Create and execute block
-		resp, err := vc.App.ExecuteBlock(vc.prepareBlock(), uint32(height), startTime)
-		if err != nil {
-			log.Error(err, "execute block error")
-			continue
+		select {
+		case <-ctx.Done():
+			log.Infow("stopping block production", "height", vc.height.Load())
+			return nil
+		default:
 		}
-		if _, err := vc.App.CommitState(); err != nil {
-			log.Fatalf("could not commit state: %v", err)
-		}
-		log.Debugw("block committed",
-			"timestamp", startTime.Unix(),
-			"height", height,
-			"hash", hex.EncodeToString(resp.Root),
-			"took", time.Since(startTime),
-		)
-		vc.vcMtx.Unlock()
 
-		// Waiting time
+		if err := vc.produceBlock(); err != nil {
+			log.Errorw(err, "block production error")
+		}
+
+		// Wait until the block time target has elapsed.
 		sinceLast := time.Since(vc.lastBlockTime)
-		if sinceLast < vc.App.BlockTimeTarget() {
-			time.Sleep(vc.App.BlockTimeTarget() - sinceLast)
+		if wait := vc.App.BlockTimeTarget() - sinceLast; wait > 0 {
+			select {
+			case <-ctx.Done():
+				return nil
+			case <-time.After(wait):
+			}
 		}
-		vc.lastBlockTime = time.Now()
-		vc.height.Add(1)
 	}
+}
+
+// produceBlock creates and commits a single block.
+func (vc *Vocone) produceBlock() error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+
+	startTime := time.Now()
+	height := vc.height.Load()
+
+	txs := vc.prepareBlock()
+
+	resp, err := vc.App.ExecuteBlock(txs, uint32(height), startTime)
+	if err != nil {
+		return fmt.Errorf("execute block at height %d: %w", height, err)
+	}
+
+	// Build the block to compute its hash (needed for the indexer and hash index).
+	blk := vc.buildBlock(height, startTime, txs, resp.Root)
+	blockHash := blk.Hash()
+
+	// Retrieve the previous block hash for chain linkage.
+	var lastBlockHash []byte
+	if height > 0 {
+		if prevMeta, err := vc.loadBlockMeta(height - 1); err == nil {
+			lastBlockHash = prevMeta.Hash
+		}
+	}
+
+	// Persist block metadata and hash→height index.
+	if err := vc.storeBlockMeta(height, startTime, int32(len(txs)), resp.Root,
+		blockHash, vc.proposerAddress, lastBlockHash, blk.DataHash); err != nil {
+		return fmt.Errorf("store block meta at height %d: %w", height, err)
+	}
+
+	if _, err := vc.App.CommitState(); err != nil {
+		return fmt.Errorf("commit state at height %d: %w", height, err)
+	}
+
+	log.Debugw("block committed",
+		"timestamp", startTime.Unix(),
+		"height", height,
+		"hash", hex.EncodeToString(blockHash),
+		"txs", len(txs),
+		"took", time.Since(startTime),
+	)
+
+	vc.lastBlockTime = time.Now()
+	vc.height.Add(1)
+	return nil
+}
+
+// Close releases all resources held by Vocone.
+func (vc *Vocone) Close() error {
+	vc.closed.Store(true)
+	var errs []error
+	if vc.blockStore != nil {
+		if err := vc.blockStore.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close blockstore: %w", err))
+		}
+	}
+	if vc.mempoolDB != nil {
+		if err := vc.mempoolDB.Close(); err != nil {
+			errs = append(errs, fmt.Errorf("close mempool db: %w", err))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+// setDefaultMethods configures the vochain callback functions for single-node operation.
+func (vc *Vocone) setDefaultMethods() {
+	vc.App.SetDefaultMethods()
+	vc.App.SetFnIsSynchronizing(func() bool { return false })
+	vc.App.SetFnSendTx(vc.addTx)
+	vc.App.SetFnGetTx(vc.getTx)
+	vc.App.SetFnGetBlockByHeight(vc.getBlock)
+	vc.App.SetFnGetBlockByHash(vc.getBlockByHash)
+	vc.App.SetFnGetTxHash(vc.getTxWithHash)
+	vc.App.SetFnMempoolSize(vc.mempoolSize)
+	vc.App.SetFnMempoolPrune(vc.mempoolPrune)
 }
 
 // SetBlockSize configures the maximum number of transactions per block.
@@ -227,14 +324,12 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 	if err := vc.App.State.SetAccount(key, acc); err != nil {
 		return err
 	}
-	if _, err := vc.Commit(); err != nil {
-		return err
-	}
-	return nil
+	_, err := vc.commit()
+	return err
 }
 
-// Commit saves the current state and returns the hash.
-func (vc *Vocone) Commit() ([]byte, error) {
+// commit saves the current state and returns the hash. Must be called with vcMtx held.
+func (vc *Vocone) commit() ([]byte, error) {
 	hash, err := vc.App.State.PrepareCommit()
 	if err != nil {
 		return nil, err
@@ -247,21 +342,18 @@ func (vc *Vocone) Commit() ([]byte, error) {
 
 // SetKeyKeeper adds a keykeeper to the application.
 func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
-	// Create key keeper
-	// we need to add a validator, so the keykeeper functions are allowed
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	// remove existing validators before we add the new one (to avoid keyindex collision)
+	// Remove existing validators before adding the new one (avoid keyindex collision).
 	validators, err := vc.App.State.Validators(true)
 	if err != nil {
 		return err
 	}
 	for _, v := range validators {
 		if err := vc.App.State.RemoveValidator(v); err != nil {
-			log.Warnf("could not remove validator %x", v.Address)
+			log.Warnw("could not remove validator", "address", fmt.Sprintf("%x", v.Address))
 		}
 	}
-	// add the new validator
 	if err := vc.App.State.AddValidator(&models.Validator{
 		Address:  key.Address().Bytes(),
 		Power:    100,
@@ -271,13 +363,11 @@ func (vc *Vocone) SetKeyKeeper(key *ethereum.SignKeys) error {
 		return err
 	}
 	log.Infow("adding validator", "address", key.Address().Hex(), "keyIndex", 1)
-	if _, err := vc.Commit(); err != nil {
+	vc.proposerAddress = key.Address().Bytes()
+	if _, err := vc.commit(); err != nil {
 		return err
 	}
-	vc.KeyKeeper, err = keykeeper.NewKeyKeeper(
-		vc.App,
-		key,
-		1)
+	vc.KeyKeeper, err = keykeeper.NewKeyKeeper(vc.App, key, 1)
 	return err
 }
 
@@ -288,179 +378,54 @@ func (vc *Vocone) SetTxCost(txType models.TxType, cost uint64) error {
 	if err := vc.App.State.SetTxBaseCost(txType, cost); err != nil {
 		return err
 	}
-	if _, err := vc.Commit(); err != nil {
-		return err
-	}
-	return nil
+	_, err := vc.commit()
+	return err
 }
 
 // SetBulkTxCosts sets the transaction cost for all existing transaction types.
-// It is useful to bootstrap the blockchain by set the transaction cost for all
-// transaction types at once. If force is enabld the cost is set for all tx types.
-// If force is disabled, the cost is set only for tx types that have not been set.
+// If force is enabled the cost is set for all tx types.
+// If force is disabled, the cost is set only for tx types that have not been set yet.
 func (vc *Vocone) SetBulkTxCosts(txCost uint64, force bool) error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	for k := range state.TxTypeCostToStateKey {
 		if !force {
 			_, err := vc.App.State.TxBaseCost(k, true)
-			if err == nil || errors.Is(err, state.ErrTxCostNotFound) {
+			if err == nil {
+				// Cost already set, skip.
 				continue
 			}
-			// If error is not ErrTxCostNotFound, return it
-			return err
+			if !errors.Is(err, state.ErrTxCostNotFound) {
+				return err
+			}
+			// Cost not found — fall through to set it.
 		}
 		log.Infow("setting tx base cost", "txtype", models.TxType_name[int32(k)], "cost", txCost)
 		if err := vc.App.State.SetTxBaseCost(k, txCost); err != nil {
 			return err
 		}
 	}
-	if _, err := vc.Commit(); err != nil {
-		return err
-	}
-	return nil
+	_, err := vc.commit()
+	return err
 }
 
-// SetElectionPrice sets the election price.
+// SetElectionPrice sets the election price calculator.
 func (vc *Vocone) SetElectionPrice() error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
-	if err := vc.App.State.SetElectionPriceCalc(); err != nil {
-		return err
-	}
-	return nil
+	return vc.App.State.SetElectionPriceCalc()
 }
 
-func (vc *Vocone) setDefaultMethods() {
-	// first set the default methods, then override some of them
-	vc.App.SetDefaultMethods()
-	vc.App.SetFnIsSynchronizing(func() bool { return false })
-	vc.App.SetFnSendTx(vc.addTx)
-	vc.App.SetFnGetTx(vc.getTx)
-	vc.App.SetFnGetBlockByHeight(vc.getBlock)
-	vc.App.SetFnGetTxHash(vc.getTxWithHash)
-	vc.App.SetFnMempoolSize(vc.mempoolSize)
-	vc.App.SetFnMempoolPrune(nil)
-}
-
-func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
-	if err != nil {
-		return nil, err
-	}
-	if resp.Code == 0 {
-		select {
-		case vc.mempool <- tx:
-		default: // mempool is full
-			return &cometcoretypes.ResultBroadcastTx{
-				Code: 1,
-				Data: []byte("mempool is full"),
-			}, fmt.Errorf("mempool is full")
-		}
-	} else {
-		log.Debugf("checkTx failed: %s", resp.Data)
-	}
-	return &cometcoretypes.ResultBroadcastTx{
-		Code: resp.Code,
-		Data: resp.Data,
-		Hash: comettmhash.Sum(tx),
-	}, nil
-}
-
-// prepareBlock prepares a block with transactions from the mempool and returns the list of transactions.
-func (vc *Vocone) prepareBlock() [][]byte {
-	defer vc.blockTimestamps.Store(vc.height.Load(), time.Now())
-	blockStoreTx := vc.blockStore.WriteTx()
-	defer blockStoreTx.Discard()
-	var transactions [][]byte
-txLoop:
-	for txCount := 0; txCount < vc.txsPerBlock; {
-		var tx []byte
-		select {
-		case tx = <-vc.mempool:
-		default: // mempool is empty
-			break txLoop
-		}
-		// ensure all txs are still valid valid
-		resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
-		if err != nil {
-			log.Errorw(err, "error on check tx")
-			continue
-		}
-		if resp.Code == 0 {
-			if err := blockStoreTx.Set(
-				[]byte(fmt.Sprintf("%d_%d", vc.height.Load(), txCount)),
-				tx,
-			); err != nil {
-				log.Errorw(err, "error on store tx")
-				continue
-			}
-			transactions = append(transactions, tx)
-		} else {
-			log.Warnw("check tx failed", "code", resp.Code, "data", string(resp.Data))
-		}
-	}
-	if len(transactions) > 0 {
-		log.Infow("stored transactions on block", "count", len(transactions), "height", vc.height.Load())
-	}
-	return transactions
-}
-
-// TO-DO: improve this function
-func (vc *Vocone) getBlock(height int64) *comettypes.Block {
-	blk := new(comettypes.Block)
-	blk.Height = height
-	blk.ChainID = vc.App.ChainID()
-	v, found := vc.blockTimestamps.Load(height)
-	if found {
-		if t, ok := v.(time.Time); ok {
-			blk.Time = t
-		}
-	}
-	for i := int32(0); ; i++ {
-		tx, err := vc.getTx(uint32(height), i)
-		if err != nil {
-			break
-		}
-		txb, err := proto.Marshal(tx)
-		if err != nil {
-			log.Warnf("error marshaling tx: %v", err)
-			continue
-		}
-		blk.Data.Txs = append(blk.Data.Txs, txb)
-	}
-	return blk
-}
-
-func (vc *Vocone) getTx(height uint32, txIndex int32) (*models.SignedTx, error) {
-	tx, err := vc.blockStore.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
-	if err != nil {
-		return nil, err
-	}
-	stx := &models.SignedTx{}
-	return stx, proto.Unmarshal(tx, stx)
-}
-
-func (vc *Vocone) mempoolSize() int {
-	return len(vc.mempool)
-}
-
-func (vc *Vocone) getTxWithHash(height uint32, txIndex int32) (*models.SignedTx, []byte, error) {
-	tx, err := vc.blockStore.Get([]byte(fmt.Sprintf("%d_%d", height, txIndex)))
-	if err != nil {
-		return nil, nil, err
-	}
-	stx := &models.SignedTx{}
-	return stx, ethereum.HashRaw(tx), proto.Unmarshal(tx, stx)
-}
-
-// VochainPrintInfo initializes the Vochain statistics recollection
-func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
-	var h uint64
-	var p, v uint64
-	var m, vc, vxm uint64
+// vochainPrintInfo periodically logs chain statistics.
+func vochainPrintInfo(ctx context.Context, interval time.Duration, vi *vochaininfo.VochainInfo) {
 	var b strings.Builder
 	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(interval):
+		}
+
 		b.Reset()
 		a := vi.BlockTimes()
 		if a[0] > 0 {
@@ -478,10 +443,11 @@ func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 		if a[4] > 0 {
 			fmt.Fprintf(&b, " 24h:%s", a[4].Truncate(time.Millisecond))
 		}
-		h = vi.Height()
-		m = vi.MempoolSize()
-		p, v, vxm = vi.TreeSizes()
-		vc = vi.VoteCacheSize()
+
+		h := vi.Height()
+		m := vi.MempoolSize()
+		p, v, vxm := vi.TreeSizes()
+		vc := vi.VoteCacheSize()
 		log.Monitor("[vochain info]", map[string]any{
 			"height":       h,
 			"mempool":      m,
@@ -492,7 +458,6 @@ func vochainPrintInfo(interval time.Duration, vi *vochaininfo.VochainInfo) {
 			"blockPeriod":  b.String(),
 			"blocksMinute": fmt.Sprintf("%.2f", vi.BlocksLastMinute()),
 		})
-		time.Sleep(interval)
 	}
 }
 
