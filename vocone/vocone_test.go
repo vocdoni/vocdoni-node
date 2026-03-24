@@ -49,7 +49,7 @@ func newTestVocone(t *testing.T) (*Vocone, context.CancelFunc, *apiclient.HTTPcl
 	_, err = vc.EnableAPI("127.0.0.1", port, "/v2")
 	qt.Assert(t, err, qt.IsNil)
 
-	time.Sleep(time.Second * 2)
+	waitForHeightAtLeast(t, vc, 1, 10*time.Second)
 
 	qt.Assert(t, vc.SetBulkTxCosts(0, true), qt.IsNil)
 
@@ -110,8 +110,26 @@ func newTestVoconeLite(t *testing.T) (*Vocone, context.CancelFunc) {
 		}
 	}()
 
-	time.Sleep(time.Second * 2)
+	waitForHeightAtLeast(t, vc, 1, 10*time.Second)
 	return vc, cancel
+}
+
+func waitForHeightAtLeast(t *testing.T, vc *Vocone, minHeight int64, timeout time.Duration) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		if vc.height.Load() >= minHeight {
+			return
+		}
+		select {
+		case <-ctx.Done():
+			t.Fatalf("timeout waiting for height >= %d (current=%d)", minHeight, vc.height.Load())
+		case <-ticker.C:
+		}
+	}
 }
 
 // TestVocone runs a full end-to-end test: account creation, election, voting, results.
@@ -138,10 +156,7 @@ func TestBlockStoreAndRetrieval(t *testing.T) {
 	defer cancel()
 	defer vc.Close()
 
-	// Wait for a few blocks to be produced.
-	time.Sleep(time.Second * 3)
-	qt.Assert(t, vc.height.Load() >= 5, qt.IsTrue,
-		qt.Commentf("expected at least 5 blocks, got %d", vc.height.Load()))
+	waitForHeightAtLeast(t, vc, 5, 15*time.Second)
 
 	// Verify block metadata is persisted correctly.
 	meta, err := vc.loadBlockMeta(3)
@@ -173,24 +188,17 @@ func TestBlockStoreAndRetrieval(t *testing.T) {
 		qt.Commentf("block 4 lastBlockHash should equal block 3 hash"))
 }
 
-// TestTransactionPersistence verifies that transactions are stored in the
-// blockstore and can be retrieved after being included in a block.
-func TestTransactionPersistence(t *testing.T) {
+// TestBlockPersistence verifies persisted block metadata and reconstruction
+// across produced heights.
+func TestBlockPersistence(t *testing.T) {
 	vc, cancel := newTestVoconeLite(t)
 	defer cancel()
 	defer vc.Close()
 
-	// Wait for a few blocks to be produced.
-	time.Sleep(time.Second * 3)
+	waitForHeightAtLeast(t, vc, 3, 15*time.Second)
 	height := vc.height.Load()
 	qt.Assert(t, height >= 3, qt.IsTrue,
 		qt.Commentf("expected at least 3 blocks, got %d", height))
-
-	// Submit a raw transaction directly through addTx
-	// (we use a raw tx bytes that will fail validation, but we can still test
-	// the mempool → blockstore flow by checking blocks that are already produced).
-
-	// Instead, verify that blocks without txs still produce valid metadata.
 	for h := int64(1); h < height; h++ {
 		meta, err := vc.loadBlockMeta(h)
 		qt.Assert(t, err, qt.IsNil, qt.Commentf("block %d meta should exist", h))
@@ -235,6 +243,16 @@ func TestMempoolPersistence(t *testing.T) {
 		qt.Commentf("expected 2 mempool keys, got %d", len(vc.mempoolKeys)))
 	qt.Assert(t, vc.mempoolSeq == 2, qt.IsTrue,
 		qt.Commentf("expected seq 2, got %d", vc.mempoolSeq))
+
+	// If persisted sequence is stale, loadMempool should derive the max from keys.
+	wTx2 := mdb2.WriteTx()
+	staleSeq := make([]byte, 8)
+	staleSeq[7] = 1 // sequence = 1 (stale)
+	qt.Assert(t, wTx2.Set([]byte(keyMempoolSeq), staleSeq), qt.IsNil)
+	qt.Assert(t, wTx2.Commit(), qt.IsNil)
+	qt.Assert(t, vc.loadMempool(), qt.IsNil)
+	qt.Assert(t, vc.mempoolSeq == 2, qt.IsTrue,
+		qt.Commentf("expected seq recovered from keys as 2, got %d", vc.mempoolSeq))
 }
 
 // TestBlockMetaPersistence verifies block metadata round-trip serialization.
@@ -272,6 +290,15 @@ func TestBlockMetaPersistence(t *testing.T) {
 	heightBytes, err := bdb.Get(blockHashKey(blockHash))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, len(heightBytes) == 8, qt.IsTrue)
+	qt.Assert(t, binary.BigEndian.Uint64(heightBytes) == 42, qt.IsTrue)
+
+	// Overwriting metadata with a different hash should remove stale reverse index.
+	newHash := []byte("block-hash-value-2")
+	qt.Assert(t, vc.storeBlockMeta(42, now, 5, stateRoot, newHash, proposer, lastHash, dataHash), qt.IsNil)
+	_, err = bdb.Get(blockHashKey(blockHash))
+	qt.Assert(t, err, qt.IsNotNil)
+	heightBytes, err = bdb.Get(blockHashKey(newHash))
+	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, binary.BigEndian.Uint64(heightBytes) == 42, qt.IsTrue)
 
 	// Verify non-existent hash returns error.
@@ -318,8 +345,7 @@ func TestKeyEncoding(t *testing.T) {
 func TestGracefulShutdown(t *testing.T) {
 	vc, cancel := newTestVoconeLite(t)
 
-	// Let it run for a bit to produce some blocks.
-	time.Sleep(time.Second)
+	waitForHeightAtLeast(t, vc, 1, 10*time.Second)
 
 	// Cancel context — Start should return.
 	cancel()
