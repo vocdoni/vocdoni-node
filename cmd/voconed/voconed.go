@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/hex"
 	"fmt"
 	"os"
@@ -226,7 +227,12 @@ func main() {
 	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
 	vc.SetBlockSize(config.blockSize)
 
-	go vc.Start()
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		if err := vc.Start(ctx); err != nil {
+			log.Fatal(err)
+		}
+	}()
 	uAPI, err := vc.EnableAPI("0.0.0.0", config.port, config.path)
 	if err != nil {
 		log.Fatal(err)
@@ -264,4 +270,8 @@ func main() {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
 	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
+	cancel()
+	if err := vc.Close(); err != nil {
+		log.Warnw("error closing vocone", "err", err)
+	}
 }
