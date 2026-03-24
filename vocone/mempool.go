@@ -1,6 +1,7 @@
 package vocone
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -24,19 +25,37 @@ func (vc *Vocone) loadMempool() error {
 	if err != nil && !errors.Is(err, db.ErrKeyNotFound) {
 		return fmt.Errorf("could not read mempool sequence: %w", err)
 	}
+	var persistedSeq uint64
 	if len(seqBytes) == 8 {
-		vc.mempoolSeq = binary.BigEndian.Uint64(seqBytes)
+		persistedSeq = binary.BigEndian.Uint64(seqBytes)
 	}
 
 	// Iterate over all pending transactions and rebuild the key list.
 	vc.mempoolKeys = nil
+	var maxObservedSeq uint64
 	if err := vc.mempoolDB.Iterate([]byte(prefixMempool), func(key, _ []byte) bool {
+		switch {
+		case len(key) == 8:
+			// Some db wrappers return prefix-stripped keys.
+			if seq := binary.BigEndian.Uint64(key); seq > maxObservedSeq {
+				maxObservedSeq = seq
+			}
+		case len(key) >= len(prefixMempool)+8 && bytes.HasPrefix(key, []byte(prefixMempool)):
+			if seq := binary.BigEndian.Uint64(key[len(key)-8:]); seq > maxObservedSeq {
+				maxObservedSeq = seq
+			}
+		}
 		keyCopy := make([]byte, len(key))
 		copy(keyCopy, key)
 		vc.mempoolKeys = append(vc.mempoolKeys, keyCopy)
 		return true
 	}); err != nil {
 		return fmt.Errorf("could not iterate mempool: %w", err)
+	}
+	if persistedSeq >= maxObservedSeq {
+		vc.mempoolSeq = persistedSeq
+	} else {
+		vc.mempoolSeq = maxObservedSeq
 	}
 
 	if len(vc.mempoolKeys) > 0 {
@@ -139,10 +158,10 @@ func mempoolKey(seq uint64) []byte {
 }
 
 // prepareBlock drains transactions from the mempool, re-validates them,
-// stores valid ones in the block store, and returns the raw tx list.
-func (vc *Vocone) prepareBlock() [][]byte {
-	height := vc.height.Load()
-
+// and returns the raw tx list along with the mempool keys that were consumed.
+// It does NOT modify the mempool or blockstore — the caller is responsible
+// for persisting writes and cleaning up the mempool after a successful commit.
+func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 	vc.mempoolMtx.Lock()
 	// Take up to txsPerBlock keys from the front of the queue.
 	count := min(vc.txsPerBlock, len(vc.mempoolKeys))
@@ -151,19 +170,8 @@ func (vc *Vocone) prepareBlock() [][]byte {
 	vc.mempoolMtx.Unlock()
 
 	if len(pendingKeys) == 0 {
-		return nil
+		return nil, nil
 	}
-
-	blockStoreTx := vc.blockStore.WriteTx()
-	defer blockStoreTx.Discard()
-	mempoolWTx := vc.mempoolDB.WriteTx()
-	defer mempoolWTx.Discard()
-
-	var (
-		transactions [][]byte
-		consumedKeys [][]byte
-		txCount      int32
-	)
 
 	for _, key := range pendingKeys {
 		txData, err := vc.mempoolDB.Get(key)
@@ -187,42 +195,53 @@ func (vc *Vocone) prepareBlock() [][]byte {
 			continue
 		}
 
-		// Store in the block store.
-		if err := blockStoreTx.Set(txKey(height, txCount), txData); err != nil {
-			log.Errorw(err, "error storing tx in blockstore")
-			break
-		}
-		transactions = append(transactions, txData)
+		txs = append(txs, txData)
 		consumedKeys = append(consumedKeys, key)
-		txCount++
 	}
 
-	// Commit block store writes.
-	if len(transactions) > 0 {
-		if err := blockStoreTx.Commit(); err != nil {
-			log.Errorw(err, "could not commit block store transaction")
-			return nil
-		}
+	if len(txs) > 0 {
+		log.Infow("prepared block transactions",
+			"count", len(txs), "height", vc.height.Load())
 	}
+	return txs, consumedKeys
+}
 
-	// Remove consumed transactions from the mempool db.
+// commitMempoolCleanup removes consumed keys from the persistent mempool
+// and the in-memory index. Must be called after a successful block commit.
+func (vc *Vocone) commitMempoolCleanup(consumedKeys [][]byte) {
+	if len(consumedKeys) == 0 {
+		return
+	}
+	wTx := vc.mempoolDB.WriteTx()
+	defer wTx.Discard()
 	for _, key := range consumedKeys {
-		if err := mempoolWTx.Delete(key); err != nil {
+		if err := wTx.Delete(key); err != nil {
 			log.Errorw(err, "could not delete mempool entry")
 		}
 	}
-	if err := mempoolWTx.Commit(); err != nil {
+	if err := wTx.Commit(); err != nil {
 		log.Errorw(err, "could not commit mempool cleanup")
 	}
 
-	// Update the in-memory index.
+	// Update the in-memory index by removing exactly the consumed keys.
 	vc.mempoolMtx.Lock()
-	vc.mempoolKeys = vc.mempoolKeys[len(consumedKeys):]
-	vc.mempoolMtx.Unlock()
-
-	if len(transactions) > 0 {
-		log.Infow("prepared block transactions",
-			"count", len(transactions), "height", height)
+	defer vc.mempoolMtx.Unlock()
+	consumed := make(map[string]struct{}, len(consumedKeys))
+	for _, key := range consumedKeys {
+		consumed[string(key)] = struct{}{}
 	}
-	return transactions
+	filtered := make([][]byte, 0, len(vc.mempoolKeys))
+	removed := 0
+	for _, key := range vc.mempoolKeys {
+		if _, ok := consumed[string(key)]; ok {
+			removed++
+			continue
+		}
+		filtered = append(filtered, key)
+	}
+	if removed < len(consumed) {
+		log.Warnw("mempool cleanup removed fewer keys than expected",
+			"expectedUnique", len(consumed), "removed", removed)
+	}
+	vc.mempoolKeys = filtered
 }

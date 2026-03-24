@@ -3,11 +3,13 @@ package vocone
 import (
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"time"
 
 	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
 	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -43,6 +45,18 @@ func (vc *Vocone) storeBlockMeta(height int64, timestamp time.Time, txCount int3
 	}
 	wTx := vc.blockStore.WriteTx()
 	defer wTx.Discard()
+	if prevData, err := vc.blockStore.Get(metaKey(height)); err == nil {
+		var prev blockMeta
+		if jsonErr := json.Unmarshal(prevData, &prev); jsonErr == nil && len(prev.Hash) > 0 {
+			if len(blockHash) == 0 || string(prev.Hash) != string(blockHash) {
+				if err := wTx.Delete(blockHashKey(prev.Hash)); err != nil {
+					return err
+				}
+			}
+		}
+	} else if !errors.Is(err, db.ErrKeyNotFound) {
+		return err
+	}
 	if err := wTx.Set(metaKey(height), data); err != nil {
 		return err
 	}
@@ -154,6 +168,9 @@ func (vc *Vocone) getBlock(height int64) *comettypes.Block {
 
 // getBlockByHash looks up a block by its hash using the reverse index.
 func (vc *Vocone) getBlockByHash(hash []byte) *comettypes.Block {
+	if vc.closed.Load() {
+		return nil
+	}
 	heightBytes, err := vc.blockStore.Get(blockHashKey(hash))
 	if err != nil {
 		return nil
