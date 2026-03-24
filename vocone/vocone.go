@@ -86,18 +86,26 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 	}
 	vc.txsPerBlock = DefaultTxsPerBlock
 
-	// Recover height from persisted state.
-	lastHeight, err := vc.App.State.LastHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get last height: %w", err)
-	}
-	vc.height.Store(int64(lastHeight))
-
-	// Open the block store database.
+	// Open the block store database (before height calc so we can check for committed blocks).
 	vc.blockStore, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "blockstore"))
 	if err != nil {
 		return nil, fmt.Errorf("could not open blockstore: %w", err)
 	}
+
+	// Recover height from persisted state.
+	// LastHeight returns the last committed height. If that block was already
+	// fully committed (metadata exists in blockstore), we must start at the
+	// next height to avoid re-executing an already-committed block.
+	lastHeight, err := vc.App.State.LastHeight()
+	if err != nil {
+		return nil, fmt.Errorf("could not get last height: %w", err)
+	}
+	nextHeight := int64(lastHeight)
+	if _, err := vc.loadBlockMeta(nextHeight); err == nil {
+		// Block at lastHeight was already committed, advance to the next one.
+		nextHeight++
+	}
+	vc.height.Store(nextHeight)
 
 	// Open the mempool database and reload pending transactions.
 	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "mempool"))
@@ -240,7 +248,7 @@ func (vc *Vocone) produceBlock() error {
 	startTime := time.Now()
 	height := vc.height.Load()
 
-	txs := vc.prepareBlock()
+	txs, consumedKeys := vc.prepareBlock()
 
 	resp, err := vc.App.ExecuteBlock(txs, uint32(height), startTime)
 	if err != nil {
@@ -265,9 +273,27 @@ func (vc *Vocone) produceBlock() error {
 		return fmt.Errorf("store block meta at height %d: %w", height, err)
 	}
 
+	// Store transactions in the blockstore (before CommitState so they're
+	// available if the indexer queries getBlock during commit processing).
+	if len(txs) > 0 {
+		wTx := vc.blockStore.WriteTx()
+		defer wTx.Discard()
+		for i, tx := range txs {
+			if err := wTx.Set(txKey(height, int32(i)), tx); err != nil {
+				return fmt.Errorf("store tx %d in blockstore at height %d: %w", i, height, err)
+			}
+		}
+		if err := wTx.Commit(); err != nil {
+			return fmt.Errorf("commit blockstore txs at height %d: %w", height, err)
+		}
+	}
+
 	if _, err := vc.App.CommitState(); err != nil {
 		return fmt.Errorf("commit state at height %d: %w", height, err)
 	}
+
+	// Only clean up the mempool after a fully successful commit.
+	vc.commitMempoolCleanup(consumedKeys)
 
 	log.Debugw("block committed",
 		"timestamp", startTime.Unix(),
@@ -283,8 +309,15 @@ func (vc *Vocone) produceBlock() error {
 }
 
 // Close releases all resources held by Vocone.
+// It acquires both vcMtx and mempoolMtx to ensure no concurrent block
+// production or mempool operation is in progress before closing databases.
 func (vc *Vocone) Close() error {
 	vc.closed.Store(true)
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	vc.mempoolMtx.Lock()
+	defer vc.mempoolMtx.Unlock()
+
 	var errs []error
 	if vc.blockStore != nil {
 		if err := vc.blockStore.Close(); err != nil {

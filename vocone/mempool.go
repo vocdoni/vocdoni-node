@@ -139,10 +139,10 @@ func mempoolKey(seq uint64) []byte {
 }
 
 // prepareBlock drains transactions from the mempool, re-validates them,
-// stores valid ones in the block store, and returns the raw tx list.
-func (vc *Vocone) prepareBlock() [][]byte {
-	height := vc.height.Load()
-
+// and returns the raw tx list along with the mempool keys that were consumed.
+// It does NOT modify the mempool or blockstore — the caller is responsible
+// for persisting writes and cleaning up the mempool after a successful commit.
+func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 	vc.mempoolMtx.Lock()
 	// Take up to txsPerBlock keys from the front of the queue.
 	count := min(vc.txsPerBlock, len(vc.mempoolKeys))
@@ -151,19 +151,8 @@ func (vc *Vocone) prepareBlock() [][]byte {
 	vc.mempoolMtx.Unlock()
 
 	if len(pendingKeys) == 0 {
-		return nil
+		return nil, nil
 	}
-
-	blockStoreTx := vc.blockStore.WriteTx()
-	defer blockStoreTx.Discard()
-	mempoolWTx := vc.mempoolDB.WriteTx()
-	defer mempoolWTx.Discard()
-
-	var (
-		transactions [][]byte
-		consumedKeys [][]byte
-		txCount      int32
-	)
 
 	for _, key := range pendingKeys {
 		txData, err := vc.mempoolDB.Get(key)
@@ -187,31 +176,31 @@ func (vc *Vocone) prepareBlock() [][]byte {
 			continue
 		}
 
-		// Store in the block store.
-		if err := blockStoreTx.Set(txKey(height, txCount), txData); err != nil {
-			log.Errorw(err, "error storing tx in blockstore")
-			break
-		}
-		transactions = append(transactions, txData)
+		txs = append(txs, txData)
 		consumedKeys = append(consumedKeys, key)
-		txCount++
 	}
 
-	// Commit block store writes.
-	if len(transactions) > 0 {
-		if err := blockStoreTx.Commit(); err != nil {
-			log.Errorw(err, "could not commit block store transaction")
-			return nil
-		}
+	if len(txs) > 0 {
+		log.Infow("prepared block transactions",
+			"count", len(txs), "height", vc.height.Load())
 	}
+	return txs, consumedKeys
+}
 
-	// Remove consumed transactions from the mempool db.
+// commitMempoolCleanup removes consumed keys from the persistent mempool
+// and the in-memory index. Must be called after a successful block commit.
+func (vc *Vocone) commitMempoolCleanup(consumedKeys [][]byte) {
+	if len(consumedKeys) == 0 {
+		return
+	}
+	wTx := vc.mempoolDB.WriteTx()
+	defer wTx.Discard()
 	for _, key := range consumedKeys {
-		if err := mempoolWTx.Delete(key); err != nil {
+		if err := wTx.Delete(key); err != nil {
 			log.Errorw(err, "could not delete mempool entry")
 		}
 	}
-	if err := mempoolWTx.Commit(); err != nil {
+	if err := wTx.Commit(); err != nil {
 		log.Errorw(err, "could not commit mempool cleanup")
 	}
 
@@ -219,10 +208,4 @@ func (vc *Vocone) prepareBlock() [][]byte {
 	vc.mempoolMtx.Lock()
 	vc.mempoolKeys = vc.mempoolKeys[len(consumedKeys):]
 	vc.mempoolMtx.Unlock()
-
-	if len(transactions) > 0 {
-		log.Infow("prepared block transactions",
-			"count", len(transactions), "height", height)
-	}
-	return transactions
 }

@@ -438,7 +438,7 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		origin = models.CensusOrigin_FARCASTER_FRAME
 		root = ctype.RootHash
 	default:
-		return 0, nil, ErrCensusTypeUnknown.Withf("%q", ctype)
+		return 0, nil, ErrCensusTypeUnknown.Withf("%v", ctype)
 	}
 	if root == nil {
 		return 0, nil, ErrCensusRootIsNil

@@ -166,7 +166,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	for k, v := range genesisAppState.TxCost.AsMap() {
 		err = app.State.SetTxBaseCost(k, v)
 		if err != nil {
-			return nil, fmt.Errorf("could not set tx cost %q to value %q from genesis file to the State", k, v)
+			return nil, fmt.Errorf("could not set tx cost %q to value %d from genesis file to the State", k, v)
 		}
 	}
 

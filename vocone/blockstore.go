@@ -154,6 +154,9 @@ func (vc *Vocone) getBlock(height int64) *comettypes.Block {
 
 // getBlockByHash looks up a block by its hash using the reverse index.
 func (vc *Vocone) getBlockByHash(hash []byte) *comettypes.Block {
+	if vc.closed.Load() {
+		return nil
+	}
 	heightBytes, err := vc.blockStore.Get(blockHashKey(hash))
 	if err != nil {
 		return nil

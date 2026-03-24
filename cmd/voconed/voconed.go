@@ -228,7 +228,9 @@ func main() {
 	vc.SetBlockSize(config.blockSize)
 
 	ctx, cancel := context.WithCancel(context.Background())
+	startDone := make(chan struct{})
 	go func() {
+		defer close(startDone)
 		if err := vc.Start(ctx); err != nil {
 			log.Fatal(err)
 		}
@@ -271,6 +273,8 @@ func main() {
 	<-c
 	log.Warnf("received SIGTERM, exiting at %s", time.Now().Format(time.RFC850))
 	cancel()
+	// Wait for the block production loop to exit before closing resources.
+	<-startDone
 	if err := vc.Close(); err != nil {
 		log.Warnw("error closing vocone", "err", err)
 	}
