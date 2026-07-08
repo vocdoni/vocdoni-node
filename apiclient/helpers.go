@@ -95,6 +95,34 @@ func (c *HTTPclient) SendTx(marshaledSignedTx []byte) (types.HexBytes, []byte, e
 	return tx.Hash, tx.Response, nil
 }
 
+// SendTxBatch submits several protobuf-marshaled models.SignedTx at once, in
+// order, to POST /chain/transactions/batch. The transactions must carry
+// contiguous account nonces; the caller is responsible for building/signing them
+// with predicted nonces (and, for NewProcess, predicted processIds).
+//
+// The result groups every input transaction into submitted / failed / pending.
+// "submitted" means the mempool accepted it, NOT that it is block-confirmed — the
+// caller must confirm each submitted item on-chain (e.g. WaitUntilTxIsMined) and
+// resubmit any that did not land together with the failed and pending items.
+func (c *HTTPclient) SendTxBatch(marshaledSignedTxs [][]byte) (*api.TransactionBatchResult, error) {
+	batch := &api.TransactionBatch{Transactions: make([]api.Transaction, len(marshaledSignedTxs))}
+	for i, tx := range marshaledSignedTxs {
+		batch.Transactions[i] = api.Transaction{Payload: tx}
+	}
+	resp, code, err := c.Request(HTTPPOST, batch, "chain", "transactions", "batch")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	result := &api.TransactionBatchResult{}
+	if err := json.Unmarshal(resp, result); err != nil {
+		return nil, fmt.Errorf("could not decode response: %w", err)
+	}
+	return result, nil
+}
+
 // WaitUntilNextBlock waits until next block, and returns nil
 //
 // It uses a context.WithTimeout(24s) before giving up and returning ctx.Err()
