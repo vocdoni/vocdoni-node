@@ -16,8 +16,14 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
+
+// maxTransactionBatchSize bounds how many transactions POST /chain/transactions/batch accepts.
+const maxTransactionBatchSize = 100
 
 const (
 	ChainHandler = "chain"
@@ -125,6 +131,14 @@ func (a *API) enableChainHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.chainSendTxHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/transactions/batch",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.chainSendTxBatchHandler,
 	); err != nil {
 		return err
 	}
@@ -602,6 +616,122 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainSendTxBatchHandler
+//
+//	@Summary				Submit a batch of transactions
+//	@Description.markdown	chainSendTxBatchHandler
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Param					transactions	body		TransactionBatch		true	"List of base64 transaction payloads, submitted in order"
+//	@Success				200				{object}	TransactionBatchResult	"Every input transaction grouped as submitted / failed / pending"
+//	@Router					/chain/transactions/batch [post]
+//
+// The transactions are submitted in order and fail-fast: the first one that fails
+// to be submitted goes to `failed` and submission stops, leaving the rest in
+// `pending`. "submitted" means the mempool accepted the broadcast, NOT that the
+// transaction is block-confirmed — the caller must confirm each submitted item
+// on-chain and resubmit any that did not land, together with failed and pending.
+// For NewProcess transactions each item carries its predicted `processId`.
+func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	req := &TransactionBatch{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+	if len(req.Transactions) == 0 {
+		return ErrCantParseDataAsJSON.With("empty transaction batch")
+	}
+	if len(req.Transactions) > maxTransactionBatchSize {
+		return ErrTransactionBatchTooLarge.Withf("%d, max is %d", len(req.Transactions), maxTransactionBatchSize)
+	}
+
+	// per-creator (EntityId) running process-index delta, advanced for every
+	// NewProcess item regardless of send outcome, so each item gets the exact
+	// processId the chain will assign in ordered commit.
+	deltas := map[string]int32{}
+	result := classifyTransactionBatch(req.Transactions,
+		func(payload []byte) []byte { return a.batchProcessID(payload, deltas) },
+		func(payload []byte) (hash, response []byte, code uint32, err error) {
+			res, err := a.sendTx(payload)
+			if err != nil {
+				return nil, nil, 0, err
+			}
+			return res.Hash.Bytes(), res.Data.Bytes(), res.Code, nil
+		},
+	)
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// classifyTransactionBatch submits the transactions in order and groups every
+// input item into submitted / failed / pending. It is fail-fast: the first send
+// error goes to `failed` and no further items are sent (they share the sender's
+// now-broken nonce sequence and cannot commit), so the rest land in `pending`.
+// `processID` supplies each item's predicted processId (nil if not applicable);
+// it is called for every item, including the unsent ones. Injecting `processID`
+// and `send` keeps the grouping logic testable without a live chain.
+func classifyTransactionBatch(
+	txs []Transaction,
+	processID func(payload []byte) []byte,
+	send func(payload []byte) (hash, response []byte, code uint32, err error),
+) *TransactionBatchResult {
+	result := &TransactionBatchResult{
+		Submitted: []Transaction{},
+		Failed:    []Transaction{},
+		Pending:   []Transaction{},
+	}
+	stopped := false
+	for i := range txs {
+		item := Transaction{ProcessID: processID(txs[i].Payload)}
+		if stopped {
+			result.Pending = append(result.Pending, item)
+			continue
+		}
+		hash, response, code, err := send(txs[i].Payload)
+		if err != nil {
+			item.Error = err.Error()
+			result.Failed = append(result.Failed, item)
+			stopped = true
+			continue
+		}
+		item.Hash = hash
+		item.Response = response
+		item.Code = &code
+		result.Submitted = append(result.Submitted, item)
+	}
+	return result
+}
+
+// batchProcessID returns the predicted processId for a NewProcess payload and
+// advances the per-creator positional delta. Returns nil for non-NewProcess or
+// undecodable payloads (the tx is still submitted; only the predicted id is absent).
+func (a *API) batchProcessID(payload []byte, deltas map[string]int32) []byte {
+	stx := &models.SignedTx{}
+	if err := proto.Unmarshal(payload, stx); err != nil {
+		return nil
+	}
+	tx := &models.Tx{}
+	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+		return nil
+	}
+	proc := tx.GetNewProcess().GetProcess()
+	if proc == nil {
+		return nil
+	}
+	key := string(proc.GetEntityId())
+	delta := deltas[key]
+	deltas[key] = delta + 1
+	pid, err := processid.BuildProcessID(proc, a.vocapp.State, delta)
+	if err != nil {
+		return nil
+	}
+	return pid.Marshal()
 }
 
 // chainTxCostHandler

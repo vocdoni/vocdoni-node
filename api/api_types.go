@@ -268,7 +268,30 @@ type Transaction struct {
 	Code      *uint32           `json:"code,omitempty" extensions:"x-omitempty"`
 	Costs     map[string]uint64 `json:"costs,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
 	Address   types.HexBytes    `json:"address,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
-	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
+	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" `
+	// Error is set on a batch item that failed to be submitted.
+	Error string `json:"error,omitempty" extensions:"x-omitempty"`
+}
+
+// TransactionBatch is a request to submit multiple transactions at once, in order.
+type TransactionBatch struct {
+	Transactions []Transaction `json:"transactions"`
+}
+
+// TransactionBatchResult groups every input transaction of a batch by its
+// submission outcome. Note: "submitted" means the mempool accepted the broadcast,
+// NOT that the transaction is block-confirmed — a mempool-accepted transaction can
+// still be discarded at commit (e.g. a stale/contended nonce, which is not checked
+// at mempool admission). The caller must confirm each submitted item on-chain and
+// resubmit any that did not land, together with the failed and pending items.
+type TransactionBatchResult struct {
+	// Submitted are the transactions accepted by the mempool, in order.
+	Submitted []Transaction `json:"submitted"`
+	// Failed holds the first transaction that failed to be submitted (Error set);
+	// submission stops there.
+	Failed []Transaction `json:"failed"`
+	// Pending are the transactions after the failed one that were not sent.
+	Pending []Transaction `json:"pending"`
 }
 
 type TransactionReference struct {
