@@ -129,6 +129,11 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		Date:                 &voteData.Date,
 	}
 
+	// The memo is not indexed; read it from the authoritative state if present.
+	if sdbVote, err := a.vocapp.State.Vote(voteData.Meta.ProcessId, voteData.Meta.Nullifier, true); err == nil {
+		vote.Memo = string(sdbVote.GetMemo())
+	}
+
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it direcectly.
 	if json.Valid(voteData.VotePackage) {
 		vote.VotePackage = voteData.VotePackage
