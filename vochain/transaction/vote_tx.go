@@ -4,10 +4,12 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"unicode/utf8"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
@@ -15,6 +17,30 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+// MaxVoteMemoSize is the maximum allowed size, in bytes, of the optional
+// VoteEnvelope.memo free-text field.
+const MaxVoteMemoSize = 256
+
+// resolveVoteMemo applies the memo soft-fork rules to a raw memo and returns the
+// value to store on the vote. The memo field is bytes (no proto decode-time
+// validation), so all validation happens here, at the application layer, where
+// the height gate makes it deterministic across upgraded nodes:
+//   - before activation (active=false) the memo is ignored entirely (returns ""),
+//     so an upgraded node produces the same state as a pre-fork node;
+//   - after activation it must be at most MaxVoteMemoSize bytes and valid UTF-8.
+func resolveVoteMemo(memo []byte, active bool) (string, error) {
+	if len(memo) == 0 || !active {
+		return "", nil
+	}
+	if len(memo) > MaxVoteMemoSize {
+		return "", fmt.Errorf("vote memo exceeds max size of %d bytes", MaxVoteMemoSize)
+	}
+	if !utf8.Valid(memo) {
+		return "", fmt.Errorf("vote memo is not valid UTF-8")
+	}
+	return string(memo), nil
+}
 
 // VoteTxCheck performs basic checks on a vote transaction.
 func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vstate.Vote, error) {
@@ -141,6 +167,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		if process.EnvelopeType.EncryptedVotes && len(vote.EncryptionKeyIndexes) == 0 {
 			return nil, fmt.Errorf("no key indexes provided on vote package")
 		}
+	}
+
+	// [Soft-fork] Optional memo field. See resolveVoteMemo.
+	memoActive := genesis.VoteMemoActive(t.state.ChainID(), height)
+	if vote.Memo, err = resolveVoteMemo(voteEnvelope.GetMemo(), memoActive); err != nil {
+		return nil, err
 	}
 
 	// Check if the vote is valid for the current state
