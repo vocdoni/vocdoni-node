@@ -269,13 +269,27 @@ type Transaction struct {
 	Costs     map[string]uint64 `json:"costs,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
 	Address   types.HexBytes    `json:"address,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
 	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" `
-	// Error is set on a batch item that failed to be submitted.
-	Error string `json:"error,omitempty" extensions:"x-omitempty"`
+}
+
+// TransactionPayload is one pre-signed transaction (base64-encoded models.SignedTx)
+// in a batch request.
+type TransactionPayload struct {
+	Payload []byte `json:"payload" swaggertype:"string" format:"base64"`
 }
 
 // TransactionBatch is a request to submit multiple transactions at once, in order.
 type TransactionBatch struct {
-	Transactions []Transaction `json:"transactions"`
+	Transactions []TransactionPayload `json:"transactions"`
+}
+
+// TransactionBatchItem is the outcome of a single transaction in a batch. For a
+// NewProcess transaction, ProcessID is the predicted election id. Error is set
+// only on the item that failed to be submitted.
+type TransactionBatchItem struct {
+	Hash      types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
+	ProcessID types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
+	Code      *uint32        `json:"code,omitempty" extensions:"x-omitempty"`
+	Error     string         `json:"error,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionBatchResult groups every input transaction of a batch by its
@@ -286,12 +300,12 @@ type TransactionBatch struct {
 // resubmit any that did not land, together with the failed and pending items.
 type TransactionBatchResult struct {
 	// Submitted are the transactions accepted by the mempool, in order.
-	Submitted []Transaction `json:"submitted"`
+	Submitted []TransactionBatchItem `json:"submitted"`
 	// Failed holds the first transaction that failed to be submitted (Error set);
 	// submission stops there.
-	Failed []Transaction `json:"failed"`
+	Failed []TransactionBatchItem `json:"failed"`
 	// Pending are the transactions after the failed one that were not sent.
-	Pending []Transaction `json:"pending"`
+	Pending []TransactionBatchItem `json:"pending"`
 }
 
 type TransactionReference struct {

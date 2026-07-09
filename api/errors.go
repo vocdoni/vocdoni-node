@@ -85,6 +85,7 @@ var (
 	ErrPageNotFound                     = apirest.APIerror{Code: 4057, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("page not found")}
 	ErrCantParseDate                    = apirest.APIerror{Code: 4058, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse date")}
 	ErrTransactionBatchTooLarge         = apirest.APIerror{Code: 4059, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("transaction batch too large")}
+	ErrTransactionBatchEmpty            = apirest.APIerror{Code: 4060, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("transaction batch is empty")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}

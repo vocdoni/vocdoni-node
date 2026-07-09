@@ -641,7 +641,7 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrCantParseDataAsJSON.WithErr(err)
 	}
 	if len(req.Transactions) == 0 {
-		return ErrCantParseDataAsJSON.With("empty transaction batch")
+		return ErrTransactionBatchEmpty
 	}
 	if len(req.Transactions) > maxTransactionBatchSize {
 		return ErrTransactionBatchTooLarge.Withf("%d, max is %d", len(req.Transactions), maxTransactionBatchSize)
@@ -653,12 +653,12 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	deltas := map[string]int32{}
 	result := classifyTransactionBatch(req.Transactions,
 		func(payload []byte) []byte { return a.batchProcessID(payload, deltas) },
-		func(payload []byte) (hash, response []byte, code uint32, err error) {
+		func(payload []byte) (hash []byte, code uint32, err error) {
 			res, err := a.sendTx(payload)
 			if err != nil {
-				return nil, nil, 0, err
+				return nil, 0, err
 			}
-			return res.Hash.Bytes(), res.Data.Bytes(), res.Code, nil
+			return res.Hash.Bytes(), res.Code, nil
 		},
 	)
 
@@ -677,23 +677,23 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 // it is called for every item, including the unsent ones. Injecting `processID`
 // and `send` keeps the grouping logic testable without a live chain.
 func classifyTransactionBatch(
-	txs []Transaction,
+	txs []TransactionPayload,
 	processID func(payload []byte) []byte,
-	send func(payload []byte) (hash, response []byte, code uint32, err error),
+	send func(payload []byte) (hash []byte, code uint32, err error),
 ) *TransactionBatchResult {
 	result := &TransactionBatchResult{
-		Submitted: []Transaction{},
-		Failed:    []Transaction{},
-		Pending:   []Transaction{},
+		Submitted: []TransactionBatchItem{},
+		Failed:    []TransactionBatchItem{},
+		Pending:   []TransactionBatchItem{},
 	}
 	stopped := false
 	for i := range txs {
-		item := Transaction{ProcessID: processID(txs[i].Payload)}
+		item := TransactionBatchItem{ProcessID: processID(txs[i].Payload)}
 		if stopped {
 			result.Pending = append(result.Pending, item)
 			continue
 		}
-		hash, response, code, err := send(txs[i].Payload)
+		hash, code, err := send(txs[i].Payload)
 		if err != nil {
 			item.Error = err.Error()
 			result.Failed = append(result.Failed, item)
@@ -701,7 +701,6 @@ func classifyTransactionBatch(
 			continue
 		}
 		item.Hash = hash
-		item.Response = response
 		item.Code = &code
 		result.Submitted = append(result.Submitted, item)
 	}

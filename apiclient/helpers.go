@@ -105,9 +105,9 @@ func (c *HTTPclient) SendTx(marshaledSignedTx []byte) (types.HexBytes, []byte, e
 // caller must confirm each submitted item on-chain (e.g. WaitUntilTxIsMined) and
 // resubmit any that did not land together with the failed and pending items.
 func (c *HTTPclient) SendTxBatch(marshaledSignedTxs [][]byte) (*api.TransactionBatchResult, error) {
-	batch := &api.TransactionBatch{Transactions: make([]api.Transaction, len(marshaledSignedTxs))}
+	batch := &api.TransactionBatch{Transactions: make([]api.TransactionPayload, len(marshaledSignedTxs))}
 	for i, tx := range marshaledSignedTxs {
-		batch.Transactions[i] = api.Transaction{Payload: tx}
+		batch.Transactions[i] = api.TransactionPayload{Payload: tx}
 	}
 	resp, code, err := c.Request(HTTPPOST, batch, "chain", "transactions", "batch")
 	if err != nil {
