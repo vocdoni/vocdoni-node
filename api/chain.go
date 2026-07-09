@@ -628,7 +628,6 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 //	@Produce				json
 //	@Param					transactions	body		TransactionBatch		true	"List of base64 transaction payloads, submitted in order"
 //	@Success				200				{object}	TransactionBatchResult	"Every input transaction grouped as submitted / failed / pending"
-//	@Router					/chain/transactions/batch [post]
 //
 // The transactions are submitted in order and fail-fast: the first one that fails
 // to be submitted goes to `failed` and submission stops, leaving the rest in
@@ -636,6 +635,8 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 // transaction is block-confirmed — the caller must confirm each submitted item
 // on-chain and resubmit any that did not land, together with failed and pending.
 // For NewProcess transactions each item carries its predicted `processId`.
+//
+//	@Router					/chain/transactions/batch [post]
 func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &TransactionBatch{}
 	if err := json.Unmarshal(msg.Data, req); err != nil {
