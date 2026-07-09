@@ -12,6 +12,7 @@ import (
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
@@ -21,6 +22,9 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/processid"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
 
 // TestClassifyTransactionBatch checks the fail-fast grouping: submission stops at
@@ -122,4 +126,66 @@ func TestChainSendTxBatchHandler(t *testing.T) {
 	// empty batch -> dedicated 400 error
 	_, code = cl.Request("POST", &TransactionBatch{Transactions: []TransactionPayload{}}, "transactions", "batch")
 	c.Assert(code, qt.Equals, ErrTransactionBatchEmpty.HTTPstatus)
+}
+
+// signedNewProcessPayload builds a signed NewProcess transaction (as the
+// marshaled models.SignedTx the endpoint receives). entityID may be nil to
+// exercise the EntityId-unset path.
+func signedNewProcessPayload(t *testing.T, signer *ethereum.SignKeys, chainID string, entityID []byte) []byte {
+	tx := &models.Tx{Payload: &models.Tx_NewProcess{NewProcess: &models.NewProcessTx{
+		Txtype: models.TxType_NEW_PROCESS,
+		Process: &models.Process{
+			EntityId:     entityID,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			EnvelopeType: &models.EnvelopeType{},
+		},
+	}}}
+	txBytes, err := proto.Marshal(tx)
+	qt.Assert(t, err, qt.IsNil)
+	sig, err := signer.SignVocdoniTx(txBytes, chainID)
+	qt.Assert(t, err, qt.IsNil)
+	payload, err := proto.Marshal(&models.SignedTx{Tx: txBytes, Signature: sig})
+	qt.Assert(t, err, qt.IsNil)
+	return payload
+}
+
+// TestBatchProcessID covers the real decode + per-EntityId delta + BuildProcessID
+// path, including the EntityId-unset case where the organization must default to
+// the tx signer (mirroring NewProcessTxCheck).
+func TestBatchProcessID(t *testing.T) {
+	c := qt.New(t)
+	app := vochain.TestBaseApplication(t)
+	a := &API{vocapp: app}
+
+	signer := &ethereum.SignKeys{}
+	c.Assert(signer.Generate(), qt.IsNil)
+	entity := signer.Address().Bytes()
+	c.Assert(app.State.CreateAccount(signer.Address(), "", nil, 100), qt.IsNil)
+
+	// expected id for a given delta, computed the same way the chain does.
+	expected := func(delta int32) []byte {
+		pid, err := processid.BuildProcessID(&models.Process{
+			EntityId:     entity,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			EnvelopeType: &models.EnvelopeType{},
+		}, app.State, delta)
+		c.Assert(err, qt.IsNil)
+		return pid.Marshal()
+	}
+
+	// EntityId set: two txs for the same entity advance the delta (0, then 1).
+	deltas := map[string]int32{}
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), entity), deltas),
+		qt.DeepEquals, expected(0))
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), entity), deltas),
+		qt.DeepEquals, expected(1))
+	c.Assert(deltas[string(entity)], qt.Equals, int32(2))
+
+	// EntityId unset: the signer is recovered and used, so the id is NOT dropped
+	// and the delta is keyed on the resolved entity (not the empty string).
+	deltas2 := map[string]int32{}
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), nil), deltas2),
+		qt.DeepEquals, expected(0))
+	c.Assert(deltas2[string(entity)], qt.Equals, int32(1))
+	c.Assert(deltas2[""], qt.Equals, int32(0))
 }

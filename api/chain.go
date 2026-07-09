@@ -10,6 +10,7 @@ import (
 	"time"
 
 	comettypes "github.com/cometbft/cometbft/types"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -715,15 +716,29 @@ func (a *API) batchProcessID(payload []byte, deltas map[string]int32) []byte {
 	if err := proto.Unmarshal(payload, stx); err != nil {
 		return nil
 	}
-	tx := &models.Tx{}
-	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+	// Decode the inner Tx and build the signed body (also used to recover the signer).
+	signedBody, tx, err := ethereum.BuildVocdoniTransaction(stx.GetTx(), a.vocapp.ChainID())
+	if err != nil {
 		return nil
 	}
 	proc := tx.GetNewProcess().GetProcess()
 	if proc == nil {
 		return nil
 	}
-	key := string(proc.GetEntityId())
+	// Resolve the organization exactly as NewProcessTxCheck does: when EntityId is
+	// unset, it defaults to the tx signer's address (vochain/transaction/election_tx.go).
+	// Both the delta key and BuildProcessID must use the resolved entity, otherwise
+	// the predicted id would be dropped and the deltas would collide on the empty key.
+	entity := proc.GetEntityId()
+	if len(entity) == 0 {
+		addr, err := ethereum.AddrFromSignature(signedBody, stx.GetSignature())
+		if err != nil {
+			return nil
+		}
+		entity = addr.Bytes()
+		proc.EntityId = entity
+	}
+	key := string(entity)
 	delta := deltas[key]
 	deltas[key] = delta + 1
 	pid, err := processid.BuildProcessID(proc, a.vocapp.State, delta)
