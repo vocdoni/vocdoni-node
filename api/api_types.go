@@ -275,6 +275,10 @@ type Transaction struct {
 // in a batch request.
 type TransactionPayload struct {
 	Payload []byte `json:"payload" swaggertype:"string" format:"base64"`
+	// Metadata is the optional raw election metadata for a NewProcess payload. When
+	// provided, its CID must match the metadata URI in the transaction, and it is
+	// pinned to IPFS on submission (same as POST /elections).
+	Metadata []byte `json:"metadata,omitempty" swaggertype:"string" format:"base64"`
 }
 
 // TransactionBatch is a request to submit multiple transactions at once, in order.
@@ -286,10 +290,11 @@ type TransactionBatch struct {
 // NewProcess transaction, ProcessID is the predicted election id. Error is set
 // only on the item that failed to be submitted.
 type TransactionBatchItem struct {
-	Hash      types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
-	ProcessID types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
-	Code      *uint32        `json:"code,omitempty" extensions:"x-omitempty"`
-	Error     string         `json:"error,omitempty" extensions:"x-omitempty"`
+	Hash        types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
+	ProcessID   types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
+	Code        *uint32        `json:"code,omitempty" extensions:"x-omitempty"`
+	Error       string         `json:"error,omitempty" extensions:"x-omitempty"`
+	MetadataURL string         `json:"metadataURL,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionBatchResult groups every input transaction of a batch by its
