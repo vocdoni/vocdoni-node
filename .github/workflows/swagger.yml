@@ -27,10 +27,14 @@ jobs:
           go-version: '1.26'
           cache: false
       - name: Install swag
+        # Build swag from source with the job's Go toolchain so its go/parser
+        # matches the stdlib syntax that --parseDependency/--parseInternal walk.
+        # A prebuilt binary embeds an older parser and fails on Go 1.26 stdlib.
         run: |
-          curl -L https://github.com/swaggo/swag/releases/download/v1.16.3/swag_1.16.3_Linux_amd64.tar.gz | tar -xzf -
+          go install github.com/swaggo/swag/cmd/swag@v1.16.6
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
       - name: Run swag
-        run: ./swag init --parseDependency --parseDepth 1 --parseInternal --md api/docs/descriptions --overridesFile api/docs/.swaggo -g api.go -d api/,api/docs/models/ -o api/docs --ot yaml
+        run: swag init --parseDependency --parseDepth 1 --parseInternal --md api/docs/descriptions --overridesFile api/docs/.swaggo -g api.go -d api/,api/docs/models/ -o api/docs --ot yaml
       - name: Install api-spec-converter
         run: npm install -g api-spec-converter
       - name: Convert the Swagger file to OAS3 format
