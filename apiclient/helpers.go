@@ -95,21 +95,20 @@ func (c *HTTPclient) SendTx(marshaledSignedTx []byte) (types.HexBytes, []byte, e
 	return tx.Hash, tx.Response, nil
 }
 
-// SendTxBatch submits several protobuf-marshaled models.SignedTx at once, in
-// order, to POST /chain/transactions/batch. The transactions must carry
-// contiguous account nonces; the caller is responsible for building/signing them
-// with predicted nonces (and, for NewProcess, predicted processIds).
+// SendTxBatch submits several transactions at once, in order, to
+// POST /chain/transactions/batch. Each item carries a protobuf-marshaled
+// models.SignedTx in Payload and, for a NewProcess, may carry the raw election
+// Metadata (which is validated against the tx's metadata URI and pinned to IPFS,
+// same as POST /elections). The transactions must carry contiguous account nonces;
+// the caller is responsible for building/signing them with predicted nonces (and,
+// for NewProcess, predicted processIds).
 //
 // The result groups every input transaction into submitted / failed / pending.
 // "submitted" means the mempool accepted it, NOT that it is block-confirmed — the
 // caller must confirm each submitted item on-chain (e.g. WaitUntilTxIsMined) and
 // resubmit any that did not land together with the failed and pending items.
-func (c *HTTPclient) SendTxBatch(marshaledSignedTxs [][]byte) (*api.TransactionBatchResult, error) {
-	batch := &api.TransactionBatch{Transactions: make([]api.TransactionPayload, len(marshaledSignedTxs))}
-	for i, tx := range marshaledSignedTxs {
-		batch.Transactions[i] = api.TransactionPayload{Payload: tx}
-	}
-	resp, code, err := c.Request(HTTPPOST, batch, "chain", "transactions", "batch")
+func (c *HTTPclient) SendTxBatch(txs []api.TransactionPayload) (*api.TransactionBatchResult, error) {
+	resp, code, err := c.Request(HTTPPOST, &api.TransactionBatch{Transactions: txs}, "chain", "transactions", "batch")
 	if err != nil {
 		return nil, err
 	}

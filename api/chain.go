@@ -676,8 +676,11 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		},
 	)
 
-	// Pin the metadata of the transactions that were actually submitted (the
-	// ordered prefix), best-effort, exactly like POST /elections.
+	// Pin the metadata of the transactions that were actually submitted, best-effort,
+	// exactly like POST /elections. This relies on the fail-fast invariant of
+	// classifyTransactionBatch: submitted items are always the leading prefix of the
+	// input in order, so result.Submitted[i] corresponds to req.Transactions[i]. If
+	// that strategy ever changes, this index correspondence must be revisited.
 	for i := range result.Submitted {
 		md := req.Transactions[i].Metadata
 		if a.storage == nil || len(md) == 0 {

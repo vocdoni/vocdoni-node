@@ -290,11 +290,14 @@ type TransactionBatch struct {
 // NewProcess transaction, ProcessID is the predicted election id. Error is set
 // only on the item that failed to be submitted.
 type TransactionBatchItem struct {
-	Hash        types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
-	ProcessID   types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
-	Code        *uint32        `json:"code,omitempty" extensions:"x-omitempty"`
-	Error       string         `json:"error,omitempty" extensions:"x-omitempty"`
-	MetadataURL string         `json:"metadataURL,omitempty" extensions:"x-omitempty"`
+	Hash      types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
+	ProcessID types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
+	// Code is the mempool CheckTx response code. For submitted items it is always
+	// 0: a non-zero CheckTx code is turned into a submit error, so the item lands
+	// in Failed instead. The field is kept for parity with the single-tx endpoint.
+	Code        *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
+	Error       string  `json:"error,omitempty" extensions:"x-omitempty"`
+	MetadataURL string  `json:"metadataURL,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionBatchResult groups every input transaction of a batch by its
