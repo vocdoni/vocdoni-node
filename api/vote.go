@@ -260,14 +260,20 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 		Pagination: pagination,
 	}
 	for _, vote := range votes {
-		list.Votes = append(list.Votes, &Vote{
+		item := &Vote{
 			ElectionID:       vote.ProcessId,
 			VoteID:           vote.Nullifier,
 			VoterID:          vote.VoterID,
 			TxHash:           vote.TxHash,
 			BlockHeight:      vote.Height,
 			TransactionIndex: &vote.TxIndex,
-		})
+		}
+		// The memo is not indexed; read it from the authoritative state, the same
+		// way GET /votes/{voteId} does. Bounded by the page size.
+		if sdbVote, err := a.vocapp.State.Vote(vote.ProcessId, vote.Nullifier, true); err == nil {
+			item.Memo = string(sdbVote.GetMemo())
+		}
+		list.Votes = append(list.Votes, item)
 	}
 	return list, nil
 }
