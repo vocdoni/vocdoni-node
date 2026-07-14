@@ -1,0 +1,263 @@
+package api
+
+import (
+	"encoding/json"
+	"fmt"
+	"net/url"
+	"path"
+	"testing"
+
+	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
+	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
+	qt "github.com/frankban/quicktest"
+	"github.com/google/uuid"
+	"go.vocdoni.io/dvote/api/censusdb"
+	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data/ipfs"
+	"go.vocdoni.io/dvote/db"
+	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/httprouter"
+	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/processid"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
+)
+
+// TestClassifyTransactionBatch checks the fail-fast grouping: submission stops at
+// the first failure, every input item lands in exactly one group, and each item
+// carries its predicted processId (including the unsent pending ones).
+func TestClassifyTransactionBatch(t *testing.T) {
+	c := qt.New(t)
+
+	txs := []TransactionPayload{
+		{Payload: []byte("a")},
+		{Payload: []byte("b")},
+		{Payload: []byte("bad")}, // fails to submit
+		{Payload: []byte("d")},   // must never be submitted (fail-fast)
+	}
+
+	// predicted processId = "pid-" + payload, for every item.
+	processID := func(p []byte) []byte { return append([]byte("pid-"), p...) }
+
+	var sent [][]byte
+	send := func(p []byte) (hash []byte, code uint32, err error) {
+		sent = append(sent, p)
+		if string(p) == "bad" {
+			return nil, 0, fmt.Errorf("boom")
+		}
+		return append([]byte("hash-"), p...), 0, nil
+	}
+
+	res := classifyTransactionBatch(txs, processID, send)
+
+	// grouping
+	c.Assert(res.Submitted, qt.HasLen, 2)
+	c.Assert(res.Failed, qt.HasLen, 1)
+	c.Assert(res.Pending, qt.HasLen, 1)
+	// every input item appears exactly once
+	c.Assert(len(res.Submitted)+len(res.Failed)+len(res.Pending), qt.Equals, len(txs))
+
+	// fail-fast: only "a", "b", "bad" were ever submitted; "d" was not.
+	c.Assert(sent, qt.HasLen, 3)
+	c.Assert(sent[2], qt.DeepEquals, []byte("bad"))
+
+	// the failed item carries its error and predicted id
+	c.Assert(res.Failed[0].Error, qt.Equals, "boom")
+	c.Assert(res.Failed[0].ProcessID, qt.DeepEquals, types.HexBytes("pid-bad"))
+	// the pending (unsent) item still carries its predicted id and no hash
+	c.Assert(res.Pending[0].ProcessID, qt.DeepEquals, types.HexBytes("pid-d"))
+	c.Assert(res.Pending[0].Hash, qt.IsNil)
+	// submitted items carry their hash
+	c.Assert(res.Submitted[0].Hash, qt.DeepEquals, types.HexBytes("hash-a"))
+}
+
+// TestChainSendTxBatchHandler exercises the HTTP handler end to end against a test
+// app whose mempool is stubbed: a payload equal to "bad" fails to submit.
+func TestChainSendTxBatchHandler(t *testing.T) {
+	c := qt.New(t)
+
+	router := httprouter.HTTProuter{}
+	router.Init("127.0.0.1", 0)
+	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "chain"))
+	c.Assert(err, qt.IsNil)
+
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
+	c.Assert(err, qt.IsNil)
+	kv, err := metadb.New(db.TypePebble, t.TempDir())
+	c.Assert(err, qt.IsNil)
+	censusDB := censusdb.NewCensusDB(kv)
+	storage := ipfs.MockIPFS(t)
+	app := vochain.TestBaseApplication(t)
+	// stub the mempool: a tx whose raw payload is "bad" is rejected at submit.
+	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+		if string(tx) == "bad" {
+			return nil, fmt.Errorf("rejected")
+		}
+		return &cometcoretypes.ResultBroadcastTx{Hash: cmtbytes.HexBytes("hash"), Code: 0}, nil
+	})
+	idx, err := indexer.New(app, indexer.Options{DataDir: t.TempDir()})
+	c.Assert(err, qt.IsNil)
+	api.Attach(app, nil, idx, storage, censusDB)
+	c.Assert(api.EnableHandlers(ChainHandler), qt.IsNil)
+
+	token := uuid.New()
+	cl := testutil.NewTestHTTPclient(t, addr, &token)
+
+	// ok, bad, ok -> submitted:1, failed:1 (fail-fast), pending:1
+	body := &TransactionBatch{Transactions: []TransactionPayload{
+		{Payload: []byte("ok1")},
+		{Payload: []byte("bad")},
+		{Payload: []byte("ok2")},
+	}}
+	resp, code := cl.Request("POST", body, "transactions", "batch")
+	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
+	result := &TransactionBatchResult{}
+	c.Assert(json.Unmarshal(resp, result), qt.IsNil)
+	c.Assert(result.Submitted, qt.HasLen, 1)
+	c.Assert(result.Failed, qt.HasLen, 1)
+	c.Assert(result.Pending, qt.HasLen, 1)
+	c.Assert(result.Failed[0].Error, qt.Not(qt.Equals), "")
+	c.Assert(result.Submitted[0].Hash, qt.Not(qt.IsNil))
+
+	// empty batch -> dedicated 400 error
+	_, code = cl.Request("POST", &TransactionBatch{Transactions: []TransactionPayload{}}, "transactions", "batch")
+	c.Assert(code, qt.Equals, ErrTransactionBatchEmpty.HTTPstatus)
+}
+
+// signedNewProcessPayload builds a signed NewProcess transaction (as the
+// marshaled models.SignedTx the endpoint receives). entityID may be nil to
+// exercise the EntityId-unset path.
+func signedNewProcessPayload(t *testing.T, signer *ethereum.SignKeys, chainID string, entityID []byte, metadataURI string) []byte {
+	tx := &models.Tx{Payload: &models.Tx_NewProcess{NewProcess: &models.NewProcessTx{
+		Txtype: models.TxType_NEW_PROCESS,
+		Process: &models.Process{
+			EntityId:     entityID,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			EnvelopeType: &models.EnvelopeType{},
+			Metadata:     &metadataURI,
+		},
+	}}}
+	txBytes, err := proto.Marshal(tx)
+	qt.Assert(t, err, qt.IsNil)
+	sig, err := signer.SignVocdoniTx(txBytes, chainID)
+	qt.Assert(t, err, qt.IsNil)
+	payload, err := proto.Marshal(&models.SignedTx{Tx: txBytes, Signature: sig})
+	qt.Assert(t, err, qt.IsNil)
+	return payload
+}
+
+// TestBatchProcessID covers the real decode + per-EntityId delta + BuildProcessID
+// path, including the EntityId-unset case where the organization must default to
+// the tx signer (mirroring NewProcessTxCheck).
+func TestBatchProcessID(t *testing.T) {
+	c := qt.New(t)
+	app := vochain.TestBaseApplication(t)
+	a := &API{vocapp: app}
+
+	signer := &ethereum.SignKeys{}
+	c.Assert(signer.Generate(), qt.IsNil)
+	entity := signer.Address().Bytes()
+	c.Assert(app.State.CreateAccount(signer.Address(), "", nil, 100), qt.IsNil)
+
+	// expected id for a given delta, computed the same way the chain does.
+	expected := func(delta int32) []byte {
+		pid, err := processid.BuildProcessID(&models.Process{
+			EntityId:     entity,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			EnvelopeType: &models.EnvelopeType{},
+		}, app.State, delta)
+		c.Assert(err, qt.IsNil)
+		return pid.Marshal()
+	}
+
+	// EntityId set: two txs for the same entity advance the delta (0, then 1).
+	deltas := map[string]int32{}
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), entity, ""), deltas),
+		qt.DeepEquals, expected(0))
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), entity, ""), deltas),
+		qt.DeepEquals, expected(1))
+	c.Assert(deltas[string(entity)], qt.Equals, int32(2))
+
+	// EntityId unset: the signer is recovered and used, so the id is NOT dropped
+	// and the delta is keyed on the resolved entity (not the empty string).
+	deltas2 := map[string]int32{}
+	c.Assert(a.batchProcessID(signedNewProcessPayload(t, signer, app.ChainID(), nil, ""), deltas2),
+		qt.DeepEquals, expected(0))
+	c.Assert(deltas2[string(entity)], qt.Equals, int32(1))
+	c.Assert(deltas2[""], qt.Equals, int32(0))
+}
+
+// TestChainSendTxBatchMetadata covers the /elections-style metadata handling on
+// the batch endpoint: when raw metadata is provided it must match the tx's URI and
+// is pinned; a mismatch or a metadata-without-URI rejects the whole batch.
+func TestChainSendTxBatchMetadata(t *testing.T) {
+	c := qt.New(t)
+	router := httprouter.HTTProuter{}
+	router.Init("127.0.0.1", 0)
+	addr, err := url.Parse("http://" + path.Join(router.Address().String(), "chain"))
+	c.Assert(err, qt.IsNil)
+	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
+	c.Assert(err, qt.IsNil)
+	kv, err := metadb.New(db.TypePebble, t.TempDir())
+	c.Assert(err, qt.IsNil)
+	app := vochain.TestBaseApplication(t)
+	app.SetFnSendTx(func(_ []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+		return &cometcoretypes.ResultBroadcastTx{Hash: cmtbytes.HexBytes("hash"), Code: 0}, nil
+	})
+	idx, err := indexer.New(app, indexer.Options{DataDir: t.TempDir()})
+	c.Assert(err, qt.IsNil)
+	api.Attach(app, nil, idx, ipfs.MockIPFS(t), censusdb.NewCensusDB(kv))
+	c.Assert(api.EnableHandlers(ChainHandler), qt.IsNil)
+	token := uuid.New()
+	cl := testutil.NewTestHTTPclient(t, addr, &token)
+
+	signer := &ethereum.SignKeys{}
+	c.Assert(signer.Generate(), qt.IsNil)
+	entity := signer.Address().Bytes()
+	raw := []byte(`{"title":{"default":"batch"}}`)
+	uri := ipfs.CalculateCIDv1json(raw)
+
+	post := func(items ...TransactionPayload) (int, *TransactionBatchResult) {
+		resp, code := cl.Request("POST", &TransactionBatch{Transactions: items}, "transactions", "batch")
+		res := &TransactionBatchResult{}
+		if code == apirest.HTTPstatusOK {
+			c.Assert(json.Unmarshal(resp, res), qt.IsNil)
+		}
+		return code, res
+	}
+
+	// URI + matching metadata -> submitted and pinned (MetadataURL set).
+	code, res := post(TransactionPayload{
+		Payload:  signedNewProcessPayload(t, signer, app.ChainID(), entity, uri),
+		Metadata: raw,
+	})
+	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
+	c.Assert(res.Submitted, qt.HasLen, 1)
+	c.Assert(res.Submitted[0].MetadataURL, qt.Not(qt.Equals), "")
+
+	// URI + mismatching metadata -> whole batch rejected, nothing submitted.
+	code, _ = post(TransactionPayload{
+		Payload:  signedNewProcessPayload(t, signer, app.ChainID(), entity, uri),
+		Metadata: []byte(`{"title":{"default":"different"}}`),
+	})
+	c.Assert(code, qt.Equals, ErrMetadataURINotMatchContent.HTTPstatus)
+
+	// URI + no raw metadata -> submitted, not pinned (elections-style optional).
+	code, res = post(TransactionPayload{
+		Payload: signedNewProcessPayload(t, signer, app.ChainID(), entity, uri),
+	})
+	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
+	c.Assert(res.Submitted, qt.HasLen, 1)
+	c.Assert(res.Submitted[0].MetadataURL, qt.Equals, "")
+
+	// raw metadata + no URI -> whole batch rejected.
+	code, _ = post(TransactionPayload{
+		Payload:  signedNewProcessPayload(t, signer, app.ChainID(), entity, ""),
+		Metadata: raw,
+	})
+	c.Assert(code, qt.Equals, ErrMetadataProvidedButNoURI.HTTPstatus)
+}

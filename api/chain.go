@@ -7,17 +7,27 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	comettypes "github.com/cometbft/cometbft/types"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
+	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/proto/build/go/models"
+	"google.golang.org/protobuf/proto"
 )
+
+// maxTransactionBatchSize bounds how many transactions POST /chain/transactions/batch accepts.
+const maxTransactionBatchSize = 100
 
 const (
 	ChainHandler = "chain"
@@ -125,6 +135,14 @@ func (a *API) enableChainHandlers() error {
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.chainSendTxHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
+		"/chain/transactions/batch",
+		"POST",
+		apirest.MethodAccessTypePublic,
+		a.chainSendTxBatchHandler,
 	); err != nil {
 		return err
 	}
@@ -602,6 +620,201 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// chainSendTxBatchHandler
+//
+//	@Summary				Submit a batch of transactions
+//	@Description.markdown	chainSendTxBatchHandler
+//	@Tags					Chain
+//	@Accept					json
+//	@Produce				json
+//	@Param					transactions	body		TransactionBatch		true	"List of base64 transaction payloads, submitted in order"
+//	@Success				200				{object}	TransactionBatchResult	"Every input transaction grouped as submitted / failed / pending"
+//
+// The transactions are submitted in order and fail-fast: the first one that fails
+// to be submitted goes to `failed` and submission stops, leaving the rest in
+// `pending`. "submitted" means the mempool accepted the broadcast, NOT that the
+// transaction is block-confirmed — the caller must confirm each submitted item
+// on-chain and resubmit any that did not land, together with failed and pending.
+// For NewProcess transactions each item carries its predicted `processId`.
+//
+//	@Router					/chain/transactions/batch [post]
+func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	req := &TransactionBatch{}
+	if err := json.Unmarshal(msg.Data, req); err != nil {
+		return ErrCantParseDataAsJSON.WithErr(err)
+	}
+	if len(req.Transactions) == 0 {
+		return ErrTransactionBatchEmpty
+	}
+	if len(req.Transactions) > maxTransactionBatchSize {
+		return ErrTransactionBatchTooLarge.Withf("%d, max is %d", len(req.Transactions), maxTransactionBatchSize)
+	}
+
+	// Validate election metadata up front (same checks as POST /elections): a
+	// client-side metadata mistake rejects the whole batch before anything is
+	// submitted, so no transaction lands on-chain because of it.
+	for i := range req.Transactions {
+		if err := a.checkBatchItemMetadata(req.Transactions[i]); err != nil {
+			return err
+		}
+	}
+
+	// per-creator (EntityId) running process-index delta, advanced for every
+	// NewProcess item regardless of send outcome, so each item gets the exact
+	// processId the chain will assign in ordered commit.
+	deltas := map[string]int32{}
+	result := classifyTransactionBatch(req.Transactions,
+		func(payload []byte) []byte { return a.batchProcessID(payload, deltas) },
+		func(payload []byte) (hash []byte, code uint32, err error) {
+			res, err := a.sendTx(payload)
+			if err != nil {
+				return nil, 0, err
+			}
+			return res.Hash.Bytes(), res.Code, nil
+		},
+	)
+
+	// Pin the metadata of the transactions that were actually submitted, best-effort,
+	// exactly like POST /elections. This relies on the fail-fast invariant of
+	// classifyTransactionBatch: submitted items are always the leading prefix of the
+	// input in order, so result.Submitted[i] corresponds to req.Transactions[i]. If
+	// that strategy ever changes, this index correspondence must be revisited.
+	for i := range result.Submitted {
+		md := req.Transactions[i].Metadata
+		if a.storage == nil || len(md) == 0 {
+			continue
+		}
+		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		cid, err := a.storage.Publish(sctx, md)
+		cancel()
+		if err != nil {
+			log.Errorf("could not publish batch metadata to storage: %v", err)
+			continue
+		}
+		result.Submitted[i].MetadataURL = a.storage.URIprefix() + cid
+		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(ipfs.CalculateCIDv1json(md), "ipfs://") {
+			log.Errorf("%s (%s != %s)", ErrVochainReturnedWrongMetadataCID, cid, ipfs.CalculateCIDv1json(md))
+		}
+	}
+
+	data, err := json.Marshal(result)
+	if err != nil {
+		return ErrMarshalingServerJSONFailed.WithErr(err)
+	}
+	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// classifyTransactionBatch submits the transactions in order and groups every
+// input item into submitted / failed / pending. It is fail-fast: the first send
+// error goes to `failed` and no further items are sent (they share the sender's
+// now-broken nonce sequence and cannot commit), so the rest land in `pending`.
+// `processID` supplies each item's predicted processId (nil if not applicable);
+// it is called for every item, including the unsent ones. Injecting `processID`
+// and `send` keeps the grouping logic testable without a live chain.
+func classifyTransactionBatch(
+	txs []TransactionPayload,
+	processID func(payload []byte) []byte,
+	send func(payload []byte) (hash []byte, code uint32, err error),
+) *TransactionBatchResult {
+	result := &TransactionBatchResult{
+		Submitted: []TransactionBatchItem{},
+		Failed:    []TransactionBatchItem{},
+		Pending:   []TransactionBatchItem{},
+	}
+	stopped := false
+	for i := range txs {
+		item := TransactionBatchItem{ProcessID: processID(txs[i].Payload)}
+		if stopped {
+			result.Pending = append(result.Pending, item)
+			continue
+		}
+		hash, code, err := send(txs[i].Payload)
+		if err != nil {
+			item.Error = err.Error()
+			result.Failed = append(result.Failed, item)
+			stopped = true
+			continue
+		}
+		item.Hash = hash
+		item.Code = &code
+		result.Submitted = append(result.Submitted, item)
+	}
+	return result
+}
+
+// batchProcessID returns the predicted processId for a NewProcess payload and
+// advances the per-creator positional delta. Returns nil for non-NewProcess or
+// undecodable payloads (the tx is still submitted; only the predicted id is absent).
+func (a *API) batchProcessID(payload []byte, deltas map[string]int32) []byte {
+	stx := &models.SignedTx{}
+	if err := proto.Unmarshal(payload, stx); err != nil {
+		return nil
+	}
+	// Decode the inner Tx and build the signed body (also used to recover the signer).
+	signedBody, tx, err := ethereum.BuildVocdoniTransaction(stx.GetTx(), a.vocapp.ChainID())
+	if err != nil {
+		return nil
+	}
+	proc := tx.GetNewProcess().GetProcess()
+	if proc == nil {
+		return nil
+	}
+	// Resolve the organization exactly as NewProcessTxCheck does: when EntityId is
+	// unset, it defaults to the tx signer's address (vochain/transaction/election_tx.go).
+	// Both the delta key and BuildProcessID must use the resolved entity, otherwise
+	// the predicted id would be dropped and the deltas would collide on the empty key.
+	entity := proc.GetEntityId()
+	if len(entity) == 0 {
+		addr, err := ethereum.AddrFromSignature(signedBody, stx.GetSignature())
+		if err != nil {
+			return nil
+		}
+		entity = addr.Bytes()
+		proc.EntityId = entity
+	}
+	key := string(entity)
+	delta := deltas[key]
+	deltas[key] = delta + 1
+	pid, err := processid.BuildProcessID(proc, a.vocapp.State, delta)
+	if err != nil {
+		return nil
+	}
+	return pid.Marshal()
+}
+
+// checkBatchItemMetadata validates a batch item's optional raw election metadata,
+// mirroring POST /elections: only when raw metadata is provided, the NewProcess tx
+// must carry a matching metadata URI. Returns nil when there is nothing to check.
+func (a *API) checkBatchItemMetadata(item TransactionPayload) error {
+	if len(item.Metadata) == 0 {
+		return nil
+	}
+	// Extract the metadata URI (and encrypted flag) from the NewProcess payload.
+	metadataURI, encryptedMetadata := "", false
+	stx := &models.SignedTx{}
+	if err := proto.Unmarshal(item.Payload, stx); err == nil {
+		tx := &models.Tx{}
+		if err := proto.Unmarshal(stx.GetTx(), tx); err == nil {
+			if p := tx.GetNewProcess().GetProcess(); p != nil {
+				metadataURI = p.GetMetadata()
+				encryptedMetadata = p.GetMode() != nil && p.GetMode().EncryptedMetaData
+			}
+		}
+	}
+	if metadataURI == "" {
+		return ErrMetadataProvidedButNoURI
+	}
+	if !encryptedMetadata {
+		if err := json.Unmarshal(item.Metadata, &ElectionMetadata{}); err != nil {
+			return ErrCantParseMetadataAsJSON.WithErr(err)
+		}
+	}
+	if !ipfs.CIDequals(ipfs.CalculateCIDv1json(item.Metadata), metadataURI) {
+		return ErrMetadataURINotMatchContent
+	}
+	return nil
 }
 
 // chainTxCostHandler
