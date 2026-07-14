@@ -268,7 +268,52 @@ type Transaction struct {
 	Code      *uint32           `json:"code,omitempty" extensions:"x-omitempty"`
 	Costs     map[string]uint64 `json:"costs,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
 	Address   types.HexBytes    `json:"address,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
-	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
+	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" `
+}
+
+// TransactionPayload is one pre-signed transaction (base64-encoded models.SignedTx)
+// in a batch request.
+type TransactionPayload struct {
+	Payload []byte `json:"payload" swaggertype:"string" format:"base64"`
+	// Metadata is the optional raw election metadata for a NewProcess payload. When
+	// provided, its CID must match the metadata URI in the transaction, and it is
+	// pinned to IPFS on submission (same as POST /elections).
+	Metadata []byte `json:"metadata,omitempty" swaggertype:"string" format:"base64"`
+}
+
+// TransactionBatch is a request to submit multiple transactions at once, in order.
+type TransactionBatch struct {
+	Transactions []TransactionPayload `json:"transactions"`
+}
+
+// TransactionBatchItem is the outcome of a single transaction in a batch. For a
+// NewProcess transaction, ProcessID is the predicted election id. Error is set
+// only on the item that failed to be submitted.
+type TransactionBatchItem struct {
+	Hash      types.HexBytes `json:"hash,omitempty" extensions:"x-omitempty"`
+	ProcessID types.HexBytes `json:"processId,omitempty" extensions:"x-omitempty"`
+	// Code is the mempool CheckTx response code. For submitted items it is always
+	// 0: a non-zero CheckTx code is turned into a submit error, so the item lands
+	// in Failed instead. The field is kept for parity with the single-tx endpoint.
+	Code        *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
+	Error       string  `json:"error,omitempty" extensions:"x-omitempty"`
+	MetadataURL string  `json:"metadataURL,omitempty" extensions:"x-omitempty"`
+}
+
+// TransactionBatchResult groups every input transaction of a batch by its
+// submission outcome. Note: "submitted" means the mempool accepted the broadcast,
+// NOT that the transaction is block-confirmed — a mempool-accepted transaction can
+// still be discarded at commit (e.g. a stale/contended nonce, which is not checked
+// at mempool admission). The caller must confirm each submitted item on-chain and
+// resubmit any that did not land, together with the failed and pending items.
+type TransactionBatchResult struct {
+	// Submitted are the transactions accepted by the mempool, in order.
+	Submitted []TransactionBatchItem `json:"submitted"`
+	// Failed holds the first transaction that failed to be submitted (Error set);
+	// submission stops there.
+	Failed []TransactionBatchItem `json:"failed"`
+	// Pending are the transactions after the failed one that were not sent.
+	Pending []TransactionBatchItem `json:"pending"`
 }
 
 type TransactionReference struct {
