@@ -240,7 +240,7 @@ func (idx *Indexer) Close() error {
 	return nil
 }
 
-// BackupPath restores the database from a backup created via SaveBackup.
+// RestoreBackup restores the database from a backup created via SaveBackup.
 // Note that this must be called with ExpectBackupRestore set to true,
 // and before any indexing or queries happen.
 func (idx *Indexer) RestoreBackup(path string) error {
