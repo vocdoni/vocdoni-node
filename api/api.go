@@ -67,6 +67,8 @@ const (
 	ParamVoteId          = "voteId"
 	ParamPage            = "page"
 	ParamLimit           = "limit"
+	ParamTitle           = "title"
+	ParamDescription     = "description"
 	ParamStatus          = "status"
 	ParamWithResults     = "withResults"
 	ParamFinalResults    = "finalResults"

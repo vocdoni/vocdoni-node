@@ -32,6 +32,7 @@ func (vs *VocdoniService) OffChainDataHandler() error {
 	}
 	vs.OffChainData = offchaindatahandler.NewOffChainDataHandler(
 		vs.App,
+		vs.Indexer,
 		vs.DataDownloader,
 		vs.CensusDB,
 		vs.Config.SkipPreviousOffchainData,
