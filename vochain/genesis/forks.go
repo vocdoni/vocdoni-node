@@ -62,7 +62,7 @@ const forkNever = uint32(math.MaxUint32)
 // before the chosen height.
 var voteMemoForkHeight = map[string]uint32{
 	"vocdoni/TEST/1":   0,         // always on for local test/dev chains
-	"vocdoni/DEV/36":   forkNever, // TODO: schedule
+	"vocdoni/DEV/36":   5_534_900, // memo soft-fork, ~1h margin after 2026-07-21 (scheduled at height 5,534,543)
 	"vocdoni/STAGE/12": forkNever, // TODO: schedule
 	"vocdoni/LTS/1.2":  forkNever, // TODO: schedule (far-future, coordinated with ops)
 }
