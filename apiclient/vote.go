@@ -39,6 +39,11 @@ type VoteData struct {
 	Election   *api.Election
 	VoteWeight *big.Int
 
+	// Memo is an optional free-text note (max 256 bytes) attached to the vote,
+	// e.g. an open "Other" answer. Only honored by the chain once the memo
+	// soft-fork is active.
+	Memo string
+
 	ProofMkTree  *CensusProof
 	ProofSIKTree *CensusProof
 	ProofCSP     types.HexBytes
@@ -70,6 +75,11 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	}
 	if err != nil {
 		return nil, err
+	}
+	// Attach the optional memo before the envelope is wrapped, marshaled and
+	// signed, so it is covered by the vote signature.
+	if v.Memo != "" {
+		vote.Memo = []byte(v.Memo)
 	}
 
 	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())

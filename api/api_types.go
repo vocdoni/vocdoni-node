@@ -218,6 +218,8 @@ type Vote struct {
 	BlockHeight      uint32          `json:"blockHeight,omitempty" extensions:"x-omitempty"`
 	TransactionIndex *int32          `json:"transactionIndex,omitempty" extensions:"x-omitempty"`
 	OverwriteCount   *uint32         `json:"overwriteCount,omitempty" extensions:"x-omitempty"`
+	// Optional free-text note attached by the voter (max 256 bytes)
+	Memo string `json:"memo,omitempty" extensions:"x-omitempty"`
 	// Date when the vote was emitted
 	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
 }

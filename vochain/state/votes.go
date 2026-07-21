@@ -34,6 +34,10 @@ type Vote struct {
 	Weight               *big.Int
 	VoterID              VoterID
 	Overwrites           uint32
+	// Memo is an optional free-text note attached by the voter (max 256 bytes).
+	// It is only set once the memo soft-fork is active for the chain; see
+	// genesis.VoteMemoActive and VoteTxCheck.
+	Memo string
 }
 
 // VotePackage represents the payload of a vote (usually base64 encoded).
@@ -75,6 +79,11 @@ func (v *Vote) Hash() []byte {
 	h.Write(v.Nullifier)
 	h.Write(v.VotePackage)
 	h.Write(v.WeightBytes())
+	// Memo is only ever non-empty once the memo soft-fork is active, so pre-fork
+	// votes hash identically to before this field existed.
+	if len(v.Memo) > 0 {
+		h.Write([]byte(v.Memo))
+	}
 	return ethereum.HashRaw(h.Bytes())
 }
 
@@ -89,6 +98,7 @@ func (v *Vote) DeepCopy() *Vote {
 		Weight:               new(big.Int).Set(v.Weight),
 		VoterID:              slices.Clone(v.VoterID),
 		Overwrites:           v.Overwrites,
+		Memo:                 v.Memo,
 	}
 	return voteCopy
 }
@@ -161,6 +171,14 @@ func (s *State) AddVote(vote *Vote) error {
 			sdbVote.OverwriteCount = new(uint32)
 			*sdbVote.OverwriteCount = 1
 		}
+	}
+	// Only store the memo when present. proto3 `optional` marshals a set empty
+	// value as a present field, which would change the StateDBVote bytes (and
+	// thus the state hash) versus a pre-fork vote; leaving it nil keeps them equal.
+	if vote.Memo != "" {
+		sdbVote.Memo = []byte(vote.Memo)
+	} else {
+		sdbVote.Memo = nil
 	}
 	sdbVoteBytes, err := proto.Marshal(sdbVote)
 	if err != nil {
