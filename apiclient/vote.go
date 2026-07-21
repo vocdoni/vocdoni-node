@@ -192,6 +192,23 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	return voteAPI.VoteID, nil
 }
 
+// GetVote fetches a single vote (by nullifier / voteID) from the API,
+// including its optional memo.
+func (c *HTTPclient) GetVote(voteID types.HexBytes) (*api.Vote, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "votes", voteID.String())
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	v := &api.Vote{}
+	if err := json.Unmarshal(resp, v); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return v, nil
+}
+
 // Verify verifies a vote. The voteID is the nullifier of the vote.
 func (c *HTTPclient) Verify(electionID, voteID types.HexBytes) (bool, error) {
 	resp, code, err := c.Request(HTTPGET, nil, "votes", "verify", electionID.String(), voteID.String())
