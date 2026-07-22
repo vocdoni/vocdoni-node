@@ -11,6 +11,29 @@ import (
 	"time"
 )
 
+const countTokenFees = `-- name: CountTokenFees :one
+SELECT COUNT(*)
+FROM token_fees
+WHERE (
+  (?1 = '' OR LOWER(HEX(from_account)) = LOWER(?1))
+  AND (?2 = '' OR LOWER(tx_type) = LOWER(?2))
+  AND (?3 = '' OR LOWER(reference) = LOWER(?3))
+)
+`
+
+type CountTokenFeesParams struct {
+	FromAccount interface{}
+	TxType      interface{}
+	Reference   interface{}
+}
+
+func (q *Queries) CountTokenFees(ctx context.Context, arg CountTokenFeesParams) (int64, error) {
+	row := q.queryRow(ctx, q.countTokenFeesStmt, countTokenFees, arg.FromAccount, arg.TxType, arg.Reference)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createTokenFee = `-- name: CreateTokenFee :execresult
 INSERT INTO token_fees (
 	from_account, block_height, reference,
@@ -42,56 +65,41 @@ func (q *Queries) CreateTokenFee(ctx context.Context, arg CreateTokenFeeParams) 
 }
 
 const searchTokenFees = `-- name: SearchTokenFees :many
-WITH results AS (
-  SELECT id, block_height, from_account, reference, cost, tx_type, spend_time
-  FROM token_fees
-  WHERE (
-    (?3 = '' OR LOWER(HEX(from_account)) = LOWER(?3))
-    AND (?4 = '' OR LOWER(tx_type) = LOWER(?4))
-    AND (?5 = '' OR LOWER(reference) = LOWER(?5))
-  )
+SELECT id, block_height, from_account, reference, cost, tx_type, spend_time
+FROM token_fees
+WHERE (
+  (?1 = '' OR LOWER(HEX(from_account)) = LOWER(?1))
+  AND (?2 = '' OR LOWER(tx_type) = LOWER(?2))
+  AND (?3 = '' OR LOWER(reference) = LOWER(?3))
 )
-SELECT id, block_height, from_account, reference, cost, tx_type, spend_time, COUNT(*) OVER() AS total_count
-FROM results
 ORDER BY spend_time DESC
-LIMIT ?2
-OFFSET ?1
+LIMIT ?5
+OFFSET ?4
 `
 
 type SearchTokenFeesParams struct {
-	Offset      int64
-	Limit       int64
 	FromAccount interface{}
 	TxType      interface{}
 	Reference   interface{}
+	Offset      int64
+	Limit       int64
 }
 
-type SearchTokenFeesRow struct {
-	ID          int64
-	BlockHeight int64
-	FromAccount []byte
-	Reference   string
-	Cost        int64
-	TxType      string
-	SpendTime   time.Time
-	TotalCount  int64
-}
-
-func (q *Queries) SearchTokenFees(ctx context.Context, arg SearchTokenFeesParams) ([]SearchTokenFeesRow, error) {
+func (q *Queries) SearchTokenFees(ctx context.Context, arg SearchTokenFeesParams) ([]TokenFee, error) {
 	rows, err := q.query(ctx, q.searchTokenFeesStmt, searchTokenFees,
-		arg.Offset,
-		arg.Limit,
 		arg.FromAccount,
 		arg.TxType,
 		arg.Reference,
+		arg.Offset,
+		arg.Limit,
 	)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchTokenFeesRow
+	var items []TokenFee
 	for rows.Next() {
-		var i SearchTokenFeesRow
+		var i TokenFee
 		if err := rows.Scan(
 			&i.ID,
 			&i.BlockHeight,
@@ -100,7 +108,6 @@ func (q *Queries) SearchTokenFees(ctx context.Context, arg SearchTokenFeesParams
 			&i.Cost,
 			&i.TxType,
 			&i.SpendTime,
-			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

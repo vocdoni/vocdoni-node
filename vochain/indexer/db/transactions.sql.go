@@ -12,12 +12,51 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
-const countTransactions = `-- name: CountTransactions :one
-SELECT COUNT(*) FROM transactions
+const countTotalTransactions = `-- name: CountTotalTransactions :one
+SELECT COUNT(*)
+FROM transactions
 `
 
-func (q *Queries) CountTransactions(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.countTransactionsStmt, countTransactions)
+func (q *Queries) CountTotalTransactions(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countTotalTransactionsStmt, countTotalTransactions)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTransactions = `-- name: CountTransactions :one
+SELECT COUNT(*)
+FROM transactions
+WHERE (
+  (?1 = 0 OR block_height = ?1)
+  AND (?2 = '' OR LOWER(type) = LOWER(?2))
+  AND (?3 = '' OR LOWER(subtype) = LOWER(?3))
+  AND (?4 = '' OR LOWER(HEX(signer)) = LOWER(?4))
+  AND (
+    ?5 = ''
+    OR (LENGTH(?5) = 64 AND LOWER(HEX(hash)) = LOWER(?5))
+    OR (LENGTH(?5) < 64 AND INSTR(LOWER(HEX(hash)), LOWER(?5)) > 0)
+    -- TODO: consider keeping an hash_hex column for faster searches
+  )
+)
+`
+
+type CountTransactionsParams struct {
+	BlockHeight interface{}
+	TxType      interface{}
+	TxSubtype   interface{}
+	TxSigner    interface{}
+	HashSubstr  interface{}
+}
+
+func (q *Queries) CountTransactions(ctx context.Context, arg CountTransactionsParams) (int64, error) {
+	row := q.queryRow(ctx, q.countTransactionsStmt, countTransactions,
+		arg.BlockHeight,
+		arg.TxType,
+		arg.TxSubtype,
+		arg.TxSigner,
+		arg.HashSubstr,
+	)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -125,7 +164,7 @@ func (q *Queries) GetTransactionByHeightAndIndex(ctx context.Context, arg GetTra
 }
 
 const searchTransactions = `-- name: SearchTransactions :many
-SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer, COUNT(*) OVER() AS total_count
+SELECT hash, block_height, block_index, type, subtype, raw_tx, signature, signer
 FROM transactions
 WHERE
   (?1 = 0 OR block_height = ?1)
@@ -153,19 +192,7 @@ type SearchTransactionsParams struct {
 	Limit       int64
 }
 
-type SearchTransactionsRow struct {
-	Hash        types.Hash
-	BlockHeight int64
-	BlockIndex  int64
-	Type        string
-	Subtype     string
-	RawTx       []byte
-	Signature   []byte
-	Signer      []byte
-	TotalCount  int64
-}
-
-func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]SearchTransactionsRow, error) {
+func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactionsParams) ([]Transaction, error) {
 	rows, err := q.query(ctx, q.searchTransactionsStmt, searchTransactions,
 		arg.BlockHeight,
 		arg.TxType,
@@ -179,9 +206,9 @@ func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactions
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchTransactionsRow
+	var items []Transaction
 	for rows.Next() {
-		var i SearchTransactionsRow
+		var i Transaction
 		if err := rows.Scan(
 			&i.Hash,
 			&i.BlockHeight,
@@ -191,7 +218,6 @@ func (q *Queries) SearchTransactions(ctx context.Context, arg SearchTransactions
 			&i.RawTx,
 			&i.Signature,
 			&i.Signer,
-			&i.TotalCount,
 		); err != nil {
 			return nil, err
 		}

@@ -30,52 +30,93 @@ SELECT * FROM processes
 WHERE id = ?
 LIMIT 1;
 
--- name: SearchProcesses :many
-WITH results AS (
-	SELECT *,
-			COUNT(*) OVER() AS total_count
-	FROM processes
-	WHERE (
-		LENGTH(sqlc.arg(entity_id_substr)) <= 40 -- if passed arg is longer, then just abort the query
-		AND (
-			sqlc.arg(entity_id_substr) = ''
-			OR (LENGTH(sqlc.arg(entity_id_substr)) = 40 AND LOWER(HEX(entity_id)) = LOWER(sqlc.arg(entity_id_substr)))
-			OR (LENGTH(sqlc.arg(entity_id_substr)) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(sqlc.arg(entity_id_substr))) > 0)
-			-- TODO: consider keeping an entity_id_hex column for faster searches
-		)
-		AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
-		AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
-		AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
-		AND LENGTH(sqlc.arg(id_substr)) <= 64 -- if passed arg is longer, then just abort the query
-		AND (
-			sqlc.arg(id_substr) = ''
-			OR (LENGTH(sqlc.arg(id_substr)) = 64 AND LOWER(HEX(id)) = LOWER(sqlc.arg(id_substr)))
-			OR (LENGTH(sqlc.arg(id_substr)) < 64 AND INSTR(LOWER(HEX(id)), LOWER(sqlc.arg(id_substr))) > 0)
-			-- TODO: consider keeping an id_hex column for faster searches
-		)
-		AND (
-			sqlc.arg(have_results) = -1
-			OR (sqlc.arg(have_results) = 1 AND have_results = TRUE)
-			OR (sqlc.arg(have_results) = 0 AND have_results = FALSE)
-		)
-		AND (
-			sqlc.arg(final_results) = -1
-			OR (sqlc.arg(final_results) = 1 AND final_results = TRUE)
-			OR (sqlc.arg(final_results) = 0 AND final_results = FALSE)
-		)
-		AND (
-			sqlc.arg(manually_ended) = -1
-			OR (sqlc.arg(manually_ended) = 1 AND manually_ended = TRUE)
-			OR (sqlc.arg(manually_ended) = 0 AND manually_ended = FALSE)
-		)
-		AND (sqlc.arg(start_date_after) IS NULL OR start_date >= sqlc.arg(start_date_after))
-		AND (sqlc.arg(start_date_before) IS NULL OR start_date <= sqlc.arg(start_date_before))
-		AND (sqlc.arg(end_date_after) IS NULL OR end_date >= sqlc.arg(end_date_after))
-		AND (sqlc.arg(end_date_before) IS NULL OR end_date <= sqlc.arg(end_date_before))
+-- name: CountTotalProcesses :one
+SELECT COUNT(*)
+FROM processes;
+
+-- name: CountProcesses :one
+SELECT COUNT(*)
+FROM processes
+WHERE (
+	LENGTH(sqlc.arg(entity_id_substr)) <= 40 -- if passed arg is longer, then just abort the query
+	AND (
+		sqlc.arg(entity_id_substr) = ''
+		OR (LENGTH(sqlc.arg(entity_id_substr)) = 40 AND LOWER(HEX(entity_id)) = LOWER(sqlc.arg(entity_id_substr)))
+		OR (LENGTH(sqlc.arg(entity_id_substr)) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(sqlc.arg(entity_id_substr))) > 0)
+		-- TODO: consider keeping an entity_id_hex column for faster searches
 	)
+	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
+	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
+	AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
+	AND LENGTH(sqlc.arg(id_substr)) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		sqlc.arg(id_substr) = ''
+		OR (LENGTH(sqlc.arg(id_substr)) = 64 AND LOWER(HEX(id)) = LOWER(sqlc.arg(id_substr)))
+		OR (LENGTH(sqlc.arg(id_substr)) < 64 AND INSTR(LOWER(HEX(id)), LOWER(sqlc.arg(id_substr))) > 0)
+		-- TODO: consider keeping an id_hex column for faster searches
+	)
+	AND (
+		sqlc.arg(have_results) = -1
+		OR (sqlc.arg(have_results) = 1 AND have_results = TRUE)
+		OR (sqlc.arg(have_results) = 0 AND have_results = FALSE)
+	)
+	AND (
+		sqlc.arg(final_results) = -1
+		OR (sqlc.arg(final_results) = 1 AND final_results = TRUE)
+		OR (sqlc.arg(final_results) = 0 AND final_results = FALSE)
+	)
+	AND (
+		sqlc.arg(manually_ended) = -1
+		OR (sqlc.arg(manually_ended) = 1 AND manually_ended = TRUE)
+		OR (sqlc.arg(manually_ended) = 0 AND manually_ended = FALSE)
+	)
+	AND (sqlc.arg(start_date_after) IS NULL OR start_date >= sqlc.arg(start_date_after))
+	AND (sqlc.arg(start_date_before) IS NULL OR start_date <= sqlc.arg(start_date_before))
+	AND (sqlc.arg(end_date_after) IS NULL OR end_date >= sqlc.arg(end_date_after))
+	AND (sqlc.arg(end_date_before) IS NULL OR end_date <= sqlc.arg(end_date_before))
+);
+
+-- name: SearchProcesses :many
+SELECT id
+FROM processes
+WHERE (
+	LENGTH(sqlc.arg(entity_id_substr)) <= 40 -- if passed arg is longer, then just abort the query
+	AND (
+		sqlc.arg(entity_id_substr) = ''
+		OR (LENGTH(sqlc.arg(entity_id_substr)) = 40 AND LOWER(HEX(entity_id)) = LOWER(sqlc.arg(entity_id_substr)))
+		OR (LENGTH(sqlc.arg(entity_id_substr)) < 40 AND INSTR(LOWER(HEX(entity_id)), LOWER(sqlc.arg(entity_id_substr))) > 0)
+		-- TODO: consider keeping an entity_id_hex column for faster searches
+	)
+	AND (sqlc.arg(namespace) = 0 OR namespace = sqlc.arg(namespace))
+	AND (sqlc.arg(status) = 0 OR status = sqlc.arg(status))
+	AND (sqlc.arg(source_network_id) = 0 OR source_network_id = sqlc.arg(source_network_id))
+	AND LENGTH(sqlc.arg(id_substr)) <= 64 -- if passed arg is longer, then just abort the query
+	AND (
+		sqlc.arg(id_substr) = ''
+		OR (LENGTH(sqlc.arg(id_substr)) = 64 AND LOWER(HEX(id)) = LOWER(sqlc.arg(id_substr)))
+		OR (LENGTH(sqlc.arg(id_substr)) < 64 AND INSTR(LOWER(HEX(id)), LOWER(sqlc.arg(id_substr))) > 0)
+		-- TODO: consider keeping an id_hex column for faster searches
+	)
+	AND (
+		sqlc.arg(have_results) = -1
+		OR (sqlc.arg(have_results) = 1 AND have_results = TRUE)
+		OR (sqlc.arg(have_results) = 0 AND have_results = FALSE)
+	)
+	AND (
+		sqlc.arg(final_results) = -1
+		OR (sqlc.arg(final_results) = 1 AND final_results = TRUE)
+		OR (sqlc.arg(final_results) = 0 AND final_results = FALSE)
+	)
+	AND (
+		sqlc.arg(manually_ended) = -1
+		OR (sqlc.arg(manually_ended) = 1 AND manually_ended = TRUE)
+		OR (sqlc.arg(manually_ended) = 0 AND manually_ended = FALSE)
+	)
+	AND (sqlc.arg(start_date_after) IS NULL OR start_date >= sqlc.arg(start_date_after))
+	AND (sqlc.arg(start_date_before) IS NULL OR start_date <= sqlc.arg(start_date_before))
+	AND (sqlc.arg(end_date_after) IS NULL OR end_date >= sqlc.arg(end_date_after))
+	AND (sqlc.arg(end_date_before) IS NULL OR end_date <= sqlc.arg(end_date_before))
 )
-SELECT id, total_count
-FROM results
 ORDER BY creation_time DESC, id ASC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset);
@@ -124,9 +165,6 @@ WHERE id = sqlc.arg(id);
 UPDATE processes
 SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = id)
 WHERE id = sqlc.arg(id);
-
--- name: GetProcessCount :one
-SELECT COUNT(*) FROM processes;
 
 -- name: GetEntityCount :one
 SELECT COUNT(DISTINCT entity_id) FROM processes;

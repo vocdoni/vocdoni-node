@@ -13,11 +13,32 @@ import (
 )
 
 const countAccounts = `-- name: CountAccounts :one
-SELECT COUNT(*) FROM accounts
+SELECT COUNT(*)
+FROM accounts
+WHERE (
+  (
+  ?1 = ''
+  OR (LENGTH(?1) = 40 AND LOWER(HEX(account)) = LOWER(?1))
+  OR (LENGTH(?1) < 40 AND INSTR(LOWER(HEX(account)), LOWER(?1)) > 0)
+  -- TODO: consider keeping an account_hex column for faster searches
+  )
+)
 `
 
-func (q *Queries) CountAccounts(ctx context.Context) (int64, error) {
-	row := q.queryRow(ctx, q.countAccountsStmt, countAccounts)
+func (q *Queries) CountAccounts(ctx context.Context, accountIDSubstr interface{}) (int64, error) {
+	row := q.queryRow(ctx, q.countAccountsStmt, countAccounts, accountIDSubstr)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const countTotalAccounts = `-- name: CountTotalAccounts :one
+SELECT COUNT(*)
+FROM accounts
+`
+
+func (q *Queries) CountTotalAccounts(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.countTotalAccountsStmt, countTotalAccounts)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -40,53 +61,37 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (s
 }
 
 const searchAccounts = `-- name: SearchAccounts :many
-WITH results AS (
-  SELECT account, balance, nonce
-  FROM accounts
-  WHERE (
-    (
-    ?3 = ''
-    OR (LENGTH(?3) = 40 AND LOWER(HEX(account)) = LOWER(?3))
-    OR (LENGTH(?3) < 40 AND INSTR(LOWER(HEX(account)), LOWER(?3)) > 0)
-    -- TODO: consider keeping an account_hex column for faster searches
-    )
+SELECT account, balance, nonce
+FROM accounts
+WHERE (
+  (
+  ?1 = ''
+  OR (LENGTH(?1) = 40 AND LOWER(HEX(account)) = LOWER(?1))
+  OR (LENGTH(?1) < 40 AND INSTR(LOWER(HEX(account)), LOWER(?1)) > 0)
+  -- TODO: consider keeping an account_hex column for faster searches
   )
 )
-SELECT account, balance, nonce, COUNT(*) OVER() AS total_count
-FROM results
 ORDER BY balance DESC
-LIMIT ?2
-OFFSET ?1
+LIMIT ?3
+OFFSET ?2
 `
 
 type SearchAccountsParams struct {
+	AccountIDSubstr interface{}
 	Offset          int64
 	Limit           int64
-	AccountIDSubstr interface{}
 }
 
-type SearchAccountsRow struct {
-	Account    []byte
-	Balance    int64
-	Nonce      int64
-	TotalCount int64
-}
-
-func (q *Queries) SearchAccounts(ctx context.Context, arg SearchAccountsParams) ([]SearchAccountsRow, error) {
-	rows, err := q.query(ctx, q.searchAccountsStmt, searchAccounts, arg.Offset, arg.Limit, arg.AccountIDSubstr)
+func (q *Queries) SearchAccounts(ctx context.Context, arg SearchAccountsParams) ([]Account, error) {
+	rows, err := q.query(ctx, q.searchAccountsStmt, searchAccounts, arg.AccountIDSubstr, arg.Offset, arg.Limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []SearchAccountsRow
+	var items []Account
 	for rows.Next() {
-		var i SearchAccountsRow
-		if err := rows.Scan(
-			&i.Account,
-			&i.Balance,
-			&i.Nonce,
-			&i.TotalCount,
-		); err != nil {
+		var i Account
+		if err := rows.Scan(&i.Account, &i.Balance, &i.Nonce); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

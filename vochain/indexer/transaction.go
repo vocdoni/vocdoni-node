@@ -21,7 +21,7 @@ var ErrTransactionNotFound = fmt.Errorf("transaction not found")
 
 // CountTotalTransactions returns the number of transactions indexed
 func (idx *Indexer) CountTotalTransactions() (uint64, error) {
-	count, err := idx.readOnlyQuery.CountTransactions(context.TODO())
+	count, err := idx.readOnlyQuery.CountTotalTransactions(context.TODO())
 	return uint64(count), err
 }
 
@@ -69,11 +69,11 @@ func (idx *Indexer) GetTransactionByHeightAndIndex(blockHeight, blockIndex int64
 	return indexertypes.TransactionFromDB(&sqlTxRef), nil
 }
 
-// SearchTransactions returns the list of transactions indexed.
+// TransactionList returns the list of transactions indexed.
 // blockHeight, hash, txType, txSubtype and txSigner are optional, if declared as zero-value will be ignored.
 // hash matches substrings.
 // The first one returned is the newest, so they are in descending order.
-func (idx *Indexer) SearchTransactions(limit, offset int, blockHeight uint64, txHash, txType, txSubtype, txSigner string) ([]*indexertypes.TransactionMetadata, uint64, error) {
+func (idx *Indexer) TransactionList(limit, offset int, blockHeight uint64, txHash, txType, txSubtype, txSigner string) ([]*indexertypes.TransactionMetadata, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
@@ -94,12 +94,19 @@ func (idx *Indexer) SearchTransactions(limit, offset int, blockHeight uint64, tx
 	}
 	list := []*indexertypes.TransactionMetadata{}
 	for _, row := range results {
-		list = append(list, indexertypes.TransactionMetadataFromDBRow(&row))
+		list = append(list, indexertypes.TransactionMetadataFromDB(&row))
 	}
-	if len(results) == 0 {
-		return list, 0, nil
+	count, err := idx.readOnlyQuery.CountTransactions(context.TODO(), indexerdb.CountTransactionsParams{
+		HashSubstr:  txHash,
+		BlockHeight: blockHeight,
+		TxType:      txType,
+		TxSubtype:   txSubtype,
+		TxSigner:    txSigner,
+	})
+	if err != nil {
+		return nil, 0, err
 	}
-	return list, uint64(results[0].TotalCount), nil
+	return list, uint64(count), nil
 }
 
 func (idx *Indexer) OnNewTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32) {

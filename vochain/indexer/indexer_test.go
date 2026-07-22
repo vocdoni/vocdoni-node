@@ -1420,7 +1420,7 @@ func TestTxIndexer(t *testing.T) {
 		}
 	}
 
-	txs, _, err := idx.SearchTransactions(15, 0, 0, "", "", "", "")
+	txs, _, err := idx.TransactionList(15, 0, 0, "", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	for i, tx := range txs {
 		// BlockIndex and TxBlockIndex start at 0, so subtract 1.
@@ -1429,7 +1429,7 @@ func TestTxIndexer(t *testing.T) {
 		qt.Assert(t, tx.TxType, qt.Equals, "setAccount")
 	}
 
-	txs, _, err = idx.SearchTransactions(1, 5, 0, "", "", "", "")
+	txs, _, err = idx.TransactionList(1, 5, 0, "", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, txs, qt.HasLen, 1)
 }

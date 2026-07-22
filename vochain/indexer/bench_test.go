@@ -175,29 +175,14 @@ func BenchmarkNewProcess(b *testing.B) {
 	idx := newTestIndexer(b, app)
 	_ = idx // used via the callbacks; we want to benchmark it too
 	startTime := time.Now()
-	numProcesses := b.N
-	entityID := util.RandomBytes(20)
 
 	b.ReportAllocs()
 	b.ResetTimer()
-	for i := 0; i < numProcesses; i++ {
-		pid := util.RandomBytes(32)
-		if err := app.State.AddProcess(&models.Process{
-			ProcessId: pid,
-			// EntityId:     util.RandomBytes(20),
-			EntityId:     entityID,
-			EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
-			Status:       models.ProcessStatus_READY,
-			BlockCount:   100000000,
-			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
-			Mode:         &models.ProcessMode{AutoStart: true},
-		}); err != nil {
-			b.Fatal(err)
-		}
-	}
-	app.AdvanceTestBlock()
+
+	createDummyProcesses(b, app, b.N)
+
 	log.Infof("indexed %d new processes, took %s",
-		numProcesses, time.Since(startTime))
+		b.N, time.Since(startTime))
 }
 
 func BenchmarkBlockList(b *testing.B) {
@@ -279,4 +264,75 @@ func createDummyBlocks(b *testing.B, idx *Indexer, n int) {
 	}
 	err := idx.blockTx.Commit()
 	qt.Assert(b, err, qt.IsNil)
+}
+
+func BenchmarkElectionList(b *testing.B) {
+	app := vochain.TestBaseApplication(b)
+
+	idx, err := New(app, Options{DataDir: b.TempDir()})
+	qt.Assert(b, err, qt.IsNil)
+
+	count := 10000
+
+	createDummyProcesses(b, app, count)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+
+	benchmarkElectionList := func(b *testing.B,
+		limit int, offset int, processID string,
+	) {
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i < b.N; i++ {
+			pids, total, err := idx.ProcessList(limit, offset, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+			qt.Assert(b, err, qt.IsNil)
+			qt.Assert(b, pids, qt.HasLen, limit, qt.Commentf("%+v", pids))
+			qt.Assert(b, total, qt.Equals, uint64(count))
+		}
+	}
+
+	// Run sub-benchmarks with different limits and filters
+	b.Run("ElectionListLimit1", func(b *testing.B) {
+		benchmarkElectionList(b, 1, 0, "")
+	})
+
+	b.Run("ElectionListLimit10", func(b *testing.B) {
+		benchmarkElectionList(b, 10, 0, "")
+	})
+
+	b.Run("ElectionListLimit100", func(b *testing.B) {
+		benchmarkElectionList(b, 100, 0, "")
+	})
+
+	b.Run("ElectionListOffset", func(b *testing.B) {
+		benchmarkElectionList(b, 10, count/2, "")
+	})
+
+	b.Run("ElectionListWithProcessID", func(b *testing.B) {
+		benchmarkElectionList(b, 10, 0, "ca")
+	})
+}
+
+func createDummyProcesses(b *testing.B, app *vochain.BaseApplication, n int) {
+	entityID := util.RandomBytes(20)
+
+	for i := 0; i < n; i++ {
+		pid := util.RandomBytes(32)
+		pid[0] = byte(0xca)
+		if err := app.State.AddProcess(&models.Process{
+			ProcessId: pid,
+			// EntityId:     util.RandomBytes(20),
+			EntityId:     entityID,
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
+			Status:       models.ProcessStatus_READY,
+			BlockCount:   100000000,
+			VoteOptions:  &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 1},
+			Mode:         &models.ProcessMode{AutoStart: true},
+		}); err != nil {
+			b.Fatal(err)
+		}
+	}
+	app.AdvanceTestBlock()
 }
