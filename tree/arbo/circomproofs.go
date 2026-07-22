@@ -1,7 +1,10 @@
 package arbo
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"slices"
 )
 
 // CircomVerifierProof contains the needed data to check a Circom Verifier Proof
@@ -88,4 +91,34 @@ func (t *Tree) GenerateCircomVerifierProof(k []byte) (*CircomVerifierProof, erro
 	}
 
 	return &cp, nil
+}
+
+// CalculateProofNodes calculates the chain of hashes in the path of the proof.
+// In the returned list, first item is the root, and last item is the hash of the leaf.
+func (cvp CircomVerifierProof) CalculateProofNodes(hashFunc HashFunction) ([][]byte, error) {
+	paddedSiblings := slices.Clone(cvp.Siblings)
+	for k, v := range paddedSiblings {
+		if bytes.Equal(v, []byte{0}) {
+			paddedSiblings[k] = make([]byte, hashFunc.Len())
+		}
+	}
+	packedSiblings, err := PackSiblings(hashFunc, paddedSiblings)
+	if err != nil {
+		return nil, err
+	}
+	return CalculateProofNodes(hashFunc, cvp.Key, cvp.Value, packedSiblings, cvp.OldKey, (cvp.Fnc == 1))
+}
+
+// CheckProof verifies the given proof. The proof verification depends on the
+// HashFunction passed as parameter.
+// Returns nil if the proof is valid, or an error otherwise.
+func (cvp CircomVerifierProof) CheckProof(hashFunc HashFunction) error {
+	hashes, err := cvp.CalculateProofNodes(hashFunc)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(hashes[0], cvp.Root) {
+		return fmt.Errorf("calculated vs expected root mismatch")
+	}
+	return nil
 }
