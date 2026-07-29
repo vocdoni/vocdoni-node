@@ -494,6 +494,17 @@ func TestAPIBlocks(t *testing.T) {
 	err := json.Unmarshal(resp, &block)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, block.TxCount, qt.Equals, int64(1))
+
+	// the same transaction must be listed by the per-block endpoint
+	// (regression: the height was passed into the hash filter slot, so this
+	// endpoint always returned an empty list)
+	resp, code = c.Request("GET", nil, "chain", "blocks", "1", "transactions", "page", "0")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+	txList := api.TransactionsList{}
+	err = json.Unmarshal(resp, &txList)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, len(txList.Transactions), qt.Equals, 1)
+	qt.Assert(t, txList.Transactions[0].BlockHeight, qt.Equals, uint32(1))
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
