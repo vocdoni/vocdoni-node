@@ -1049,8 +1049,11 @@ func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprou
 	params, err := parseTransactionParams(
 		ctx.URLParam(ParamPage),
 		"",
-		ctx.URLParam(ParamHeight),
 		"",
+		// parseTransactionParams takes hash before height; passing the height
+		// in the hash slot silently filtered by a nonexistent hash and made
+		// this endpoint always return an empty list.
+		ctx.URLParam(ParamHeight),
 		"",
 		"",
 		"",
