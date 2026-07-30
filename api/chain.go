@@ -1102,9 +1102,11 @@ func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprou
 		ctx.URLParam(ParamPage),
 		"",
 		"",
-		// parseTransactionParams takes hash before height; passing the height
-		// in the hash slot silently filtered by a nonexistent hash and made
-		// this endpoint always return an empty list.
+		// parseTransactionParams takes hash before height; the height used to be
+		// passed in the hash slot, which filtered by a hash substring instead and
+		// left the height filter unset. The result was not an empty list but a
+		// wrong one: every transaction whose hex hash happened to contain the
+		// height as a substring, from any block.
 		ctx.URLParam(ParamHeight),
 		"",
 		"",

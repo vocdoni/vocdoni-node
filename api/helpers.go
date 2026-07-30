@@ -25,6 +25,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -305,6 +306,32 @@ func parseStatus(s string) (models.ProcessStatus, error) {
 		return 0, ErrParamStatusInvalid.With(s)
 	}
 	return models.ProcessStatus(status), nil
+}
+
+// parseBucket converts a time bucket granularity string ("hour", "day") into the
+// corresponding indexer bucket.
+//
+// If the string doesn't map to a value, returns an APIerror.
+//
+// The empty string "" is treated specially, returns the default (hour) with no error.
+func parseBucket(s string) (string, error) {
+	switch s {
+	case "":
+		return indexer.VoteBucketHour, nil
+	case indexer.VoteBucketHour, indexer.VoteBucketDay:
+		return s, nil
+	default:
+		return "", ErrParamBucketInvalid.With(s)
+	}
+}
+
+// bucketDuration returns the time span covered by a single bucket of the given
+// granularity, which must be one returned by parseBucket.
+func bucketDuration(bucket string) time.Duration {
+	if bucket == indexer.VoteBucketDay {
+		return 24 * time.Hour
+	}
+	return time.Hour
 }
 
 // parseHexString converts a string like 0x1234cafe (or 1234cafe)

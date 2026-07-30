@@ -26,25 +26,50 @@ SELECT COUNT(*) FROM votes;
 -- Aggregates the votes of a process into time buckets, using the block timestamp.
 -- The bucket_format argument is a strftime format string which truncates the
 -- timestamp to the desired granularity (e.g. '%Y-%m-%dT%H:00:00Z' for hourly).
-SELECT CAST(strftime(CAST(sqlc.arg(bucket_format) AS TEXT), b.time) AS TEXT) AS period,
+-- The join on blocks is a LEFT JOIN on purpose: a vote whose block is not indexed
+-- cannot be dated, and is reported under the empty period rather than dropped,
+-- so that the caller can tell the aggregation apart from the vote count.
+-- The from_time and to_time arguments bound the dated votes; undated votes belong
+-- to no window, so they are always counted.
+SELECT CAST(COALESCE(strftime(CAST(sqlc.arg(bucket_format) AS TEXT), b.time), '') AS TEXT) AS period,
 	COUNT(*) AS count
 FROM votes AS v
-JOIN blocks AS b
+LEFT JOIN blocks AS b
 	ON v.block_height = b.height
 WHERE v.process_id = sqlc.arg(process_id)
+	AND (
+		b.height IS NULL
+		OR (
+			-- datetime() normalizes both sides to UTC, so that a stored timestamp
+			-- and a bound written with different zone offsets still compare right.
+			(sqlc.arg(from_time) IS NULL OR datetime(b.time) >= datetime(sqlc.arg(from_time)))
+			AND (sqlc.arg(to_time) IS NULL OR datetime(b.time) <= datetime(sqlc.arg(to_time)))
+		)
+	)
 GROUP BY period
 ORDER BY period;
 
--- name: HasVotesMissingBlockTime :one
--- Reports whether any indexed vote references a block which is not indexed, and
--- thus cannot be dated. Used once at startup as a completeness check: the scan
--- stops at the first such vote, so it is cheap when the data is complete.
-SELECT CAST(EXISTS (
-	SELECT 1 FROM votes AS v
-	LEFT JOIN blocks AS b
-		ON v.block_height = b.height
-	WHERE b.height IS NULL
-) AS INTEGER) AS incomplete;
+-- name: VoteBlockHeightBounds :one
+-- Returns the height of the oldest and newest indexed vote, and the height of the
+-- oldest indexed block. An indexer db recreated or restored later than the chain
+-- it indexes holds votes older than its first block, which therefore cannot be
+-- dated. Every value is a MIN/MAX over an indexed column, so this is O(log n) and
+-- cheap to run on every boot, unlike a scan looking for votes with no block row.
+-- A zero means the corresponding table is empty.
+SELECT
+	CAST(COALESCE((SELECT MIN(block_height) FROM votes), 0) AS INTEGER) AS min_vote_height,
+	CAST(COALESCE((SELECT MAX(block_height) FROM votes), 0) AS INTEGER) AS max_vote_height,
+	CAST(COALESCE((SELECT MIN(height) FROM blocks), 0) AS INTEGER) AS min_block_height;
+
+-- name: CountUndatedVotesBelowHeight :one
+-- Counts the votes below the given height whose block is not indexed. Only used to
+-- report how many votes can never be dated, when their blocks are already pruned
+-- from the block store, so it only ever scans that (bounded) height range.
+SELECT COUNT(*) FROM votes AS v
+LEFT JOIN blocks AS b
+	ON v.block_height = b.height
+WHERE v.block_height < sqlc.arg(height)
+	AND b.height IS NULL;
 
 -- name: SearchVotes :many
 WITH results AS (

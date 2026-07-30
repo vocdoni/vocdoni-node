@@ -53,6 +53,12 @@ const (
 	DefaultItemsPerPage = 10
 	// MaxItemsPerPage defines a ceiling for the `limit` param passed by the client
 	MaxItemsPerPage = 100
+	// MaxVoteActivityBuckets is the highest number of time buckets the vote activity
+	// endpoint will aggregate in a single response. The aggregation is done at read
+	// time over every vote of the election, so the window it covers is bounded: a
+	// client hitting the cap has to either use a coarser bucket or narrow the window
+	// down with the `from` and `to` params.
+	MaxVoteActivityBuckets = 1000
 )
 
 // These consts define the keywords for query (?param=), url (/url/param/) and POST params.
@@ -70,6 +76,8 @@ const (
 	ParamLimit           = "limit"
 	ParamStatus          = "status"
 	ParamBucket          = "bucket"
+	ParamFrom            = "from"
+	ParamTo              = "to"
 	ParamWithResults     = "withResults"
 	ParamFinalResults    = "finalResults"
 	ParamManuallyEnded   = "manuallyEnded"

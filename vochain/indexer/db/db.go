@@ -48,6 +48,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countTransactionsByTypeStmt, err = db.PrepareContext(ctx, countTransactionsByType); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactionsByType: %w", err)
 	}
+	if q.countUndatedVotesBelowHeightStmt, err = db.PrepareContext(ctx, countUndatedVotesBelowHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query CountUndatedVotesBelowHeight: %w", err)
+	}
 	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
 	}
@@ -104,9 +107,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
-	}
-	if q.hasVotesMissingBlockTimeStmt, err = db.PrepareContext(ctx, hasVotesMissingBlockTime); err != nil {
-		return nil, fmt.Errorf("error preparing query HasVotesMissingBlockTime: %w", err)
 	}
 	if q.lastBlockHeightStmt, err = db.PrepareContext(ctx, lastBlockHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query LastBlockHeight: %w", err)
@@ -174,6 +174,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.voteActivityStmt, err = db.PrepareContext(ctx, voteActivity); err != nil {
 		return nil, fmt.Errorf("error preparing query VoteActivity: %w", err)
 	}
+	if q.voteBlockHeightBoundsStmt, err = db.PrepareContext(ctx, voteBlockHeightBounds); err != nil {
+		return nil, fmt.Errorf("error preparing query VoteBlockHeightBounds: %w", err)
+	}
 	return &q, nil
 }
 
@@ -217,6 +220,11 @@ func (q *Queries) Close() error {
 	if q.countTransactionsByTypeStmt != nil {
 		if cerr := q.countTransactionsByTypeStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTransactionsByTypeStmt: %w", cerr)
+		}
+	}
+	if q.countUndatedVotesBelowHeightStmt != nil {
+		if cerr := q.countUndatedVotesBelowHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countUndatedVotesBelowHeightStmt: %w", cerr)
 		}
 	}
 	if q.countVotesStmt != nil {
@@ -312,11 +320,6 @@ func (q *Queries) Close() error {
 	if q.getVoteStmt != nil {
 		if cerr := q.getVoteStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
-		}
-	}
-	if q.hasVotesMissingBlockTimeStmt != nil {
-		if cerr := q.hasVotesMissingBlockTimeStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing hasVotesMissingBlockTimeStmt: %w", cerr)
 		}
 	}
 	if q.lastBlockHeightStmt != nil {
@@ -429,6 +432,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing voteActivityStmt: %w", cerr)
 		}
 	}
+	if q.voteBlockHeightBoundsStmt != nil {
+		if cerr := q.voteBlockHeightBoundsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing voteBlockHeightBoundsStmt: %w", cerr)
+		}
+	}
 	return err
 }
 
@@ -476,6 +484,7 @@ type Queries struct {
 	countTransactionsStmt                 *sql.Stmt
 	countTransactionsByHeightStmt         *sql.Stmt
 	countTransactionsByTypeStmt           *sql.Stmt
+	countUndatedVotesBelowHeightStmt      *sql.Stmt
 	countVotesStmt                        *sql.Stmt
 	createAccountStmt                     *sql.Stmt
 	createBlockStmt                       *sql.Stmt
@@ -495,7 +504,6 @@ type Queries struct {
 	getTransactionByHashStmt              *sql.Stmt
 	getTransactionByHeightAndIndexStmt    *sql.Stmt
 	getVoteStmt                           *sql.Stmt
-	hasVotesMissingBlockTimeStmt          *sql.Stmt
 	lastBlockHeightStmt                   *sql.Stmt
 	listAccountsMissingNameStmt           *sql.Stmt
 	listProcessesMissingMetadataTitleStmt *sql.Stmt
@@ -518,6 +526,7 @@ type Queries struct {
 	updateProcessResultByIDStmt           *sql.Stmt
 	updateProcessResultsStmt              *sql.Stmt
 	voteActivityStmt                      *sql.Stmt
+	voteBlockHeightBoundsStmt             *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -532,6 +541,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		countTransactionsStmt:                 q.countTransactionsStmt,
 		countTransactionsByHeightStmt:         q.countTransactionsByHeightStmt,
 		countTransactionsByTypeStmt:           q.countTransactionsByTypeStmt,
+		countUndatedVotesBelowHeightStmt:      q.countUndatedVotesBelowHeightStmt,
 		countVotesStmt:                        q.countVotesStmt,
 		createAccountStmt:                     q.createAccountStmt,
 		createBlockStmt:                       q.createBlockStmt,
@@ -551,7 +561,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTransactionByHashStmt:              q.getTransactionByHashStmt,
 		getTransactionByHeightAndIndexStmt:    q.getTransactionByHeightAndIndexStmt,
 		getVoteStmt:                           q.getVoteStmt,
-		hasVotesMissingBlockTimeStmt:          q.hasVotesMissingBlockTimeStmt,
 		lastBlockHeightStmt:                   q.lastBlockHeightStmt,
 		listAccountsMissingNameStmt:           q.listAccountsMissingNameStmt,
 		listProcessesMissingMetadataTitleStmt: q.listProcessesMissingMetadataTitleStmt,
@@ -574,5 +583,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateProcessResultByIDStmt:           q.updateProcessResultByIDStmt,
 		updateProcessResultsStmt:              q.updateProcessResultsStmt,
 		voteActivityStmt:                      q.voteActivityStmt,
+		voteBlockHeightBoundsStmt:             q.voteBlockHeightBoundsStmt,
 	}
 }

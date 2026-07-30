@@ -170,10 +170,30 @@ func TestAPIcensusAndVote(t *testing.T) {
 		qt.Assert(t, activity.TotalVotes, qt.Equals, uint64(1))
 		qt.Assert(t, activity.Buckets, qt.HasLen, 1)
 		qt.Assert(t, activity.Buckets[0].Count, qt.Equals, uint64(1))
+		// every vote of this election has its block indexed
+		qt.Assert(t, activity.UndatedVotes, qt.Equals, uint64(0))
 	}
 
 	// An unknown granularity is rejected
 	_, code = c.RequestWithQuery("GET", nil, "bucket=banana",
+		"elections", election.ElectionID.String(), "votes", "activity")
+	qt.Assert(t, code, qt.Equals, 400)
+
+	// The from and to params bound the aggregation by block time
+	for _, query := range []string{
+		"from=" + time.Now().Add(time.Hour).UTC().Format(time.RFC3339),
+		"to=" + time.Now().Add(-time.Hour).UTC().Format(time.RFC3339),
+	} {
+		resp, code = c.RequestWithQuery("GET", nil, query,
+			"elections", election.ElectionID.String(), "votes", "activity")
+		qt.Assert(t, code, qt.Equals, 200, qt.Commentf("query %s response: %s", query, resp))
+		activity := api.VoteActivity{}
+		qt.Assert(t, json.Unmarshal(resp, &activity), qt.IsNil)
+		qt.Assert(t, activity.TotalVotes, qt.Equals, uint64(0))
+		qt.Assert(t, activity.Buckets, qt.HasLen, 0)
+	}
+	// An unparseable bound is rejected
+	_, code = c.RequestWithQuery("GET", nil, "from=yesterday",
 		"elections", election.ElectionID.String(), "votes", "activity")
 	qt.Assert(t, code, qt.Equals, 400)
 
@@ -554,16 +574,33 @@ func TestAPIBlocks(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, block.TxCount, qt.Equals, int64(1))
 
-	// the same transaction must be listed by the per-block endpoint
-	// (regression: the height was passed into the hash filter slot, so this
-	// endpoint always returned an empty list)
-	resp, code = c.Request("GET", nil, "chain", "blocks", "1", "transactions", "page", "0")
-	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
-	txList := api.TransactionsList{}
-	err = json.Unmarshal(resp, &txList)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, len(txList.Transactions), qt.Equals, 1)
-	qt.Assert(t, txList.Transactions[0].BlockHeight, qt.Equals, uint32(1))
+	// create a second account, so a second block has a transaction of its own
+	_ = createAccount(t, c, server, initBalance)
+
+	// Block 3
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	// each block must be listed with its own transactions by the per-block endpoint
+	// (regression: the height was passed into the hash filter slot, so the endpoint
+	// filtered by a hash substring with no height filter at all, listing every
+	// transaction whose hex hash contained the height as a substring)
+	blockTxs := func(height uint32) []*indexertypes.TransactionMetadata {
+		resp, code := c.Request("GET", nil, "chain", "blocks", fmt.Sprint(height), "transactions", "page", "0")
+		qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
+		txList := api.TransactionsList{}
+		qt.Assert(t, json.Unmarshal(resp, &txList), qt.IsNil)
+		return txList.Transactions
+	}
+	txsBlock1 := blockTxs(1)
+	qt.Assert(t, txsBlock1, qt.HasLen, 1)
+	qt.Assert(t, txsBlock1[0].BlockHeight, qt.Equals, uint32(1))
+	txsBlock2 := blockTxs(2)
+	qt.Assert(t, txsBlock2, qt.HasLen, 1)
+	qt.Assert(t, txsBlock2[0].BlockHeight, qt.Equals, uint32(2))
+	qt.Assert(t, txsBlock1[0].Hash.String() != txsBlock2[0].Hash.String(), qt.IsTrue)
+	// a block with no transaction lists none, rather than any hash matching "3"
+	qt.Assert(t, blockTxs(3), qt.HasLen, 0)
 }
 
 func runAPIElectionCostWithParams(t *testing.T,
