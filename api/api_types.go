@@ -135,6 +135,11 @@ type ElectionSummary struct {
 	// has not been resolved, in which case a client that needs it has to fall
 	// back to the election detail endpoint for that row.
 	Title string `json:"title,omitempty"`
+	// KeyRevealHeight and KeyRevealTxHash locate the transaction that revealed
+	// the encryption keys of an encrypted election. Both are omitted unless the
+	// keys were revealed and the revealing transaction is indexed.
+	KeyRevealHeight uint32         `json:"keyRevealHeight,omitempty"`
+	KeyRevealTxHash types.HexBytes `json:"keyRevealTxHash,omitempty"`
 }
 
 // ElectionsList is used to return a paginated list to the client

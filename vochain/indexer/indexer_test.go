@@ -1860,3 +1860,67 @@ func TestEntityMetadata(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, pending, qt.HasLen, 0)
 }
+
+func TestProcessKeyReveal(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	pid := util.RandomBytes(32)
+	err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EntityId:      util.RandomBytes(20),
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: true},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    100,
+		MaxCensusSize: 10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// before the keys are revealed, nothing points at a reveal transaction
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, uint32(0))
+	qt.Assert(t, proc.KeyRevealTxHash, qt.IsNil)
+
+	// index the transaction revealing them, as the app does on every tx
+	signedTx, err := proto.Marshal(&models.SignedTx{
+		Tx: func() []byte {
+			b, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: &models.AdminTx{
+				Txtype:    models.TxType_REVEAL_PROCESS_KEYS,
+				ProcessId: pid,
+			}}})
+			qt.Assert(t, err, qt.IsNil)
+			return b
+		}(),
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vtx := new(vochaintx.Tx)
+	qt.Assert(t, vtx.Unmarshal(signedTx, app.ChainID()), qt.IsNil)
+
+	revealHeight := app.Height()
+	idx.OnNewTx(vtx, revealHeight, 0)
+	app.AdvanceTestBlock()
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, revealHeight)
+	qt.Assert(t, proc.KeyRevealTxHash.String(), qt.Equals, hex.EncodeToString(vtx.TxID[:]))
+
+	// an election whose keys were revealed before the columns existed is repaired
+	// at boot, by re-reading the body of the stored transaction
+	_, err = idx.readWriteDB.Exec(
+		"UPDATE processes SET key_reveal_height = 0, key_reveal_tx_hash = x'' WHERE id = ?", pid)
+	qt.Assert(t, err, qt.IsNil)
+
+	idx.bootstrapKeyReveals()
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, revealHeight)
+	qt.Assert(t, proc.KeyRevealTxHash.String(), qt.Equals, hex.EncodeToString(vtx.TxID[:]))
+}

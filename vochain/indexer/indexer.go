@@ -363,6 +363,11 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	// indexed vote is known to have a block, and thus a timestamp.
 	idx.bootstrapBlocks(inTest)
 
+	// Fill the key reveal columns of the elections indexed before they existed.
+	// Cheap enough to attempt on every boot: it is one indexed lookup, and each
+	// row it does find is written at most once.
+	idx.bootstrapKeyReveals()
+
 	// if no live results, we don't need the bootstraping
 	if idx.ignoreLiveResults {
 		return

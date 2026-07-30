@@ -26,6 +26,8 @@ type Process struct {
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
 	MetadataTitle     string                     `json:"metadataTitle,omitempty"`
+	KeyRevealHeight   uint32                     `json:"keyRevealHeight,omitempty"`
+	KeyRevealTxHash   types.HexBytes             `json:"keyRevealTxHash,omitempty"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
 	Status            int32                      `json:"status"`
 	Namespace         uint32                     `json:"namespace"`
@@ -82,6 +84,8 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
 		MetadataTitle:     dbproc.MetadataTitle,
+		KeyRevealHeight:   uint32(dbproc.KeyRevealHeight),
+		KeyRevealTxHash:   nonEmptyBytes(dbproc.KeyRevealTxHash),
 		ChainID:           dbproc.ChainID,
 
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
