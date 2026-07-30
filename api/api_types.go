@@ -220,6 +220,10 @@ type Vote struct {
 	OverwriteCount   *uint32         `json:"overwriteCount,omitempty" extensions:"x-omitempty"`
 	// Date when the vote was emitted
 	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
+	// BlockTime is the timestamp of the block that included the vote. It is the
+	// same instant as Date, reported on list rows so that clients don't need a
+	// per-vote request to date them. Omitted when the block is not indexed.
+	BlockTime *time.Time `json:"blockTime,omitempty" extensions:"x-omitempty"`
 }
 
 type VotesList struct {
@@ -237,6 +241,25 @@ type VoteActivity struct {
 	TotalVotes uint64 `json:"totalVotes"`
 	// Bucket is the granularity used, either "hour" or "day".
 	Bucket string `json:"bucket" example:"hour"`
+}
+
+// ChainStats bundles the chain-wide counters a client would otherwise have to
+// assemble out of one list request per bucket, reading totalItems off each.
+type ChainStats struct {
+	// TxCountByType holds the number of transactions of each type, keyed by the
+	// same type names accepted by the transaction list type filter. A type with
+	// no transaction indexed is absent rather than reported as zero.
+	TxCountByType map[string]uint64 `json:"txCountByType"`
+	// ElectionCountByStatus holds the number of elections in each status, keyed
+	// by the same status names reported by the election endpoints (READY,
+	// ENDED...). A status with no election is absent rather than zero.
+	ElectionCountByStatus map[string]uint64 `json:"electionCountByStatus"`
+	// AccountCount is the total number of indexed accounts.
+	AccountCount uint64 `json:"accountCount" example:"2618"`
+	// ElectionCount is the total number of indexed elections.
+	ElectionCount uint64 `json:"electionCount" example:"2602"`
+	// VoteCount is the total number of indexed votes.
+	VoteCount uint64 `json:"voteCount" example:"134523"`
 }
 
 type CensusTypeDescription struct {

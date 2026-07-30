@@ -127,11 +127,15 @@ func (q *Queries) HasVotesMissingBlockTime(ctx context.Context) (int64, error) {
 
 const searchVotes = `-- name: SearchVotes :many
 WITH results AS (
-	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
+	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash, b.time AS block_time
 	FROM votes AS v
 	LEFT JOIN transactions AS t
 		ON v.block_height = t.block_height
 		AND v.block_index = t.block_index
+	-- dates every listed vote by its block, the same indexed point lookup on the
+	-- blocks primary key that GetVote and VoteActivity already do
+	LEFT JOIN blocks AS b
+		ON v.block_height = b.height
 	WHERE (
 		LENGTH(?3) <= 64 -- if passed arg is longer, then just abort the query
 		AND (
@@ -149,7 +153,7 @@ WITH results AS (
 		)
 	)
 )
-SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, COUNT(*) OVER() AS total_count
+SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, block_time, COUNT(*) OVER() AS total_count
 FROM results
 ORDER BY block_height DESC, nullifier ASC
 LIMIT ?2
@@ -174,6 +178,7 @@ type SearchVotesRow struct {
 	EncryptionKeyIndexes string
 	Package              string
 	Hash                 []byte
+	BlockTime            sql.NullTime
 	TotalCount           int64
 }
 
@@ -202,6 +207,7 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.EncryptionKeyIndexes,
 			&i.Package,
 			&i.Hash,
+			&i.BlockTime,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err

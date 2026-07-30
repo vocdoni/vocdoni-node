@@ -22,6 +22,14 @@ LIMIT 1;
 -- name: CountTransactions :one
 SELECT COUNT(*) FROM transactions;
 
+-- name: CountTransactionsByType :many
+-- Counts the indexed transactions grouped by their type, in one pass over
+-- index_transactions_type. Types with no transaction are simply absent.
+SELECT type, COUNT(*) AS count
+FROM transactions
+GROUP BY type
+ORDER BY type;
+
 -- name: CountTransactionsByHeight :one
 SELECT COUNT(*) FROM transactions
 WHERE block_height = ?;

@@ -262,6 +262,7 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 			TxHash:           vote.TxHash,
 			BlockHeight:      vote.Height,
 			TransactionIndex: &vote.TxIndex,
+			BlockTime:        vote.BlockTime,
 		})
 	}
 	return list, nil

@@ -176,6 +176,37 @@ func TestAPIcensusAndVote(t *testing.T) {
 	_, code = c.RequestWithQuery("GET", nil, "bucket=banana",
 		"elections", election.ElectionID.String(), "votes", "activity")
 	qt.Assert(t, code, qt.Equals, 400)
+
+	// The vote list dates every row by its block, so clients don't need a request per vote
+	resp, code = c.RequestWithQuery("GET", nil, "electionId="+election.ElectionID.String(), "votes")
+	qt.Assert(t, code, qt.Equals, 200)
+	votesList := api.VotesList{}
+	err = json.Unmarshal(resp, &votesList)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, votesList.Votes, qt.HasLen, 1)
+	qt.Assert(t, votesList.Votes[0].BlockTime, qt.IsNotNil)
+	qt.Assert(t, votesList.Votes[0].BlockTime.IsZero(), qt.IsFalse)
+
+	// The chain stats bundle every counter a dashboard would otherwise poll one by one
+	resp, code = c.Request("GET", nil, "chain", "stats")
+	qt.Assert(t, code, qt.Equals, 200)
+	stats := api.ChainStats{}
+	err = json.Unmarshal(resp, &stats)
+	qt.Assert(t, err, qt.IsNil)
+	// one election was created and one vote cast, by the single account of this test
+	qt.Assert(t, stats.ElectionCount, qt.Equals, uint64(1))
+	qt.Assert(t, stats.VoteCount, qt.Equals, uint64(1))
+	// the account count includes the accounts the test fixture funds from
+	qt.Assert(t, stats.AccountCount > 0, qt.IsTrue)
+	qt.Assert(t, stats.ElectionCountByStatus["READY"], qt.Equals, uint64(1))
+	qt.Assert(t, stats.TxCountByType["vote"], qt.Equals, uint64(1))
+	qt.Assert(t, stats.TxCountByType["newProcess"], qt.Equals, uint64(1))
+	// the per-status counts add up to the total, and so do the per-type ones
+	statusTotal := uint64(0)
+	for _, count := range stats.ElectionCountByStatus {
+		statusTotal += count
+	}
+	qt.Assert(t, statusTotal, qt.Equals, stats.ElectionCount)
 }
 
 func TestAPIaccount(t *testing.T) {

@@ -48,11 +48,15 @@ SELECT CAST(EXISTS (
 
 -- name: SearchVotes :many
 WITH results AS (
-	SELECT v.*, t.hash
+	SELECT v.*, t.hash, b.time AS block_time
 	FROM votes AS v
 	LEFT JOIN transactions AS t
 		ON v.block_height = t.block_height
 		AND v.block_index = t.block_index
+	-- dates every listed vote by its block, the same indexed point lookup on the
+	-- blocks primary key that GetVote and VoteActivity already do
+	LEFT JOIN blocks AS b
+		ON v.block_height = b.height
 	WHERE (
 		LENGTH(sqlc.arg(process_id_substr)) <= 64 -- if passed arg is longer, then just abort the query
 		AND (

@@ -33,6 +33,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countBlocksStmt, err = db.PrepareContext(ctx, countBlocks); err != nil {
 		return nil, fmt.Errorf("error preparing query CountBlocks: %w", err)
 	}
+	if q.countProcessesByStatusStmt, err = db.PrepareContext(ctx, countProcessesByStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query CountProcessesByStatus: %w", err)
+	}
 	if q.countTokenTransfersByAccountStmt, err = db.PrepareContext(ctx, countTokenTransfersByAccount); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTokenTransfersByAccount: %w", err)
 	}
@@ -41,6 +44,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.countTransactionsByHeightStmt, err = db.PrepareContext(ctx, countTransactionsByHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactionsByHeight: %w", err)
+	}
+	if q.countTransactionsByTypeStmt, err = db.PrepareContext(ctx, countTransactionsByType); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTransactionsByType: %w", err)
 	}
 	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
@@ -170,6 +176,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing countBlocksStmt: %w", cerr)
 		}
 	}
+	if q.countProcessesByStatusStmt != nil {
+		if cerr := q.countProcessesByStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countProcessesByStatusStmt: %w", cerr)
+		}
+	}
 	if q.countTokenTransfersByAccountStmt != nil {
 		if cerr := q.countTokenTransfersByAccountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTokenTransfersByAccountStmt: %w", cerr)
@@ -183,6 +194,11 @@ func (q *Queries) Close() error {
 	if q.countTransactionsByHeightStmt != nil {
 		if cerr := q.countTransactionsByHeightStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTransactionsByHeightStmt: %w", cerr)
+		}
+	}
+	if q.countTransactionsByTypeStmt != nil {
+		if cerr := q.countTransactionsByTypeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTransactionsByTypeStmt: %w", cerr)
 		}
 	}
 	if q.countVotesStmt != nil {
@@ -407,9 +423,11 @@ type Queries struct {
 	computeProcessVoteCountStmt        *sql.Stmt
 	countAccountsStmt                  *sql.Stmt
 	countBlocksStmt                    *sql.Stmt
+	countProcessesByStatusStmt         *sql.Stmt
 	countTokenTransfersByAccountStmt   *sql.Stmt
 	countTransactionsStmt              *sql.Stmt
 	countTransactionsByHeightStmt      *sql.Stmt
+	countTransactionsByTypeStmt        *sql.Stmt
 	countVotesStmt                     *sql.Stmt
 	createAccountStmt                  *sql.Stmt
 	createBlockStmt                    *sql.Stmt
@@ -455,9 +473,11 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		computeProcessVoteCountStmt:        q.computeProcessVoteCountStmt,
 		countAccountsStmt:                  q.countAccountsStmt,
 		countBlocksStmt:                    q.countBlocksStmt,
+		countProcessesByStatusStmt:         q.countProcessesByStatusStmt,
 		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
 		countTransactionsStmt:              q.countTransactionsStmt,
 		countTransactionsByHeightStmt:      q.countTransactionsByHeightStmt,
+		countTransactionsByTypeStmt:        q.countTransactionsByTypeStmt,
 		countVotesStmt:                     q.countVotesStmt,
 		createAccountStmt:                  q.createAccountStmt,
 		createBlockStmt:                    q.createBlockStmt,

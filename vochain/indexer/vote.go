@@ -90,6 +90,10 @@ func (idx *Indexer) VoteList(limit, offset int, processID string, nullifier stri
 		if len(txRef.VoterID) > 0 {
 			envelopeMetadata.VoterID = state.VoterID(txRef.VoterID).Address()
 		}
+		if txRef.BlockTime.Valid {
+			blockTime := txRef.BlockTime.Time
+			envelopeMetadata.BlockTime = &blockTime
+		}
 		list = append(list, envelopeMetadata)
 	}
 	if len(results) == 0 {

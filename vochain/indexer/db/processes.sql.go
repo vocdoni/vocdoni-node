@@ -23,6 +23,43 @@ func (q *Queries) ComputeProcessVoteCount(ctx context.Context, id types.ProcessI
 	return q.exec(ctx, q.computeProcessVoteCountStmt, computeProcessVoteCount, id)
 }
 
+const countProcessesByStatus = `-- name: CountProcessesByStatus :many
+SELECT status, COUNT(*) AS count
+FROM processes
+GROUP BY status
+ORDER BY status
+`
+
+type CountProcessesByStatusRow struct {
+	Status int64
+	Count  int64
+}
+
+// Counts the indexed processes grouped by their status, in one pass over
+// index_processes_status. Statuses with no process are simply absent.
+func (q *Queries) CountProcessesByStatus(ctx context.Context) ([]CountProcessesByStatusRow, error) {
+	rows, err := q.query(ctx, q.countProcessesByStatusStmt, countProcessesByStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountProcessesByStatusRow
+	for rows.Next() {
+		var i CountProcessesByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
