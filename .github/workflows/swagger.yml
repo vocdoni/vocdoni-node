@@ -15,13 +15,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-      - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
-      - name: Checkout developer-portal repo
-        uses: actions/checkout@v5
-        with:
-          repository: vocdoni/developer-portal
-          ref: main
-          path: developer-portal
       - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
@@ -43,65 +36,12 @@ jobs:
         uses: mikefarah/yq@v4.34.1
         with:
           cmd: |
+            mkdir -p api/docs/build
             yq '.components.schemas."api.GenericTransactionWithInfo".properties.tx = load("api/docs/models/transactions.yaml").target' \
-              api/docs/oas3.yaml > developer-portal/swaggers/vocdoni-api.yaml
+              api/docs/oas3.yaml > api/docs/build/vocdoni-api.yaml
 
       - name: Publish Artifact
         uses: actions/upload-artifact@v5
         with:
           name: vocdoni-api.yaml
-          path: developer-portal/swaggers/vocdoni-api.yaml
-
-      - name: Check if there is a difference
-        uses: mathiasvr/command-output@v2.0.0
-        id: diff
-        with:
-          run: git -C developer-portal diff --no-color swaggers/vocdoni-api.yaml
-
-      - name: Mark previous comment as outdated if no diff
-        if: ${{ github.event_name == 'pull_request' && steps.diff.outputs.stdout == '' }}
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          header: diff
-          hide: true
-          hide_classify: "OUTDATED"
-
-      - name: Post comment with diff in original PR
-        if: ${{ github.event_name == 'pull_request' && steps.diff.outputs.stdout }}
-        uses: marocchino/sticky-pull-request-comment@v2
-        with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          header: diff
-          message: |
-            This PR introduces the following changes in the developer-portal documentation:
-            ```diff
-            ${{ steps.diff.outputs.stdout }}
-            ```
-
-      - name: Create PR to developer-portal repo
-        id: cpr
-        uses: peter-evans/create-pull-request@v7
-        if: ${{ github.event_name == 'push' }}
-        with:
-          path: developer-portal
-          token: ${{ secrets.VOCDONIBOT_PAT }}
-          commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
-          committer: "Arabot-1 <arabot-1@users.noreply.github.com>"
-          base: main
-          branch: update-api-docs
-          #branch-suffix: short-commit-hash   ## creates temp update-sdk-docs-xyz branches
-          delete-branch: true                 ## true: delete branch after merging
-          title: Update docs with vocdoni-api repo changes
-          body: |
-            * This is an automated pull request to upload the updated vocdoni-api documentation.
-            * GitHub Action Run: [${{ github.run_id }}](https://github.com/vocdoni/vocdoni-node/actions/runs/${{ github.run_id }})
-          labels: |
-            automated pr
-          reviewers: ${{ github.actor }}
-          team-reviewers: SdkDocsReviewer
-
-      - name: "Check PR: ${{ steps.cpr.outputs.pull-request-url }}"
-        if: ${{ steps.cpr.outputs.pull-request-number }}
-        run: |
-          echo "Pull Request Number - ${{ steps.cpr.outputs.pull-request-number }}"
-          echo "Pull Request URL - ${{ steps.cpr.outputs.pull-request-url }}"
+          path: api/docs/build/vocdoni-api.yaml
