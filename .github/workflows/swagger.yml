@@ -78,13 +78,23 @@ jobs:
             ${{ steps.diff.outputs.stdout }}
             ```
 
+      - name: Mint app token for developer-portal
+        id: app-token
+        if: ${{ github.event_name == 'push' }}
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.DOCS_BOT_APP_ID }}
+          private-key: ${{ secrets.DOCS_BOT_PRIVATE_KEY }}
+          owner: vocdoni
+          repositories: developer-portal
+
       - name: Create PR to developer-portal repo
         id: cpr
         uses: peter-evans/create-pull-request@v7
         if: ${{ github.event_name == 'push' }}
         with:
           path: developer-portal
-          token: ${{ secrets.VOCDONIBOT_PAT }}
+          token: ${{ steps.app-token.outputs.token }}
           commit-message: "Update vocdoni-api docs by commit ${{ env.SHA }}"
           committer: "Arabot-1 <arabot-1@users.noreply.github.com>"
           base: main
