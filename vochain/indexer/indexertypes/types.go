@@ -25,6 +25,7 @@ type Process struct {
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
+	MetadataTitle     string                     `json:"metadataTitle,omitempty"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
 	Status            int32                      `json:"status"`
 	Namespace         uint32                     `json:"namespace"`
@@ -80,6 +81,7 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
+		MetadataTitle:     dbproc.MetadataTitle,
 		ChainID:           dbproc.ChainID,
 
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
@@ -264,6 +266,10 @@ type TokenTransfersAccount struct {
 type Entity struct {
 	EntityID     types.EntityID
 	ProcessCount int64
+	// Name and Avatar come from the account off-chain metadata, and are empty
+	// when it was never resolved for this entity.
+	Name   string
+	Avatar string
 }
 
 // VoteBucket is the number of votes cast within a single time bucket.

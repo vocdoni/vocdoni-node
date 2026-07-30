@@ -407,6 +407,9 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 					log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
 				}
 				election.Metadata = &electionMetadata
+				// cache the title, so the election list can render it without
+				// resolving the metadata of every row
+				a.cacheElectionTitle(electionID, &electionMetadata)
 			} else {
 				election.Metadata = metadataBytes
 			}

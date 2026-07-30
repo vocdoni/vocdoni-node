@@ -136,10 +136,12 @@ func (idx *Indexer) CountProcessesByStatus() (map[string]uint64, error) {
 	return counts, nil
 }
 
-// EntityList returns the list of entities indexed by the indexer
-// entityID is optional, if declared as zero-value
-// will be ignored. Searches against the entityID field as lowercase hex.
-func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertypes.Entity, uint64, error) {
+// EntityList returns the list of entities indexed by the indexer.
+// entityID and name are optional, if declared as zero-value they are ignored.
+// entityID is searched against the entityID field as lowercase hex, name as a
+// case-insensitive substring of the entity name resolved from its account
+// metadata (ASCII case folding only, see the SearchEntities query).
+func (idx *Indexer) EntityList(limit, offset int, entityID, name string) ([]indexertypes.Entity, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
@@ -148,6 +150,7 @@ func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertyp
 	}
 	results, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: strings.ToLower(entityID), // we search in lowercase
+		NameSubstr:     name,
 		Offset:         int64(offset),
 		Limit:          int64(limit),
 	})
@@ -159,6 +162,8 @@ func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertyp
 		list = append(list, indexertypes.Entity{
 			EntityID:     row.EntityID,
 			ProcessCount: row.ProcessCount,
+			Name:         row.AccountName,
+			Avatar:       row.AccountAvatar,
 		})
 	}
 	if len(results) == 0 {
@@ -173,7 +178,7 @@ func (idx *Indexer) EntityExists(entityID string) bool {
 	if len(entityID) != 40 {
 		return false
 	}
-	_, count, err := idx.EntityList(1, 0, entityID)
+	_, count, err := idx.EntityList(1, 0, entityID, "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}

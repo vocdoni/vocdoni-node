@@ -39,9 +39,48 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (s
 	return q.exec(ctx, q.createAccountStmt, createAccount, arg.Account, arg.Balance, arg.Nonce)
 }
 
+const listAccountsMissingName = `-- name: ListAccountsMissingName :many
+SELECT account FROM accounts
+WHERE name = '' AND account > ?1
+ORDER BY account
+LIMIT ?2
+`
+
+type ListAccountsMissingNameParams struct {
+	AfterAccount types.AccountID
+	Limit        int64
+}
+
+// Lists the accounts whose name was never resolved, so a backfill knows which
+// ones to look up. Used once per boot. Paged by the account id rather than by an
+// offset, so that a page is never revisited even though rows leave the result set
+// as the backfill fills them.
+func (q *Queries) ListAccountsMissingName(ctx context.Context, arg ListAccountsMissingNameParams) ([]types.AccountID, error) {
+	rows, err := q.query(ctx, q.listAccountsMissingNameStmt, listAccountsMissingName, arg.AfterAccount, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []types.AccountID
+	for rows.Next() {
+		var account types.AccountID
+		if err := rows.Scan(&account); err != nil {
+			return nil, err
+		}
+		items = append(items, account)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchAccounts = `-- name: SearchAccounts :many
 WITH results AS (
-  SELECT account, balance, nonce
+  SELECT account, balance, nonce, name, avatar
   FROM accounts
   WHERE (
     (
@@ -52,7 +91,7 @@ WITH results AS (
     )
   )
 )
-SELECT account, balance, nonce, COUNT(*) OVER() AS total_count
+SELECT account, balance, nonce, name, avatar, COUNT(*) OVER() AS total_count
 FROM results
 ORDER BY balance DESC
 LIMIT ?2
@@ -69,6 +108,8 @@ type SearchAccountsRow struct {
 	Account    []byte
 	Balance    int64
 	Nonce      int64
+	Name       string
+	Avatar     string
 	TotalCount int64
 }
 
@@ -85,6 +126,8 @@ func (q *Queries) SearchAccounts(ctx context.Context, arg SearchAccountsParams) 
 			&i.Account,
 			&i.Balance,
 			&i.Nonce,
+			&i.Name,
+			&i.Avatar,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -98,4 +141,26 @@ func (q *Queries) SearchAccounts(ctx context.Context, arg SearchAccountsParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const setAccountMetadata = `-- name: SetAccountMetadata :execresult
+UPDATE accounts
+SET name = ?1,
+    avatar = ?2
+WHERE account = ?3
+  AND (name != ?1 OR avatar != ?2)
+`
+
+type SetAccountMetadataParams struct {
+	Name    string
+	Avatar  string
+	Account types.AccountID
+}
+
+// Stores the name and avatar resolved from the account off-chain metadata. Only
+// writes when either actually changed, so re-resolving unchanged metadata costs
+// no write. The account row must exist; accounts are created by CreateAccount
+// when the state indexes them.
+func (q *Queries) SetAccountMetadata(ctx context.Context, arg SetAccountMetadataParams) (sql.Result, error) {
+	return q.exec(ctx, q.setAccountMetadataStmt, setAccountMetadata, arg.Name, arg.Avatar, arg.Account)
 }
