@@ -106,6 +106,25 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 	return i, err
 }
 
+const hasVotesMissingBlockTime = `-- name: HasVotesMissingBlockTime :one
+SELECT CAST(EXISTS (
+	SELECT 1 FROM votes AS v
+	LEFT JOIN blocks AS b
+		ON v.block_height = b.height
+	WHERE b.height IS NULL
+) AS INTEGER) AS incomplete
+`
+
+// Reports whether any indexed vote references a block which is not indexed, and
+// thus cannot be dated. Used once at startup as a completeness check: the scan
+// stops at the first such vote, so it is cheap when the data is complete.
+func (q *Queries) HasVotesMissingBlockTime(ctx context.Context) (int64, error) {
+	row := q.queryRow(ctx, q.hasVotesMissingBlockTimeStmt, hasVotesMissingBlockTime)
+	var incomplete int64
+	err := row.Scan(&incomplete)
+	return incomplete, err
+}
+
 const searchVotes = `-- name: SearchVotes :many
 WITH results AS (
 	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
@@ -185,6 +204,53 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.Hash,
 			&i.TotalCount,
 		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const voteActivity = `-- name: VoteActivity :many
+SELECT CAST(strftime(CAST(?1 AS TEXT), b.time) AS TEXT) AS period,
+	COUNT(*) AS count
+FROM votes AS v
+JOIN blocks AS b
+	ON v.block_height = b.height
+WHERE v.process_id = ?2
+GROUP BY period
+ORDER BY period
+`
+
+type VoteActivityParams struct {
+	BucketFormat string
+	ProcessID    types.ProcessID
+}
+
+type VoteActivityRow struct {
+	Period string
+	Count  int64
+}
+
+// Aggregates the votes of a process into time buckets, using the block timestamp.
+// The bucket_format argument is a strftime format string which truncates the
+// timestamp to the desired granularity (e.g. '%Y-%m-%dT%H:00:00Z' for hourly).
+func (q *Queries) VoteActivity(ctx context.Context, arg VoteActivityParams) ([]VoteActivityRow, error) {
+	rows, err := q.query(ctx, q.voteActivityStmt, voteActivity, arg.BucketFormat, arg.ProcessID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []VoteActivityRow
+	for rows.Next() {
+		var i VoteActivityRow
+		if err := rows.Scan(&i.Period, &i.Count); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

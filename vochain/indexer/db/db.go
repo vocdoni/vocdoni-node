@@ -99,6 +99,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
 	}
+	if q.hasVotesMissingBlockTimeStmt, err = db.PrepareContext(ctx, hasVotesMissingBlockTime); err != nil {
+		return nil, fmt.Errorf("error preparing query HasVotesMissingBlockTime: %w", err)
+	}
 	if q.lastBlockHeightStmt, err = db.PrepareContext(ctx, lastBlockHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query LastBlockHeight: %w", err)
 	}
@@ -143,6 +146,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.updateProcessResultsStmt, err = db.PrepareContext(ctx, updateProcessResults); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProcessResults: %w", err)
+	}
+	if q.voteActivityStmt, err = db.PrepareContext(ctx, voteActivity); err != nil {
+		return nil, fmt.Errorf("error preparing query VoteActivity: %w", err)
 	}
 	return &q, nil
 }
@@ -274,6 +280,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
 		}
 	}
+	if q.hasVotesMissingBlockTimeStmt != nil {
+		if cerr := q.hasVotesMissingBlockTimeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing hasVotesMissingBlockTimeStmt: %w", cerr)
+		}
+	}
 	if q.lastBlockHeightStmt != nil {
 		if cerr := q.lastBlockHeightStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing lastBlockHeightStmt: %w", cerr)
@@ -349,6 +360,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing updateProcessResultsStmt: %w", cerr)
 		}
 	}
+	if q.voteActivityStmt != nil {
+		if cerr := q.voteActivityStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing voteActivityStmt: %w", cerr)
+		}
+	}
 	return err
 }
 
@@ -413,6 +429,7 @@ type Queries struct {
 	getTransactionByHashStmt           *sql.Stmt
 	getTransactionByHeightAndIndexStmt *sql.Stmt
 	getVoteStmt                        *sql.Stmt
+	hasVotesMissingBlockTimeStmt       *sql.Stmt
 	lastBlockHeightStmt                *sql.Stmt
 	searchAccountsStmt                 *sql.Stmt
 	searchBlocksStmt                   *sql.Stmt
@@ -428,6 +445,7 @@ type Queries struct {
 	updateProcessFromStateStmt         *sql.Stmt
 	updateProcessResultByIDStmt        *sql.Stmt
 	updateProcessResultsStmt           *sql.Stmt
+	voteActivityStmt                   *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
@@ -459,6 +477,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTransactionByHashStmt:           q.getTransactionByHashStmt,
 		getTransactionByHeightAndIndexStmt: q.getTransactionByHeightAndIndexStmt,
 		getVoteStmt:                        q.getVoteStmt,
+		hasVotesMissingBlockTimeStmt:       q.hasVotesMissingBlockTimeStmt,
 		lastBlockHeightStmt:                q.lastBlockHeightStmt,
 		searchAccountsStmt:                 q.searchAccountsStmt,
 		searchBlocksStmt:                   q.searchBlocksStmt,
@@ -474,5 +493,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		updateProcessFromStateStmt:         q.updateProcessFromStateStmt,
 		updateProcessResultByIDStmt:        q.updateProcessResultByIDStmt,
 		updateProcessResultsStmt:           q.updateProcessResultsStmt,
+		voteActivityStmt:                   q.voteActivityStmt,
 	}
 }
