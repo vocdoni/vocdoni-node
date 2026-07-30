@@ -163,7 +163,7 @@ func testEntityList(t *testing.T, entityCount int) {
 	entitiesByID := make(map[string]bool)
 	last := 0
 	for len(entitiesByID) <= entityCount {
-		list, _, err := idx.EntityList(10, last, "")
+		list, _, err := idx.EntityList(10, last, "", "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) < 1 {
 			t.Log("list is empty")
@@ -258,23 +258,23 @@ func TestEntitySearch(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 	// Exact entity search
-	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 1)
 	// Search for nonexistent entity
-	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
+	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 0)
 	// Search containing part of all manually-defined entities
-	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
+	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as mixed case hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as uppercase hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 }
@@ -359,7 +359,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
 	countEntityProcs := func(eid []byte) int64 {
-		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid))
+		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid), "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) == 0 {
 			return -1
@@ -1768,4 +1768,95 @@ func TestVoteActivity(t *testing.T) {
 	empty, err := idx.VoteActivity(util.RandomBytes(32), VoteBucketHour)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, empty, qt.HasLen, 0)
+}
+
+func TestEntityMetadata(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	// two organizations, each with one election
+	entities := [][]byte{util.RandomBytes(20), util.RandomBytes(20)}
+	for _, eid := range entities {
+		err := app.State.AddProcess(&models.Process{
+			ProcessId:     util.RandomBytes(32),
+			EntityId:      eid,
+			EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+			Status:        models.ProcessStatus_READY,
+			Mode:          &models.ProcessMode{AutoStart: true},
+			BlockCount:    100,
+			MaxCensusSize: 10,
+			VoteOptions: &models.ProcessVoteOptions{
+				MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+			},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		idx.OnSetAccount(eid, &state.Account{})
+	}
+	app.AdvanceTestBlock()
+
+	// with no metadata resolved yet, the rows carry no name
+	list, total, err := idx.EntityList(10, 0, "", "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(2))
+	for _, e := range list {
+		qt.Assert(t, e.Name, qt.Equals, "")
+		qt.Assert(t, e.Avatar, qt.Equals, "")
+	}
+
+	// resolving the metadata of one of them embeds it in its list row
+	qt.Assert(t, idx.SetAccountMetadata(entities[0], "Bank of Åland", "ipfs://avatar"), qt.IsNil)
+	list, _, err = idx.EntityList(10, 0, hex.EncodeToString(entities[0]), "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, 1)
+	qt.Assert(t, list[0].Name, qt.Equals, "Bank of Åland")
+	qt.Assert(t, list[0].Avatar, qt.Equals, "ipfs://avatar")
+
+	// the name filter matches a substring, ignoring ASCII case
+	for _, query := range []string{"Bank", "bank of", "BANK OF ÅLAND"} {
+		list, total, err = idx.EntityList(10, 0, "", query)
+		qt.Assert(t, err, qt.IsNil, qt.Commentf("query %q", query))
+		qt.Assert(t, total, qt.Equals, uint64(1), qt.Commentf("query %q", query))
+		qt.Assert(t, hex.EncodeToString(list[0].EntityID), qt.Equals, hex.EncodeToString(entities[0]))
+	}
+	// and it excludes the organizations with no name resolved
+	_, total, err = idx.EntityList(10, 0, "", "nonesuch")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(0))
+
+	// an election title is likewise stored and read back
+	pending, err := idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 0) // these processes declare no metadata URI
+
+	pid := util.RandomBytes(32)
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EntityId:      entities[0],
+		Metadata:      proto.String("ipfs://metadata"),
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    100,
+		MaxCensusSize: 10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	pending, err = idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 1)
+	qt.Assert(t, pending[0].URI, qt.Equals, "ipfs://metadata")
+
+	qt.Assert(t, idx.SetProcessMetadataTitle(pending[0].ProcessID, "A vote on something"), qt.IsNil)
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MetadataTitle, qt.Equals, "A vote on something")
+
+	// once resolved it is no longer pending, so the backfill won't revisit it
+	pending, err = idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 0)
 }

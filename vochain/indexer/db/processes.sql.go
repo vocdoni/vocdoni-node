@@ -160,7 +160,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -197,6 +197,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.SourceBlockHeight,
 		&i.SourceNetworkID,
 		&i.ManuallyEnded,
+		&i.MetadataTitle,
 	)
 	return i, err
 }
@@ -253,13 +254,64 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 	return status, err
 }
 
+const listProcessesMissingMetadataTitle = `-- name: ListProcessesMissingMetadataTitle :many
+SELECT id, metadata FROM processes
+WHERE metadata_title = '' AND metadata != '' AND id > ?1
+ORDER BY id
+LIMIT ?2
+`
+
+type ListProcessesMissingMetadataTitleParams struct {
+	AfterID types.ProcessID
+	Limit   int64
+}
+
+type ListProcessesMissingMetadataTitleRow struct {
+	ID       types.ProcessID
+	Metadata string
+}
+
+// Lists the processes whose title was never resolved but which do declare a
+// metadata URI, so a backfill knows where to look. Used once per boot. Paged by
+// the process id rather than by an offset, so that a page is never revisited
+// even though rows leave the result set as the backfill fills them.
+func (q *Queries) ListProcessesMissingMetadataTitle(ctx context.Context, arg ListProcessesMissingMetadataTitleParams) ([]ListProcessesMissingMetadataTitleRow, error) {
+	rows, err := q.query(ctx, q.listProcessesMissingMetadataTitleStmt, listProcessesMissingMetadataTitle, arg.AfterID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProcessesMissingMetadataTitleRow
+	for rows.Next() {
+		var i ListProcessesMissingMetadataTitleRow
+		if err := rows.Scan(&i.ID, &i.Metadata); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
-    SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended
-    FROM processes
-    WHERE (?3 = '' OR (INSTR(LOWER(HEX(entity_id)), ?3) > 0))
+    SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title,
+        COALESCE(a.name, '') AS account_name,
+        COALESCE(a.avatar, '') AS account_avatar
+    FROM processes AS p
+    LEFT JOIN accounts AS a
+        ON a.account = p.entity_id
+    WHERE (?3 = '' OR (INSTR(LOWER(HEX(p.entity_id)), ?3) > 0))
+    AND (?4 = '' OR (INSTR(LOWER(COALESCE(a.name, '')), LOWER(?4)) > 0))
 )
 SELECT entity_id,
+	account_name,
+	account_avatar,
 	COUNT(id) AS process_count,
 	COUNT(entity_id) OVER() AS total_count
 FROM results
@@ -273,16 +325,29 @@ type SearchEntitiesParams struct {
 	Offset         int64
 	Limit          int64
 	EntityIDSubstr interface{}
+	NameSubstr     interface{}
 }
 
 type SearchEntitiesRow struct {
-	EntityID     []byte
-	ProcessCount int64
-	TotalCount   int64
+	EntityID      []byte
+	AccountName   string
+	AccountAvatar string
+	ProcessCount  int64
+	TotalCount    int64
 }
 
+// The join to accounts is an indexed point lookup on the accounts primary key,
+// and carries the name and avatar resolved from the account off-chain metadata,
+// so a client listing organizations doesn't need one account request per row.
+// The name filter is a case-insensitive substring match; LOWER only folds ASCII
+// in sqlite, so names differing by non-ASCII case or by diacritics do not match.
 func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
-	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities, arg.Offset, arg.Limit, arg.EntityIDSubstr)
+	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities,
+		arg.Offset,
+		arg.Limit,
+		arg.EntityIDSubstr,
+		arg.NameSubstr,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +355,13 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 	var items []SearchEntitiesRow
 	for rows.Next() {
 		var i SearchEntitiesRow
-		if err := rows.Scan(&i.EntityID, &i.ProcessCount, &i.TotalCount); err != nil {
+		if err := rows.Scan(
+			&i.EntityID,
+			&i.AccountName,
+			&i.AccountAvatar,
+			&i.ProcessCount,
+			&i.TotalCount,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -306,7 +377,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 
 const searchProcesses = `-- name: SearchProcesses :many
 WITH results AS (
-	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended,
+	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title,
 			COUNT(*) OVER() AS total_count
 	FROM processes
 	WHERE (
@@ -413,6 +484,24 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const setProcessMetadataTitle = `-- name: SetProcessMetadataTitle :execresult
+UPDATE processes
+SET metadata_title = ?1
+WHERE id = ?2 AND metadata_title != ?1
+`
+
+type SetProcessMetadataTitleParams struct {
+	MetadataTitle string
+	ID            types.ProcessID
+}
+
+// Stores the title resolved from the process off-chain metadata. Only writes when
+// the title actually changed, so the common case of re-resolving the same title
+// costs no write.
+func (q *Queries) SetProcessMetadataTitle(ctx context.Context, arg SetProcessMetadataTitleParams) (sql.Result, error) {
+	return q.exec(ctx, q.setProcessMetadataTitleStmt, setProcessMetadataTitle, arg.MetadataTitle, arg.ID)
 }
 
 const setProcessResultsCancelled = `-- name: SetProcessResultsCancelled :execresult

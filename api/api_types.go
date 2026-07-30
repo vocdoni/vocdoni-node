@@ -39,6 +39,7 @@ type ElectionParams struct {
 type OrganizationParams struct {
 	PaginationParams
 	OrganizationID string `json:"organizationId,omitempty"`
+	Name           string `json:"name,omitempty"`
 }
 
 // AccountParams allows the client to filter accounts
@@ -106,6 +107,11 @@ type Pagination struct {
 type OrganizationSummary struct {
 	OrganizationID types.HexBytes `json:"organizationID"  example:"0x370372b92514d81a0e3efb8eba9d036ae0877653"`
 	ElectionCount  uint64         `json:"electionCount" example:"1"`
+	// Name and Avatar come from the organization off-chain metadata. They are
+	// omitted when it has not been resolved, in which case a client that needs
+	// them has to fall back to the account endpoint for that row.
+	Name   string `json:"name,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
 }
 
 // OrganizationsList is used to return a paginated list to the client
@@ -125,6 +131,10 @@ type ElectionSummary struct {
 	Results        [][]*types.BigInt `json:"result,omitempty"`
 	ManuallyEnded  bool              `json:"manuallyEnded"`
 	ChainID        string            `json:"chainId"`
+	// Title comes from the election off-chain metadata. It is omitted when it
+	// has not been resolved, in which case a client that needs it has to fall
+	// back to the election detail endpoint for that row.
+	Title string `json:"title,omitempty"`
 }
 
 // ElectionsList is used to return a paginated list to the client

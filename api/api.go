@@ -65,6 +65,7 @@ const (
 	ParamElectionId      = "electionId"
 	ParamOrganizationId  = "organizationId"
 	ParamVoteId          = "voteId"
+	ParamName            = "name"
 	ParamPage            = "page"
 	ParamLimit           = "limit"
 	ParamStatus          = "status"
@@ -148,6 +149,9 @@ func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochainin
 	a.indexer = indexer
 	a.storage = data
 	a.censusdb = censusdb
+	// this is the first point where both the indexer and off-chain storage are
+	// known, which is what filling the cached metadata needs
+	a.startMetadataBackfill()
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.

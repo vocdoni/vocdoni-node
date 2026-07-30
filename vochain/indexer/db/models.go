@@ -48,6 +48,7 @@ type Process struct {
 	SourceBlockHeight  int64
 	SourceNetworkID    int64
 	ManuallyEnded      bool
+	MetadataTitle      string
 }
 
 type TokenTransfer struct {

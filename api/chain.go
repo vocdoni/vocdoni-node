@@ -288,6 +288,7 @@ func (a *API) enableChainHandlers() error {
 //	@Param					page			query		number	false	"Page"
 //	@Param					limit			query		number	false	"Items per page"
 //	@Param					organizationId	query		string	false	"Filter by partial organizationId"
+//	@Param					name			query		string	false	"Filter by organization name, case-insensitive substring match (ASCII case folding only)"
 //	@Success				200				{object}	OrganizationsList
 //	@Router					/chain/organizations [get]
 func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -295,6 +296,7 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		ctx.QueryParam(ParamPage),
 		ctx.QueryParam(ParamLimit),
 		ctx.QueryParam(ParamOrganizationId),
+		ctx.QueryParam(ParamName),
 	)
 	if err != nil {
 		return err
@@ -323,6 +325,7 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 func (a *API) organizationListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseOrganizationParams(
 		ctx.URLParam(ParamPage),
+		"",
 		"",
 		"",
 	)
@@ -393,6 +396,7 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		params.Limit,
 		params.Page*params.Limit,
 		params.OrganizationID,
+		params.Name,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -411,6 +415,8 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		list.Organizations = append(list.Organizations, &OrganizationSummary{
 			OrganizationID: org.EntityID,
 			ElectionCount:  uint64(org.ProcessCount),
+			Name:           org.Name,
+			Avatar:         org.Avatar,
 		})
 	}
 	return list, nil
@@ -1621,7 +1627,7 @@ func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 }
 
 // parseOrganizationParams returns an OrganizationParams filled with the passed params
-func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID string) (*OrganizationParams, error) {
+func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramName string) (*OrganizationParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -1630,6 +1636,7 @@ func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID string) 
 	return &OrganizationParams{
 		PaginationParams: pagination,
 		OrganizationID:   util.TrimHex(paramOrganizationID),
+		Name:             paramName,
 	}, nil
 }
 

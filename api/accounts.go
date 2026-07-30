@@ -172,6 +172,9 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	}
 
 	accMetadata := getAccountMetadata()
+	// cache the name and avatar, so the organization list can render them without
+	// resolving the metadata of every row
+	a.cacheAccountMetadata(addr.Bytes(), accMetadata)
 
 	// take the last word of the URL path to determine the type of request
 	// if the last word is "metadata" then return only the account metadata
