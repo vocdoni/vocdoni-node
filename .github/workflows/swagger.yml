@@ -14,15 +14,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - uses: benjlevesque/short-sha@v3.0 # sets env.SHA to the first 7 chars of github.sha
       - name: Checkout developer-portal repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: vocdoni/developer-portal
           ref: main
           path: developer-portal
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version: '1.26'
           cache: false
@@ -47,7 +47,7 @@ jobs:
               api/docs/oas3.yaml > developer-portal/swaggers/vocdoni-api.yaml
 
       - name: Publish Artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: vocdoni-api.yaml
           path: developer-portal/swaggers/vocdoni-api.yaml
@@ -80,7 +80,7 @@ jobs:
 
       - name: Create PR to developer-portal repo
         id: cpr
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         if: ${{ github.event_name == 'push' }}
         with:
           path: developer-portal
