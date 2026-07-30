@@ -223,6 +223,13 @@ func (vc *Vocone) Start(ctx context.Context) error {
 			return nil
 		default:
 		}
+		// Close() may run before the context is canceled (the test harness
+		// defers Close after cancel, so it executes first); producing against
+		// released databases would panic.
+		if vc.closed.Load() {
+			log.Infow("stopping block production, vocone closed", "height", vc.height.Load())
+			return nil
+		}
 
 		if err := vc.produceBlock(); err != nil {
 			log.Errorw(err, "block production error")
@@ -244,6 +251,14 @@ func (vc *Vocone) Start(ctx context.Context) error {
 func (vc *Vocone) produceBlock() error {
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
+
+	// Checked under vcMtx: Close() sets the flag before taking this lock, so
+	// either it waits for an in-flight block to finish, or we observe the flag
+	// here and never touch the already-released databases. The pre-lock check
+	// in Start is advisory only; this one is what makes shutdown race-free.
+	if vc.closed.Load() {
+		return nil
+	}
 
 	startTime := time.Now()
 	height := vc.height.Load()
