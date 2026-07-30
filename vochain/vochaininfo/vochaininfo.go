@@ -259,7 +259,11 @@ func (vi *VochainInfo) Start(sleepSecs uint64) {
 		panic("sleepSecs cannot be zero")
 	}
 	log.Infof("starting vochain info service every %d seconds", sleepSecs)
-	metrics.NewGauge("vochain_tokens_burned",
+	// GetOrCreate rather than New: a process can host several VochainInfo
+	// instances over its lifetime (vocone tests, -count>1 runs), and NewGauge
+	// panics on re-registration. The callback keeps reporting the instance
+	// that registered first, which is only observable in tests.
+	metrics.GetOrCreateGauge("vochain_tokens_burned",
 		func() float64 { return float64(vi.TokensBurned()) })
 
 	var duration time.Duration
