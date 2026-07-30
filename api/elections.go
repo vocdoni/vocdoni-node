@@ -459,12 +459,20 @@ func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Summary		Vote activity over time
 //	@Description	Returns the number of votes cast in an election, aggregated into time buckets.
 //	@Description	Only buckets containing at least one vote are returned, ordered chronologically.
-//	@Description	A vote is dated by the block that included it.
+//	@Description	A vote is dated by the block that included it. Votes whose block is not indexed
+//	@Description	cannot be dated, and are reported apart as undatedVotes rather than bucketed.
+//	@Description	Since a vote is keyed by its nullifier, an overwritten vote is dated by the block
+//	@Description	of its last overwrite, so the count of a past bucket can decrease over time.
+//	@Description	The from and to params bound the aggregation; by default it covers the whole election.
+//	@Description	At most 1000 buckets are aggregated per request: a wider window needs a coarser
+//	@Description	bucket or a narrower from/to range.
 //	@Tags			Elections
 //	@Accept			json
 //	@Produce		json
 //	@Param			electionId	path		string	true	"Election id"
 //	@Param			bucket		query		string	false	"Time bucket granularity, either hour (default) or day"	Enums(hour, day)
+//	@Param			from		query		string	false	"Only count votes cast at or after this RFC3339 timestamp"
+//	@Param			to			query		string	false	"Only count votes cast at or before this RFC3339 timestamp"
 //	@Success		200			{object}	VoteActivity
 //	@Router			/elections/{electionId}/votes/activity [get]
 func (a *API) electionVotesActivityHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -473,26 +481,48 @@ func (a *API) electionVotesActivityHandler(_ *apirest.APIdata, ctx *httprouter.H
 		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
 	}
 	// check the election exists, so an unknown id doesn't silently return an empty activity
-	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+	process, err := getElection(electionID, a.vocapp.State)
+	if err != nil {
 		return err
 	}
 
-	bucket := ctx.QueryParam(ParamBucket)
-	if bucket == "" {
-		bucket = indexer.VoteBucketHour
+	bucket, err := parseBucket(ctx.QueryParam(ParamBucket))
+	if err != nil {
+		return err
+	}
+	from, err := parseDate(ctx.QueryParam(ParamFrom))
+	if err != nil {
+		return err
+	}
+	to, err := parseDate(ctx.QueryParam(ParamTo))
+	if err != nil {
+		return err
 	}
 
-	buckets, err := a.indexer.VoteActivity(electionID, bucket)
+	// The aggregation is recomputed on every call, so bound the number of buckets it
+	// can produce: the window is the election lifetime, narrowed down by from and to.
+	start := time.Unix(int64(process.GetStartTime()), 0)
+	end := start.Add(time.Duration(process.GetDuration()) * time.Second)
+	if from != nil && from.After(start) {
+		start = *from
+	}
+	if to != nil && to.Before(end) {
+		end = *to
+	}
+	if count := end.Sub(start)/bucketDuration(bucket) + 1; count > MaxVoteActivityBuckets {
+		return ErrTooManyBucketsRequested.Withf("(%d buckets of one %s, maximum is %d)",
+			count, bucket, MaxVoteActivityBuckets)
+	}
+
+	buckets, undated, err := a.indexer.VoteActivity(electionID, bucket, from, to)
 	if err != nil {
-		if errors.Is(err, indexer.ErrInvalidVoteBucket) {
-			return ErrParamBucketInvalid.Withf("(%s)", bucket)
-		}
 		return ErrIndexerQueryFailed.WithErr(err)
 	}
 
 	activity := &VoteActivity{
-		Buckets: buckets,
-		Bucket:  bucket,
+		Buckets:      buckets,
+		Bucket:       bucket,
+		UndatedVotes: undated,
 	}
 	for _, b := range buckets {
 		activity.TotalVotes += b.Count

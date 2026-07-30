@@ -98,10 +98,22 @@ type Indexer struct {
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
 
-	// blockReindexNeeded is set by startDB when the indexed blocks are known to be
-	// incomplete, and consumed once by bootstrapBlocks. It is atomic because startDB
-	// may run on the state-sync restore path, concurrently with the bootstrap.
-	blockReindexNeeded atomic.Bool
+	// blockReindexNeeded is set by startDB when a pending migration is about to
+	// rewrite the block rows, and consumed once by bootstrapBlocks.
+	//
+	// maxUndatedVoteHeight is the highest block height at which startDB found votes
+	// with no indexed block (0 when every indexed vote has its block). Only the
+	// heights the block store still holds can be repaired, so bootstrapBlocks
+	// compares it against the block store base before scheduling a reindex.
+	//
+	// Both are atomic to document and uphold one ordering invariant: startDB writes
+	// them, AfterSyncBootstrap reads and clears them, and on the state-sync path
+	// startDB is called from RestoreBackup, which by contract runs before any
+	// indexing or query happens, while AfterSyncBootstrap runs on its own goroutine
+	// and may already be waiting. A plain bool would be a data race there even
+	// though the values themselves cannot conflict (startDB panics if called twice).
+	blockReindexNeeded   atomic.Bool
+	maxUndatedVoteHeight atomic.Int64
 }
 
 type Options struct {
@@ -217,18 +229,27 @@ func (idx *Indexer) startDB() error {
 
 	// An indexer db recreated or restored later than the chain it indexes can hold
 	// votes whose block was never indexed, and which therefore cannot be dated.
-	// Check for that here, on every start; the check is a single aggregate stopping
-	// at the first undatable vote, so it costs nothing once the data is complete.
-	// The reindex which repairs it runs on bootstrap, see bootstrapBlocks.
-	if !idx.blockReindexNeeded.Load() {
-		missing, err := idx.readOnlyQuery.HasVotesMissingBlockTime(context.TODO())
-		if err != nil {
-			return fmt.Errorf("could not check indexer block completeness: %w", err)
+	// Detect that here, on every start, by comparing the oldest vote height against
+	// the oldest indexed block height: both are indexed MIN lookups, so this is
+	// O(log n) rather than a scan of the votes table. Whether the gap is worth a
+	// reindex is decided on bootstrap, once the block store is known, see
+	// bootstrapBlocks.
+	bounds, err := idx.readOnlyQuery.VoteBlockHeightBounds(context.TODO())
+	if err != nil {
+		return fmt.Errorf("could not check indexer block completeness: %w", err)
+	}
+	if bounds.MinVoteHeight > 0 && (bounds.MinBlockHeight == 0 || bounds.MinVoteHeight < bounds.MinBlockHeight) {
+		// The undated votes span [MinVoteHeight, MinBlockHeight), or every vote
+		// height when no block at all is indexed.
+		maxUndated := bounds.MaxVoteHeight
+		if bounds.MinBlockHeight > 0 {
+			maxUndated = bounds.MinBlockHeight - 1
 		}
-		if missing > 0 {
-			log.Info("indexer has votes with no indexed block, a block reindex will run on bootstrap")
-			idx.blockReindexNeeded.Store(true)
-		}
+		log.Infow("indexer holds votes with no indexed block",
+			"oldestVoteHeight", bounds.MinVoteHeight,
+			"oldestBlockHeight", bounds.MinBlockHeight,
+		)
+		idx.maxUndatedVoteHeight.Store(maxUndated)
 	}
 	return nil
 }
@@ -349,19 +370,27 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
 // and then execute a set of recovery actions. It first repairs the indexed blocks if
-// startDB found them incomplete, so that afterwards every indexed vote can be dated.
+// startDB found them incomplete, so that afterwards more indexed votes can be dated.
 // It then checks for those processes which are still open (live) and updates all
 // temporary data (current voting weight and live results if unecrypted).
 // This method might be called on a goroutine after initializing the Indexer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
 func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
+	// A node which never reports itself as synced, such as a seed node, would wait
+	// below forever and leak the goroutine polling for the sync state. Those nodes
+	// run with live results disabled, so unless there is a block repair to do there
+	// is nothing here worth waiting for.
+	if idx.ignoreLiveResults && !idx.blockReindexNeeded.Load() && idx.maxUndatedVoteHeight.Load() == 0 {
+		return
+	}
+
 	if !inTest {
 		<-idx.App.WaitUntilSynced()
 	}
 
-	// Repair the indexed blocks before anything else, so that from here on every
-	// indexed vote is known to have a block, and thus a timestamp.
-	idx.bootstrapBlocks(inTest)
+	// Repair the indexed blocks before anything else, so that from here on as many
+	// indexed votes as the block store allows have a block, and thus a timestamp.
+	idx.bootstrapBlocks()
 
 	// Fill the key reveal columns of the elections indexed before they existed.
 	// Cheap enough to attempt on every boot: it is one indexed lookup, and each
@@ -465,24 +494,55 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 
 // bootstrapBlocks reindexes the blocks when startDB found the indexed blocks to be
 // incomplete, either because a migration changed them or because votes were indexed
-// whose block was not. It blocks until the reindex is done, so that once the
-// bootstrap returns, every indexed vote can be dated by its block.
-func (idx *Indexer) bootstrapBlocks(inTest bool) {
-	if !idx.blockReindexNeeded.Swap(false) {
+// whose block was not. It must be called with the chain already synced, as it does
+// not wait for it; it blocks until the reindex is done.
+//
+// A reindex can only rewrite the blocks the block store still holds, that is the
+// [Base, Height] range: on a pruned or state-synced node the votes below the base
+// can never be dated, so scheduling a reindex for them would walk the whole store
+// on every single restart to no effect. Those are only reported, once per boot.
+func (idx *Indexer) bootstrapBlocks() {
+	reindex := idx.blockReindexNeeded.Swap(false)
+	if maxUndated := idx.maxUndatedVoteHeight.Swap(0); maxUndated > 0 {
+		base := int64(0)
+		if idx.App.Node != nil && idx.App.Node.BlockStore() != nil {
+			base = idx.App.Node.BlockStore().Base()
+		}
+		if maxUndated >= base {
+			reindex = true
+		}
+		if base > 0 {
+			count, err := idx.readOnlyQuery.CountUndatedVotesBelowHeight(context.TODO(), base)
+			if err != nil {
+				log.Warnw("could not count the votes which cannot be dated", "err", err.Error())
+			} else if count > 0 {
+				log.Infow("indexer holds votes whose block is no longer in the block store; "+
+					"they can never be dated and are reported apart as undated votes",
+					"votes", count, "blockStoreBase", base)
+			}
+		}
+	}
+	if !reindex {
 		return
 	}
 	log.Info("running indexer blocks bootstrap")
 	startTime := time.Now()
-	idx.ReindexBlocks(inTest)
+	idx.reindexBlocks()
 	log.Infow("indexer blocks bootstrap finished", "took", time.Since(startTime).String())
 }
 
-// ReindexBlocks reindexes all blocks found in blockstore
+// ReindexBlocks waits until the chain is synced and reindexes all blocks found in
+// the blockstore.
 func (idx *Indexer) ReindexBlocks(inTest bool) {
 	if !inTest {
 		<-idx.App.WaitUntilSynced()
 	}
+	idx.reindexBlocks()
+}
 
+// reindexBlocks reindexes all blocks found in blockstore. The caller is
+// responsible for only calling it once the chain is synced.
+func (idx *Indexer) reindexBlocks() {
 	// Note that holding blockMu means new votes aren't added until the reindex finishes.
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()

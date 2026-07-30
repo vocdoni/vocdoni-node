@@ -1741,34 +1741,59 @@ func TestVoteActivity(t *testing.T) {
 	setBlockTime(h2, epoch.Add(2*time.Hour+15*time.Minute))
 	setBlockTime(h3, epoch.Add(30*time.Hour))
 
-	// Every vote has its block indexed, which is what the startup check verifies.
-	incomplete, err := idx.readOnlyQuery.HasVotesMissingBlockTime(context.TODO())
+	// Every vote has its block indexed, which is what the startup probe checks: the
+	// oldest vote is not older than the oldest indexed block.
+	bounds, err := idx.readOnlyQuery.VoteBlockHeightBounds(context.TODO())
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, incomplete, qt.Equals, int64(0))
+	qt.Assert(t, bounds.MinVoteHeight >= bounds.MinBlockHeight, qt.IsTrue)
 
-	hourly, err := idx.VoteActivity(pid, VoteBucketHour)
+	hourly, undated, err := idx.VoteActivity(pid, VoteBucketHour, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, undated, qt.Equals, uint64(0))
 	qt.Assert(t, hourly, qt.DeepEquals, []*indexertypes.VoteBucket{
 		{Period: "1970-01-01T00:00:00Z", Count: 2},
 		{Period: "1970-01-01T02:00:00Z", Count: 3},
 		{Period: "1970-01-02T06:00:00Z", Count: 1},
 	})
 
-	daily, err := idx.VoteActivity(pid, VoteBucketDay)
+	daily, _, err := idx.VoteActivity(pid, VoteBucketDay, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, daily, qt.DeepEquals, []*indexertypes.VoteBucket{
 		{Period: "1970-01-01T00:00:00Z", Count: 5},
 		{Period: "1970-01-02T00:00:00Z", Count: 1},
 	})
 
+	// The from and to bounds narrow the aggregation down to a window.
+	windowed, _, err := idx.VoteActivity(pid, VoteBucketHour,
+		ptr(epoch.Add(time.Hour)), ptr(epoch.Add(24*time.Hour)))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, windowed, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T02:00:00Z", Count: 3},
+	})
+
+	// A vote whose block is not indexed cannot be dated, so it is reported apart
+	// instead of silently disappearing from the aggregation.
+	_, err = idx.readWriteDB.Exec("DELETE FROM blocks WHERE height = ?", h2)
+	qt.Assert(t, err, qt.IsNil)
+	hourly, undated, err = idx.VoteActivity(pid, VoteBucketHour, nil, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, undated, qt.Equals, uint64(3))
+	qt.Assert(t, hourly, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T00:00:00Z", Count: 2},
+		{Period: "1970-01-02T06:00:00Z", Count: 1},
+	})
+
 	// An unknown bucket granularity is rejected, and an unknown process is empty.
-	_, err = idx.VoteActivity(pid, "banana")
+	_, _, err = idx.VoteActivity(pid, "banana", nil, nil)
 	qt.Assert(t, err, qt.Equals, ErrInvalidVoteBucket)
 
-	empty, err := idx.VoteActivity(util.RandomBytes(32), VoteBucketHour)
+	empty, _, err := idx.VoteActivity(util.RandomBytes(32), VoteBucketHour, nil, nil)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, empty, qt.HasLen, 0)
 }
+
+// ptr returns a pointer to v, to pass optional values inline.
+func ptr[T any](v T) *T { return &v }
 
 func TestEntityMetadata(t *testing.T) {
 	app := vochain.TestBaseApplication(t)

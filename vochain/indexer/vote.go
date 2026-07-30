@@ -119,32 +119,50 @@ var voteBucketFormats = map[string]string{
 var ErrInvalidVoteBucket = fmt.Errorf("invalid vote activity bucket")
 
 // VoteActivity returns the votes of a process aggregated into time buckets of the
-// given granularity ("hour" or "day"), ordered chronologically. Buckets with no
-// votes are not present in the returned slice.
+// given granularity ("hour" or "day"), ordered chronologically, together with the
+// number of votes which could not be dated. Buckets with no votes are not present
+// in the returned slice. When from or to are non-nil, only the votes cast within
+// that window are bucketed; the undated count is not affected by them.
 //
-// The timestamp of a vote comes from the block it was included in. The bootstrap
-// run at startup guarantees every indexed vote has its block indexed, so all the
-// votes of the process are accounted for here.
-func (idx *Indexer) VoteActivity(processID []byte, bucket string) ([]*indexertypes.VoteBucket, error) {
+// The timestamp of a vote comes from the block it was included in. A vote whose
+// block is not indexed cannot be dated, and is reported apart as the undated
+// count: the block reindex run on bootstrap repairs those it can, but a pruned or
+// state-synced node no longer has the blocks below the block store base, so the
+// completeness of the buckets is never guaranteed.
+//
+// Note also that votes are keyed by nullifier, so an overwritten vote is dated by
+// the block of its last overwrite. A bucket count for a past period can therefore
+// legitimately decrease as votes are overwritten into more recent buckets.
+func (idx *Indexer) VoteActivity(processID []byte, bucket string, from, to *time.Time) (
+	[]*indexertypes.VoteBucket, uint64, error,
+) {
 	format, ok := voteBucketFormats[bucket]
 	if !ok {
-		return nil, ErrInvalidVoteBucket
+		return nil, 0, ErrInvalidVoteBucket
 	}
 	rows, err := idx.readOnlyQuery.VoteActivity(context.TODO(), indexerdb.VoteActivityParams{
 		BucketFormat: format,
 		ProcessID:    processID,
+		FromTime:     from,
+		ToTime:       to,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
+	undated := uint64(0)
 	buckets := make([]*indexertypes.VoteBucket, 0, len(rows))
 	for _, row := range rows {
+		// The query reports the votes with no indexed block under the empty period.
+		if row.Period == "" {
+			undated = uint64(row.Count)
+			continue
+		}
 		buckets = append(buckets, &indexertypes.VoteBucket{
 			Period: row.Period,
 			Count:  uint64(row.Count),
 		})
 	}
-	return buckets, nil
+	return buckets, undated, nil
 }
 
 // CountTotalVotes returns the total number of envelopes.

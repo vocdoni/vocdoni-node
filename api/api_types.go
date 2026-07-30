@@ -252,8 +252,14 @@ type VoteActivity struct {
 	// Buckets holds one entry per time bucket that contains at least one vote,
 	// ordered chronologically.
 	Buckets []*indexertypes.VoteBucket `json:"buckets"`
-	// TotalVotes is the sum of the counts of all buckets.
+	// TotalVotes is the sum of the counts of all buckets, so it does not include
+	// UndatedVotes. With no time window requested, the vote count of the election
+	// is TotalVotes plus UndatedVotes.
 	TotalVotes uint64 `json:"totalVotes"`
+	// UndatedVotes is the number of votes which could not be placed in any bucket,
+	// because the block that included them is not indexed. It is not affected by the
+	// requested time window, and is omitted when every vote could be dated.
+	UndatedVotes uint64 `json:"undatedVotes,omitempty" extensions:"x-omitempty"`
 	// Bucket is the granularity used, either "hour" or "day".
 	Bucket string `json:"bucket" example:"hour"`
 }
