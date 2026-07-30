@@ -97,7 +97,6 @@ jobs:
             * GitHub Action Run: [${{ github.run_id }}](https://github.com/vocdoni/vocdoni-node/actions/runs/${{ github.run_id }})
           labels: |
             automated pr
-          reviewers: ${{ github.actor }}
           team-reviewers: SdkDocsReviewer
 
       - name: "Check PR: ${{ steps.cpr.outputs.pull-request-url }}"
