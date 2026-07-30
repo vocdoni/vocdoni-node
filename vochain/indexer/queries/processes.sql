@@ -146,6 +146,17 @@ WHERE metadata_title = '' AND metadata != '' AND id > sqlc.arg(after_id)
 ORDER BY id
 LIMIT sqlc.arg(limit);
 
+-- name: SetProcessKeyReveal :execresult
+-- Records where the encryption keys of a process were revealed. Keeps the
+-- earliest such transaction, since the keys of a multi-key election are revealed
+-- one transaction at a time and it is the first one that dates the reveal. Also
+-- makes reindexing the same transaction a no-op.
+UPDATE processes
+SET key_reveal_height = sqlc.arg(key_reveal_height),
+    key_reveal_tx_hash = sqlc.arg(key_reveal_tx_hash)
+WHERE id = sqlc.arg(id)
+  AND (key_reveal_height = 0 OR key_reveal_height > sqlc.arg(key_reveal_height));
+
 -- name: CountProcessesByStatus :many
 -- Counts the indexed processes grouped by their status, in one pass over
 -- index_processes_status. Statuses with no process are simply absent.

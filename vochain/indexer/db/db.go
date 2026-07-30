@@ -117,6 +117,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listProcessesMissingMetadataTitleStmt, err = db.PrepareContext(ctx, listProcessesMissingMetadataTitle); err != nil {
 		return nil, fmt.Errorf("error preparing query ListProcessesMissingMetadataTitle: %w", err)
 	}
+	if q.listTransactionsByTypeAndSubtypeStmt, err = db.PrepareContext(ctx, listTransactionsByTypeAndSubtype); err != nil {
+		return nil, fmt.Errorf("error preparing query ListTransactionsByTypeAndSubtype: %w", err)
+	}
 	if q.searchAccountsStmt, err = db.PrepareContext(ctx, searchAccounts); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchAccounts: %w", err)
 	}
@@ -143,6 +146,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.setAccountMetadataStmt, err = db.PrepareContext(ctx, setAccountMetadata); err != nil {
 		return nil, fmt.Errorf("error preparing query SetAccountMetadata: %w", err)
+	}
+	if q.setProcessKeyRevealStmt, err = db.PrepareContext(ctx, setProcessKeyReveal); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessKeyReveal: %w", err)
 	}
 	if q.setProcessMetadataTitleStmt, err = db.PrepareContext(ctx, setProcessMetadataTitle); err != nil {
 		return nil, fmt.Errorf("error preparing query SetProcessMetadataTitle: %w", err)
@@ -328,6 +334,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listProcessesMissingMetadataTitleStmt: %w", cerr)
 		}
 	}
+	if q.listTransactionsByTypeAndSubtypeStmt != nil {
+		if cerr := q.listTransactionsByTypeAndSubtypeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listTransactionsByTypeAndSubtypeStmt: %w", cerr)
+		}
+	}
 	if q.searchAccountsStmt != nil {
 		if cerr := q.searchAccountsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchAccountsStmt: %w", cerr)
@@ -371,6 +382,11 @@ func (q *Queries) Close() error {
 	if q.setAccountMetadataStmt != nil {
 		if cerr := q.setAccountMetadataStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing setAccountMetadataStmt: %w", cerr)
+		}
+	}
+	if q.setProcessKeyRevealStmt != nil {
+		if cerr := q.setProcessKeyRevealStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessKeyRevealStmt: %w", cerr)
 		}
 	}
 	if q.setProcessMetadataTitleStmt != nil {
@@ -483,6 +499,7 @@ type Queries struct {
 	lastBlockHeightStmt                   *sql.Stmt
 	listAccountsMissingNameStmt           *sql.Stmt
 	listProcessesMissingMetadataTitleStmt *sql.Stmt
+	listTransactionsByTypeAndSubtypeStmt  *sql.Stmt
 	searchAccountsStmt                    *sql.Stmt
 	searchBlocksStmt                      *sql.Stmt
 	searchEntitiesStmt                    *sql.Stmt
@@ -492,6 +509,7 @@ type Queries struct {
 	searchTransactionsStmt                *sql.Stmt
 	searchVotesStmt                       *sql.Stmt
 	setAccountMetadataStmt                *sql.Stmt
+	setProcessKeyRevealStmt               *sql.Stmt
 	setProcessMetadataTitleStmt           *sql.Stmt
 	setProcessResultsCancelledStmt        *sql.Stmt
 	setProcessResultsReadyStmt            *sql.Stmt
@@ -537,6 +555,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		lastBlockHeightStmt:                   q.lastBlockHeightStmt,
 		listAccountsMissingNameStmt:           q.listAccountsMissingNameStmt,
 		listProcessesMissingMetadataTitleStmt: q.listProcessesMissingMetadataTitleStmt,
+		listTransactionsByTypeAndSubtypeStmt:  q.listTransactionsByTypeAndSubtypeStmt,
 		searchAccountsStmt:                    q.searchAccountsStmt,
 		searchBlocksStmt:                      q.searchBlocksStmt,
 		searchEntitiesStmt:                    q.searchEntitiesStmt,
@@ -546,6 +565,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		searchTransactionsStmt:                q.searchTransactionsStmt,
 		searchVotesStmt:                       q.searchVotesStmt,
 		setAccountMetadataStmt:                q.setAccountMetadataStmt,
+		setProcessKeyRevealStmt:               q.setProcessKeyRevealStmt,
 		setProcessMetadataTitleStmt:           q.setProcessMetadataTitleStmt,
 		setProcessResultsCancelledStmt:        q.setProcessResultsCancelledStmt,
 		setProcessResultsReadyStmt:            q.setProcessResultsReadyStmt,

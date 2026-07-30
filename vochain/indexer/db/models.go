@@ -49,6 +49,8 @@ type Process struct {
 	SourceNetworkID    int64
 	ManuallyEnded      bool
 	MetadataTitle      string
+	KeyRevealHeight    int64
+	KeyRevealTxHash    []byte
 }
 
 type TokenTransfer struct {

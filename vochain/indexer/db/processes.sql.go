@@ -160,7 +160,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -198,6 +198,8 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.SourceNetworkID,
 		&i.ManuallyEnded,
 		&i.MetadataTitle,
+		&i.KeyRevealHeight,
+		&i.KeyRevealTxHash,
 	)
 	return i, err
 }
@@ -300,7 +302,7 @@ func (q *Queries) ListProcessesMissingMetadataTitle(ctx context.Context, arg Lis
 
 const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
-    SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title,
+    SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title, p.key_reveal_height, p.key_reveal_tx_hash,
         COALESCE(a.name, '') AS account_name,
         COALESCE(a.avatar, '') AS account_avatar
     FROM processes AS p
@@ -377,7 +379,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 
 const searchProcesses = `-- name: SearchProcesses :many
 WITH results AS (
-	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title,
+	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash,
 			COUNT(*) OVER() AS total_count
 	FROM processes
 	WHERE (
@@ -484,6 +486,28 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const setProcessKeyReveal = `-- name: SetProcessKeyReveal :execresult
+UPDATE processes
+SET key_reveal_height = ?1,
+    key_reveal_tx_hash = ?2
+WHERE id = ?3
+  AND (key_reveal_height = 0 OR key_reveal_height > ?1)
+`
+
+type SetProcessKeyRevealParams struct {
+	KeyRevealHeight int64
+	KeyRevealTxHash []byte
+	ID              types.ProcessID
+}
+
+// Records where the encryption keys of a process were revealed. Keeps the
+// earliest such transaction, since the keys of a multi-key election are revealed
+// one transaction at a time and it is the first one that dates the reveal. Also
+// makes reindexing the same transaction a no-op.
+func (q *Queries) SetProcessKeyReveal(ctx context.Context, arg SetProcessKeyRevealParams) (sql.Result, error) {
+	return q.exec(ctx, q.setProcessKeyRevealStmt, setProcessKeyReveal, arg.KeyRevealHeight, arg.KeyRevealTxHash, arg.ID)
 }
 
 const setProcessMetadataTitle = `-- name: SetProcessMetadataTitle :execresult
