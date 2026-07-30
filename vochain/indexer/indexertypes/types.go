@@ -152,6 +152,9 @@ type EnvelopeMetadata struct {
 	TxIndex   int32          `json:"txIndex"`
 	Height    uint32         `json:"height"`
 	TxHash    types.HexBytes `json:"txHash"`
+	// BlockTime is the timestamp of the block that included the vote, or nil if
+	// that block is not indexed and the vote therefore cannot be dated.
+	BlockTime *time.Time `json:"blockTime,omitempty"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api

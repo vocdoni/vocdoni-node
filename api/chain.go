@@ -51,6 +51,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/stats",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainStatsHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -422,6 +430,44 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.CountTotalEntities()
 	return marshalAndSend(ctx, &CountResult{Count: count})
+}
+
+// chainStatsHandler
+//
+//	@Summary		Chain statistics
+//	@Description	Returns the chain-wide counters in a single response: transactions
+//	@Description	grouped by type, elections grouped by status, and the total number of
+//	@Description	accounts, elections and votes. Buckets with a count of zero are omitted.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ChainStats
+//	@Router			/chain/stats [get]
+func (a *API) chainStatsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	txCountByType, err := a.indexer.CountTransactionsByType()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	electionCountByStatus, err := a.indexer.CountProcessesByStatus()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	accountCount, err := a.indexer.CountTotalAccounts()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	voteCount, err := a.indexer.CountTotalVotes()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	return marshalAndSend(ctx, &ChainStats{
+		TxCountByType:         txCountByType,
+		ElectionCountByStatus: electionCountByStatus,
+		AccountCount:          accountCount,
+		ElectionCount:         a.indexer.CountTotalProcesses(),
+		VoteCount:             voteCount,
+	})
 }
 
 // chainInfoHandler

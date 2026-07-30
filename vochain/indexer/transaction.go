@@ -25,6 +25,21 @@ func (idx *Indexer) CountTotalTransactions() (uint64, error) {
 	return uint64(count), err
 }
 
+// CountTransactionsByType returns the number of indexed transactions of each type,
+// keyed by the transaction type as reported by SearchTransactions. Types with no
+// transaction indexed are absent from the map rather than reported as zero.
+func (idx *Indexer) CountTransactionsByType() (map[string]uint64, error) {
+	rows, err := idx.readOnlyQuery.CountTransactionsByType(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]uint64, len(rows))
+	for _, row := range rows {
+		counts[row.Type] = uint64(row.Count)
+	}
+	return counts, nil
+}
+
 // CountTransactionsByHeight returns the number of transactions indexed for a given height
 func (idx *Indexer) CountTransactionsByHeight(height int64) (int64, error) {
 	return idx.readOnlyQuery.CountTransactionsByHeight(context.TODO(), height)

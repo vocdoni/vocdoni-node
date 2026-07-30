@@ -115,6 +115,27 @@ func (idx *Indexer) CountTotalProcesses() uint64 {
 	return uint64(count)
 }
 
+// CountProcessesByStatus returns the number of indexed processes of each status,
+// keyed by the same status names used by the process list (READY, ENDED...).
+// Statuses with no process indexed are absent from the map rather than reported
+// as zero. An unknown status number, which should not happen, is skipped.
+func (idx *Indexer) CountProcessesByStatus() (map[string]uint64, error) {
+	rows, err := idx.readOnlyQuery.CountProcessesByStatus(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]uint64, len(rows))
+	for _, row := range rows {
+		name, ok := models.ProcessStatus_name[int32(row.Status)]
+		if !ok {
+			log.Warnw("skipping unknown process status in count", "status", row.Status)
+			continue
+		}
+		counts[name] = uint64(row.Count)
+	}
+	return counts, nil
+}
+
 // EntityList returns the list of entities indexed by the indexer
 // entityID is optional, if declared as zero-value
 // will be ignored. Searches against the entityID field as lowercase hex.

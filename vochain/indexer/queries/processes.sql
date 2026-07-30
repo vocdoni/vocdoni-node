@@ -128,6 +128,14 @@ WHERE id = sqlc.arg(id);
 -- name: GetProcessCount :one
 SELECT COUNT(*) FROM processes;
 
+-- name: CountProcessesByStatus :many
+-- Counts the indexed processes grouped by their status, in one pass over
+-- index_processes_status. Statuses with no process are simply absent.
+SELECT status, COUNT(*) AS count
+FROM processes
+GROUP BY status
+ORDER BY status;
+
 -- name: GetEntityCount :one
 SELECT COUNT(DISTINCT entity_id) FROM processes;
 
