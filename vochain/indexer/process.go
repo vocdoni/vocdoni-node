@@ -115,10 +115,33 @@ func (idx *Indexer) CountTotalProcesses() uint64 {
 	return uint64(count)
 }
 
-// EntityList returns the list of entities indexed by the indexer
-// entityID is optional, if declared as zero-value
-// will be ignored. Searches against the entityID field as lowercase hex.
-func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertypes.Entity, uint64, error) {
+// CountProcessesByStatus returns the number of indexed processes of each status,
+// keyed by the same status names used by the process list (READY, ENDED...).
+// Statuses with no process indexed are absent from the map rather than reported
+// as zero. An unknown status number, which should not happen, is skipped.
+func (idx *Indexer) CountProcessesByStatus() (map[string]uint64, error) {
+	rows, err := idx.readOnlyQuery.CountProcessesByStatus(context.TODO())
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[string]uint64, len(rows))
+	for _, row := range rows {
+		name, ok := models.ProcessStatus_name[int32(row.Status)]
+		if !ok {
+			log.Warnw("skipping unknown process status in count", "status", row.Status)
+			continue
+		}
+		counts[name] = uint64(row.Count)
+	}
+	return counts, nil
+}
+
+// EntityList returns the list of entities indexed by the indexer.
+// entityID and name are optional, if declared as zero-value they are ignored.
+// entityID is searched against the entityID field as lowercase hex, name as a
+// case-insensitive substring of the entity name resolved from its account
+// metadata (ASCII case folding only, see the SearchEntities query).
+func (idx *Indexer) EntityList(limit, offset int, entityID, name string) ([]indexertypes.Entity, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
@@ -127,6 +150,7 @@ func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertyp
 	}
 	results, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: strings.ToLower(entityID), // we search in lowercase
+		NameSubstr:     name,
 		Offset:         int64(offset),
 		Limit:          int64(limit),
 	})
@@ -138,6 +162,8 @@ func (idx *Indexer) EntityList(limit, offset int, entityID string) ([]indexertyp
 		list = append(list, indexertypes.Entity{
 			EntityID:     row.EntityID,
 			ProcessCount: row.ProcessCount,
+			Name:         row.AccountName,
+			Avatar:       row.AccountAvatar,
 		})
 	}
 	if len(results) == 0 {
@@ -152,7 +178,7 @@ func (idx *Indexer) EntityExists(entityID string) bool {
 	if len(entityID) != 40 {
 		return false
 	}
-	_, count, err := idx.EntityList(1, 0, entityID)
+	_, count, err := idx.EntityList(1, 0, entityID, "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}

@@ -13,6 +13,24 @@ import (
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
+const countUndatedVotesBelowHeight = `-- name: CountUndatedVotesBelowHeight :one
+SELECT COUNT(*) FROM votes AS v
+LEFT JOIN blocks AS b
+	ON v.block_height = b.height
+WHERE v.block_height < ?1
+	AND b.height IS NULL
+`
+
+// Counts the votes below the given height whose block is not indexed. Only used to
+// report how many votes can never be dated, when their blocks are already pruned
+// from the block store, so it only ever scans that (bounded) height range.
+func (q *Queries) CountUndatedVotesBelowHeight(ctx context.Context, height int64) (int64, error) {
+	row := q.queryRow(ctx, q.countUndatedVotesBelowHeightStmt, countUndatedVotesBelowHeight, height)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const countVotes = `-- name: CountVotes :one
 SELECT COUNT(*) FROM votes
 `
@@ -108,11 +126,15 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 
 const searchVotes = `-- name: SearchVotes :many
 WITH results AS (
-	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash
+	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash, b.time AS block_time
 	FROM votes AS v
 	LEFT JOIN transactions AS t
 		ON v.block_height = t.block_height
 		AND v.block_index = t.block_index
+	-- dates every listed vote by its block, the same indexed point lookup on the
+	-- blocks primary key that GetVote and VoteActivity already do
+	LEFT JOIN blocks AS b
+		ON v.block_height = b.height
 	WHERE (
 		LENGTH(?3) <= 64 -- if passed arg is longer, then just abort the query
 		AND (
@@ -130,7 +152,7 @@ WITH results AS (
 		)
 	)
 )
-SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, COUNT(*) OVER() AS total_count
+SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, block_time, COUNT(*) OVER() AS total_count
 FROM results
 ORDER BY block_height DESC, nullifier ASC
 LIMIT ?2
@@ -155,6 +177,7 @@ type SearchVotesRow struct {
 	EncryptionKeyIndexes string
 	Package              string
 	Hash                 []byte
+	BlockTime            sql.NullTime
 	TotalCount           int64
 }
 
@@ -183,6 +206,7 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.EncryptionKeyIndexes,
 			&i.Package,
 			&i.Hash,
+			&i.BlockTime,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -196,4 +220,98 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 		return nil, err
 	}
 	return items, nil
+}
+
+const voteActivity = `-- name: VoteActivity :many
+SELECT CAST(COALESCE(strftime(CAST(?1 AS TEXT), b.time), '') AS TEXT) AS period,
+	COUNT(*) AS count
+FROM votes AS v
+LEFT JOIN blocks AS b
+	ON v.block_height = b.height
+WHERE v.process_id = ?2
+	AND (
+		b.height IS NULL
+		OR (
+			-- datetime() normalizes both sides to UTC, so that a stored timestamp
+			-- and a bound written with different zone offsets still compare right.
+			(?3 IS NULL OR datetime(b.time) >= datetime(?3))
+			AND (?4 IS NULL OR datetime(b.time) <= datetime(?4))
+		)
+	)
+GROUP BY period
+ORDER BY period
+`
+
+type VoteActivityParams struct {
+	BucketFormat string
+	ProcessID    types.ProcessID
+	FromTime     interface{}
+	ToTime       interface{}
+}
+
+type VoteActivityRow struct {
+	Period string
+	Count  int64
+}
+
+// Aggregates the votes of a process into time buckets, using the block timestamp.
+// The bucket_format argument is a strftime format string which truncates the
+// timestamp to the desired granularity (e.g. '%Y-%m-%dT%H:00:00Z' for hourly).
+// The join on blocks is a LEFT JOIN on purpose: a vote whose block is not indexed
+// cannot be dated, and is reported under the empty period rather than dropped,
+// so that the caller can tell the aggregation apart from the vote count.
+// The from_time and to_time arguments bound the dated votes; undated votes belong
+// to no window, so they are always counted.
+func (q *Queries) VoteActivity(ctx context.Context, arg VoteActivityParams) ([]VoteActivityRow, error) {
+	rows, err := q.query(ctx, q.voteActivityStmt, voteActivity,
+		arg.BucketFormat,
+		arg.ProcessID,
+		arg.FromTime,
+		arg.ToTime,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []VoteActivityRow
+	for rows.Next() {
+		var i VoteActivityRow
+		if err := rows.Scan(&i.Period, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const voteBlockHeightBounds = `-- name: VoteBlockHeightBounds :one
+SELECT
+	CAST(COALESCE((SELECT MIN(block_height) FROM votes), 0) AS INTEGER) AS min_vote_height,
+	CAST(COALESCE((SELECT MAX(block_height) FROM votes), 0) AS INTEGER) AS max_vote_height,
+	CAST(COALESCE((SELECT MIN(height) FROM blocks), 0) AS INTEGER) AS min_block_height
+`
+
+type VoteBlockHeightBoundsRow struct {
+	MinVoteHeight  int64
+	MaxVoteHeight  int64
+	MinBlockHeight int64
+}
+
+// Returns the height of the oldest and newest indexed vote, and the height of the
+// oldest indexed block. An indexer db recreated or restored later than the chain
+// it indexes holds votes older than its first block, which therefore cannot be
+// dated. Every value is a MIN/MAX over an indexed column, so this is O(log n) and
+// cheap to run on every boot, unlike a scan looking for votes with no block row.
+// A zero means the corresponding table is empty.
+func (q *Queries) VoteBlockHeightBounds(ctx context.Context) (VoteBlockHeightBoundsRow, error) {
+	row := q.queryRow(ctx, q.voteBlockHeightBoundsStmt, voteBlockHeightBounds)
+	var i VoteBlockHeightBoundsRow
+	err := row.Scan(&i.MinVoteHeight, &i.MaxVoteHeight, &i.MinBlockHeight)
+	return i, err
 }

@@ -22,6 +22,14 @@ LIMIT 1;
 -- name: CountTransactions :one
 SELECT COUNT(*) FROM transactions;
 
+-- name: CountTransactionsByType :many
+-- Counts the indexed transactions grouped by their type, in one pass over
+-- index_transactions_type. Types with no transaction are simply absent.
+SELECT type, COUNT(*) AS count
+FROM transactions
+GROUP BY type
+ORDER BY type;
+
 -- name: CountTransactionsByHeight :one
 SELECT COUNT(*) FROM transactions
 WHERE block_height = ?;
@@ -30,6 +38,13 @@ WHERE block_height = ?;
 SELECT * FROM transactions
 WHERE block_height = ? AND block_index = ?
 LIMIT 1;
+
+-- name: ListTransactionsByTypeAndSubtype :many
+-- Returns the stored transactions of a given type and subtype, walking
+-- index_transactions_type. Used to backfill process columns derived from a
+-- transaction body, which only the raw transaction holds.
+SELECT hash, block_height, raw_tx FROM transactions
+WHERE type = sqlc.arg(tx_type) AND subtype = sqlc.arg(tx_subtype);
 
 -- name: SearchTransactions :many
 SELECT *, COUNT(*) OVER() AS total_count

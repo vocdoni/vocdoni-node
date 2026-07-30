@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	qt "github.com/frankban/quicktest"
 	"github.com/pressly/goose/v3"
@@ -21,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
@@ -161,7 +163,7 @@ func testEntityList(t *testing.T, entityCount int) {
 	entitiesByID := make(map[string]bool)
 	last := 0
 	for len(entitiesByID) <= entityCount {
-		list, _, err := idx.EntityList(10, last, "")
+		list, _, err := idx.EntityList(10, last, "", "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) < 1 {
 			t.Log("list is empty")
@@ -256,23 +258,23 @@ func TestEntitySearch(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 	// Exact entity search
-	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e")
+	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 1)
 	// Search for nonexistent entity
-	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f")
+	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 0)
 	// Search containing part of all manually-defined entities
-	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e")
+	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as mixed case hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as uppercase hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 }
@@ -357,7 +359,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
 	countEntityProcs := func(eid []byte) int64 {
-		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid))
+		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid), "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) == 0 {
 			return -1
@@ -1687,4 +1689,263 @@ func friendlyResults(votes [][]*types.BigInt) [][]string {
 		}
 	}
 	return r
+}
+
+func TestVoteActivity(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	vp, err := state.NewVotePackage([]int{1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	pid := util.RandomBytes(32)
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    100000,
+		MaxCensusSize: 1000,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// castVotes adds n votes to the block currently being built, commits it, and
+	// returns the height the votes were indexed at.
+	castVotes := func(n int) int64 {
+		for i := 0; i < n; i++ {
+			v := &state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}
+			qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+		}
+		height := int64(app.Height())
+		app.AdvanceTestBlock()
+		return height
+	}
+	// setBlockTime rewrites the timestamp of an indexed block. The test block store
+	// stamps every block with the wall clock, so times far enough apart to fall on
+	// distinct buckets have to be set explicitly.
+	setBlockTime := func(height int64, blockTime time.Time) {
+		_, err := idx.readWriteDB.Exec("UPDATE blocks SET time = ? WHERE height = ?", blockTime, height)
+		qt.Assert(t, err, qt.IsNil)
+	}
+
+	// 2 votes at 00:30, 3 votes at 02:15, 1 vote at 30:00 (i.e. the next day).
+	h1 := castVotes(2)
+	h2 := castVotes(3)
+	h3 := castVotes(1)
+	epoch := time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
+	setBlockTime(h1, epoch.Add(30*time.Minute))
+	setBlockTime(h2, epoch.Add(2*time.Hour+15*time.Minute))
+	setBlockTime(h3, epoch.Add(30*time.Hour))
+
+	// Every vote has its block indexed, which is what the startup probe checks: the
+	// oldest vote is not older than the oldest indexed block.
+	bounds, err := idx.readOnlyQuery.VoteBlockHeightBounds(context.TODO())
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, bounds.MinVoteHeight >= bounds.MinBlockHeight, qt.IsTrue)
+
+	hourly, undated, err := idx.VoteActivity(pid, VoteBucketHour, nil, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, undated, qt.Equals, uint64(0))
+	qt.Assert(t, hourly, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T00:00:00Z", Count: 2},
+		{Period: "1970-01-01T02:00:00Z", Count: 3},
+		{Period: "1970-01-02T06:00:00Z", Count: 1},
+	})
+
+	daily, _, err := idx.VoteActivity(pid, VoteBucketDay, nil, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, daily, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T00:00:00Z", Count: 5},
+		{Period: "1970-01-02T00:00:00Z", Count: 1},
+	})
+
+	// The from and to bounds narrow the aggregation down to a window.
+	windowed, _, err := idx.VoteActivity(pid, VoteBucketHour,
+		ptr(epoch.Add(time.Hour)), ptr(epoch.Add(24*time.Hour)))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, windowed, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T02:00:00Z", Count: 3},
+	})
+
+	// A vote whose block is not indexed cannot be dated, so it is reported apart
+	// instead of silently disappearing from the aggregation.
+	_, err = idx.readWriteDB.Exec("DELETE FROM blocks WHERE height = ?", h2)
+	qt.Assert(t, err, qt.IsNil)
+	hourly, undated, err = idx.VoteActivity(pid, VoteBucketHour, nil, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, undated, qt.Equals, uint64(3))
+	qt.Assert(t, hourly, qt.DeepEquals, []*indexertypes.VoteBucket{
+		{Period: "1970-01-01T00:00:00Z", Count: 2},
+		{Period: "1970-01-02T06:00:00Z", Count: 1},
+	})
+
+	// An unknown bucket granularity is rejected, and an unknown process is empty.
+	_, _, err = idx.VoteActivity(pid, "banana", nil, nil)
+	qt.Assert(t, err, qt.Equals, ErrInvalidVoteBucket)
+
+	empty, _, err := idx.VoteActivity(util.RandomBytes(32), VoteBucketHour, nil, nil)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, empty, qt.HasLen, 0)
+}
+
+// ptr returns a pointer to v, to pass optional values inline.
+func ptr[T any](v T) *T { return &v }
+
+func TestEntityMetadata(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	// two organizations, each with one election
+	entities := [][]byte{util.RandomBytes(20), util.RandomBytes(20)}
+	for _, eid := range entities {
+		err := app.State.AddProcess(&models.Process{
+			ProcessId:     util.RandomBytes(32),
+			EntityId:      eid,
+			EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+			Status:        models.ProcessStatus_READY,
+			Mode:          &models.ProcessMode{AutoStart: true},
+			BlockCount:    100,
+			MaxCensusSize: 10,
+			VoteOptions: &models.ProcessVoteOptions{
+				MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+			},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		idx.OnSetAccount(eid, &state.Account{})
+	}
+	app.AdvanceTestBlock()
+
+	// with no metadata resolved yet, the rows carry no name
+	list, total, err := idx.EntityList(10, 0, "", "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(2))
+	for _, e := range list {
+		qt.Assert(t, e.Name, qt.Equals, "")
+		qt.Assert(t, e.Avatar, qt.Equals, "")
+	}
+
+	// resolving the metadata of one of them embeds it in its list row
+	qt.Assert(t, idx.SetAccountMetadata(entities[0], "Bank of Åland", "ipfs://avatar"), qt.IsNil)
+	list, _, err = idx.EntityList(10, 0, hex.EncodeToString(entities[0]), "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, list, qt.HasLen, 1)
+	qt.Assert(t, list[0].Name, qt.Equals, "Bank of Åland")
+	qt.Assert(t, list[0].Avatar, qt.Equals, "ipfs://avatar")
+
+	// the name filter matches a substring, ignoring ASCII case
+	for _, query := range []string{"Bank", "bank of", "BANK OF ÅLAND"} {
+		list, total, err = idx.EntityList(10, 0, "", query)
+		qt.Assert(t, err, qt.IsNil, qt.Commentf("query %q", query))
+		qt.Assert(t, total, qt.Equals, uint64(1), qt.Commentf("query %q", query))
+		qt.Assert(t, hex.EncodeToString(list[0].EntityID), qt.Equals, hex.EncodeToString(entities[0]))
+	}
+	// and it excludes the organizations with no name resolved
+	_, total, err = idx.EntityList(10, 0, "", "nonesuch")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(0))
+
+	// an election title is likewise stored and read back
+	pending, err := idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 0) // these processes declare no metadata URI
+
+	pid := util.RandomBytes(32)
+	err = app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EntityId:      entities[0],
+		Metadata:      proto.String("ipfs://metadata"),
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    100,
+		MaxCensusSize: 10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	pending, err = idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 1)
+	qt.Assert(t, pending[0].URI, qt.Equals, "ipfs://metadata")
+
+	qt.Assert(t, idx.SetProcessMetadataTitle(pending[0].ProcessID, "A vote on something"), qt.IsNil)
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MetadataTitle, qt.Equals, "A vote on something")
+
+	// once resolved it is no longer pending, so the backfill won't revisit it
+	pending, err = idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 0)
+}
+
+func TestProcessKeyReveal(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	pid := util.RandomBytes(32)
+	err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EntityId:      util.RandomBytes(20),
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: true},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    100,
+		MaxCensusSize: 10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount: 1, MaxValue: 1, MaxTotalCost: 1, CostExponent: 1,
+		},
+	})
+	qt.Assert(t, err, qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// before the keys are revealed, nothing points at a reveal transaction
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, uint32(0))
+	qt.Assert(t, proc.KeyRevealTxHash, qt.IsNil)
+
+	// index the transaction revealing them, as the app does on every tx
+	signedTx, err := proto.Marshal(&models.SignedTx{
+		Tx: func() []byte {
+			b, err := proto.Marshal(&models.Tx{Payload: &models.Tx_Admin{Admin: &models.AdminTx{
+				Txtype:    models.TxType_REVEAL_PROCESS_KEYS,
+				ProcessId: pid,
+			}}})
+			qt.Assert(t, err, qt.IsNil)
+			return b
+		}(),
+	})
+	qt.Assert(t, err, qt.IsNil)
+	vtx := new(vochaintx.Tx)
+	qt.Assert(t, vtx.Unmarshal(signedTx, app.ChainID()), qt.IsNil)
+
+	revealHeight := app.Height()
+	idx.OnNewTx(vtx, revealHeight, 0)
+	app.AdvanceTestBlock()
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, revealHeight)
+	qt.Assert(t, proc.KeyRevealTxHash.String(), qt.Equals, hex.EncodeToString(vtx.TxID[:]))
+
+	// an election whose keys were revealed before the columns existed is repaired
+	// at boot, by re-reading the body of the stored transaction
+	_, err = idx.readWriteDB.Exec(
+		"UPDATE processes SET key_reveal_height = 0, key_reveal_tx_hash = x'' WHERE id = ?", pid)
+	qt.Assert(t, err, qt.IsNil)
+
+	idx.bootstrapKeyReveals()
+
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, revealHeight)
+	qt.Assert(t, proc.KeyRevealTxHash.String(), qt.Equals, hex.EncodeToString(vtx.TxID[:]))
 }

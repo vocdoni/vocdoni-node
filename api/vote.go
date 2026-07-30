@@ -267,6 +267,7 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 			TxHash:           vote.TxHash,
 			BlockHeight:      vote.Height,
 			TransactionIndex: &vote.TxIndex,
+			BlockTime:        vote.BlockTime,
 		}
 		// The memo is not indexed; read it from the authoritative state, the same
 		// way GET /votes/{voteId} does. Bounded by the page size.

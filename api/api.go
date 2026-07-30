@@ -53,6 +53,12 @@ const (
 	DefaultItemsPerPage = 10
 	// MaxItemsPerPage defines a ceiling for the `limit` param passed by the client
 	MaxItemsPerPage = 100
+	// MaxVoteActivityBuckets is the highest number of time buckets the vote activity
+	// endpoint will aggregate in a single response. The aggregation is done at read
+	// time over every vote of the election, so the window it covers is bounded: a
+	// client hitting the cap has to either use a coarser bucket or narrow the window
+	// down with the `from` and `to` params.
+	MaxVoteActivityBuckets = 1000
 )
 
 // These consts define the keywords for query (?param=), url (/url/param/) and POST params.
@@ -65,9 +71,13 @@ const (
 	ParamElectionId      = "electionId"
 	ParamOrganizationId  = "organizationId"
 	ParamVoteId          = "voteId"
+	ParamName            = "name"
 	ParamPage            = "page"
 	ParamLimit           = "limit"
 	ParamStatus          = "status"
+	ParamBucket          = "bucket"
+	ParamFrom            = "from"
+	ParamTo              = "to"
 	ParamWithResults     = "withResults"
 	ParamFinalResults    = "finalResults"
 	ParamManuallyEnded   = "manuallyEnded"
@@ -147,6 +157,9 @@ func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochainin
 	a.indexer = indexer
 	a.storage = data
 	a.censusdb = censusdb
+	// this is the first point where both the indexer and off-chain storage are
+	// known, which is what filling the cached metadata needs
+	a.startMetadataBackfill()
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.

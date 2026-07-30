@@ -128,16 +128,65 @@ WHERE id = sqlc.arg(id);
 -- name: GetProcessCount :one
 SELECT COUNT(*) FROM processes;
 
+-- name: SetProcessMetadataTitle :execresult
+-- Stores the title resolved from the process off-chain metadata. Only writes when
+-- the title actually changed, so the common case of re-resolving the same title
+-- costs no write.
+UPDATE processes
+SET metadata_title = sqlc.arg(metadata_title)
+WHERE id = sqlc.arg(id) AND metadata_title != sqlc.arg(metadata_title);
+
+-- name: ListProcessesMissingMetadataTitle :many
+-- Lists the processes whose title was never resolved but which do declare a
+-- metadata URI, so a backfill knows where to look. Used once per boot. Paged by
+-- the process id rather than by an offset, so that a page is never revisited
+-- even though rows leave the result set as the backfill fills them.
+SELECT id, metadata FROM processes
+WHERE metadata_title = '' AND metadata != '' AND id > sqlc.arg(after_id)
+ORDER BY id
+LIMIT sqlc.arg(limit);
+
+-- name: SetProcessKeyReveal :execresult
+-- Records where the encryption keys of a process were revealed. Keeps the
+-- earliest such transaction, since the keys of a multi-key election are revealed
+-- one transaction at a time and it is the first one that dates the reveal. Also
+-- makes reindexing the same transaction a no-op.
+UPDATE processes
+SET key_reveal_height = sqlc.arg(key_reveal_height),
+    key_reveal_tx_hash = sqlc.arg(key_reveal_tx_hash)
+WHERE id = sqlc.arg(id)
+  AND (key_reveal_height = 0 OR key_reveal_height > sqlc.arg(key_reveal_height));
+
+-- name: CountProcessesByStatus :many
+-- Counts the indexed processes grouped by their status, in one pass over
+-- index_processes_status. Statuses with no process are simply absent.
+SELECT status, COUNT(*) AS count
+FROM processes
+GROUP BY status
+ORDER BY status;
+
 -- name: GetEntityCount :one
 SELECT COUNT(DISTINCT entity_id) FROM processes;
 
 -- name: SearchEntities :many
+-- The join to accounts is an indexed point lookup on the accounts primary key,
+-- and carries the name and avatar resolved from the account off-chain metadata,
+-- so a client listing organizations doesn't need one account request per row.
+-- The name filter is a case-insensitive substring match; LOWER only folds ASCII
+-- in sqlite, so names differing by non-ASCII case or by diacritics do not match.
 WITH results AS (
-    SELECT *
-    FROM processes
-    WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(entity_id)), sqlc.arg(entity_id_substr)) > 0))
+    SELECT p.*,
+        COALESCE(a.name, '') AS account_name,
+        COALESCE(a.avatar, '') AS account_avatar
+    FROM processes AS p
+    LEFT JOIN accounts AS a
+        ON a.account = p.entity_id
+    WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(p.entity_id)), sqlc.arg(entity_id_substr)) > 0))
+    AND (sqlc.arg(name_substr) = '' OR (INSTR(LOWER(COALESCE(a.name, '')), LOWER(sqlc.arg(name_substr))) > 0))
 )
 SELECT entity_id,
+	account_name,
+	account_avatar,
 	COUNT(id) AS process_count,
 	COUNT(entity_id) OVER() AS total_count
 FROM results

@@ -39,6 +39,7 @@ type ElectionParams struct {
 type OrganizationParams struct {
 	PaginationParams
 	OrganizationID string `json:"organizationId,omitempty"`
+	Name           string `json:"name,omitempty"`
 }
 
 // AccountParams allows the client to filter accounts
@@ -106,6 +107,11 @@ type Pagination struct {
 type OrganizationSummary struct {
 	OrganizationID types.HexBytes `json:"organizationID"  example:"0x370372b92514d81a0e3efb8eba9d036ae0877653"`
 	ElectionCount  uint64         `json:"electionCount" example:"1"`
+	// Name and Avatar come from the organization off-chain metadata. They are
+	// omitted when it has not been resolved, in which case a client that needs
+	// them has to fall back to the account endpoint for that row.
+	Name   string `json:"name,omitempty"`
+	Avatar string `json:"avatar,omitempty"`
 }
 
 // OrganizationsList is used to return a paginated list to the client
@@ -125,6 +131,15 @@ type ElectionSummary struct {
 	Results        [][]*types.BigInt `json:"result,omitempty"`
 	ManuallyEnded  bool              `json:"manuallyEnded"`
 	ChainID        string            `json:"chainId"`
+	// Title comes from the election off-chain metadata. It is omitted when it
+	// has not been resolved, in which case a client that needs it has to fall
+	// back to the election detail endpoint for that row.
+	Title string `json:"title,omitempty"`
+	// KeyRevealHeight and KeyRevealTxHash locate the transaction that revealed
+	// the encryption keys of an encrypted election. Both are omitted unless the
+	// keys were revealed and the revealing transaction is indexed.
+	KeyRevealHeight uint32         `json:"keyRevealHeight,omitempty"`
+	KeyRevealTxHash types.HexBytes `json:"keyRevealTxHash,omitempty"`
 }
 
 // ElectionsList is used to return a paginated list to the client
@@ -222,11 +237,52 @@ type Vote struct {
 	Memo string `json:"memo,omitempty" extensions:"x-omitempty"`
 	// Date when the vote was emitted
 	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
+	// BlockTime is the timestamp of the block that included the vote. It is the
+	// same instant as Date, reported on list rows so that clients don't need a
+	// per-vote request to date them. Omitted when the block is not indexed.
+	BlockTime *time.Time `json:"blockTime,omitempty" extensions:"x-omitempty"`
 }
 
 type VotesList struct {
 	Votes      []*Vote     `json:"votes"`
 	Pagination *Pagination `json:"pagination"`
+}
+
+// VoteActivity is a digest of the votes of an election over time, so clients can
+// plot vote activity without paging through every single vote.
+type VoteActivity struct {
+	// Buckets holds one entry per time bucket that contains at least one vote,
+	// ordered chronologically.
+	Buckets []*indexertypes.VoteBucket `json:"buckets"`
+	// TotalVotes is the sum of the counts of all buckets, so it does not include
+	// UndatedVotes. With no time window requested, the vote count of the election
+	// is TotalVotes plus UndatedVotes.
+	TotalVotes uint64 `json:"totalVotes"`
+	// UndatedVotes is the number of votes which could not be placed in any bucket,
+	// because the block that included them is not indexed. It is not affected by the
+	// requested time window, and is omitted when every vote could be dated.
+	UndatedVotes uint64 `json:"undatedVotes,omitempty" extensions:"x-omitempty"`
+	// Bucket is the granularity used, either "hour" or "day".
+	Bucket string `json:"bucket" example:"hour"`
+}
+
+// ChainStats bundles the chain-wide counters a client would otherwise have to
+// assemble out of one list request per bucket, reading totalItems off each.
+type ChainStats struct {
+	// TxCountByType holds the number of transactions of each type, keyed by the
+	// same type names accepted by the transaction list type filter. A type with
+	// no transaction indexed is absent rather than reported as zero.
+	TxCountByType map[string]uint64 `json:"txCountByType"`
+	// ElectionCountByStatus holds the number of elections in each status, keyed
+	// by the same status names reported by the election endpoints (READY,
+	// ENDED...). A status with no election is absent rather than zero.
+	ElectionCountByStatus map[string]uint64 `json:"electionCountByStatus"`
+	// AccountCount is the total number of indexed accounts.
+	AccountCount uint64 `json:"accountCount" example:"2618"`
+	// ElectionCount is the total number of indexed elections.
+	ElectionCount uint64 `json:"electionCount" example:"2602"`
+	// VoteCount is the total number of indexed votes.
+	VoteCount uint64 `json:"voteCount" example:"134523"`
 }
 
 type CensusTypeDescription struct {

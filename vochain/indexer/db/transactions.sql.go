@@ -35,6 +35,43 @@ func (q *Queries) CountTransactionsByHeight(ctx context.Context, blockHeight int
 	return count, err
 }
 
+const countTransactionsByType = `-- name: CountTransactionsByType :many
+SELECT type, COUNT(*) AS count
+FROM transactions
+GROUP BY type
+ORDER BY type
+`
+
+type CountTransactionsByTypeRow struct {
+	Type  string
+	Count int64
+}
+
+// Counts the indexed transactions grouped by their type, in one pass over
+// index_transactions_type. Types with no transaction are simply absent.
+func (q *Queries) CountTransactionsByType(ctx context.Context) ([]CountTransactionsByTypeRow, error) {
+	rows, err := q.query(ctx, q.countTransactionsByTypeStmt, countTransactionsByType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountTransactionsByTypeRow
+	for rows.Next() {
+		var i CountTransactionsByTypeRow
+		if err := rows.Scan(&i.Type, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createTransaction = `-- name: CreateTransaction :execresult
 INSERT INTO transactions (
 	hash, block_height, block_index, type, subtype, raw_tx, signature, signer
@@ -122,6 +159,48 @@ func (q *Queries) GetTransactionByHeightAndIndex(ctx context.Context, arg GetTra
 		&i.Signer,
 	)
 	return i, err
+}
+
+const listTransactionsByTypeAndSubtype = `-- name: ListTransactionsByTypeAndSubtype :many
+SELECT hash, block_height, raw_tx FROM transactions
+WHERE type = ?1 AND subtype = ?2
+`
+
+type ListTransactionsByTypeAndSubtypeParams struct {
+	TxType    string
+	TxSubtype string
+}
+
+type ListTransactionsByTypeAndSubtypeRow struct {
+	Hash        types.Hash
+	BlockHeight int64
+	RawTx       []byte
+}
+
+// Returns the stored transactions of a given type and subtype, walking
+// index_transactions_type. Used to backfill process columns derived from a
+// transaction body, which only the raw transaction holds.
+func (q *Queries) ListTransactionsByTypeAndSubtype(ctx context.Context, arg ListTransactionsByTypeAndSubtypeParams) ([]ListTransactionsByTypeAndSubtypeRow, error) {
+	rows, err := q.query(ctx, q.listTransactionsByTypeAndSubtypeStmt, listTransactionsByTypeAndSubtype, arg.TxType, arg.TxSubtype)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTransactionsByTypeAndSubtypeRow
+	for rows.Next() {
+		var i ListTransactionsByTypeAndSubtypeRow
+		if err := rows.Scan(&i.Hash, &i.BlockHeight, &i.RawTx); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const searchTransactions = `-- name: SearchTransactions :many

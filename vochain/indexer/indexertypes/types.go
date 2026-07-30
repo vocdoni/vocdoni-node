@@ -25,6 +25,9 @@ type Process struct {
 	CensusRoot        types.HexBytes             `json:"censusRoot"`
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
+	MetadataTitle     string                     `json:"metadataTitle,omitempty"`
+	KeyRevealHeight   uint32                     `json:"keyRevealHeight,omitempty"`
+	KeyRevealTxHash   types.HexBytes             `json:"keyRevealTxHash,omitempty"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
 	Status            int32                      `json:"status"`
 	Namespace         uint32                     `json:"namespace"`
@@ -80,6 +83,9 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		CreationTime:      dbproc.CreationTime,
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
+		MetadataTitle:     dbproc.MetadataTitle,
+		KeyRevealHeight:   uint32(dbproc.KeyRevealHeight),
+		KeyRevealTxHash:   nonEmptyBytes(dbproc.KeyRevealTxHash),
 		ChainID:           dbproc.ChainID,
 
 		PrivateKeys:        json.RawMessage(dbproc.PrivateKeys),
@@ -152,6 +158,9 @@ type EnvelopeMetadata struct {
 	TxIndex   int32          `json:"txIndex"`
 	Height    uint32         `json:"height"`
 	TxHash    types.HexBytes `json:"txHash"`
+	// BlockTime is the timestamp of the block that included the vote, or nil if
+	// that block is not indexed and the vote therefore cannot be dated.
+	BlockTime *time.Time `json:"blockTime,omitempty"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
@@ -261,4 +270,15 @@ type TokenTransfersAccount struct {
 type Entity struct {
 	EntityID     types.EntityID
 	ProcessCount int64
+	// Name and Avatar come from the account off-chain metadata, and are empty
+	// when it was never resolved for this entity.
+	Name   string
+	Avatar string
+}
+
+// VoteBucket is the number of votes cast within a single time bucket.
+// Period is the RFC3339 timestamp of the beginning of the bucket, in UTC.
+type VoteBucket struct {
+	Period string `json:"period"`
+	Count  uint64 `json:"count"`
 }

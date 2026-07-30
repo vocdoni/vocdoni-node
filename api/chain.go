@@ -51,6 +51,14 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/chain/stats",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.chainStatsHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/chain/organizations/count",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -280,6 +288,7 @@ func (a *API) enableChainHandlers() error {
 //	@Param					page			query		number	false	"Page"
 //	@Param					limit			query		number	false	"Items per page"
 //	@Param					organizationId	query		string	false	"Filter by partial organizationId"
+//	@Param					name			query		string	false	"Filter by organization name, case-insensitive substring match (ASCII case folding only)"
 //	@Success				200				{object}	OrganizationsList
 //	@Router					/chain/organizations [get]
 func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -287,6 +296,7 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		ctx.QueryParam(ParamPage),
 		ctx.QueryParam(ParamLimit),
 		ctx.QueryParam(ParamOrganizationId),
+		ctx.QueryParam(ParamName),
 	)
 	if err != nil {
 		return err
@@ -315,6 +325,7 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 func (a *API) organizationListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseOrganizationParams(
 		ctx.URLParam(ParamPage),
+		"",
 		"",
 		"",
 	)
@@ -385,6 +396,7 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		params.Limit,
 		params.Page*params.Limit,
 		params.OrganizationID,
+		params.Name,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -403,6 +415,8 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		list.Organizations = append(list.Organizations, &OrganizationSummary{
 			OrganizationID: org.EntityID,
 			ElectionCount:  uint64(org.ProcessCount),
+			Name:           org.Name,
+			Avatar:         org.Avatar,
 		})
 	}
 	return list, nil
@@ -422,6 +436,44 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	count := a.indexer.CountTotalEntities()
 	return marshalAndSend(ctx, &CountResult{Count: count})
+}
+
+// chainStatsHandler
+//
+//	@Summary		Chain statistics
+//	@Description	Returns the chain-wide counters in a single response: transactions
+//	@Description	grouped by type, elections grouped by status, and the total number of
+//	@Description	accounts, elections and votes. Buckets with a count of zero are omitted.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ChainStats
+//	@Router			/chain/stats [get]
+func (a *API) chainStatsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	txCountByType, err := a.indexer.CountTransactionsByType()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	electionCountByStatus, err := a.indexer.CountProcessesByStatus()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	accountCount, err := a.indexer.CountTotalAccounts()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	voteCount, err := a.indexer.CountTotalVotes()
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	return marshalAndSend(ctx, &ChainStats{
+		TxCountByType:         txCountByType,
+		ElectionCountByStatus: electionCountByStatus,
+		AccountCount:          accountCount,
+		ElectionCount:         a.indexer.CountTotalProcesses(),
+		VoteCount:             voteCount,
+	})
 }
 
 // chainInfoHandler
@@ -1049,8 +1101,13 @@ func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprou
 	params, err := parseTransactionParams(
 		ctx.URLParam(ParamPage),
 		"",
-		ctx.URLParam(ParamHeight),
 		"",
+		// parseTransactionParams takes hash before height; the height used to be
+		// passed in the hash slot, which filtered by a hash substring instead and
+		// left the height filter unset. The result was not an empty list but a
+		// wrong one: every transaction whose hex hash happened to contain the
+		// height as a substring, from any block.
+		ctx.URLParam(ParamHeight),
 		"",
 		"",
 		"",
@@ -1572,7 +1629,7 @@ func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 }
 
 // parseOrganizationParams returns an OrganizationParams filled with the passed params
-func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID string) (*OrganizationParams, error) {
+func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramName string) (*OrganizationParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -1581,6 +1638,7 @@ func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID string) 
 	return &OrganizationParams{
 		PaginationParams: pagination,
 		OrganizationID:   util.TrimHex(paramOrganizationID),
+		Name:             paramName,
 	}, nil
 }
 

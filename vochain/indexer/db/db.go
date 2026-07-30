@@ -33,6 +33,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.countBlocksStmt, err = db.PrepareContext(ctx, countBlocks); err != nil {
 		return nil, fmt.Errorf("error preparing query CountBlocks: %w", err)
 	}
+	if q.countProcessesByStatusStmt, err = db.PrepareContext(ctx, countProcessesByStatus); err != nil {
+		return nil, fmt.Errorf("error preparing query CountProcessesByStatus: %w", err)
+	}
 	if q.countTokenTransfersByAccountStmt, err = db.PrepareContext(ctx, countTokenTransfersByAccount); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTokenTransfersByAccount: %w", err)
 	}
@@ -41,6 +44,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.countTransactionsByHeightStmt, err = db.PrepareContext(ctx, countTransactionsByHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query CountTransactionsByHeight: %w", err)
+	}
+	if q.countTransactionsByTypeStmt, err = db.PrepareContext(ctx, countTransactionsByType); err != nil {
+		return nil, fmt.Errorf("error preparing query CountTransactionsByType: %w", err)
+	}
+	if q.countUndatedVotesBelowHeightStmt, err = db.PrepareContext(ctx, countUndatedVotesBelowHeight); err != nil {
+		return nil, fmt.Errorf("error preparing query CountUndatedVotesBelowHeight: %w", err)
 	}
 	if q.countVotesStmt, err = db.PrepareContext(ctx, countVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query CountVotes: %w", err)
@@ -102,6 +111,15 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.lastBlockHeightStmt, err = db.PrepareContext(ctx, lastBlockHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query LastBlockHeight: %w", err)
 	}
+	if q.listAccountsMissingNameStmt, err = db.PrepareContext(ctx, listAccountsMissingName); err != nil {
+		return nil, fmt.Errorf("error preparing query ListAccountsMissingName: %w", err)
+	}
+	if q.listProcessesMissingMetadataTitleStmt, err = db.PrepareContext(ctx, listProcessesMissingMetadataTitle); err != nil {
+		return nil, fmt.Errorf("error preparing query ListProcessesMissingMetadataTitle: %w", err)
+	}
+	if q.listTransactionsByTypeAndSubtypeStmt, err = db.PrepareContext(ctx, listTransactionsByTypeAndSubtype); err != nil {
+		return nil, fmt.Errorf("error preparing query ListTransactionsByTypeAndSubtype: %w", err)
+	}
 	if q.searchAccountsStmt, err = db.PrepareContext(ctx, searchAccounts); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchAccounts: %w", err)
 	}
@@ -126,6 +144,15 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.searchVotesStmt, err = db.PrepareContext(ctx, searchVotes); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchVotes: %w", err)
 	}
+	if q.setAccountMetadataStmt, err = db.PrepareContext(ctx, setAccountMetadata); err != nil {
+		return nil, fmt.Errorf("error preparing query SetAccountMetadata: %w", err)
+	}
+	if q.setProcessKeyRevealStmt, err = db.PrepareContext(ctx, setProcessKeyReveal); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessKeyReveal: %w", err)
+	}
+	if q.setProcessMetadataTitleStmt, err = db.PrepareContext(ctx, setProcessMetadataTitle); err != nil {
+		return nil, fmt.Errorf("error preparing query SetProcessMetadataTitle: %w", err)
+	}
 	if q.setProcessResultsCancelledStmt, err = db.PrepareContext(ctx, setProcessResultsCancelled); err != nil {
 		return nil, fmt.Errorf("error preparing query SetProcessResultsCancelled: %w", err)
 	}
@@ -143,6 +170,12 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.updateProcessResultsStmt, err = db.PrepareContext(ctx, updateProcessResults); err != nil {
 		return nil, fmt.Errorf("error preparing query UpdateProcessResults: %w", err)
+	}
+	if q.voteActivityStmt, err = db.PrepareContext(ctx, voteActivity); err != nil {
+		return nil, fmt.Errorf("error preparing query VoteActivity: %w", err)
+	}
+	if q.voteBlockHeightBoundsStmt, err = db.PrepareContext(ctx, voteBlockHeightBounds); err != nil {
+		return nil, fmt.Errorf("error preparing query VoteBlockHeightBounds: %w", err)
 	}
 	return &q, nil
 }
@@ -164,6 +197,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing countBlocksStmt: %w", cerr)
 		}
 	}
+	if q.countProcessesByStatusStmt != nil {
+		if cerr := q.countProcessesByStatusStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countProcessesByStatusStmt: %w", cerr)
+		}
+	}
 	if q.countTokenTransfersByAccountStmt != nil {
 		if cerr := q.countTokenTransfersByAccountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTokenTransfersByAccountStmt: %w", cerr)
@@ -177,6 +215,16 @@ func (q *Queries) Close() error {
 	if q.countTransactionsByHeightStmt != nil {
 		if cerr := q.countTransactionsByHeightStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing countTransactionsByHeightStmt: %w", cerr)
+		}
+	}
+	if q.countTransactionsByTypeStmt != nil {
+		if cerr := q.countTransactionsByTypeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countTransactionsByTypeStmt: %w", cerr)
+		}
+	}
+	if q.countUndatedVotesBelowHeightStmt != nil {
+		if cerr := q.countUndatedVotesBelowHeightStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing countUndatedVotesBelowHeightStmt: %w", cerr)
 		}
 	}
 	if q.countVotesStmt != nil {
@@ -279,6 +327,21 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing lastBlockHeightStmt: %w", cerr)
 		}
 	}
+	if q.listAccountsMissingNameStmt != nil {
+		if cerr := q.listAccountsMissingNameStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listAccountsMissingNameStmt: %w", cerr)
+		}
+	}
+	if q.listProcessesMissingMetadataTitleStmt != nil {
+		if cerr := q.listProcessesMissingMetadataTitleStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listProcessesMissingMetadataTitleStmt: %w", cerr)
+		}
+	}
+	if q.listTransactionsByTypeAndSubtypeStmt != nil {
+		if cerr := q.listTransactionsByTypeAndSubtypeStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listTransactionsByTypeAndSubtypeStmt: %w", cerr)
+		}
+	}
 	if q.searchAccountsStmt != nil {
 		if cerr := q.searchAccountsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchAccountsStmt: %w", cerr)
@@ -319,6 +382,21 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing searchVotesStmt: %w", cerr)
 		}
 	}
+	if q.setAccountMetadataStmt != nil {
+		if cerr := q.setAccountMetadataStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setAccountMetadataStmt: %w", cerr)
+		}
+	}
+	if q.setProcessKeyRevealStmt != nil {
+		if cerr := q.setProcessKeyRevealStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessKeyRevealStmt: %w", cerr)
+		}
+	}
+	if q.setProcessMetadataTitleStmt != nil {
+		if cerr := q.setProcessMetadataTitleStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing setProcessMetadataTitleStmt: %w", cerr)
+		}
+	}
 	if q.setProcessResultsCancelledStmt != nil {
 		if cerr := q.setProcessResultsCancelledStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing setProcessResultsCancelledStmt: %w", cerr)
@@ -347,6 +425,16 @@ func (q *Queries) Close() error {
 	if q.updateProcessResultsStmt != nil {
 		if cerr := q.updateProcessResultsStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing updateProcessResultsStmt: %w", cerr)
+		}
+	}
+	if q.voteActivityStmt != nil {
+		if cerr := q.voteActivityStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing voteActivityStmt: %w", cerr)
+		}
+	}
+	if q.voteBlockHeightBoundsStmt != nil {
+		if cerr := q.voteBlockHeightBoundsStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing voteBlockHeightBoundsStmt: %w", cerr)
 		}
 	}
 	return err
@@ -386,93 +474,115 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 }
 
 type Queries struct {
-	db                                 DBTX
-	tx                                 *sql.Tx
-	computeProcessVoteCountStmt        *sql.Stmt
-	countAccountsStmt                  *sql.Stmt
-	countBlocksStmt                    *sql.Stmt
-	countTokenTransfersByAccountStmt   *sql.Stmt
-	countTransactionsStmt              *sql.Stmt
-	countTransactionsByHeightStmt      *sql.Stmt
-	countVotesStmt                     *sql.Stmt
-	createAccountStmt                  *sql.Stmt
-	createBlockStmt                    *sql.Stmt
-	createProcessStmt                  *sql.Stmt
-	createTokenFeeStmt                 *sql.Stmt
-	createTokenTransferStmt            *sql.Stmt
-	createTransactionStmt              *sql.Stmt
-	createVoteStmt                     *sql.Stmt
-	getBlockByHashStmt                 *sql.Stmt
-	getBlockByHeightStmt               *sql.Stmt
-	getEntityCountStmt                 *sql.Stmt
-	getProcessStmt                     *sql.Stmt
-	getProcessCountStmt                *sql.Stmt
-	getProcessIDsByFinalResultsStmt    *sql.Stmt
-	getProcessStatusStmt               *sql.Stmt
-	getTokenTransferStmt               *sql.Stmt
-	getTransactionByHashStmt           *sql.Stmt
-	getTransactionByHeightAndIndexStmt *sql.Stmt
-	getVoteStmt                        *sql.Stmt
-	lastBlockHeightStmt                *sql.Stmt
-	searchAccountsStmt                 *sql.Stmt
-	searchBlocksStmt                   *sql.Stmt
-	searchEntitiesStmt                 *sql.Stmt
-	searchProcessesStmt                *sql.Stmt
-	searchTokenFeesStmt                *sql.Stmt
-	searchTokenTransfersStmt           *sql.Stmt
-	searchTransactionsStmt             *sql.Stmt
-	searchVotesStmt                    *sql.Stmt
-	setProcessResultsCancelledStmt     *sql.Stmt
-	setProcessResultsReadyStmt         *sql.Stmt
-	updateProcessEndDateStmt           *sql.Stmt
-	updateProcessFromStateStmt         *sql.Stmt
-	updateProcessResultByIDStmt        *sql.Stmt
-	updateProcessResultsStmt           *sql.Stmt
+	db                                    DBTX
+	tx                                    *sql.Tx
+	computeProcessVoteCountStmt           *sql.Stmt
+	countAccountsStmt                     *sql.Stmt
+	countBlocksStmt                       *sql.Stmt
+	countProcessesByStatusStmt            *sql.Stmt
+	countTokenTransfersByAccountStmt      *sql.Stmt
+	countTransactionsStmt                 *sql.Stmt
+	countTransactionsByHeightStmt         *sql.Stmt
+	countTransactionsByTypeStmt           *sql.Stmt
+	countUndatedVotesBelowHeightStmt      *sql.Stmt
+	countVotesStmt                        *sql.Stmt
+	createAccountStmt                     *sql.Stmt
+	createBlockStmt                       *sql.Stmt
+	createProcessStmt                     *sql.Stmt
+	createTokenFeeStmt                    *sql.Stmt
+	createTokenTransferStmt               *sql.Stmt
+	createTransactionStmt                 *sql.Stmt
+	createVoteStmt                        *sql.Stmt
+	getBlockByHashStmt                    *sql.Stmt
+	getBlockByHeightStmt                  *sql.Stmt
+	getEntityCountStmt                    *sql.Stmt
+	getProcessStmt                        *sql.Stmt
+	getProcessCountStmt                   *sql.Stmt
+	getProcessIDsByFinalResultsStmt       *sql.Stmt
+	getProcessStatusStmt                  *sql.Stmt
+	getTokenTransferStmt                  *sql.Stmt
+	getTransactionByHashStmt              *sql.Stmt
+	getTransactionByHeightAndIndexStmt    *sql.Stmt
+	getVoteStmt                           *sql.Stmt
+	lastBlockHeightStmt                   *sql.Stmt
+	listAccountsMissingNameStmt           *sql.Stmt
+	listProcessesMissingMetadataTitleStmt *sql.Stmt
+	listTransactionsByTypeAndSubtypeStmt  *sql.Stmt
+	searchAccountsStmt                    *sql.Stmt
+	searchBlocksStmt                      *sql.Stmt
+	searchEntitiesStmt                    *sql.Stmt
+	searchProcessesStmt                   *sql.Stmt
+	searchTokenFeesStmt                   *sql.Stmt
+	searchTokenTransfersStmt              *sql.Stmt
+	searchTransactionsStmt                *sql.Stmt
+	searchVotesStmt                       *sql.Stmt
+	setAccountMetadataStmt                *sql.Stmt
+	setProcessKeyRevealStmt               *sql.Stmt
+	setProcessMetadataTitleStmt           *sql.Stmt
+	setProcessResultsCancelledStmt        *sql.Stmt
+	setProcessResultsReadyStmt            *sql.Stmt
+	updateProcessEndDateStmt              *sql.Stmt
+	updateProcessFromStateStmt            *sql.Stmt
+	updateProcessResultByIDStmt           *sql.Stmt
+	updateProcessResultsStmt              *sql.Stmt
+	voteActivityStmt                      *sql.Stmt
+	voteBlockHeightBoundsStmt             *sql.Stmt
 }
 
 func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
-		db:                                 tx,
-		tx:                                 tx,
-		computeProcessVoteCountStmt:        q.computeProcessVoteCountStmt,
-		countAccountsStmt:                  q.countAccountsStmt,
-		countBlocksStmt:                    q.countBlocksStmt,
-		countTokenTransfersByAccountStmt:   q.countTokenTransfersByAccountStmt,
-		countTransactionsStmt:              q.countTransactionsStmt,
-		countTransactionsByHeightStmt:      q.countTransactionsByHeightStmt,
-		countVotesStmt:                     q.countVotesStmt,
-		createAccountStmt:                  q.createAccountStmt,
-		createBlockStmt:                    q.createBlockStmt,
-		createProcessStmt:                  q.createProcessStmt,
-		createTokenFeeStmt:                 q.createTokenFeeStmt,
-		createTokenTransferStmt:            q.createTokenTransferStmt,
-		createTransactionStmt:              q.createTransactionStmt,
-		createVoteStmt:                     q.createVoteStmt,
-		getBlockByHashStmt:                 q.getBlockByHashStmt,
-		getBlockByHeightStmt:               q.getBlockByHeightStmt,
-		getEntityCountStmt:                 q.getEntityCountStmt,
-		getProcessStmt:                     q.getProcessStmt,
-		getProcessCountStmt:                q.getProcessCountStmt,
-		getProcessIDsByFinalResultsStmt:    q.getProcessIDsByFinalResultsStmt,
-		getProcessStatusStmt:               q.getProcessStatusStmt,
-		getTokenTransferStmt:               q.getTokenTransferStmt,
-		getTransactionByHashStmt:           q.getTransactionByHashStmt,
-		getTransactionByHeightAndIndexStmt: q.getTransactionByHeightAndIndexStmt,
-		getVoteStmt:                        q.getVoteStmt,
-		lastBlockHeightStmt:                q.lastBlockHeightStmt,
-		searchAccountsStmt:                 q.searchAccountsStmt,
-		searchBlocksStmt:                   q.searchBlocksStmt,
-		searchEntitiesStmt:                 q.searchEntitiesStmt,
-		searchProcessesStmt:                q.searchProcessesStmt,
-		searchTokenFeesStmt:                q.searchTokenFeesStmt,
-		searchTokenTransfersStmt:           q.searchTokenTransfersStmt,
-		searchTransactionsStmt:             q.searchTransactionsStmt,
-		searchVotesStmt:                    q.searchVotesStmt,
-		setProcessResultsCancelledStmt:     q.setProcessResultsCancelledStmt,
-		setProcessResultsReadyStmt:         q.setProcessResultsReadyStmt,
-		updateProcessEndDateStmt:           q.updateProcessEndDateStmt,
-		updateProcessFromStateStmt:         q.updateProcessFromStateStmt,
-		updateProcessResultByIDStmt:        q.updateProcessResultByIDStmt,
-		updateProcessResultsStmt:           q.updateProcessResultsStmt,
+		db:                                    tx,
+		tx:                                    tx,
+		computeProcessVoteCountStmt:           q.computeProcessVoteCountStmt,
+		countAccountsStmt:                     q.countAccountsStmt,
+		countBlocksStmt:                       q.countBlocksStmt,
+		countProcessesByStatusStmt:            q.countProcessesByStatusStmt,
+		countTokenTransfersByAccountStmt:      q.countTokenTransfersByAccountStmt,
+		countTransactionsStmt:                 q.countTransactionsStmt,
+		countTransactionsByHeightStmt:         q.countTransactionsByHeightStmt,
+		countTransactionsByTypeStmt:           q.countTransactionsByTypeStmt,
+		countUndatedVotesBelowHeightStmt:      q.countUndatedVotesBelowHeightStmt,
+		countVotesStmt:                        q.countVotesStmt,
+		createAccountStmt:                     q.createAccountStmt,
+		createBlockStmt:                       q.createBlockStmt,
+		createProcessStmt:                     q.createProcessStmt,
+		createTokenFeeStmt:                    q.createTokenFeeStmt,
+		createTokenTransferStmt:               q.createTokenTransferStmt,
+		createTransactionStmt:                 q.createTransactionStmt,
+		createVoteStmt:                        q.createVoteStmt,
+		getBlockByHashStmt:                    q.getBlockByHashStmt,
+		getBlockByHeightStmt:                  q.getBlockByHeightStmt,
+		getEntityCountStmt:                    q.getEntityCountStmt,
+		getProcessStmt:                        q.getProcessStmt,
+		getProcessCountStmt:                   q.getProcessCountStmt,
+		getProcessIDsByFinalResultsStmt:       q.getProcessIDsByFinalResultsStmt,
+		getProcessStatusStmt:                  q.getProcessStatusStmt,
+		getTokenTransferStmt:                  q.getTokenTransferStmt,
+		getTransactionByHashStmt:              q.getTransactionByHashStmt,
+		getTransactionByHeightAndIndexStmt:    q.getTransactionByHeightAndIndexStmt,
+		getVoteStmt:                           q.getVoteStmt,
+		lastBlockHeightStmt:                   q.lastBlockHeightStmt,
+		listAccountsMissingNameStmt:           q.listAccountsMissingNameStmt,
+		listProcessesMissingMetadataTitleStmt: q.listProcessesMissingMetadataTitleStmt,
+		listTransactionsByTypeAndSubtypeStmt:  q.listTransactionsByTypeAndSubtypeStmt,
+		searchAccountsStmt:                    q.searchAccountsStmt,
+		searchBlocksStmt:                      q.searchBlocksStmt,
+		searchEntitiesStmt:                    q.searchEntitiesStmt,
+		searchProcessesStmt:                   q.searchProcessesStmt,
+		searchTokenFeesStmt:                   q.searchTokenFeesStmt,
+		searchTokenTransfersStmt:              q.searchTokenTransfersStmt,
+		searchTransactionsStmt:                q.searchTransactionsStmt,
+		searchVotesStmt:                       q.searchVotesStmt,
+		setAccountMetadataStmt:                q.setAccountMetadataStmt,
+		setProcessKeyRevealStmt:               q.setProcessKeyRevealStmt,
+		setProcessMetadataTitleStmt:           q.setProcessMetadataTitleStmt,
+		setProcessResultsCancelledStmt:        q.setProcessResultsCancelledStmt,
+		setProcessResultsReadyStmt:            q.setProcessResultsReadyStmt,
+		updateProcessEndDateStmt:              q.updateProcessEndDateStmt,
+		updateProcessFromStateStmt:            q.updateProcessFromStateStmt,
+		updateProcessResultByIDStmt:           q.updateProcessResultByIDStmt,
+		updateProcessResultsStmt:              q.updateProcessResultsStmt,
+		voteActivityStmt:                      q.voteActivityStmt,
+		voteBlockHeightBoundsStmt:             q.voteBlockHeightBoundsStmt,
 	}
 }
