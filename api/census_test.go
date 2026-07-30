@@ -15,10 +15,12 @@ import (
 	"google.golang.org/protobuf/proto"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
@@ -221,6 +223,7 @@ func TestCensusProofVerifierArbo(t *testing.T) {
 	// verify the proof
 	electionID := rnd.RandomBytes(32)
 	valid, weight, err := transaction.VerifyProof(
+		app.ChainID(),
 		&models.Process{
 			ProcessId:    electionID,
 			CensusRoot:   censusData.CensusID,
@@ -332,6 +335,7 @@ func TestCensusZk(t *testing.T) {
 	// verify the proof
 	electionID := util.RandomBytes(32)
 	valid, newWeight, err := transaction.VerifyProof(
+		app.ChainID(),
 		&models.Process{
 			ProcessId:    electionID,
 			CensusRoot:   censusData.CensusID,
@@ -413,6 +417,7 @@ func TestCensusProofVerifierCSP(t *testing.T) {
 
 	// verify the proof
 	valid, weight, err := transaction.VerifyProof(
+		app.ChainID(),
 		process,
 		&models.VoteEnvelope{
 			Nonce:     util.RandomBytes(32),
@@ -488,6 +493,7 @@ func TestCensusProofVerifierCSPLegacy(t *testing.T) {
 
 	// verify the proof
 	valid, weight, err := transaction.VerifyProof(
+		app.ChainID(),
 		process,
 		&models.VoteEnvelope{
 			Nonce:     util.RandomBytes(32),
@@ -508,4 +514,66 @@ func TestCensusProofVerifierCSPLegacy(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, valid, qt.IsTrue)
 	qt.Assert(t, weight.Int64(), qt.Equals, int64(1))
+}
+
+// TestCensusProofVerifierCSPSalted covers the salted CSP proof types through the
+// transaction.VerifyProof dispatch, on a chain where the fixed salt derivation
+// (issue #1424) is active: the weight travels bound inside the salt.
+func TestCensusProofVerifierCSPSalted(t *testing.T) {
+	app := vochain.TestBaseApplicationWithChainID(t, "vocdoni/TEST/1")
+
+	signer, err := testcsp.NewSigner()
+	qt.Assert(t, err, qt.IsNil)
+
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	for _, proofType := range []models.ProofCA_Type{
+		models.ProofCA_ECDSA_PIDSALTED,
+		models.ProofCA_ECDSA_BLIND_PIDSALTED,
+	} {
+		t.Run(proofType.String(), func(t *testing.T) {
+			root, err := signer.CensusRoot(proofType)
+			qt.Assert(t, err, qt.IsNil)
+
+			pid := util.RandomBytes(types.ProcessIDsize)
+			process := &models.Process{
+				ProcessId:     pid,
+				StartTime:     0,
+				EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+				Mode:          new(models.ProcessMode),
+				Status:        models.ProcessStatus_READY,
+				EntityId:      util.RandomBytes(types.EthereumAddressSize),
+				CensusRoot:    root,
+				CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+				BlockCount:    1024,
+				MaxCensusSize: 1000,
+			}
+			qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+
+			k := ethereum.NewSignKeys()
+			qt.Assert(t, k.Generate(), qt.IsNil)
+			weight := big.NewInt(testParticipantWeight)
+			salt, err := saltedkey.Salt(pid, weight.Bytes())
+			qt.Assert(t, err, qt.IsNil)
+			proof, err := signer.SignProof(proofType,
+				testcsp.Bundle(pid, k.Address().Bytes(), weight), salt)
+			qt.Assert(t, err, qt.IsNil)
+
+			valid, gotWeight, err := transaction.VerifyProof(
+				app.ChainID(),
+				process,
+				&models.VoteEnvelope{
+					Nonce:       util.RandomBytes(32),
+					ProcessId:   pid,
+					Proof:       proof,
+					VotePackage: vp,
+				},
+				state.NewVoterID(state.VoterIDTypeECDSA, k.PublicKey()),
+			)
+			qt.Assert(t, err, qt.IsNil)
+			qt.Assert(t, valid, qt.IsTrue)
+			qt.Assert(t, gotWeight.Int64(), qt.Equals, testParticipantWeight)
+		})
+	}
 }

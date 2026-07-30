@@ -23,7 +23,10 @@ type ProofVerifier interface {
 
 // VerifyProof is a wrapper over all VerifyProofFunc(s) available which uses the process.CensusOrigin
 // to execute the correct verification function.
-func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error) {
+//
+// chainID is needed to resolve per-election soft-fork activation; only the CSP
+// verifier consumes it today, so the ProofVerifier interface stays free of it.
+func VerifyProof(chainID string, process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error) {
 	// sanity checks
 	if envelope == nil {
 		return false, nil, fmt.Errorf("envelope is nil")
@@ -59,7 +62,7 @@ func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID sta
 			verifier = &arboproof.ProofVerifierArbo{}
 		}
 	case models.CensusOrigin_OFF_CHAIN_CA:
-		verifier = &cspproof.ProofVerifierCSP{}
+		verifier = &cspproof.ProofVerifierCSP{ChainID: chainID}
 	case models.CensusOrigin_ERC20, models.CensusOrigin_MINI_ME:
 		verifier = &ethereumproof.ProofVerifierEthereumStorage{}
 	case models.CensusOrigin_FARCASTER_FRAME:

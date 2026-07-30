@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -17,6 +19,13 @@ func init() {
 		},
 		description: "csp election",
 		example:     os.Args[0] + " --operation=cspelection --votes=1000",
+	}
+	ops["cspelectionblindsalted"] = operation{
+		testFunc: func() VochainTest {
+			return &E2ECSPBlindSaltedElection{}
+		},
+		description: "csp election with weighted blind pid-salted proofs (issue #1424 derivation)",
+		example:     os.Args[0] + " --operation=cspelectionblindsalted --votes=1000",
 	}
 }
 
@@ -86,4 +95,24 @@ func (t *E2ECSPElection) Run() error {
 	log.Infof("election results: %v", elres.Results)
 
 	return nil
+}
+
+var _ VochainTest = (*E2ECSPBlindSaltedElection)(nil)
+
+// E2ECSPBlindSaltedElection runs a CSP election where every proof is
+// ECDSA_BLIND_PIDSALTED with a CSP-authorized weight, exercising end to end the
+// salt derivation of issue #1424 on chains where it is active.
+type E2ECSPBlindSaltedElection struct {
+	E2ECSPElection
+}
+
+func (t *E2ECSPBlindSaltedElection) Setup(api *apiclient.HTTPclient, c *config) error {
+	signer, err := testcsp.NewSigner()
+	if err != nil {
+		return err
+	}
+	t.cspSigner = signer
+	t.cspProofType = models.ProofCA_ECDSA_BLIND_PIDSALTED
+	t.cspVoteWeight = big.NewInt(10)
+	return t.E2ECSPElection.Setup(api, c)
 }

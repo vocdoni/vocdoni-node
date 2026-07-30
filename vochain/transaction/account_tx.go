@@ -306,7 +306,7 @@ func (t *TransactionHandler) RegisterSIKTxCheck(vtx *vochaintx.Tx) (common.Addre
 		process.EnvelopeType.Anonymous = true
 	}()
 	// verify the proof for the transaction signer address
-	valid, _, err := VerifyProof(process, &models.VoteEnvelope{ProcessId: pid, Proof: censusProof}, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
+	valid, _, err := VerifyProof(t.state.ChainID(), process, &models.VoteEnvelope{ProcessId: pid, Proof: censusProof}, vstate.NewVoterID(vstate.VoterIDTypeZkSnark, txAddress.Bytes()))
 	if err != nil {
 		return common.Address{}, nil, nil, false, fmt.Errorf("error verifying the proof: %w", err)
 	}

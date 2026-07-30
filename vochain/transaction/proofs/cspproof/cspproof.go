@@ -9,17 +9,41 @@ import (
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
 // ProofVerifierCSP defines the interface for CSP (Credential Service Provider) proof verification systems.
-type ProofVerifierCSP struct{}
+type ProofVerifierCSP struct {
+	// ChainID of the vochain, used to resolve the per-election activation of the
+	// fixed salt derivation. An empty or unknown ChainID keeps the legacy one.
+	ChainID string
+}
+
+// salt returns the salt applied to the CSP census root for this election.
+//
+// Before the fork point the salt is the raw processID, of which the salting
+// primitives consume saltedkey.SaltSize (20) bytes: chainID[6] + orgAddr[:14].
+// The nonce is cropped, so every election of the same organization on the same
+// chain shares one salted key (issue #1424). Kept verbatim for elections that
+// started before the fork, so their in-flight proofs stay valid.
+//
+// After it, the salt covers the whole processID and the CSP-authorized vote
+// weight. See saltedkey.Salt.
+func (v *ProofVerifierCSP) salt(process *models.Process, envelope *models.VoteEnvelope,
+	bundle *models.CAbundle,
+) ([]byte, error) {
+	if !genesis.CSPSaltedProofV2Active(v.ChainID, process.StartTime) {
+		return envelope.ProcessId, nil
+	}
+	return saltedkey.Salt(envelope.ProcessId, bundle.GetVoteWeight())
+}
 
 // VerifyProof verifies a proof with census origin OFF_CHAIN_CA.
 // Returns verification result and weight.
-func (*ProofVerifierCSP) Verify(process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error) {
+func (v *ProofVerifierCSP) Verify(process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error) {
 	key := vID.Address()
 	censusRoot := process.CensusRoot
 	p := envelope.Proof.GetCa()
@@ -54,7 +78,11 @@ func (*ProofVerifierCSP) Verify(process *models.Process, envelope *models.VoteEn
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot unmarshal ECDSA CSP public key: %w", err)
 			}
-			rootPubSalted, err = saltedkey.SaltECDSAPubKey(rootPubSalted, envelope.ProcessId)
+			salt, err := v.salt(process, envelope, p.Bundle)
+			if err != nil {
+				return false, nil, err
+			}
+			rootPubSalted, err = saltedkey.SaltECDSAPubKey(rootPubSalted, salt)
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot salt ECDSA public key: %w", err)
 			}
@@ -83,7 +111,11 @@ func (*ProofVerifierCSP) Verify(process *models.Process, envelope *models.VoteEn
 		}
 		// If pid salted, apply the salt (processId) to the censusRoot public key
 		if p.GetType() == models.ProofCA_ECDSA_BLIND_PIDSALTED {
-			rootPub, err = saltedkey.SaltBlindPubKey(rootPub, envelope.ProcessId)
+			salt, err := v.salt(process, envelope, p.Bundle)
+			if err != nil {
+				return false, nil, err
+			}
+			rootPub, err = saltedkey.SaltBlindPubKey(rootPub, salt)
 			if err != nil {
 				return false, nil, fmt.Errorf("cannot salt blind pubkey: %w", err)
 			}

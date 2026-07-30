@@ -36,6 +36,9 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 		tb.Fatal(err)
 	}
 	app.SetTestingMethods()
+	// propagate the chainID to the app and the state, as SetupVochain does on a
+	// real node; InitChain below only hands it to cometbft
+	app.SetChainID(chainID)
 	genesisDoc, err := NewTemplateGenesisFile(tb.TempDir(), 4)
 	if err != nil {
 		tb.Fatal(err)

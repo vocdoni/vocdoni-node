@@ -173,7 +173,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		}
 		// verify the proof
 		valid := false
-		valid, vote.Weight, err = VerifyProof(process, voteEnvelope, vote.VoterID)
+		valid, vote.Weight, err = VerifyProof(t.state.ChainID(), process, voteEnvelope, vote.VoterID)
 		if err != nil {
 			return nil, fmt.Errorf("proof not valid: %w", err)
 		}
@@ -203,7 +203,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			"height", height)
 
 		// Verify the proof
-		valid, weight, err := VerifyProof(process, voteEnvelope, vote.VoterID)
+		valid, weight, err := VerifyProof(t.state.ChainID(), process, voteEnvelope, vote.VoterID)
 		if err != nil {
 			return nil, err
 		}
