@@ -98,6 +98,51 @@ func (idx *Indexer) VoteList(limit, offset int, processID string, nullifier stri
 	return list, uint64(results[0].TotalCount), nil
 }
 
+// Vote activity time buckets supported by VoteActivity.
+const (
+	VoteBucketHour = "hour"
+	VoteBucketDay  = "day"
+)
+
+// voteBucketFormats maps a bucket name to the strftime format truncating a
+// timestamp to that granularity.
+var voteBucketFormats = map[string]string{
+	VoteBucketHour: "%Y-%m-%dT%H:00:00Z",
+	VoteBucketDay:  "%Y-%m-%dT00:00:00Z",
+}
+
+// ErrInvalidVoteBucket is returned when an unsupported time bucket is requested.
+var ErrInvalidVoteBucket = fmt.Errorf("invalid vote activity bucket")
+
+// VoteActivity returns the votes of a process aggregated into time buckets of the
+// given granularity ("hour" or "day"), ordered chronologically. Buckets with no
+// votes are not present in the returned slice.
+//
+// The timestamp of a vote comes from the block it was included in. The bootstrap
+// run at startup guarantees every indexed vote has its block indexed, so all the
+// votes of the process are accounted for here.
+func (idx *Indexer) VoteActivity(processID []byte, bucket string) ([]*indexertypes.VoteBucket, error) {
+	format, ok := voteBucketFormats[bucket]
+	if !ok {
+		return nil, ErrInvalidVoteBucket
+	}
+	rows, err := idx.readOnlyQuery.VoteActivity(context.TODO(), indexerdb.VoteActivityParams{
+		BucketFormat: format,
+		ProcessID:    processID,
+	})
+	if err != nil {
+		return nil, err
+	}
+	buckets := make([]*indexertypes.VoteBucket, 0, len(rows))
+	for _, row := range rows {
+		buckets = append(buckets, &indexertypes.VoteBucket{
+			Period: row.Period,
+			Count:  uint64(row.Count),
+		})
+	}
+	return buckets, nil
+}
+
 // CountTotalVotes returns the total number of envelopes.
 func (idx *Indexer) CountTotalVotes() (uint64, error) {
 	height, err := idx.readOnlyQuery.CountVotes(context.TODO())

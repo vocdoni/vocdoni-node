@@ -262,3 +262,10 @@ type Entity struct {
 	EntityID     types.EntityID
 	ProcessCount int64
 }
+
+// VoteBucket is the number of votes cast within a single time bucket.
+// Period is the RFC3339 timestamp of the beginning of the bucket, in UTC.
+type VoteBucket struct {
+	Period string `json:"period"`
+	Count  uint64 `json:"count"`
+}

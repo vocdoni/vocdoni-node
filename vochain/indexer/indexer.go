@@ -16,6 +16,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"go.vocdoni.io/dvote/log"
@@ -96,6 +97,11 @@ type Indexer struct {
 
 	// ignoreLiveResults if true, partial/live results won't be calculated (only final results)
 	ignoreLiveResults bool
+
+	// blockReindexNeeded is set by startDB when the indexed blocks are known to be
+	// incomplete, and consumed once by bootstrapBlocks. It is atomic because startDB
+	// may run on the state-sync restore path, concurrently with the bootstrap.
+	blockReindexNeeded atomic.Bool
 }
 
 type Options struct {
@@ -175,8 +181,8 @@ func (idx *Indexer) startDB() error {
 	goose.SetBaseFS(embedMigrations)
 
 	if gooseMigrationsPending(idx.readWriteDB, "migrations") {
-		log.Info("indexer db needs migration, scheduling a reindex after sync")
-		defer func() { go idx.ReindexBlocks(false) }()
+		log.Info("indexer db needs migration, a block reindex will run on bootstrap")
+		idx.blockReindexNeeded.Store(true)
 	}
 
 	if err := goose.Up(idx.readWriteDB, "migrations"); err != nil {
@@ -207,6 +213,22 @@ func (idx *Indexer) startDB() error {
 	idx.blockQueries, err = indexerdb.Prepare(context.TODO(), idx.readWriteDB)
 	if err != nil {
 		return err
+	}
+
+	// An indexer db recreated or restored later than the chain it indexes can hold
+	// votes whose block was never indexed, and which therefore cannot be dated.
+	// Check for that here, on every start; the check is a single aggregate stopping
+	// at the first undatable vote, so it costs nothing once the data is complete.
+	// The reindex which repairs it runs on bootstrap, see bootstrapBlocks.
+	if !idx.blockReindexNeeded.Load() {
+		missing, err := idx.readOnlyQuery.HasVotesMissingBlockTime(context.TODO())
+		if err != nil {
+			return fmt.Errorf("could not check indexer block completeness: %w", err)
+		}
+		if missing > 0 {
+			log.Info("indexer has votes with no indexed block, a block reindex will run on bootstrap")
+			idx.blockReindexNeeded.Store(true)
+		}
 	}
 	return nil
 }
@@ -326,18 +348,24 @@ func (idx *Indexer) blockTxQueries() *indexerdb.Queries {
 }
 
 // AfterSyncBootstrap is a blocking function that waits until the Vochain is synchronized
-// and then execute a set of recovery actions. It mainly checks for those processes which are
-// still open (live) and updates all temporary data (current voting weight and live results
-// if unecrypted). This method might be called on a goroutine after initializing the Indexer.
+// and then execute a set of recovery actions. It first repairs the indexed blocks if
+// startDB found them incomplete, so that afterwards every indexed vote can be dated.
+// It then checks for those processes which are still open (live) and updates all
+// temporary data (current voting weight and live results if unecrypted).
+// This method might be called on a goroutine after initializing the Indexer.
 // TO-DO: refactor and use blockHeight for reusing existing live results
 func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
+	if !inTest {
+		<-idx.App.WaitUntilSynced()
+	}
+
+	// Repair the indexed blocks before anything else, so that from here on every
+	// indexed vote is known to have a block, and thus a timestamp.
+	idx.bootstrapBlocks(inTest)
+
 	// if no live results, we don't need the bootstraping
 	if idx.ignoreLiveResults {
 		return
-	}
-
-	if !inTest {
-		<-idx.App.WaitUntilSynced()
 	}
 
 	log.Infof("running indexer after-sync bootstrap")
@@ -428,6 +456,20 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 	idx.blockTx = nil
 
 	log.Infof("live results recovery computation finished, took %s", time.Since(startTime))
+}
+
+// bootstrapBlocks reindexes the blocks when startDB found the indexed blocks to be
+// incomplete, either because a migration changed them or because votes were indexed
+// whose block was not. It blocks until the reindex is done, so that once the
+// bootstrap returns, every indexed vote can be dated by its block.
+func (idx *Indexer) bootstrapBlocks(inTest bool) {
+	if !idx.blockReindexNeeded.Swap(false) {
+		return
+	}
+	log.Info("running indexer blocks bootstrap")
+	startTime := time.Now()
+	idx.ReindexBlocks(inTest)
+	log.Infow("indexer blocks bootstrap finished", "took", time.Since(startTime).String())
 }
 
 // ReindexBlocks reindexes all blocks found in blockstore

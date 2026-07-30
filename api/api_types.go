@@ -227,6 +227,18 @@ type VotesList struct {
 	Pagination *Pagination `json:"pagination"`
 }
 
+// VoteActivity is a digest of the votes of an election over time, so clients can
+// plot vote activity without paging through every single vote.
+type VoteActivity struct {
+	// Buckets holds one entry per time bucket that contains at least one vote,
+	// ordered chronologically.
+	Buckets []*indexertypes.VoteBucket `json:"buckets"`
+	// TotalVotes is the sum of the counts of all buckets.
+	TotalVotes uint64 `json:"totalVotes"`
+	// Bucket is the granularity used, either "hour" or "day".
+	Bucket string `json:"bucket" example:"hour"`
+}
+
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
 	Size      uint64         `json:"size"`

@@ -68,6 +68,7 @@ const (
 	ParamPage            = "page"
 	ParamLimit           = "limit"
 	ParamStatus          = "status"
+	ParamBucket          = "bucket"
 	ParamWithResults     = "withResults"
 	ParamFinalResults    = "finalResults"
 	ParamManuallyEnded   = "manuallyEnded"

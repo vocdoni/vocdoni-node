@@ -148,6 +148,34 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, v2.BlockHeight, qt.Equals, uint32(2))
 	qt.Assert(t, *v2.TransactionIndex, qt.Equals, int32(0))
 	qt.Assert(t, v2.VoterID.String(), qt.Equals, hex.EncodeToString(voterKey.Address().Bytes()))
+
+	// Get the digested vote activity of the election
+	for _, bucket := range []string{"", "hour", "day"} {
+		query := ""
+		if bucket != "" {
+			query = "bucket=" + bucket
+		}
+		resp, code = c.RequestWithQuery("GET", nil, query,
+			"elections", election.ElectionID.String(), "votes", "activity")
+		qt.Assert(t, code, qt.Equals, 200)
+		activity := api.VoteActivity{}
+		err = json.Unmarshal(resp, &activity)
+		qt.Assert(t, err, qt.IsNil)
+		if bucket == "" {
+			// hour is the default granularity
+			qt.Assert(t, activity.Bucket, qt.Equals, "hour")
+		} else {
+			qt.Assert(t, activity.Bucket, qt.Equals, bucket)
+		}
+		qt.Assert(t, activity.TotalVotes, qt.Equals, uint64(1))
+		qt.Assert(t, activity.Buckets, qt.HasLen, 1)
+		qt.Assert(t, activity.Buckets[0].Count, qt.Equals, uint64(1))
+	}
+
+	// An unknown granularity is rejected
+	_, code = c.RequestWithQuery("GET", nil, "bucket=banana",
+		"elections", election.ElectionID.String(), "votes", "activity")
+	qt.Assert(t, code, qt.Equals, 400)
 }
 
 func TestAPIaccount(t *testing.T) {

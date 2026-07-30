@@ -70,6 +70,14 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/elections/{electionId}/votes/activity",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionVotesActivityHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionId}/votes/page/{page}",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -441,6 +449,52 @@ func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrCantCountVotes.WithErr(err)
 	}
 	return marshalAndSend(ctx, &CountResult{Count: count})
+}
+
+// electionVotesActivityHandler
+//
+//	@Summary		Vote activity over time
+//	@Description	Returns the number of votes cast in an election, aggregated into time buckets.
+//	@Description	Only buckets containing at least one vote are returned, ordered chronologically.
+//	@Description	A vote is dated by the block that included it.
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionId	path		string	true	"Election id"
+//	@Param			bucket		query		string	false	"Time bucket granularity, either hour (default) or day"	Enums(hour, day)
+//	@Success		200			{object}	VoteActivity
+//	@Router			/elections/{electionId}/votes/activity [get]
+func (a *API) electionVotesActivityHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
+	if err != nil || electionID == nil {
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
+	}
+	// check the election exists, so an unknown id doesn't silently return an empty activity
+	if _, err := getElection(electionID, a.vocapp.State); err != nil {
+		return err
+	}
+
+	bucket := ctx.QueryParam(ParamBucket)
+	if bucket == "" {
+		bucket = indexer.VoteBucketHour
+	}
+
+	buckets, err := a.indexer.VoteActivity(electionID, bucket)
+	if err != nil {
+		if errors.Is(err, indexer.ErrInvalidVoteBucket) {
+			return ErrParamBucketInvalid.Withf("(%s)", bucket)
+		}
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+
+	activity := &VoteActivity{
+		Buckets: buckets,
+		Bucket:  bucket,
+	}
+	for _, b := range buckets {
+		activity.TotalVotes += b.Count
+	}
+	return marshalAndSend(ctx, activity)
 }
 
 // electionKeysHandler
