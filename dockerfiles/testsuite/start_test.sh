@@ -39,6 +39,7 @@ TEST_PREFIX="testsuite_test"
 RANDOMID="${RANDOM}${RANDOM}"
 
 log() { echo $(date --rfc-3339=s) "$@" ; }
+die() { log "### $* ###" ; exit 4 ; }
 
 ### if you want to add a new test:
 ### add "newtest" to tests_to_run array (as well as a comment at the head of the file)
@@ -169,12 +170,12 @@ test_statesync() {
 
 log "### Starting test suite ###"
 [ $BUILD -eq 1 ] && {
-	$COMPOSE_CMD build
-	$COMPOSE_CMD build test
+	$COMPOSE_CMD build || die "docker compose build failed"
+	$COMPOSE_CMD build test || die "docker compose build test failed"
 }
-$COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
+$COMPOSE_CMD up -d seed || die "docker compose up seed failed" # start the seed first so the nodes can properly bootstrap
 sleep 10
-$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
+$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0 || die "docker compose up nodes failed"
 
 check_gw_is_up() {
   height=$($COMPOSE_CMD_RUN --rm test \
