@@ -77,8 +77,13 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		return nil, err
 	}
 	// Attach the optional memo before the envelope is wrapped, marshaled and
-	// signed, so it is covered by the vote signature.
+	// signed, so it is covered by the vote signature. Check the size here too:
+	// the node enforces it, but failing before the round trip gives the caller a
+	// usable error instead of an opaque HTTP one.
 	if len(v.Memo) > 0 {
+		if len(v.Memo) > types.MaxVoteMemoSize {
+			return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
+		}
 		vote.Memo = v.Memo
 	}
 

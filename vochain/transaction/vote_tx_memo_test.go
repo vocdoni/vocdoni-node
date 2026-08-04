@@ -6,6 +6,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 func TestValidateVoteMemo(t *testing.T) {
@@ -42,4 +43,31 @@ func TestValidateVoteMemo(t *testing.T) {
 	m, err = validateVoteMemo(invalidUTF8)
 	c.Assert(err, qt.IsNil)
 	c.Assert(m, qt.DeepEquals, invalidUTF8)
+}
+
+func TestMemoAllowed(t *testing.T) {
+	c := qt.New(t)
+
+	// Signed votes bind the whole envelope through the tx signature.
+	c.Assert(memoAllowed(&models.Process{
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		EnvelopeType: &models.EnvelopeType{},
+	}), qt.IsTrue)
+
+	// Anonymous votes carry no signature and the proof does not cover the envelope.
+	c.Assert(memoAllowed(&models.Process{
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		EnvelopeType: &models.EnvelopeType{Anonymous: true},
+	}), qt.IsFalse)
+
+	// Farcaster signs the frame body, not the envelope.
+	c.Assert(memoAllowed(&models.Process{
+		CensusOrigin: models.CensusOrigin_FARCASTER_FRAME,
+		EnvelopeType: &models.EnvelopeType{},
+	}), qt.IsFalse)
+
+	// A nil EnvelopeType must not panic and must not be treated as anonymous.
+	c.Assert(memoAllowed(&models.Process{
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+	}), qt.IsTrue)
 }

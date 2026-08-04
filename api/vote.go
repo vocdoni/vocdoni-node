@@ -11,6 +11,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
+	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -130,8 +131,11 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 	}
 
 	// The memo is not indexed; read it from the authoritative state if present.
+	// A read failure must not be reported as "this vote has no memo", so log it.
 	if sdbVote, err := a.vocapp.State.Vote(voteData.Meta.ProcessId, voteData.Meta.Nullifier, true); err == nil {
 		vote.Memo = sdbVote.GetMemo()
+	} else if !errors.Is(err, vstate.ErrVoteNotFound) && !errors.Is(err, vstate.ErrProcessNotFound) {
+		log.Warnw("could not read vote memo from state", "voteId", vote.VoteID.String(), "error", err.Error())
 	}
 
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it direcectly.
@@ -259,8 +263,11 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 		Votes:      []*Vote{},
 		Pagination: pagination,
 	}
+	// Index the items by process so the memos below can be fetched with one state
+	// lookup per process rather than one per row.
+	byProcess := map[string][]int{}
 	for _, vote := range votes {
-		item := &Vote{
+		list.Votes = append(list.Votes, &Vote{
 			ElectionID:       vote.ProcessId,
 			VoteID:           vote.Nullifier,
 			VoterID:          vote.VoterID,
@@ -268,13 +275,29 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 			BlockHeight:      vote.Height,
 			TransactionIndex: &vote.TxIndex,
 			BlockTime:        vote.BlockTime,
+		})
+		byProcess[string(vote.ProcessId)] = append(byProcess[string(vote.ProcessId)], len(list.Votes)-1)
+	}
+
+	// The memo is not indexed; read it from the authoritative state, the same way
+	// GET /votes/{voteId} does. State.Votes opens the votes subtree once per
+	// process, so a page filtered by electionId costs a single open.
+	for pid, rows := range byProcess {
+		nullifiers := make([][]byte, len(rows))
+		for i, row := range rows {
+			nullifiers[i] = list.Votes[row].VoteID
 		}
-		// The memo is not indexed; read it from the authoritative state, the same
-		// way GET /votes/{voteId} does. Bounded by the page size.
-		if sdbVote, err := a.vocapp.State.Vote(vote.ProcessId, vote.Nullifier, true); err == nil {
-			item.Memo = sdbVote.GetMemo()
+		sdbVotes, err := a.vocapp.State.Votes([]byte(pid), nullifiers, true)
+		if err != nil {
+			// Serve the page without memos rather than failing it, but say so: an
+			// absent memo and a failed read must not look the same in the logs.
+			log.Warnw("could not read vote memos from state", "processId",
+				hex.EncodeToString([]byte(pid)), "error", err.Error())
+			continue
 		}
-		list.Votes = append(list.Votes, item)
+		for i, sdbVote := range sdbVotes {
+			list.Votes[rows[i]].Memo = sdbVote.GetMemo()
+		}
 	}
 	return list, nil
 }

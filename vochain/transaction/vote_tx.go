@@ -35,6 +35,22 @@ func validateVoteMemo(memo []byte) ([]byte, error) {
 	return memo, nil
 }
 
+// memoAllowed reports whether votes for this process may carry a memo.
+//
+// Anonymous (zk) and Farcaster votes do not bind the vote envelope to their proof:
+// the zk public inputs are the electionID, census root, nullifier, weight and SIK
+// root — the votePackage binding is disabled, see zkproof.VerifyProof — and a
+// Farcaster message signs the frame body, not the envelope. Neither path checks a
+// transaction signature either. So anyone who observes such a vote in the mempool
+// could attach or rewrite its memo and rebroadcast it under the same nullifier,
+// and whichever landed first would be recorded. Unlike the votePackage, the memo
+// is served back as free-form text attributed to that vote, so reject it here
+// until it can be bound into the proof.
+func memoAllowed(process *models.Process) bool {
+	return !process.GetEnvelopeType().GetAnonymous() &&
+		process.GetCensusOrigin() != models.CensusOrigin_FARCASTER_FRAME
+}
+
 // VoteTxCheck performs basic checks on a vote transaction.
 func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vstate.Vote, error) {
 	// Get the vote envelope from the transaction
@@ -162,7 +178,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		}
 	}
 
-	// Optional memo field. See validateVoteMemo.
+	// Optional memo field. See validateVoteMemo and memoAllowed. Both run outside
+	// the vote-cache branch above, so CheckTx and DeliverTx reach the same verdict
+	// on the same envelope.
+	if len(voteEnvelope.GetMemo()) > 0 && !memoAllowed(process) {
+		return nil, fmt.Errorf("vote memo not supported for anonymous or farcaster votes")
+	}
 	if vote.Memo, err = validateVoteMemo(voteEnvelope.GetMemo()); err != nil {
 		return nil, err
 	}

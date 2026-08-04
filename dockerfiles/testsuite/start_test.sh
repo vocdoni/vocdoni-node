@@ -9,7 +9,7 @@
 #  e2etest_overwritelection: run overwrite test
 #  e2etest_censusizelection: run max census size test
 #  e2etest_ballotelection: run ballot test
-#  e2etest_memoelection: run vote-memo round-trip test (needs memo soft-fork active, e.g. vocdoni/TEST/1)
+#  e2etest_memoelection: run vote-memo round-trip test
 #  e2etest_lifecyclelection: run lifecycle test
 #  e2etest_cspelection: run csp test
 #  e2etest_dynamicensuselection: run dynamic census test
