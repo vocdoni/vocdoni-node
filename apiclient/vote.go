@@ -39,9 +39,8 @@ type VoteData struct {
 	Election   *api.Election
 	VoteWeight *big.Int
 
-	// Memo is an optional free-text note (max 256 bytes) attached to the vote,
-	// e.g. an open "Other" answer. Only honored by the chain once the memo
-	// soft-fork is active.
+	// Memo is an optional free-text note (max types.MaxVoteMemoSize bytes)
+	// attached to the vote, e.g. an open "Other" answer.
 	Memo string
 
 	ProofMkTree  *CensusProof

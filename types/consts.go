@@ -35,4 +35,8 @@ const (
 
 	// MaxURLLength is the maximum length of a URL string used in the protocol.
 	MaxURLLength = 2083
+
+	// MaxVoteMemoSize is the maximum allowed size, in bytes, of the optional
+	// VoteEnvelope.memo free-text field.
+	MaxVoteMemoSize = 256
 )

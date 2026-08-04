@@ -15,7 +15,7 @@ func init() {
 		testFunc: func() VochainTest {
 			return &E2EMemoElection{}
 		},
-		description: "Casts votes carrying an optional free-text memo and verifies each memo round-trips through the API. Requires a chain where the memo soft-fork is active (e.g. vocdoni/TEST/1).",
+		description: "Casts votes carrying an optional free-text memo and verifies each memo round-trips through the API.",
 		example:     os.Args[0] + " --operation=memoelection --votes=5",
 	}
 }

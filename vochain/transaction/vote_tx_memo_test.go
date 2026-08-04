@@ -5,42 +5,39 @@ import (
 	"testing"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/types"
 )
 
-func TestResolveVoteMemo(t *testing.T) {
+func TestValidateVoteMemo(t *testing.T) {
 	c := qt.New(t)
 	invalidUTF8 := []byte{0xff, 0xfe}
 
-	// Inactive: any memo is ignored (no error, empty result) — keeps pre-fork state.
-	m, err := resolveVoteMemo([]byte("hello"), false)
+	// Valid.
+	m, err := validateVoteMemo([]byte("other: my answer"))
 	c.Assert(err, qt.IsNil)
-	c.Assert(m, qt.Equals, "")
+	c.Assert(string(m), qt.Equals, "other: my answer")
 
-	// Inactive with otherwise-invalid bytes: still ignored, no error (validation is gated).
-	m, err = resolveVoteMemo(invalidUTF8, false)
+	// Absent and empty both yield nil, so the stored vote stays byte-identical to
+	// one cast without the field. A zero-length slice would not: proto3 `optional`
+	// marshals a set empty value as present.
+	m, err = validateVoteMemo(nil)
 	c.Assert(err, qt.IsNil)
-	c.Assert(m, qt.Equals, "")
+	c.Assert(m, qt.IsNil)
 
-	// Active, valid.
-	m, err = resolveVoteMemo([]byte("other: my answer"), true)
+	m, err = validateVoteMemo([]byte{})
 	c.Assert(err, qt.IsNil)
-	c.Assert(m, qt.Equals, "other: my answer")
+	c.Assert(m, qt.IsNil)
 
-	// Active, empty.
-	m, err = resolveVoteMemo(nil, true)
-	c.Assert(err, qt.IsNil)
-	c.Assert(m, qt.Equals, "")
-
-	// Active, too long → rejected.
-	_, err = resolveVoteMemo([]byte(strings.Repeat("a", MaxVoteMemoSize+1)), true)
+	// Too long → rejected.
+	_, err = validateVoteMemo([]byte(strings.Repeat("a", types.MaxVoteMemoSize+1)))
 	c.Assert(err, qt.IsNotNil)
 
-	// Active, at the limit → accepted.
-	m, err = resolveVoteMemo([]byte(strings.Repeat("a", MaxVoteMemoSize)), true)
+	// At the limit → accepted.
+	m, err = validateVoteMemo([]byte(strings.Repeat("a", types.MaxVoteMemoSize)))
 	c.Assert(err, qt.IsNil)
-	c.Assert(len(m), qt.Equals, MaxVoteMemoSize)
+	c.Assert(len(m), qt.Equals, types.MaxVoteMemoSize)
 
-	// Active, invalid UTF-8 → rejected.
-	_, err = resolveVoteMemo(invalidUTF8, true)
+	// Invalid UTF-8 → rejected.
+	_, err = validateVoteMemo(invalidUTF8)
 	c.Assert(err, qt.IsNotNil)
 }
