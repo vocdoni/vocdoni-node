@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 
@@ -57,7 +58,7 @@ func (t *E2EMemoElection) Run() error {
 	// (not via sendVotes, which discards the voteID) so we can read each back.
 	type castVote struct {
 		voteID types.HexBytes
-		memo   string
+		memo   []byte
 	}
 	var cast []castVote
 	var idx int
@@ -67,9 +68,16 @@ func (t *E2EMemoElection) Run() error {
 		if !ok {
 			return true
 		}
-		memo := fmt.Sprintf("e2e memo ✓ #%d", idx)
-		if idx == 0 {
-			memo = "" // one voter without a memo
+		// The memo is opaque to the chain, so cover all three shapes: absent,
+		// bytes that are not valid UTF-8, and ordinary text.
+		var memo []byte
+		switch idx {
+		case 0:
+			memo = nil
+		case 1:
+			memo = []byte{0xff, 0xfe, 0x00, 0x01}
+		default:
+			memo = fmt.Appendf(nil, "e2e memo ✓ #%d", idx)
 		}
 		voteID, err := t.api.Vote(&apiclient.VoteData{
 			Election:     t.election,
@@ -101,8 +109,8 @@ func (t *E2EMemoElection) Run() error {
 		if err != nil {
 			return fmt.Errorf("could not fetch vote %s: %w", cv.voteID.String(), err)
 		}
-		if got.Memo != cv.memo {
-			return fmt.Errorf("memo mismatch for vote %s: got %q, want %q",
+		if !bytes.Equal(got.Memo, cv.memo) {
+			return fmt.Errorf("memo mismatch for vote %s: got %x, want %x",
 				cv.voteID.String(), got.Memo, cv.memo)
 		}
 	}

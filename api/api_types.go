@@ -233,8 +233,10 @@ type Vote struct {
 	BlockHeight      uint32          `json:"blockHeight,omitempty" extensions:"x-omitempty"`
 	TransactionIndex *int32          `json:"transactionIndex,omitempty" extensions:"x-omitempty"`
 	OverwriteCount   *uint32         `json:"overwriteCount,omitempty" extensions:"x-omitempty"`
-	// Optional free-text note attached by the voter (max 256 bytes)
-	Memo string `json:"memo,omitempty" extensions:"x-omitempty"`
+	// Optional opaque note attached by the voter, hex-encoded, at most
+	// types.MaxVoteMemoSize bytes. The chain stores and returns the bytes
+	// verbatim and does not interpret them; the encoding is up to the client.
+	Memo types.HexBytes `json:"memo,omitempty" extensions:"x-omitempty"`
 	// Date when the vote was emitted
 	Date *time.Time `json:"date,omitempty" extensions:"x-omitempty"`
 	// BlockTime is the timestamp of the block that included the vote. It is the

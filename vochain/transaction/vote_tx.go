@@ -4,7 +4,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"unicode/utf8"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
@@ -18,9 +17,10 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// validateVoteMemo checks the optional VoteEnvelope.memo free-text field and
-// returns the value to store on the vote. memo is a proto bytes field, so it
-// carries no decode-time validation and is checked here instead.
+// validateVoteMemo checks the optional VoteEnvelope.memo field and returns the
+// value to store on the vote. The memo is opaque to the chain: its bytes are
+// stored and returned verbatim, and only their length is constrained. Whatever
+// encoding a voter uses is a matter between them and whoever reads it back.
 //
 // An absent or empty memo returns nil rather than an empty slice: the stored
 // StateDBVote.memo is an optional field, and leaving it unset keeps the vote
@@ -31,9 +31,6 @@ func validateVoteMemo(memo []byte) ([]byte, error) {
 	}
 	if len(memo) > types.MaxVoteMemoSize {
 		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
-	}
-	if !utf8.Valid(memo) {
-		return nil, fmt.Errorf("vote memo is not valid UTF-8")
 	}
 	return memo, nil
 }

@@ -37,7 +37,9 @@ func TestValidateVoteMemo(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(len(m), qt.Equals, types.MaxVoteMemoSize)
 
-	// Invalid UTF-8 → rejected.
-	_, err = validateVoteMemo(invalidUTF8)
-	c.Assert(err, qt.IsNotNil)
+	// The memo is opaque: bytes that are not valid UTF-8 pass through verbatim.
+	// Only the length is the chain's business.
+	m, err = validateVoteMemo(invalidUTF8)
+	c.Assert(err, qt.IsNil)
+	c.Assert(m, qt.DeepEquals, invalidUTF8)
 }

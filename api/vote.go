@@ -131,7 +131,7 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 
 	// The memo is not indexed; read it from the authoritative state if present.
 	if sdbVote, err := a.vocapp.State.Vote(voteData.Meta.ProcessId, voteData.Meta.Nullifier, true); err == nil {
-		vote.Memo = string(sdbVote.GetMemo())
+		vote.Memo = sdbVote.GetMemo()
 	}
 
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it direcectly.
@@ -272,7 +272,7 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 		// The memo is not indexed; read it from the authoritative state, the same
 		// way GET /votes/{voteId} does. Bounded by the page size.
 		if sdbVote, err := a.vocapp.State.Vote(vote.ProcessId, vote.Nullifier, true); err == nil {
-			item.Memo = string(sdbVote.GetMemo())
+			item.Memo = sdbVote.GetMemo()
 		}
 		list.Votes = append(list.Votes, item)
 	}
