@@ -173,15 +173,12 @@ func (s *State) AddVote(vote *Vote) error {
 			*sdbVote.OverwriteCount = 1
 		}
 	}
-	// Only store the memo when present. proto3 `optional` marshals a set empty
-	// value as a present field, which would change the StateDBVote bytes (and thus
-	// the state hash) versus a vote cast without a memo; leaving it nil keeps them
-	// equal. The else branch also clears a memo carried by the overwritten vote.
-	if len(vote.Memo) > 0 {
-		sdbVote.Memo = vote.Memo
-	} else {
-		sdbVote.Memo = nil
-	}
+	// Assigned unconditionally so an overwrite also clears a memo the previous vote
+	// carried. Callers must pass nil, not an empty slice, for "no memo": memo is a
+	// proto3 optional, where a set empty value marshals as present and would change
+	// these bytes -- and so the state hash -- versus a vote cast without one.
+	// transaction.checkVoteMemo does that normalization.
+	sdbVote.Memo = vote.Memo
 	sdbVoteBytes, err := proto.Marshal(sdbVote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)
@@ -266,67 +263,6 @@ func (s *State) Vote(processID, nullifier []byte, committed bool) (*models.State
 		return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
 	}
 	return &sdbVote, nil
-}
-
-// Votes returns the stored votes for the given nullifiers of a single process.
-// It is the batch form of Vote: the votes subtree is opened once for the whole
-// set instead of once per nullifier, which matters for callers serving a page of
-// results.
-//
-// The result is positional and always has len(nullifiers) entries: entry i is nil
-// when that nullifier has no vote, or when its vote id could not be derived. Like
-// Vote, an unknown processID is not an error in itself — the subtree view is
-// created lazily and every lookup simply misses, yielding all-nil entries.
-//
-// When committed is false, the operation is executed also on not yet committed
-// data from the currently open StateDB transaction.
-// When committed is true, the operation is executed on the last committed version.
-func (s *State) Votes(processID []byte, nullifiers [][]byte, committed bool) ([]*models.StateDBVote, error) {
-	votes := make([]*models.StateDBVote, len(nullifiers))
-	if len(nullifiers) == 0 {
-		return votes, nil
-	}
-	// Derive the vote ids before taking the lock, as Vote does inside voteID.
-	vids := make([][]byte, len(nullifiers))
-	for i, nullifier := range nullifiers {
-		vid, err := s.voteID(processID, nullifier)
-		if err != nil {
-			// Leave this entry nil; a malformed nullifier must not fail the batch.
-			continue
-		}
-		vids[i] = vid
-	}
-	if !committed {
-		// Same reason as Vote: DeepSubTree creates temporary in-memory trees that
-		// the DeliverTx path might read concurrently during block commit (race #581).
-		s.tx.Lock()
-		defer s.tx.Unlock()
-	}
-	treeCfg := StateChildTreeCfg(ChildTreeVotes)
-	votesTree, err := s.mainTreeViewer(committed).DeepSubTree(
-		StateTreeCfg(TreeProcess), treeCfg.WithKey(processID))
-	if errors.Is(err, arbo.ErrKeyNotFound) {
-		return nil, ErrProcessNotFound
-	} else if err != nil {
-		return nil, err
-	}
-	for i, vid := range vids {
-		if vid == nil {
-			continue
-		}
-		sdbVoteBytes, err := votesTree.Get(vid)
-		if errors.Is(err, arbo.ErrKeyNotFound) {
-			continue
-		} else if err != nil {
-			return nil, err
-		}
-		var sdbVote models.StateDBVote
-		if err := proto.Unmarshal(sdbVoteBytes, &sdbVote); err != nil {
-			return nil, fmt.Errorf("cannot unmarshal sdbVote: %w", err)
-		}
-		votes[i] = &sdbVote
-	}
-	return votes, nil
 }
 
 // IterateVotes iterates over all the votes of a process. The callback function is executed for each vote.

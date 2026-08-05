@@ -46,11 +46,11 @@ const createVote = `-- name: CreateVote :execresult
 REPLACE INTO votes (
 	nullifier, process_id, block_height, block_index,
 	weight, voter_id, overwrite_count,
-	encryption_key_indexes, package
+	encryption_key_indexes, package, memo
 ) VALUES (
 	?, ?, ?, ?,
 	?, ?, ?,
-	?, ?
+	?, ?, ?
 )
 `
 
@@ -64,8 +64,11 @@ type CreateVoteParams struct {
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
 	Package              string
+	Memo                 []byte
 }
 
+// REPLACE is DELETE + INSERT, so every column the votes table owns must be listed
+// here: one left out reverts to its default whenever a vote is overwritten.
 func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Result, error) {
 	return q.exec(ctx, q.createVoteStmt, createVote,
 		arg.Nullifier,
@@ -77,11 +80,12 @@ func (q *Queries) CreateVote(ctx context.Context, arg CreateVoteParams) (sql.Res
 		arg.OverwriteCount,
 		arg.EncryptionKeyIndexes,
 		arg.Package,
+		arg.Memo,
 	)
 }
 
 const getVote = `-- name: GetVote :one
-SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
+SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, v.memo, t.hash AS tx_hash, b.time AS block_time FROM votes AS v
 LEFT JOIN transactions AS t
 	ON v.block_height = t.block_height
 	AND v.block_index = t.block_index
@@ -101,6 +105,7 @@ type GetVoteRow struct {
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
 	Package              string
+	Memo                 []byte
 	TxHash               types.Hash
 	BlockTime            sql.NullTime
 }
@@ -118,6 +123,7 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 		&i.OverwriteCount,
 		&i.EncryptionKeyIndexes,
 		&i.Package,
+		&i.Memo,
 		&i.TxHash,
 		&i.BlockTime,
 	)
@@ -126,7 +132,7 @@ func (q *Queries) GetVote(ctx context.Context, nullifier types.Nullifier) (GetVo
 
 const searchVotes = `-- name: SearchVotes :many
 WITH results AS (
-	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, t.hash, b.time AS block_time
+	SELECT v.nullifier, v.process_id, v.block_height, v.block_index, v.weight, v.voter_id, v.overwrite_count, v.encryption_key_indexes, v.package, v.memo, t.hash, b.time AS block_time
 	FROM votes AS v
 	LEFT JOIN transactions AS t
 		ON v.block_height = t.block_height
@@ -152,7 +158,7 @@ WITH results AS (
 		)
 	)
 )
-SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, hash, block_time, COUNT(*) OVER() AS total_count
+SELECT nullifier, process_id, block_height, block_index, weight, voter_id, overwrite_count, encryption_key_indexes, package, memo, hash, block_time, COUNT(*) OVER() AS total_count
 FROM results
 ORDER BY block_height DESC, nullifier ASC
 LIMIT ?2
@@ -176,6 +182,7 @@ type SearchVotesRow struct {
 	OverwriteCount       int64
 	EncryptionKeyIndexes string
 	Package              string
+	Memo                 []byte
 	Hash                 []byte
 	BlockTime            sql.NullTime
 	TotalCount           int64
@@ -205,6 +212,7 @@ func (q *Queries) SearchVotes(ctx context.Context, arg SearchVotesParams) ([]Sea
 			&i.OverwriteCount,
 			&i.EncryptionKeyIndexes,
 			&i.Package,
+			&i.Memo,
 			&i.Hash,
 			&i.BlockTime,
 			&i.TotalCount,

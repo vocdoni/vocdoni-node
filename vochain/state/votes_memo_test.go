@@ -86,13 +86,16 @@ func TestAddVoteMemoRoundTrip(t *testing.T) {
 	c.Assert(string(got.GetMemo()), qt.Equals, "other: my open answer")
 }
 
-// TestAddVoteEmptyMemoNotStored ensures a zero-length memo is stored as an absent
-// field, so the marshaled StateDBVote — and therefore the arbo leaf and the state
-// hash derived from it — is byte-identical to a vote cast with no memo at all.
-// proto3 `optional` marshals a set empty value as present, so this is the
-// property that keeps existing votes compatible; asserting got.Memo == nil alone
-// would not catch a regression that stored an empty-but-present field.
-func TestAddVoteEmptyMemoNotStored(t *testing.T) {
+// TestAddVoteMemoNilContract pins AddVote's contract for "no memo", which is
+// consensus-relevant: memo is a proto3 optional, where a set empty value marshals
+// as *present* and changes the StateDBVote bytes — and therefore the arbo leaf and
+// the state hash — versus a vote cast without one.
+//
+// AddVote assigns the field verbatim, so callers must pass nil rather than an
+// empty slice. transaction.checkVoteMemo does that normalization; the second half
+// of this test asserts the difference is real, so that the requirement is a pinned
+// fact rather than a silent trap for the next caller.
+func TestAddVoteMemoNilContract(t *testing.T) {
 	c := qt.New(t)
 	pid := []byte("processidprocessidprocessidproce") // 32 bytes
 
@@ -105,69 +108,25 @@ func TestAddVoteEmptyMemoNotStored(t *testing.T) {
 
 		got, err := s.Vote(pid, v.Nullifier, false)
 		c.Assert(err, qt.IsNil)
-		c.Assert(got.Memo, qt.IsNil) // absent, not a present empty value
 
 		b, err := proto.Marshal(got)
 		c.Assert(err, qt.IsNil)
 		return b
 	}
 
+	// nil is stored as an absent field, byte-identical to a vote built without the
+	// field at all. This is what keeps votes cast before the memo existed valid.
 	noMemo := marshaledWith(nil)
-	emptyMemo := marshaledWith([]byte{})
-	c.Assert(emptyMemo, qt.DeepEquals, noMemo)
-}
-
-// TestStateVotes checks the batch lookup against the single-vote path it replaces.
-func TestStateVotes(t *testing.T) {
-	c := qt.New(t)
-	pid := []byte("processidprocessidprocessidproce") // 32 bytes
-	s := newStateWithProcess(c, pid)
-
-	nullifiers := [][]byte{
-		[]byte("nullifier-one-nullifier-one-abcd"),
-		[]byte("nullifier-two-nullifier-two-abcd"),
-		[]byte("nullifier-three-nullifier-three-"),
-	}
-	for i, n := range nullifiers {
-		v := baseVote()
-		v.ProcessID = pid
-		v.Nullifier = n
-		v.Memo = []byte{byte('a' + i)}
-		c.Assert(s.AddVote(v), qt.IsNil)
-	}
-
-	absent := []byte("nullifier-absent-nullifier-absen")
-	got, err := s.Votes(pid, append(append([][]byte{}, nullifiers...), absent), false)
+	bare, err := proto.Marshal(&models.StateDBVote{
+		VoteHash:    baseVote().Hash(),
+		Nullifier:   baseVote().Nullifier,
+		Weight:      baseVote().WeightBytes(),
+		VotePackage: baseVote().VotePackage,
+	})
 	c.Assert(err, qt.IsNil)
+	c.Assert(noMemo, qt.DeepEquals, bare)
 
-	// Positional: one entry per requested nullifier, nil where there is no vote.
-	c.Assert(got, qt.HasLen, len(nullifiers)+1)
-	c.Assert(got[len(nullifiers)], qt.IsNil)
-
-	// Each entry must equal what the single-vote path returns.
-	for i, n := range nullifiers {
-		want, err := s.Vote(pid, n, false)
-		c.Assert(err, qt.IsNil)
-		c.Assert(got[i].GetMemo(), qt.DeepEquals, want.GetMemo())
-		c.Assert(got[i].GetVoteHash(), qt.DeepEquals, want.GetVoteHash())
-	}
-
-	// An empty request is not an error and yields no entries.
-	empty, err := s.Votes(pid, nil, false)
-	c.Assert(err, qt.IsNil)
-	c.Assert(empty, qt.HasLen, 0)
-
-	// An unknown process yields no votes rather than an error, because DeepSubTree
-	// creates the view lazily and the lookup simply misses. Assert that the batch
-	// path agrees with the single-vote path, which reports ErrVoteNotFound here.
-	unknownPID := []byte("unknownunknownunknownunknownunkn")
-	_, err = s.Vote(unknownPID, nullifiers[0], false)
-	c.Assert(err, qt.Equals, ErrVoteNotFound)
-
-	gotUnknown, err := s.Votes(unknownPID, nullifiers, false)
-	c.Assert(err, qt.IsNil)
-	c.Assert(gotUnknown, qt.HasLen, len(nullifiers))
-	for _, v := range gotUnknown {
-		c.Assert(v, qt.IsNil)
-	}
+	// An empty slice is NOT equivalent — it marshals as a present, zero-length
+	// field. Hence the nil requirement above.
+	c.Assert(marshaledWith([]byte{}), qt.Not(qt.DeepEquals), noMemo)
 }

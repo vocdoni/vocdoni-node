@@ -116,6 +116,20 @@ func TestVoteCheckZkSNARK(t *testing.T) {
 		TxID:       txID,
 	}, commit)
 	c.Assert(err, qt.IsNil)
+
+	// An anonymous vote must not be able to carry a memo: nothing binds the
+	// envelope to the zk proof, so an observer could attach one to this very tx
+	// and rebroadcast it under the same nullifier. Deleting the gate in
+	// checkVoteMemo makes this case pass, which is what makes it worth having.
+	vtx.Memo = []byte("attached by someone who is not the voter")
+	_, err = app.TransactionHandler.VoteTxCheck(&vochaintx.Tx{
+		Tx:         &models.Tx{Payload: &models.Tx_Vote{Vote: vtx}},
+		Signature:  signature,
+		SignedBody: txBytes,
+		TxID:       [32]byte{1}, // distinct, or the vote cache short-circuits the check
+	}, commit)
+	c.Assert(err, qt.IsNotNil)
+	c.Assert(err.Error(), qt.Contains, "memo")
 }
 
 func testBuildSignedRegisterSIKTx(t *testing.T, account *ethereum.SignKeys, pid,

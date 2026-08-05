@@ -17,17 +17,24 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// validateVoteMemo checks the optional VoteEnvelope.memo field and returns the
-// value to store on the vote. The memo is opaque to the chain: its bytes are
-// stored and returned verbatim, and only their length is constrained. Whatever
-// encoding a voter uses is a matter between them and whoever reads it back.
+// checkVoteMemo validates the optional VoteEnvelope.memo for this process and
+// returns the value to store on the vote. The memo is opaque to the chain: its
+// bytes are stored and returned verbatim, and only their length is constrained.
+// Whatever encoding a voter uses is a matter between them and whoever reads it
+// back.
 //
 // An absent or empty memo returns nil rather than an empty slice: the stored
-// StateDBVote.memo is an optional field, and leaving it unset keeps the vote
-// byte-identical to one cast without a memo at all.
-func validateVoteMemo(memo []byte) ([]byte, error) {
+// StateDBVote.memo is a proto3 optional, where a set empty value marshals as
+// present and would change the stored bytes versus a vote cast without a memo at
+// all. Normalizing here is what lets State.AddVote assign the field directly.
+func checkVoteMemo(memo []byte, process *models.Process) ([]byte, error) {
+	// Ahead of the memoAllowed gate on purpose: a vote carrying no memo is valid
+	// on every process, including the ones that may not carry one.
 	if len(memo) == 0 {
 		return nil, nil
+	}
+	if !memoAllowed(process) {
+		return nil, fmt.Errorf("vote memo not supported for anonymous, farcaster or encrypted votes")
 	}
 	if len(memo) > types.MaxVoteMemoSize {
 		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
@@ -44,10 +51,17 @@ func validateVoteMemo(memo []byte) ([]byte, error) {
 // transaction signature either. So anyone who observes such a vote in the mempool
 // could attach or rewrite its memo and rebroadcast it under the same nullifier,
 // and whichever landed first would be recorded. Unlike the votePackage, the memo
-// is served back as free-form text attributed to that vote, so reject it here
-// until it can be bound into the proof.
+// is served back as free-form text attributed to that vote.
+//
+// Encrypted elections are excluded for a different reason: their whole point is
+// that no ballot content is readable until the encryption keys are revealed, and
+// the API enforces that for the votePackage. The memo is not encrypted by anyone,
+// so allowing it would serve voter-supplied plaintext beside a sealed ballot, in
+// real time. Withholding it at the API instead would only be cosmetic — it sits
+// in the clear in consensus state either way.
 func memoAllowed(process *models.Process) bool {
 	return !process.GetEnvelopeType().GetAnonymous() &&
+		!process.GetEnvelopeType().GetEncryptedVotes() &&
 		process.GetCensusOrigin() != models.CensusOrigin_FARCASTER_FRAME
 }
 
@@ -178,13 +192,9 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		}
 	}
 
-	// Optional memo field. See validateVoteMemo and memoAllowed. Both run outside
-	// the vote-cache branch above, so CheckTx and DeliverTx reach the same verdict
-	// on the same envelope.
-	if len(voteEnvelope.GetMemo()) > 0 && !memoAllowed(process) {
-		return nil, fmt.Errorf("vote memo not supported for anonymous or farcaster votes")
-	}
-	if vote.Memo, err = validateVoteMemo(voteEnvelope.GetMemo()); err != nil {
+	// Optional memo field. See checkVoteMemo. It runs outside the vote-cache branch
+	// above, so CheckTx and DeliverTx reach the same verdict on the same envelope.
+	if vote.Memo, err = checkVoteMemo(voteEnvelope.GetMemo(), process); err != nil {
 		return nil, err
 	}
 

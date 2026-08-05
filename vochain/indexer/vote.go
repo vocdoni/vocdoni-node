@@ -43,6 +43,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 		Weight:               indexertypes.DecodeJSON[string](voteRef.Weight),
 		OverwriteCount:       uint32(voteRef.OverwriteCount),
 		Date:                 voteRef.BlockTime.Time,
+		Memo:                 voteRef.Memo,
 		Meta: indexertypes.EnvelopeMetadata{
 			VoterID:   voteRef.VoterID.Address(),
 			ProcessId: voteRef.ProcessID,
@@ -50,6 +51,7 @@ func (idx *Indexer) GetEnvelope(nullifier []byte) (*indexertypes.EnvelopePackage
 			TxIndex:   int32(voteRef.BlockIndex),
 			Height:    uint32(voteRef.BlockHeight),
 			TxHash:    voteRef.TxHash,
+			Memo:      voteRef.Memo,
 		},
 	}
 	if len(envelopePackage.Meta.VoterID) > 0 {
@@ -86,6 +88,7 @@ func (idx *Indexer) VoteList(limit, offset int, processID string, nullifier stri
 			TxIndex:   int32(txRef.BlockIndex),
 			Height:    uint32(txRef.BlockHeight),
 			TxHash:    txRef.Hash,
+			Memo:      txRef.Memo,
 		}
 		if len(txRef.VoterID) > 0 {
 			envelopeMetadata.VoterID = state.VoterID(txRef.VoterID).Address()
