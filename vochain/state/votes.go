@@ -174,10 +174,9 @@ func (s *State) AddVote(vote *Vote) error {
 		}
 	}
 	// Assigned unconditionally so an overwrite also clears a memo the previous vote
-	// carried. Callers must pass nil, not an empty slice, for "no memo": memo is a
-	// proto3 optional, where a set empty value marshals as present and would change
-	// these bytes -- and so the state hash -- versus a vote cast without one.
-	// transaction.checkVoteMemo does that normalization.
+	// carried. Memo is a proto3 optional: the common memo-less vote carries nil,
+	// which marshals as absent and keeps its bytes -- and so the state hash --
+	// identical to a vote cast before the field existed.
 	sdbVote.Memo = vote.Memo
 	sdbVoteBytes, err := proto.Marshal(sdbVote)
 	if err != nil {

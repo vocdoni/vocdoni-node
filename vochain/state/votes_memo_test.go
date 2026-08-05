@@ -91,10 +91,10 @@ func TestAddVoteMemoRoundTrip(t *testing.T) {
 // as *present* and changes the StateDBVote bytes — and therefore the arbo leaf and
 // the state hash — versus a vote cast without one.
 //
-// AddVote assigns the field verbatim, so callers must pass nil rather than an
-// empty slice. transaction.checkVoteMemo does that normalization; the second half
-// of this test asserts the difference is real, so that the requirement is a pinned
-// fact rather than a silent trap for the next caller.
+// AddVote assigns the field verbatim, and an unset proto field decodes as nil, so
+// the honest path always stores an absent field. The second half of this test
+// asserts the nil/empty difference is real, so that it stays a pinned fact rather
+// than a silent trap for the next caller.
 func TestAddVoteMemoNilContract(t *testing.T) {
 	c := qt.New(t)
 	pid := []byte("processidprocessidprocessidproce") // 32 bytes

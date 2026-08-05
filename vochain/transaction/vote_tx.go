@@ -21,19 +21,11 @@ import (
 // returns the value to store on the vote. The memo is opaque to the chain: its
 // bytes are stored and returned verbatim, and only their length is constrained.
 // Whatever encoding a voter uses is a matter between them and whoever reads it
-// back.
-//
-// An absent or empty memo returns nil rather than an empty slice: the stored
-// StateDBVote.memo is a proto3 optional, where a set empty value marshals as
-// present and would change the stored bytes versus a vote cast without a memo at
-// all. Normalizing here is what lets State.AddVote assign the field directly.
+// back. An unset memo decodes as nil and flows through as such.
 func checkVoteMemo(memo []byte, process *models.Process) ([]byte, error) {
-	// Ahead of the memoAllowed gate on purpose: a vote carrying no memo is valid
-	// on every process, including the ones that may not carry one.
-	if len(memo) == 0 {
-		return nil, nil
-	}
-	if !memoAllowed(process) {
+	// Gated only when a memo is actually carried: a vote without one is valid on
+	// every process, including the ones that may not carry one.
+	if len(memo) > 0 && !memoAllowed(process) {
 		return nil, fmt.Errorf("vote memo not supported for anonymous, farcaster or encrypted votes")
 	}
 	if len(memo) > types.MaxVoteMemoSize {

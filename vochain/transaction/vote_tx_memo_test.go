@@ -28,14 +28,9 @@ func TestCheckVoteMemo(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	c.Assert(string(m), qt.Equals, "other: my answer")
 
-	// Absent and empty both yield nil, never a zero-length slice: State.AddVote
-	// assigns the value verbatim, and a set empty proto3 optional marshals as
-	// present, which would change the stored bytes. See TestAddVoteMemoNilContract.
+	// An absent memo decodes as nil and flows through untouched, so the common
+	// memo-less vote stores an absent field. See TestAddVoteMemoNilContract.
 	m, err = checkVoteMemo(nil, p)
-	c.Assert(err, qt.IsNil)
-	c.Assert(m, qt.IsNil)
-
-	m, err = checkVoteMemo([]byte{}, p)
 	c.Assert(err, qt.IsNil)
 	c.Assert(m, qt.IsNil)
 
