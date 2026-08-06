@@ -34,6 +34,11 @@ type Vote struct {
 	Weight               *big.Int
 	VoterID              VoterID
 	Overwrites           uint32
+	// Memo is an optional free-text note attached by the voter, at most
+	// types.MaxVoteMemoSize bytes of valid UTF-8. Bytes rather than string to
+	// match VoteEnvelope.memo and StateDBVote.memo on either side of it.
+	// Validated in VoteTxCheck; nil when the voter attached none.
+	Memo []byte
 }
 
 // VotePackage represents the payload of a vote (usually base64 encoded).
@@ -75,6 +80,11 @@ func (v *Vote) Hash() []byte {
 	h.Write(v.Nullifier)
 	h.Write(v.VotePackage)
 	h.Write(v.WeightBytes())
+	// Only mixed in when the voter attached one, so a vote without a memo hashes
+	// identically to one cast before this field existed.
+	if len(v.Memo) > 0 {
+		h.Write(v.Memo)
+	}
 	return ethereum.HashRaw(h.Bytes())
 }
 
@@ -89,6 +99,7 @@ func (v *Vote) DeepCopy() *Vote {
 		Weight:               new(big.Int).Set(v.Weight),
 		VoterID:              slices.Clone(v.VoterID),
 		Overwrites:           v.Overwrites,
+		Memo:                 slices.Clone(v.Memo),
 	}
 	return voteCopy
 }
@@ -162,6 +173,11 @@ func (s *State) AddVote(vote *Vote) error {
 			*sdbVote.OverwriteCount = 1
 		}
 	}
+	// Assigned unconditionally so an overwrite also clears a memo the previous vote
+	// carried. Memo is a proto3 optional: the common memo-less vote carries nil,
+	// which marshals as absent and keeps its bytes -- and so the state hash --
+	// identical to a vote cast before the field existed.
+	sdbVote.Memo = vote.Memo
 	sdbVoteBytes, err := proto.Marshal(sdbVote)
 	if err != nil {
 		return fmt.Errorf("cannot marshal sdbVote: %w", err)

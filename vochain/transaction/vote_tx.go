@@ -7,6 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
@@ -15,6 +16,19 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
+
+// checkVoteMemo validates the optional VoteEnvelope.memo and returns the value to
+// store on the vote. The memo is opaque to the chain: its bytes are stored and
+// returned verbatim, and only their length is constrained. Whether it is encrypted,
+// signed, or plain text is the application layer's business — note in particular
+// that nothing binds it to a zk proof or a farcaster message, and that on encrypted
+// elections it is served in the clear beside the sealed ballot.
+func checkVoteMemo(memo []byte) ([]byte, error) {
+	if len(memo) > types.MaxVoteMemoSize {
+		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
+	}
+	return memo, nil
+}
 
 // VoteTxCheck performs basic checks on a vote transaction.
 func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vstate.Vote, error) {
@@ -141,6 +155,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		if process.EnvelopeType.EncryptedVotes && len(vote.EncryptionKeyIndexes) == 0 {
 			return nil, fmt.Errorf("no key indexes provided on vote package")
 		}
+	}
+
+	// Optional memo field. It runs outside the vote-cache branch above, so CheckTx
+	// and DeliverTx reach the same verdict on the same envelope.
+	if vote.Memo, err = checkVoteMemo(voteEnvelope.GetMemo()); err != nil {
+		return nil, err
 	}
 
 	// Check if the vote is valid for the current state

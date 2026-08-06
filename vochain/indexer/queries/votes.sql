@@ -1,12 +1,14 @@
 -- name: CreateVote :execresult
+-- REPLACE is DELETE + INSERT, so every column the votes table owns must be listed
+-- here: one left out reverts to its default whenever a vote is overwritten.
 REPLACE INTO votes (
 	nullifier, process_id, block_height, block_index,
 	weight, voter_id, overwrite_count,
-	encryption_key_indexes, package
+	encryption_key_indexes, package, memo
 ) VALUES (
 	?, ?, ?, ?,
 	?, ?, ?,
-	?, ?
+	?, ?, ?
 );
 
 -- name: GetVote :one

@@ -161,6 +161,8 @@ type EnvelopeMetadata struct {
 	// BlockTime is the timestamp of the block that included the vote, or nil if
 	// that block is not indexed and the vote therefore cannot be dated.
 	BlockTime *time.Time `json:"blockTime,omitempty"`
+	// Memo is the optional opaque note attached by the voter, empty if none.
+	Memo []byte `json:"memo,omitempty"`
 }
 
 // EnvelopePackage contains a VoteEnvelope and auxiliary information for the Envelope api
@@ -173,6 +175,8 @@ type EnvelopePackage struct {
 	Weight               string           `json:"weight"`      // [math/big.Int.String]
 	OverwriteCount       uint32           `json:"overwriteCount"`
 	Date                 time.Time        `json:"date"`
+	// Memo is the optional opaque note attached by the voter, empty if none.
+	Memo []byte `json:"memo,omitempty"`
 }
 
 // TxPackage contains a SignedTx and auxiliary information for the Transaction api

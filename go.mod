@@ -54,7 +54,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	github.com/vocdoni/storage-proofs-eth-go v0.1.6
 	go.mongodb.org/mongo-driver v1.12.1
-	go.vocdoni.io/proto v1.15.12
+	go.vocdoni.io/proto v1.15.13
 	golang.org/x/crypto v0.32.0
 	golang.org/x/net v0.34.0
 	google.golang.org/protobuf v1.36.4

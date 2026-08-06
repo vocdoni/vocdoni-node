@@ -127,6 +127,7 @@ func (a *API) getVoteHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		TransactionIndex:     &voteData.Meta.TxIndex,
 		OverwriteCount:       &voteData.OverwriteCount,
 		Date:                 &voteData.Date,
+		Memo:                 voteData.Memo,
 	}
 
 	// If VotePackage is valid JSON, it's not encrypted, so we can include it direcectly.
@@ -263,6 +264,7 @@ func (a *API) votesList(params *VoteParams) (*VotesList, error) {
 			BlockHeight:      vote.Height,
 			TransactionIndex: &vote.TxIndex,
 			BlockTime:        vote.BlockTime,
+			Memo:             vote.Memo,
 		})
 	}
 	return list, nil

@@ -839,6 +839,7 @@ func (idx *Indexer) OnVote(vote *state.Vote, txIndex int32) {
 		VoterID:              nonNullBytes(vote.VoterID),
 		EncryptionKeyIndexes: keyIndexes,
 		Package:              string(vote.VotePackage),
+		Memo:                 nonNullBytes(vote.Memo),
 	}); err != nil {
 		log.Errorw(err, "could not index vote")
 	}

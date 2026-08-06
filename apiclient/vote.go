@@ -39,6 +39,11 @@ type VoteData struct {
 	Election   *api.Election
 	VoteWeight *big.Int
 
+	// Memo is an optional opaque note attached to the vote, at most
+	// types.MaxVoteMemoSize bytes. The chain does not interpret it; encoding it
+	// (UTF-8 text, JSON, anything) is the caller's choice.
+	Memo []byte
+
 	ProofMkTree  *CensusProof
 	ProofSIKTree *CensusProof
 	ProofCSP     types.HexBytes
@@ -71,6 +76,9 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Attach the optional memo before the envelope is wrapped, marshaled and
+	// signed, so it is covered by the vote signature.
+	vote.Memo = v.Memo
 
 	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}
@@ -180,6 +188,22 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	}
 	// return the voteID received from the API as result of success vote
 	return voteAPI.VoteID, nil
+}
+
+// GetVote fetches a single vote (by nullifier / voteID) from the API.
+func (c *HTTPclient) GetVote(voteID types.HexBytes) (*api.Vote, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "votes", voteID.String())
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	v := &api.Vote{}
+	if err := json.Unmarshal(resp, v); err != nil {
+		return nil, fmt.Errorf("could not unmarshal response: %w", err)
+	}
+	return v, nil
 }
 
 // Verify verifies a vote. The voteID is the nullifier of the vote.

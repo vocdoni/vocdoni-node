@@ -1189,6 +1189,61 @@ func TestCountVotes(t *testing.T) {
 	// while the txCounter only increments on DeliverTx() execution.
 }
 
+// TestVoteMemoSurvivesReindex guards the REPLACE INTO hazard in CreateVote:
+// REPLACE is DELETE + INSERT, so any column of the votes table left out of the
+// statement silently reverts to its default every time a vote is re-indexed or
+// overwritten. Dropping `memo` from the column list in queries/votes.sql leaves
+// the first assertion passing and this one failing.
+func TestVoteMemoSurvivesReindex(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+	pid := util.RandomBytes(32)
+
+	qt.Assert(t, app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EntityId:      util.RandomBytes(20),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		EnvelopeType:  &models.EnvelopeType{},
+		Status:        models.ProcessStatus_READY,
+		Mode:          &models.ProcessMode{AutoStart: true},
+		BlockCount:    10,
+		MaxCensusSize: 10,
+		VoteOptions: &models.ProcessVoteOptions{
+			MaxCount:     1,
+			MaxValue:     1,
+			MaxTotalCost: 1,
+			CostExponent: 1,
+		},
+	}), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	vp, err := state.NewVotePackage([]int{1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+	memo := []byte("keep me through the overwrite")
+	vote := &state.Vote{
+		ProcessID:   pid,
+		Nullifier:   util.RandomBytes(32),
+		VotePackage: vp,
+		Memo:        memo,
+	}
+
+	idx.OnVote(vote, 0)
+	app.AdvanceTestBlock()
+
+	env, err := idx.GetEnvelope(vote.Nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, env.Memo, qt.DeepEquals, memo)
+
+	// Re-index the same nullifier, which is what an overwrite does.
+	vote.Overwrites = 1
+	idx.OnVote(vote, 0)
+	app.AdvanceTestBlock()
+
+	env, err = idx.GetEnvelope(vote.Nullifier)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, env.Memo, qt.DeepEquals, memo)
+}
+
 func TestOverwriteVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
