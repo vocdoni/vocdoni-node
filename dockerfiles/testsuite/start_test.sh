@@ -12,6 +12,7 @@
 #  e2etest_memoelection: run vote-memo round-trip test
 #  e2etest_lifecyclelection: run lifecycle test
 #  e2etest_cspelection: run csp test
+#  e2etest_cspelectionv2: run csp test with census origin V2 and weighted blind pid-salted proofs
 #  e2etest_dynamicensuselection: run dynamic census test
 #  e2etest_electiontimebounds: run election time bounds test
 
@@ -59,6 +60,7 @@ tests_to_run=(
   	"e2etest_tokentxs"
   	"e2etest_lifecyclelection"
   	"e2etest_cspelection"
+  	"e2etest_cspelectionv2"
   	"e2etest_dynamicensuselection"
   	"e2etest_electiontimebounds"
 	"test_statesync"
@@ -152,6 +154,10 @@ e2etest_lifecyclelection() {
 
 e2etest_cspelection() {
   e2etest cspelection
+}
+
+e2etest_cspelectionv2() {
+  e2etest cspelectionv2
 }
 
 e2etest_dynamicensuselection() {

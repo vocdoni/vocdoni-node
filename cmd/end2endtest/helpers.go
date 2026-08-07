@@ -15,7 +15,9 @@ import (
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
@@ -203,6 +205,9 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 		for _, acc := range accounts {
 			voterKey := acc.Address().Bytes()
 			proof, err := func() (*apiclient.CensusProof, error) {
+				if t.cspSigner != nil {
+					return t.cspGenProofSalted(voterKey)
+				}
 				if csp != nil {
 					return cspGenProof(t.election.ElectionID, voterKey, csp)
 				}
@@ -435,9 +440,17 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 	csp := &ethereum.SignKeys{}
 
 	switch prc.CensusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_CA:
+	case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
 		voterAccounts = ethereum.NewSignKeysBatch(t.config.nvotes)
 
+		if t.cspSigner != nil {
+			censusRoot, err := t.cspSigner.CensusRoot(t.cspProofType)
+			if err != nil {
+				return err
+			}
+			prc.CensusRoot = censusRoot
+			break
+		}
 		if err := csp.Generate(); err != nil {
 			return err
 		}
@@ -643,6 +656,37 @@ func votesToBigInt(votes ...uint64) []*types.BigInt {
 		vBigInt[i] = new(types.BigInt).SetUint64(v)
 	}
 	return vBigInt
+}
+
+// cspGenProofSalted issues a t.cspProofType proof for the running election,
+// signed by t.cspSigner with the salt derivation the chain expects. It reads
+// the same public data an external CSP service uses to pick the derivation:
+// the election's census origin.
+func (t *e2eElection) cspGenProofSalted(voterKey []byte) (*apiclient.CensusProof, error) {
+	pid := t.election.ElectionID
+	bundle := testcsp.Bundle(pid, voterKey, t.cspVoteWeight)
+
+	salt := []byte(pid) // legacy derivation: the raw processID
+	if t.election.Census.CensusOrigin == models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA_V2)] {
+		var weightBytes []byte
+		if t.cspVoteWeight != nil {
+			weightBytes = t.cspVoteWeight.Bytes()
+		}
+		var err error
+		if salt, err = saltedkey.Salt(pid, weightBytes); err != nil {
+			return nil, err
+		}
+	}
+
+	caProof, err := t.cspSigner.Sign(t.cspProofType, bundle, salt)
+	if err != nil {
+		return nil, err
+	}
+	caProofBytes, err := proto.Marshal(caProof)
+	if err != nil {
+		return nil, err
+	}
+	return &apiclient.CensusProof{Proof: caProofBytes}, nil
 }
 
 func cspGenProof(pid, voterKey []byte, csp *ethereum.SignKeys) (*apiclient.CensusProof, error) {

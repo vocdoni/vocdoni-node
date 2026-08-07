@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/hex"
 	"fmt"
+	"math/big"
 	"os"
 	"path/filepath"
 	"sync"
@@ -14,7 +15,9 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/proto/build/go/models"
 )
 
 // how many times to retry flaky transactions
@@ -43,6 +46,12 @@ type e2eElection struct {
 	config   *config
 	election *vapi.Election
 	voters   *sync.Map // key:acc.Public, value: acctProof struct {account, proof, proofSik}
+
+	// cspSigner, when set on a CSP election, issues the CSP proofs as
+	// cspProofType with cspVoteWeight, instead of the default plain ECDSA
+	cspSigner     *testcsp.Signer
+	cspProofType  models.ProofCA_Type
+	cspVoteWeight *big.Int
 }
 
 type operation struct {
