@@ -83,6 +83,7 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}
 	censusOriginCSP := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA)]
+	censusOriginCSPv2 := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA_V2)]
 	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]
 	switch {
 	case v.Election.VoteMode.Anonymous:
@@ -160,7 +161,8 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 		if err != nil {
 			return nil, err
 		}
-	case v.Election.Census.CensusOrigin == censusOriginCSP:
+	case v.Election.Census.CensusOrigin == censusOriginCSP ||
+		v.Election.Census.CensusOrigin == censusOriginCSPv2:
 		// decode the CSP proof and include in a VoteEnvelope
 		p := models.ProofCA{}
 		if err := proto.Unmarshal(v.ProofCSP, &p); err != nil {
