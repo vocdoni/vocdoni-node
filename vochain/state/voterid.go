@@ -1,8 +1,6 @@
 package state
 
 import (
-	"encoding/binary"
-
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 )
@@ -21,7 +19,6 @@ const (
 	VoterIDTypeECDSA     VoterIDType = 1
 	VoterIDTypeZkSnark   VoterIDType = 2
 	VoterIDTypeEd25519   VoterIDType = 3
-	VoterIDTypeFarcaster VoterIDType = 4
 )
 
 // Enum value map for VoterIDType.
@@ -30,21 +27,11 @@ var voterIDTypeName = map[VoterIDType]string{
 	VoterIDTypeECDSA:     "ECDSA",
 	VoterIDTypeZkSnark:   "ZKSNARK",
 	VoterIDTypeEd25519:   "ED25519",
-	VoterIDTypeFarcaster: "FARCASTER",
 }
 
 // NewVoterID creates a new VoterID from a VoterIDType and a key.
 func NewVoterID(voterIDType VoterIDType, key []byte) VoterID {
 	return append([]byte{voterIDType}, key...)
-}
-
-// NewFarcasterVoterID creates a new VoterID for Farcaster from a public key and a fid.
-// The public key is hashed (keccak256) with the fid to create the VoterID.
-func NewFarcasterVoterID(publicKey []byte, fid uint64) VoterID {
-	fidBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(fidBytes, fid)
-	hashedPubKey := ethereum.HashRaw(append(publicKey, fidBytes...))
-	return NewVoterID(VoterIDTypeFarcaster, hashedPubKey)
 }
 
 // Type returns the VoterID type defined in VoterIDTypeName
@@ -92,8 +79,6 @@ func (v VoterID) Address() []byte {
 		return v[1:]
 	case VoterIDTypeEd25519:
 		return common.BytesToAddress(ethereum.HashRaw(v[1:])).Bytes()
-	case VoterIDTypeFarcaster:
-		return common.BytesToAddress(v[1:]).Bytes()
 	default:
 		return nil
 	}

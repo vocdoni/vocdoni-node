@@ -88,6 +88,7 @@ var (
 	ErrTransactionBatchEmpty            = apirest.APIerror{Code: 4060, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("transaction batch is empty")}
 	ErrParamBucketInvalid               = apirest.APIerror{Code: 4061, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (bucket) invalid, must be hour or day")}
 	ErrTooManyBucketsRequested          = apirest.APIerror{Code: 4062, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("too many time buckets requested, use a coarser bucket or narrow the time window with the (from) and (to) params")}
+	ErrParamNameInvalid                 = apirest.APIerror{Code: 4063, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (name) invalid, must be at most %d printable characters", MaxOrganizationNameFilterLen)}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}

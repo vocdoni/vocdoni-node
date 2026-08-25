@@ -53,16 +53,6 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}
-	case models.CensusOrigin_FARCASTER_FRAME:
-		if tx.Process.EnvelopeType.Anonymous {
-			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for Farcaster voting")
-		}
-		if tx.Process.EnvelopeType.EncryptedVotes {
-			return nil, ethereum.Address{}, fmt.Errorf("encrypted votes not supported for Farcaster voting")
-		}
-		if tx.Process.VoteOptions.MaxCount > 1 {
-			return nil, ethereum.Address{}, fmt.Errorf("multi-vote not supported for Farcaster voting")
-		}
 	}
 
 	// get current timestamp from state

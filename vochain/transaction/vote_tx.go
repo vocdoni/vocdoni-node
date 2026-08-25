@@ -11,7 +11,6 @@ import (
 	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/zkproof"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -21,8 +20,8 @@ import (
 // store on the vote. The memo is opaque to the chain: its bytes are stored and
 // returned verbatim, and only their length is constrained. Whether it is encrypted,
 // signed, or plain text is the application layer's business — note in particular
-// that nothing binds it to a zk proof or a farcaster message, and that on encrypted
-// elections it is served in the clear beside the sealed ballot.
+// that nothing binds it to a zk proof, and that on encrypted elections it is
+// served in the clear beside the sealed ballot.
 func checkVoteMemo(memo []byte) ([]byte, error) {
 	if len(memo) > types.MaxVoteMemoSize {
 		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
@@ -142,8 +141,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 			} else {
 				vote, err = arboproof.InitializeSignedVote(voteEnvelope, vtx.SignedBody, vtx.Signature, height)
 			}
-		case models.CensusOrigin_FARCASTER_FRAME:
-			vote, err = farcasterproof.InitializeFarcasterFrameVote(voteEnvelope, height)
 		default:
 			return nil, fmt.Errorf("could not initialize vote, census origin not compatible")
 		}
