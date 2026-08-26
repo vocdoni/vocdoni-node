@@ -41,7 +41,35 @@ const (
 	// is deliberately short: the backfill is meant to pick up what the local
 	// store already has, not to wait on the network for what it does not.
 	metadataBackfillTimeout = time.Second
+	// metadataBackfillMaxFailures caps how many unresolved fetches a single
+	// backfill pass tolerates before giving up early. Without a bound, a
+	// backlog of permanently unreachable metadata documents gets re-fetched
+	// over the network in full on every boot.
+	metadataBackfillMaxFailures = 200
+	// metadataCacheWriteWorkers bounds the number of detached goroutines that
+	// may be writing request-triggered cache updates at once, so a burst of
+	// requests cannot pile up writers against the single read-write connection
+	// that block commits also use.
+	metadataCacheWriteWorkers = 4
 )
+
+// metadataCacheWriteSem bounds concurrent request-triggered cache writes; see
+// metadataCacheWriteWorkers.
+var metadataCacheWriteSem = make(chan struct{}, metadataCacheWriteWorkers)
+
+// cacheWrite runs fn on a detached goroutine if the concurrent-write bound
+// allows it, and drops it otherwise: the cache will be filled by a future
+// request or by the next boot's backfill, so no caller needs to wait or queue.
+func cacheWrite(fn func()) {
+	select {
+	case metadataCacheWriteSem <- struct{}{}:
+		go func() {
+			defer func() { <-metadataCacheWriteSem }()
+			fn()
+		}()
+	default:
+	}
+}
 
 // languageString picks a displayable value out of a multi-language string,
 // preferring the default language and falling back to any English variant.
@@ -62,11 +90,11 @@ func (a *API) cacheElectionTitle(electionID []byte, metadata *ElectionMetadata) 
 		return
 	}
 	id := append([]byte(nil), electionID...)
-	go func() {
+	cacheWrite(func() {
 		if err := a.indexer.SetProcessMetadataTitle(id, title); err != nil {
 			log.Warnw("could not cache election title", "electionId", id, "err", err.Error())
 		}
-	}()
+	})
 }
 
 // cacheAccountMetadata stores an already resolved organization name and avatar
@@ -84,11 +112,11 @@ func (a *API) cacheAccountMetadata(address []byte, metadata *AccountMetadata) {
 		return
 	}
 	addr := append([]byte(nil), address...)
-	go func() {
+	cacheWrite(func() {
 		if err := a.indexer.SetAccountMetadata(addr, name, avatar); err != nil {
 			log.Warnw("could not cache account metadata", "account", addr, "err", err.Error())
 		}
-	}()
+	})
 }
 
 // startMetadataBackfill launches, once per boot, a best-effort pass filling the
@@ -163,6 +191,7 @@ func (a *API) retrieveMetadata(uri string, v any) bool {
 // cached, and returns how many were filled.
 func (a *API) backfillElectionTitles() int {
 	filled := 0
+	failures := 0
 	var after []byte
 	for {
 		pending, err := a.indexer.ProcessesMissingMetadataTitle(after, metadataBackfillBatch)
@@ -174,7 +203,7 @@ func (a *API) backfillElectionTitles() int {
 			return filled
 		}
 		after = pending[len(pending)-1].ProcessID
-		filled += backfillWorkers(pending, func(p indexer.ProcessMetadataURI) bool {
+		batchFilled := backfillWorkers(pending, func(p indexer.ProcessMetadataURI) bool {
 			metadata := ElectionMetadata{}
 			if !a.retrieveMetadata(p.URI, &metadata) {
 				return false
@@ -189,6 +218,13 @@ func (a *API) backfillElectionTitles() int {
 			}
 			return true
 		})
+		filled += batchFilled
+		failures += len(pending) - batchFilled
+		if failures >= metadataBackfillMaxFailures {
+			log.Infow("metadata backfill stopping early, too many unresolved election titles",
+				"filled", filled, "failures", failures)
+			return filled
+		}
 	}
 }
 
@@ -200,6 +236,7 @@ func (a *API) backfillAccountMetadata() int {
 		return 0
 	}
 	filled := 0
+	failures := 0
 	var after []byte
 	for {
 		pending, err := a.indexer.AccountsMissingName(after, metadataBackfillBatch)
@@ -211,7 +248,7 @@ func (a *API) backfillAccountMetadata() int {
 			return filled
 		}
 		after = pending[len(pending)-1]
-		filled += backfillWorkers(pending, func(address []byte) bool {
+		batchFilled := backfillWorkers(pending, func(address []byte) bool {
 			acc, err := a.vocapp.State.GetAccount(common.BytesToAddress(address), true)
 			if err != nil || acc == nil {
 				return false
@@ -234,5 +271,12 @@ func (a *API) backfillAccountMetadata() int {
 			}
 			return true
 		})
+		filled += batchFilled
+		failures += len(pending) - batchFilled
+		if failures >= metadataBackfillMaxFailures {
+			log.Infow("metadata backfill stopping early, too many unresolved account metadata fetches",
+				"filled", filled, "failures", failures)
+			return filled
+		}
 	}
 }

@@ -28,7 +28,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
 	"go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/farcasterproof"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -127,6 +126,8 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 	if err != nil {
 		return nil, fmt.Errorf("could not create indexer: %w", err)
 	}
+	// launch the indexer after sync routine (executed when the blockchain is ready)
+	go vc.Indexer.AfterSyncBootstrap(false)
 
 	// Create key keeper (also adds the validator).
 	if err := vc.SetKeyKeeper(keymanager); err != nil {
@@ -151,9 +152,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 			return nil, fmt.Errorf("could not create offchain data handler: %w", err)
 		}
 	}
-
-	// Disable election ID verification on the farcaster proof for testing purposes.
-	farcasterproof.DisableElectionIDVerification = true
 
 	return vc, nil
 }

@@ -35,9 +35,9 @@ type Vote struct {
 	VoterID              VoterID
 	Overwrites           uint32
 	// Memo is an optional free-text note attached by the voter, at most
-	// types.MaxVoteMemoSize bytes of valid UTF-8. Bytes rather than string to
-	// match VoteEnvelope.memo and StateDBVote.memo on either side of it.
-	// Validated in VoteTxCheck; nil when the voter attached none.
+	// types.MaxVoteMemoSize opaque bytes. Bytes rather than string to match
+	// VoteEnvelope.memo and StateDBVote.memo on either side of it. Only its
+	// length is validated in VoteTxCheck; nil when the voter attached none.
 	Memo []byte
 }
 
