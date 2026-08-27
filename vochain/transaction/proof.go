@@ -60,6 +60,8 @@ func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID sta
 		}
 	case models.CensusOrigin_OFF_CHAIN_CA:
 		verifier = &cspproof.ProofVerifierCSP{}
+	case models.CensusOrigin_OFF_CHAIN_CA_V2:
+		verifier = &cspproof.ProofVerifierCSP{V2: true}
 	case models.CensusOrigin_ERC20, models.CensusOrigin_MINI_ME:
 		verifier = &ethereumproof.ProofVerifierEthereumStorage{}
 	case models.CensusOrigin_FARCASTER_FRAME:

@@ -2,11 +2,14 @@ package vochain
 
 import (
 	"context"
+	"math/big"
 	"testing"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/crypto/saltedkey"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -245,4 +248,187 @@ func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.Sign
 	}
 	_, err = app.CommitState()
 	qt.Assert(t, err, qt.IsNil)
+}
+
+// cspTestProcess adds a CSP process with the given census origin and CSP root,
+// returning its pid.
+func cspTestProcess(t *testing.T, app *BaseApplication, censusRoot []byte,
+	origin models.CensusOrigin,
+) []byte {
+	pid := util.RandomBytes(types.ProcessIDsize)
+	process := &models.Process{
+		ProcessId:     pid,
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          new(models.ProcessMode),
+		Status:        models.ProcessStatus_READY,
+		EntityId:      util.RandomBytes(types.EthereumAddressSize),
+		CensusRoot:    censusRoot,
+		CensusOrigin:  origin,
+		BlockCount:    1024,
+		MaxCensusSize: 1000,
+	}
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	return pid
+}
+
+// TestCSPproofSaltedV2 drives the salted CSP proof types through the full
+// CheckTx -> deliverTx -> commit path on an election with census origin
+// OFF_CHAIN_CA_V2, where the fixed salt derivation (issue #1424) applies.
+func TestCSPproofSaltedV2(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer, err := testcsp.NewSigner()
+	qt.Assert(t, err, qt.IsNil)
+
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	for _, proofType := range []models.ProofCA_Type{
+		models.ProofCA_ECDSA_PIDSALTED,
+		models.ProofCA_ECDSA_BLIND_PIDSALTED,
+	} {
+		t.Run(proofType.String(), func(t *testing.T) {
+			root, err := signer.CensusRoot(proofType)
+			qt.Assert(t, err, qt.IsNil)
+			pid := cspTestProcess(t, app, root, models.CensusOrigin_OFF_CHAIN_CA_V2)
+			weight := big.NewInt(42)
+
+			// a proof salted for this election and weight is accepted
+			k := ethereum.NewSignKeys()
+			qt.Assert(t, k.Generate(), qt.IsNil)
+			salt, err := saltedkey.Salt(pid, weight.Bytes())
+			qt.Assert(t, err, qt.IsNil)
+			proof, err := signer.Sign(proofType, testcsp.Bundle(pid, k.Address().Bytes(), weight), salt)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k, proof, app, true)
+
+			// a proof salted for a sibling election of the same organization
+			// (identical first 20 bytes, different nonce) is rejected: this is
+			// the cross-election reuse the V2 origin closes
+			k2 := ethereum.NewSignKeys()
+			qt.Assert(t, k2.Generate(), qt.IsNil)
+			sibling := append([]byte{}, pid...)
+			sibling[31] ^= 0xff
+			siblingSalt, err := saltedkey.Salt(sibling, weight.Bytes())
+			qt.Assert(t, err, qt.IsNil)
+			proof, err = signer.Sign(proofType, testcsp.Bundle(pid, k2.Address().Bytes(), weight), siblingSalt)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k2, proof, app, false)
+
+			// a bundle declaring a weight the CSP did not salt for is rejected
+			k3 := ethereum.NewSignKeys()
+			qt.Assert(t, k3.Generate(), qt.IsNil)
+			authorizedSalt, err := saltedkey.Salt(pid, big.NewInt(5).Bytes())
+			qt.Assert(t, err, qt.IsNil)
+			proof, err = signer.Sign(proofType, testcsp.Bundle(pid, k3.Address().Bytes(), big.NewInt(1000)), authorizedSalt)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k3, proof, app, false)
+
+			// the adaptive forgery: the voter holds a signature the CSP made for
+			// another election at weight 1, and picks the weight that would make
+			// this election derive the same salt under an additive rule. The
+			// hashed derivation defeats it; an additive one would accept it.
+			k4 := ethereum.NewSignKeys()
+			qt.Assert(t, k4.Generate(), qt.IsNil)
+			otherPID := util.RandomBytes(types.ProcessIDsize)
+			saltOther, err := saltedkey.Salt(otherPID, big.NewInt(1).Bytes())
+			qt.Assert(t, err, qt.IsNil)
+			mod := new(big.Int).Lsh(big.NewInt(1), saltedkey.MaxVoteWeightBits)
+			hThis := new(big.Int).SetBytes(ethereum.HashRaw(pid)[:saltedkey.SaltSize])
+			forged := new(big.Int).Mod(new(big.Int).Sub(new(big.Int).SetBytes(saltOther), hThis), mod)
+			proof, err = signer.Sign(proofType, testcsp.Bundle(pid, k4.Address().Bytes(), forged), saltOther)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k4, proof, app, false)
+		})
+	}
+}
+
+// TestCSPproofSaltedLegacy checks the legacy derivation still governs
+// OFF_CHAIN_CA elections, byte-identical to what deployed CSPs sign today,
+// and that a V2-derived proof does not verify there.
+func TestCSPproofSaltedLegacy(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer, err := testcsp.NewSigner()
+	qt.Assert(t, err, qt.IsNil)
+
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+
+	for _, proofType := range []models.ProofCA_Type{
+		models.ProofCA_ECDSA_PIDSALTED,
+		models.ProofCA_ECDSA_BLIND_PIDSALTED,
+	} {
+		t.Run(proofType.String(), func(t *testing.T) {
+			root, err := signer.CensusRoot(proofType)
+			qt.Assert(t, err, qt.IsNil)
+			pid := cspTestProcess(t, app, root, models.CensusOrigin_OFF_CHAIN_CA)
+
+			// the legacy salt is the raw processID
+			k := ethereum.NewSignKeys()
+			qt.Assert(t, k.Generate(), qt.IsNil)
+			proof, err := signer.Sign(proofType, testcsp.Bundle(pid, k.Address().Bytes(), nil), pid)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k, proof, app, true)
+
+			// a proof salted with the V2 derivation is rejected here
+			k2 := ethereum.NewSignKeys()
+			qt.Assert(t, k2.Generate(), qt.IsNil)
+			salt, err := saltedkey.Salt(pid, nil)
+			qt.Assert(t, err, qt.IsNil)
+			proof, err = signer.Sign(proofType, testcsp.Bundle(pid, k2.Address().Bytes(), nil), salt)
+			qt.Assert(t, err, qt.IsNil)
+			testCSPsendVotes(t, pid, vp, k2, proof, app, false)
+		})
+	}
+}
+
+// TestCSPproofSaltedV2NoCache delivers a salted V2 vote without a prior
+// CheckTx, so the vote cache cannot serve it and the proof is fully
+// re-verified at delivery. The outcome must match the cached path exercised by
+// testCSPsendVotes: the derivation depends only on the election's census
+// origin, so the two paths cannot disagree.
+func TestCSPproofSaltedV2NoCache(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer, err := testcsp.NewSigner()
+	qt.Assert(t, err, qt.IsNil)
+	root, err := signer.CensusRoot(models.ProofCA_ECDSA_BLIND_PIDSALTED)
+	qt.Assert(t, err, qt.IsNil)
+	pid := cspTestProcess(t, app, root, models.CensusOrigin_OFF_CHAIN_CA_V2)
+
+	vp, err := state.NewVotePackage([]int{1, 2, 3, 4}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+	weight := big.NewInt(42)
+	salt, err := saltedkey.Salt(pid, weight.Bytes())
+	qt.Assert(t, err, qt.IsNil)
+
+	buildVote := func(k *ethereum.SignKeys, salt []byte) []byte {
+		proof, err := signer.Sign(models.ProofCA_ECDSA_BLIND_PIDSALTED,
+			testcsp.Bundle(pid, k.Address().Bytes(), weight), salt)
+		qt.Assert(t, err, qt.IsNil)
+		var stx models.SignedTx
+		stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_Vote{Vote: &models.VoteEnvelope{
+			Nonce:       util.RandomBytes(32),
+			ProcessId:   pid,
+			Proof:       &models.Proof{Payload: &models.Proof_Ca{Ca: proof}},
+			VotePackage: vp,
+		}}})
+		qt.Assert(t, err, qt.IsNil)
+		stx.Signature, err = k.SignVocdoniTx(stx.Tx, app.chainID)
+		qt.Assert(t, err, qt.IsNil)
+		txb, err := proto.Marshal(&stx)
+		qt.Assert(t, err, qt.IsNil)
+		return txb
+	}
+
+	// a valid salted vote delivered straight to deliverTx is accepted
+	k := ethereum.NewSignKeys()
+	qt.Assert(t, k.Generate(), qt.IsNil)
+	resp := app.deliverTx(buildVote(k, salt))
+	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("%s", resp.Data))
+
+	// and a legacy-salted one is rejected, also without cache involvement
+	k2 := ethereum.NewSignKeys()
+	qt.Assert(t, k2.Generate(), qt.IsNil)
+	resp = app.deliverTx(buildVote(k2, pid))
+	qt.Assert(t, resp.Code, qt.Not(qt.Equals), uint32(0))
 }

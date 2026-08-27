@@ -2,11 +2,13 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 	"os"
 	"time"
 
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/test/testcommon/testcsp"
 	"go.vocdoni.io/proto/build/go/models"
 )
 
@@ -17,6 +19,13 @@ func init() {
 		},
 		description: "csp election",
 		example:     os.Args[0] + " --operation=cspelection --votes=1000",
+	}
+	ops["cspelectionv2"] = operation{
+		testFunc: func() VochainTest {
+			return &E2ECSPElectionV2{}
+		},
+		description: "csp election with census origin OFF_CHAIN_CA_V2 and weighted blind pid-salted proofs (issue #1424 derivation)",
+		example:     os.Args[0] + " --operation=cspelectionv2 --votes=1000",
 	}
 }
 
@@ -85,5 +94,37 @@ func (t *E2ECSPElection) Run() error {
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", elres.Results)
 
+	return nil
+}
+
+var _ VochainTest = (*E2ECSPElectionV2)(nil)
+
+// E2ECSPElectionV2 runs a CSP election with census origin OFF_CHAIN_CA_V2,
+// where every proof is ECDSA_BLIND_PIDSALTED with a CSP-authorized weight,
+// exercising the fixed salt derivation of issue #1424 end to end.
+type E2ECSPElectionV2 struct {
+	E2ECSPElection
+}
+
+func (t *E2ECSPElectionV2) Setup(api *apiclient.HTTPclient, c *config) error {
+	signer, err := testcsp.NewSigner()
+	if err != nil {
+		return err
+	}
+	t.cspSigner = signer
+	t.cspProofType = models.ProofCA_ECDSA_BLIND_PIDSALTED
+	t.cspVoteWeight = big.NewInt(10)
+
+	t.api = api
+	t.config = c
+
+	p := newTestProcess()
+	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA_V2
+
+	if err := t.setupElectionRaw(p); err != nil {
+		return err
+	}
+
+	logElection(t.election)
 	return nil
 }

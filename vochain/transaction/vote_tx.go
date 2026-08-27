@@ -135,7 +135,7 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		switch process.CensusOrigin {
 		case models.CensusOrigin_OFF_CHAIN_TREE,
 			models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
-			models.CensusOrigin_OFF_CHAIN_CA,
+			models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2,
 			models.CensusOrigin_ERC20, models.CensusOrigin_MINI_ME:
 			if process.GetEnvelopeType().Anonymous {
 				vote, sikRoot, err = zkproof.InitializeZkVote(voteEnvelope, height)
