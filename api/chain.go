@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"unicode"
+	"unicode/utf8"
 
 	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -30,8 +31,9 @@ import (
 // maxTransactionBatchSize bounds how many transactions POST /chain/transactions/batch accepts.
 const maxTransactionBatchSize = 100
 
-// MaxOrganizationNameFilterLen bounds the length of the ?name= substring filter
-// accepted by /chain/organizations, before it reaches the SearchEntities query.
+// MaxOrganizationNameFilterLen bounds the ?name= substring filter accepted by
+// /chain/organizations, in runes (characters), before it reaches the
+// SearchEntities query.
 const MaxOrganizationNameFilterLen = 100
 
 const (
@@ -1675,9 +1677,9 @@ func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramNa
 }
 
 // validateOrganizationNameFilter rejects a ?name= filter before it reaches
-// SearchEntities: too long, or containing non-printable characters.
+// SearchEntities: too many runes, or containing non-printable characters.
 func validateOrganizationNameFilter(name string) error {
-	if len(name) > MaxOrganizationNameFilterLen {
+	if utf8.RuneCountInString(name) > MaxOrganizationNameFilterLen {
 		return ErrParamNameInvalid
 	}
 	for _, r := range name {
