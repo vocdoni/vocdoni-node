@@ -24,9 +24,12 @@ func (q *Queries) CountAccounts(ctx context.Context) (int64, error) {
 }
 
 const createAccount = `-- name: CreateAccount :execresult
-REPLACE INTO accounts (
+INSERT INTO accounts (
     account, balance, nonce
 ) VALUES (?, ?, ?)
+ON CONFLICT(account) DO UPDATE
+SET balance = excluded.balance,
+    nonce   = excluded.nonce
 `
 
 type CreateAccountParams struct {
@@ -35,6 +38,9 @@ type CreateAccountParams struct {
 	Nonce   int64
 }
 
+// Preserves name/avatar (resolved separately by SetAccountMetadata): a plain
+// REPLACE INTO is DELETE + INSERT, so every account update would otherwise wipe
+// them back to their defaults.
 func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (sql.Result, error) {
 	return q.exec(ctx, q.createAccountStmt, createAccount, arg.Account, arg.Balance, arg.Nonce)
 }

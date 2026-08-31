@@ -1,7 +1,13 @@
 -- name: CreateAccount :execresult
-REPLACE INTO accounts (
+-- Preserves name/avatar (resolved separately by SetAccountMetadata): a plain
+-- REPLACE INTO is DELETE + INSERT, so every account update would otherwise wipe
+-- them back to their defaults.
+INSERT INTO accounts (
     account, balance, nonce
-) VALUES (?, ?, ?);
+) VALUES (?, ?, ?)
+ON CONFLICT(account) DO UPDATE
+SET balance = excluded.balance,
+    nonce   = excluded.nonce;
 
 -- name: SearchAccounts :many
 WITH results AS (

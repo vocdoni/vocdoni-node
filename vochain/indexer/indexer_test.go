@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -1242,6 +1243,37 @@ func TestVoteMemoSurvivesReindex(t *testing.T) {
 	env, err = idx.GetEnvelope(vote.Nullifier)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, env.Memo, qt.DeepEquals, memo)
+}
+
+// TestAccountMetadataSurvivesReindex guards the same REPLACE INTO hazard as
+// TestVoteMemoSurvivesReindex, but for accounts.name/avatar: those columns are
+// resolved separately by SetAccountMetadata, so OnSetAccount (called on every
+// balance/nonce change) must not reset them to their defaults.
+func TestAccountMetadataSurvivesReindex(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+	account := util.RandomBytes(20)
+
+	idx.OnSetAccount(account, &state.Account{Account: models.Account{Balance: 100, Nonce: 0}})
+	app.AdvanceTestBlock()
+
+	qt.Assert(t, idx.SetAccountMetadata(account, "Acme", "ipfs://avatar"), qt.IsNil)
+
+	// A subsequent account update (e.g. a balance change from a later tx) must
+	// not wipe the metadata resolved above.
+	idx.OnSetAccount(account, &state.Account{Account: models.Account{Balance: 50, Nonce: 1}})
+	app.AdvanceTestBlock()
+
+	rows, err := idx.readOnlyQuery.SearchAccounts(context.TODO(), indexerdb.SearchAccountsParams{
+		Limit:           10,
+		AccountIDSubstr: hex.EncodeToString(account),
+	})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, rows, qt.HasLen, 1)
+	qt.Assert(t, rows[0].Name, qt.Equals, "Acme")
+	qt.Assert(t, rows[0].Avatar, qt.Equals, "ipfs://avatar")
+	qt.Assert(t, rows[0].Balance, qt.Equals, int64(50))
+	qt.Assert(t, rows[0].Nonce, qt.Equals, int64(1))
 }
 
 func TestOverwriteVotes(t *testing.T) {
