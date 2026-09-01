@@ -204,7 +204,7 @@ func (i *Handler) addAndPin(ctx context.Context, path string) (ipfspath.Immutabl
 
 	rpath, err := i.CoreAPI.Unixfs().Add(ctx, f,
 		options.Unixfs.CidVersion(1),
-		options.Unixfs.Pin(true))
+		options.Unixfs.Pin(true, ""))
 	if err != nil {
 		return ipfspath.ImmutablePath{}, err
 	}
@@ -228,39 +228,36 @@ func (i *Handler) Stats() map[string]any {
 	return map[string]any{"peers": stats.Peers.Get(), "addresses": stats.KnownAddrs.Get(), "pins": stats.Pins.Get()}
 }
 
+// lsPins streams every pin through fn. Note that Ls delivers on a channel
+// that gets closed when finished: we MUST range over the entire channel to
+// not leak goroutines, so fn is called for every pin even after an error.
+func (i *Handler) lsPins(ctx context.Context, fn func(coreiface.Pin)) error {
+	pins := make(chan coreiface.Pin)
+	errCh := make(chan error, 1)
+	go func() { errCh <- i.CoreAPI.Pin().Ls(ctx, pins) }()
+	for pin := range pins {
+		fn(pin)
+	}
+	return <-errCh
+}
+
 func (i *Handler) countPins(ctx context.Context) (int, error) {
-	// Note that pins is a channel that gets closed when finished.
-	// We MUST range over the entire channel to not leak goroutines.
 	// Maybe there is a way to get the total number of pins without
 	// iterating over them?
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
-	if err != nil {
-		return 0, err
-	}
 	count := 0
-	for pin := range pins {
-		if err := pin.Err(); err != nil {
-			return 0, err
-		}
-		count++
+	if err := i.lsPins(ctx, func(coreiface.Pin) { count++ }); err != nil {
+		return 0, err
 	}
 	return count, nil
 }
 
 // ListPins returns a map of all pinned CIDs and their types
 func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
-	// Note that pins is a channel that gets closed when finished.
-	// We MUST range over the entire channel to not leak goroutines.
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
-	if err != nil {
-		return nil, err
-	}
 	pinMap := make(map[string]string)
-	for pin := range pins {
-		if err := pin.Err(); err != nil {
-			return nil, err
-		}
-		pinMap[pin.Path().String()] = pin.Type()
+	if err := i.lsPins(ctx, func(p coreiface.Pin) {
+		pinMap[p.Path().String()] = p.Type()
+	}); err != nil {
+		return nil, err
 	}
 	return pinMap, nil
 }

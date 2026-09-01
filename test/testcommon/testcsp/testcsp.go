@@ -28,9 +28,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// blindSignAttempts bounds the retry loop in blindSign. blind.BlindSign rejects
-// a k or a blinded message that does not serialize to exactly 32 bytes, each
-// failing with probability ~1/256, so a single attempt is flaky.
+// blindSignAttempts bounds the retry loops here. The blind secp256k1 library
+// rejects any scalar that does not serialize to exactly 32 bytes — a private
+// key, a k, or a blinded message — each failing with probability ~1/256, so a
+// single attempt is flaky.
 const blindSignAttempts = 32
 
 // Signer holds the CSP keys: an ECDSA one for the plain proof types and a blind
@@ -46,11 +47,14 @@ func NewSigner() (*Signer, error) {
 	if err := ecdsaKey.Generate(); err != nil {
 		return nil, fmt.Errorf("cannot generate CSP ECDSA key: %w", err)
 	}
-	blindKey, err := blind.NewPrivateKey()
-	if err != nil {
-		return nil, fmt.Errorf("cannot generate CSP blind key: %w", err)
+	for range blindSignAttempts {
+		blindKey, err := blind.NewPrivateKey()
+		if err != nil {
+			continue // rejected draw, see blindSignAttempts
+		}
+		return &Signer{ECDSA: ecdsaKey, Blind: blindKey}, nil
 	}
-	return &Signer{ECDSA: ecdsaKey, Blind: blindKey}, nil
+	return nil, fmt.Errorf("cannot generate CSP blind key after %d attempts", blindSignAttempts)
 }
 
 // CensusRoot returns the value to store in process.CensusRoot for proofType.
