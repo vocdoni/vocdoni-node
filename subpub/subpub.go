@@ -108,7 +108,11 @@ func (s *SubPub) listen(receiver chan<- *Message) {
 		select {
 		case <-s.close:
 			return
-		case spmsg := <-s.gossip.Messages:
+		case spmsg, ok := <-s.gossip.Messages:
+			// readGossipLoop closes this channel when the subscription ends.
+			if !ok {
+				return
+			}
 			receiver <- spmsg
 		case spmsg := <-s.unicastMsgs:
 			receiver <- spmsg
@@ -123,8 +127,9 @@ func (s *SubPub) Close() {
 	case <-s.close:
 		// already closed
 	default:
+		// Note we do not close s.messages: it is owned by whoever called
+		// Start, and closing it here races with listen still sending on it.
 		close(s.close)
-		close(s.messages)
 	}
 }
 

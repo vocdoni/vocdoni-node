@@ -228,19 +228,24 @@ func (i *Handler) Stats() map[string]any {
 	return map[string]any{"peers": stats.Peers.Get(), "addresses": stats.KnownAddrs.Get(), "pins": stats.Pins.Get()}
 }
 
-func (i *Handler) countPins(ctx context.Context) (int, error) {
-	// Note that pins is a channel that gets closed when finished.
-	// We MUST range over the entire channel to not leak goroutines.
-	// Maybe there is a way to get the total number of pins without
-	// iterating over them?
+// lsPins streams every pin through fn. Note that Ls delivers on a channel
+// that gets closed when finished: we MUST range over the entire channel to
+// not leak goroutines, so fn is called for every pin even after an error.
+func (i *Handler) lsPins(ctx context.Context, fn func(coreiface.Pin)) error {
 	pins := make(chan coreiface.Pin)
 	errCh := make(chan error, 1)
 	go func() { errCh <- i.CoreAPI.Pin().Ls(ctx, pins) }()
-	count := 0
-	for range pins {
-		count++
+	for pin := range pins {
+		fn(pin)
 	}
-	if err := <-errCh; err != nil {
+	return <-errCh
+}
+
+func (i *Handler) countPins(ctx context.Context) (int, error) {
+	// Maybe there is a way to get the total number of pins without
+	// iterating over them?
+	count := 0
+	if err := i.lsPins(ctx, func(coreiface.Pin) { count++ }); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -248,16 +253,10 @@ func (i *Handler) countPins(ctx context.Context) (int, error) {
 
 // ListPins returns a map of all pinned CIDs and their types
 func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
-	// Note that pins is a channel that gets closed when finished.
-	// We MUST range over the entire channel to not leak goroutines.
-	pins := make(chan coreiface.Pin)
-	errCh := make(chan error, 1)
-	go func() { errCh <- i.CoreAPI.Pin().Ls(ctx, pins) }()
 	pinMap := make(map[string]string)
-	for pin := range pins {
-		pinMap[pin.Path().String()] = pin.Type()
-	}
-	if err := <-errCh; err != nil {
+	if err := i.lsPins(ctx, func(p coreiface.Pin) {
+		pinMap[p.Path().String()] = p.Type()
+	}); err != nil {
 		return nil, err
 	}
 	return pinMap, nil
