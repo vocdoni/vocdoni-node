@@ -204,7 +204,7 @@ func (i *Handler) addAndPin(ctx context.Context, path string) (ipfspath.Immutabl
 
 	rpath, err := i.CoreAPI.Unixfs().Add(ctx, f,
 		options.Unixfs.CidVersion(1),
-		options.Unixfs.Pin(true))
+		options.Unixfs.Pin(true, ""))
 	if err != nil {
 		return ipfspath.ImmutablePath{}, err
 	}
@@ -233,16 +233,15 @@ func (i *Handler) countPins(ctx context.Context) (int, error) {
 	// We MUST range over the entire channel to not leak goroutines.
 	// Maybe there is a way to get the total number of pins without
 	// iterating over them?
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
-	if err != nil {
-		return 0, err
-	}
+	pins := make(chan coreiface.Pin)
+	errCh := make(chan error, 1)
+	go func() { errCh <- i.CoreAPI.Pin().Ls(ctx, pins) }()
 	count := 0
-	for pin := range pins {
-		if err := pin.Err(); err != nil {
-			return 0, err
-		}
+	for range pins {
 		count++
+	}
+	if err := <-errCh; err != nil {
+		return 0, err
 	}
 	return count, nil
 }
@@ -251,16 +250,15 @@ func (i *Handler) countPins(ctx context.Context) (int, error) {
 func (i *Handler) ListPins(ctx context.Context) (map[string]string, error) {
 	// Note that pins is a channel that gets closed when finished.
 	// We MUST range over the entire channel to not leak goroutines.
-	pins, err := i.CoreAPI.Pin().Ls(ctx)
-	if err != nil {
-		return nil, err
-	}
+	pins := make(chan coreiface.Pin)
+	errCh := make(chan error, 1)
+	go func() { errCh <- i.CoreAPI.Pin().Ls(ctx, pins) }()
 	pinMap := make(map[string]string)
 	for pin := range pins {
-		if err := pin.Err(); err != nil {
-			return nil, err
-		}
 		pinMap[pin.Path().String()] = pin.Type()
+	}
+	if err := <-errCh; err != nil {
+		return nil, err
 	}
 	return pinMap, nil
 }
