@@ -21,7 +21,6 @@ import (
 	"github.com/ipfs/kubo/repo"
 	"github.com/ipfs/kubo/repo/fsrepo"
 	"github.com/ipfs/kubo/repo/fsrepo/migrations"
-	"github.com/ipfs/kubo/repo/fsrepo/migrations/ipfsfetcher"
 	"github.com/libp2p/go-libp2p/core/routing"
 	"github.com/multiformats/go-multicodec"
 	"github.com/multiformats/go-multihash"
@@ -110,52 +109,15 @@ func startNode() (*ipfscore.IpfsNode, coreiface.CoreAPI, error) {
 	return node, api, nil
 }
 
-// runMigrationsAndOpen fetches and applies migrations just like upstream kubo does
+// runMigrationsAndOpen applies migrations just like upstream kubo does
 // and returns fsrepo.Open(ConfigRoot)
 func runMigrationsAndOpen(ConfigRoot string) (repo.Repo, error) {
-	// Read Migration section of IPFS config
-	migrationCfg, err := migrations.ReadMigrationConfig(ConfigRoot, "")
-	if err != nil {
-		return nil, err
-	}
-
-	// Define function to create IPFS fetcher.  Do not supply an
-	// already-constructed IPFS fetcher, because this may be expensive and
-	// not needed according to migration config. Instead, supply a function
-	// to construct the particular IPFS fetcher implementation used here,
-	// which is called only if an IPFS fetcher is needed.
-	newIpfsFetcher := func(distPath string) migrations.Fetcher {
-		return ipfsfetcher.NewIpfsFetcher(distPath, 0, &ConfigRoot, "")
-	}
-
-	// Fetch migrations from current distribution, or location from environ
-	fetchDistPath := migrations.GetDistPathEnv(migrations.CurrentIpfsDist)
-
-	// Create fetchers according to migrationCfg.DownloadSources
-	fetcher, err := migrations.GetMigrationFetcher(migrationCfg.DownloadSources,
-		fetchDistPath, newIpfsFetcher)
-	if err != nil {
-		return nil, err
-	}
-	defer fetcher.Close()
-
-	if migrationCfg.Keep == "cache" || migrationCfg.Keep == "pin" {
-		// Create temp directory to store downloaded migration archives
-		migrations.DownloadDirectory, err = os.MkdirTemp("", "migrations")
-		if err != nil {
-			return nil, err
-		}
-		// Defer cleanup of download directory so that it gets cleaned up
-		// if daemon returns early due to error
-		defer func() {
-			if migrations.DownloadDirectory != "" {
-				_ = os.RemoveAll(migrations.DownloadDirectory)
-			}
-		}()
-	}
-
-	err = migrations.RunMigration(context.TODO(), fetcher, fsrepo.RepoVersion, ConfigRoot, false)
-	if err != nil {
+	// Hybrid strategy: external migration tools for legacy repo versions,
+	// embedded migrations for v16+. It reads the config, builds the fetchers
+	// and handles the download directory on its own.
+	if err := migrations.RunHybridMigrations(
+		context.TODO(), fsrepo.RepoVersion, ConfigRoot, false,
+	); err != nil {
 		return nil, fmt.Errorf("migrations of ipfs-repo failed: %w", err)
 	}
 
