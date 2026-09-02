@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"math/big"
 
-	blind "github.com/arnaucube/go-blindsecp256k1"
+	blind "github.com/vocdoni/go-blindsecp256k1"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 )
 
