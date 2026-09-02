@@ -5,9 +5,9 @@ import (
 	"math/big"
 	"testing"
 
-	blind "github.com/vocdoni/go-blindsecp256k1"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
 	qt "github.com/frankban/quicktest"
+	blind "github.com/vocdoni/go-blindsecp256k1"
 )
 
 // testProcessID builds a 32 byte processID with the real layout:
