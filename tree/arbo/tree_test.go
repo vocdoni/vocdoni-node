@@ -539,9 +539,8 @@ func TestGenProofAndVerify(t *testing.T) {
 
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
-	verif, err := CheckProof(tree.hashFunction, k, v, root, siblings)
+	err = CheckProof(tree.hashFunction, k, v, root, siblings)
 	c.Assert(err, qt.IsNil)
-	c.Check(verif, qt.IsTrue)
 }
 
 func TestDumpAndImportDump(t *testing.T) {
@@ -933,16 +932,14 @@ func TestKeyLen(t *testing.T) {
 
 	root, err := tree.Root()
 	c.Assert(err, qt.IsNil)
-	verif, err := CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
+	err = CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
 	c.Assert(err, qt.IsNil)
-	c.Assert(verif, qt.IsTrue)
 
 	// use a similar key but with one zero, expect that CheckProof fails on
 	// the verification
 	kAux = append(kAux, 0)
-	verif, err = CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
-	c.Assert(err, qt.IsNil)
-	c.Assert(verif, qt.IsFalse)
+	err = CheckProof(tree.HashFunction(), kAux, vAux, root, packedSiblings)
+	c.Assert(err, qt.ErrorMatches, "calculated vs expected root mismatch")
 }
 
 func TestKeyLenBiggerThan32(t *testing.T) {
