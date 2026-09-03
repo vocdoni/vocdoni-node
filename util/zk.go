@@ -27,7 +27,7 @@ func BigToFF(iv *big.Int) *big.Int {
 
 // BytesToArboSplit calculates the sha256 hash (32 bytes) of the slice of bytes
 // provided. Then, splits the hash into a two parts of 16 bytes, swap the
-// endianess of that parts and encodes they into a two big.Int's.
+// endianness of those parts and encodes them into two big.Int values.
 func BytesToArboSplit(input []byte) []*big.Int {
 	hash := sha256.Sum256(input)
 	return []*big.Int{
