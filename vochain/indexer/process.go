@@ -136,21 +136,90 @@ func (idx *Indexer) CountProcessesByStatus() (map[string]uint64, error) {
 	return counts, nil
 }
 
+// Orderings supported by EntityList.
+const (
+	// EntitySortByCreatedAt orders by the creation time of the first election
+	// indexed for the entity, i.e. by when the entity first appeared in the
+	// index. It is the default, and matches the ordering EntityList had before
+	// it took a sortBy.
+	EntitySortByCreatedAt = "createdAt"
+	// EntitySortByElectionCount orders by how many elections the entity has.
+	EntitySortByElectionCount = "electionCount"
+	// EntitySortByName orders by the entity name resolved from its account
+	// metadata, case-insensitively (ASCII case folding only). Entities whose
+	// account resolves no name sort last, in either direction.
+	EntitySortByName = "name"
+)
+
+// Sort directions supported by EntityList.
+const (
+	SortOrderAsc  = "asc"
+	SortOrderDesc = "desc"
+)
+
+// entitySortDefaultOrder maps each supported sortBy to its natural direction,
+// used when the caller does not ask for one.
+var entitySortDefaultOrder = map[string]string{
+	EntitySortByCreatedAt:     SortOrderDesc, // most recently created first
+	EntitySortByElectionCount: SortOrderDesc, // busiest organizations first
+	EntitySortByName:          SortOrderAsc,  // alphabetical
+}
+
+var (
+	// ErrInvalidEntitySortBy is returned when an unsupported entity ordering is requested.
+	ErrInvalidEntitySortBy = fmt.Errorf("invalid entity sortBy")
+	// ErrInvalidSortOrder is returned when an unsupported sort direction is requested.
+	ErrInvalidSortOrder = fmt.Errorf("invalid sort order")
+)
+
+// NormalizeEntitySort validates a sortBy/order pair for EntityList and fills in
+// the defaults for the zero values: EntitySortByCreatedAt for sortBy, and the
+// natural direction of the resulting sortBy for order.
+func NormalizeEntitySort(sortBy, order string) (string, string, error) {
+	if sortBy == "" {
+		sortBy = EntitySortByCreatedAt
+	}
+	defaultOrder, ok := entitySortDefaultOrder[sortBy]
+	if !ok {
+		return "", "", fmt.Errorf("%w: %q", ErrInvalidEntitySortBy, sortBy)
+	}
+	switch order {
+	case "":
+		order = defaultOrder
+	case SortOrderAsc, SortOrderDesc:
+	default:
+		return "", "", fmt.Errorf("%w: %q", ErrInvalidSortOrder, order)
+	}
+	return sortBy, order, nil
+}
+
 // EntityList returns the list of entities indexed by the indexer.
 // entityID and name are optional, if declared as zero-value they are ignored.
 // entityID is searched against the entityID field as lowercase hex, name as a
 // case-insensitive substring of the entity name resolved from its account
 // metadata (ASCII case folding only, see the SearchEntities query).
-func (idx *Indexer) EntityList(limit, offset int, entityID, name string) ([]indexertypes.Entity, uint64, error) {
+//
+// sortBy is one of the EntitySortBy* values and order one of the SortOrder*
+// ones; both are optional and, when zero-valued, default to EntitySortByCreatedAt
+// and to the natural direction of the chosen sortBy, as NormalizeEntitySort does.
+// The ordering is always total, entityID being the last tiebreak, so paging
+// through it neither repeats nor skips entities.
+func (idx *Indexer) EntityList(limit, offset int, entityID, name, sortBy, order string) ([]indexertypes.Entity, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
 	}
 	if limit <= 0 {
 		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
 	}
+	sortBy, order, err := NormalizeEntitySort(sortBy, order)
+	if err != nil {
+		return nil, 0, err
+	}
 	results, err := idx.readOnlyQuery.SearchEntities(context.TODO(), indexerdb.SearchEntitiesParams{
 		EntityIDSubstr: strings.ToLower(entityID), // we search in lowercase
 		NameSubstr:     name,
+		SortBy:         sortBy,
+		SortOrder:      order,
 		Offset:         int64(offset),
 		Limit:          int64(limit),
 	})
@@ -178,7 +247,7 @@ func (idx *Indexer) EntityExists(entityID string) bool {
 	if len(entityID) != 40 {
 		return false
 	}
-	_, count, err := idx.EntityList(1, 0, entityID, "")
+	_, count, err := idx.EntityList(1, 0, entityID, "", "", "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}

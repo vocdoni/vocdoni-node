@@ -174,6 +174,26 @@ SELECT COUNT(DISTINCT entity_id) FROM processes;
 -- so a client listing organizations doesn't need one account request per row.
 -- The name filter is a case-insensitive substring match; LOWER only folds ASCII
 -- in sqlite, so names differing by non-ASCII case or by diacritics do not match.
+--
+-- sort_by selects the ordering ('createdAt', 'electionCount' or 'name') and
+-- sort_order its direction ('asc' or 'desc'). Both are expected to be one of
+-- those exact values; the caller validates them. sqlite cannot parameterize an
+-- ORDER BY term and sqlc does not even substitute arguments inside one, so the
+-- sort key is computed as a column of the grouped subquery and the outer ORDER
+-- BY only picks between the ascending and the descending one, exactly one of
+-- which is non-NULL. A term that is NULL on every row compares equal on every
+-- row, so it is a no-op.
+--
+-- 'createdAt' is MIN(creation_time), the creation time of the *first* election
+-- indexed for an organization, i.e. when the organization first appeared in the
+-- index. That is what the previous hardcoded `ORDER BY creation_time DESC, id
+-- ASC` resolved to in practice: creation_time and id were bare columns of a
+-- grouped query, so sqlite took them from an arbitrary row of each group, and
+-- with the scan driven by index_processes_entity_id that row was the group's
+-- first, i.e. its oldest process.
+--
+-- entity_id is always the last tiebreak, so the ordering is total and paging
+-- with LIMIT/OFFSET can neither repeat nor skip a row.
 WITH results AS (
     SELECT p.*,
         COALESCE(a.name, '') AS account_name,
@@ -183,15 +203,35 @@ WITH results AS (
         ON a.account = p.entity_id
     WHERE (sqlc.arg(entity_id_substr) = '' OR (INSTR(LOWER(HEX(p.entity_id)), sqlc.arg(entity_id_substr)) > 0))
     AND (sqlc.arg(name_substr) = '' OR (INSTR(LOWER(COALESCE(a.name, '')), LOWER(sqlc.arg(name_substr))) > 0))
+), grouped AS (
+    SELECT entity_id,
+        account_name,
+        account_avatar,
+        COUNT(id) AS process_count,
+        COUNT(entity_id) OVER() AS total_count,
+        -- organizations whose account resolves no name sort last when sorting
+        -- by name, in either direction
+        CASE WHEN sqlc.arg(sort_by) = 'name' AND account_name = '' THEN 1 END AS sort_name_empty,
+        CASE WHEN sqlc.arg(sort_order) = 'asc' THEN (CASE
+            WHEN sqlc.arg(sort_by) = 'electionCount' THEN COUNT(id)
+            WHEN sqlc.arg(sort_by) = 'name' THEN LOWER(account_name)
+            WHEN sqlc.arg(sort_by) = 'createdAt' THEN MIN(creation_time)
+        END) END AS sort_key_asc,
+        CASE WHEN sqlc.arg(sort_order) = 'desc' THEN (CASE
+            WHEN sqlc.arg(sort_by) = 'electionCount' THEN COUNT(id)
+            WHEN sqlc.arg(sort_by) = 'name' THEN LOWER(account_name)
+            WHEN sqlc.arg(sort_by) = 'createdAt' THEN MIN(creation_time)
+        END) END AS sort_key_desc
+    FROM results
+    GROUP BY entity_id
 )
 SELECT entity_id,
 	account_name,
 	account_avatar,
-	COUNT(id) AS process_count,
-	COUNT(entity_id) OVER() AS total_count
-FROM results
-GROUP BY entity_id
-ORDER BY creation_time DESC, id ASC
+	process_count,
+	total_count
+FROM grouped
+ORDER BY sort_name_empty ASC, sort_key_asc ASC, sort_key_desc DESC, entity_id ASC
 LIMIT sqlc.arg(limit)
 OFFSET sqlc.arg(offset);
 

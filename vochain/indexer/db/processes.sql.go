@@ -310,15 +310,35 @@ WITH results AS (
         ON a.account = p.entity_id
     WHERE (?3 = '' OR (INSTR(LOWER(HEX(p.entity_id)), ?3) > 0))
     AND (?4 = '' OR (INSTR(LOWER(COALESCE(a.name, '')), LOWER(?4)) > 0))
+), grouped AS (
+    SELECT entity_id,
+        account_name,
+        account_avatar,
+        COUNT(id) AS process_count,
+        COUNT(entity_id) OVER() AS total_count,
+        -- organizations whose account resolves no name sort last when sorting
+        -- by name, in either direction
+        CASE WHEN ?5 = 'name' AND account_name = '' THEN 1 END AS sort_name_empty,
+        CASE WHEN ?6 = 'asc' THEN (CASE
+            WHEN ?5 = 'electionCount' THEN COUNT(id)
+            WHEN ?5 = 'name' THEN LOWER(account_name)
+            WHEN ?5 = 'createdAt' THEN MIN(creation_time)
+        END) END AS sort_key_asc,
+        CASE WHEN ?6 = 'desc' THEN (CASE
+            WHEN ?5 = 'electionCount' THEN COUNT(id)
+            WHEN ?5 = 'name' THEN LOWER(account_name)
+            WHEN ?5 = 'createdAt' THEN MIN(creation_time)
+        END) END AS sort_key_desc
+    FROM results
+    GROUP BY entity_id
 )
 SELECT entity_id,
 	account_name,
 	account_avatar,
-	COUNT(id) AS process_count,
-	COUNT(entity_id) OVER() AS total_count
-FROM results
-GROUP BY entity_id
-ORDER BY creation_time DESC, id ASC
+	process_count,
+	total_count
+FROM grouped
+ORDER BY sort_name_empty ASC, sort_key_asc ASC, sort_key_desc DESC, entity_id ASC
 LIMIT ?2
 OFFSET ?1
 `
@@ -328,6 +348,8 @@ type SearchEntitiesParams struct {
 	Limit          int64
 	EntityIDSubstr interface{}
 	NameSubstr     interface{}
+	SortBy         interface{}
+	SortOrder      interface{}
 }
 
 type SearchEntitiesRow struct {
@@ -343,12 +365,34 @@ type SearchEntitiesRow struct {
 // so a client listing organizations doesn't need one account request per row.
 // The name filter is a case-insensitive substring match; LOWER only folds ASCII
 // in sqlite, so names differing by non-ASCII case or by diacritics do not match.
+//
+// sort_by selects the ordering ('createdAt', 'electionCount' or 'name') and
+// sort_order its direction ('asc' or 'desc'). Both are expected to be one of
+// those exact values; the caller validates them. sqlite cannot parameterize an
+// ORDER BY term and sqlc does not even substitute arguments inside one, so the
+// sort key is computed as a column of the grouped subquery and the outer ORDER
+// BY only picks between the ascending and the descending one, exactly one of
+// which is non-NULL. A term that is NULL on every row compares equal on every
+// row, so it is a no-op.
+//
+// 'createdAt' is MIN(creation_time), the creation time of the *first* election
+// indexed for an organization, i.e. when the organization first appeared in the
+// index. That is what the previous hardcoded `ORDER BY creation_time DESC, id
+// ASC` resolved to in practice: creation_time and id were bare columns of a
+// grouped query, so sqlite took them from an arbitrary row of each group, and
+// with the scan driven by index_processes_entity_id that row was the group's
+// first, i.e. its oldest process.
+//
+// entity_id is always the last tiebreak, so the ordering is total and paging
+// with LIMIT/OFFSET can neither repeat nor skip a row.
 func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) ([]SearchEntitiesRow, error) {
 	rows, err := q.query(ctx, q.searchEntitiesStmt, searchEntities,
 		arg.Offset,
 		arg.Limit,
 		arg.EntityIDSubstr,
 		arg.NameSubstr,
+		arg.SortBy,
+		arg.SortOrder,
 	)
 	if err != nil {
 		return nil, err

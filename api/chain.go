@@ -289,6 +289,8 @@ func (a *API) enableChainHandlers() error {
 //	@Param					limit			query		number	false	"Items per page"
 //	@Param					organizationId	query		string	false	"Filter by partial organizationId"
 //	@Param					name			query		string	false	"Filter by organization name, case-insensitive substring match (ASCII case folding only)"
+//	@Param					sortBy			query		string	false	"Sort by createdAt (when the organization first appeared, default), electionCount or name"	Enums(createdAt, electionCount, name)
+//	@Param					order			query		string	false	"Sort direction. Defaults to desc for createdAt and electionCount, asc for name"			Enums(asc, desc)
 //	@Success				200				{object}	OrganizationsList
 //	@Router					/chain/organizations [get]
 func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -297,6 +299,8 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		ctx.QueryParam(ParamLimit),
 		ctx.QueryParam(ParamOrganizationId),
 		ctx.QueryParam(ParamName),
+		ctx.QueryParam(ParamSortBy),
+		ctx.QueryParam(ParamOrder),
 	)
 	if err != nil {
 		return err
@@ -325,6 +329,8 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 func (a *API) organizationListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := parseOrganizationParams(
 		ctx.URLParam(ParamPage),
+		"",
+		"",
 		"",
 		"",
 		"",
@@ -388,15 +394,26 @@ func (a *API) organizationListByFilterAndPageHandler(msg *apirest.APIdata, ctx *
 	return marshalAndSend(ctx, list)
 }
 
-// organizationList produces a filtered, paginated OrganizationsList.
+// organizationList produces a filtered, sorted, paginated OrganizationsList.
+//
+// The ordering is validated here rather than in parseOrganizationParams so that
+// the deprecated POST filter endpoint, which unmarshals its OrganizationParams
+// straight from the request body, is covered as well.
 //
 // Errors returned are always of type APIerror.
 func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, error) {
+	sortBy, order, err := parseOrganizationSort(params.SortBy, params.Order)
+	if err != nil {
+		return nil, err
+	}
+
 	orgs, total, err := a.indexer.EntityList(
 		params.Limit,
 		params.Page*params.Limit,
 		params.OrganizationID,
 		params.Name,
+		sortBy,
+		order,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -1628,8 +1645,14 @@ func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// parseOrganizationParams returns an OrganizationParams filled with the passed params
-func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramName string) (*OrganizationParams, error) {
+// parseOrganizationParams returns an OrganizationParams filled with the passed params.
+//
+// paramSortBy and paramOrder are carried through as given; organizationList
+// validates and defaults them, so that the endpoints taking an OrganizationParams
+// from a JSON body are covered by the same check.
+func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramName,
+	paramSortBy, paramOrder string,
+) (*OrganizationParams, error) {
 	pagination, err := parsePaginationParams(paramPage, paramLimit)
 	if err != nil {
 		return nil, err
@@ -1639,6 +1662,8 @@ func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramNa
 		PaginationParams: pagination,
 		OrganizationID:   util.TrimHex(paramOrganizationID),
 		Name:             paramName,
+		SortBy:           paramSortBy,
+		Order:            paramOrder,
 	}, nil
 }
 
