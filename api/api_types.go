@@ -35,11 +35,13 @@ type ElectionParams struct {
 	EndDateBefore   *time.Time `json:"endDateBefore,omitempty"`
 }
 
-// OrganizationParams allows the client to filter organizations
+// OrganizationParams allows the client to filter and sort organizations
 type OrganizationParams struct {
 	PaginationParams
 	OrganizationID string `json:"organizationId,omitempty"`
 	Name           string `json:"name,omitempty"`
+	SortBy         string `json:"sortBy,omitempty"`
+	Order          string `json:"order,omitempty"`
 }
 
 // AccountParams allows the client to filter accounts

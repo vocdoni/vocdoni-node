@@ -325,6 +325,23 @@ func parseBucket(s string) (string, error) {
 	}
 }
 
+// parseOrganizationSort validates an organization list ordering, given as the
+// sortBy and order query params, and fills in the defaults for the empty
+// strings: ordering by createdAt, and the natural direction of the resulting
+// ordering (descending for createdAt and electionCount, ascending for name).
+//
+// If either string doesn't map to a value, returns an APIerror.
+func parseOrganizationSort(sortBy, order string) (string, string, error) {
+	normalizedSortBy, normalizedOrder, err := indexer.NormalizeEntitySort(sortBy, order)
+	if err != nil {
+		if errors.Is(err, indexer.ErrInvalidSortOrder) {
+			return "", "", ErrParamOrderInvalid.With(order)
+		}
+		return "", "", ErrParamSortByInvalid.With(sortBy)
+	}
+	return normalizedSortBy, normalizedOrder, nil
+}
+
 // bucketDuration returns the time span covered by a single bucket of the given
 // granularity, which must be one returned by parseBucket.
 func bucketDuration(bucket string) time.Duration {

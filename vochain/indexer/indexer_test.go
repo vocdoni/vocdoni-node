@@ -164,7 +164,7 @@ func testEntityList(t *testing.T, entityCount int) {
 	entitiesByID := make(map[string]bool)
 	last := 0
 	for len(entitiesByID) <= entityCount {
-		list, _, err := idx.EntityList(10, last, "", "")
+		list, _, err := idx.EntityList(10, last, "", "", "", "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) < 1 {
 			t.Log("list is empty")
@@ -186,6 +186,173 @@ func testEntityList(t *testing.T, entityCount int) {
 	if len(entitiesByID) < entityCount {
 		t.Fatalf("expected %d entities, got %d", entityCount, len(entitiesByID))
 	}
+
+	// Paging an ordering where almost every entity ties (all but one have a
+	// single election) must still visit each entity exactly once, which is only
+	// true because entity_id is the last tiebreak.
+	byElectionCount := make(map[string]bool)
+	for offset := 0; ; offset += 10 {
+		list, total, err := idx.EntityList(10, offset, "", "", EntitySortByElectionCount, SortOrderDesc)
+		qt.Assert(t, err, qt.IsNil)
+		if len(list) == 0 {
+			break
+		}
+		qt.Assert(t, total, qt.Equals, uint64(entityCount))
+		for _, e := range list {
+			if byElectionCount[string(e.EntityID)] {
+				t.Fatalf("found duplicated entity: %x", e.EntityID)
+			}
+			byElectionCount[string(e.EntityID)] = true
+		}
+	}
+	qt.Assert(t, byElectionCount, qt.HasLen, entityCount)
+	// the only entity with two elections must come first
+	first, _, err := idx.EntityList(1, 0, "", "", EntitySortByElectionCount, SortOrderDesc)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, first, qt.HasLen, 1)
+	qt.Assert(t, hex.EncodeToString(first[0].EntityID), qt.Equals, hex.EncodeToString(twoProcessesEntity))
+	qt.Assert(t, first[0].ProcessCount, qt.Equals, int64(2))
+}
+
+func TestEntityListSorting(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	// Fixed entity ids, so the entity_id tiebreak is predictable: eA < eB < eC < eD.
+	eA := bytes.Repeat([]byte{0xaa}, 20)
+	eB := bytes.Repeat([]byte{0xbb}, 20)
+	eC := bytes.Repeat([]byte{0xcc}, 20)
+	eD := bytes.Repeat([]byte{0xdd}, 20)
+
+	addElection := func(eid []byte) {
+		err := app.State.AddProcess(&models.Process{
+			ProcessId:     util.RandomBytes(32),
+			EntityId:      eid,
+			EnvelopeType:  &models.EnvelopeType{},
+			Status:        models.ProcessStatus_READY,
+			Mode:          &models.ProcessMode{AutoStart: true},
+			BlockCount:    100,
+			MaxCensusSize: 10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		idx.OnSetAccount(eid, &state.Account{})
+	}
+
+	// Each block is one second later than the previous one, and a process is
+	// indexed with the timestamp of the block before the one committing it, so
+	// two blocks per entity give every entity a distinct creation time: eA is
+	// the oldest, eD the newest.
+	advance := func() {
+		app.AdvanceTestBlock()
+		app.AdvanceTestBlock()
+	}
+	for _, eid := range [][]byte{eA, eB, eC, eD} {
+		addElection(eid)
+		advance()
+	}
+	// Later elections for eB and eC, in a block newer than every entity's first
+	// one. They change each entity's *last* election but not its first, so an
+	// ordering by MAX(creation_time) rather than MIN would come out different.
+	addElection(eB)
+	addElection(eB)
+	addElection(eC)
+	advance()
+
+	// Names chosen so that a case-sensitive (binary) collation would order them
+	// "Bravo" < "alpha" < "charlie"; eC deliberately resolves no name.
+	qt.Assert(t, idx.SetAccountMetadata(eA, "charlie", ""), qt.IsNil)
+	qt.Assert(t, idx.SetAccountMetadata(eB, "alpha", ""), qt.IsNil)
+	qt.Assert(t, idx.SetAccountMetadata(eD, "Bravo", ""), qt.IsNil)
+
+	names := map[string]string{
+		string(eA): "eA(charlie, 1 election, oldest)",
+		string(eB): "eB(alpha, 3 elections)",
+		string(eC): "eC(unnamed, 2 elections)",
+		string(eD): "eD(Bravo, 1 election, newest)",
+	}
+	describe := func(list []indexertypes.Entity) []string {
+		out := []string{}
+		for _, e := range list {
+			out = append(out, names[string(e.EntityID)])
+		}
+		return out
+	}
+	want := func(eids ...[]byte) []string {
+		out := []string{}
+		for _, eid := range eids {
+			out = append(out, names[string(eid)])
+		}
+		return out
+	}
+
+	for _, tc := range []struct {
+		sortBy, order string
+		want          []string
+	}{
+		// createdAt is the creation time of the entity's *first* election
+		{EntitySortByCreatedAt, SortOrderDesc, want(eD, eC, eB, eA)},
+		{EntitySortByCreatedAt, SortOrderAsc, want(eA, eB, eC, eD)},
+		// eA and eD both have one election, so they fall back to entity_id ASC
+		{EntitySortByElectionCount, SortOrderDesc, want(eB, eC, eA, eD)},
+		{EntitySortByElectionCount, SortOrderAsc, want(eA, eD, eC, eB)},
+		// the unnamed eC sorts last in both directions
+		{EntitySortByName, SortOrderAsc, want(eB, eD, eA, eC)},
+		{EntitySortByName, SortOrderDesc, want(eA, eD, eB, eC)},
+	} {
+		comment := qt.Commentf("sortBy=%s order=%s", tc.sortBy, tc.order)
+		list, total, err := idx.EntityList(10, 0, "", "", tc.sortBy, tc.order)
+		qt.Assert(t, err, qt.IsNil, comment)
+		qt.Assert(t, total, qt.Equals, uint64(4), comment)
+		qt.Assert(t, describe(list), qt.DeepEquals, tc.want, comment)
+
+		// Paging must not repeat nor skip: every page of size 1 yields exactly
+		// the corresponding element of the unpaged list.
+		paged := []string{}
+		for offset := 0; ; offset++ {
+			page, _, err := idx.EntityList(1, offset, "", "", tc.sortBy, tc.order)
+			qt.Assert(t, err, qt.IsNil, comment)
+			if len(page) == 0 {
+				break
+			}
+			paged = append(paged, describe(page)...)
+		}
+		qt.Assert(t, paged, qt.DeepEquals, tc.want, comment)
+
+		// And so must overlapping page sizes: pages 0 and 1 of size 2 share no
+		// row and together are the whole list.
+		firstPage, _, err := idx.EntityList(2, 0, "", "", tc.sortBy, tc.order)
+		qt.Assert(t, err, qt.IsNil, comment)
+		secondPage, _, err := idx.EntityList(2, 2, "", "", tc.sortBy, tc.order)
+		qt.Assert(t, err, qt.IsNil, comment)
+		qt.Assert(t, append(describe(firstPage), describe(secondPage)...), qt.DeepEquals, tc.want, comment)
+	}
+
+	// The zero values keep the ordering EntityList had before it took a sortBy.
+	defaults, _, err := idx.EntityList(10, 0, "", "", "", "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, describe(defaults), qt.DeepEquals, want(eD, eC, eB, eA))
+	// An empty order picks the natural direction of the sortBy.
+	naturalName, _, err := idx.EntityList(10, 0, "", "", EntitySortByName, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, describe(naturalName), qt.DeepEquals, want(eB, eD, eA, eC))
+	naturalCount, _, err := idx.EntityList(10, 0, "", "", EntitySortByElectionCount, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, describe(naturalCount), qt.DeepEquals, want(eB, eC, eA, eD))
+
+	// Sorting composes with the filters.
+	filtered, total, err := idx.EntityList(10, 0, "", "a", EntitySortByName, SortOrderAsc)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(3)) // eC has no name to match
+	qt.Assert(t, describe(filtered), qt.DeepEquals, want(eB, eD, eA))
+
+	// Unsupported values are rejected rather than silently ignored.
+	_, _, err = idx.EntityList(10, 0, "", "", "electioncount", "")
+	qt.Assert(t, err, qt.ErrorIs, ErrInvalidEntitySortBy)
+	_, _, err = idx.EntityList(10, 0, "", "", "", "sideways")
+	qt.Assert(t, err, qt.ErrorIs, ErrInvalidSortOrder)
+	_, _, err = idx.EntityList(10, 0, "", "", EntitySortByName, "DESC")
+	qt.Assert(t, err, qt.ErrorIs, ErrInvalidSortOrder)
 }
 
 func TestEntitySearch(t *testing.T) {
@@ -259,23 +426,23 @@ func TestEntitySearch(t *testing.T) {
 	}
 	app.AdvanceTestBlock()
 	// Exact entity search
-	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e", "")
+	list, _, err := idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526e", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 1)
 	// Search for nonexistent entity
-	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f", "")
+	list, _, err = idx.EntityList(10, 0, "4011d50537fa164b6fef261141797bbe4014526f", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 0)
 	// Search containing part of all manually-defined entities
-	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e", "")
+	list, _, err = idx.EntityList(10, 0, "011d50537fa164b6fef261141797bbe4014526e", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as mixed case hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452", "")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6Fef261141797BbE401452", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 	// Partial entity search as uppercase hex
-	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452", "")
+	list, _, err = idx.EntityList(10, 0, "50537FA164B6FEF261141797BBE401452", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(entityIds))
 }
@@ -360,7 +527,7 @@ func testProcessList(t *testing.T, procsCount int) {
 
 	qt.Assert(t, idx.CountTotalProcesses(), qt.Equals, uint64(10+procsCount))
 	countEntityProcs := func(eid []byte) int64 {
-		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid), "")
+		list, _, err := idx.EntityList(1, 0, fmt.Sprintf("%x", eid), "", "", "")
 		qt.Assert(t, err, qt.IsNil)
 		if len(list) == 0 {
 			return -1
@@ -1907,7 +2074,7 @@ func TestEntityMetadata(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// with no metadata resolved yet, the rows carry no name
-	list, total, err := idx.EntityList(10, 0, "", "")
+	list, total, err := idx.EntityList(10, 0, "", "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, total, qt.Equals, uint64(2))
 	for _, e := range list {
@@ -1917,7 +2084,7 @@ func TestEntityMetadata(t *testing.T) {
 
 	// resolving the metadata of one of them embeds it in its list row
 	qt.Assert(t, idx.SetAccountMetadata(entities[0], "Bank of Åland", "ipfs://avatar"), qt.IsNil)
-	list, _, err = idx.EntityList(10, 0, hex.EncodeToString(entities[0]), "")
+	list, _, err = idx.EntityList(10, 0, hex.EncodeToString(entities[0]), "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 1)
 	qt.Assert(t, list[0].Name, qt.Equals, "Bank of Åland")
@@ -1925,13 +2092,13 @@ func TestEntityMetadata(t *testing.T) {
 
 	// the name filter matches a substring, ignoring ASCII case
 	for _, query := range []string{"Bank", "bank of", "BANK OF ÅLAND"} {
-		list, total, err = idx.EntityList(10, 0, "", query)
+		list, total, err = idx.EntityList(10, 0, "", query, "", "")
 		qt.Assert(t, err, qt.IsNil, qt.Commentf("query %q", query))
 		qt.Assert(t, total, qt.Equals, uint64(1), qt.Commentf("query %q", query))
 		qt.Assert(t, hex.EncodeToString(list[0].EntityID), qt.Equals, hex.EncodeToString(entities[0]))
 	}
 	// and it excludes the organizations with no name resolved
-	_, total, err = idx.EntityList(10, 0, "", "nonesuch")
+	_, total, err = idx.EntityList(10, 0, "", "nonesuch", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, total, qt.Equals, uint64(0))
 
