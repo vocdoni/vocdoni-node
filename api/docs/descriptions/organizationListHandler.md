@@ -23,4 +23,8 @@ with the `organizationId` and `name` filters and with `page`/`limit`, so a
 ranking such as the top five organizations by election count is a single
 `?sortBy=electionCount&order=desc&limit=5` request.
 
-Omitting `sortBy` keeps the ordering this endpoint had before it took one.
+Omitting `sortBy` orders by `createdAt` descending, as before. Creation times
+have a one second granularity, so organizations whose first election landed in
+the same block share one: their relative order is now their organization id and
+may differ from previous releases, where it was neither documented nor
+deterministic.

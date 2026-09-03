@@ -131,4 +131,40 @@ func TestOrganizationListSorting(t *testing.T) {
 	legacy := &OrganizationsList{}
 	c.Assert(json.Unmarshal(resp, legacy), qt.IsNil)
 	c.Assert(legacy.Organizations, qt.HasLen, 3)
+
+	// The deprecated POST filter endpoint takes its OrganizationParams straight
+	// from the request body, so it reaches the ordering without going through
+	// parseOrganizationParams. It must sort, and reject, just the same.
+	postList := func(body *OrganizationParams) []string {
+		resp, code := cl.Request("POST", body, "organizations", "filter", "page", "0")
+		c.Assert(code, qt.Equals, apirest.HTTPstatusOK, qt.Commentf("body %+v: %s", body, resp))
+		result := &OrganizationsList{}
+		c.Assert(json.Unmarshal(resp, result), qt.IsNil)
+		byID := map[string]string{}
+		for name, eid := range orgs {
+			byID[hex.EncodeToString(eid)] = name
+		}
+		names := []string{}
+		for _, org := range result.Organizations {
+			names = append(names, byID[org.OrganizationID.String()])
+		}
+		return names
+	}
+	c.Assert(postList(&OrganizationParams{SortBy: "electionCount", Order: "desc"}),
+		qt.DeepEquals, []string{"abacus", "zenith", "quorum"})
+	c.Assert(postList(&OrganizationParams{}), qt.DeepEquals, []string{"zenith", "abacus", "quorum"})
+
+	for _, tc := range []struct {
+		body    *OrganizationParams
+		wantErr apirest.APIerror
+	}{
+		{&OrganizationParams{SortBy: "votes"}, ErrParamSortByInvalid},
+		{&OrganizationParams{Order: "sideways"}, ErrParamOrderInvalid},
+	} {
+		resp, code := cl.Request("POST", tc.body, "organizations", "filter", "page", "0")
+		c.Assert(code, qt.Equals, tc.wantErr.HTTPstatus, qt.Commentf("body %+v: %s", tc.body, resp))
+		apiErr := &apirest.APIerror{}
+		c.Assert(json.Unmarshal(resp, apiErr), qt.IsNil)
+		c.Assert(apiErr.Code, qt.Equals, tc.wantErr.Code, qt.Commentf("body %+v: %s", tc.body, resp))
+	}
 }
