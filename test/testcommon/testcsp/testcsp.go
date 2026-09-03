@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"math/big"
 
-	blind "github.com/arnaucube/go-blindsecp256k1"
 	ethcrypto "github.com/ethereum/go-ethereum/crypto"
+	blind "github.com/vocdoni/go-blindsecp256k1"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
 	"go.vocdoni.io/dvote/types"
@@ -182,7 +182,7 @@ func blindSign(sk *blind.PrivateKey, msg []byte) (*blind.Signature, error) {
 		if err != nil {
 			continue
 		}
-		return blind.Unblind(sBlind, userSecret), nil
+		return blind.Unblind(sBlind, userSecret)
 	}
 	return nil, fmt.Errorf("blind signature failed after %d attempts", blindSignAttempts)
 }
