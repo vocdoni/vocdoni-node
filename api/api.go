@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/data"
@@ -116,6 +117,11 @@ type API struct {
 	db       db.Database // used for internal db operations
 
 	censusPublishStatusMap sync.Map // used to store the status of the census publishing process when async
+
+	// chainStatsMu guards the short-lived cache for chainStatsHandler.
+	chainStatsMu    sync.Mutex
+	chainStatsCache *ChainStats
+	chainStatsAt    time.Time
 }
 
 // NewAPI creates a new instance of the API.  Attach must be called next.

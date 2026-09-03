@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -28,6 +30,11 @@ import (
 
 // maxTransactionBatchSize bounds how many transactions POST /chain/transactions/batch accepts.
 const maxTransactionBatchSize = 100
+
+// MaxOrganizationNameFilterLen bounds the ?name= substring filter accepted by
+// /chain/organizations, in runes (characters), before it reaches the
+// SearchEntities query.
+const MaxOrganizationNameFilterLen = 100
 
 const (
 	ChainHandler = "chain"
@@ -450,30 +457,54 @@ func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPC
 //	@Success		200	{object}	ChainStats
 //	@Router			/chain/stats [get]
 func (a *API) chainStatsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	stats, err := a.chainStats()
+	if err != nil {
+		return err
+	}
+	return marshalAndSend(ctx, stats)
+}
+
+// chainStatsCacheTTL bounds how stale /chain/stats may be. The underlying
+// counters are recomputed with several full-table queries, so caching them
+// avoids repeating that work for every request between two blocks.
+const chainStatsCacheTTL = 10 * time.Second
+
+// chainStats returns the chain-wide counters, reusing a cached response when
+// it is younger than chainStatsCacheTTL.
+func (a *API) chainStats() (*ChainStats, error) {
+	a.chainStatsMu.Lock()
+	defer a.chainStatsMu.Unlock()
+	if a.chainStatsCache != nil && time.Since(a.chainStatsAt) < chainStatsCacheTTL {
+		return a.chainStatsCache, nil
+	}
+
 	txCountByType, err := a.indexer.CountTransactionsByType()
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 	electionCountByStatus, err := a.indexer.CountProcessesByStatus()
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 	accountCount, err := a.indexer.CountTotalAccounts()
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 	voteCount, err := a.indexer.CountTotalVotes()
 	if err != nil {
-		return ErrIndexerQueryFailed.WithErr(err)
+		return nil, ErrIndexerQueryFailed.WithErr(err)
 	}
 
-	return marshalAndSend(ctx, &ChainStats{
+	stats := &ChainStats{
 		TxCountByType:         txCountByType,
 		ElectionCountByStatus: electionCountByStatus,
 		AccountCount:          accountCount,
 		ElectionCount:         a.indexer.CountTotalProcesses(),
 		VoteCount:             voteCount,
-	})
+	}
+	a.chainStatsCache = stats
+	a.chainStatsAt = time.Now()
+	return stats, nil
 }
 
 // chainInfoHandler
@@ -1634,12 +1665,29 @@ func parseOrganizationParams(paramPage, paramLimit, paramOrganizationID, paramNa
 	if err != nil {
 		return nil, err
 	}
+	if err := validateOrganizationNameFilter(paramName); err != nil {
+		return nil, err
+	}
 
 	return &OrganizationParams{
 		PaginationParams: pagination,
 		OrganizationID:   util.TrimHex(paramOrganizationID),
 		Name:             paramName,
 	}, nil
+}
+
+// validateOrganizationNameFilter rejects a ?name= filter before it reaches
+// SearchEntities: too many runes, or containing non-printable characters.
+func validateOrganizationNameFilter(name string) error {
+	if utf8.RuneCountInString(name) > MaxOrganizationNameFilterLen {
+		return ErrParamNameInvalid
+	}
+	for _, r := range name {
+		if !unicode.IsPrint(r) {
+			return ErrParamNameInvalid
+		}
+	}
+	return nil
 }
 
 // parseFeesParams returns an FeesParams filled with the passed params
