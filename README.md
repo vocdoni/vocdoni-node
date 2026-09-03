@@ -1,5 +1,9 @@
 <p align="center" width="100%">
-    <img src="https://developer.vocdoni.io/img/vocdoni_logotype_full_white.svg" />
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://app-dev.vocdoni.io/assets/logo-classic-white.svg" />
+      <source media="(prefers-color-scheme: light)" srcset="https://app-dev.vocdoni.io/assets/logo-classic.svg" />
+      <img alt="Vocdoni logo" src="https://app-dev.vocdoni.io/assets/logo-classic.svg" />
+  </picture>
 </p>
 
 <p align="center" width="100%">
@@ -9,17 +13,16 @@
     <a href="https://godoc.org/go.vocdoni.io/dvote"><img src="https://godoc.org/go.vocdoni.io/dvote?status.svg"></a>
     <a href="https://goreportcard.com/report/go.vocdoni.io/dvote"><img src="https://goreportcard.com/badge/go.vocdoni.io/dvote"></a>
     <a href="https://coveralls.io/github/vocdoni/vocdoni-node"><img src="https://coveralls.io/repos/github/vocdoni/vocdoni-node/badge.svg"></a>
-    <a href="https://discord.gg/xFTh8Np2ga"><img src="https://img.shields.io/badge/discord-join%20chat-blue.svg" /></a>
+    <a href="https://chat.vocdoni.io"><img src="https://img.shields.io/badge/discord-join%20chat-blue.svg" /></a>
     <a href="https://twitter.com/vocdoni"><img src="https://img.shields.io/twitter/follow/vocdoni.svg?style=social&label=Follow" /></a>
 </p>
-
 
   <div align="center">
     Vocdoni is the first universally verifiable, censorship-resistant, anonymous, and self-sovereign governance protocol. <br />
     Our main aim is a trustless voting system where anyone can speak their voice and where everything is auditable. <br />
     We are engineering building blocks for a permissionless, private and censorship resistant democracy.
     <br />
-    <a href="https://developer.vocdoni.io/"><strong>Explore the developer portal »</strong></a>
+    <a href="https://vocdoni.io/developers"><strong>Explore the developer portal »</strong></a>
     <br />
     <h3>More About Us</h3>
     <a href="https://vocdoni.io">Vocdoni Website</a>
@@ -30,18 +33,14 @@
     |
     <a href="https://law.mit.edu/pub/remotevotingintheageofcryptography/release/1">MIT Law Publication</a>
     |
-    <a href="https://chat.vocdoni.io">Contact Us</a>
+    <a href="https://vocdoni.io/contact">Contact Us</a>
     <br />
     <h3>Key Repositories</h3>
+    <a href="https://github.com/vocdoni/vocdoni-app">Vocdoni App</a>
+    |
     <a href="https://github.com/vocdoni/vocdoni-node">Vocdoni Node</a>
     |
-    <a href="https://github.com/vocdoni/vocdoni-sdk/">Vocdoni SDK</a>
-    |
-    <a href="https://github.com/vocdoni/ui-components">UI Components</a>
-    |
-    <a href="https://github.com/vocdoni/ui-scaffold">Application UI</a>
-    |
-    <a href="https://github.com/vocdoni/census3">Census3</a>
+    <a href="https://github.com/vocdoni/vocdoni-integrator-sdk">Vocdoni Integrator SDK</a>
   </div>
 
 # vocdoni-node
