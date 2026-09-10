@@ -6,105 +6,142 @@ import (
 )
 
 /*
-This mechanism is responsible for the management and updating of validator power based on their voting and proposing performance over time.
-It operates by evaluating the performance of validators in terms of votes on proposals they have accrued.
+This mechanism manages validator power based on how often each validator participates in block
+production over a fixed rolling window of `updatePowerPeriod` blocks.
 
-As a general idea, when a validator does not participate on the block production, their power will decay over time.
-On the other hand, if a validator participates in the block production, their power will increase over time until it reaches the maximum power.
-When a new validator joins the validator set, it starts with the minimum power (currently 5).
+As a general idea, when a validator does not participate in block production, its power decays over
+time. When a validator does participate, its power increases until it reaches the maximum. When a new
+validator joins the set, it starts with `newValidatorPower`.
 
-The mechanism is based on the following parameters:
+Parameters:
 
-1. `maxPower`: This represents the maximum power that any validator can achieve. Currently set to 100.
+ 1. `maxPower`: maximum power any validator can achieve.
+ 2. `minPower`: floor at which a validator with a persistently negative signal is pinned before eviction.
+    A validator kept at this floor still signs blocks but contributes only `minPower/maxPower` (≈0.1%) to
+    consensus weight; effectively a "shadow" seat.
+ 3. `updatePowerPeriod`: frequency (in blocks) at which power and score are recomputed. Also the length
+    of the rolling window used to compute the score.
+ 4. `positiveScoreThreshold`: score at or above which a validator's power increases.
+ 5. `powerIncrement`: amount added per period on a positive score signal.
+ 6. `powerDecayRate`: exponential decay per period on a negative signal.
+ 7. `inactiveGraceBlocks`: distance a validator must remain at the floor before being removed from the
+    set. Re-adding a validator is a manual, coordinated operation; a several-day tolerance is cheap and
+    preferred over premature eviction.
 
-2. `updatePowerPeriod`: The frequency with which the validator power and score updates are made.
-    Power adjustments for each validator are carried out once every 10 blocks.
+Workflow (only at heights that are a multiple of `updatePowerPeriod`):
 
-3. `positiveScoreThreshold`: Validators need to maintain a score equal to or above this threshold for their power to increase.
-    The threshold is currently set at 80.
+  - The score is `Votes / (currentHeight - Height) * 100`, i.e. the percentage of blocks the validator
+    attended during the just-closed window. After scoring, `Votes` is reset to 0 and `Height` is set
+    to the current height, so the next window starts fresh. This keeps the score fully reactive to
+    recent behaviour and prevents a long-lived validator's lifetime average from masking a fresh
+    outage.
+  - If the score is above or equal to `positiveScoreThreshold` or has improved, the power is incremented
+    by `powerIncrement`, capped at `maxPower`.
+  - If the score dropped or is zero, the power decays at `powerDecayRate`, floored at `minPower`.
+  - The inactive-since marker is set to the current height the first period the validator reaches the
+    floor, and cleared the first period it climbs back above.
+  - A validator whose marker is at least `inactiveGraceBlocks` behind the current height is removed
+    from the set, unless doing so would leave fewer than three validators.
 
-4. `powerDecayRate`: If a validator underperforms, i.e., if their new score is lower than their previous score or if it's zero,
-    their power will decay at this rate. The current rate is set to 5%.
+Simulations (12s block time):
 
-Workflow:
-
-- Every `updatePowerPeriod` blocks, the mechanism calculates a new score for each validator based on their voting performance.
-- If a validator's score is above or equal to the `positiveScoreThreshold` or if it has improved, their power is incremented by 1, until the `maxPower` is reached.
-- If a validator's score drops or is zero, their power is subjected to decay at the rate of `powerDecayRate`.
-- Finally, if a validator's power becomes zero (and there are more than 3 validators), they are removed from the validator set. Otherwise, their updated state is stored back.
-
-
-Simulations:
-
-- Scenario A: Validator stops working after 100,000 blocks:
-
-With 5% exponential decay and considering an update every 10 blocks:
-Approximately 1,320 blocks (or 132 adjustment periods) to decrease power from 100 to 0.
-
-- Scenario B: A new validator starts working after 100,000 blocks:
-
-The validator would take approximately 20,000 blocks (or 2,000 adjustment periods) to reach the maximum power of 100,
-assuming they maintain an ideal score throughout.
+  - Silent validator (regardless of prior lifetime): score drops to 0 the first period after silence
+    begins, and every subsequent period; power halves-and-a-bit per period until it reaches `minPower`
+    in ~66 periods ≈ 660 blocks ≈ 2h 12min.
+  - Once at the floor, the validator stays in the set for `inactiveGraceBlocks` before being evicted,
+    about 21 days at the current parameters.
+  - A recovering validator reaches `maxPower` from `newValidatorPower` in ~100 periods ≈ 1000 blocks ≈ 3h 20min.
 */
 
 const (
-	maxPower               = 100  // maximum power of a validator
+	maxPower               = 1000 // maximum power of a validator
+	minPower               = 1    // minimum power floor for a validator inside the grace period
 	updatePowerPeriod      = 10   // number of blocks to wait before updating validators power
 	positiveScoreThreshold = 80   // if this minimum score is kept, the validator power will be increased
-	powerDecayRate         = 0.05 // 5% decay rate
+	powerIncrement         = 10   // amount added per period on a positive score signal (1% of maxPower)
+	powerDecayRate         = 0.10 // 10% decay rate per period on a negative score signal
 )
 
+// inactiveGraceBlocks is the block distance a validator must remain at
+// minPower before being removed from the set (~21d at 12s/block). Exposed as
+// a var so tests can shorten it; production code never mutates it.
+var inactiveGraceBlocks uint32 = 150_000
+
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
-	// get the validators
 	validators, err := c.state.Validators(true)
 	if err != nil {
 		return fmt.Errorf("cannot update validator score: %w", err)
 	}
-	// get the validator score
+	// Attribute this block's votes and proposer.
 	for _, voteAddr := range voteAddresses {
-		validator := ""
 		for k, v := range validators {
 			if bytes.Equal(voteAddr, v.ValidatorAddress) {
-				validator = k
+				validators[k].Votes++
+				if bytes.Equal(proposer, v.ValidatorAddress) {
+					validators[k].Proposals++
+				}
 				break
 			}
 		}
-		if validator != "" {
-			validators[validator].Votes++
-			if bytes.Equal(proposer, validators[validator].ValidatorAddress) {
-				validators[validator].Proposals++
-			}
-		}
 	}
-	// compute the new power and score
-	for idx := range validators {
-		if c.state.CurrentHeight()%updatePowerPeriod == 0 {
-			newScore := uint32(float64(validators[idx].Votes) /
-				float64(c.state.CurrentHeight()-uint32(validators[idx].Height)) * 100)
-			if newScore > validators[idx].Score ||
-				(newScore >= positiveScoreThreshold && validators[idx].Score == newScore) {
-				if validators[idx].Power < maxPower {
-					validators[idx].Power++
+
+	height := c.state.CurrentHeight()
+	updatePeriod := height%updatePowerPeriod == 0
+
+	for idx, v := range validators {
+		if updatePeriod {
+			// Score is the participation rate over the just-closed window.
+			// `Height` and `Votes` are reset at the end of this branch so the
+			// denominator here is always `updatePowerPeriod` after the first
+			// period, and equals the actual gap during any partial first
+			// window (e.g. a validator joined mid-period).
+			gap := height - uint32(v.Height)
+			if gap == 0 {
+				gap = updatePowerPeriod
+			}
+			newScore := uint32(float64(v.Votes) / float64(gap) * 100)
+			switch {
+			case newScore > v.Score ||
+				(newScore >= positiveScoreThreshold && v.Score == newScore):
+				v.Power = min(v.Power+powerIncrement, maxPower)
+			case newScore < v.Score || newScore == 0:
+				v.Power = max(uint64(float64(v.Power)*(1-powerDecayRate)), minPower)
+			}
+			v.Score = newScore
+			// Reset the window so the next score reflects only the next
+			// updatePowerPeriod blocks. Proposals is left cumulative on purpose
+			// (metric-only, not consensus-critical).
+			v.Height = uint64(height)
+			v.Votes = 0
+
+			since, marked, err := c.state.ValidatorInactiveSince(v.Address, true)
+			if err != nil {
+				return fmt.Errorf("cannot read validator inactive-since: %w", err)
+			}
+			switch {
+			case v.Power <= minPower && !marked:
+				if err := c.state.SetValidatorInactiveSince(v.Address, height); err != nil {
+					return fmt.Errorf("cannot set validator inactive-since: %w", err)
 				}
-			}
-			if newScore < validators[idx].Score || newScore == 0 {
-				validators[idx].Power = uint64(float64(validators[idx].Power) * (1 - powerDecayRate))
-			}
-			validators[idx].Score = newScore
-		}
-		// update or remove the validator
-		if validators[idx].Power <= 0 {
-			if len(validators) <= 3 {
-				// cannot remove the last 3 validators
-				validators[idx].Power = 1
-			} else {
-				if err := c.state.RemoveValidator(validators[idx]); err != nil {
-					return fmt.Errorf("cannot remove validator: %w", err)
+			case v.Power > minPower && marked:
+				if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
+					return fmt.Errorf("cannot clear validator inactive-since: %w", err)
 				}
-				continue
+			case v.Power <= minPower && marked && height-since >= inactiveGraceBlocks:
+				if len(validators) > 3 {
+					if err := c.state.RemoveValidator(v); err != nil {
+						return fmt.Errorf("cannot remove validator: %w", err)
+					}
+					if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
+						return fmt.Errorf("cannot clear validator inactive-since: %w", err)
+					}
+					delete(validators, idx)
+					continue
+				}
+				// Never leave the set below three validators, even past the grace period.
 			}
 		}
-		if err := c.state.AddValidator(validators[idx]); err != nil {
+		if err := c.state.AddValidator(v); err != nil {
 			return fmt.Errorf("cannot update validator score: %w", err)
 		}
 	}
