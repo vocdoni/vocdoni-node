@@ -14,6 +14,9 @@ import (
 // StateDB Tree hierarchy
 // - Main
 //   - Extra (key: string, value: []byte)
+//     - "vldIS/"||address (25B): 4-byte big-endian uint32 block height at which the validator with the
+//        given signing address first reached the minimum consensus power floor. Consumed by the IST
+//        to delay expulsion by a grace period. Absent / empty means the validator is not at the floor.
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
 //   - SIK: (key: address, value: []byte)
