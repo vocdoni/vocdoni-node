@@ -32,9 +32,8 @@ const (
 	CensusTypeCSP        = "csp"
 	// CensusTypeCSPv2 is CensusTypeCSP with the fixed salt derivation for the
 	// salted proof types (census origin OFF_CHAIN_CA_V2).
-	CensusTypeCSPv2     = "csp2"
-	CensusTypeFarcaster = "farcaster"
-	CensusTypeUnknown   = "unknown"
+	CensusTypeCSPv2   = "csp2"
+	CensusTypeUnknown = "unknown"
 
 	MaxCensusAddBatchSize = 8192
 
