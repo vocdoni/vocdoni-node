@@ -34,8 +34,4 @@ var CensusOrigins = map[models.CensusOrigin]CensusProperties{
 		Name: "ca_v2", WeightedSupport: true,
 		NeedsURI: true, AllowCensusUpdate: true,
 	},
-	models.CensusOrigin_FARCASTER_FRAME: {
-		Name: "farcaster", NeedsDownload: true,
-		NeedsURI: true, AllowCensusUpdate: true, WeightedSupport: true,
-	},
 }
