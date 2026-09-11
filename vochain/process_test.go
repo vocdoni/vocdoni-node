@@ -298,7 +298,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI2,
-		CensusOrigin:  models.CensusOrigin_ERC20,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
 		BlockCount:    1024,
 		MaxCensusSize: 100,
 	}
