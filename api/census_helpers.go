@@ -23,7 +23,10 @@ func decodeCensusType(t string) models.Census_Type {
 }
 
 // encodeCensusType returns the string version of the given models.Census_Type, by
-// default CensusTypeUnknown.
+// default CensusTypeUnknown. Note: after the Farcaster removal (#1458), historical
+// elections carrying a retired census origin serialise as CensusTypeUnknown, and
+// api/elections.go's models.CensusOrigin_name[proc.CensusOrigin] lookup returns
+// "" for enum integers that no longer exist in dvote-protobuf v1.16+.
 func encodeCensusType(t models.Census_Type) string {
 	switch t {
 	case models.Census_ARBO_POSEIDON:
@@ -32,8 +35,6 @@ func encodeCensusType(t models.Census_Type) string {
 		return CensusTypeWeighted
 	case models.Census_CA:
 		return CensusTypeCSP
-	case models.Census_FARCASTER_FRAME:
-		return CensusTypeFarcaster
 	}
 
 	return CensusTypeUnknown
