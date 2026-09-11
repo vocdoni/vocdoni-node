@@ -1,6 +1,7 @@
 package state
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -113,4 +114,64 @@ func (v *State) Validator(address common.Address, committed bool) (*models.Valid
 		return nil, err
 	}
 	return list[hex.EncodeToString(address.Bytes())], nil
+}
+
+// validatorInactiveSinceKey namespaces the TreeExtra entry that records the
+// block height at which a validator first reached the minimum consensus power
+// floor. The prefix is short so the key fits inside TreeExtra's 32-byte cap.
+const validatorInactiveSinceKeyPrefix = "vldIS/"
+
+func validatorInactiveSinceKey(addr []byte) []byte {
+	k := make([]byte, 0, len(validatorInactiveSinceKeyPrefix)+len(addr))
+	k = append(k, validatorInactiveSinceKeyPrefix...)
+	return append(k, addr...)
+}
+
+// SetValidatorInactiveSince records the block height at which the validator
+// with the given signing address first fell to the minimum power floor. The
+// IST uses this marker to enforce a grace period before removing the validator
+// from the set.
+func (v *State) SetValidatorInactiveSince(addr []byte, height uint32) error {
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	var b [4]byte
+	binary.BigEndian.PutUint32(b[:], height)
+	return v.tx.DeepSet(validatorInactiveSinceKey(addr), b[:], StateTreeCfg(TreeExtra))
+}
+
+// ValidatorInactiveSince returns the height recorded by SetValidatorInactiveSince
+// for the given validator address. The second result is false when no marker
+// exists (either because it was never set or because it was cleared).
+func (v *State) ValidatorInactiveSince(addr []byte, committed bool) (uint32, bool, error) {
+	if !committed {
+		v.tx.RLock()
+		defer v.tx.RUnlock()
+	}
+	extra, err := v.mainTreeViewer(committed).SubTree(StateTreeCfg(TreeExtra))
+	if err != nil {
+		return 0, false, err
+	}
+	value, err := extra.Get(validatorInactiveSinceKey(addr))
+	if errors.Is(err, arbo.ErrKeyNotFound) {
+		return 0, false, nil
+	}
+	if err != nil {
+		return 0, false, err
+	}
+	// A cleared marker is written as an empty leaf.
+	if len(value) == 0 {
+		return 0, false, nil
+	}
+	if len(value) != 4 {
+		return 0, false, fmt.Errorf("validator inactive-since: unexpected value length %d", len(value))
+	}
+	return binary.BigEndian.Uint32(value), true, nil
+}
+
+// ClearValidatorInactiveSince removes any inactive-since marker for the given
+// validator address. It is safe to call when no marker is set.
+func (v *State) ClearValidatorInactiveSince(addr []byte) error {
+	v.tx.Lock()
+	defer v.tx.Unlock()
+	return v.tx.DeepSet(validatorInactiveSinceKey(addr), nil, StateTreeCfg(TreeExtra))
 }
