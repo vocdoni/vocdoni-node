@@ -26,7 +26,6 @@ import (
 
 // NewVochain starts a node with an ABCI application
 func NewVochain(vochaincfg *config.VochainCfg) *BaseApplication {
-	migrateLegacyDirs(vochaincfg.DataDir)
 	// creating new vochain app
 	app, err := NewBaseApplication(vochaincfg)
 	if err != nil {
@@ -322,42 +321,4 @@ func newTendermint(app *BaseApplication, localConfig *config.VochainCfg) (*comet
 		return nil, fmt.Errorf("failed to create new Tendermint node: %w", err)
 	}
 	return node, nil
-}
-
-// migrateLegacyDirs handles the legacy paths used before commit "refactor genesis package"
-// cometbft data is now separated from vcstate and snapshots, so we need to migrate current deployments
-func migrateLegacyDirs(dataDir string) {
-	// first move our dirs out, so they are not mixed with cometbft data
-	// * vochain/data/vcstate -> vochain/vcstate
-	// * vochain/data/snapshots -> vochain/snapshots
-	migrateLegacyPath(StateDataDir, filepath.Join(dataDir, cometconfig.DefaultDataDir), dataDir)
-	migrateLegacyPath(SnapshotsDataDir, filepath.Join(dataDir, cometconfig.DefaultDataDir), dataDir)
-	// then move cometbft dirs into its own subdir
-	// * vochain/config -> vochain/cometbft/config
-	// * vochain/data -> vochain/cometbft/data
-	migrateLegacyPath(cometconfig.DefaultConfigDir, dataDir, filepath.Join(dataDir, config.DefaultCometBFTPath))
-	migrateLegacyPath(cometconfig.DefaultDataDir, dataDir, filepath.Join(dataDir, config.DefaultCometBFTPath))
-}
-
-// migrateLegacyPath moves dir from oldRoot into newRoot,
-// only if it exists on oldRoot and not on newRoot
-func migrateLegacyPath(dir, oldRoot, newRoot string) {
-	oldpath := filepath.Join(oldRoot, dir)
-	newpath := filepath.Join(newRoot, dir)
-	if _, err := os.Stat(oldpath); os.IsNotExist(err) {
-		return
-	}
-	if _, err := os.Stat(newpath); !os.IsNotExist(err) {
-		log.Warnf("found legacy dir %s but also new dir %s, leaving untouched, you need to resolve migration manually", oldpath, newpath)
-		return
-	}
-	if err := os.MkdirAll(newRoot, 0o750); err != nil {
-		log.Errorw(err, fmt.Sprintf("migrating legacy dirs, couldn't create %s", newRoot))
-		return
-	}
-	if err := os.Rename(oldpath, newpath); err != nil {
-		log.Errorw(err, fmt.Sprintf("couldn't migrate legacy dir %s -> %s", oldpath, newpath))
-		return
-	}
-	log.Warnf("migrated legacy dir %s -> %s", oldpath, newpath)
 }
