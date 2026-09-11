@@ -9,19 +9,27 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// makeValidator returns a validator whose signing address and cometbft
-// validator address are both filled with the given seed byte, so tests can
-// address them by a single-letter mnemonic.
+// makeValidator returns a validator whose signing address, cometbft validator
+// address, and pubkey are all derived from the given seed byte, so tests can
+// address them by a single-letter mnemonic. The pubkey is a 33-byte value
+// that matches what CometBFT expects (compressed-secp256k1 shape).
 func makeValidator(seed byte, power uint64, joinHeight uint64) *models.Validator {
 	addr := make([]byte, 20)
 	vaddr := make([]byte, 20)
+	pubkey := make([]byte, 33)
 	for i := range addr {
 		addr[i] = seed
 		vaddr[i] = seed ^ 0x80 // distinct from signing address
 	}
+	// First byte 0x02 is the compressed-point prefix; remainder from seed.
+	pubkey[0] = 0x02
+	for i := 1; i < len(pubkey); i++ {
+		pubkey[i] = seed ^ byte(i)
+	}
 	return &models.Validator{
 		Address:          addr,
 		ValidatorAddress: vaddr,
+		PubKey:           pubkey,
 		Power:            power,
 		Height:           joinHeight,
 	}
@@ -314,4 +322,87 @@ func TestBottomOfBarrelKeepsThree(t *testing.T) {
 	for _, v := range list {
 		qt.Assert(t, v.Power, qt.Equals, uint64(minPower))
 	}
+}
+
+// TestEvictedValidatorEmitsPowerZero is the regression test for the CometBFT
+// zombie-validator bug fixed in this branch. Per the ABCI spec, a validator is
+// only removed from CometBFT's internal ValidatorSet when it appears in
+// ValidatorUpdates with Power=0. A validator that is simply absent from the
+// map is silently kept at its last-known power ("not mentioned" ≠ "removed").
+//
+// Before this fix, RemoveValidator dropped the validator from the state map
+// before validatorUpdate ran, so no Power=0 entry was ever emitted for the
+// removed validator. With PR#1454's minPower=1, the validator's last-known
+// power was 1, not 0, so CometBFT kept it in its ValidatorSet indefinitely.
+//
+// The fix: updateValidatorScore appends the evicted validator's pubkey to
+// Controller.removedPubKeys; FinalizeBlock drains it via DrainRemovedPubKeys
+// and passes the list to validatorUpdate, which emits a Power=0 entry for each.
+//
+// This test exercises the full production path:
+//
+//	updateValidatorScore → RemoveValidator → Controller.removedPubKeys
+//	→ DrainRemovedPubKeys → (consumed by validatorUpdate in FinalizeBlock)
+//
+// We verify both invariants that must hold:
+//
+//	(a) the validator is removed from state (not reachable via Validators),
+//	(b) DrainRemovedPubKeys returns the evicted validator's pubkey, which
+//	    validatorUpdate will use to emit the required Power=0 entry.
+func TestEvictedValidatorEmitsPowerZero(t *testing.T) {
+	// Shorten the grace period so the test runs in milliseconds.
+	original := inactiveGraceBlocks
+	inactiveGraceBlocks = 50
+	t.Cleanup(func() { inactiveGraceBlocks = original })
+
+	h := newISTHarness(t)
+
+	// Four validators: A, B, C vote; D is silent from the start.
+	// Four is the minimum for removal to be legal (len > 3 check).
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 100, 0)), qt.IsNil)
+	}
+	h.commit()
+
+	activeVAddrs := [][]byte{}
+	for _, seed := range []byte{'A', 'B', 'C'} {
+		activeVAddrs = append(activeVAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+
+	// Advance period by period until D is evicted. The loop stops on the same
+	// period that removes D, so removedPubKeys is still populated from that
+	// updateValidatorScore run and has not yet been cleared by a subsequent
+	// call. We impose a generous safety cap to avoid infinite loops.
+	const safetyCapPeriods = 10000
+	for i := range safetyCapPeriods {
+		if !h.exists('D') {
+			break
+		}
+		h.advancePeriod(activeVAddrs, activeVAddrs[0])
+		if i == safetyCapPeriods-1 {
+			t.Fatalf("safety cap reached: D was not evicted after %d periods", safetyCapPeriods)
+		}
+	}
+
+	// (a) D must be gone from state.
+	qt.Assert(t, h.exists('D'), qt.IsFalse,
+		qt.Commentf("D should have been removed from state after the grace period"))
+
+	// (b) DrainRemovedPubKeys must contain D's pubkey. This is the exact data
+	// that FinalizeBlock passes to validatorUpdate to emit the Power=0 entry
+	// that tells CometBFT to remove D from its ValidatorSet.
+	//
+	// On the pre-fix code, removedPubKeys was never populated, so this would
+	// return nil (len 0) and the assertion below would fail — confirming the
+	// bug.  With the fix, updateValidatorScore appends the pubkey on eviction.
+	dPubKey := makeValidator('D', 0, 0).PubKey
+	removed := h.istc.DrainRemovedPubKeys()
+	qt.Assert(t, len(removed), qt.Equals, 1,
+		qt.Commentf("exactly one validator was removed; DrainRemovedPubKeys should return one entry"))
+	qt.Assert(t, removed[0], qt.DeepEquals, dPubKey,
+		qt.Commentf("the removed pubkey must be D's so validatorUpdate emits Power=0 for D"))
+
+	// Draining is destructive: a second call returns nothing.
+	qt.Assert(t, h.istc.DrainRemovedPubKeys(), qt.IsNil,
+		qt.Commentf("DrainRemovedPubKeys must clear the buffer on first call"))
 }

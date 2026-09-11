@@ -68,6 +68,11 @@ const (
 var inactiveGraceBlocks uint32 = 180
 
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
+	// Clear any pubkeys buffered by a prior run in this block (handles the
+	// rare FinalizeBlock re-execution path when ProcessProposal's cached
+	// results are invalidated by a hash mismatch).
+	c.removedPubKeys = nil
+
 	validators, err := c.state.Validators(true)
 	if err != nil {
 		return fmt.Errorf("cannot update validator score: %w", err)
@@ -135,6 +140,10 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 					if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
 						return fmt.Errorf("cannot clear validator inactive-since: %w", err)
 					}
+					// Record the pubkey so FinalizeBlock can emit the ABCI
+					// Power=0 ValidatorUpdate required to actually remove this
+					// validator from CometBFT's internal ValidatorSet.
+					c.removedPubKeys = append(c.removedPubKeys, bytes.Clone(v.PubKey))
 					delete(validators, idx)
 					continue
 				}
