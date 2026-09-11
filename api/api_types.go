@@ -531,6 +531,8 @@ func (t TallyMode) MarshalJSON() ([]byte, error) {
 	return m.Marshal(&t)
 }
 
+// CensusTypeToOrigin maps a request-side CensusTypeDescription to the on-chain
+// CensusOrigin the transaction handler expects.
 func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byte, error) {
 	var origin models.CensusOrigin
 	var root []byte
@@ -543,9 +545,6 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 		root = ctype.PublicKey
 	case CensusTypeWeighted, CensusTypeZKWeighted:
 		origin = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
-		root = ctype.RootHash
-	case CensusTypeFarcaster:
-		origin = models.CensusOrigin_FARCASTER_FRAME
 		root = ctype.RootHash
 	default:
 		return 0, nil, ErrCensusTypeUnknown.Withf("%v", ctype)
