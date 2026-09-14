@@ -30,11 +30,15 @@ Parameters:
 
 Workflow (only at heights that are a multiple of `updatePowerPeriod`):
 
-  - The score is `Votes / (currentHeight - Height) * 100`, i.e. the percentage of blocks the validator
-    attended during the just-closed window. After scoring, `Votes` is reset to 0 and `Height` is set
-    to the current height, so the next window starts fresh. This keeps the score fully reactive to
-    recent behaviour and prevents a long-lived validator's lifetime average from masking a fresh
-    outage.
+  - `models.Validator.Height` is the join height and `models.Validator.Votes` is the lifetime count
+    of blocks the validator signed. Both are canonical, never reset, and exposed as `joinHeight` and
+    `votes` on `GET /chain/validators`. The score-window boundary — the height and lifetime-Votes
+    value seen at the last score computation — lives in TreeExtra under `vldSW/`.
+  - The score is `(Votes - votesAtWindowStart) / (currentHeight - windowStartHeight) * 100`, i.e.
+    the percentage of blocks the validator attended during the just-closed window. On the first
+    period after a validator joins the set, the fallback boundary is `(v.Height, 0)`, so the ratio
+    still reflects that partial first window. This keeps the score fully reactive to recent
+    behaviour and prevents a long-lived validator's lifetime average from masking a fresh outage.
   - If the score is above or equal to `positiveScoreThreshold` or has improved, the power is incremented
     by `powerIncrement`, capped at `maxPower`.
   - If the score dropped or is zero, the power decays at `powerDecayRate`, floored at `minPower`.
@@ -46,11 +50,12 @@ Workflow (only at heights that are a multiple of `updatePowerPeriod`):
 Simulations (12s block time):
 
   - Silent validator (regardless of prior lifetime): score drops to 0 the first period after silence
-    begins, and every subsequent period; power halves-and-a-bit per period until it reaches `minPower`
-    in ~66 periods ≈ 660 blocks ≈ 2h 12min.
+    begins, and every subsequent period; power drops by 10% per period. With the uint64 truncation
+    applied at each step, a validator starting at `maxPower` (1000) reaches `minPower` (1) in 49
+    periods ≈ 490 blocks ≈ 1h 38min (pinned by `TestFloorReachedInExpectedPeriodCount`).
   - Once at the floor, the validator stays in the set for `inactiveGraceBlocks` before being evicted,
     about 21 days at the current parameters.
-  - A recovering validator reaches `maxPower` from `newValidatorPower` in ~100 periods ≈ 1000 blocks ≈ 3h 20min.
+  - A recovering validator reaches `maxPower` from `newValidatorPower` in ~95 periods ≈ 950 blocks ≈ 3h 10min.
 */
 
 const (
@@ -95,16 +100,27 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 
 	for idx, v := range validators {
 		if updatePeriod {
-			// Score is the participation rate over the just-closed window.
-			// `Height` and `Votes` are reset at the end of this branch so the
-			// denominator here is always `updatePowerPeriod` after the first
-			// period, and equals the actual gap during any partial first
-			// window (e.g. a validator joined mid-period).
-			gap := height - uint32(v.Height)
+			// Score is the participation rate over the just-closed window. The
+			// window boundary (height and lifetime-Votes count at the last
+			// score computation) is stored in TreeExtra under vldSW/; the
+			// canonical models.Validator.Height (join height) and .Votes
+			// (lifetime signature count) are never mutated by scoring.
+			windowStart, votesAtStart, hasWindow, err := c.state.ValidatorScoreWindow(v.Address, true)
+			if err != nil {
+				return fmt.Errorf("cannot read validator score window: %w", err)
+			}
+			if !hasWindow {
+				// First period after joining the set: use the join height and
+				// zero lifetime-votes as the boundary.
+				windowStart = uint32(v.Height)
+				votesAtStart = 0
+			}
+			gap := height - windowStart
 			if gap == 0 {
 				gap = updatePowerPeriod
 			}
-			newScore := uint32(float64(v.Votes) / float64(gap) * 100)
+			windowVotes := v.Votes - votesAtStart
+			newScore := uint32(float64(windowVotes) / float64(gap) * 100)
 			switch {
 			case newScore > v.Score ||
 				(newScore >= positiveScoreThreshold && v.Score == newScore):
@@ -113,11 +129,14 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				v.Power = max(uint64(float64(v.Power)*(1-powerDecayRate)), minPower)
 			}
 			v.Score = newScore
-			// Reset the window so the next score reflects only the next
-			// updatePowerPeriod blocks. Proposals is left cumulative on purpose
-			// (metric-only, not consensus-critical).
-			v.Height = uint64(height)
-			v.Votes = 0
+			// Advance the window so the next score reflects only the next
+			// updatePowerPeriod blocks. The canonical Height/Votes on
+			// models.Validator are intentionally left untouched here so the
+			// public /chain/validators response keeps returning the join height
+			// and lifetime vote count.
+			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
+				return fmt.Errorf("cannot set validator score window: %w", err)
+			}
 
 			since, marked, err := c.state.ValidatorInactiveSince(v.Address, true)
 			if err != nil {
@@ -139,6 +158,9 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 					}
 					if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
 						return fmt.Errorf("cannot clear validator inactive-since: %w", err)
+					}
+					if err := c.state.ClearValidatorScoreWindow(v.Address); err != nil {
+						return fmt.Errorf("cannot clear validator score window: %w", err)
 					}
 					// Record the pubkey so FinalizeBlock can emit the ABCI
 					// Power=0 ValidatorUpdate required to actually remove this

@@ -110,6 +110,46 @@ func (h *istHarness) marker(seed byte) (uint32, bool) {
 	return since, marked
 }
 
+// TestScoringPreservesJoinHeightAndLifetimeVotes verifies that scoring never
+// overwrites `models.Validator.Height` (join height) or `models.Validator.Votes`
+// (lifetime signature count). Both are surfaced by GET /chain/validators as
+// `joinHeight` and `votes`; a prior revision of updateValidatorScore reset them
+// to the window boundary and to zero every period, which would have made the
+// two API fields useless for any downstream computing tenure/age or lifetime
+// participation. The window boundary now lives in TreeExtra under `vldSW/`.
+func TestScoringPreservesJoinHeightAndLifetimeVotes(t *testing.T) {
+	h := newISTHarness(t)
+
+	// One steadily-voting validator joining at height 0.
+	seeds := []byte{'A', 'B', 'C', 'D'}
+	const joinHeight = uint64(0)
+	for _, seed := range seeds {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 500, joinHeight)), qt.IsNil)
+	}
+	h.commit()
+
+	votingAddrs := [][]byte{}
+	for _, seed := range seeds {
+		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+	proposer := votingAddrs[0]
+
+	// Run enough periods to close several score windows.
+	const periods = 5
+	for range periods {
+		h.advancePeriod(votingAddrs, proposer)
+	}
+
+	list, err := h.s.Validators(true)
+	qt.Assert(t, err, qt.IsNil)
+	for _, v := range list {
+		qt.Assert(t, v.Height, qt.Equals, joinHeight,
+			qt.Commentf("Validator.Height (joinHeight in public API) must stay at the join height, not be reset per score window; got %d", v.Height))
+		qt.Assert(t, v.Votes, qt.Equals, uint64(periods*updatePowerPeriod),
+			qt.Commentf("Validator.Votes must be the lifetime signature count, not reset per window; got %d after %d blocks of voting", v.Votes, periods*updatePowerPeriod))
+	}
+}
+
 // TestPowerDecaysToFloor verifies that a non-voting validator's power
 // decays exponentially and floors at minPower rather than crossing to zero.
 func TestPowerDecaysToFloor(t *testing.T) {
