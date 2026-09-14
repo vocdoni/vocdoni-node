@@ -183,6 +183,94 @@ func TestPowerDecaysToFloor(t *testing.T) {
 	}
 }
 
+// TestSingleSilentPeriodDropsPowerByDecayRate pins `powerDecayRate = 0.10`:
+// one silent period must move an active validator from `maxPower` (1000) to
+// exactly 900. If `powerDecayRate` regresses to its pre-recalibration 0.05,
+// the drop would be to 950 and this assertion catches it.
+func TestSingleSilentPeriodDropsPowerByDecayRate(t *testing.T) {
+	h := newISTHarness(t)
+
+	// Four validators so removal is legal (len > 3), even though we don't
+	// exercise removal here. A, B, C vote; D is silent.
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 1000, 0)), qt.IsNil)
+	}
+	h.commit()
+
+	votingAddrs := [][]byte{}
+	for _, seed := range []byte{'A', 'B', 'C'} {
+		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+	h.advancePeriod(votingAddrs, votingAddrs[0])
+
+	// D silent for one period: 1000 * (1 - 0.10) = 900. A literal, not
+	// `maxPower * (1 - powerDecayRate)`, so that reverting `powerDecayRate`
+	// to a different value fails this test.
+	qt.Assert(t, h.power('D'), qt.Equals, uint64(900),
+		qt.Commentf("one silent period must drop power from 1000 to exactly 900 (10%% decay)"))
+}
+
+// TestSinglePositivePeriodIncrementsByTen pins `powerIncrement = 10`: one
+// positive-score period from 990 must land on exactly 1000. If
+// `powerIncrement` regresses to its pre-recalibration 1, the ramp would land
+// at 991 and this assertion catches it. Also pins `maxPower = 1000` via the
+// `min(..., maxPower)` clamp: with `maxPower = 100`, the clamp would drop
+// the result to 100.
+func TestSinglePositivePeriodIncrementsByTen(t *testing.T) {
+	h := newISTHarness(t)
+
+	// A single validator voting every block earns score = 100 in the first
+	// period; that clears both branches of the ramp-up guard (`newScore >
+	// v.Score` on the first period since Score starts at 0). Three others so
+	// the harness has a legal set and set-size logic never trips.
+	qt.Assert(t, h.s.AddValidator(makeValidator('A', 990, 0)), qt.IsNil)
+	for _, seed := range []byte{'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 1000, 0)), qt.IsNil)
+	}
+	h.commit()
+
+	votingAddrs := [][]byte{}
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+	h.advancePeriod(votingAddrs, votingAddrs[0])
+
+	qt.Assert(t, h.power('A'), qt.Equals, uint64(1000),
+		qt.Commentf("one positive period from 990 must reach exactly 1000 (increment=10, cap=1000)"))
+}
+
+// TestFloorReachedInExpectedPeriodCount pins the whole decay curve — the
+// combination of `powerDecayRate`, `minPower`, and `maxPower` — by asserting
+// that a validator starting at `maxPower` (1000) reaches `minPower` (1) in
+// exactly `expectedPeriods` periods and no earlier. Any regression on those
+// three constants shifts the number.
+func TestFloorReachedInExpectedPeriodCount(t *testing.T) {
+	h := newISTHarness(t)
+
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 1000, 0)), qt.IsNil)
+	}
+	h.commit()
+
+	votingAddrs := [][]byte{}
+	for _, seed := range []byte{'A', 'B', 'C'} {
+		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+
+	// With powerDecayRate=0.10, maxPower=1000, minPower=1, the uint64
+	// truncation at each step of `uint64(power * 0.9)` compounds and reaches
+	// 1 at period 49 (never earlier: assert the "not on period 48" boundary).
+	const expectedPeriods = 49
+	for i := range expectedPeriods - 1 {
+		h.advancePeriod(votingAddrs, votingAddrs[0])
+		qt.Assert(t, h.power('D') > minPower, qt.IsTrue,
+			qt.Commentf("D must still be above the floor at period %d (want floor at exactly period %d)", i+1, expectedPeriods))
+	}
+	h.advancePeriod(votingAddrs, votingAddrs[0])
+	qt.Assert(t, h.power('D'), qt.Equals, uint64(minPower),
+		qt.Commentf("D must reach the floor at exactly period %d", expectedPeriods))
+}
+
 // TestInactiveSinceMarkerLifecycle verifies the marker is set on first floor
 // entry and cleared once the validator recovers above the floor.
 func TestInactiveSinceMarkerLifecycle(t *testing.T) {
