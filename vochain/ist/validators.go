@@ -115,11 +115,21 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				windowStart = uint32(v.Height)
 				votesAtStart = 0
 			}
-			gap := height - windowStart
-			if gap == 0 {
+			// After a cometbft rollback or a chain restart whose InitialHeight
+			// is below a previously recorded window boundary, the boundary
+			// values can land ahead of the current chain state. Guard the two
+			// uint underflows before they wrap to ~4e9 and score a zero
+			// participation on every validator each period.
+			var gap uint32
+			if windowStart >= height {
 				gap = updatePowerPeriod
+			} else {
+				gap = height - windowStart
 			}
-			windowVotes := v.Votes - votesAtStart
+			var windowVotes uint64
+			if v.Votes >= votesAtStart {
+				windowVotes = v.Votes - votesAtStart
+			}
 			newScore := uint32(float64(windowVotes) / float64(gap) * 100)
 			switch {
 			case newScore > v.Score ||
@@ -151,7 +161,10 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
 					return fmt.Errorf("cannot clear validator inactive-since: %w", err)
 				}
-			case v.Power <= minPower && marked && height-since >= inactiveGraceBlocks:
+			// height >= since guards against uint32 underflow after a cometbft
+			// rollback / low InitialHeight: without it the subtraction wraps
+			// to ~4e9 and every marked validator is evicted with no grace.
+			case v.Power <= minPower && marked && height >= since && height-since >= inactiveGraceBlocks:
 				if len(validators) > 3 {
 					if err := c.state.RemoveValidator(v); err != nil {
 						return fmt.Errorf("cannot remove validator: %w", err)
