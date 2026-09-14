@@ -99,7 +99,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		}
 
 		return &cometabcitypes.InitChainResponse{
-			Validators: validatorUpdate(validators),
+			Validators: validatorUpdate(validators, nil),
 			AppHash:    app.State.CommittedHash(),
 		}, nil
 	}
@@ -211,7 +211,7 @@ func (app *BaseApplication) InitChain(_ context.Context,
 	}
 
 	return &cometabcitypes.InitChainResponse{
-		Validators: validatorUpdate(validators),
+		Validators: validatorUpdate(validators, nil),
 		AppHash:    hash,
 	}, nil
 }
@@ -340,24 +340,36 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 	if err != nil {
 		return nil, fmt.Errorf("cannot get validators: %w", err)
 	}
+	// Drain any validators evicted during this block's IST run. Per the ABCI
+	// spec, a validator is only removed from CometBFT's ValidatorSet when its
+	// entry appears in ValidatorUpdates with Power=0. A validator absent from
+	// the map (because RemoveValidator was already called) is silently kept at
+	// its last-known power — it becomes a zombie. DrainRemovedPubKeys returns
+	// exactly the pubkeys that need the Power=0 signal.
+	removedPubKeys := app.Istc.DrainRemovedPubKeys()
 	return &cometabcitypes.FinalizeBlockResponse{
 		AppHash:          root,
 		TxResults:        txResults,
-		ValidatorUpdates: validatorUpdate(validators),
+		ValidatorUpdates: validatorUpdate(validators, removedPubKeys),
 	}, nil
 }
 
-func validatorUpdate(validators map[string]*models.Validator) cometabcitypes.ValidatorUpdates {
-	validatorUpdate := []cometabcitypes.ValidatorUpdate{}
+// validatorUpdate builds the ABCI ValidatorUpdates slice from the surviving
+// validators map, and appends a Power=0 entry for every pubkey in
+// removedPubKeys. CometBFT removes a validator from its internal ValidatorSet
+// only when that validator's pubkey appears in ValidatorUpdates with Power=0;
+// omitting it leaves the validator in the set at its last-known power.
+func validatorUpdate(validators map[string]*models.Validator, removedPubKeys [][]byte) cometabcitypes.ValidatorUpdates {
+	updates := make([]cometabcitypes.ValidatorUpdate, 0, len(validators)+len(removedPubKeys))
 	for _, v := range validators {
 		var pubKey crypto256k1.PubKey = bytes.Clone(v.PubKey)
-		validatorUpdate = append(validatorUpdate, cometabcitypes.NewValidatorUpdate(
-			pubKey,
-			int64(v.Power),
-		),
-		)
+		updates = append(updates, cometabcitypes.NewValidatorUpdate(pubKey, int64(v.Power)))
 	}
-	return validatorUpdate
+	for _, pk := range removedPubKeys {
+		var pubKey crypto256k1.PubKey = bytes.Clone(pk)
+		updates = append(updates, cometabcitypes.NewValidatorUpdate(pubKey, 0))
+	}
+	return updates
 }
 
 // Commit is the CometBFT implementation of the ABCI Commit method. We currently do nothing here.

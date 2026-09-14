@@ -44,6 +44,22 @@ const (
 // Controller is the internal state transition controller.
 type Controller struct {
 	state *state.State
+	// removedPubKeys accumulates the raw CometBFT public-keys of validators
+	// that were evicted during the current block's updateValidatorScore run.
+	// FinalizeBlock drains this via DrainRemovedPubKeys and emits Power=0
+	// ValidatorUpdate entries so CometBFT actually removes them from its
+	// internal ValidatorSet (ABCI spec: "not mentioned" ≠ "removed").
+	removedPubKeys [][]byte
+}
+
+// DrainRemovedPubKeys returns the pubkeys of validators evicted during the
+// last updateValidatorScore execution and clears the internal buffer. The
+// caller (FinalizeBlock) passes these to validatorUpdate so that CometBFT
+// receives the mandatory Power=0 signals for each removed validator.
+func (c *Controller) DrainRemovedPubKeys() [][]byte {
+	out := c.removedPubKeys
+	c.removedPubKeys = nil
+	return out
 }
 
 var (
