@@ -52,7 +52,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.1-0.20220721030215-126854af5e6d
 	github.com/vocdoni/go-blindsecp256k1 v0.2.0
 	go.mongodb.org/mongo-driver v1.17.7
-	go.vocdoni.io/proto v1.15.14
+	go.vocdoni.io/proto v1.16.0
 	golang.org/x/crypto v0.55.0
 	golang.org/x/net v0.57.0
 	google.golang.org/protobuf v1.36.11
