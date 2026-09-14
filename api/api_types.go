@@ -184,6 +184,7 @@ type ElectionKeys struct {
 
 type ElectionCensus struct {
 	CensusOrigin           string         `json:"censusOrigin"`
+	CensusOriginDeprecated bool           `json:"censusOriginDeprecated,omitempty"`
 	CensusRoot             types.HexBytes `json:"censusRoot" `
 	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot" `
 	CensusURL              string         `json:"censusURL"`
@@ -197,6 +198,10 @@ type ElectionCreate struct {
 	ElectionID                types.HexBytes `json:"electionID" `
 	MetadataURL               string         `json:"metadataURL"`
 	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
+	// Warning carries a non-fatal chain-side notice about the transaction
+	// (e.g. a soft-deprecated census origin). Empty when there is nothing
+	// to report. Sourced from the CheckTx response Log field.
+	Warning string `json:"warning,omitempty"`
 }
 
 type ElectionDescription struct {
