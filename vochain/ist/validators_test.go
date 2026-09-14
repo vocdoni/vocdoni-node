@@ -452,6 +452,100 @@ func TestBottomOfBarrelKeepsThree(t *testing.T) {
 	}
 }
 
+// TestNoEvictionWhenInactiveSinceAheadOfHeight guards against uint32
+// underflow in the grace-period check: after a cometbft rollback or a chain
+// restart whose InitialHeight is below a previously recorded inactive-since
+// marker, `height - since` wraps to ~4e9 and every marked validator would be
+// evicted with no grace at all. The `height >= since` guard in
+// updateValidatorScore is what prevents that.
+func TestNoEvictionWhenInactiveSinceAheadOfHeight(t *testing.T) {
+	original := inactiveGraceBlocks
+	inactiveGraceBlocks = 50
+	t.Cleanup(func() { inactiveGraceBlocks = original })
+
+	h := newISTHarness(t)
+
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, minPower, 0)), qt.IsNil)
+	}
+	// Mark all four validators as inactive at a high height, then commit.
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		addr := make([]byte, 20)
+		for i := range addr {
+			addr[i] = seed
+		}
+		qt.Assert(t, h.s.SetValidatorInactiveSince(addr, 10_000), qt.IsNil)
+	}
+	h.commit()
+
+	// Simulate a rollback: chain height is now well below the marker.
+	// Pick a value that's a multiple of updatePowerPeriod so the score branch fires.
+	h.height = 100
+	h.s.SetHeight(h.height)
+
+	qt.Assert(t, h.istc.updateValidatorScore(nil, nil), qt.IsNil)
+	h.commit()
+
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.exists(seed), qt.IsTrue,
+			qt.Commentf("validator %c must NOT be evicted when its inactive-since marker is ahead of current height (rollback scenario)", seed))
+	}
+	qt.Assert(t, len(h.istc.DrainRemovedPubKeys()), qt.Equals, 0,
+		qt.Commentf("removedPubKeys must be empty when no eviction happened"))
+}
+
+// TestScoreGapDoesNotWrapWhenWindowStartAheadOfHeight guards the sibling
+// underflow inside score computation: `gap := height - windowStart` on a
+// rollback would wrap to ~4e9, driving `newScore` to zero on every validator
+// and forcing an unwarranted decay every period.
+func TestScoreGapDoesNotWrapWhenWindowStartAheadOfHeight(t *testing.T) {
+	h := newISTHarness(t)
+
+	// Four validators at mid-range power, no inactive-since marker set — the
+	// power path should be exercised without touching eviction.
+	const startPower = uint64(500)
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, startPower, 0)), qt.IsNil)
+	}
+	// Seed a score-window entry at a height much higher than what we'll
+	// simulate below — mimics the post-rollback state where vldSW/ still
+	// holds a boundary from the pre-rollback tip.
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		addr := make([]byte, 20)
+		for i := range addr {
+			addr[i] = seed
+		}
+		qt.Assert(t, h.s.SetValidatorScoreWindow(addr, 10_000, 0), qt.IsNil)
+	}
+	h.commit()
+
+	// Rollback: chain height jumps back to a value below the recorded window.
+	// Keep it on a period boundary so the score branch runs.
+	h.height = 100
+	h.s.SetHeight(h.height)
+
+	votingAddrs := [][]byte{}
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
+	}
+	// One period boundary run; every validator votes so windowVotes > 0.
+	qt.Assert(t, h.istc.updateValidatorScore(votingAddrs, votingAddrs[0]), qt.IsNil)
+	h.commit()
+
+	// Without the guard, `gap` would be ~4e9, newScore would be 0, and the
+	// decay branch (`newScore == 0`) would fire on every validator, dropping
+	// power from 500 to 450. With the guard, gap falls back to
+	// updatePowerPeriod (10), newScore = 1/10 * 100 = 10, which is above the
+	// starting v.Score of 0 and hits the increment branch (power → 510).
+	// Assert power did not decay — i.e. no wraparound-triggered erroneous
+	// decay slipped through.
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		p := h.power(seed)
+		qt.Assert(t, p >= startPower, qt.IsTrue,
+			qt.Commentf("validator %c power must not have decayed after a windowStart-ahead-of-height run; want >= %d, got %d", seed, startPower, p))
+	}
+}
+
 // TestEvictedValidatorEmitsPowerZero is the regression test for the CometBFT
 // zombie-validator bug fixed in this branch. Per the ABCI spec, a validator is
 // only removed from CometBFT's internal ValidatorSet when it appears in
