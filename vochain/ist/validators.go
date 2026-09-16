@@ -140,6 +140,12 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				return fmt.Errorf("cannot remove tombstoned validator: %w", err)
 			}
 			delete(validators, idx)
+			// Also drop from modified — CometBFT applies ValidatorUpdates at
+			// H+2, so the tombstoned validator still signs the block right
+			// after our Power=0 emission and lands in voteAddresses. Without
+			// this delete, the non-boundary else branch below would call
+			// AddValidator(validators[idx]) on a nil pointer.
+			delete(modified, idx)
 		}
 	}
 
@@ -167,8 +173,15 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
 					return fmt.Errorf("cannot seed validator score window: %w", err)
 				}
-				if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
-					return fmt.Errorf("cannot clear validator inactive-since: %w", err)
+				// Only clear the marker if one exists — a fresh validator has
+				// none, and DeepSet(key, nil) would create an empty leaf that
+				// counts toward AppHash forever.
+				if _, marked, err := c.state.ValidatorInactiveSince(v.Address, false); err != nil {
+					return fmt.Errorf("cannot read validator inactive-since: %w", err)
+				} else if marked {
+					if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
+						return fmt.Errorf("cannot clear validator inactive-since: %w", err)
+					}
 				}
 				if err := c.state.AddValidator(v); err != nil {
 					return fmt.Errorf("cannot update validator score: %w", err)
@@ -196,9 +209,6 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				v.Power = max(uint64(float64(v.Power)*(1-powerDecayRate)), minPower)
 			}
 			v.Score = newScore
-			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
-				return fmt.Errorf("cannot set validator score window: %w", err)
-			}
 
 			since, marked, err := c.state.ValidatorInactiveSince(v.Address, false)
 			if err != nil {
@@ -218,7 +228,13 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			// and every marked validator is evicted with no grace.
 			case v.Power <= minPower && marked && height >= since && height-since >= inactiveGraceBlocks:
 				candidates = append(candidates, idx)
-				continue // Pass 3 will AddValidator with Power=0.
+				continue // Pass 3 handles the leaf; next block's reap clears vldSW.
+			}
+			// Advance the window boundary for the next scoring period. Skipped
+			// for eviction candidates above because RemoveValidator on the reap
+			// tick would immediately clear this write.
+			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
+				return fmt.Errorf("cannot set validator score window: %w", err)
 			}
 			if err := c.state.AddValidator(v); err != nil {
 				return fmt.Errorf("cannot update validator score: %w", err)
