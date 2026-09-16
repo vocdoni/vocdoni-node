@@ -59,31 +59,26 @@ func (v *State) AddValidator(validator *models.Validator) error {
 // other has produced silent bugs before.
 func (v *State) RemoveValidator(validator *models.Validator) error {
 	v.tx.Lock()
+	defer v.tx.Unlock()
 	validators, err := v.tx.SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
-		v.tx.Unlock()
 		return err
 	}
 	if _, err := validators.Get(validator.GetAddress()); errors.Is(err, arbo.ErrKeyNotFound) {
-		v.tx.Unlock()
 		return fmt.Errorf("validator not found: %w", err)
 	} else if err != nil {
-		v.tx.Unlock()
 		return err
 	}
 	if err := validators.Set(validator.GetAddress(), nil); err != nil {
-		v.tx.Unlock()
 		return err
 	}
-	v.tx.Unlock()
-	// Marker clears go through ClearValidator* helpers so we exercise the same
-	// single writer (DeepSet under TreeExtra) as the rest of the IST code —
-	// intermixing raw SubTree.Del with DeepSet writes on the same tx can
-	// silently drop unrelated pending writes on commit.
-	if err := v.ClearValidatorInactiveSince(validator.GetAddress()); err != nil {
+	// Inline the marker clears rather than delegating to ClearValidator*
+	// helpers because those take v.tx.Lock() themselves — sync.Mutex is not
+	// reentrant, so the delegated call would deadlock under our defer.
+	if err := v.tx.DeepSet(validatorInactiveSinceKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
 		return err
 	}
-	if err := v.ClearValidatorScoreWindow(validator.GetAddress()); err != nil {
+	if err := v.tx.DeepSet(validatorScoreWindowKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
 		return err
 	}
 	go metricsDeleteValidator(proto.Clone(validator).(*models.Validator))
