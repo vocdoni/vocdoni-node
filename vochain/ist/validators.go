@@ -55,8 +55,9 @@ Every `updatePowerPeriod`-boundary block, in addition, runs the score/power upda
     full fresh window. Without this skip, the fallback would reconstruct a lifetime-average score
     from the canonical `v.Votes` and `v.Height`, spuriously rewarding validators whose accumulated
     Votes reflect activity from a pre-activation rule set.
-  - If the score is above or equal to `positiveScoreThreshold` or has improved, the power is incremented
-    by `powerIncrement`, capped at `maxPower`.
+  - If the score improved OR held steady at/above `positiveScoreThreshold`, the power is incremented
+    by `powerIncrement`, capped at `maxPower`. A score that DROPS but stays above the threshold does
+    NOT increment — it takes the decay branch below (a fresh drop is a signal even if still healthy).
   - If the score dropped or is zero, the power decays at `powerDecayRate`, floored at `minPower`.
   - The inactive-since marker is set to the current height the first period the validator reaches the
     floor, and cleared the first period it climbs back above.

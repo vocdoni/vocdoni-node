@@ -1190,6 +1190,11 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 	}
 	validators := ValidatorList{}
 	for _, v := range stateValidators {
+		// Skip tombstoned leaves — Power=0 marks a validator awaiting
+		// reap on the next block; not part of the active set.
+		if v.GetPower() == 0 {
+			continue
+		}
 		validators.Validators = append(validators.Validators, Validator{
 			AccountAddress:   v.GetAddress(),
 			ValidatorAddress: v.GetValidatorAddress(),

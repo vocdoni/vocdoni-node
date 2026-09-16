@@ -73,12 +73,27 @@ func (v *State) RemoveValidator(validator *models.Validator) error {
 		return err
 	}
 	// Inline the marker clears rather than delegating to ClearValidator*
-	// helpers because those take v.tx.Lock() themselves — sync.Mutex is not
-	// reentrant, so the delegated call would deadlock under our defer.
-	if err := v.tx.DeepSet(validatorInactiveSinceKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
+	// helpers because those take v.tx.Lock() themselves — sync.RWMutex is
+	// not reentrant, so the delegated call would deadlock under our defer.
+	// Gated on existence so we don't create an empty leaf (which counts
+	// toward AppHash forever) for validators that never had these markers
+	// — e.g. vocone bootstrap removing pristine genesis validators.
+	extra, err := v.tx.SubTree(StateTreeCfg(TreeExtra))
+	if err != nil {
 		return err
 	}
-	if err := v.tx.DeepSet(validatorScoreWindowKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
+	if val, err := extra.Get(validatorInactiveSinceKey(validator.GetAddress())); err == nil && len(val) > 0 {
+		if err := v.tx.DeepSet(validatorInactiveSinceKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
+			return err
+		}
+	} else if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
+		return err
+	}
+	if val, err := extra.Get(validatorScoreWindowKey(validator.GetAddress())); err == nil && len(val) > 0 {
+		if err := v.tx.DeepSet(validatorScoreWindowKey(validator.GetAddress()), nil, StateTreeCfg(TreeExtra)); err != nil {
+			return err
+		}
+	} else if err != nil && !errors.Is(err, arbo.ErrKeyNotFound) {
 		return err
 	}
 	go metricsDeleteValidator(proto.Clone(validator).(*models.Validator))
@@ -124,14 +139,25 @@ func (v *State) Validators(committed bool) (map[string]*models.Validator, error)
 	return validators, nil
 }
 
-// Validator returns an existing validator identified by the given signing address.
-// If the validator is not found, returns nil and no error.
+// Validator returns an existing validator identified by the given signing
+// address. If the validator is not found, returns nil and no error. A leaf
+// carrying Power=0 (an IST tombstone awaiting reap on the next block) is
+// treated as "not a validator" here — every caller of this singular getter
+// is doing an "is this an active validator?" check (tx auth, node
+// self-identification), and returning the tombstone would let a validator
+// keep authorising things for the one-block window between tombstone and
+// reap. The ABCI path in cometbft.go reads Validators (plural) directly so
+// it still sees the tombstone and emits the required Power=0 signal.
 func (v *State) Validator(address common.Address, committed bool) (*models.Validator, error) {
 	list, err := v.Validators(committed)
 	if err != nil {
 		return nil, err
 	}
-	return list[hex.EncodeToString(address.Bytes())], nil
+	val := list[hex.EncodeToString(address.Bytes())]
+	if val == nil || val.Power == 0 {
+		return nil, nil
+	}
+	return val, nil
 }
 
 // validatorInactiveSinceKey namespaces the TreeExtra entry that records the
