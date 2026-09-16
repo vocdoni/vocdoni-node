@@ -128,28 +128,25 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 	height := c.state.CurrentHeight()
 	updatePeriod := height%updatePowerPeriod == 0
 
-	// Pass 1 (every block): reap any validators tombstoned by a previous
-	// tick's eviction. A tombstone is a state leaf carrying Power=0; the
-	// previous FinalizeBlock already forwarded that Power=0 to CometBFT via
-	// validatorUpdate, so CometBFT has ejected it from its ValidatorSet.
-	// state.RemoveValidator drops the leaf and clears the per-validator IST
-	// markers atomically. This is what makes eviction consistent with
-	// CometBFT's set without any side-channel: state IS the source of truth
-	// for what validatorUpdate emits.
+	// Pass 1 (every block): reap any validator tombstoned on a previous tick.
+	// A tombstone is a Power=0 leaf; the previous FinalizeBlock already emitted
+	// Power=0 to CometBFT via validatorUpdate, so CometBFT has ejected it —
+	// state.RemoveValidator now drops the leaf and clears the IST markers
+	// atomically. State is the source of truth for validatorUpdate; no
+	// side-channel.
 	for idx, v := range validators {
 		if v.Power == 0 {
 			if err := c.state.RemoveValidator(v); err != nil {
 				return fmt.Errorf("cannot remove tombstoned validator: %w", err)
 			}
 			delete(validators, idx)
-			delete(modified, idx)
 		}
 	}
 
-	// Pass 2 (update-period only): compute score, adjust power, maintain the
-	// inactive-since marker. Eviction candidates are collected here but not
-	// tombstoned yet — tombstoning is a separate deterministic pass so it
-	// does not depend on Go's randomised map iteration order.
+	// Pass 2 (boundary blocks only): score, power, marker. Eviction candidates
+	// are collected here but not tombstoned — Pass 3 sorts them so the choice
+	// of who to evict when multiple pass grace in the same tick is
+	// deterministic across nodes.
 	var candidates []string
 	if updatePeriod {
 		for idx, v := range validators {
@@ -157,26 +154,16 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			if err != nil {
 				return fmt.Errorf("cannot read validator score window: %w", err)
 			}
-			// A stale window boundary from a previous life of this address
-			// (validator was tombstoned + reaped + re-added; state.Validators
-			// carried the stale marker if the re-add path bypassed the reap)
-			// or a legacy activation where hasWindow=true but the boundary
-			// predates v.Height, both must be treated as "no window" so the
-			// seed branch takes over and starts fresh.
+			// Stale window from a previous life of this address (re-add
+			// without a reap in between) or from a chain-restart activation.
 			if hasWindow && windowStart < uint32(v.Height) {
 				hasWindow = false
 			}
 			if !hasWindow {
-				// First scoring period for this validator (fresh add or the
-				// first tick after a chain-restart activation). Seed the
-				// window boundary at the validator's current lifetime state
-				// and clear any stale inactive-since marker, then skip the
-				// score branch: the next period will produce the first real
-				// score against a full, fresh window. Without this, the
-				// fallback would reconstruct a lifetime-average score from
-				// the canonical v.Votes / v.Height, spuriously rewarding
-				// validators whose accumulated Votes reflect activity from
-				// a pre-activation rule set.
+				// Seed the window and clear any stale marker, then skip score
+				// for this period. Without the skip, the fallback would
+				// reconstruct a lifetime-average from v.Votes / v.Height and
+				// spuriously reward legacy validators at chainID-bump time.
 				if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
 					return fmt.Errorf("cannot seed validator score window: %w", err)
 				}
@@ -186,18 +173,14 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				if err := c.state.AddValidator(v); err != nil {
 					return fmt.Errorf("cannot update validator score: %w", err)
 				}
-				delete(modified, idx)
 				continue
 			}
-			// After a cometbft rollback or a chain restart whose InitialHeight
-			// is below a previously recorded window boundary, the boundary
-			// values can land ahead of the current chain state. Guard the two
-			// uint underflows before they wrap to ~4e9 and score a zero
-			// participation on every validator each period.
-			var gap uint32
-			if windowStart >= height {
-				gap = updatePowerPeriod
-			} else {
+			// Guard both underflows: after a cometbft rollback or a
+			// low-InitialHeight restart, the recorded boundary can land ahead
+			// of the current tip; the naive subtractions wrap to ~4e9 and
+			// score zero on every validator each period.
+			var gap uint32 = updatePowerPeriod
+			if windowStart < height {
 				gap = height - windowStart
 			}
 			var windowVotes uint64
@@ -213,11 +196,6 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				v.Power = max(uint64(float64(v.Power)*(1-powerDecayRate)), minPower)
 			}
 			v.Score = newScore
-			// Advance the window so the next score reflects only the next
-			// updatePowerPeriod blocks. The canonical Height/Votes on
-			// models.Validator are intentionally left untouched here so the
-			// public /chain/validators response keeps returning the join height
-			// and lifetime vote count.
 			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
 				return fmt.Errorf("cannot set validator score window: %w", err)
 			}
@@ -226,7 +204,6 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			if err != nil {
 				return fmt.Errorf("cannot read validator inactive-since: %w", err)
 			}
-			isCandidate := false
 			switch {
 			case v.Power <= minPower && !marked:
 				if err := c.state.SetValidatorInactiveSince(v.Address, height); err != nil {
@@ -236,52 +213,35 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 				if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
 					return fmt.Errorf("cannot clear validator inactive-since: %w", err)
 				}
-			// height >= since guards against uint32 underflow after a cometbft
-			// rollback / low InitialHeight: without it the subtraction wraps
-			// to ~4e9 and every marked validator is evicted with no grace.
+			// height >= since guards against uint32 underflow after a
+			// cometbft rollback: without it the subtraction wraps to ~4e9
+			// and every marked validator is evicted with no grace.
 			case v.Power <= minPower && marked && height >= since && height-since >= inactiveGraceBlocks:
 				candidates = append(candidates, idx)
-				isCandidate = true
+				continue // Pass 3 will AddValidator with Power=0.
 			}
-			// Score / power / marker changed on every boundary iteration —
-			// always persist. Skip when the validator is a candidate: Pass 3
-			// is about to overwrite the leaf with Power=0.
-			if !isCandidate {
-				if err := c.state.AddValidator(v); err != nil {
-					return fmt.Errorf("cannot update validator score: %w", err)
-				}
+			if err := c.state.AddValidator(v); err != nil {
+				return fmt.Errorf("cannot update validator score: %w", err)
 			}
-			delete(modified, idx)
+		}
+	} else {
+		// Non-boundary blocks only need to persist the leaves that got a
+		// Votes/Proposals bump above. Rewriting an unchanged leaf would
+		// burn CPU on proto.Marshal and Pebble WAL for no state change.
+		for idx := range modified {
+			if err := c.state.AddValidator(validators[idx]); err != nil {
+				return fmt.Errorf("cannot update validator score: %w", err)
+			}
 		}
 	}
 
-	// Non-update-period blocks: persist only the validators whose Votes or
-	// Proposals were bumped in the attribution loop above. Other leaves are
-	// bit-identical to their committed value; rewriting them would burn CPU
-	// on proto.Marshal and cache lines on Pebble WAL for no state change.
-	for idx := range modified {
-		if err := c.state.AddValidator(validators[idx]); err != nil {
-			return fmt.Errorf("cannot update validator score: %w", err)
-		}
-	}
-
-	// Pass 3 (update-period only): tombstone up to (len - 3) candidates in
-	// sorted-by-hex(Address) order. Deterministic ordering is critical for
-	// consensus: without it, when several validators pass the grace window
-	// in the same tick, different nodes would pick different subsets to
-	// evict and produce divergent AppHash.
-	//
-	// A tombstone is v.Power = 0 persisted to state. The next FinalizeBlock
-	// forwards it to CometBFT via validatorUpdate (Power=0 leaves are
-	// naturally emitted); CometBFT ejects; pass 1 of the next IST tick
-	// reaps the leaf and clears markers. Clear the inactive-since marker
-	// alongside the tombstone so the reap-tick view is atomic in intent
-	// even before the reap actually runs.
-	if slots := len(validators) - 3; slots > 0 && len(candidates) > 0 {
+	// Pass 3 (boundary blocks only): tombstone up to (len - 3) candidates in
+	// sorted-by-hex(Address) order. Setting Power=0 causes the next
+	// FinalizeBlock's validatorUpdate to emit the ABCI eviction signal; the
+	// next block's Pass 1 reaps the leaf. Clear the marker in the same tick
+	// so the tombstone-to-reap window is internally consistent.
+	if slots := min(len(candidates), len(validators)-3); slots > 0 {
 		slices.Sort(candidates)
-		if slots > len(candidates) {
-			slots = len(candidates)
-		}
 		for _, idx := range candidates[:slots] {
 			validators[idx].Power = 0
 			if err := c.state.ClearValidatorInactiveSince(validators[idx].Address); err != nil {
