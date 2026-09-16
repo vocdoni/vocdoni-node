@@ -97,6 +97,19 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("cannot get validators: %w", err)
 		}
+		// Strip Power=0 tombstones. If the freeze in an EndOfChain ceremony
+		// captured state between an eviction's tombstone tick and the
+		// following block's reap, the map still carries the Power=0 leaf.
+		// CometBFT validates InitChainResponse.Validators with
+		// allowDeletes=false and panics on any Power=0 entry, so a chain
+		// restart on such a state would never start. The reap runs
+		// naturally on the first block of the new chain, so dropping the
+		// leaf here is only for the InitChain window.
+		for idx, v := range validators {
+			if v.Power == 0 {
+				delete(validators, idx)
+			}
+		}
 
 		return &cometabcitypes.InitChainResponse{
 			Validators: validatorUpdate(validators),

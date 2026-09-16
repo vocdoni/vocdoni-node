@@ -43,27 +43,50 @@ func (v *State) AddValidator(validator *models.Validator) error {
 	if err := v.tx.DeepSet(validator.GetAddress(), validatorBytes, StateTreeCfg(TreeValidators)); err != nil {
 		return err
 	}
-	go metricsUpdateValidator(validator)
+	// Metrics runs on a background goroutine; the caller frequently mutates the
+	// *models.Validator immediately after this call (e.g. IST Pass 3 setting
+	// Power=0 for tombstoning), so hand the goroutine a fresh copy to avoid a
+	// data race on the shared pointer.
+	go metricsUpdateValidator(proto.Clone(validator).(*models.Validator))
 	return nil
 }
 
-// RemoveValidator removes a tendermint validator identified by its validator.Address
+// RemoveValidator removes a tendermint validator identified by its
+// validator.Address. It also clears the per-validator IST markers (vldIS/,
+// vldSW/) so any subsequent re-add of the same address starts with a clean
+// slate — the two are logically part of the same "this address is no longer
+// a validator" operation, and letting a caller forget one and remember the
+// other has produced silent bugs before.
 func (v *State) RemoveValidator(validator *models.Validator) error {
 	v.tx.Lock()
-	defer v.tx.Unlock()
 	validators, err := v.tx.SubTree(StateTreeCfg(TreeValidators))
 	if err != nil {
+		v.tx.Unlock()
 		return err
 	}
 	if _, err := validators.Get(validator.GetAddress()); errors.Is(err, arbo.ErrKeyNotFound) {
+		v.tx.Unlock()
 		return fmt.Errorf("validator not found: %w", err)
 	} else if err != nil {
+		v.tx.Unlock()
 		return err
 	}
 	if err := validators.Set(validator.GetAddress(), nil); err != nil {
+		v.tx.Unlock()
 		return err
 	}
-	go metricsDeleteValidator(validator)
+	v.tx.Unlock()
+	// Marker clears go through ClearValidator* helpers so we exercise the same
+	// single writer (DeepSet under TreeExtra) as the rest of the IST code —
+	// intermixing raw SubTree.Del with DeepSet writes on the same tx can
+	// silently drop unrelated pending writes on commit.
+	if err := v.ClearValidatorInactiveSince(validator.GetAddress()); err != nil {
+		return err
+	}
+	if err := v.ClearValidatorScoreWindow(validator.GetAddress()); err != nil {
+		return err
+	}
+	go metricsDeleteValidator(proto.Clone(validator).(*models.Validator))
 	return nil
 }
 

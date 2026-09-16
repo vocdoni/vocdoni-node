@@ -477,13 +477,19 @@ func TestNoEvictionWhenInactiveSinceAheadOfHeight(t *testing.T) {
 	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
 		qt.Assert(t, h.s.AddValidator(makeValidator(seed, minPower, 0)), qt.IsNil)
 	}
-	// Mark all four validators as inactive at a high height, then commit.
+	// Mark all four validators as inactive at a high height AND seed a
+	// score-window entry — otherwise Pass 2 hits the hasWindow=false seed
+	// branch and never reaches the marker switch this test is written to
+	// exercise, making the assertion vacuous. Any refactor that removes
+	// the height >= since guard would then pass the test while
+	// reintroducing the rollback-eviction bug it exists to pin.
 	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
 		addr := make([]byte, 20)
 		for i := range addr {
 			addr[i] = seed
 		}
 		qt.Assert(t, h.s.SetValidatorInactiveSince(addr, 10_000), qt.IsNil)
+		qt.Assert(t, h.s.SetValidatorScoreWindow(addr, 90, 0), qt.IsNil)
 	}
 	h.commit()
 
