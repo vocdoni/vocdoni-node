@@ -3,6 +3,7 @@ package ist
 import (
 	"bytes"
 	"fmt"
+	"slices"
 )
 
 /*
@@ -28,7 +29,16 @@ Parameters:
     set. Re-adding a validator is a manual, coordinated operation; a several-day tolerance is cheap and
     preferred over premature eviction.
 
-Workflow (only at heights that are a multiple of `updatePowerPeriod`):
+Workflow:
+
+Every block runs a cleanup pass that reaps validators tombstoned by a previous tick's eviction
+(state leaves carrying `Power == 0`). CometBFT already ejected them on the previous FinalizeBlock —
+validatorUpdate emitted their Power=0 leaf naturally — so the cleanup pass deletes the state leaf
+and clears the per-validator IST markers. Routing eviction through this two-tick tombstone keeps
+state and CometBFT's ValidatorSet consistent without any side-channel: state IS the source of
+truth for what validatorUpdate emits.
+
+Every `updatePowerPeriod`-boundary block, in addition, runs the score/power update:
 
   - `models.Validator.Height` is the join height and `models.Validator.Votes` is the lifetime count
     of blocks the validator signed. Both are canonical, never reset, and exposed as `joinHeight` and
@@ -36,26 +46,34 @@ Workflow (only at heights that are a multiple of `updatePowerPeriod`):
     value seen at the last score computation — lives in TreeExtra under `vldSW/`.
   - The score is `(Votes - votesAtWindowStart) / (currentHeight - windowStartHeight) * 100`, i.e.
     the percentage of blocks the validator attended during the just-closed window. On the first
-    period after a validator joins the set, the fallback boundary is `(v.Height, 0)`, so the ratio
-    still reflects that partial first window. This keeps the score fully reactive to recent
-    behaviour and prevents a long-lived validator's lifetime average from masking a fresh outage.
+    period a validator ever sees under this scheme (no vldSW/ entry yet — fresh add or first
+    boundary after a chain-restart activation), the boundary is seeded at `(height, v.Votes)` and
+    the score/power branches are skipped. The next period produces the first real score against a
+    full fresh window. Without this skip, the fallback would reconstruct a lifetime-average score
+    from the canonical `v.Votes` and `v.Height`, spuriously rewarding validators whose accumulated
+    Votes reflect activity from a pre-activation rule set.
   - If the score is above or equal to `positiveScoreThreshold` or has improved, the power is incremented
     by `powerIncrement`, capped at `maxPower`.
   - If the score dropped or is zero, the power decays at `powerDecayRate`, floored at `minPower`.
   - The inactive-since marker is set to the current height the first period the validator reaches the
     floor, and cleared the first period it climbs back above.
-  - A validator whose marker is at least `inactiveGraceBlocks` behind the current height is removed
-    from the set, unless doing so would leave fewer than three validators.
+  - Validators past `inactiveGraceBlocks` at the floor become eviction candidates. Up to
+    `len(validators) - 3` of them are tombstoned per tick, in sorted-by-hex(Address) order — the
+    deterministic order is critical for consensus when several validators pass grace in the same
+    tick. Tombstoning a validator is `v.Power = 0` persisted to state; the next FinalizeBlock's
+    validatorUpdate emits the ABCI Power=0 signal and the next block's cleanup pass reaps the leaf.
 
 Simulations (12s block time):
 
-  - Silent validator (regardless of prior lifetime): score drops to 0 the first period after silence
-    begins, and every subsequent period; power drops by 10% per period. With the uint64 truncation
-    applied at each step, a validator starting at `maxPower` (1000) reaches `minPower` (1) in 49
-    periods ≈ 490 blocks ≈ 1h 38min (pinned by `TestFloorReachedInExpectedPeriodCount`).
-  - Once at the floor, the validator stays in the set for `inactiveGraceBlocks` before being evicted,
-    about 21 days at the current parameters.
-  - A recovering validator reaches `maxPower` from `newValidatorPower` in ~95 periods ≈ 950 blocks ≈ 3h 10min.
+  - Silent validator (regardless of prior lifetime): score drops to 0 the first scored period after
+    silence begins, and every subsequent period; power drops by 10% per period. With the uint64
+    truncation applied at each step, a validator starting at `maxPower` (1000) reaches `minPower`
+    (1) after 49 scored decay periods; adding the initial seed-only period, 50 total periods ≈ 500
+    blocks ≈ 1h 40min (pinned by `TestFloorReachedInExpectedPeriodCount`).
+  - Once at the floor, the validator stays in the set for `inactiveGraceBlocks` before being tombstoned,
+    about 21 days at the current parameters. State cleanup follows on the very next block.
+  - A recovering validator reaches `maxPower` from `newValidatorPower` in ~95 scored periods (plus
+    the seed period) ≈ 960 blocks ≈ 3h 12min.
 */
 
 const (
@@ -73,11 +91,6 @@ const (
 var inactiveGraceBlocks uint32 = 150_000
 
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
-	// Clear any pubkeys buffered by a prior run in this block (handles the
-	// rare FinalizeBlock re-execution path when ProcessProposal's cached
-	// results are invalidated by a hash mismatch).
-	c.removedPubKeys = nil
-
 	validators, err := c.state.Validators(true)
 	if err != nil {
 		return fmt.Errorf("cannot update validator score: %w", err)
@@ -98,22 +111,56 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 	height := c.state.CurrentHeight()
 	updatePeriod := height%updatePowerPeriod == 0
 
+	// Pass 1 (every block): reap any validators tombstoned by a previous
+	// tick's eviction. A tombstone is a state leaf carrying Power=0; the
+	// previous FinalizeBlock already forwarded that Power=0 to CometBFT via
+	// validatorUpdate, so CometBFT has ejected it from its ValidatorSet.
+	// Delete the state leaf and clear the per-validator IST markers so a
+	// future re-add of the same address starts fresh. This is what makes
+	// eviction consistent with CometBFT's set without any side-channel:
+	// state IS the source of truth for what validatorUpdate emits.
 	for idx, v := range validators {
-		if updatePeriod {
-			// Score is the participation rate over the just-closed window. The
-			// window boundary (height and lifetime-Votes count at the last
-			// score computation) is stored in TreeExtra under vldSW/; the
-			// canonical models.Validator.Height (join height) and .Votes
-			// (lifetime signature count) are never mutated by scoring.
+		if v.Power == 0 {
+			if err := c.state.RemoveValidator(v); err != nil {
+				return fmt.Errorf("cannot remove tombstoned validator: %w", err)
+			}
+			if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
+				return fmt.Errorf("cannot clear validator inactive-since: %w", err)
+			}
+			if err := c.state.ClearValidatorScoreWindow(v.Address); err != nil {
+				return fmt.Errorf("cannot clear validator score window: %w", err)
+			}
+			delete(validators, idx)
+		}
+	}
+
+	// Pass 2 (update-period only): compute score, adjust power, maintain the
+	// inactive-since marker. Eviction candidates are collected here but not
+	// tombstoned yet — tombstoning is a separate deterministic pass so it
+	// does not depend on Go's randomised map iteration order.
+	var candidates []string
+	if updatePeriod {
+		for idx, v := range validators {
 			windowStart, votesAtStart, hasWindow, err := c.state.ValidatorScoreWindow(v.Address, true)
 			if err != nil {
 				return fmt.Errorf("cannot read validator score window: %w", err)
 			}
 			if !hasWindow {
-				// First period after joining the set: use the join height and
-				// zero lifetime-votes as the boundary.
-				windowStart = uint32(v.Height)
-				votesAtStart = 0
+				// First scoring period for this validator (fresh add or the
+				// first tick after a chain-restart activation). Seed the
+				// window boundary at the validator's current lifetime state
+				// and skip the score branch: the next period will produce
+				// the first real score against a full, fresh window. This
+				// prevents the old lifetime-average formula from spuriously
+				// rewarding a validator whose Votes reflect activity from a
+				// pre-activation rule set.
+				if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
+					return fmt.Errorf("cannot seed validator score window: %w", err)
+				}
+				if err := c.state.AddValidator(v); err != nil {
+					return fmt.Errorf("cannot update validator score: %w", err)
+				}
+				continue
 			}
 			// After a cometbft rollback or a chain restart whose InitialHeight
 			// is below a previously recorded window boundary, the boundary
@@ -165,28 +212,42 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			// rollback / low InitialHeight: without it the subtraction wraps
 			// to ~4e9 and every marked validator is evicted with no grace.
 			case v.Power <= minPower && marked && height >= since && height-since >= inactiveGraceBlocks:
-				if len(validators) > 3 {
-					if err := c.state.RemoveValidator(v); err != nil {
-						return fmt.Errorf("cannot remove validator: %w", err)
-					}
-					if err := c.state.ClearValidatorInactiveSince(v.Address); err != nil {
-						return fmt.Errorf("cannot clear validator inactive-since: %w", err)
-					}
-					if err := c.state.ClearValidatorScoreWindow(v.Address); err != nil {
-						return fmt.Errorf("cannot clear validator score window: %w", err)
-					}
-					// Record the pubkey so FinalizeBlock can emit the ABCI
-					// Power=0 ValidatorUpdate required to actually remove this
-					// validator from CometBFT's internal ValidatorSet.
-					c.removedPubKeys = append(c.removedPubKeys, bytes.Clone(v.PubKey))
-					delete(validators, idx)
-					continue
-				}
-				// Never leave the set below three validators, even past the grace period.
+				candidates = append(candidates, idx)
+			}
+			if err := c.state.AddValidator(v); err != nil {
+				return fmt.Errorf("cannot update validator score: %w", err)
 			}
 		}
-		if err := c.state.AddValidator(v); err != nil {
-			return fmt.Errorf("cannot update validator score: %w", err)
+	} else {
+		// Non-update-period blocks still need to persist any in-memory Votes
+		// increments attributed above.
+		for _, v := range validators {
+			if err := c.state.AddValidator(v); err != nil {
+				return fmt.Errorf("cannot update validator score: %w", err)
+			}
+		}
+	}
+
+	// Pass 3 (update-period only): tombstone up to (len - 3) candidates in
+	// sorted-by-hex(Address) order. Deterministic ordering is critical for
+	// consensus: without it, when several validators pass the grace window
+	// in the same tick, different nodes would pick different subsets to
+	// evict and produce divergent AppHash.
+	//
+	// A tombstone is v.Power = 0 persisted to state. The next FinalizeBlock
+	// forwards it to CometBFT via validatorUpdate (Power=0 leaves are
+	// naturally emitted); CometBFT ejects; pass 1 of the next IST tick
+	// reaps the leaf and clears markers. No side-channel needed.
+	if slots := len(validators) - 3; slots > 0 && len(candidates) > 0 {
+		slices.Sort(candidates)
+		if slots > len(candidates) {
+			slots = len(candidates)
+		}
+		for _, idx := range candidates[:slots] {
+			validators[idx].Power = 0
+			if err := c.state.AddValidator(validators[idx]); err != nil {
+				return fmt.Errorf("cannot tombstone validator: %w", err)
+			}
 		}
 	}
 	return nil

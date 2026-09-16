@@ -184,8 +184,8 @@ func TestPowerDecaysToFloor(t *testing.T) {
 }
 
 // TestSingleSilentPeriodDropsPowerByDecayRate pins `powerDecayRate = 0.10`:
-// one silent period must move an active validator from `maxPower` (1000) to
-// exactly 900. If `powerDecayRate` regresses to its pre-recalibration 0.05,
+// one scored silent period must move an active validator from `maxPower` (1000)
+// to exactly 900. If `powerDecayRate` regresses to its pre-recalibration 0.05,
 // the drop would be to 950 and this assertion catches it.
 func TestSingleSilentPeriodDropsPowerByDecayRate(t *testing.T) {
 	h := newISTHarness(t)
@@ -201,9 +201,14 @@ func TestSingleSilentPeriodDropsPowerByDecayRate(t *testing.T) {
 	for _, seed := range []byte{'A', 'B', 'C'} {
 		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
 	}
+	// The first period seeds each validator's vldSW/ boundary and does not
+	// score (the fallback would otherwise reintroduce the pre-window
+	// lifetime-average formula). Advance a second period for the first
+	// actual scored decay.
+	h.advancePeriod(votingAddrs, votingAddrs[0])
 	h.advancePeriod(votingAddrs, votingAddrs[0])
 
-	// D silent for one period: 1000 * (1 - 0.10) = 900. A literal, not
+	// D silent for one scored period: 1000 * (1 - 0.10) = 900. A literal, not
 	// `maxPower * (1 - powerDecayRate)`, so that reverting `powerDecayRate`
 	// to a different value fails this test.
 	qt.Assert(t, h.power('D'), qt.Equals, uint64(900),
@@ -233,6 +238,9 @@ func TestSinglePositivePeriodIncrementsByTen(t *testing.T) {
 	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
 		votingAddrs = append(votingAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
 	}
+	// First period seeds vldSW/ and does not score; second period is the
+	// first actual increment.
+	h.advancePeriod(votingAddrs, votingAddrs[0])
 	h.advancePeriod(votingAddrs, votingAddrs[0])
 
 	qt.Assert(t, h.power('A'), qt.Equals, uint64(1000),
@@ -259,8 +267,9 @@ func TestFloorReachedInExpectedPeriodCount(t *testing.T) {
 
 	// With powerDecayRate=0.10, maxPower=1000, minPower=1, the uint64
 	// truncation at each step of `uint64(power * 0.9)` compounds and reaches
-	// 1 at period 49 (never earlier: assert the "not on period 48" boundary).
-	const expectedPeriods = 49
+	// 1 after 49 scored decay steps. The first period is a seed-only pass
+	// (see updateValidatorScore), so the total period count is 49 + 1 = 50.
+	const expectedPeriods = 50
 	for i := range expectedPeriods - 1 {
 		h.advancePeriod(votingAddrs, votingAddrs[0])
 		qt.Assert(t, h.power('D') > minPower, qt.IsTrue,
@@ -489,9 +498,9 @@ func TestNoEvictionWhenInactiveSinceAheadOfHeight(t *testing.T) {
 	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
 		qt.Assert(t, h.exists(seed), qt.IsTrue,
 			qt.Commentf("validator %c must NOT be evicted when its inactive-since marker is ahead of current height (rollback scenario)", seed))
+		qt.Assert(t, h.power(seed) > 0, qt.IsTrue,
+			qt.Commentf("validator %c must NOT be tombstoned (Power=0) when the marker is ahead of current height", seed))
 	}
-	qt.Assert(t, len(h.istc.DrainRemovedPubKeys()), qt.Equals, 0,
-		qt.Commentf("removedPubKeys must be empty when no eviction happened"))
 }
 
 // TestScoreGapDoesNotWrapWhenWindowStartAheadOfHeight guards the sibling
@@ -546,31 +555,31 @@ func TestScoreGapDoesNotWrapWhenWindowStartAheadOfHeight(t *testing.T) {
 	}
 }
 
-// TestEvictedValidatorEmitsPowerZero is the regression test for the CometBFT
-// zombie-validator bug fixed in this branch. Per the ABCI spec, a validator is
-// only removed from CometBFT's internal ValidatorSet when it appears in
-// ValidatorUpdates with Power=0. A validator that is simply absent from the
-// map is silently kept at its last-known power ("not mentioned" ≠ "removed").
+// TestEvictedValidatorEmitsPowerZero pins the two-tick eviction contract that
+// keeps state and CometBFT's ValidatorSet consistent without any side-channel.
 //
-// Before this fix, RemoveValidator dropped the validator from the state map
-// before validatorUpdate ran, so no Power=0 entry was ever emitted for the
-// removed validator. With PR#1454's minPower=1, the validator's last-known
-// power was 1, not 0, so CometBFT kept it in its ValidatorSet indefinitely.
+// Per the ABCI spec, a validator is only removed from CometBFT's internal
+// ValidatorSet when it appears in ValidatorUpdates with Power=0. A validator
+// that is simply absent from the map is silently kept at its last-known power
+// ("not mentioned" ≠ "removed"). The pre-fix code called state.RemoveValidator
+// the moment the grace period expired, so validatorUpdate never got a chance
+// to see (and emit) a Power=0 leaf for the departing validator — zombie.
 //
-// The fix: updateValidatorScore appends the evicted validator's pubkey to
-// Controller.removedPubKeys; FinalizeBlock drains it via DrainRemovedPubKeys
-// and passes the list to validatorUpdate, which emits a Power=0 entry for each.
+// The fix routes eviction through two ticks:
 //
-// This test exercises the full production path:
+//  1. Tick T (grace expires): updateValidatorScore sets v.Power=0 and persists
+//     it. FinalizeBlock reads state, and validatorUpdate — a pure map→slice
+//     converter — naturally emits Power=0 for the tombstoned entry, which is
+//     the signal CometBFT needs to drop the validator from its set.
+//  2. Tick T+1 (any next block): the cleanup pass at the top of
+//     updateValidatorScore sees the Power=0 leaf, calls state.RemoveValidator
+//     and clears the per-validator IST markers so a future re-add of the same
+//     address starts fresh.
 //
-//	updateValidatorScore → RemoveValidator → Controller.removedPubKeys
-//	→ DrainRemovedPubKeys → (consumed by validatorUpdate in FinalizeBlock)
+// The test asserts both ticks land on the right state:
 //
-// We verify both invariants that must hold:
-//
-//	(a) the validator is removed from state (not reachable via Validators),
-//	(b) DrainRemovedPubKeys returns the evicted validator's pubkey, which
-//	    validatorUpdate will use to emit the required Power=0 entry.
+//	(a) after the grace period, D is tombstoned (still in state, Power=0);
+//	(b) after one more block, D is reaped from state (leaf gone, markers clear).
 func TestEvictedValidatorEmitsPowerZero(t *testing.T) {
 	// Shorten the grace period so the test runs in milliseconds.
 	original := inactiveGraceBlocks
@@ -591,40 +600,41 @@ func TestEvictedValidatorEmitsPowerZero(t *testing.T) {
 		activeVAddrs = append(activeVAddrs, makeValidator(seed, 0, 0).ValidatorAddress)
 	}
 
-	// Advance period by period until D is evicted. The loop stops on the same
-	// period that removes D, so removedPubKeys is still populated from that
-	// updateValidatorScore run and has not yet been cleared by a subsequent
-	// call. We impose a generous safety cap to avoid infinite loops.
+	// Advance period by period until D is tombstoned (Power=0). We stop on the
+	// tombstone tick so the cleanup pass has not yet reaped the leaf — the
+	// map still contains D at Power=0, which is exactly what validatorUpdate
+	// sees when it emits the ABCI Power=0 signal to CometBFT. Safety cap to
+	// avoid infinite loops on regressions.
 	const safetyCapPeriods = 10000
 	for i := range safetyCapPeriods {
-		if !h.exists('D') {
+		if h.power('D') == 0 {
 			break
 		}
 		h.advancePeriod(activeVAddrs, activeVAddrs[0])
 		if i == safetyCapPeriods-1 {
-			t.Fatalf("safety cap reached: D was not evicted after %d periods", safetyCapPeriods)
+			t.Fatalf("safety cap reached: D was not tombstoned after %d periods", safetyCapPeriods)
 		}
 	}
 
-	// (a) D must be gone from state.
+	// (a) D must still be in state, tombstoned at Power=0. This is what
+	// validatorUpdate emits as the ABCI Power=0 update on this block's
+	// FinalizeBlock. On the pre-fix code the leaf was already gone (via
+	// state.RemoveValidator called in the same tick), and validatorUpdate had
+	// nothing to emit — the zombie bug this test defends against.
+	qt.Assert(t, h.exists('D'), qt.IsTrue,
+		qt.Commentf("D must still be in state on the tombstone tick, so validatorUpdate can emit Power=0"))
+	qt.Assert(t, h.power('D'), qt.Equals, uint64(0),
+		qt.Commentf("D's leaf on the tombstone tick must carry Power=0 — that leaf is what validatorUpdate reads"))
+
+	// (b) One more block runs the cleanup pass: leaf is reaped, markers clear.
+	h.height++
+	h.s.SetHeight(h.height)
+	qt.Assert(t, h.istc.updateValidatorScore(activeVAddrs, activeVAddrs[0]), qt.IsNil)
+	h.commit()
+
 	qt.Assert(t, h.exists('D'), qt.IsFalse,
-		qt.Commentf("D should have been removed from state after the grace period"))
-
-	// (b) DrainRemovedPubKeys must contain D's pubkey. This is the exact data
-	// that FinalizeBlock passes to validatorUpdate to emit the Power=0 entry
-	// that tells CometBFT to remove D from its ValidatorSet.
-	//
-	// On the pre-fix code, removedPubKeys was never populated, so this would
-	// return nil (len 0) and the assertion below would fail — confirming the
-	// bug.  With the fix, updateValidatorScore appends the pubkey on eviction.
-	dPubKey := makeValidator('D', 0, 0).PubKey
-	removed := h.istc.DrainRemovedPubKeys()
-	qt.Assert(t, len(removed), qt.Equals, 1,
-		qt.Commentf("exactly one validator was removed; DrainRemovedPubKeys should return one entry"))
-	qt.Assert(t, removed[0], qt.DeepEquals, dPubKey,
-		qt.Commentf("the removed pubkey must be D's so validatorUpdate emits Power=0 for D"))
-
-	// Draining is destructive: a second call returns nothing.
-	qt.Assert(t, h.istc.DrainRemovedPubKeys(), qt.IsNil,
-		qt.Commentf("DrainRemovedPubKeys must clear the buffer on first call"))
+		qt.Commentf("D must be reaped from state on the block after its tombstone"))
+	_, marked := h.marker('D')
+	qt.Assert(t, marked, qt.IsFalse,
+		qt.Commentf("D's inactive-since marker must be cleared by the cleanup pass"))
 }
