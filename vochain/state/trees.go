@@ -14,13 +14,6 @@ import (
 // StateDB Tree hierarchy
 // - Main
 //   - Extra (key: string, value: []byte)
-//     - "vldIS/"||address (26B): 4-byte big-endian uint32 block height at which the validator with the
-//        given signing address first reached the minimum consensus power floor. Consumed by the IST
-//        to delay expulsion by a grace period. Absent / empty means the validator is not at the floor.
-//     - "vldSW/"||address (26B): score-window boundary — 4-byte big-endian uint32 window-start height
-//        followed by 8-byte big-endian uint64 lifetime Votes count at that height (12B value).
-//        Consumed by the IST so score computation can use the delta on Validator.Votes without
-//        overwriting the canonical join-height / lifetime-votes fields exposed by the public API.
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
 //   - SIK: (key: address, value: []byte)
