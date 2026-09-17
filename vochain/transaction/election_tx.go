@@ -49,7 +49,18 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 
 	// run specific checks based on census origin
 	switch tx.Process.CensusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
+	case models.CensusOrigin_OFF_CHAIN_CA:
+		// Legacy OFF_CHAIN_CA has a broken salt derivation for the
+		// two salted ProofCA types (issue #1424): the nonce and the
+		// CSP-authorized weight never enter the salt, so sibling
+		// elections of the same organization derive the same CSP
+		// keypair and voter-declared weight is unbound. Soft-deprecated
+		// with a warning in LTS/1.3; hard-rejected here in LTS/1.4.
+		// Use OFF_CHAIN_CA_V2, which fixes the derivation and accepts
+		// the same four ProofCA types.
+		return nil, ethereum.Address{}, fmt.Errorf(
+			"census origin OFF_CHAIN_CA is deprecated (issue #1424); use OFF_CHAIN_CA_V2")
+	case models.CensusOrigin_OFF_CHAIN_CA_V2:
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}

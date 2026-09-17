@@ -709,3 +709,33 @@ func TestSetProcessDuration(t *testing.T) {
 	// check that newBalance is at least 30 tokens less than oldBalance
 	qt.Assert(t, oldBalance-newBalance >= 30, qt.IsTrue)
 }
+
+// TestNewProcessRejectsLegacyCSPOrigin covers the LTS/1.4 hard rejection of
+// CensusOrigin_OFF_CHAIN_CA at process creation: the legacy origin has a
+// broken salt derivation for the salted ProofCA types (issue #1424) and was
+// soft-deprecated in LTS/1.3 with a warning. LTS/1.4 promotes that warning to
+// a hard rejection; the fixed OFF_CHAIN_CA_V2 origin remains accepted.
+func TestNewProcessRejectsLegacyCSPOrigin(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 2)
+
+	process := &models.Process{
+		StartBlock:    0,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(33),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		BlockCount:    1024,
+		MaxCensusSize: 10,
+	}
+
+	// legacy OFF_CHAIN_CA is rejected at CheckTx
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[0], app, process),
+		qt.ErrorMatches, ".*OFF_CHAIN_CA is deprecated.*")
+
+	// OFF_CHAIN_CA_V2 with the same fields is accepted
+	process.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA_V2
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
+}
