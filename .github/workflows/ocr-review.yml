@@ -18,10 +18,8 @@ jobs:
       !github.event.pull_request.draft &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       github.event.pull_request.user.type != 'Bot'
-    uses: p4u/open-code-review/.github/workflows/claude-review.yml@e7dfc2e0f1cdbbd371d02acacc8b340dd1c6365b
+    uses: vocdoni/open-code-review/.github/workflows/claude-review-channel.yml@ocr-stable
     with:
-      source_repository: p4u/open-code-review
-      source_sha: e7dfc2e0f1cdbbd371d02acacc8b340dd1c6365b
       gateway_url: https://claude.vocdoni.net
       runner_labels: '["self-hosted"]'
       # Uses the repository/organization OCR_MODEL variable, or the default model.

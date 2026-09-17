@@ -1,0 +1,209 @@
+# Temporary release-channel validation. Remove after the successful pre-merge run.
+name: OCR release-channel smoke test
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [main]
+    paths:
+      - .github/workflows/ocr-ci-smoke.yml
+      - .github/workflows/ocr-review.yml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ocr-smoke-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # GitHub validates both reusable-workflow interfaces. Execution must remain
+  # skipped on pull_request because the production guard is intentionally intact.
+  channel-contract:
+    uses: vocdoni/open-code-review/.github/workflows/claude-review-channel.yml@ocr-stable
+    with:
+      runner_labels: '["self-hosted"]'
+      gateway_url: https://claude.vocdoni.net
+    secrets:
+      gateway_token: ${{ secrets.OCR_GATEWAY_AUTH_TOKEN }}
+
+  review:
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.repository == 'vocdoni/vocdoni-node' &&
+      github.event.pull_request.number == 1473 &&
+      github.event.pull_request.head.ref == 'ci/ocr-review-pilot' &&
+      github.event.pull_request.base.ref == 'main' &&
+      github.event.pull_request.user.login == 'p4u' &&
+      github.actor == 'p4u' &&
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type != 'Bot'
+    runs-on: [self-hosted]
+    timeout-minutes: 30
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: '24'
+          package-manager-cache: false
+
+      - name: Checkout trusted review base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Checkout OCR release channel
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: vocdoni/open-code-review
+          ref: ocr-stable
+          path: .ocr-channel
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Resolve centrally selected OCR revision
+        id: channel
+        shell: bash
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const { execFileSync } = require('child_process');
+          const workflow = fs.readFileSync('.ocr-channel/.github/workflows/claude-review-channel.yml', 'utf8');
+          const implementation = workflow.match(/^    uses: vocdoni\/open-code-review\/\.github\/workflows\/claude-review\.yml@([a-f0-9]{40})$/m);
+          const source = workflow.match(/^      source_sha: ([a-f0-9]{40})$/m);
+          if (!implementation || !source || implementation[1] !== source[1] ||
+              !/^      source_repository: vocdoni\/open-code-review$/m.test(workflow)) {
+            throw new Error('Release workflow must pin implementation and source to the same Vocdoni commit');
+          }
+          const channel = execFileSync('git', ['-C', '.ocr-channel', 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+          if (!/^[a-f0-9]{40}$/.test(channel)) throw new Error('Invalid release channel revision');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, `source_sha=${source[1]}\nchannel_sha=${channel}\n`);
+          console.log(`Release channel revision: ${channel}`);
+          console.log(`Pinned OCR revision: ${source[1]}`);
+          NODE
+
+      - name: Validate workflow configuration
+        id: settings
+        shell: bash
+        env:
+          SOURCE_REPOSITORY: vocdoni/open-code-review
+          SOURCE_SHA: ${{ steps.channel.outputs.source_sha }}
+          MODEL: ${{ vars.OCR_MODEL || 'claude-gpt-6-astra' }}
+          GATEWAY_URL: https://claude.vocdoni.net
+          CLAUDE_VERSION: '2.1.273'
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const values = {
+            source_repository: process.env.SOURCE_REPOSITORY,
+            source_sha: process.env.SOURCE_SHA,
+            model: process.env.MODEL,
+            gateway_url: process.env.GATEWAY_URL,
+            claude_version: process.env.CLAUDE_VERSION,
+          };
+          function fail(message) { console.error(message); process.exit(1); }
+          for (const [name, value] of Object.entries(values)) {
+            if (!value || value.trim() !== value || /[\x00-\x1f\x7f]/.test(value)) {
+              fail(`${name} must be nonempty, single-line, and have no surrounding whitespace`);
+            }
+          }
+          if (!/^[A-Za-z0-9][A-Za-z0-9_.-]*\/[A-Za-z0-9][A-Za-z0-9_.-]*$/.test(values.source_repository)) {
+            fail('source_repository must be an owner/repository name');
+          }
+          if (!/^[a-fA-F0-9]{40}$/.test(values.source_sha)) {
+            fail('source_sha must be a full 40-character commit SHA');
+          }
+          values.source_sha = values.source_sha.toLowerCase();
+          if (!/^\d+\.\d+\.\d+$/.test(values.claude_version)) {
+            fail('claude_version must be an exact release version');
+          }
+          let gateway;
+          try { gateway = new URL(values.gateway_url); } catch { fail('gateway_url must be an HTTPS URL'); }
+          if (gateway.protocol !== 'https:' || gateway.username || gateway.password || gateway.search || gateway.hash) {
+            fail('gateway_url must use HTTPS without credentials, query, or fragment');
+          }
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,
+            Object.entries(values).map(([name, value]) => `${name}=${value}\n`).join(''));
+          NODE
+
+      - name: Checkout pinned OCR tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ steps.settings.outputs.source_repository }}
+          ref: ${{ steps.settings.outputs.source_sha }}
+          path: .ocr-tooling
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version-file: .ocr-tooling/go.mod
+          cache: false
+
+      - name: Build pinned OCR
+        working-directory: .ocr-tooling
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.settings.outputs.source_sha }}
+          CGO_ENABLED: '0'
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          # Upstream compatibility version plus immutable fork identity. Forks need
+          # no release tags (pushing those could trigger upstream publishing jobs).
+          make build VERSION="v1.12.2+fork.${SOURCE_SHA}"
+          ./dist/opencodereview --version
+
+      - name: Install pinned Claude Code
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        env:
+          CLAUDE_VERSION: ${{ steps.settings.outputs.claude_version }}
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ocr-claude" --no-audit --no-fund \
+            --registry https://registry.npmjs.org/ "@anthropic-ai/claude-code@${CLAUDE_VERSION}"
+          "$RUNNER_TEMP/ocr-claude/node_modules/.bin/claude" --version
+          printf '%s\n' "$RUNNER_TEMP/ocr-claude/node_modules/.bin" >> "$GITHUB_PATH"
+
+      - name: Review and publish findings
+        id: review
+        uses: ./.ocr-tooling
+        env:
+          ANTHROPIC_BASE_URL: ${{ steps.settings.outputs.gateway_url }}
+          ANTHROPIC_API_KEY: ''
+          CLAUDE_CODE_USE_GATEWAY: '1'
+          CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY: '1'
+          CLAUDE_CODE_AUTO_COMPACT_WINDOW: '1000000'
+          CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: '1'
+          API_TIMEOUT_MS: '30000'
+          OCR_NO_UPDATE: '1'
+        with:
+          provider: claude-code
+          ocr_binary: ${{ github.workspace }}/.ocr-tooling/dist/opencodereview
+          skip_checkout: 'true'
+          require_complete: 'true'
+          llm_model: ${{ steps.settings.outputs.model }}
+          claude_auth_token: ${{ secrets.OCR_GATEWAY_AUTH_TOKEN }}
+          github_token: ${{ github.token }}
+          effort: low
+          review_concurrency: '1'
+          max_tokens_budget: '500000'
+          sticky_summary: 'true'
+          incremental: 'true'
+          checkpoint_range: 'false'
+          upload_artifacts: 'true'
+
+      - name: Verify review publication
+        shell: bash
+        env:
+          COMMENTS_FAILED: ${{ steps.review.outputs.comments_failed }}
+          SUMMARY_URL: ${{ steps.review.outputs.summary_comment_url }}
+        run: |
+          if [[ "$COMMENTS_FAILED" != "0" || -z "$SUMMARY_URL" ]]; then
+            printf '%s\n' 'Review publication was incomplete; inspect the Action logs and result artifacts.' >&2
+            exit 1
+          fi
