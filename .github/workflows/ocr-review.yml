@@ -1,0 +1,31 @@
+name: OCR review
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ocr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    if: >-
+      !github.event.pull_request.draft &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.type != 'Bot'
+    uses: p4u/open-code-review/.github/workflows/claude-review.yml@e7dfc2e0f1cdbbd371d02acacc8b340dd1c6365b
+    with:
+      source_repository: p4u/open-code-review
+      source_sha: e7dfc2e0f1cdbbd371d02acacc8b340dd1c6365b
+      gateway_url: https://claude.vocdoni.net
+      runner_labels: '["self-hosted"]'
+      # Uses the repository/organization OCR_MODEL variable, or the default model.
+      # Uncomment to override it for this repository:
+      # model: claude-gpt-6-astra
+    secrets:
+      gateway_token: ${{ secrets.OCR_GATEWAY_AUTH_TOKEN }}
