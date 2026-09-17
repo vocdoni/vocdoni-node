@@ -62,7 +62,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// for backwards compatibility with block count based processes, we transform the block count to duration timestamp.
-	// TODO: remove once all processes are timestamp based
+	// TODO: remove once all processes are timestamp based (requires migrating the test suite)
 	if tx.Process.BlockCount > 0 {
 		if tx.Process.Duration > 0 {
 			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with both duration time and block count")
