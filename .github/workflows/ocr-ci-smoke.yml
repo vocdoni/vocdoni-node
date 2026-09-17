@@ -43,6 +43,20 @@ jobs:
     runs-on: [self-hosted]
     timeout-minutes: 30
     steps:
+      - name: Ensure runner HOME
+        shell: bash
+        run: |
+          # Preserve configured runner homes and their normal cache behavior.
+          if [[ -z "${HOME:-}" ]]; then
+            if [[ "${RUNNER_TEMP:-}" != /* || "${RUNNER_TEMP:-}" =~ [[:cntrl:]] ]]; then
+              printf '%s\n' 'RUNNER_TEMP must be an absolute path without control characters.' >&2
+              exit 1
+            fi
+            umask 077
+            runner_home="$(mktemp -d "$RUNNER_TEMP/ocr-runner-home.XXXXXX")"
+            printf 'HOME=%s\n' "$runner_home" >> "$GITHUB_ENV"
+          fi
+
       - name: Set up Node.js
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
