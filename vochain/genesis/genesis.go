@@ -129,7 +129,7 @@ var (
 		},
 		"vocdoni/DEV/38": {
 			GenesisDoc: comettypes.GenesisDoc{
-				GenesisTime:     time.Date(2026, time.September, 22, 9, 30, 0, 0, time.UTC),
+				GenesisTime:     time.Date(2026, time.September, 22, 9, 15, 0, 0, time.UTC),
 				InitialHeight:   1,
 				ConsensusParams: DefaultConsensusParams(),
 				AppState:        jsonRawMessage(initialAppStateForDev),
