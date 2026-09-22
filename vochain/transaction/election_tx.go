@@ -53,6 +53,11 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}
+	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
+		// no additional origin-specific checks
+	default:
+		return nil, ethereum.Address{}, fmt.Errorf("census origin %s not supported for new process",
+			models.CensusOrigin_name[int32(tx.Process.CensusOrigin)])
 	}
 
 	// get current timestamp from state
