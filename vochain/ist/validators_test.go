@@ -644,3 +644,75 @@ func TestEvictedValidatorEmitsPowerZero(t *testing.T) {
 	qt.Assert(t, marked, qt.IsFalse,
 		qt.Commentf("D's inactive-since marker must be cleared by the cleanup pass"))
 }
+
+// TestRetainedCandidatesAdvanceWindow verifies that eviction candidates who
+// cannot be tombstoned this tick because the 3-validator floor caps
+// Pass 3's slot count still get their score-window boundary advanced and
+// their scored state persisted. A prior revision skipped both writes for
+// every candidate on the assumption that Pass 3 would tombstone them all —
+// leaving retained candidates with an ever-widening score window that
+// pinned newScore to ~0 forever and blocked recovery even after
+// participation resumed.
+func TestRetainedCandidatesAdvanceWindow(t *testing.T) {
+	original := inactiveGraceBlocks
+	inactiveGraceBlocks = 50
+	t.Cleanup(func() { inactiveGraceBlocks = original })
+
+	h := newISTHarness(t)
+
+	// Four validators, three silent (B/C/D). len=4 → Pass 3 slots = len-3 = 1,
+	// so only the sorted-first candidate is tombstoned. Address sort order is
+	// by hex(Address), and Address is filled with the seed byte, so the order
+	// is B (0x42…), C (0x43…), D (0x44…). B gets tombstoned; C and D are
+	// retained by the floor.
+	for _, seed := range []byte{'A', 'B', 'C', 'D'} {
+		qt.Assert(t, h.s.AddValidator(makeValidator(seed, 100, 0)), qt.IsNil)
+	}
+	h.commit()
+
+	activeVAddrs := [][]byte{makeValidator('A', 0, 0).ValidatorAddress}
+
+	// Advance period by period until B is tombstoned. At that tick B has a
+	// Power=0 leaf in state (not yet reaped) and Pass 3 has just written the
+	// retained-candidate updates for C and D.
+	const safetyCapPeriods = 10000
+	for i := range safetyCapPeriods {
+		if h.exists('B') && h.power('B') == 0 {
+			break
+		}
+		h.advancePeriod(activeVAddrs, activeVAddrs[0])
+		if i == safetyCapPeriods-1 {
+			t.Fatalf("safety cap: B was not tombstoned after %d periods", safetyCapPeriods)
+		}
+	}
+
+	qt.Assert(t, h.power('C'), qt.Equals, uint64(minPower),
+		qt.Commentf("C (retained by floor) must stay at minPower after B's tombstone tick"))
+	qt.Assert(t, h.power('D'), qt.Equals, uint64(minPower),
+		qt.Commentf("D (retained by floor) must stay at minPower after B's tombstone tick"))
+
+	// The core regression assertion: retained candidates' score-window
+	// boundary must be advanced to the current tip. Pre-fix, the window
+	// stayed at whatever value was set the last time the validator was not a
+	// candidate — so `gap` in the next scoring period would balloon and
+	// newScore = windowVotes/gap*100 would round to 0 on any partial vote
+	// resumption.
+	addrC := make([]byte, 20)
+	addrD := make([]byte, 20)
+	for i := range addrC {
+		addrC[i] = 'C'
+		addrD[i] = 'D'
+	}
+	winStartC, _, hasC, err := h.s.ValidatorScoreWindow(addrC, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, hasC, qt.IsTrue,
+		qt.Commentf("retained candidate C must have a score-window entry"))
+	qt.Assert(t, winStartC, qt.Equals, h.height,
+		qt.Commentf("retained C's window boundary must be advanced to current height %d; got %d", h.height, winStartC))
+	winStartD, _, hasD, err := h.s.ValidatorScoreWindow(addrD, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, hasD, qt.IsTrue,
+		qt.Commentf("retained candidate D must have a score-window entry"))
+	qt.Assert(t, winStartD, qt.Equals, h.height,
+		qt.Commentf("retained D's window boundary must be advanced to current height %d; got %d", h.height, winStartD))
+}

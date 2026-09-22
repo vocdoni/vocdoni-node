@@ -229,11 +229,13 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			// and every marked validator is evicted with no grace.
 			case v.Power <= minPower && marked && height >= since && height-since >= inactiveGraceBlocks:
 				candidates = append(candidates, idx)
-				continue // Pass 3 handles the leaf; next block's reap clears vldSW.
+				continue // Pass 3 persists (either tombstone or retained-candidate).
 			}
 			// Advance the window boundary for the next scoring period. Skipped
-			// for eviction candidates above because RemoveValidator on the reap
-			// tick would immediately clear this write.
+			// for eviction candidates above because Pass 3 owns their persistence:
+			// tombstoned ones would have their vldSW cleared by the next block's
+			// reap anyway, and retained ones need the window advanced to the
+			// current tip so a stale window doesn't block recovery later.
 			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
 				return fmt.Errorf("cannot set validator score window: %w", err)
 			}
@@ -257,8 +259,14 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 	// FinalizeBlock's validatorUpdate to emit the ABCI eviction signal; the
 	// next block's Pass 1 reaps the leaf. Clear the marker in the same tick
 	// so the tombstone-to-reap window is internally consistent.
-	if slots := min(len(candidates), len(validators)-3); slots > 0 {
+	//
+	// Retained candidates (the 3-validator floor prevents evicting them here)
+	// still need their scored state persisted and their score window advanced
+	// to the current tip — otherwise the stale window makes newScore collapse
+	// to ~0 forever and blocks recovery when the validator resumes voting.
+	if len(candidates) > 0 {
 		slices.Sort(candidates)
+		slots := min(len(candidates), len(validators)-3)
 		for _, idx := range candidates[:slots] {
 			validators[idx].Power = 0
 			if err := c.state.ClearValidatorInactiveSince(validators[idx].Address); err != nil {
@@ -266,6 +274,15 @@ func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byt
 			}
 			if err := c.state.AddValidator(validators[idx]); err != nil {
 				return fmt.Errorf("cannot tombstone validator: %w", err)
+			}
+		}
+		for _, idx := range candidates[slots:] {
+			v := validators[idx]
+			if err := c.state.SetValidatorScoreWindow(v.Address, height, v.Votes); err != nil {
+				return fmt.Errorf("cannot set retained-candidate score window: %w", err)
+			}
+			if err := c.state.AddValidator(v); err != nil {
+				return fmt.Errorf("cannot update retained-candidate validator: %w", err)
 			}
 		}
 	}
