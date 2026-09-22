@@ -92,7 +92,7 @@ const (
 // inactiveGraceBlocks is the block distance a validator must remain at
 // minPower before being removed from the set (~21d at 12s/block). Exposed as
 // a var so tests can shorten it; production code never mutates it.
-var inactiveGraceBlocks uint32 = 150_000
+var inactiveGraceBlocks uint32 = 100
 
 func (c *Controller) updateValidatorScore(voteAddresses [][]byte, proposer []byte) error {
 	// Read uncommitted state so a validator re-added earlier in the same
