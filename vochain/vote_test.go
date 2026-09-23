@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// testCreateKeysAndBuildCensus creates a bunch of random keys and a new zk
+// testCreateKeysAndBuildWeightedZkCensus creates a bunch of random keys and a new zk
 // friendly census tree (using Poseidon as tree hash and the weight provided as
 // leaf value). It returns the keys, the census root and the proofs for each key.
 func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.Int) ([]*ethereum.SignKeys, []byte, [][]byte) {
