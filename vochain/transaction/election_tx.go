@@ -56,8 +56,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 		// no additional origin-specific checks
 	default:
+		// Format the enum itself rather than CensusOrigin_name: the map
+		// yields "" for integers the proto no longer defines (retired
+		// origins, or an arbitrary attacker-supplied value), whereas the
+		// generated String() falls back to the decimal number.
 		return nil, ethereum.Address{}, fmt.Errorf("census origin %s not supported for new process",
-			models.CensusOrigin_name[int32(tx.Process.CensusOrigin)])
+			tx.Process.CensusOrigin)
 	}
 
 	// get current timestamp from state
