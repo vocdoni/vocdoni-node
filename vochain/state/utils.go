@@ -52,7 +52,7 @@ func CheckDuplicateDelegates(delegates [][]byte, addr *ethcommon.Address) error 
 }
 
 func printPrettierDelegates(delegates [][]byte) []string {
-	prettierDelegates := make([]string, len(delegates))
+	prettierDelegates := make([]string, 0, len(delegates))
 	for _, delegate := range delegates {
 		prettierDelegates = append(prettierDelegates, ethcommon.BytesToAddress(delegate).String())
 	}
