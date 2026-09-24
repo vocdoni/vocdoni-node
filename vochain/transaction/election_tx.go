@@ -53,6 +53,15 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}
+	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
+		// no additional origin-specific checks
+	default:
+		// Format the enum itself rather than CensusOrigin_name: the map
+		// yields "" for integers the proto no longer defines (retired
+		// origins, or an arbitrary attacker-supplied value), whereas the
+		// generated String() falls back to the decimal number.
+		return nil, ethereum.Address{}, fmt.Errorf("census origin %s not supported for new process",
+			tx.Process.CensusOrigin)
 	}
 
 	// get current timestamp from state
@@ -62,7 +71,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// for backwards compatibility with block count based processes, we transform the block count to duration timestamp.
-	// TODO: remove once all processes are timestamp based
+	// TODO: remove once all processes are timestamp based (requires migrating the test suite)
 	if tx.Process.BlockCount > 0 {
 		if tx.Process.Duration > 0 {
 			return nil, ethereum.Address{}, fmt.Errorf("cannot add process with both duration time and block count")

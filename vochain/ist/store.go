@@ -1,9 +1,7 @@
 package ist
 
 import (
-	"bytes"
 	"fmt"
-	"strings"
 
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
@@ -41,18 +39,11 @@ func (c *Controller) retrieveAction(id []byte) (*Action, error) {
 // findPendingActions returns all pending actions that are ready to be executed.
 func (c *Controller) findPendingActions(height, timestamp uint32) ([]*Action, error) {
 	pendingActions := []*Action{}
-	// legacyActionsKVs (along with legacy.go) can be removed once LTS 1.2 chain is upgraded
-	legacyActionsKVs := make(map[string][]byte)
 	if err := c.state.NoState(true).Iterate([]byte(dbPrefix), func(key, value []byte) bool {
 		act := &Action{}
 		if err := act.decode(value); err != nil {
-			if strings.Contains(err.Error(), "gob: type mismatch") {
-				legacyActionsKVs[string(bytes.Clone(key))] = bytes.Clone(value)
-				return true
-			} else {
-				log.Errorw(err, fmt.Sprintf("error decoding ist action with key %x, ignoring", key))
-				return true
-			}
+			log.Errorw(err, fmt.Sprintf("error decoding ist action with key %x, ignoring", key))
+			return true
 		}
 		if (act.Height != 0 && height >= act.Height) || (act.TimeStamp != 0) && timestamp >= act.TimeStamp {
 			pendingActions = append(pendingActions, act)
@@ -61,14 +52,6 @@ func (c *Controller) findPendingActions(height, timestamp uint32) ([]*Action, er
 	}); err != nil {
 		return nil, err
 	}
-
-	legacyActions := c.handleLegacyActionsKVs(legacyActionsKVs)
-	for _, act := range legacyActions {
-		if act.Height != 0 && height >= act.Height {
-			pendingActions = append(pendingActions, act)
-		}
-	}
-
 	return pendingActions, nil
 }
 
