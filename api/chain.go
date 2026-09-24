@@ -511,6 +511,13 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 	if err != nil {
 		return err
 	}
+	// Skip Power=0 tombstones, as in chainValidatorsHandler.
+	validatorCount := uint32(0)
+	for _, v := range validators {
+		if v.GetPower() > 0 {
+			validatorCount++
+		}
+	}
 	// TODO: merge the "count total" methods for entities/processes/votes in the indexer
 	voteCount, err := a.indexer.CountTotalVotes()
 	if err != nil {
@@ -546,7 +553,7 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		Height:            a.vocapp.Height(),
 		Syncing:           !a.vocapp.IsSynced(),
 		TransactionCount:  transactionCount,
-		ValidatorCount:    uint32(len(validators)),
+		ValidatorCount:    validatorCount,
 		Timestamp:         a.vocapp.Timestamp(),
 		VoteCount:         voteCount,
 		GenesisTime:       a.vocapp.Genesis().GenesisTime,
@@ -1190,6 +1197,11 @@ func (a *API) chainValidatorsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCon
 	}
 	validators := ValidatorList{}
 	for _, v := range stateValidators {
+		// Skip tombstoned leaves — Power=0 marks a validator awaiting
+		// reap on the next block; not part of the active set.
+		if v.GetPower() == 0 {
+			continue
+		}
 		validators.Validators = append(validators.Validators, Validator{
 			AccountAddress:   v.GetAddress(),
 			ValidatorAddress: v.GetValidatorAddress(),
