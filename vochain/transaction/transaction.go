@@ -18,8 +18,10 @@ import (
 )
 
 const (
-	// newValidatorPower is the default power of a new validator
-	newValidatorPower = 5
+	// newValidatorPower is the entry power of a new validator: 5% of maxPower
+	// (see vochain/ist/validators.go). Keep it scaled with maxPower so the entry
+	// weight stays consistent across parameter revisions.
+	newValidatorPower = 50
 )
 
 var (
