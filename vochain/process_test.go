@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/transaction"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -710,60 +711,61 @@ func TestSetProcessDuration(t *testing.T) {
 	qt.Assert(t, oldBalance-newBalance >= 30, qt.IsTrue)
 }
 
-// TestNewProcessSoftDeprecatesLegacyCSPOrigin covers the LTS/1.3 soft deprecation
-// of CensusOrigin_OFF_CHAIN_CA: process creation still succeeds so integrators
-// currently on the SDK's legacy origin keep working, but the CheckTx response
-// carries a warning in its Log field that surfaces to API clients (and via
-// log.Warnw to validator operators). The follow-up LTS/1.4 change will flip
-// this to a hard rejection.
-func TestNewProcessSoftDeprecatesLegacyCSPOrigin(t *testing.T) {
+// TestNewProcessRejectsLegacyCSPOrigin covers the hard rejection of
+// CensusOrigin_OFF_CHAIN_CA at process creation: the legacy origin has a
+// broken salt derivation for the salted ProofCA types (issue #1424) and was
+// soft-deprecated in LTS/1.3 with a warning, then rejected from
+// transaction.LegacyCSPRejectHeightLTS13; the fixed OFF_CHAIN_CA_V2 origin
+// remains accepted.
+func TestNewProcessRejectsLegacyCSPOrigin(t *testing.T) {
 	app, accounts := createTestBaseApplicationAndAccounts(t, 2)
 
-	buildProcess := func(origin models.CensusOrigin) *models.Process {
-		return &models.Process{
-			EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
-			Mode:          &models.ProcessMode{Interruptible: true},
-			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
-			Status:        models.ProcessStatus_READY,
-			EntityId:      accounts[0].Address().Bytes(),
-			CensusRoot:    util.RandomBytes(33),
-			CensusOrigin:  origin,
-			Duration:      10240,
-			MaxCensusSize: 10,
-		}
+	process := &models.Process{
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(33),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		Duration:      10240,
+		MaxCensusSize: 10,
 	}
 
-	// legacy OFF_CHAIN_CA: accepted, warning surfaced in CheckTx Log
-	log := checkTxLog(t, app, accounts[0], buildProcess(models.CensusOrigin_OFF_CHAIN_CA))
-	qt.Assert(t, log, qt.Contains, "OFF_CHAIN_CA is deprecated")
+	// legacy OFF_CHAIN_CA is rejected at CheckTx
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[0], app, process),
+		qt.ErrorMatches, ".*OFF_CHAIN_CA is no longer supported.*")
 
-	// OFF_CHAIN_CA_V2: accepted, no warning
-	log = checkTxLog(t, app, accounts[1], buildProcess(models.CensusOrigin_OFF_CHAIN_CA_V2))
-	qt.Assert(t, log, qt.Equals, "")
+	// OFF_CHAIN_CA_V2 with the same fields is accepted
+	process.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA_V2
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
 }
 
-// checkTxLog signs and runs CheckTx for a NewProcess and returns the response
-// Log field (the API surfaces it as the ElectionCreate.Warning field). The test
-// asserts a Code=0 acceptance; use it only where the transaction is expected to
-// pass its checks.
-func checkTxLog(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys, process *models.Process) string {
-	t.Helper()
-	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
-	qt.Assert(t, err, qt.IsNil)
-	tx := &models.NewProcessTx{
-		Txtype:  models.TxType_NEW_PROCESS,
-		Nonce:   txSenderAcc.Nonce,
-		Process: process,
+// TestLegacyCSPOriginGateLTS13 checks that on vocdoni/LTS/1.3 legacy
+// OFF_CHAIN_CA is still accepted before transaction.LegacyCSPRejectHeightLTS13,
+// as with the LTS/1.3 soft-deprecation, and rejected from that height.
+func TestLegacyCSPOriginGateLTS13(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 2)
+	app.SetChainID("vocdoni/LTS/1.3")
+	app.State.SetHeight(transaction.LegacyCSPRejectHeightLTS13 - 1)
+
+	process := &models.Process{
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      accounts[0].Address().Bytes(),
+		CensusRoot:    util.RandomBytes(33),
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA,
+		Duration:      10240,
+		MaxCensusSize: 10,
 	}
-	var stx models.SignedTx
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: tx}})
-	qt.Assert(t, err, qt.IsNil)
-	stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID)
-	qt.Assert(t, err, qt.IsNil)
-	rawTx, err := proto.Marshal(&stx)
-	qt.Assert(t, err, qt.IsNil)
-	resp, err := app.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: rawTx})
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("CheckTx failed: %s", resp.Data))
-	return resp.Log
+
+	// before activation: legacy OFF_CHAIN_CA is accepted
+	qt.Assert(t, testCreateProcess(t, accounts[0], app, process), qt.IsNotNil)
+
+	// at activation: legacy OFF_CHAIN_CA is rejected
+	app.State.SetHeight(transaction.LegacyCSPRejectHeightLTS13)
+	qt.Assert(t, testCreateProcessWithErr(t, accounts[0], app, process),
+		qt.ErrorMatches, ".*OFF_CHAIN_CA is no longer supported.*")
 }
