@@ -154,6 +154,14 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 	}
+
+	if tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA {
+		// Legacy OFF_CHAIN_CA has a broken salt derivation.
+		// Soft-deprecated in LTS/1.3 and scheduled for hard rejection in LTS/1.4.
+		log.Warnw("deprecated OFF_CHAIN_CA census origin (issue #1424); use OFF_CHAIN_CA_V2",
+			"processId", hex.EncodeToString(tx.Process.ProcessId),
+			"entityId", hex.EncodeToString(tx.Process.EntityId))
+	}
 	return tx.Process, ethereum.Address(*addr), nil
 }
 

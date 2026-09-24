@@ -709,3 +709,61 @@ func TestSetProcessDuration(t *testing.T) {
 	// check that newBalance is at least 30 tokens less than oldBalance
 	qt.Assert(t, oldBalance-newBalance >= 30, qt.IsTrue)
 }
+
+// TestNewProcessSoftDeprecatesLegacyCSPOrigin covers the LTS/1.3 soft deprecation
+// of CensusOrigin_OFF_CHAIN_CA: process creation still succeeds so integrators
+// currently on the SDK's legacy origin keep working, but the CheckTx response
+// carries a warning in its Log field that surfaces to API clients (and via
+// log.Warnw to validator operators). The follow-up LTS/1.4 change will flip
+// this to a hard rejection.
+func TestNewProcessSoftDeprecatesLegacyCSPOrigin(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 2)
+
+	buildProcess := func(origin models.CensusOrigin) *models.Process {
+		return &models.Process{
+			EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+			Mode:          &models.ProcessMode{Interruptible: true},
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+			Status:        models.ProcessStatus_READY,
+			EntityId:      accounts[0].Address().Bytes(),
+			CensusRoot:    util.RandomBytes(33),
+			CensusOrigin:  origin,
+			Duration:      10240,
+			MaxCensusSize: 10,
+		}
+	}
+
+	// legacy OFF_CHAIN_CA: accepted, warning surfaced in CheckTx Log
+	log := checkTxLog(t, app, accounts[0], buildProcess(models.CensusOrigin_OFF_CHAIN_CA))
+	qt.Assert(t, log, qt.Contains, "OFF_CHAIN_CA is deprecated")
+
+	// OFF_CHAIN_CA_V2: accepted, no warning
+	log = checkTxLog(t, app, accounts[1], buildProcess(models.CensusOrigin_OFF_CHAIN_CA_V2))
+	qt.Assert(t, log, qt.Equals, "")
+}
+
+// checkTxLog signs and runs CheckTx for a NewProcess and returns the response
+// Log field (the API surfaces it as the ElectionCreate.Warning field). The test
+// asserts a Code=0 acceptance; use it only where the transaction is expected to
+// pass its checks.
+func checkTxLog(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys, process *models.Process) string {
+	t.Helper()
+	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	tx := &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   txSenderAcc.Nonce,
+		Process: process,
+	}
+	var stx models.SignedTx
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: tx}})
+	qt.Assert(t, err, qt.IsNil)
+	stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID)
+	qt.Assert(t, err, qt.IsNil)
+	rawTx, err := proto.Marshal(&stx)
+	qt.Assert(t, err, qt.IsNil)
+	resp, err := app.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: rawTx})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("CheckTx failed: %s", resp.Data))
+	return resp.Log
+}
