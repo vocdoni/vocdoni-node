@@ -691,6 +691,7 @@ func (a *API) chainSendTxHandler(msg *apirest.APIdata, ctx *httprouter.HTTPConte
 		Response: res.Data.Bytes(),
 		Code:     &res.Code,
 		Hash:     res.Hash.Bytes(),
+		Warning:  res.Log,
 	})
 	if err != nil {
 		return err
@@ -743,12 +744,12 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 	deltas := map[string]int32{}
 	result := classifyTransactionBatch(req.Transactions,
 		func(payload []byte) []byte { return a.batchProcessID(payload, deltas) },
-		func(payload []byte) (hash []byte, code uint32, err error) {
+		func(payload []byte) (hash []byte, code uint32, warning string, err error) {
 			res, err := a.sendTx(payload)
 			if err != nil {
-				return nil, 0, err
+				return nil, 0, "", err
 			}
-			return res.Hash.Bytes(), res.Code, nil
+			return res.Hash.Bytes(), res.Code, res.Log, nil
 		},
 	)
 
@@ -792,7 +793,7 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 func classifyTransactionBatch(
 	txs []TransactionPayload,
 	processID func(payload []byte) []byte,
-	send func(payload []byte) (hash []byte, code uint32, err error),
+	send func(payload []byte) (hash []byte, code uint32, warning string, err error),
 ) *TransactionBatchResult {
 	result := &TransactionBatchResult{
 		Submitted: []TransactionBatchItem{},
@@ -806,7 +807,7 @@ func classifyTransactionBatch(
 			result.Pending = append(result.Pending, item)
 			continue
 		}
-		hash, code, err := send(txs[i].Payload)
+		hash, code, warning, err := send(txs[i].Payload)
 		if err != nil {
 			item.Error = err.Error()
 			result.Failed = append(result.Failed, item)
@@ -815,6 +816,7 @@ func classifyTransactionBatch(
 		}
 		item.Hash = hash
 		item.Code = &code
+		item.Warning = warning
 		result.Submitted = append(result.Submitted, item)
 	}
 	return result

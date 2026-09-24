@@ -379,10 +379,11 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		ElectionMode:    ElectionMode{ProcessMode: proc.Mode},
 		TallyMode:       TallyMode{ProcessVoteOptions: proc.VoteOpts},
 		Census: &ElectionCensus{
-			CensusOrigin:  models.CensusOrigin_name[proc.CensusOrigin],
-			CensusRoot:    proc.CensusRoot,
-			CensusURL:     proc.CensusURI,
-			MaxCensusSize: proc.MaxCensusSize,
+			CensusOrigin:           models.CensusOrigin_name[proc.CensusOrigin],
+			CensusOriginDeprecated: proc.CensusOrigin == int32(models.CensusOrigin_OFF_CHAIN_CA),
+			CensusRoot:             proc.CensusRoot,
+			CensusURL:              proc.CensusURI,
+			MaxCensusSize:          proc.MaxCensusSize,
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
@@ -747,6 +748,7 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	resp := &ElectionCreate{
 		TxHash:     res.Hash.Bytes(),
 		ElectionID: res.Data.Bytes(),
+		Warning:    res.Log,
 	}
 
 	// check the electionID returned by Vochain is actually valid
