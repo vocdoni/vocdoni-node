@@ -67,7 +67,7 @@ var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
 	"dev":   "vocdoni/DEV/36",
 	"stage": "vocdoni/STAGE/12",
-	"lts":   "vocdoni/LTS/1.2",
+	"lts":   "vocdoni/LTS/1.3",
 }
 
 // genesis contains all hardcoded genesis, indexed by chainID
@@ -144,7 +144,7 @@ var (
 			GenesisDoc: comettypes.GenesisDoc{
 				GenesisTime:   time.Date(2024, time.April, 24, 9, 0, 0, 0, time.UTC),
 				InitialHeight: 1,
-				ConsensusParams: &comettypes.ConsensusParams{ // TODO: use DefaultConsensusParams when bumping to vocdoni/LTS/1.3
+				ConsensusParams: &comettypes.ConsensusParams{
 					Block:     DefaultBlockParams(),
 					Evidence:  comettypes.DefaultEvidenceParams(),
 					Validator: DefaultValidatorParams(),
@@ -155,6 +155,14 @@ var (
 				AppState: jsonRawMessage(initialAppStateForLTS),
 			},
 			EndOfChain: 8622985,
+		},
+		"vocdoni/LTS/1.3": {
+			GenesisDoc: comettypes.GenesisDoc{
+				GenesisTime:     time.Date(2026, time.September, 28, 10, 15, 8, 0, time.UTC),
+				InitialHeight:   8622986,
+				ConsensusParams: DefaultConsensusParams(),
+				AppHash:         []byte(types.HexStringToHexBytes("567172252756b9530bd2fe305661fdec0cdb6cac8fea7d15ae23436668f01acc")),
+			},
 		},
 	}
 )
