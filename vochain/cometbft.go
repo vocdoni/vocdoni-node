@@ -97,6 +97,19 @@ func (app *BaseApplication) InitChain(_ context.Context,
 		if err != nil {
 			return nil, fmt.Errorf("cannot get validators: %w", err)
 		}
+		// Strip Power=0 tombstones. If the freeze in an EndOfChain ceremony
+		// captured state between an eviction's tombstone tick and the
+		// following block's reap, the map still carries the Power=0 leaf.
+		// CometBFT validates InitChainResponse.Validators with
+		// allowDeletes=false and panics on any Power=0 entry, so a chain
+		// restart on such a state would never start. The reap runs
+		// naturally on the first block of the new chain, so dropping the
+		// leaf here is only for the InitChain window.
+		for idx, v := range validators {
+			if v.Power == 0 {
+				delete(validators, idx)
+			}
+		}
 
 		return &cometabcitypes.InitChainResponse{
 			Validators: validatorUpdate(validators),
@@ -335,7 +348,11 @@ func (app *BaseApplication) FinalizeBlock(_ context.Context,
 		return nil, fmt.Errorf("finalize block: could not schedule IST action: %w", err)
 	}
 
-	// update current validators
+	// update current validators. The map reflects the state after this
+	// block's IST tick, including tombstoned validators (Power=0) that
+	// were flagged for eviction — validatorUpdate emits Power=0 for each,
+	// which is the ABCI signal CometBFT requires to drop them from its set.
+	// On the next tick the IST cleanup pass removes their state leaves.
 	validators, err := app.State.Validators(false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot get validators: %w", err)
