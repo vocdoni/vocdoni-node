@@ -86,6 +86,9 @@ func (c *HTTPclient) NewElectionRaw(process *models.Process) (types.HexBytes, er
 	if err := json.Unmarshal(resp, electionCreate); err != nil {
 		return nil, err
 	}
+	if electionCreate.Warning != "" {
+		log.Warnf("election %x: %s", electionCreate.ElectionID, electionCreate.Warning)
+	}
 
 	return electionCreate.ElectionID, nil
 }
@@ -247,6 +250,9 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 	electionCreate = new(api.ElectionCreate)
 	if err := json.Unmarshal(resp, electionCreate); err != nil {
 		return nil, err
+	}
+	if electionCreate.Warning != "" {
+		log.Warnf("election %x: %s", electionCreate.ElectionID, electionCreate.Warning)
 	}
 	if electionCreate.MetadataURL == "" {
 		log.Warnf("metadata could not be published")

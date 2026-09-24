@@ -44,12 +44,17 @@ func TestClassifyTransactionBatch(t *testing.T) {
 	processID := func(p []byte) []byte { return append([]byte("pid-"), p...) }
 
 	var sent [][]byte
-	send := func(p []byte) (hash []byte, code uint32, err error) {
+	send := func(p []byte) (hash []byte, code uint32, warning string, err error) {
 		sent = append(sent, p)
 		if string(p) == "bad" {
-			return nil, 0, fmt.Errorf("boom")
+			return nil, 0, "", fmt.Errorf("boom")
 		}
-		return append([]byte("hash-"), p...), 0, nil
+		// only "a" comes back with a CheckTx Log, so we can tell the warning
+		// is carried per-item rather than smeared across the batch.
+		if string(p) == "a" {
+			warning = "deprecated something"
+		}
+		return append([]byte("hash-"), p...), 0, warning, nil
 	}
 
 	res := classifyTransactionBatch(txs, processID, send)
@@ -73,6 +78,10 @@ func TestClassifyTransactionBatch(t *testing.T) {
 	c.Assert(res.Pending[0].Hash, qt.IsNil)
 	// submitted items carry their hash
 	c.Assert(res.Submitted[0].Hash, qt.DeepEquals, types.HexBytes("hash-a"))
+	// the CheckTx Log reaches the batch item that produced it, and only it,
+	// so batch clients see the same deprecation notices as the single-tx path
+	c.Assert(res.Submitted[0].Warning, qt.Equals, "deprecated something")
+	c.Assert(res.Submitted[1].Warning, qt.Equals, "")
 }
 
 // TestChainSendTxBatchHandler exercises the HTTP handler end to end against a test

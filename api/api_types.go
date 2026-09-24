@@ -184,6 +184,7 @@ type ElectionKeys struct {
 
 type ElectionCensus struct {
 	CensusOrigin           string         `json:"censusOrigin"`
+	CensusOriginDeprecated bool           `json:"censusOriginDeprecated,omitempty"`
 	CensusRoot             types.HexBytes `json:"censusRoot" `
 	PostRegisterCensusRoot types.HexBytes `json:"postRegisterCensusRoot" `
 	CensusURL              string         `json:"censusURL"`
@@ -197,6 +198,7 @@ type ElectionCreate struct {
 	ElectionID                types.HexBytes `json:"electionID" `
 	MetadataURL               string         `json:"metadataURL"`
 	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
+	Warning                   string         `json:"warning,omitempty"`
 }
 
 type ElectionDescription struct {
@@ -331,6 +333,7 @@ type Transaction struct {
 	Costs     map[string]uint64 `json:"costs,omitempty" extensions:"x-omitempty" swaggerignore:"true"`
 	Address   types.HexBytes    `json:"address,omitempty" extensions:"x-omitempty" swaggerignore:"true" `
 	ProcessID types.HexBytes    `json:"processId,omitempty" extensions:"x-omitempty" `
+	Warning   string            `json:"warning,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionPayload is one pre-signed transaction (base64-encoded models.SignedTx)
@@ -359,6 +362,7 @@ type TransactionBatchItem struct {
 	// in Failed instead. The field is kept for parity with the single-tx endpoint.
 	Code        *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
 	Error       string  `json:"error,omitempty" extensions:"x-omitempty"`
+	Warning     string  `json:"warning,omitempty" extensions:"x-omitempty"`
 	MetadataURL string  `json:"metadataURL,omitempty" extensions:"x-omitempty"`
 }
 
