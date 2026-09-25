@@ -154,6 +154,7 @@ var (
 				},
 				AppState: jsonRawMessage(initialAppStateForLTS),
 			},
+			EndOfChain: 8622050,
 		},
 	}
 )
