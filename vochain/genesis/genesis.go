@@ -67,7 +67,7 @@ var networks = map[string]string{
 	"test":  "vocdoni/TEST/1",
 	"dev":   "vocdoni/DEV/36",
 	"stage": "vocdoni/STAGE/12",
-	"lts":   "vocdoni/LTS/1.2",
+	"lts":   "vocdoni/LTS/1.3",
 }
 
 // genesis contains all hardcoded genesis, indexed by chainID
@@ -144,7 +144,7 @@ var (
 			GenesisDoc: comettypes.GenesisDoc{
 				GenesisTime:   time.Date(2024, time.April, 24, 9, 0, 0, 0, time.UTC),
 				InitialHeight: 1,
-				ConsensusParams: &comettypes.ConsensusParams{ // TODO: use DefaultConsensusParams when bumping to vocdoni/LTS/1.3
+				ConsensusParams: &comettypes.ConsensusParams{
 					Block:     DefaultBlockParams(),
 					Evidence:  comettypes.DefaultEvidenceParams(),
 					Validator: DefaultValidatorParams(),
@@ -155,6 +155,18 @@ var (
 				AppState: jsonRawMessage(initialAppStateForLTS),
 			},
 			EndOfChain: 8622050,
+		},
+		"vocdoni/LTS/1.3": {
+			GenesisDoc: comettypes.GenesisDoc{
+				// TODO(post-freeze): set to freeze wall time captured from the miner logs.
+				GenesisTime:     time.Date(2026, time.September, 28, 7, 30, 0, 0, time.UTC),
+				InitialHeight:   8622051,
+				ConsensusParams: DefaultConsensusParams(),
+				// TODO(post-freeze): replace with the AppHash captured from the freeze logs.
+				// Command: docker logs vocdoninode-vocdoninode-1 2>&1 | grep 'now you can deploy' | head -1
+				// Verify all validators log the same AppHash before committing.
+				AppHash: []byte(types.HexStringToHexBytes("0000000000000000000000000000000000000000000000000000000000000000")),
+			},
 		},
 	}
 )
