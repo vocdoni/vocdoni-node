@@ -75,6 +75,7 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 		return &cometcoretypes.ResultBroadcastTx{
 			Code: resp.Code,
 			Data: resp.Data,
+			Log:  resp.Log,
 			Hash: comettmhash.Sum(tx),
 		}, nil
 	}
@@ -112,6 +113,7 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	return &cometcoretypes.ResultBroadcastTx{
 		Code: resp.Code,
 		Data: resp.Data,
+		Log:  resp.Log,
 		Hash: comettmhash.Sum(tx),
 	}, nil
 }
