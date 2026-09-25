@@ -48,12 +48,12 @@ func TestProcessID(t *testing.T) {
 	qt.Assert(t, et.EncryptedVotes, qt.Equals, false)
 	qt.Assert(t, et.Anonymous, qt.Equals, true)
 
-	csOrg = models.CensusOrigin_ERC20
+	csOrg = models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED
 	err = pid.SetCensusOrigin(csOrg)
 	qt.Assert(t, err, qt.IsNil)
 	err = pid2.Unmarshal(pid.Marshal())
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, pid2.CensusOrigin(), qt.Equals, models.CensusOrigin_ERC20)
+	qt.Assert(t, pid2.CensusOrigin(), qt.Equals, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)
 	qt.Assert(t, pid2.Addr().Hex(), qt.Equals, test_vbAddr)
 
 	err = pid.SetCensusOrigin(777)

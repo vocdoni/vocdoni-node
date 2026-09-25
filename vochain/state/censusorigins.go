@@ -22,10 +22,6 @@ var CensusOrigins = map[models.CensusOrigin]CensusProperties{
 		Name: "offchain weighted tree", NeedsDownload: true, NeedsURI: true,
 		WeightedSupport: true, AllowCensusUpdate: true,
 	},
-	models.CensusOrigin_ERC20: {
-		Name: "erc20", NeedsDownload: true,
-		WeightedSupport: true, NeedsIndexSlot: true,
-	},
 	models.CensusOrigin_OFF_CHAIN_CA: {
 		Name: "ca", WeightedSupport: true,
 		NeedsURI: true, AllowCensusUpdate: true,
@@ -33,9 +29,5 @@ var CensusOrigins = map[models.CensusOrigin]CensusProperties{
 	models.CensusOrigin_OFF_CHAIN_CA_V2: {
 		Name: "ca_v2", WeightedSupport: true,
 		NeedsURI: true, AllowCensusUpdate: true,
-	},
-	models.CensusOrigin_FARCASTER_FRAME: {
-		Name: "farcaster", NeedsDownload: true,
-		NeedsURI: true, AllowCensusUpdate: true, WeightedSupport: true,
 	},
 }
