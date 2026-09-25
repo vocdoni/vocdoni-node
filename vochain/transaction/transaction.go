@@ -114,9 +114,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			return nil, fmt.Errorf("newProcessTx: %w", err)
 		}
 		response.Data = p.ProcessId
-		if p.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA {
-			response.Log = "warning: census origin OFF_CHAIN_CA is deprecated (issue #1424); use OFF_CHAIN_CA_V2"
-		}
 		if forCommit {
 			tx := vtx.Tx.GetNewProcess()
 			if tx.Process == nil {

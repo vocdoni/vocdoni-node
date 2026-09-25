@@ -425,7 +425,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 	}
 	entityID := cli.MyAddress().Bytes()
 	censusRoot := cspKey.PublicKey()
-	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA
+	censusOrigin := models.CensusOrigin_OFF_CHAIN_CA_V2
 	censusSize := uint64(10)
 	processID, err := cli.NewElectionRaw(
 		&models.Process{
