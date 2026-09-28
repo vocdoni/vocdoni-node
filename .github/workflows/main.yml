@@ -131,7 +131,8 @@ jobs:
 
   call-docker-release:
     name: Docker
-    needs: [job_go_checks, job_go_test, job_compose_test]
+    # tests take ~12 min and would sit on the critical path of timed LTS rollouts. They still run in parallel for signal.
+    # needs: [job_go_checks, job_go_test, job_compose_test]
     # docker releases are triggered only on push to the selected branches at the beginning of this file
     if: github.event_name == 'push' &&
         github.ref != 'refs/heads/dev'   # but pushes to dev trigger a release via a quicker workflow (deploy-dev.yml) which skips the tests
