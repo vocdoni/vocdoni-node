@@ -27,7 +27,8 @@ var DefaultSeedNodes = map[string][]string{
 
 	// LTS production network
 	"lts": {
-		"32acbdcda649fbcd35775f1dd8653206d940eee4@seed1.lts.vocdoni.net:26656",
+		"c1c1b643caaa1aa6af27111d5ff1a8ee5d0fc35b@seed1.lts.vocdoni.net:26656",
 		"02bfac9bd98bf25429d12edc50552cca5e975080@seed2.lts.vocdoni.net:26656",
+		"91991f4828dd46a787c0c862d2b58ae43a0fbc8c@seed3.lts.vocdoni.net:26656",
 	},
 }
