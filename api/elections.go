@@ -256,26 +256,26 @@ func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //
 //	@Summary				List elections
 //	@Description.markdown	electionListHandler
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			page			query		number	false	"Page"
-//	@Param			limit			query		number	false	"Items per page"
-//	@Param			organizationId	query		string	false	"Filter by partial organizationId"
-//	@Param			status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
-//	@Param			electionId		query		string	false	"Filter by partial electionId"
-//	@Param			withResults		query		boolean	false	"Filter by (partial or final) results available or not"
-//	@Param			finalResults	query		boolean	false	"Filter by final results available or not"
-//	@Param			manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
-//	@Param			startDateAfter	query		string	false	"Only elections starting at or after this date (RFC3339 or YYYY-MM-DD)"
-//	@Param			startDateBefore	query		string	false	"Only elections starting at or before this date (RFC3339 or YYYY-MM-DD)"
-//	@Param			endDateAfter	query		string	false	"Only elections ending at or after this date (RFC3339 or YYYY-MM-DD)"
-//	@Param			endDateBefore	query		string	false	"Only elections ending at or before this date (RFC3339 or YYYY-MM-DD)"
-//	@Param			title			query		string	false	"Filter by election title, case-insensitive substring match (ASCII case folding only)"
-//	@Param			sortBy			query		string	false	"Sort by createdAt (default), startDate, endDate, voteCount or title"	Enums(createdAt, startDate, endDate, voteCount, title)
-//	@Param			order			query		string	false	"Sort direction. Defaults to asc for title, desc for everything else"	Enums(asc, desc)
-//	@Success		200				{object}	ElectionsList
-//	@Router			/elections [get]
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					page			query		number	false	"Page"
+//	@Param					limit			query		number	false	"Items per page"
+//	@Param					organizationId	query		string	false	"Filter by partial organizationId"
+//	@Param					status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
+//	@Param					electionId		query		string	false	"Filter by partial electionId"
+//	@Param					withResults		query		boolean	false	"Filter by (partial or final) results available or not"
+//	@Param					finalResults	query		boolean	false	"Filter by final results available or not"
+//	@Param					manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
+//	@Param					startDateAfter	query		string	false	"Only elections starting at or after this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					startDateBefore	query		string	false	"Only elections starting at or before this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					endDateAfter	query		string	false	"Only elections ending at or after this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					endDateBefore	query		string	false	"Only elections ending at or before this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					title			query		string	false	"Filter by election title, case-insensitive substring match (ASCII case folding only)"
+//	@Param					sortBy			query		string	false	"Sort by createdAt (default), startDate, endDate, voteCount or title"	Enums(createdAt, startDate, endDate, voteCount, title)
+//	@Param					order			query		string	false	"Sort direction. Defaults to asc for title, desc for everything else"	Enums(asc, desc)
+//	@Success				200				{object}	ElectionsList
+//	@Router					/elections [get]
 func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := electionParams(ctx.QueryParam,
 		ParamPage,

@@ -290,7 +290,7 @@ func (a *API) enableChainHandlers() error {
 //	@Param					organizationId	query		string	false	"Filter by partial organizationId"
 //	@Param					name			query		string	false	"Filter by organization name, case-insensitive substring match (ASCII case folding only)"
 //	@Param					sortBy			query		string	false	"Sort by createdAt (when the organization first appeared, default), lastElection, electionCount, voteCount, balance or name"	Enums(createdAt, lastElection, electionCount, voteCount, balance, name)
-//	@Param					order			query		string	false	"Sort direction. Defaults to asc for name, desc for everything else"			Enums(asc, desc)
+//	@Param					order			query		string	false	"Sort direction. Defaults to asc for name, desc for everything else"															Enums(asc, desc)
 //	@Success				200				{object}	OrganizationsList
 //	@Router					/chain/organizations [get]
 func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
