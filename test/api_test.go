@@ -1,6 +1,7 @@
 package test
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -1145,4 +1146,103 @@ func TestAPIElectionsList(t *testing.T) {
 	// this should return no elections,
 	el["me_true"] = fetchEL("GET", nil, "manuallyEnded=true", "elections")
 	qt.Assert(t, el["me_true"].Pagination.TotalItems, qt.Equals, uint64(0))
+}
+
+func TestAPIElectionMetadataUpdate(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+	signer := createAccount(t, c, server, 80)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+	censusRoot := createCensus(t, c)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
+	electionResponse := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false, 0)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 4)
+
+	newMetadata, err := json.Marshal(&api.ElectionMetadata{
+		Title:   map[string]string{"default": "updated election"},
+		Version: "1.0",
+	})
+	qt.Assert(t, err, qt.IsNil)
+	// bare CID, as createElection does, since the storage mock indexes files by it
+	newMetadataURI := ipfs.CalculateCIDv1json(newMetadata)
+
+	signedSetMetadataTx := func(hash []byte) []byte {
+		txb, err := proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: &models.SetProcessTx{
+			Txtype:       models.TxType_SET_PROCESS_METADATA,
+			Nonce:        1,
+			ProcessId:    electionResponse.ElectionID,
+			Metadata:     &newMetadataURI,
+			MetadataHash: hash,
+		}}})
+		qt.Assert(t, err, qt.IsNil)
+		signature, err := signer.SignVocdoniTx(txb, server.VochainAPP.ChainID())
+		qt.Assert(t, err, qt.IsNil)
+		stxb, err := proto.Marshal(&models.SignedTx{Tx: txb, Signature: signature})
+		qt.Assert(t, err, qt.IsNil)
+		return stxb
+	}
+
+	// a hash that does not match the content is rejected
+	_, code := c.Request("PUT", &api.ElectionMetadataUpdate{
+		TxPayload: signedSetMetadataTx(make([]byte, types.MetadataHashSize)),
+		Metadata:  newMetadata,
+	}, "elections", electionResponse.ElectionID.String(), "metadata")
+	qt.Assert(t, code, qt.Equals, 400)
+
+	// the matching hash is accepted
+	resp, code := c.Request("PUT", &api.ElectionMetadataUpdate{
+		TxPayload: signedSetMetadataTx(api.MetadataHash(newMetadata)),
+		Metadata:  newMetadata,
+	}, "elections", electionResponse.ElectionID.String(), "metadata")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 5)
+
+	resp, code = c.Request("GET", nil, "elections", electionResponse.ElectionID.String())
+	qt.Assert(t, code, qt.Equals, 200)
+	var election api.Election
+	qt.Assert(t, json.Unmarshal(resp, &election), qt.IsNil)
+	qt.Assert(t, election.MetadataURL, qt.Equals, newMetadataURI)
+	qt.Assert(t, election.MetadataHash, qt.DeepEquals, types.HexBytes(api.MetadataHash(newMetadata)))
+	metadata, err := json.Marshal(election.Metadata)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, string(metadata), qt.Contains, "updated election")
+
+	// the history lists the creation version and the update, with the tx that set each
+	resp, code = c.Request("GET", nil, "elections", electionResponse.ElectionID.String(), "metadata", "history")
+	qt.Assert(t, code, qt.Equals, 200)
+	var history api.ElectionMetadataHistory
+	qt.Assert(t, json.Unmarshal(resp, &history), qt.IsNil)
+	qt.Assert(t, history.Versions, qt.HasLen, 2)
+	qt.Assert(t, history.Versions[0].MetadataURL, qt.Not(qt.Equals), "")
+	qt.Assert(t, history.Versions[0].MetadataURL, qt.Not(qt.Equals), newMetadataURI)
+	qt.Assert(t, history.Versions[0].TxHash, qt.HasLen, 32)
+	// the indexed NewProcessTx carries the process ID right after its first 0x0a 0x20,
+	// which the indexer migration relies on to locate the creation tx of existing elections
+	creationTx, err := server.Indexer.GetTransactionByHash(history.Versions[0].TxHash)
+	qt.Assert(t, err, qt.IsNil)
+	pidAt := bytes.Index(creationTx.RawTx, []byte{0x0a, 0x20}) + 2
+	qt.Assert(t, pidAt >= 2 && len(creationTx.RawTx) >= pidAt+32, qt.IsTrue)
+	qt.Assert(t, types.HexBytes(creationTx.RawTx[pidAt:pidAt+32]), qt.DeepEquals, electionResponse.ElectionID)
+	qt.Assert(t, history.Versions[1].MetadataURL, qt.Equals, newMetadataURI)
+	qt.Assert(t, history.Versions[1].MetadataHash, qt.DeepEquals, types.HexBytes(api.MetadataHash(newMetadata)))
+	qt.Assert(t, history.Versions[1].TxHash, qt.HasLen, 32)
 }

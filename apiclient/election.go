@@ -205,6 +205,7 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 		VoteOptions:   voteOptions,
 		CensusOrigin:  censusOrigin,
 		Metadata:      &metadataURI,
+		MetadataHash:  api.MetadataHash(metadataBytes),
 		MaxCensusSize: description.Census.Size,
 		TempSIKs:      &description.TempSIKs,
 	}
@@ -369,6 +370,96 @@ func (c *HTTPclient) SetElectionDuration(electionID types.HexBytes, newDuration 
 	}
 	hash, _, err := c.SignAndSendTx(txb)
 	return hash, err
+}
+
+// SetElectionMetadata replaces the metadata of an election. The new document is
+// referenced by its IPFS CIDv1 and committed on chain by its SHA-256 hash, and it
+// is published to the node storage. Returns the transaction hash.
+func (c *HTTPclient) SetElectionMetadata(electionID types.HexBytes, metadata *api.ElectionMetadata) (types.HexBytes, error) {
+	metadataBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("cannot format metadata: %w", err)
+	}
+	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+	txb, err := c.setElectionMetadataTx(electionID, metadataURI, api.MetadataHash(metadataBytes))
+	if err != nil {
+		return nil, err
+	}
+	stx, err := c.signTx(txb)
+	if err != nil {
+		return nil, err
+	}
+	resp, code, err := c.Request(HTTPPUT, &api.ElectionMetadataUpdate{
+		TxPayload: stx,
+		Metadata:  metadataBytes,
+	}, "elections", electionID.String(), "metadata")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	update := &api.ElectionMetadataUpdate{}
+	if err := json.Unmarshal(resp, update); err != nil {
+		return nil, err
+	}
+	if update.MetadataURL == "" {
+		log.Warnf("metadata could not be published")
+	}
+	return update.TxHash, nil
+}
+
+// ElectionMetadataHistory returns every metadata URL and hash the election has had, oldest first.
+func (c *HTTPclient) ElectionMetadataHistory(electionID types.HexBytes) (*api.ElectionMetadataHistory, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "metadata", "history")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	history := &api.ElectionMetadataHistory{}
+	if err := json.Unmarshal(resp, history); err != nil {
+		return nil, err
+	}
+	return history, nil
+}
+
+// SetElectionMetadataURI points the metadata of an election to a document hosted
+// elsewhere, committing its SHA-256 hash on chain. Returns the transaction hash.
+func (c *HTTPclient) SetElectionMetadataURI(electionID types.HexBytes, uri string, hash []byte) (types.HexBytes, error) {
+	txb, err := c.setElectionMetadataTx(electionID, uri, hash)
+	if err != nil {
+		return nil, err
+	}
+	txHash, _, err := c.SignAndSendTx(txb)
+	return txHash, err
+}
+
+// setElectionMetadataTx builds a protobuf marshaled SET_PROCESS_METADATA transaction.
+func (c *HTTPclient) setElectionMetadataTx(electionID types.HexBytes, uri string, hash []byte) ([]byte, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+	// get the own account details
+	acc, err := c.Account("")
+	if err != nil {
+		return nil, fmt.Errorf("could not fetch account info: %w", err)
+	}
+
+	// build the set process transaction
+	tx := models.SetProcessTx{
+		Txtype:       models.TxType_SET_PROCESS_METADATA,
+		ProcessId:    electionID,
+		Metadata:     &uri,
+		MetadataHash: hash,
+		Nonce:        acc.Nonce,
+	}
+	return proto.Marshal(&models.Tx{
+		Payload: &models.Tx_SetProcess{
+			SetProcess: &tx,
+		},
+	})
 }
 
 // SetElectionCensus updates the census of an election. Root, URI and size can be updated.
