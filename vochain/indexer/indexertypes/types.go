@@ -26,6 +26,7 @@ type Process struct {
 	CensusURI         string                     `json:"censusURI"`
 	Metadata          string                     `json:"metadata"`
 	MetadataTitle     string                     `json:"metadataTitle,omitempty"`
+	MetadataHash      types.HexBytes             `json:"metadataHash,omitempty"`
 	KeyRevealHeight   uint32                     `json:"keyRevealHeight,omitempty"`
 	KeyRevealTxHash   types.HexBytes             `json:"keyRevealTxHash,omitempty"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
@@ -84,6 +85,7 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		SourceBlockHeight: uint64(dbproc.SourceBlockHeight),
 		Metadata:          dbproc.Metadata,
 		MetadataTitle:     dbproc.MetadataTitle,
+		MetadataHash:      nonEmptyBytes(dbproc.MetadataHash),
 		KeyRevealHeight:   uint32(dbproc.KeyRevealHeight),
 		KeyRevealTxHash:   nonEmptyBytes(dbproc.KeyRevealTxHash),
 		ChainID:           dbproc.ChainID,
@@ -148,6 +150,29 @@ func nonEmptyBytes(p []byte) []byte {
 		return nil
 	}
 	return p
+}
+
+// ProcessMetadataVersion is a metadata URI and hash a process has had, and the
+// transaction that set it.
+type ProcessMetadataVersion struct {
+	Metadata     string         `json:"metadata"`
+	MetadataHash types.HexBytes `json:"metadataHash,omitempty"`
+	BlockHeight  uint32         `json:"blockHeight"`
+	TxIndex      int32          `json:"txIndex"`
+	TxHash       types.HexBytes `json:"txHash,omitempty"`
+	Time         time.Time      `json:"time"`
+}
+
+// ProcessMetadataVersionFromDB converts a process metadata history row.
+func ProcessMetadataVersionFromDB(row *indexerdb.ListProcessMetadataHistoryRow) *ProcessMetadataVersion {
+	return &ProcessMetadataVersion{
+		Metadata:     row.Metadata,
+		MetadataHash: nonEmptyBytes(row.MetadataHash),
+		BlockHeight:  uint32(row.BlockHeight),
+		TxIndex:      int32(row.BlockIndex),
+		TxHash:       nonEmptyBytes(row.TxHash),
+		Time:         row.Time,
+	}
 }
 
 // EnvelopeMetadata contains vote information for the EnvelopeList api
