@@ -304,7 +304,8 @@ const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
     SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title, p.key_reveal_height, p.key_reveal_tx_hash,
         COALESCE(a.name, '') AS account_name,
-        COALESCE(a.avatar, '') AS account_avatar
+        COALESCE(a.avatar, '') AS account_avatar,
+        COALESCE(a.balance, 0) AS account_balance
     FROM processes AS p
     LEFT JOIN accounts AS a
         ON a.account = p.entity_id
@@ -316,6 +317,9 @@ WITH results AS (
         account_avatar,
         COUNT(id) AS process_count,
         COUNT(entity_id) OVER() AS total_count,
+        CAST(SUM(vote_count) AS INTEGER) AS vote_count_total,
+        CAST(strftime('%s', MAX(creation_time)) AS INTEGER) AS last_election_unix,
+        CAST(MAX(account_balance) AS INTEGER) AS balance,
         -- organizations whose account resolves no name sort last when sorting
         -- by name, in either direction
         CASE WHEN ?5 = 'name' AND account_name = '' THEN 1 END AS sort_name_empty,
@@ -323,11 +327,17 @@ WITH results AS (
             WHEN ?5 = 'electionCount' THEN COUNT(id)
             WHEN ?5 = 'name' THEN LOWER(account_name)
             WHEN ?5 = 'createdAt' THEN MIN(creation_time)
+            WHEN ?5 = 'lastElection' THEN MAX(creation_time)
+            WHEN ?5 = 'voteCount' THEN SUM(vote_count)
+            WHEN ?5 = 'balance' THEN MAX(account_balance)
         END) END AS sort_key_asc,
         CASE WHEN ?6 = 'desc' THEN (CASE
             WHEN ?5 = 'electionCount' THEN COUNT(id)
             WHEN ?5 = 'name' THEN LOWER(account_name)
             WHEN ?5 = 'createdAt' THEN MIN(creation_time)
+            WHEN ?5 = 'lastElection' THEN MAX(creation_time)
+            WHEN ?5 = 'voteCount' THEN SUM(vote_count)
+            WHEN ?5 = 'balance' THEN MAX(account_balance)
         END) END AS sort_key_desc
     FROM results
     GROUP BY entity_id
@@ -336,6 +346,9 @@ SELECT entity_id,
 	account_name,
 	account_avatar,
 	process_count,
+	vote_count_total,
+	last_election_unix,
+	balance,
 	total_count
 FROM grouped
 ORDER BY sort_name_empty ASC, sort_key_asc ASC, sort_key_desc DESC, entity_id ASC
@@ -353,11 +366,14 @@ type SearchEntitiesParams struct {
 }
 
 type SearchEntitiesRow struct {
-	EntityID      []byte
-	AccountName   string
-	AccountAvatar string
-	ProcessCount  int64
-	TotalCount    int64
+	EntityID         []byte
+	AccountName      string
+	AccountAvatar    string
+	ProcessCount     int64
+	VoteCountTotal   int64
+	LastElectionUnix int64
+	Balance          int64
+	TotalCount       int64
 }
 
 // The join to accounts is an indexed point lookup on the accounts primary key,
@@ -366,7 +382,8 @@ type SearchEntitiesRow struct {
 // The name filter is a case-insensitive substring match; LOWER only folds ASCII
 // in sqlite, so names differing by non-ASCII case or by diacritics do not match.
 //
-// sort_by selects the ordering ('createdAt', 'electionCount' or 'name') and
+// sort_by selects the ordering ('createdAt', 'lastElection', 'electionCount',
+// 'voteCount', 'balance' or 'name') and
 // sort_order its direction ('asc' or 'desc'). Both are expected to be one of
 // those exact values; the caller validates them. sqlite cannot parameterize an
 // ORDER BY term and sqlc does not even substitute arguments inside one, so the
@@ -382,6 +399,11 @@ type SearchEntitiesRow struct {
 // grouped query, so sqlite took them from an arbitrary row of each group, and
 // with the scan driven by index_processes_entity_id that row was the group's
 // first, i.e. its oldest process.
+//
+// 'lastElection' is MAX(creation_time), the creation time of the organization's
+// most recent election. 'voteCount' is the sum of the vote counts of all its
+// elections, and 'balance' the token balance of its account (0 when the account
+// is not indexed). The same three values are returned with every row.
 //
 // entity_id is always the last tiebreak, so the ordering is total and paging
 // with LIMIT/OFFSET can neither repeat nor skip a row.
@@ -406,6 +428,9 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 			&i.AccountName,
 			&i.AccountAvatar,
 			&i.ProcessCount,
+			&i.VoteCountTotal,
+			&i.LastElectionUnix,
+			&i.Balance,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -463,11 +488,42 @@ WITH results AS (
 		AND (?12 IS NULL OR start_date <= ?12)
 		AND (?13 IS NULL OR end_date >= ?13)
 		AND (?14 IS NULL OR end_date <= ?14)
+		-- case-insensitive substring of the title resolved from the metadata; as
+		-- with the entity name filter, LOWER only folds ASCII
+		AND (?15 = '' OR INSTR(LOWER(metadata_title), LOWER(?15)) > 0)
 	)
+), sorted AS (
+	-- sort_by ('createdAt', 'startDate', 'endDate', 'voteCount' or 'title') and
+	-- sort_order ('asc' or 'desc') pick the ordering, validated by the caller.
+	-- As in SearchEntities, sqlite cannot parameterize an ORDER BY term, so the
+	-- key is computed here and the outer ORDER BY picks between the ascending
+	-- and the descending column, exactly one of which is non-NULL. id is the
+	-- last tiebreak, so the ordering is total and LIMIT/OFFSET paging neither
+	-- repeats nor skips a row. createdAt DESC is the ordering this query had
+	-- before it took a sort_by.
+	SELECT id, total_count,
+		-- elections whose title was never resolved sort last when sorting by
+		-- title, in either direction
+		CASE WHEN ?16 = 'title' AND metadata_title = '' THEN 1 END AS sort_title_empty,
+		CASE WHEN ?17 = 'asc' THEN (CASE
+			WHEN ?16 = 'createdAt' THEN creation_time
+			WHEN ?16 = 'startDate' THEN start_date
+			WHEN ?16 = 'endDate' THEN end_date
+			WHEN ?16 = 'voteCount' THEN vote_count
+			WHEN ?16 = 'title' THEN LOWER(metadata_title)
+		END) END AS sort_key_asc,
+		CASE WHEN ?17 = 'desc' THEN (CASE
+			WHEN ?16 = 'createdAt' THEN creation_time
+			WHEN ?16 = 'startDate' THEN start_date
+			WHEN ?16 = 'endDate' THEN end_date
+			WHEN ?16 = 'voteCount' THEN vote_count
+			WHEN ?16 = 'title' THEN LOWER(metadata_title)
+		END) END AS sort_key_desc
+	FROM results
 )
 SELECT id, total_count
-FROM results
-ORDER BY creation_time DESC, id ASC
+FROM sorted
+ORDER BY sort_title_empty ASC, sort_key_asc ASC, sort_key_desc DESC, id ASC
 LIMIT ?2
 OFFSET ?1
 `
@@ -487,6 +543,9 @@ type SearchProcessesParams struct {
 	StartDateBefore interface{}
 	EndDateAfter    interface{}
 	EndDateBefore   interface{}
+	TitleSubstr     interface{}
+	SortBy          interface{}
+	SortOrder       interface{}
 }
 
 type SearchProcessesRow struct {
@@ -510,6 +569,9 @@ func (q *Queries) SearchProcesses(ctx context.Context, arg SearchProcessesParams
 		arg.StartDateBefore,
 		arg.EndDateAfter,
 		arg.EndDateBefore,
+		arg.TitleSubstr,
+		arg.SortBy,
+		arg.SortOrder,
 	)
 	if err != nil {
 		return nil, err
