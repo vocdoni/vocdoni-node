@@ -22,6 +22,13 @@ const (
 	// (see vochain/ist/validators.go). Keep it scaled with maxPower so the entry
 	// weight stays consistent across parameter revisions.
 	newValidatorPower = 50
+
+	// MetadataForkHeightLTS13 is the vocdoni/LTS/1.3 height at which the
+	// process metadata fork (issue #1479) activates: the SET_PROCESS_METADATA
+	// transaction and the metadata URI/hash checks on NewProcessTx. Before it,
+	// the chain must behave exactly as binaries without these rules.
+	// TODO: set the final activation height before releasing to LTS.
+	MetadataForkHeightLTS13 = 9_000_000
 )
 
 var (
@@ -55,6 +62,13 @@ func NewTransactionHandler(state *vstate.State, istc *ist.Controller) *Transacti
 		state: state,
 		istc:  istc,
 	}
+}
+
+// metadataForkActive reports whether the process metadata fork (issue #1479)
+// is active at the current height. It is always active except on
+// vocdoni/LTS/1.3 before MetadataForkHeightLTS13.
+func (t *TransactionHandler) metadataForkActive() bool {
+	return !(t.state.ChainID() == "vocdoni/LTS/1.3" && t.state.CurrentHeight() < MetadataForkHeightLTS13)
 }
 
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
@@ -220,6 +234,10 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				// schedule the new duration on the ISTC
 				if err := t.istc.Reschedule(tx.ProcessId, process.StartTime+tx.GetDuration(), false, 0); err != nil {
 					return nil, fmt.Errorf("setProcessDuration: cannot reschedule IST action: %w", err)
+				}
+			case models.TxType_SET_PROCESS_METADATA:
+				if err := t.state.SetProcessMetadata(tx.ProcessId, tx.GetMetadata(), tx.GetMetadataHash(), true); err != nil {
+					return nil, fmt.Errorf("setProcessMetadata: %w", err)
 				}
 
 			default:
