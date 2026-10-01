@@ -253,17 +253,27 @@ if [ -n "$GOCOVERDIR" ] ; then
 	rm -rf "$GOCOVERDIR"
 	mkdir -p "$GOCOVERDIR"
 	$COMPOSE_CMD stop
-	$COMPOSE_CMD_RUN --user=`id -u`:`id -g` -v $(pwd):/wd/ gocoverage sh -c "\
-		cp -rf /app/run/gocoverage/. /wd/$GOCOVERDIR
-		go tool covdata textfmt \
-			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
-			-o=/wd/$GOCOVERDIR/gocoverage-integration.txt
-		go tool covdata merge \
-			-i=\$(find /wd/$GOCOVERDIR/ -type d -printf '%p,'| sed 's/,$//') \
-			-o=/wd/$GOCOVERDIR/
-		"
-	log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
-	log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
+	# process coverage inside the container and stream it out as a tar on stdout, rather than writing
+	# to a bind mount: container uids don't map to the host user under userns-remap or rootless docker
+	if ( set -o pipefail
+		$COMPOSE_CMD run -T --rm gocoverage sh -c "set -e
+			{
+				mkdir -p /tmp/out && cp -rf /app/run/gocoverage/. /tmp/out/
+				go tool covdata textfmt \
+					-i=\$(find /tmp/out/ -type d -printf '%p,'| sed 's/,$//') \
+					-o=/tmp/out/gocoverage-integration.txt
+				go tool covdata merge \
+					-i=\$(find /tmp/out/ -type d -printf '%p,'| sed 's/,$//') \
+					-o=/tmp/out/
+			} >&2
+			tar -C /tmp/out -cf - .
+			" | tar -xf - -C "$GOCOVERDIR"
+	) ; then
+		log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
+		log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
+	else
+		log "### WARNING: failed to collect coverage data ###"
+	fi
 fi
 
 if $COMPOSE_CMD logs | grep -q "^panic:" ; then
