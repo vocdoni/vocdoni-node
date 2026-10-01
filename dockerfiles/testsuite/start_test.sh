@@ -256,19 +256,22 @@ if [ -n "$GOCOVERDIR" ] ; then
 	# process coverage inside the container and extract it with docker cp, rather than writing
 	# to a bind mount: container uids don't map to the host user under userns-remap or rootless docker
 	GOCOVERAGE_CONTAINER="${COMPOSE_PROJECT_NAME:-testsuite}_gocoverage_$RANDOM"
-	$COMPOSE_CMD_RUN --name "$GOCOVERAGE_CONTAINER" gocoverage sh -c "\
-		mkdir -p /out && cp -rf /app/run/gocoverage/. /out/
+	$COMPOSE_CMD_RUN --name "$GOCOVERAGE_CONTAINER" gocoverage sh -c "set -e
+		mkdir -p /tmp/out && cp -rf /app/run/gocoverage/. /tmp/out/
 		go tool covdata textfmt \
-			-i=\$(find /out/ -type d -printf '%p,'| sed 's/,$//') \
-			-o=/out/gocoverage-integration.txt
+			-i=\$(find /tmp/out/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/tmp/out/gocoverage-integration.txt
 		go tool covdata merge \
-			-i=\$(find /out/ -type d -printf '%p,'| sed 's/,$//') \
-			-o=/out/
+			-i=\$(find /tmp/out/ -type d -printf '%p,'| sed 's/,$//') \
+			-o=/tmp/out/
 		"
-	docker cp "$GOCOVERAGE_CONTAINER":/out/. "$GOCOVERDIR"
+	if docker cp "$GOCOVERAGE_CONTAINER":/tmp/out/. "$GOCOVERDIR" ; then
+		log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
+		log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
+	else
+		log "### WARNING: failed to extract coverage data from $GOCOVERAGE_CONTAINER ###"
+	fi
 	docker rm -f "$GOCOVERAGE_CONTAINER" >/dev/null
-	log "### Coverage data in textfmt left in $GOCOVERDIR/gocoverage-integration.txt ###"
-	log "### Coverage data in binary fmt left in $GOCOVERDIR ###"
 fi
 
 if $COMPOSE_CMD logs | grep -q "^panic:" ; then
