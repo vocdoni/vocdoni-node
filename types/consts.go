@@ -36,6 +36,12 @@ const (
 	// MaxURLLength is the maximum length of a URL string used in the protocol.
 	MaxURLLength = 2083
 
+	// MaxMetadataURILength is the maximum length, in bytes, of a process metadata URI.
+	MaxMetadataURILength = 256
+
+	// MetadataHashSize is the size of a process metadata hash (SHA-256).
+	MetadataHashSize = 32
+
 	// MaxVoteMemoSize is the maximum allowed size, in bytes, of the optional
 	// VoteEnvelope.memo free-text field.
 	MaxVoteMemoSize = 256

@@ -20,12 +20,14 @@ const metadataWriteTimeout = 5 * time.Second
 //
 // Callers should not block a request on this: it competes for the same single
 // read-write connection block commits use.
-func (idx *Indexer) SetProcessMetadataTitle(processID []byte, title string) error {
+func (idx *Indexer) SetProcessMetadataTitle(processID []byte, metadataURI string, metadataHash []byte, title string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), metadataWriteTimeout)
 	defer cancel()
 	_, err := indexerdb.New(idx.readWriteDB).SetProcessMetadataTitle(ctx, indexerdb.SetProcessMetadataTitleParams{
 		ID:            processID,
 		MetadataTitle: title,
+		Metadata:      metadataURI,
+		MetadataHash:  nonNullBytes(metadataHash),
 	})
 	return err
 }
@@ -49,10 +51,11 @@ func (idx *Indexer) SetAccountMetadata(accountID []byte, name, avatar string) er
 }
 
 // ProcessMetadataURI is a process whose title has not been resolved yet, paired
-// with the metadata URI to resolve it from.
+// with the metadata URI to resolve it from and the metadata hash committed for it.
 type ProcessMetadataURI struct {
 	ProcessID []byte
 	URI       string
+	Hash      []byte
 }
 
 // ProcessesMissingMetadataTitle returns up to limit processes which declare a
@@ -72,7 +75,7 @@ func (idx *Indexer) ProcessesMissingMetadataTitle(afterID []byte, limit int) ([]
 	}
 	list := make([]ProcessMetadataURI, 0, len(rows))
 	for _, row := range rows {
-		list = append(list, ProcessMetadataURI{ProcessID: row.ID, URI: row.Metadata})
+		list = append(list, ProcessMetadataURI{ProcessID: row.ID, URI: row.Metadata, Hash: row.MetadataHash})
 	}
 	return list, nil
 }

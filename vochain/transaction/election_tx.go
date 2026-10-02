@@ -46,6 +46,14 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
 		return nil, ethereum.Address{}, fmt.Errorf("status must be READY or PAUSED")
 	}
+	if t.metadataForkActive() {
+		if len(tx.Process.GetMetadata()) > types.MaxMetadataURILength {
+			return nil, ethereum.Address{}, fmt.Errorf("metadata URI too long (max %d bytes)", types.MaxMetadataURILength)
+		}
+		if len(tx.Process.MetadataHash) != 0 && len(tx.Process.MetadataHash) != types.MetadataHashSize {
+			return nil, ethereum.Address{}, fmt.Errorf("metadata hash must be %d bytes", types.MetadataHashSize)
+		}
+	}
 
 	// run specific checks based on census origin
 	switch tx.Process.CensusOrigin {
@@ -245,6 +253,18 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 			return ethereum.Address{}, err
 		}
 		return ethereum.Address(*addr), t.state.SetProcessDuration(process.ProcessId, tx.GetDuration(), false)
+	case models.TxType_SET_PROCESS_METADATA:
+		if !t.metadataForkActive() {
+			return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)
+		}
+		if tx.GetMetadata() == "" || len(tx.GetMetadata()) > types.MaxMetadataURILength {
+			return ethereum.Address{}, fmt.Errorf("metadata URI must be between 1 and %d bytes", types.MaxMetadataURILength)
+		}
+		if len(tx.GetMetadataHash()) != types.MetadataHashSize {
+			return ethereum.Address{}, fmt.Errorf("metadata hash must be %d bytes", types.MetadataHashSize)
+		}
+		return ethereum.Address(*addr), t.state.SetProcessMetadata(
+			process.ProcessId, tx.GetMetadata(), tx.GetMetadataHash(), false)
 
 	default:
 		return ethereum.Address{}, fmt.Errorf("unknown setProcess tx type: %s", tx.Txtype)

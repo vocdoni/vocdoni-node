@@ -2,7 +2,7 @@
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
 	vote_count, have_results, final_results, census_root,
-	max_census_size, census_uri, metadata,
+	max_census_size, census_uri, metadata, metadata_hash,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
 	private_keys, public_keys,
@@ -14,7 +14,7 @@ INSERT INTO processes (
 ) VALUES (
 	?, ?, ?, ?, ?,
 	?, ?, ?, ?,
-	?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?,
@@ -86,7 +86,11 @@ SET census_root         = sqlc.arg(census_root),
 	census_uri          = sqlc.arg(census_uri),
 	private_keys        = sqlc.arg(private_keys),
 	public_keys         = sqlc.arg(public_keys),
+	-- a new metadata document invalidates the cached title, so the API resolves it again
+	metadata_title      = CASE WHEN metadata != sqlc.arg(metadata) OR metadata_hash != sqlc.arg(metadata_hash)
+	                          THEN '' ELSE metadata_title END,
 	metadata            = sqlc.arg(metadata),
+	metadata_hash       = sqlc.arg(metadata_hash),
 	status              = sqlc.arg(status),
 	max_census_size	 	= sqlc.arg(max_census_size),
 	end_date 			= sqlc.arg(end_date)
@@ -131,17 +135,20 @@ SELECT COUNT(*) FROM processes;
 -- name: SetProcessMetadataTitle :execresult
 -- Stores the title resolved from the process off-chain metadata. Only writes when
 -- the title actually changed, so the common case of re-resolving the same title
--- costs no write.
+-- costs no write. Only writes while the process still has the metadata URI and
+-- hash the title was resolved from, so a title resolved just before a metadata
+-- update does not overwrite the reset done by that update.
 UPDATE processes
 SET metadata_title = sqlc.arg(metadata_title)
-WHERE id = sqlc.arg(id) AND metadata_title != sqlc.arg(metadata_title);
+WHERE id = sqlc.arg(id) AND metadata_title != sqlc.arg(metadata_title)
+  AND metadata = sqlc.arg(metadata) AND metadata_hash = sqlc.arg(metadata_hash);
 
 -- name: ListProcessesMissingMetadataTitle :many
 -- Lists the processes whose title was never resolved but which do declare a
 -- metadata URI, so a backfill knows where to look. Used once per boot. Paged by
 -- the process id rather than by an offset, so that a page is never revisited
 -- even though rows leave the result set as the backfill fills them.
-SELECT id, metadata FROM processes
+SELECT id, metadata, metadata_hash FROM processes
 WHERE metadata_title = '' AND metadata != '' AND id > sqlc.arg(after_id)
 ORDER BY id
 LIMIT sqlc.arg(limit);
@@ -252,3 +259,19 @@ UPDATE processes
 SET end_date = sqlc.arg(end_date),
 	manually_ended = sqlc.arg(manually_ended)
 WHERE id = sqlc.arg(id);
+
+-- name: AddProcessMetadataVersion :execresult
+INSERT OR REPLACE INTO process_metadata_history (
+	process_id, block_height, block_index, time, metadata, metadata_hash
+) VALUES (
+	?, ?, ?, ?, ?, ?
+);
+
+-- name: ListProcessMetadataHistory :many
+SELECT h.block_height, h.block_index, h.time, h.metadata, h.metadata_hash,
+	CAST(COALESCE(t.hash, x'') AS BLOB) AS tx_hash
+FROM process_metadata_history AS h
+LEFT JOIN transactions AS t
+	ON t.block_height = h.block_height AND t.block_index = h.block_index
+WHERE h.process_id = ?
+ORDER BY h.block_height ASC, h.block_index ASC;

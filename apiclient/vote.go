@@ -79,6 +79,9 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	// Attach the optional memo before the envelope is wrapped, marshaled and
 	// signed, so it is covered by the vote signature.
 	vote.Memo = v.Memo
+	// Attest the metadata the election currently commits to, as the chain
+	// rejects votes cast against any other version.
+	vote.MetadataHash = v.Election.MetadataHash
 
 	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}

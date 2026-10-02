@@ -1,14 +1,17 @@
 package vocone
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
 	"time"
 
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -483,6 +486,33 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 			return err
 		}
 		if votes == uint32(censusSize) {
+			break
+		}
+		time.Sleep(time.Second)
+	}
+
+	// replace the election metadata and wait until it is indexed
+	newMetadata := &api.ElectionMetadata{
+		Title:   map[string]string{"default": "updated election"},
+		Version: "1.0",
+	}
+	if _, err := cli.SetElectionMetadata(processID, newMetadata); err != nil {
+		return err
+	}
+	newMetadataBytes, err := json.Marshal(newMetadata)
+	if err != nil {
+		return err
+	}
+	startTimeMetadata := time.Now()
+	for {
+		if time.Since(startTimeMetadata) > time.Second*10 {
+			return fmt.Errorf("timeout waiting for the election metadata to be updated")
+		}
+		election, err := cli.Election(processID)
+		if err != nil {
+			return err
+		}
+		if bytes.Equal(election.MetadataHash, api.MetadataHash(newMetadataBytes)) {
 			break
 		}
 		time.Sleep(time.Second)

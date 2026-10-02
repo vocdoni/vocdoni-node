@@ -1742,6 +1742,147 @@ func TestCensusUpdate(t *testing.T) {
 	qt.Assert(t, proc.CensusURI, qt.DeepEquals, *newCensusURI)
 }
 
+func TestProcessMetadataUpdate(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	metadataURI := "https://example.com/metadata.json"
+	metadataHash := util.RandomBytes(types.MetadataHashSize)
+	pid := util.RandomBytes(32)
+	censusURI := "ipfs://1234"
+	if err := app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+		Mode:          &models.ProcessMode{AutoStart: true, Interruptible: true},
+		MaxCensusSize: 1000,
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Metadata:      &metadataURI,
+		MetadataHash:  metadataHash,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	app.AdvanceTestBlock()
+
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Metadata, qt.Equals, metadataURI)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, types.HexBytes(metadataHash))
+	qt.Assert(t, idx.SetProcessMetadataTitle(pid, metadataURI, metadataHash, "Old title"), qt.IsNil)
+
+	// an unrelated update keeps the cached title
+	status := models.ProcessStatus_PAUSED
+	qt.Assert(t, app.State.SetProcessStatus(pid, status, true), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MetadataTitle, qt.Equals, "Old title")
+
+	// new content behind the same URI resets the cached title
+	newHash := util.RandomBytes(types.MetadataHashSize)
+	qt.Assert(t, app.State.SetProcessMetadata(pid, metadataURI, newHash, true), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Metadata, qt.Equals, metadataURI)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, types.HexBytes(newHash))
+	qt.Assert(t, proc.MetadataTitle, qt.Equals, "")
+	pending, err := idx.ProcessesMissingMetadataTitle(nil, 10)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, pending, qt.HasLen, 1)
+	qt.Assert(t, pending[0].URI, qt.Equals, metadataURI)
+	qt.Assert(t, pending[0].Hash, qt.DeepEquals, newHash)
+
+	// a title resolved from the previous metadata does not undo the reset
+	qt.Assert(t, idx.SetProcessMetadataTitle(pid, metadataURI, metadataHash, "Old title"), qt.IsNil)
+	proc, err = idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MetadataTitle, qt.Equals, "")
+
+	// the history keeps the creation version and the update, oldest first
+	history, err := idx.ProcessMetadataHistory(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, history, qt.HasLen, 2)
+	qt.Assert(t, history[0].Metadata, qt.Equals, metadataURI)
+	qt.Assert(t, history[0].MetadataHash, qt.DeepEquals, types.HexBytes(metadataHash))
+	qt.Assert(t, history[1].Metadata, qt.Equals, metadataURI)
+	qt.Assert(t, history[1].MetadataHash, qt.DeepEquals, types.HexBytes(newHash))
+	qt.Assert(t, history[1].BlockHeight > history[0].BlockHeight, qt.IsTrue)
+}
+
+// TestProcessMetadataHistoryMigration checks that migrating an indexer db created
+// before the metadata history existed backfills the creation version of each process.
+func TestProcessMetadataHistoryMigration(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	metadataURI := "ipfs://bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy"
+	pid := util.RandomBytes(32)
+	censusURI := "ipfs://1234"
+	qt.Assert(t, app.State.AddProcess(&models.Process{
+		ProcessId:     pid,
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Status:        models.ProcessStatus_READY,
+		BlockCount:    10,
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+		Mode:          &models.ProcessMode{AutoStart: true},
+		MaxCensusSize: 1000,
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Metadata:      &metadataURI,
+	}), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err := idx.ProcessInfo(pid)
+	qt.Assert(t, err, qt.IsNil)
+
+	// go back to the schema before the metadata history, then migrate again
+	qt.Assert(t, goose.DownTo(idx.readWriteDB, "migrations", 19), qt.IsNil)
+	qt.Assert(t, goose.Up(idx.readWriteDB, "migrations"), qt.IsNil)
+
+	// no NewProcessTx indexed for it: the creating transaction is unknown
+	history, err := idx.ProcessMetadataHistory(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, history, qt.HasLen, 1)
+	qt.Assert(t, history[0].Metadata, qt.Equals, metadataURI)
+	qt.Assert(t, history[0].MetadataHash, qt.IsNil)
+	qt.Assert(t, history[0].BlockHeight, qt.Equals, uint32(0))
+	qt.Assert(t, history[0].TxHash, qt.IsNil)
+	qt.Assert(t, history[0].Time.Equal(proc.CreationTime), qt.IsTrue)
+
+	// with its NewProcessTx indexed, which carries the process ID, it is located
+	rawTx, err := proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: &models.NewProcessTx{
+		Txtype: models.TxType_NEW_PROCESS,
+		Nonce:  10,
+		Process: &models.Process{
+			ProcessId:    pid,
+			EntityId:     util.RandomBytes(20),
+			CensusRoot:   util.RandomBytes(32),
+			EnvelopeType: &models.EnvelopeType{},
+			Mode:         &models.ProcessMode{AutoStart: true},
+			Metadata:     &metadataURI,
+		},
+	}}})
+	qt.Assert(t, err, qt.IsNil)
+	txHash := util.RandomBytes(32)
+	qt.Assert(t, goose.DownTo(idx.readWriteDB, "migrations", 19), qt.IsNil)
+	_, err = idx.readWriteDB.Exec(`INSERT INTO transactions (hash, block_height, block_index, type, subtype, raw_tx)
+		VALUES (?, 7, 2, 'newProcess', 'new_process', ?)`, txHash, rawTx)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, goose.Up(idx.readWriteDB, "migrations"), qt.IsNil)
+
+	history, err = idx.ProcessMetadataHistory(pid)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, history, qt.HasLen, 1)
+	qt.Assert(t, history[0].BlockHeight, qt.Equals, uint32(7))
+	qt.Assert(t, history[0].TxIndex, qt.Equals, int32(2))
+	qt.Assert(t, history[0].TxHash, qt.DeepEquals, types.HexBytes(txHash))
+}
+
 func TestEndProcess(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
@@ -2129,7 +2270,7 @@ func TestEntityMetadata(t *testing.T) {
 	qt.Assert(t, pending, qt.HasLen, 1)
 	qt.Assert(t, pending[0].URI, qt.Equals, "ipfs://metadata")
 
-	qt.Assert(t, idx.SetProcessMetadataTitle(pending[0].ProcessID, "A vote on something"), qt.IsNil)
+	qt.Assert(t, idx.SetProcessMetadataTitle(pending[0].ProcessID, pending[0].URI, pending[0].Hash, "A vote on something"), qt.IsNil)
 	proc, err := idx.ProcessInfo(pid)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, proc.MetadataTitle, qt.Equals, "A vote on something")

@@ -90,6 +90,8 @@ var (
 	ErrTooManyBucketsRequested          = apirest.APIerror{Code: 4062, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("too many time buckets requested, use a coarser bucket or narrow the time window with the (from) and (to) params")}
 	ErrParamSortByInvalid               = apirest.APIerror{Code: 4063, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (sortBy) invalid")}
 	ErrParamOrderInvalid                = apirest.APIerror{Code: 4064, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (order) invalid, must be asc or desc")}
+	ErrMetadataHashNotMatchContent      = apirest.APIerror{Code: 4065, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("metadata hash does not match metadata content")}
+	ErrNotSetMetadataTx                 = apirest.APIerror{Code: 4066, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("transaction is not a SET_PROCESS_METADATA for this election")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}

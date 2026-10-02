@@ -55,15 +55,16 @@ func languageString(ls LanguageString) string {
 	return ""
 }
 
-// cacheElectionTitle stores an already resolved election title in the indexer.
-func (a *API) cacheElectionTitle(electionID []byte, metadata *ElectionMetadata) {
+// cacheElectionTitle stores an already resolved election title in the indexer,
+// as long as the election still has the metadata URI and hash it was resolved from.
+func (a *API) cacheElectionTitle(electionID []byte, metadataURI string, metadataHash []byte, metadata *ElectionMetadata) {
 	title := languageString(metadata.Title)
 	if title == "" || a.indexer == nil {
 		return
 	}
 	id := append([]byte(nil), electionID...)
 	go func() {
-		if err := a.indexer.SetProcessMetadataTitle(id, title); err != nil {
+		if err := a.indexer.SetProcessMetadataTitle(id, metadataURI, metadataHash, title); err != nil {
 			log.Warnw("could not cache election title", "electionId", id, "err", err.Error())
 		}
 	}()
@@ -183,7 +184,7 @@ func (a *API) backfillElectionTitles() int {
 			if title == "" {
 				return false
 			}
-			if err := a.indexer.SetProcessMetadataTitle(p.ProcessID, title); err != nil {
+			if err := a.indexer.SetProcessMetadataTitle(p.ProcessID, p.URI, p.Hash, title); err != nil {
 				log.Warnw("could not backfill election title", "electionId", p.ProcessID, "err", err.Error())
 				return false
 			}

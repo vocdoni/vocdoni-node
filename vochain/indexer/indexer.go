@@ -788,9 +788,9 @@ func (idx *Indexer) Rollback() {
 }
 
 // OnProcess indexer stores the processID
-func (idx *Indexer) OnProcess(p *models.Process, _ int32) {
+func (idx *Indexer) OnProcess(p *models.Process, txIndex int32) {
 	pid := p.GetProcessId()
-	if err := idx.newEmptyProcess(pid); err != nil {
+	if err := idx.newEmptyProcess(pid, txIndex); err != nil {
 		log.Errorw(err, "commit: cannot create new empty process")
 	}
 	if idx.App.IsSynced() {
@@ -872,6 +872,17 @@ func (idx *Indexer) OnProcessDurationChange(pid []byte, _ uint32, _ int32) {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 	idx.blockUpdateProcs[string(pid)] = true
+}
+
+// OnProcessMetadataChange adds the process to blockUpdateProcs and records the
+// new metadata version in its history
+func (idx *Indexer) OnProcessMetadataChange(pid []byte, metadataURI string, metadataHash []byte, txIndex int32) {
+	idx.blockMu.Lock()
+	defer idx.blockMu.Unlock()
+	idx.blockUpdateProcs[string(pid)] = true
+	if err := idx.addProcessMetadataVersionUnsafe(pid, metadataURI, metadataHash, txIndex); err != nil {
+		log.Errorw(err, "cannot index process metadata version")
+	}
 }
 
 // OnRevealKeys checks if all keys have been revealed and in such case add the

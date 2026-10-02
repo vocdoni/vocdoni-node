@@ -104,13 +104,7 @@ func (d *OffChainDataHandler) OnProcess(p *models.Process, _ int32) {
 		return
 	}
 	// enqueue for import election metadata information
-	if m := p.GetMetadata(); m != "" {
-		log.Debugf("adding election metadata %s to queue", m)
-		d.queue = append(d.queue, importItem{
-			uri:      m,
-			itemType: itemTypeElectionMetadata,
-		})
-	}
+	d.enqueueElectionMetadataUnsafe(p.GetMetadata())
 	// enqueue for download external census if needs to be imported
 	if state.CensusOrigins[p.CensusOrigin].NeedsDownload && len(p.GetCensusURI()) > 0 {
 		log.Debugf("adding election censusURI %s to queue", p.GetCensusURI())
@@ -139,6 +133,30 @@ func (d *OffChainDataHandler) OnCensusUpdate(pid, censusRoot []byte, censusURI s
 			itemType:   itemTypeExternalCensus,
 		})
 	}
+}
+
+// OnProcessMetadataChange is triggered when the metadata of an election is updated.
+// The new metadata URI is enqueued for import.
+func (d *OffChainDataHandler) OnProcessMetadataChange(_ []byte, metadataURI string, _ []byte, _ int32) {
+	d.queueLock.Lock()
+	defer d.queueLock.Unlock()
+	if d.importOnlyNew && !d.isSynced {
+		return
+	}
+	d.enqueueElectionMetadataUnsafe(metadataURI)
+}
+
+// enqueueElectionMetadataUnsafe enqueues an election metadata URI for import, if
+// not empty. The caller must hold queueLock.
+func (d *OffChainDataHandler) enqueueElectionMetadataUnsafe(uri string) {
+	if uri == "" {
+		return
+	}
+	log.Debugf("adding election metadata %s to queue", uri)
+	d.queue = append(d.queue, importItem{
+		uri:      uri,
+		itemType: itemTypeElectionMetadata,
+	})
 }
 
 // OnProcessesStart is triggered when a process starts. Does nothing.

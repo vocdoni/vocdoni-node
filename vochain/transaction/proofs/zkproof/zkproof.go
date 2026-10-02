@@ -47,7 +47,9 @@ func (*ProofVerifierZk) Verify(process *models.Process, envelope *models.VoteEnv
 
 	// verify the votePackage hash
 	// Disabled for issues with the current circuit implementation
-	// We must be sure the public input order is consistent with the circuit definition
+	// We must be sure the public input order is consistent with the circuit definition.
+	// Until it is enabled, nothing in the proof binds the envelope votePackage, memo
+	// nor metadataHash: re-enabling it should cover all of them.
 	//proofVoteHash, err := proof.VoteHash()
 	//if err != nil {
 	//	return false, nil, fmt.Errorf("failed on parsing vote hash from public inputs provided: %w", err)

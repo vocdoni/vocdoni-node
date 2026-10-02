@@ -282,7 +282,7 @@ func boolToInt(b *bool) int {
 
 // newEmptyProcess creates a new empty process and stores it into the database.
 // The process must exist on the Vochain state, else an error is returned.
-func (idx *Indexer) newEmptyProcess(pid []byte) error {
+func (idx *Indexer) newEmptyProcess(pid []byte, txIndex int32) error {
 	p, err := idx.App.State.Process(pid, false)
 	if err != nil {
 		return fmt.Errorf("cannot create new empty process: %w", err)
@@ -326,6 +326,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 		SourceBlockHeight: int64(p.GetSourceBlockHeight()),
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
+		MetadataHash:      nonNullBytes(p.MetadataHash),
 		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(options)),
 		ChainID:           idx.App.ChainID(),
 	}
@@ -336,7 +337,41 @@ func (idx *Indexer) newEmptyProcess(pid []byte) error {
 	if _, err := queries.CreateProcess(context.TODO(), procParams); err != nil {
 		return fmt.Errorf("sql create process: %w", err)
 	}
+	if p.GetMetadata() != "" || len(p.MetadataHash) > 0 {
+		if err := idx.addProcessMetadataVersionUnsafe(pid, p.GetMetadata(), p.MetadataHash, txIndex); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// addProcessMetadataVersionUnsafe records a metadata version of a process, set by
+// the transaction at txIndex of the current block. Callers must hold blockMu.
+func (idx *Indexer) addProcessMetadataVersionUnsafe(pid []byte, metadataURI string, metadataHash []byte, txIndex int32) error {
+	if _, err := idx.blockTxQueries().AddProcessMetadataVersion(context.TODO(), indexerdb.AddProcessMetadataVersionParams{
+		ProcessID:    pid,
+		BlockHeight:  int64(idx.App.Height()),
+		BlockIndex:   int64(txIndex),
+		Time:         time.Unix(idx.App.Timestamp(), 0),
+		Metadata:     metadataURI,
+		MetadataHash: nonNullBytes(metadataHash),
+	}); err != nil {
+		return fmt.Errorf("sql add process metadata version: %w", err)
+	}
+	return nil
+}
+
+// ProcessMetadataHistory returns every metadata version of a process, oldest first.
+func (idx *Indexer) ProcessMetadataHistory(pid []byte) ([]*indexertypes.ProcessMetadataVersion, error) {
+	rows, err := idx.readOnlyQuery.ListProcessMetadataHistory(context.TODO(), pid)
+	if err != nil {
+		return nil, err
+	}
+	versions := make([]*indexertypes.ProcessMetadataVersion, 0, len(rows))
+	for i := range rows {
+		versions = append(versions, indexertypes.ProcessMetadataVersionFromDB(&rows[i]))
+	}
+	return versions, nil
 }
 
 // updateProcess synchronize those fields that can be updated on an existing process
@@ -364,6 +399,7 @@ func (idx *Indexer) updateProcess(ctx context.Context, queries *indexerdb.Querie
 		PrivateKeys:   indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
 		PublicKeys:    indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		Metadata:      p.GetMetadata(),
+		MetadataHash:  nonNullBytes(p.MetadataHash),
 		Status:        int64(p.Status),
 		MaxCensusSize: int64(p.GetMaxCensusSize()),
 		EndDate:       time.Unix(int64(p.StartTime+p.Duration), 0),
