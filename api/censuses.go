@@ -354,7 +354,7 @@ func (a *API) censusAddHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Param			censusId	path		string					true	"Census id"
+//	@Param			censusId	path		string				true	"Census id"
 //	@Success		200			{object}	object{type=string}	"Census type "weighted", "zkweighted", "csp"
 //	@Router			/censuses/{censusId}/type [get]
 func (a *API) censusTypeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -568,7 +568,7 @@ func (a *API) censusWeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
-//	@Param			censusId	path		string				true	"Census id"
+//	@Param			censusId	path		string					true	"Census id"
 //	@Success		200			{object}	object{size=integer}	"Size as integer"
 //	@Router			/censuses/{censusId}/size [get]
 func (a *API) censusSizeHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
@@ -645,7 +645,7 @@ func (a *API) censusDeleteHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //	@Security				ApiKeyAuth
 //	@Success				200			{object}	object{censusID=string,uri=string}	"It returns the published censusID and the ipfs uri where it is uploaded (the async endpoint only returns censusID)"
 //	@Param					censusId	path		string								true	"Census id"
-//	@Param					root		path		string												true	"Specific root where to publish the census (only for /censuses/{censusId}/publish/{root})"
+//	@Param					root		path		string								true	"Specific root where to publish the census (only for /censuses/{censusId}/publish/{root})"
 //	@Router					/censuses/{censusId}/publish [post]
 //	@Router					/censuses/{censusId}/publish/async [post]
 //	@Router					/censuses/{censusId}/publish/{root} [post]
@@ -797,7 +797,7 @@ func (a *API) censusPublishHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCon
 //	@Produce				json
 //	@Success				200			{object}	object{censusID=string,uri=string}	"It returns the published censusID and the ipfs uri where it is uploaded"
 //	@Success				204			"(empty body) publishing still in progress"
-//	@Param					censusId	path		string								true	"Census id"
+//	@Param					censusId	path	string	true	"Census id"
 //	@Router					/censuses/{censusId}/check [get]
 func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam(ParamCensusId))
@@ -833,8 +833,8 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Param					censusId	path		string																												true	"Census id"
-//	@Param					key			path		string																												true	"Key to proof"
+//	@Param					censusId	path		string																										true	"Census id"
+//	@Param					key			path		string																										true	"Key to proof"
 //	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string,censusSiblings=[]string}	"censusProof is the Merkle proof, value is the Merkle tree leaf value and censusSiblings is only returned for zkweighted censuses"
 //	@Router					/censuses/{censusId}/proof/{key} [get]
 func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
