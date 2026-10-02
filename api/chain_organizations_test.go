@@ -52,6 +52,7 @@ func TestOrganizationListSorting(t *testing.T) {
 		"zenith": util.RandomBytes(20),
 	}
 	electionCounts := map[string]int{"quorum": 1, "abacus": 3, "zenith": 2}
+	balances := map[string]uint64{"quorum": 300, "abacus": 100, "zenith": 200}
 	for _, name := range []string{"quorum", "abacus", "zenith"} {
 		eid := orgs[name]
 		for i := 0; i < electionCounts[name]; i++ {
@@ -66,7 +67,7 @@ func TestOrganizationListSorting(t *testing.T) {
 				VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
 			}), qt.IsNil)
 		}
-		idx.OnSetAccount(eid, &state.Account{})
+		idx.OnSetAccount(eid, &state.Account{Account: models.Account{Balance: balances[name]}})
 		app.AdvanceTestBlock()
 		app.AdvanceTestBlock()
 		c.Assert(idx.SetAccountMetadata(eid, name, ""), qt.IsNil)
@@ -101,6 +102,15 @@ func TestOrganizationListSorting(t *testing.T) {
 	c.Assert(list("sortBy=name&order=desc"), qt.DeepEquals, []string{"zenith", "quorum", "abacus"})
 	c.Assert(list("sortBy=createdAt"), qt.DeepEquals, []string{"zenith", "abacus", "quorum"})
 	c.Assert(list("sortBy=createdAt&order=asc"), qt.DeepEquals, []string{"quorum", "abacus", "zenith"})
+	// Each organization's elections all landed in one block, so its last
+	// election is also its first.
+	c.Assert(list("sortBy=lastElection"), qt.DeepEquals, []string{"zenith", "abacus", "quorum"})
+	c.Assert(list("sortBy=lastElection&order=asc"), qt.DeepEquals, []string{"quorum", "abacus", "zenith"})
+	c.Assert(list("sortBy=balance"), qt.DeepEquals, []string{"quorum", "zenith", "abacus"})
+	c.Assert(list("sortBy=balance&order=asc"), qt.DeepEquals, []string{"abacus", "zenith", "quorum"})
+	// No votes were cast, so every organization ties and entity_id decides; the
+	// point here is that the key is accepted.
+	c.Assert(list("sortBy=voteCount"), qt.HasLen, 3)
 	// No sortBy at all keeps the ordering the endpoint had before it took one.
 	c.Assert(list(""), qt.DeepEquals, []string{"zenith", "abacus", "quorum"})
 
@@ -109,6 +119,20 @@ func TestOrganizationListSorting(t *testing.T) {
 	c.Assert(list("sortBy=electionCount&order=desc&limit=1&page=1"), qt.DeepEquals, []string{"zenith"})
 	c.Assert(list("sortBy=electionCount&order=desc&limit=1&page=2"), qt.DeepEquals, []string{"quorum"})
 	c.Assert(list("sortBy=name&order=asc&name=quo"), qt.DeepEquals, []string{"quorum"})
+
+	// Every row carries its balance, vote count and last election date.
+	resp, code := cl.RequestWithQuery("GET", nil, "sortBy=balance", "organizations")
+	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
+	rows := &OrganizationsList{}
+	c.Assert(json.Unmarshal(resp, rows), qt.IsNil)
+	c.Assert(rows.Organizations, qt.HasLen, 3)
+	for i, name := range []string{"quorum", "zenith", "abacus"} {
+		org := rows.Organizations[i]
+		c.Assert(org.Balance, qt.Equals, balances[name], qt.Commentf("%s", name))
+		c.Assert(org.VoteCount, qt.Equals, uint64(0), qt.Commentf("%s", name))
+		c.Assert(org.LastElectionDate.IsZero(), qt.IsFalse, qt.Commentf("%s", name))
+	}
+	c.Assert(rows.Organizations[1].LastElectionDate.After(rows.Organizations[0].LastElectionDate), qt.IsTrue)
 
 	// Unsupported values are a 400, not silently ignored.
 	for query, wantErr := range map[string]apirest.APIerror{
@@ -126,7 +150,7 @@ func TestOrganizationListSorting(t *testing.T) {
 	}
 
 	// The deprecated by-page endpoint keeps working, with the default ordering.
-	resp, code := cl.Request("GET", nil, "organizations", "page", "0")
+	resp, code = cl.Request("GET", nil, "organizations", "page", "0")
 	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
 	legacy := &OrganizationsList{}
 	c.Assert(json.Unmarshal(resp, legacy), qt.IsNil)

@@ -33,6 +33,9 @@ type ElectionParams struct {
 	StartDateBefore *time.Time `json:"startDateBefore,omitempty"`
 	EndDateAfter    *time.Time `json:"endDateAfter,omitempty"`
 	EndDateBefore   *time.Time `json:"endDateBefore,omitempty"`
+	Title           string     `json:"title,omitempty"`
+	SortBy          string     `json:"sortBy,omitempty"`
+	Order           string     `json:"order,omitempty"`
 }
 
 // OrganizationParams allows the client to filter and sort organizations
@@ -114,6 +117,14 @@ type OrganizationSummary struct {
 	// them has to fall back to the account endpoint for that row.
 	Name   string `json:"name,omitempty"`
 	Avatar string `json:"avatar,omitempty"`
+	// VoteCount is the total number of votes cast across all of the
+	// organization's elections.
+	VoteCount uint64 `json:"voteCount" example:"1234"`
+	// LastElectionDate is the creation time of the organization's most recent
+	// election.
+	LastElectionDate time.Time `json:"lastElectionDate" example:"2026-09-29T14:12:20Z"`
+	// Balance is the token balance of the organization's account.
+	Balance uint64 `json:"balance" example:"100"`
 }
 
 // OrganizationsList is used to return a paginated list to the client

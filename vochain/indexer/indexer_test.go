@@ -224,9 +224,10 @@ func TestEntityListSorting(t *testing.T) {
 	eC := bytes.Repeat([]byte{0xcc}, 20)
 	eD := bytes.Repeat([]byte{0xdd}, 20)
 
-	addElection := func(eid []byte) {
+	addElection := func(eid []byte) []byte {
+		pid := util.RandomBytes(32)
 		err := app.State.AddProcess(&models.Process{
-			ProcessId:     util.RandomBytes(32),
+			ProcessId:     pid,
 			EntityId:      eid,
 			EnvelopeType:  &models.EnvelopeType{},
 			Status:        models.ProcessStatus_READY,
@@ -237,6 +238,7 @@ func TestEntityListSorting(t *testing.T) {
 		})
 		qt.Assert(t, err, qt.IsNil)
 		idx.OnSetAccount(eid, &state.Account{})
+		return pid
 	}
 
 	// Each block is one second later than the previous one, and a process is
@@ -247,17 +249,37 @@ func TestEntityListSorting(t *testing.T) {
 		app.AdvanceTestBlock()
 		app.AdvanceTestBlock()
 	}
+	pids := map[string][]byte{}
 	for _, eid := range [][]byte{eA, eB, eC, eD} {
-		addElection(eid)
+		pids[string(eid)] = addElection(eid)
 		advance()
 	}
 	// Later elections for eB and eC, in a block newer than every entity's first
 	// one. They change each entity's *last* election but not its first, so an
 	// ordering by MAX(creation_time) rather than MIN would come out different.
-	addElection(eB)
+	secondB := addElection(eB)
 	addElection(eB)
 	addElection(eC)
 	advance()
+
+	// Votes, spread so that eB's total sums over two of its elections: eA 5,
+	// eD 3, eB 2 (1 + 1), eC 0.
+	vp, err := state.NewVotePackage([]int{1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+	vote := func(pid []byte, n int) {
+		for range n {
+			qt.Assert(t, app.State.AddVote(&state.Vote{ProcessID: pid, VotePackage: vp, Nullifier: util.RandomBytes(32)}), qt.IsNil)
+		}
+	}
+	vote(pids[string(eA)], 5)
+	vote(pids[string(eD)], 3)
+	vote(pids[string(eB)], 1)
+	vote(secondB, 1)
+	// Balances in yet another order: eC 50, eB 30, eD 20, eA 10.
+	for eid, balance := range map[string]uint64{string(eA): 10, string(eB): 30, string(eC): 50, string(eD): 20} {
+		idx.OnSetAccount([]byte(eid), &state.Account{Account: models.Account{Balance: balance}})
+	}
+	app.AdvanceTestBlock()
 
 	// Names chosen so that a case-sensitive (binary) collation would order them
 	// "Bravo" < "alpha" < "charlie"; eC deliberately resolves no name.
@@ -299,6 +321,14 @@ func TestEntityListSorting(t *testing.T) {
 		// the unnamed eC sorts last in both directions
 		{EntitySortByName, SortOrderAsc, want(eB, eD, eA, eC)},
 		{EntitySortByName, SortOrderDesc, want(eA, eD, eB, eC)},
+		// lastElection is the creation time of the entity's *latest* election:
+		// eB and eC share the newest block, so they fall back to entity_id ASC
+		{EntitySortByLastElection, SortOrderDesc, want(eB, eC, eD, eA)},
+		{EntitySortByLastElection, SortOrderAsc, want(eA, eD, eB, eC)},
+		{EntitySortByVoteCount, SortOrderDesc, want(eA, eD, eB, eC)},
+		{EntitySortByVoteCount, SortOrderAsc, want(eC, eB, eD, eA)},
+		{EntitySortByBalance, SortOrderDesc, want(eC, eB, eD, eA)},
+		{EntitySortByBalance, SortOrderAsc, want(eA, eD, eB, eC)},
 	} {
 		comment := qt.Commentf("sortBy=%s order=%s", tc.sortBy, tc.order)
 		list, total, err := idx.EntityList(10, 0, "", "", tc.sortBy, tc.order)
@@ -339,6 +369,31 @@ func TestEntityListSorting(t *testing.T) {
 	naturalCount, _, err := idx.EntityList(10, 0, "", "", EntitySortByElectionCount, "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, describe(naturalCount), qt.DeepEquals, want(eB, eC, eA, eD))
+	naturalVotes, _, err := idx.EntityList(10, 0, "", "", EntitySortByVoteCount, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, describe(naturalVotes), qt.DeepEquals, want(eA, eD, eB, eC))
+
+	// Every row carries the values the new orderings sort by.
+	byID := map[string]indexertypes.Entity{}
+	for _, e := range defaults {
+		byID[string(e.EntityID)] = e
+	}
+	for eid, want := range map[string]struct {
+		votes, balance uint64
+	}{
+		string(eA): {5, 10},
+		string(eB): {2, 30},
+		string(eC): {0, 50},
+		string(eD): {3, 20},
+	} {
+		comment := qt.Commentf("%s", names[eid])
+		qt.Assert(t, byID[eid].VoteCount, qt.Equals, want.votes, comment)
+		qt.Assert(t, byID[eid].Balance, qt.Equals, want.balance, comment)
+	}
+	// eB's last election is newer than its first, and than eD's only one.
+	qt.Assert(t, byID[string(eB)].LastProcess.After(byID[string(eD)].LastProcess), qt.IsTrue)
+	qt.Assert(t, byID[string(eA)].LastProcess.Before(byID[string(eD)].LastProcess), qt.IsTrue)
+	qt.Assert(t, byID[string(eA)].LastProcess.IsZero(), qt.IsFalse)
 
 	// Sorting composes with the filters.
 	filtered, total, err := idx.EntityList(10, 0, "", "a", EntitySortByName, SortOrderAsc)
@@ -352,6 +407,133 @@ func TestEntityListSorting(t *testing.T) {
 	_, _, err = idx.EntityList(10, 0, "", "", "", "sideways")
 	qt.Assert(t, err, qt.ErrorIs, ErrInvalidSortOrder)
 	_, _, err = idx.EntityList(10, 0, "", "", EntitySortByName, "DESC")
+	qt.Assert(t, err, qt.ErrorIs, ErrInvalidSortOrder)
+}
+
+func TestProcessListSorting(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+	eid := util.RandomBytes(20)
+
+	// Four processes created two blocks apart (so p1 is the oldest and p4 the
+	// newest), each with start/end dates, a vote count and a title chosen so
+	// that every ordering comes out different from creation order and from
+	// every other ordering.
+	type fixture struct {
+		name                string
+		startTime, duration uint32
+		votes               int
+		title               string
+	}
+	fixtures := []fixture{
+		{"p1", 4000, 100, 0, "delta"},
+		{"p2", 1000, 5000, 2, "Alpha"},
+		{"p3", 3000, 500, 5, ""}, // title never resolved
+		{"p4", 2000, 2500, 1, "charlie"},
+	}
+	names := map[string]string{}
+	pids := map[string][]byte{}
+	for _, f := range fixtures {
+		pid := util.RandomBytes(32)
+		err := app.State.AddProcess(&models.Process{
+			ProcessId:     pid,
+			EntityId:      eid,
+			StartTime:     f.startTime,
+			Duration:      f.duration,
+			EnvelopeType:  &models.EnvelopeType{},
+			Status:        models.ProcessStatus_READY,
+			Mode:          &models.ProcessMode{AutoStart: true},
+			BlockCount:    100,
+			MaxCensusSize: 10,
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		})
+		qt.Assert(t, err, qt.IsNil)
+		idx.OnSetAccount(eid, &state.Account{})
+		names[string(pid)] = f.name
+		pids[f.name] = pid
+		app.AdvanceTestBlock()
+		app.AdvanceTestBlock()
+	}
+	vp, err := state.NewVotePackage([]int{1}).Encode()
+	qt.Assert(t, err, qt.IsNil)
+	for _, f := range fixtures {
+		for range f.votes {
+			v := &state.Vote{ProcessID: pids[f.name], VotePackage: vp, Nullifier: util.RandomBytes(32)}
+			qt.Assert(t, app.State.AddVote(v), qt.IsNil)
+		}
+	}
+	app.AdvanceTestBlock()
+	for _, f := range fixtures {
+		if f.title != "" {
+			qt.Assert(t, idx.SetProcessMetadataTitle(pids[f.name], f.title), qt.IsNil)
+		}
+	}
+
+	list := func(limit, offset int, title, sortBy, order string) ([]string, uint64, error) {
+		ids, total, err := idx.ProcessList(limit, offset, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil,
+			title, sortBy, order)
+		out := []string{}
+		for _, id := range ids {
+			out = append(out, names[string(id)])
+		}
+		return out, total, err
+	}
+
+	for _, tc := range []struct {
+		sortBy, order string
+		want          []string
+	}{
+		{ProcessSortByCreatedAt, SortOrderDesc, []string{"p4", "p3", "p2", "p1"}},
+		{ProcessSortByCreatedAt, SortOrderAsc, []string{"p1", "p2", "p3", "p4"}},
+		{ProcessSortByStartDate, SortOrderDesc, []string{"p1", "p3", "p4", "p2"}},
+		{ProcessSortByStartDate, SortOrderAsc, []string{"p2", "p4", "p3", "p1"}},
+		// end dates: p1 4100, p2 6000, p3 3500, p4 4500
+		{ProcessSortByEndDate, SortOrderDesc, []string{"p2", "p4", "p1", "p3"}},
+		{ProcessSortByEndDate, SortOrderAsc, []string{"p3", "p1", "p4", "p2"}},
+		{ProcessSortByVoteCount, SortOrderDesc, []string{"p3", "p2", "p4", "p1"}},
+		{ProcessSortByVoteCount, SortOrderAsc, []string{"p1", "p4", "p2", "p3"}},
+		// case-insensitive, and the untitled p3 sorts last in both directions
+		{ProcessSortByTitle, SortOrderAsc, []string{"p2", "p4", "p1", "p3"}},
+		{ProcessSortByTitle, SortOrderDesc, []string{"p1", "p4", "p2", "p3"}},
+	} {
+		comment := qt.Commentf("sortBy=%s order=%s", tc.sortBy, tc.order)
+		got, total, err := list(10, 0, "", tc.sortBy, tc.order)
+		qt.Assert(t, err, qt.IsNil, comment)
+		qt.Assert(t, total, qt.Equals, uint64(4), comment)
+		qt.Assert(t, got, qt.DeepEquals, tc.want, comment)
+
+		// Paging must neither repeat nor skip.
+		paged := []string{}
+		for offset := 0; ; offset++ {
+			page, _, err := list(1, offset, "", tc.sortBy, tc.order)
+			qt.Assert(t, err, qt.IsNil, comment)
+			if len(page) == 0 {
+				break
+			}
+			paged = append(paged, page...)
+		}
+		qt.Assert(t, paged, qt.DeepEquals, tc.want, comment)
+	}
+
+	// The zero values keep the ordering ProcessList had before it took a sortBy,
+	// and an empty order picks the natural direction of the sortBy.
+	defaults, _, err := list(10, 0, "", "", "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, defaults, qt.DeepEquals, []string{"p4", "p3", "p2", "p1"})
+	naturalTitle, _, err := list(10, 0, "", ProcessSortByTitle, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, naturalTitle, qt.DeepEquals, []string{"p2", "p4", "p1", "p3"})
+
+	// The title filter is a case-insensitive substring match, composing with sorting.
+	filtered, total, err := list(10, 0, "HA", ProcessSortByVoteCount, "")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, total, qt.Equals, uint64(2)) // "Alpha" and "charlie"
+	qt.Assert(t, filtered, qt.DeepEquals, []string{"p2", "p4"})
+
+	// Unsupported values are rejected rather than silently ignored.
+	_, _, err = list(10, 0, "", "votecount", "")
+	qt.Assert(t, err, qt.ErrorIs, ErrInvalidProcessSortBy)
+	_, _, err = list(10, 0, "", "", "sideways")
 	qt.Assert(t, err, qt.ErrorIs, ErrInvalidSortOrder)
 }
 
@@ -502,7 +684,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	for len(procs) < procsCount {
 		fmt.Printf("%x\n", eidProcsCount)
 		fmt.Printf("%s\n", hex.EncodeToString(eidProcsCount))
-		list, total, err := idx.ProcessList(10, last, hex.EncodeToString(eidProcsCount), "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+		list, total, err := idx.ProcessList(10, last, hex.EncodeToString(eidProcsCount), "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -521,7 +703,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	}
 	qt.Assert(t, procs, qt.HasLen, procsCount)
 
-	_, total, err := idx.ProcessList(64, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	_, total, err := idx.ProcessList(64, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, total, qt.Equals, uint64(10+procsCount))
 
@@ -539,7 +721,7 @@ func testProcessList(t *testing.T, procsCount int) {
 	qt.Assert(t, countEntityProcs([]byte("not an entity id that exists")), qt.Equals, int64(-1))
 
 	// Past the end (from=10000) should return an empty list
-	emptyList, _, err := idx.ProcessList(64, 10000, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	emptyList, _, err := idx.ProcessList(64, 10000, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, emptyList, qt.DeepEquals, [][]byte{})
 }
@@ -629,7 +811,7 @@ func TestProcessSearch(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Exact process search
-	list, _, err := idx.ProcessList(10, 0, hex.EncodeToString(eidTest), pidExact, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err := idx.ProcessList(10, 0, hex.EncodeToString(eidTest), pidExact, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -638,7 +820,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Exact process search, with it being encrypted.
 	// This once caused a sqlite bug due to a mistake in the SQL query.
-	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), pidExactEncrypted, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), pidExactEncrypted, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -647,7 +829,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Search for nonexistent process
 	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest),
-		"4011d50537fa164b6fef261141797bbe4014526f", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+		"4011d50537fa164b6fef261141797bbe4014526f", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -656,7 +838,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 	// Search containing part of all manually-defined processes
 	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest),
-		"011d50537fa164b6fef261141797bbe4014526e", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+		"011d50537fa164b6fef261141797bbe4014526e", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -665,7 +847,7 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	list, _, err = idx.ProcessList(100, 0, hex.EncodeToString(eidTest),
-		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, 0, models.ProcessStatus_ENDED, nil, nil, nil, nil, nil, nil, nil)
+		"0c6ca22d2c175a1fbdd15d7595ae532bb1094b5", 0, 0, models.ProcessStatus_ENDED, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -674,17 +856,17 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// Partial process search as uppercase hex
-	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), "011D50537FA164B6FEF261141797BBE4014526E", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), "011D50537FA164B6FEF261141797BBE4014526E", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(processIds))
 	// Partial process search as mixed case hex
-	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), "011D50537fA164B6FeF261141797BbE4014526E", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(10, 0, hex.EncodeToString(eidTest), "011D50537fA164B6FeF261141797BbE4014526E", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, len(processIds))
 
 	// Search with an exact Entity ID, but starting with a null byte.
 	// This can trip up sqlite, as it assumes TEXT strings are NUL-terminated.
-	list, _, err = idx.ProcessList(100, 0, "\x00foobar", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(100, 0, "\x00foobar", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -693,12 +875,12 @@ func TestProcessSearch(t *testing.T) {
 	}
 
 	// list all processes, with a max of 10
-	list, _, err = idx.ProcessList(10, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(10, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 10)
 
 	// list all processes, with a max of 1000
-	list, _, err = idx.ProcessList(1000, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(1000, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, list, qt.HasLen, 21)
 }
@@ -747,25 +929,25 @@ func TestProcessListWithNamespaceAndStatus(t *testing.T) {
 	app.AdvanceTestBlock()
 
 	// Get the process list for namespace 123
-	list, _, err := idx.ProcessList(100, 0, hex.EncodeToString(eid20), "", 123, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err := idx.ProcessList(100, 0, hex.EncodeToString(eid20), "", 123, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)
 
 	// Get the process list for all namespaces
-	list, _, err = idx.ProcessList(100, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(100, 0, "", "", 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	// Check there are exactly 10 + 10
 	qt.Assert(t, len(list), qt.CmpEquals(), 20)
 
 	// Get the process list for namespace 10
-	list, _, err = idx.ProcessList(100, 0, "", "", 10, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(100, 0, "", "", 10, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 1)
 
 	// Get the process list for namespace 10
-	list, _, err = idx.ProcessList(100, 0, "", "", 0, 0, models.ProcessStatus_READY, nil, nil, nil, nil, nil, nil, nil)
+	list, _, err = idx.ProcessList(100, 0, "", "", 0, 0, models.ProcessStatus_READY, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	qt.Assert(t, err, qt.IsNil)
 	// Check there is exactly 1
 	qt.Assert(t, len(list), qt.CmpEquals(), 10)

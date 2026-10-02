@@ -254,21 +254,28 @@ func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 
 // electionListHandler
 //
-//	@Summary		List elections
-//	@Description	Get a list of elections summaries.
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			page			query		number	false	"Page"
-//	@Param			limit			query		number	false	"Items per page"
-//	@Param			organizationId	query		string	false	"Filter by partial organizationId"
-//	@Param			status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
-//	@Param			electionId		query		string	false	"Filter by partial electionId"
-//	@Param			withResults		query		boolean	false	"Filter by (partial or final) results available or not"
-//	@Param			finalResults	query		boolean	false	"Filter by final results available or not"
-//	@Param			manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
-//	@Success		200				{object}	ElectionsList
-//	@Router			/elections [get]
+//	@Summary				List elections
+//	@Description.markdown	electionListHandler
+//	@Tags					Elections
+//	@Accept					json
+//	@Produce				json
+//	@Param					page			query		number	false	"Page"
+//	@Param					limit			query		number	false	"Items per page"
+//	@Param					organizationId	query		string	false	"Filter by partial organizationId"
+//	@Param					status			query		string	false	"Election status"	Enums(ready, paused, canceled, ended, results)
+//	@Param					electionId		query		string	false	"Filter by partial electionId"
+//	@Param					withResults		query		boolean	false	"Filter by (partial or final) results available or not"
+//	@Param					finalResults	query		boolean	false	"Filter by final results available or not"
+//	@Param					manuallyEnded	query		boolean	false	"Filter by whether the election was manually ended or not"
+//	@Param					startDateAfter	query		string	false	"Only elections starting at or after this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					startDateBefore	query		string	false	"Only elections starting at or before this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					endDateAfter	query		string	false	"Only elections ending at or after this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					endDateBefore	query		string	false	"Only elections ending at or before this date (RFC3339 or YYYY-MM-DD)"
+//	@Param					title			query		string	false	"Filter by election title, case-insensitive substring match (ASCII case folding only)"
+//	@Param					sortBy			query		string	false	"Sort by createdAt (default), startDate, endDate, voteCount or title"	Enums(createdAt, startDate, endDate, voteCount, title)
+//	@Param					order			query		string	false	"Sort direction. Defaults to asc for title, desc for everything else"	Enums(asc, desc)
+//	@Success				200				{object}	ElectionsList
+//	@Router					/elections [get]
 func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	params, err := electionParams(ctx.QueryParam,
 		ParamPage,
@@ -283,6 +290,9 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		ParamStartDateBefore,
 		ParamEndDateAfter,
 		ParamEndDateBefore,
+		ParamTitle,
+		ParamSortBy,
+		ParamOrder,
 	)
 	if err != nil {
 		return err
@@ -296,12 +306,21 @@ func (a *API) electionListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	return marshalAndSend(ctx, list)
 }
 
-// electionList produces a filtered, paginated ElectionsList.
+// electionList produces a filtered, sorted, paginated ElectionsList.
+//
+// The ordering is validated here rather than in electionParams so that the
+// deprecated POST filter endpoints, which unmarshal their ElectionParams
+// straight from the request body, are covered as well.
 //
 // Errors returned are always of type APIerror.
 func (a *API) electionList(params *ElectionParams) (*ElectionsList, error) {
 	if params.OrganizationID != "" && !a.indexer.AccountExists(params.OrganizationID) {
 		return nil, ErrOrgNotFound
+	}
+
+	sortBy, order, err := parseElectionSort(params.SortBy, params.Order)
+	if err != nil {
+		return nil, err
 	}
 
 	status, err := parseStatus(params.Status)
@@ -324,6 +343,9 @@ func (a *API) electionList(params *ElectionParams) (*ElectionsList, error) {
 		params.StartDateBefore,
 		params.EndDateAfter,
 		params.EndDateBefore,
+		params.Title,
+		sortBy,
+		order,
 	)
 	if err != nil {
 		return nil, ErrIndexerQueryFailed.WithErr(err)
@@ -928,5 +950,8 @@ func electionParams(f func(key string) string, keys ...string) (*ElectionParams,
 		StartDateBefore:  dates[ParamStartDateBefore],
 		EndDateAfter:     dates[ParamEndDateAfter],
 		EndDateBefore:    dates[ParamEndDateBefore],
+		Title:            strings[ParamTitle],
+		SortBy:           strings[ParamSortBy],
+		Order:            strings[ParamOrder],
 	}, nil
 }
