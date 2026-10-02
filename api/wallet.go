@@ -198,7 +198,7 @@ func (a *API) walletAddHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 //
 //	@Summary		Set wallet account
 //	@Description	Set a new account. Needed the bearer token associated the account.
-//	@Security		BasicAuth
+//	@Security		ApiKeyAuth
 //	@Tags			Wallet
 //	@Accept			json
 //	@Produce		json
@@ -246,7 +246,7 @@ func (a *API) walletCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCont
 //
 //	@Summary		Transfer tokens
 //	@Description	Transfer balance to another account. Needed the bearer token associated the account.
-//	@Security		BasicAuth
+//	@Security		ApiKeyAuth
 //	@Tags			Wallet
 //	@Accept			json
 //	@Produce		json
@@ -307,7 +307,7 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 //
 //	@Summary		Create election for wallet
 //	@Description	Creates an election. Requires the bearer token of the account you want to create the election.
-//	@Security		BasicAuth
+//	@Security		ApiKeyAuth
 //	@Tags			Wallet
 //	@Accept			json
 //	@Produce		json

@@ -72,7 +72,7 @@ func (cr *CensusRef) SetTree(tree *censustree.Tree) {
 type CensusDump struct {
 	Type     models.Census_Type `json:"type"`
 	RootHash types.HexBytes     `json:"rootHash"`
-	Data     []byte             `json:"data"`
+	Data     []byte             `json:"data" swaggertype:"string" format:"base64"`
 	// MaxLevels is required to load the census with the original size because
 	// it could be different according to the election (and census) type.
 	MaxLevels int            `json:"maxLevels"`

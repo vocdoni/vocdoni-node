@@ -45,7 +45,10 @@ import (
 //	@host		api-dev.vocdoni.net
 //	@BasePath	/v2
 
-//	@securityDefinitions.basic	BasicAuth
+//	@securityDefinitions.apikey	ApiKeyAuth
+//	@in							header
+//	@name						Authorization
+//	@description				Send as "Authorization: Bearer <token>". Census endpoints take the client-chosen UUID used when creating the census; wallet endpoints take the token returned by /wallet/add/{privateKey}; admin-only endpoints take the node admin token.
 
 const (
 	// DefaultItemsPerPage defines how many items per page are returned by the paginated endpoints,
