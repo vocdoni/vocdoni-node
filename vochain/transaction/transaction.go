@@ -22,6 +22,12 @@ const (
 	// (see vochain/ist/validators.go). Keep it scaled with maxPower so the entry
 	// weight stays consistent across parameter revisions.
 	newValidatorPower = 50
+
+	// LegacyCSPRejectHeightLTS13 is the vocdoni/LTS/1.3 height from which
+	// NewProcessTx with CensusOrigin OFF_CHAIN_CA is rejected (issue #1424).
+	// Before it, the legacy origin is accepted with a deprecation warning.
+	// TODO: set the final activation height before releasing to LTS.
+	LegacyCSPRejectHeightLTS13 = 9_000_000
 )
 
 var (
@@ -55,6 +61,13 @@ func NewTransactionHandler(state *vstate.State, istc *ist.Controller) *Transacti
 		state: state,
 		istc:  istc,
 	}
+}
+
+// legacyCSPRejected reports whether NewProcessTx with CensusOrigin OFF_CHAIN_CA
+// is rejected at the current height. It always is except on vocdoni/LTS/1.3
+// before LegacyCSPRejectHeightLTS13.
+func (t *TransactionHandler) legacyCSPRejected() bool {
+	return !(t.state.ChainID() == "vocdoni/LTS/1.3" && t.state.CurrentHeight() < LegacyCSPRejectHeightLTS13)
 }
 
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
