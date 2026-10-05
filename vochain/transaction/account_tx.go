@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/tree/arbo"
@@ -328,6 +329,11 @@ func (t *TransactionHandler) SetAccountValidatorTxCheck(vtx *vochaintx.Tx) error
 	validatorPubKey := vtx.Tx.GetSetAccount().GetPublicKey()
 	if validatorPubKey == nil {
 		return fmt.Errorf("invalid nil public key")
+	}
+	// cometbft only accepts compressed secp256k1 keys and panics on any other length
+	if len(validatorPubKey) != cometCrypto256k1.PubKeySize {
+		return fmt.Errorf("invalid public key length %d, expected %d (compressed secp256k1)",
+			len(validatorPubKey), cometCrypto256k1.PubKeySize)
 	}
 	validatorAddress, err := ethereum.AddrFromPublicKey(validatorPubKey)
 	if err != nil {

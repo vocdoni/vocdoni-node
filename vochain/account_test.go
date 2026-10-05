@@ -1033,3 +1033,41 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 	}
 	return nil
 }
+
+func TestSetAccountValidatorTxRejectsUncompressedPubKey(t *testing.T) {
+	app, signers, err := setupTestBaseApplicationAndSigners(t, 2)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_SET_ACCOUNT_VALIDATOR, 100), qt.IsNil)
+	qt.Assert(t, app.State.SetAccount(signers[0].Address(), &state.Account{
+		Account: models.Account{Balance: 10000},
+	}), qt.IsNil)
+	testCommitState(t, app)
+
+	// a 65-byte uncompressed key is a valid secp256k1 key for ethereum, but
+	// cometbft requires the 33-byte compressed form and panics otherwise
+	uncompressed, err := ethereum.DecompressPubKey(signers[1].PublicKey())
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, uncompressed, qt.HasLen, 65)
+
+	nonce := uint32(0)
+	stx := &models.SignedTx{}
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: &models.SetAccountTx{
+		Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
+		Nonce:     &nonce,
+		PublicKey: uncompressed,
+	}}})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, sendTx(app, signers[0], stx), qt.ErrorMatches, "checkTx failed.*")
+
+	// the compressed form of the same key is accepted
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: &models.SetAccountTx{
+		Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
+		Nonce:     &nonce,
+		PublicKey: signers[1].PublicKey(),
+	}}})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, sendTx(app, signers[0], stx), qt.IsNil)
+	validator, err := app.State.Validator(signers[1].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validator, qt.IsNotNil)
+}
