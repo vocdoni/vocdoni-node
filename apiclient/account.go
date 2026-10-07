@@ -129,8 +129,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	}
 
 	// Build the transaction
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
 			SetAccount: &models.SetAccountTx{
 				Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -147,11 +146,7 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	}
 
 	// Sign and send the transaction
-	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
-	if err != nil {
-		return nil, err
-	}
-	stxb, err := proto.Marshal(&stx)
+	stxb, err := c.signTx(txb)
 	if err != nil {
 		return nil, err
 	}
@@ -186,8 +181,7 @@ func (c *HTTPclient) AccountSetValidator(pubKey []byte, name string) (types.HexB
 		pubKey = c.account.PublicKey()
 	}
 	// Build the transaction
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
 			SetAccount: &models.SetAccountTx{
 				Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
@@ -201,11 +195,7 @@ func (c *HTTPclient) AccountSetValidator(pubKey []byte, name string) (types.HexB
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal transaction: %w", err)
 	}
-	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
-	if err != nil {
-		return nil, err
-	}
-	stxb, err := proto.Marshal(&stx)
+	stxb, err := c.signTx(txb)
 	if err != nil {
 		return nil, err
 	}
@@ -245,8 +235,7 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 
 	// Build the transaction
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetAccount{
 			SetAccount: &models.SetAccountTx{
 				Txtype:  models.TxType_SET_ACCOUNT_INFO_URI,
@@ -262,11 +251,7 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 
 	// Sign and send the transaction
-	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
-	if err != nil {
-		return nil, err
-	}
-	stxb, err := proto.Marshal(&stx)
+	stxb, err := c.signTx(txb)
 	if err != nil {
 		return nil, err
 	}
@@ -313,8 +298,7 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 		return nil, fmt.Errorf("could not generate the sik: %w", err)
 	}
 	// Build the transaction
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_SetSIK{
 			SetSIK: &models.SIKTx{
 				Txtype: models.TxType_SET_ACCOUNT_SIK,
@@ -327,11 +311,7 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 		return nil, err
 	}
 	// Sign and send the transaction
-	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
-	if err != nil {
-		return nil, err
-	}
-	stxb, err := proto.Marshal(&stx)
+	stxb, err := c.signTx(txb)
 	if err != nil {
 		return nil, err
 	}
@@ -356,9 +336,7 @@ func (c *HTTPclient) SetSIK(secret []byte) (types.HexBytes, error) {
 // HTTPClient account if it already has a valid one.
 func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 	// Build the transaction
-	var err error
-	stx := models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{
+	txb, err := proto.Marshal(&models.Tx{
 		Payload: &models.Tx_DelSIK{
 			DelSIK: &models.SIKTx{
 				Txtype: models.TxType_DEL_ACCOUNT_SIK,
@@ -369,11 +347,7 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 		return nil, err
 	}
 	// Sign and send the transaction
-	stx.Signature, err = c.account.SignVocdoniTx(stx.Tx, c.ChainID())
-	if err != nil {
-		return nil, err
-	}
-	stxb, err := proto.Marshal(&stx)
+	stxb, err := c.signTx(txb)
 	if err != nil {
 		return nil, err
 	}

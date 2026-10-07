@@ -24,6 +24,8 @@ const (
 	HTTPGET = http.MethodGet
 	// HTTPPOST is the method string used for calling Request()
 	HTTPPOST = http.MethodPost
+	// HTTPPUT is the method string used for calling Request()
+	HTTPPUT = http.MethodPut
 	// HTTPDELETE is the method string used for calling
 	HTTPDELETE = http.MethodDelete
 
