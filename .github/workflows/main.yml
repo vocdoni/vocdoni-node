@@ -133,8 +133,10 @@ jobs:
     name: Docker
     needs: [job_go_checks, job_go_test, job_compose_test]
     # docker releases are triggered only on push to the selected branches at the beginning of this file
+    # but pushes to dev and release-lts* trigger a release via a quicker workflow (deploy.yml) which skips the tests
     if: github.event_name == 'push' &&
-        github.ref != 'refs/heads/dev'   # but pushes to dev trigger a release via a quicker workflow (deploy-dev.yml) which skips the tests
+        github.ref != 'refs/heads/dev' &&
+        !startsWith(github.ref, 'refs/heads/release-lts')
     uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:

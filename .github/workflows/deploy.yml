@@ -1,10 +1,15 @@
-name: Deploy dev
+name: Deploy
+
+# Branches here get a docker image without waiting for the tests in main.yml:
+# dev is for quick iteration, and release-lts* only receives commits already tested on main,
+# with timed rollouts (canary burn-in, validator-by-validator) that shouldn't wait on tests.
 
 on:
   push:
     branches:
       - main
       - dev
+      - release-lts*
 
 jobs:
   push-to-dev:
@@ -21,8 +26,8 @@ jobs:
   call-docker-release:
     name: Docker
     needs: push-to-dev
-    if: always() && !cancelled() && !failure() # so if push-to-dev was skipped (because branch is dev) this still runs
+    if: always() && !cancelled() && !failure() # so if push-to-dev was skipped (because branch is not main) this still runs
     uses: vocdoni/vocdoni-node/.github/workflows/docker-release.yml@main
     secrets: inherit
     with:
-      image-tag: dev
+      image-tag: ${{ github.ref == 'refs/heads/main' && 'dev' || github.ref_name }}
