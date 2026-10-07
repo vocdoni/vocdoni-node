@@ -319,6 +319,38 @@ func (v *State) SetProcessDuration(pid []byte, newDurationSeconds uint32, commit
 	return nil
 }
 
+// SetProcessMetadata sets the metadata URI and hash for a given process.
+// If commit is true, the change is committed to the state and the event listeners are called.
+// The process must be in READY or PAUSED status, and the URI or the hash must change.
+// Keeping the URI while changing the hash is valid (mutable content behind a stable URL).
+func (v *State) SetProcessMetadata(pid []byte, uri string, hash []byte, commit bool) error {
+	process, err := v.Process(pid, false)
+	if err != nil {
+		return err
+	}
+
+	if process.Status != models.ProcessStatus_READY && process.Status != models.ProcessStatus_PAUSED {
+		return fmt.Errorf("cannot set metadata, invalid status: %s", process.Status)
+	}
+
+	if uri == process.GetMetadata() && bytes.Equal(hash, process.MetadataHash) {
+		return fmt.Errorf("cannot set metadata to the same URI and hash")
+	}
+
+	// If all checks pass, the transition is valid
+	if commit {
+		process.Metadata = &uri
+		process.MetadataHash = hash
+		if err := v.UpdateProcess(process, process.ProcessId); err != nil {
+			return err
+		}
+		for _, l := range v.eventListeners {
+			l.OnProcessMetadataChange(process.ProcessId, uri, hash, v.txCounter.Load())
+		}
+	}
+	return nil
+}
+
 // SetProcessResults sets the results for a given process and calls the event listeners.
 func (v *State) SetProcessResults(pid []byte, result *models.ProcessResult) error {
 	process, err := v.Process(pid, false)

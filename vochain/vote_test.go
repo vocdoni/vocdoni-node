@@ -9,6 +9,7 @@ import (
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/censustree"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/tree/arbo"
@@ -90,6 +91,14 @@ func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys,
 func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys,
 	proof []byte, votePackage []int, chainID string,
 ) *models.SignedTx {
+	return testBuildSignedVoteWithMetadataHash(t, electionID, key, proof, votePackage, chainID, nil)
+}
+
+// testBuildSignedVoteWithMetadataHash builds a signed vote which attests the
+// given election metadata hash.
+func testBuildSignedVoteWithMetadataHash(t *testing.T, electionID []byte, key *ethereum.SignKeys,
+	proof []byte, votePackage []int, chainID string, metadataHash []byte,
+) *models.SignedTx {
 	var stx models.SignedTx
 	var err error
 	vp, err := json.Marshal(votePackage)
@@ -106,7 +115,8 @@ func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys
 				},
 			},
 		},
-		VotePackage: vp,
+		VotePackage:  vp,
+		MetadataHash: metadataHash,
 	}
 
 	stx.Tx, err = proto.Marshal(&models.Tx{
@@ -284,4 +294,113 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// the 11th vote should fail
 	qt.Check(t, vote(10), qt.Equals, uint32(1))
+}
+
+// testMetadataVoteSetup creates an election with a committed metadata hash,
+// owned by an account able to update it, and a census of voters.
+func testMetadataVoteSetup(t *testing.T) (*BaseApplication, *ethereum.SignKeys, *models.Process,
+	[]*ethereum.SignKeys, [][]byte,
+) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
+	voters, root, proofs := testCreateKeysAndBuildCensus(t, 4)
+	process := testMetadataProcess(accounts[0].Address().Bytes())
+	process.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	process.Mode = &models.ProcessMode{AutoStart: true, Interruptible: true}
+	process.VoteOptions = &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 3}
+	process.CensusRoot = root
+	process.BlockCount = 1024
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	app.AdvanceTestBlock()
+	return app, accounts[0], process, voters, proofs
+}
+
+func testSendVote(app *BaseApplication, stx *models.SignedTx, forCommit bool) uint32 {
+	txb, err := proto.Marshal(stx)
+	if err != nil {
+		return 1
+	}
+	if forCommit {
+		return app.deliverTx(txb).Code
+	}
+	resp, _ := app.CheckTx(context.TODO(), &cometabcitypes.CheckTxRequest{Tx: txb})
+	return resp.Code
+}
+
+func TestVoteMetadataHash(t *testing.T) {
+	app, _, process, voters, proofs := testMetadataVoteSetup(t)
+	pid := process.ProcessId
+
+	// a vote attesting the committed metadata is accepted
+	stx := testBuildSignedVoteWithMetadataHash(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+	app.AdvanceTestBlock()
+
+	// a vote without the metadata hash is rejected
+	stx = testBuildSignedVote(t, pid, voters[1], proofs[1], []int{1, 0, 1}, app.ChainID())
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+
+	// a vote attesting another metadata is rejected
+	stx = testBuildSignedVoteWithMetadataHash(t, pid, voters[1], proofs[1], []int{1, 0, 1},
+		app.ChainID(), util.RandomBytes(32))
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+}
+
+// TestVoteMetadataHashChangedInFlight checks that a vote accepted into the
+// mempool is rejected when the metadata is updated before it is included.
+func TestVoteMetadataHashChangedInFlight(t *testing.T) {
+	app, owner, process, voters, proofs := testMetadataVoteSetup(t)
+	pid := process.ProcessId
+
+	stx := testBuildSignedVoteWithMetadataHash(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+
+	uri := "https://example.com/metadata/2.json"
+	newHash := util.RandomBytes(32)
+	qt.Assert(t, testSetProcessMetadata(t, pid, owner, app, &uri, newHash), qt.IsNil)
+
+	qt.Assert(t, testSendVote(app, stx, true), qt.Not(qt.Equals), uint32(0))
+
+	// voting again attesting the new metadata is accepted
+	stx = testBuildSignedVoteWithMetadataHash(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), newHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+}
+
+func TestVoteMetadataHashWithoutCommittedHash(t *testing.T) {
+	app := TestBaseApplication(t)
+	voters, root, proofs := testCreateKeysAndBuildCensus(t, 2)
+	process := testMetadataProcess(util.RandomBytes(types.EthereumAddressSize))
+	process.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	process.Mode = &models.ProcessMode{AutoStart: true}
+	process.VoteOptions = &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 3}
+	process.CensusRoot = root
+	process.BlockCount = 1024
+	process.MetadataHash = nil
+	qt.Assert(t, app.State.AddProcess(process), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// without a committed hash, votes must not attest one
+	stx := testBuildSignedVoteWithMetadataHash(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), util.RandomBytes(32))
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+
+	stx = testBuildSignedVote(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1}, app.ChainID())
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+}
+
+// TestVoteMetadataHashBeforeForkLTS13 checks that on vocdoni/LTS/1.3 votes are
+// not checked against the metadata hash before its config.Forks MetadataFork height.
+func TestVoteMetadataHashBeforeForkLTS13(t *testing.T) {
+	app, _, process, voters, proofs := testMetadataVoteSetup(t)
+	app.SetChainID("vocdoni/LTS/1.3")
+	app.State.SetHeight(config.ForksForChainID("vocdoni/LTS/1.3").MetadataFork - 1)
+
+	stx := testBuildSignedVote(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1}, app.ChainID())
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
 }

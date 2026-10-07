@@ -8,6 +8,7 @@ import (
 
 	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/ist"
@@ -55,6 +56,12 @@ func NewTransactionHandler(state *vstate.State, istc *ist.Controller) *Transacti
 		state: state,
 		istc:  istc,
 	}
+}
+
+// metadataForkActive reports whether the process metadata fork (issue #1479)
+// is active at the current height, as set by config.Forks for the chain.
+func (t *TransactionHandler) metadataForkActive() bool {
+	return t.state.CurrentHeight() >= config.ForksForChainID(t.state.ChainID()).MetadataFork
 }
 
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
@@ -220,6 +227,10 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				// schedule the new duration on the ISTC
 				if err := t.istc.Reschedule(tx.ProcessId, process.StartTime+tx.GetDuration(), false, 0); err != nil {
 					return nil, fmt.Errorf("setProcessDuration: cannot reschedule IST action: %w", err)
+				}
+			case models.TxType_SET_PROCESS_METADATA:
+				if err := t.state.SetProcessMetadata(tx.ProcessId, tx.GetMetadata(), tx.GetMetadataHash(), true); err != nil {
+					return nil, fmt.Errorf("setProcessMetadata: %w", err)
 				}
 
 			default:

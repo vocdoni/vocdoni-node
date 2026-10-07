@@ -276,3 +276,6 @@ func (k *KeyKeeper) OnCancel(_ []byte, _ int32) {}
 
 // OnProcessDurationChange does nothing
 func (k *KeyKeeper) OnProcessDurationChange(_ []byte, _ uint32, _ int32) {}
+
+// OnProcessMetadataChange does nothing
+func (k *KeyKeeper) OnProcessMetadataChange(_ []byte, _ string, _ []byte, _ int32) {}
