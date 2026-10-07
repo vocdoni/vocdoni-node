@@ -6,7 +6,11 @@ import (
 	"go.vocdoni.io/proto/build/go/models"
 )
 
-// TransactionCosts describes how much each operation should cost
+// TransactionCosts describes how much each operation should cost.
+//
+// Adding a field changes the genesis AppState JSON of every network that embeds
+// it (and thus its genesis doc hash), so new tx types such as SetProcessMetadata
+// are only listed in the name maps below and fall back to state.FailbackTxCost.
 type TransactionCosts struct {
 	SetProcessStatus        uint32 `json:"Tx_SetProcessStatus"`
 	SetProcessCensus        uint32 `json:"Tx_SetProcessCensus"`
@@ -45,6 +49,7 @@ var TxCostNameToTxTypeMap = map[string]models.TxType{
 	"SetProcessStatus":        models.TxType_SET_PROCESS_STATUS,
 	"SetProcessCensus":        models.TxType_SET_PROCESS_CENSUS,
 	"SetProcessDuration":      models.TxType_SET_PROCESS_DURATION,
+	"SetProcessMetadata":      models.TxType_SET_PROCESS_METADATA,
 	"SetProcessQuestionIndex": models.TxType_SET_PROCESS_QUESTION_INDEX,
 	"SendTokens":              models.TxType_SEND_TOKENS,
 	"SetAccountInfoURI":       models.TxType_SET_ACCOUNT_INFO_URI,
@@ -72,6 +77,7 @@ var TxTypeToCostNameMap = map[models.TxType]string{
 	models.TxType_SET_PROCESS_STATUS:         "SetProcessStatus",
 	models.TxType_SET_PROCESS_CENSUS:         "SetProcessCensus",
 	models.TxType_SET_PROCESS_DURATION:       "SetProcessDuration",
+	models.TxType_SET_PROCESS_METADATA:       "SetProcessMetadata",
 	models.TxType_SET_PROCESS_QUESTION_INDEX: "SetProcessQuestionIndex",
 	models.TxType_SEND_TOKENS:                "SendTokens",
 	models.TxType_SET_ACCOUNT_INFO_URI:       "SetAccountInfoURI",

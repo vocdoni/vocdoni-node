@@ -3,10 +3,12 @@ package vochain
 import (
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 
 	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
+	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -225,6 +227,18 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 func testSetProcessStatus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, status *models.ProcessStatus,
 ) error {
+	return testSendSetProcessTx(t, app, txSender, &models.SetProcessTx{
+		Txtype:    models.TxType_SET_PROCESS_STATUS,
+		ProcessId: pid,
+		Status:    status,
+	})
+}
+
+// testSendSetProcessTx signs a SetProcessTx with the sender current nonce and
+// runs it through CheckTx, DeliverTx and Commit.
+func testSendSetProcessTx(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys,
+	tx *models.SetProcessTx,
+) error {
 	var stx models.SignedTx
 	var err error
 
@@ -233,13 +247,7 @@ func testSetProcessStatus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	if err != nil {
 		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
 	}
-	// create tx
-	tx := &models.SetProcessTx{
-		Txtype:    models.TxType_SET_PROCESS_STATUS,
-		Nonce:     txSenderAcc.Nonce,
-		ProcessId: pid,
-		Status:    status,
-	}
+	tx.Nonce = txSenderAcc.Nonce
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}})
 	if err != nil {
 		return fmt.Errorf("cannot mashal tx %w", err)
@@ -355,29 +363,11 @@ func testSetProcessCensus(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 func testSetProcessDuration(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
 	app *BaseApplication, duration uint32,
 ) error {
-	var stx models.SignedTx
-	var err error
-
-	txSenderAcc, err := app.State.GetAccount(txSender.Address(), false)
-	if err != nil {
-		return fmt.Errorf("cannot get tx sender account %s with error %w", txSender.Address(), err)
-	}
-
-	tx := &models.SetProcessTx{
+	return testSendSetProcessTx(t, app, txSender, &models.SetProcessTx{
 		Txtype:    models.TxType_SET_PROCESS_DURATION,
-		Nonce:     txSenderAcc.Nonce,
 		ProcessId: pid,
 		Duration:  &duration,
-	}
-	if stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: tx}}); err != nil {
-		return fmt.Errorf("cannot mashal tx %w", err)
-	}
-	if stx.Signature, err = txSender.SignVocdoniTx(stx.Tx, app.chainID); err != nil {
-		return fmt.Errorf("cannot sign tx %+v with error %w", tx, err)
-	}
-
-	_, err = testCheckTxDeliverTxCommit(t, app, &stx)
-	return err
+	})
 }
 
 func TestCount(t *testing.T) {
@@ -766,4 +756,181 @@ func checkTxLog(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys,
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("CheckTx failed: %s", resp.Data))
 	return resp.Log
+}
+
+func testSetProcessMetadata(t *testing.T, pid []byte, txSender *ethereum.SignKeys,
+	app *BaseApplication, uri *string, hash []byte,
+) error {
+	return testSendSetProcessTx(t, app, txSender, &models.SetProcessTx{
+		Txtype:       models.TxType_SET_PROCESS_METADATA,
+		ProcessId:    pid,
+		Metadata:     uri,
+		MetadataHash: hash,
+	})
+}
+
+func testMetadataProcess(entityID []byte) *models.Process {
+	censusURI := ipfsUrlTest
+	metadataURI := "https://example.com/metadata/1.json"
+	return &models.Process{
+		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
+		Mode:          &models.ProcessMode{Interruptible: true},
+		VoteOptions:   &models.ProcessVoteOptions{MaxCount: 16, MaxValue: 16},
+		Status:        models.ProcessStatus_READY,
+		EntityId:      entityID,
+		CensusRoot:    util.RandomBytes(32),
+		CensusURI:     &censusURI,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		Duration:      1024,
+		MaxCensusSize: 100,
+		Metadata:      &metadataURI,
+		MetadataHash:  util.RandomBytes(32),
+	}
+}
+
+func TestProcessSetMetadata(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+
+	process := testMetadataProcess(keys[0].Address().Bytes())
+	initialHash := process.MetadataHash
+	pid := testCreateProcess(t, keys[0], app, process)
+	qt.Assert(t, pid, qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	proc, err := app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, initialHash)
+
+	// owner updates the content behind the same URI (should work)
+	uri := process.GetMetadata()
+	hash := util.RandomBytes(32)
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, hash), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.GetMetadata(), qt.Equals, uri)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, hash)
+
+	// same URI and hash (should fail)
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, hash),
+		qt.ErrorMatches, ".*same URI and hash.*")
+
+	// delegate sets a new URI (should work)
+	uri2 := "ipfs://bafkreigh2akiscaildcqabsyg3dfr6chu3fgpregiymsck7e7aqa4s52zy"
+	hash2 := util.RandomBytes(32)
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[1], app, &uri2, hash2), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.GetMetadata(), qt.Equals, uri2)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, hash2)
+
+	// non delegate (should fail)
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[2], app, &uri, util.RandomBytes(32)),
+		qt.ErrorMatches, ".*unauthorized.*")
+
+	// invalid URI or hash (should fail)
+	empty := ""
+	longURI := "https://example.com/" + strings.Repeat("a", types.MaxURLLength)
+	for _, tc := range []struct {
+		name    string
+		uri     *string
+		hash    []byte
+		wantErr string
+	}{
+		{"missing URI", nil, util.RandomBytes(32), ".*metadata URI must be.*"},
+		{"empty URI", &empty, util.RandomBytes(32), ".*metadata URI must be.*"},
+		{"too long URI", &longURI, util.RandomBytes(32), ".*metadata URI must be.*"},
+		{"missing hash", &uri, nil, ".*metadata hash must be.*"},
+		{"too long hash", &uri, util.RandomBytes(types.MaxMetadataHashSize + 1), ".*metadata hash must be.*"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, tc.uri, tc.hash), qt.ErrorMatches, tc.wantErr)
+		})
+	}
+
+	// PAUSED (should work)
+	status := models.ProcessStatus_PAUSED
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// ENDED (should fail)
+	status = models.ProcessStatus_ENDED
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)),
+		qt.ErrorMatches, ".*invalid status.*")
+
+	// CANCELED (should fail)
+	pid2 := testCreateProcess(t, keys[0], app, testMetadataProcess(keys[0].Address().Bytes()))
+	qt.Assert(t, pid2, qt.IsNotNil)
+	app.AdvanceTestBlock()
+	status = models.ProcessStatus_CANCELED
+	qt.Assert(t, testSetProcessStatus(t, pid2, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
+	qt.Assert(t, testSetProcessMetadata(t, pid2, keys[0], app, &uri, util.RandomBytes(32)),
+		qt.ErrorMatches, ".*invalid status.*")
+}
+
+func TestNewProcessMetadataLimits(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+
+	// too long hash (should fail)
+	process := testMetadataProcess(keys[0].Address().Bytes())
+	process.MetadataHash = util.RandomBytes(types.MaxMetadataHashSize + 1)
+	qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, process),
+		qt.ErrorMatches, ".*metadata hash too long.*")
+
+	// any hash length up to the limit is accepted, the chain does not interpret it
+	process = testMetadataProcess(keys[0].Address().Bytes())
+	process.MetadataHash = util.RandomBytes(5)
+	qt.Assert(t, testCreateProcess(t, keys[0], app, process), qt.IsNotNil)
+
+	// too long URI (should fail)
+	process = testMetadataProcess(keys[0].Address().Bytes())
+	longURI := "https://example.com/" + strings.Repeat("a", types.MaxURLLength)
+	process.Metadata = &longURI
+	qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, process),
+		qt.ErrorMatches, ".*metadata URI too long.*")
+
+	// no hash (should work, the hash is optional on creation)
+	process = testMetadataProcess(keys[0].Address().Bytes())
+	process.MetadataHash = nil
+	qt.Assert(t, testCreateProcess(t, keys[0], app, process), qt.IsNotNil)
+
+	// explicitly empty hash (should work, same as no hash)
+	process = testMetadataProcess(keys[0].Address().Bytes())
+	process.MetadataHash = []byte{}
+	qt.Assert(t, testCreateProcess(t, keys[0], app, process), qt.IsNotNil)
+}
+
+// TestProcessMetadataForkLTS13 checks that on vocdoni/LTS/1.3 the metadata
+// fork stays inactive before its config.Forks MetadataFork height, behaving as
+// binaries without them, and activate at that height.
+func TestProcessMetadataForkLTS13(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	app.SetChainID("vocdoni/LTS/1.3")
+	forkHeight := config.ForksForChainID("vocdoni/LTS/1.3").MetadataFork
+	app.State.SetHeight(forkHeight - 1)
+
+	// before activation: NewProcessTx does not check the metadata URI nor hash
+	longURI := "https://example.com/" + strings.Repeat("a", types.MaxURLLength)
+	process := testMetadataProcess(keys[0].Address().Bytes())
+	process.Metadata = &longURI
+	process.MetadataHash = util.RandomBytes(types.MaxMetadataHashSize + 1)
+	pid := testCreateProcess(t, keys[0], app, process)
+	qt.Assert(t, pid, qt.IsNotNil)
+
+	// before activation: SET_PROCESS_METADATA is an unknown tx type
+	uri := "https://example.com/metadata/2.json"
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)),
+		qt.ErrorMatches, ".*unknown setProcess tx type.*")
+
+	// at activation: the fork rules apply
+	app.State.SetHeight(forkHeight)
+	qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, process),
+		qt.ErrorMatches, ".*metadata URI too long.*")
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)), qt.IsNil)
 }

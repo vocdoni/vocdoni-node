@@ -1,6 +1,7 @@
 package transaction
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -27,6 +28,20 @@ func checkVoteMemo(memo []byte) ([]byte, error) {
 		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
 	}
 	return memo, nil
+}
+
+// checkVoteMetadataHash checks that the vote attests the metadata the process
+// currently commits to, so a vote cast while the voter was shown an older
+// version is rejected.
+func (t *TransactionHandler) checkVoteMetadataHash(voteHash []byte, process *models.Process) error {
+	if !t.metadataForkActive() {
+		return nil
+	}
+	if !bytes.Equal(voteHash, process.GetMetadataHash()) {
+		return fmt.Errorf("vote metadata hash %x does not match the election metadata hash %x",
+			voteHash, process.GetMetadataHash())
+	}
+	return nil
 }
 
 // VoteTxCheck performs basic checks on a vote transaction.
@@ -156,6 +171,13 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	// Optional memo field. It runs outside the vote-cache branch above, so CheckTx
 	// and DeliverTx reach the same verdict on the same envelope.
 	if vote.Memo, err = checkVoteMemo(voteEnvelope.GetMemo()); err != nil {
+		return nil, err
+	}
+
+	// Like the memo, it runs outside the vote-cache branch: a vote that entered
+	// the mempool before a SET_PROCESS_METADATA must be rejected in the block
+	// after it.
+	if err := t.checkVoteMetadataHash(voteEnvelope.GetMetadataHash(), process); err != nil {
 		return nil, err
 	}
 
