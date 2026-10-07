@@ -410,7 +410,7 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 				election.Metadata = &electionMetadata
 				// cache the title, so the election list can render it without
 				// resolving the metadata of every row
-				a.cacheElectionTitle(electionID, &electionMetadata)
+				a.cacheElectionTitle(electionID, proc.Metadata, proc.MetadataHash, &electionMetadata)
 			} else {
 				election.Metadata = metadataBytes
 			}
