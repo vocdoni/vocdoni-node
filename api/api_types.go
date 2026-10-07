@@ -170,6 +170,7 @@ type Election struct {
 	ElectionSummary
 	Census       *ElectionCensus `json:"census,omitempty"`
 	MetadataURL  string          `json:"metadataURL"`
+	MetadataHash types.HexBytes  `json:"metadataHash,omitempty"`
 	CreationTime time.Time       `json:"creationTime"`
 	VoteMode     VoteMode        `json:"voteMode,omitempty"`
 	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
@@ -199,6 +200,30 @@ type ElectionCreate struct {
 	MetadataURL               string         `json:"metadataURL"`
 	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
 	Warning                   string         `json:"warning,omitempty"`
+}
+
+// ElectionMetadataUpdate is the request and response of PUT /elections/{electionId}/metadata.
+type ElectionMetadataUpdate struct {
+	TxPayload   []byte         `json:"txPayload,omitempty"`
+	Metadata    []byte         `json:"metadata,omitempty"`
+	TxHash      types.HexBytes `json:"txHash"`
+	MetadataURL string         `json:"metadataURL"`
+}
+
+// ElectionMetadataHistory lists every metadata version an election has had, oldest first.
+type ElectionMetadataHistory struct {
+	Versions []ElectionMetadataVersion `json:"versions"`
+}
+
+// ElectionMetadataVersion is a metadata URL and hash an election has had, and the
+// transaction that set it: the election creation or a later metadata update.
+type ElectionMetadataVersion struct {
+	MetadataURL  string         `json:"metadataURL"`
+	MetadataHash types.HexBytes `json:"metadataHash,omitempty"`
+	BlockHeight  uint32         `json:"blockHeight"`
+	TxIndex      int32          `json:"txIndex"`
+	TxHash       types.HexBytes `json:"txHash,omitempty"`
+	Timestamp    time.Time      `json:"timestamp"`
 }
 
 type ElectionDescription struct {
