@@ -13,6 +13,34 @@ import (
 	"go.vocdoni.io/dvote/types"
 )
 
+const addProcessMetadataVersion = `-- name: AddProcessMetadataVersion :execresult
+INSERT OR REPLACE INTO process_metadata_history (
+	process_id, block_height, block_index, time, metadata, metadata_hash
+) VALUES (
+	?, ?, ?, ?, ?, ?
+)
+`
+
+type AddProcessMetadataVersionParams struct {
+	ProcessID    types.ProcessID
+	BlockHeight  int64
+	BlockIndex   int64
+	Time         time.Time
+	Metadata     string
+	MetadataHash []byte
+}
+
+func (q *Queries) AddProcessMetadataVersion(ctx context.Context, arg AddProcessMetadataVersionParams) (sql.Result, error) {
+	return q.exec(ctx, q.addProcessMetadataVersionStmt, addProcessMetadataVersion,
+		arg.ProcessID,
+		arg.BlockHeight,
+		arg.BlockIndex,
+		arg.Time,
+		arg.Metadata,
+		arg.MetadataHash,
+	)
+}
+
 const computeProcessVoteCount = `-- name: ComputeProcessVoteCount :execresult
 UPDATE processes
 SET vote_count = (SELECT COUNT(*) FROM votes WHERE process_id = id)
@@ -64,7 +92,7 @@ const createProcess = `-- name: CreateProcess :execresult
 INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
 	vote_count, have_results, final_results, census_root,
-	max_census_size, census_uri, metadata,
+	max_census_size, census_uri, metadata, metadata_hash,
 	census_origin, status, namespace,
 	envelope, mode, vote_opts,
 	private_keys, public_keys,
@@ -76,7 +104,7 @@ INSERT INTO processes (
 ) VALUES (
 	?, ?, ?, ?, ?,
 	?, ?, ?, ?,
-	?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?, ?,
 	?, ?,
@@ -101,6 +129,7 @@ type CreateProcessParams struct {
 	MaxCensusSize     int64
 	CensusUri         string
 	Metadata          string
+	MetadataHash      []byte
 	CensusOrigin      int64
 	Status            int64
 	Namespace         int64
@@ -131,6 +160,7 @@ func (q *Queries) CreateProcess(ctx context.Context, arg CreateProcessParams) (s
 		arg.MaxCensusSize,
 		arg.CensusUri,
 		arg.Metadata,
+		arg.MetadataHash,
 		arg.CensusOrigin,
 		arg.Status,
 		arg.Namespace,
@@ -160,7 +190,7 @@ func (q *Queries) GetEntityCount(ctx context.Context) (int64, error) {
 }
 
 const getProcess = `-- name: GetProcess :one
-SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash FROM processes
+SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash, metadata_hash FROM processes
 WHERE id = ?
 LIMIT 1
 `
@@ -200,6 +230,7 @@ func (q *Queries) GetProcess(ctx context.Context, id types.ProcessID) (Process, 
 		&i.MetadataTitle,
 		&i.KeyRevealHeight,
 		&i.KeyRevealTxHash,
+		&i.MetadataHash,
 	)
 	return i, err
 }
@@ -256,8 +287,57 @@ func (q *Queries) GetProcessStatus(ctx context.Context, id types.ProcessID) (int
 	return status, err
 }
 
+const listProcessMetadataHistory = `-- name: ListProcessMetadataHistory :many
+SELECT h.block_height, h.block_index, h.time, h.metadata, h.metadata_hash,
+	CAST(COALESCE(t.hash, x'') AS BLOB) AS tx_hash
+FROM process_metadata_history AS h
+LEFT JOIN transactions AS t
+	ON t.block_height = h.block_height AND t.block_index = h.block_index
+WHERE h.process_id = ?
+ORDER BY h.block_height ASC, h.block_index ASC
+`
+
+type ListProcessMetadataHistoryRow struct {
+	BlockHeight  int64
+	BlockIndex   int64
+	Time         time.Time
+	Metadata     string
+	MetadataHash []byte
+	TxHash       []byte
+}
+
+func (q *Queries) ListProcessMetadataHistory(ctx context.Context, processID types.ProcessID) ([]ListProcessMetadataHistoryRow, error) {
+	rows, err := q.query(ctx, q.listProcessMetadataHistoryStmt, listProcessMetadataHistory, processID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProcessMetadataHistoryRow
+	for rows.Next() {
+		var i ListProcessMetadataHistoryRow
+		if err := rows.Scan(
+			&i.BlockHeight,
+			&i.BlockIndex,
+			&i.Time,
+			&i.Metadata,
+			&i.MetadataHash,
+			&i.TxHash,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listProcessesMissingMetadataTitle = `-- name: ListProcessesMissingMetadataTitle :many
-SELECT id, metadata FROM processes
+SELECT id, metadata, metadata_hash FROM processes
 WHERE metadata_title = '' AND metadata != '' AND id > ?1
 ORDER BY id
 LIMIT ?2
@@ -269,8 +349,9 @@ type ListProcessesMissingMetadataTitleParams struct {
 }
 
 type ListProcessesMissingMetadataTitleRow struct {
-	ID       types.ProcessID
-	Metadata string
+	ID           types.ProcessID
+	Metadata     string
+	MetadataHash []byte
 }
 
 // Lists the processes whose title was never resolved but which do declare a
@@ -286,7 +367,7 @@ func (q *Queries) ListProcessesMissingMetadataTitle(ctx context.Context, arg Lis
 	var items []ListProcessesMissingMetadataTitleRow
 	for rows.Next() {
 		var i ListProcessesMissingMetadataTitleRow
-		if err := rows.Scan(&i.ID, &i.Metadata); err != nil {
+		if err := rows.Scan(&i.ID, &i.Metadata, &i.MetadataHash); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -302,7 +383,7 @@ func (q *Queries) ListProcessesMissingMetadataTitle(ctx context.Context, arg Lis
 
 const searchEntities = `-- name: SearchEntities :many
 WITH results AS (
-    SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title, p.key_reveal_height, p.key_reveal_tx_hash,
+    SELECT p.id, p.entity_id, p.start_date, p.end_date, p.vote_count, p.chain_id, p.have_results, p.final_results, p.results_votes, p.results_weight, p.results_block_height, p.census_root, p.max_census_size, p.census_uri, p.metadata, p.census_origin, p.status, p.namespace, p.envelope, p.mode, p.vote_opts, p.private_keys, p.public_keys, p.question_index, p.creation_time, p.source_block_height, p.source_network_id, p.manually_ended, p.metadata_title, p.key_reveal_height, p.key_reveal_tx_hash, p.metadata_hash,
         COALESCE(a.name, '') AS account_name,
         COALESCE(a.avatar, '') AS account_avatar
     FROM processes AS p
@@ -423,7 +504,7 @@ func (q *Queries) SearchEntities(ctx context.Context, arg SearchEntitiesParams) 
 
 const searchProcesses = `-- name: SearchProcesses :many
 WITH results AS (
-	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash,
+	SELECT id, entity_id, start_date, end_date, vote_count, chain_id, have_results, final_results, results_votes, results_weight, results_block_height, census_root, max_census_size, census_uri, metadata, census_origin, status, namespace, envelope, mode, vote_opts, private_keys, public_keys, question_index, creation_time, source_block_height, source_network_id, manually_ended, metadata_title, key_reveal_height, key_reveal_tx_hash, metadata_hash,
 			COUNT(*) OVER() AS total_count
 	FROM processes
 	WHERE (
@@ -558,18 +639,28 @@ const setProcessMetadataTitle = `-- name: SetProcessMetadataTitle :execresult
 UPDATE processes
 SET metadata_title = ?1
 WHERE id = ?2 AND metadata_title != ?1
+  AND metadata = ?3 AND metadata_hash = ?4
 `
 
 type SetProcessMetadataTitleParams struct {
 	MetadataTitle string
 	ID            types.ProcessID
+	Metadata      string
+	MetadataHash  []byte
 }
 
 // Stores the title resolved from the process off-chain metadata. Only writes when
 // the title actually changed, so the common case of re-resolving the same title
-// costs no write.
+// costs no write. Only writes while the process still has the metadata URI and
+// hash the title was resolved from, so a title resolved just before a metadata
+// update does not overwrite the reset done by that update.
 func (q *Queries) SetProcessMetadataTitle(ctx context.Context, arg SetProcessMetadataTitleParams) (sql.Result, error) {
-	return q.exec(ctx, q.setProcessMetadataTitleStmt, setProcessMetadataTitle, arg.MetadataTitle, arg.ID)
+	return q.exec(ctx, q.setProcessMetadataTitleStmt, setProcessMetadataTitle,
+		arg.MetadataTitle,
+		arg.ID,
+		arg.Metadata,
+		arg.MetadataHash,
+	)
 }
 
 const setProcessResultsCancelled = `-- name: SetProcessResultsCancelled :execresult
@@ -641,11 +732,15 @@ SET census_root         = ?1,
 	census_uri          = ?2,
 	private_keys        = ?3,
 	public_keys         = ?4,
+	-- a new metadata document invalidates the cached title, so the API resolves it again
+	metadata_title      = CASE WHEN metadata != ?5 OR metadata_hash != ?6
+	                          THEN '' ELSE metadata_title END,
 	metadata            = ?5,
-	status              = ?6,
-	max_census_size	 	= ?7,
-	end_date 			= ?8
-WHERE id = ?9
+	metadata_hash       = ?6,
+	status              = ?7,
+	max_census_size	 	= ?8,
+	end_date 			= ?9
+WHERE id = ?10
 `
 
 type UpdateProcessFromStateParams struct {
@@ -654,6 +749,7 @@ type UpdateProcessFromStateParams struct {
 	PrivateKeys   string
 	PublicKeys    string
 	Metadata      string
+	MetadataHash  []byte
 	Status        int64
 	MaxCensusSize int64
 	EndDate       time.Time
@@ -667,6 +763,7 @@ func (q *Queries) UpdateProcessFromState(ctx context.Context, arg UpdateProcessF
 		arg.PrivateKeys,
 		arg.PublicKeys,
 		arg.Metadata,
+		arg.MetadataHash,
 		arg.Status,
 		arg.MaxCensusSize,
 		arg.EndDate,

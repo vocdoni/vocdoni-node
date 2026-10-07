@@ -24,6 +24,9 @@ func New(db DBTX) *Queries {
 func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	q := Queries{db: db}
 	var err error
+	if q.addProcessMetadataVersionStmt, err = db.PrepareContext(ctx, addProcessMetadataVersion); err != nil {
+		return nil, fmt.Errorf("error preparing query AddProcessMetadataVersion: %w", err)
+	}
 	if q.computeProcessVoteCountStmt, err = db.PrepareContext(ctx, computeProcessVoteCount); err != nil {
 		return nil, fmt.Errorf("error preparing query ComputeProcessVoteCount: %w", err)
 	}
@@ -114,6 +117,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.listAccountsMissingNameStmt, err = db.PrepareContext(ctx, listAccountsMissingName); err != nil {
 		return nil, fmt.Errorf("error preparing query ListAccountsMissingName: %w", err)
 	}
+	if q.listProcessMetadataHistoryStmt, err = db.PrepareContext(ctx, listProcessMetadataHistory); err != nil {
+		return nil, fmt.Errorf("error preparing query ListProcessMetadataHistory: %w", err)
+	}
 	if q.listProcessesMissingMetadataTitleStmt, err = db.PrepareContext(ctx, listProcessesMissingMetadataTitle); err != nil {
 		return nil, fmt.Errorf("error preparing query ListProcessesMissingMetadataTitle: %w", err)
 	}
@@ -182,6 +188,11 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 
 func (q *Queries) Close() error {
 	var err error
+	if q.addProcessMetadataVersionStmt != nil {
+		if cerr := q.addProcessMetadataVersionStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing addProcessMetadataVersionStmt: %w", cerr)
+		}
+	}
 	if q.computeProcessVoteCountStmt != nil {
 		if cerr := q.computeProcessVoteCountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing computeProcessVoteCountStmt: %w", cerr)
@@ -332,6 +343,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing listAccountsMissingNameStmt: %w", cerr)
 		}
 	}
+	if q.listProcessMetadataHistoryStmt != nil {
+		if cerr := q.listProcessMetadataHistoryStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing listProcessMetadataHistoryStmt: %w", cerr)
+		}
+	}
 	if q.listProcessesMissingMetadataTitleStmt != nil {
 		if cerr := q.listProcessesMissingMetadataTitleStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing listProcessesMissingMetadataTitleStmt: %w", cerr)
@@ -476,6 +492,7 @@ func (q *Queries) queryRow(ctx context.Context, stmt *sql.Stmt, query string, ar
 type Queries struct {
 	db                                    DBTX
 	tx                                    *sql.Tx
+	addProcessMetadataVersionStmt         *sql.Stmt
 	computeProcessVoteCountStmt           *sql.Stmt
 	countAccountsStmt                     *sql.Stmt
 	countBlocksStmt                       *sql.Stmt
@@ -506,6 +523,7 @@ type Queries struct {
 	getVoteStmt                           *sql.Stmt
 	lastBlockHeightStmt                   *sql.Stmt
 	listAccountsMissingNameStmt           *sql.Stmt
+	listProcessMetadataHistoryStmt        *sql.Stmt
 	listProcessesMissingMetadataTitleStmt *sql.Stmt
 	listTransactionsByTypeAndSubtypeStmt  *sql.Stmt
 	searchAccountsStmt                    *sql.Stmt
@@ -533,6 +551,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 	return &Queries{
 		db:                                    tx,
 		tx:                                    tx,
+		addProcessMetadataVersionStmt:         q.addProcessMetadataVersionStmt,
 		computeProcessVoteCountStmt:           q.computeProcessVoteCountStmt,
 		countAccountsStmt:                     q.countAccountsStmt,
 		countBlocksStmt:                       q.countBlocksStmt,
@@ -563,6 +582,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getVoteStmt:                           q.getVoteStmt,
 		lastBlockHeightStmt:                   q.lastBlockHeightStmt,
 		listAccountsMissingNameStmt:           q.listAccountsMissingNameStmt,
+		listProcessMetadataHistoryStmt:        q.listProcessMetadataHistoryStmt,
 		listProcessesMissingMetadataTitleStmt: q.listProcessesMissingMetadataTitleStmt,
 		listTransactionsByTypeAndSubtypeStmt:  q.listTransactionsByTypeAndSubtypeStmt,
 		searchAccountsStmt:                    q.searchAccountsStmt,

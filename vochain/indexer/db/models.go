@@ -51,6 +51,7 @@ type Process struct {
 	MetadataTitle      string
 	KeyRevealHeight    int64
 	KeyRevealTxHash    []byte
+	MetadataHash       []byte
 }
 
 type TokenTransfer struct {
