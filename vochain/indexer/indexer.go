@@ -431,6 +431,10 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 			log.Errorf("cannot fetch process: %v", err)
 			continue
 		}
+		// a metadata-only process takes no votes, so it has no results to recover
+		if process.MetadataOnly {
+			continue
+		}
 		options := process.VoteOpts
 
 		indxR := &results.Results{
