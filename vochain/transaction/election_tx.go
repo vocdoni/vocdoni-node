@@ -12,6 +12,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
 	"go.vocdoni.io/dvote/vochain/results"
+	vstate "go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
@@ -26,22 +27,30 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	if tx.Process == nil {
 		return nil, ethereum.Address{}, fmt.Errorf("new process data is empty")
 	}
-	// basic required fields check
-	if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
-		return nil, ethereum.Address{}, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
-	}
-	if tx.Process.VoteOptions.MaxCount == 0 {
-		return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
-	}
-	if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
-		return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
-	}
+	// a process without voteOptions is metadata-only once the parent fork is active
+	metadataOnly := t.parentForkActive() && vstate.IsMetadataOnlyProcess(tx.Process)
+	if metadataOnly {
+		if err := checkMetadataOnlyProcess(tx.Process); err != nil {
+			return nil, ethereum.Address{}, err
+		}
+	} else {
+		// basic required fields check
+		if tx.Process.VoteOptions == nil || tx.Process.EnvelopeType == nil || tx.Process.Mode == nil {
+			return nil, ethereum.Address{}, fmt.Errorf("missing required fields (voteOptions, envelopeType or processMode)")
+		}
+		if tx.Process.VoteOptions.MaxCount == 0 {
+			return nil, ethereum.Address{}, fmt.Errorf("missing vote maxCount parameter")
+		}
+		if vtx.Signature == nil || tx == nil || vtx.SignedBody == nil {
+			return nil, ethereum.Address{}, fmt.Errorf("missing vtx.Signature or new process transaction")
+		}
 
-	// check for maxCount/maxValue overflows
-	if tx.Process.VoteOptions.MaxCount > results.MaxQuestions {
-		return nil, ethereum.Address{},
-			fmt.Errorf("maxCount overflows (%d, %d)",
-				results.MaxQuestions, tx.Process.VoteOptions.MaxCount)
+		// check for maxCount/maxValue overflows
+		if tx.Process.VoteOptions.MaxCount > results.MaxQuestions {
+			return nil, ethereum.Address{},
+				fmt.Errorf("maxCount overflows (%d, %d)",
+					results.MaxQuestions, tx.Process.VoteOptions.MaxCount)
+		}
 	}
 	if !(tx.Process.GetStatus() == models.ProcessStatus_READY || tx.Process.GetStatus() == models.ProcessStatus_PAUSED) {
 		return nil, ethereum.Address{}, fmt.Errorf("status must be READY or PAUSED")
@@ -55,13 +64,17 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		}
 	}
 
-	// run specific checks based on census origin
-	switch tx.Process.CensusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
+	// run specific checks based on census origin (a metadata-only process has none)
+	switch {
+	case metadataOnly:
+		// checked by checkMetadataOnlyProcess
+	case tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA,
+		tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA_V2:
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}
-	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
+	case tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_TREE,
+		tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
 		// no additional origin-specific checks
 	default:
 		// Format the enum itself rather than CensusOrigin_name: the map
@@ -109,8 +122,10 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	// check MaxCensusSize is properly set and within the allowed range
-	if err := t.checkMaxCensusSize(tx.Process); err != nil {
-		return nil, ethereum.Address{}, err
+	if !metadataOnly {
+		if err := t.checkMaxCensusSize(tx.Process); err != nil {
+			return nil, ethereum.Address{}, err
+		}
 	}
 
 	// get Tx cost, since it is a new process, we should use the election price calculator
@@ -143,6 +158,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		}
 	}
 
+	if t.parentForkActive() && len(tx.Process.ParentProcessId) > 0 {
+		if err := t.checkParentProcess(tx.Process); err != nil {
+			return nil, ethereum.Address{}, err
+		}
+	}
+
 	// build the deterministic process ID
 	pid, err := processid.BuildProcessID(tx.Process, t.state, processid.BuildNextProcessID)
 	if err != nil {
@@ -153,11 +174,11 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
 	// all the required changes to support a process with a rolling census
 	// that is not Anonymous.
-	if tx.Process.EnvelopeType.Serial {
+	if tx.Process.GetEnvelopeType().GetSerial() {
 		return nil, ethereum.Address{}, fmt.Errorf("serial process not yet implemented")
 	}
 
-	if tx.Process.EnvelopeType.EncryptedVotes {
+	if tx.Process.GetEnvelopeType().GetEncryptedVotes() {
 		// We consider the zero value as nil for security
 		tx.Process.EncryptionPublicKeys = make([]string, types.KeyKeeperMaxKeyIndex)
 		tx.Process.EncryptionPrivateKeys = make([]string, types.KeyKeeperMaxKeyIndex)
@@ -223,6 +244,9 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 		}
 		return ethereum.Address(*addr), t.state.SetProcessStatus(process.ProcessId, tx.GetStatus(), false)
 	case models.TxType_SET_PROCESS_CENSUS:
+		if t.parentForkActive() && vstate.IsMetadataOnlyProcess(process) {
+			return ethereum.Address{}, fmt.Errorf("cannot set the census of a metadata-only process")
+		}
 		// If the census size is increased, sanity check the new size and compute the cost increase
 		if tx.GetCensusSize() != 0 && (tx.GetCensusSize() != process.GetMaxCensusSize()) {
 			// if the new census size is smaller than the current census size, we return an error
@@ -271,6 +295,52 @@ func (t *TransactionHandler) SetProcessTxCheck(vtx *vochaintx.Tx) (ethereum.Addr
 	}
 }
 
+// checkMetadataOnlyProcess checks a new metadata-only process: it has no envelope
+// type nor census, since it takes no votes, and it commits a metadata URI and hash,
+// which are all it is for.
+func checkMetadataOnlyProcess(p *models.Process) error {
+	if p.Mode == nil {
+		return fmt.Errorf("missing required fields (processMode)")
+	}
+	if p.EnvelopeType != nil {
+		return fmt.Errorf("metadata-only process (no voteOptions) cannot have an envelopeType")
+	}
+	if p.CensusOrigin != 0 || len(p.CensusRoot) > 0 || p.GetCensusURI() != "" || p.MaxCensusSize != 0 {
+		return fmt.Errorf("metadata-only process (no voteOptions) cannot have a census " +
+			"(censusOrigin, censusRoot, censusURI or maxCensusSize)")
+	}
+	if p.GetMetadata() == "" {
+		return fmt.Errorf("metadata-only process requires a metadata URI")
+	}
+	if len(p.MetadataHash) == 0 {
+		return fmt.Errorf("metadata-only process requires a metadata hash")
+	}
+	return nil
+}
+
+// checkParentProcess checks the parentProcessId of a new process, whose EntityId
+// must be already resolved: the parent exists, belongs to the same organization,
+// is metadata-only and has no parent itself, so links are at most one level deep.
+func (t *TransactionHandler) checkParentProcess(p *models.Process) error {
+	if len(p.ParentProcessId) != types.ProcessIDsize {
+		return fmt.Errorf("invalid parentProcessId size %d, expected %d", len(p.ParentProcessId), types.ProcessIDsize)
+	}
+	parent, err := t.state.Process(p.ParentProcessId, false)
+	if err != nil {
+		return fmt.Errorf("cannot get parent process %x: %w", p.ParentProcessId, err)
+	}
+	if !bytes.Equal(parent.EntityId, p.EntityId) {
+		return fmt.Errorf("parent process %x belongs to another organization", p.ParentProcessId)
+	}
+	if !vstate.IsMetadataOnlyProcess(parent) {
+		return fmt.Errorf("parent process %x is not metadata-only", p.ParentProcessId)
+	}
+	if len(parent.ParentProcessId) > 0 {
+		return fmt.Errorf("parent process %x has a parent itself", p.ParentProcessId)
+	}
+	return nil
+}
+
 // checkMaxCensusSize checks if the maxCensusSize is within the allowed range.
 func (t *TransactionHandler) checkMaxCensusSize(proc *models.Process) error {
 	txMaxCensusSize := proc.GetMaxCensusSize()
@@ -285,7 +355,7 @@ func (t *TransactionHandler) checkMaxCensusSize(proc *models.Process) error {
 		return fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
 	}
 	// check that the census size is not bigger than the circuit levels
-	if proc.EnvelopeType.Anonymous && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
+	if proc.GetEnvelopeType().GetAnonymous() && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
 		return fmt.Errorf("maxCensusSize for anonymous envelope "+
 			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
 			circuit.Global().Config.MaxCensusSize().Int64(), txMaxCensusSize)
@@ -353,9 +423,9 @@ func (t *TransactionHandler) txElectionCostFromProcess(process *models.Process) 
 		MaxCensusSize:           process.GetMaxCensusSize(),
 		ElectionDuration:        process.BlockCount,
 		ElectionDurationSeconds: process.Duration,
-		EncryptedVotes:          process.GetEnvelopeType().EncryptedVotes,
-		AnonymousVotes:          process.GetEnvelopeType().Anonymous,
-		MaxVoteOverwrite:        process.GetVoteOptions().MaxVoteOverwrites,
+		EncryptedVotes:          process.GetEnvelopeType().GetEncryptedVotes(),
+		AnonymousVotes:          process.GetEnvelopeType().GetAnonymous(),
+		MaxVoteOverwrite:        process.GetVoteOptions().GetMaxVoteOverwrites(),
 	})
 }
 

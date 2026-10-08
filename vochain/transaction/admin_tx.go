@@ -46,7 +46,7 @@ func (t *TransactionHandler) AdminTxCheck(vtx *vochaintx.Tx) (ethereum.Address, 
 		}
 
 		// check if process actually requires keys
-		if !process.EnvelopeType.EncryptedVotes && !process.EnvelopeType.Anonymous {
+		if !process.GetEnvelopeType().GetEncryptedVotes() && !process.GetEnvelopeType().GetAnonymous() {
 			return ethereum.Address{}, fmt.Errorf("process does not require keys")
 		}
 
