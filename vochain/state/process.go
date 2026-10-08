@@ -56,9 +56,10 @@ func (v *State) AddProcess(p *models.Process) error {
 // IsMetadataOnlyProcess reports whether p is a metadata-only process: one without
 // vote options, envelope type nor census, which only commits on chain the metadata
 // shared by the processes that link to it through their parentProcessId. It takes
-// no votes and has no results.
+// no votes and has no results. NewProcessTx only accepts a process without vote
+// options if it has no envelope type either, so both being unset identifies it.
 func IsMetadataOnlyProcess(p *models.Process) bool {
-	return p.GetVoteOptions() == nil
+	return p.GetVoteOptions() == nil && p.GetEnvelopeType() == nil
 }
 
 // CancelProcess sets the process canceled attribute to true

@@ -28,7 +28,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		return nil, ethereum.Address{}, fmt.Errorf("new process data is empty")
 	}
 	// a process without voteOptions is metadata-only once the parent fork is active
-	metadataOnly := t.parentForkActive() && vstate.IsMetadataOnlyProcess(tx.Process)
+	metadataOnly := t.parentForkActive() && tx.Process.VoteOptions == nil
 	if metadataOnly {
 		if err := checkMetadataOnlyProcess(tx.Process); err != nil {
 			return nil, ethereum.Address{}, err

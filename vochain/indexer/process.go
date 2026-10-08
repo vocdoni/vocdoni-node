@@ -323,6 +323,9 @@ func (idx *Indexer) newEmptyProcess(pid []byte, txIndex int32) error {
 		options = &models.ProcessVoteOptions{}
 		envelope = &models.EnvelopeType{}
 	} else {
+		if options == nil {
+			return fmt.Errorf("newEmptyProcess: vote options is nil")
+		}
 		if options.MaxCount == 0 {
 			return fmt.Errorf("newEmptyProcess: maxCount is zero")
 		}
