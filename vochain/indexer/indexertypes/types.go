@@ -303,6 +303,12 @@ type Entity struct {
 	// when it was never resolved for this entity.
 	Name   string
 	Avatar string
+	// VoteCount is the total number of votes cast across the entity's processes.
+	VoteCount uint64
+	// LastProcess is the creation time of the entity's most recent process.
+	LastProcess time.Time
+	// Balance is the token balance of the entity's account, 0 if not indexed.
+	Balance uint64
 }
 
 // VoteBucket is the number of votes cast within a single time bucket.

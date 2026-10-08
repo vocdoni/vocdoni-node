@@ -98,6 +98,7 @@ const (
 	ParamStartDateBefore = "startDateBefore"
 	ParamEndDateAfter    = "endDateAfter"
 	ParamEndDateBefore   = "endDateBefore"
+	ParamTitle           = "title"
 	ParamSortBy          = "sortBy"
 	ParamOrder           = "order"
 )

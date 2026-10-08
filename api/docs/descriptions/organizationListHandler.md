@@ -3,7 +3,9 @@ An **Account** could be a validator, an oracle, a voter or just someone who want
 
 The `/chain/organizations` endpoints are related only to the Organization account type.
 
-- Return list of organizations ids.
+- Return list of organizations, each with its election count, total vote count,
+  the creation time of its most recent election (`lastElectionDate`) and its
+  account balance, plus the name and avatar from its metadata when resolved.
 - If no page is defined, will assume page 0.
 
 ### Sorting
@@ -14,7 +16,10 @@ unsupported value is rejected with a 400 rather than ignored.
 | `sortBy` | orders by | default `order` |
 | --- | --- | --- |
 | `createdAt` (default) | when the organization first appeared in the index, i.e. the creation time of its oldest indexed election | `desc`, newest organizations first |
+| `lastElection` | when the organization was last active, i.e. the creation time of its most recent election | `desc`, most recently active first |
 | `electionCount` | how many elections the organization has | `desc`, busiest organizations first |
+| `voteCount` | the total number of votes cast across all of its elections | `desc`, most voted first |
+| `balance` | the token balance of its account | `desc`, largest balance first |
 | `name` | the organization name resolved from its account metadata, case-insensitively (ASCII case folding only). Organizations whose account resolves no name always sort last, in either direction | `asc`, alphabetical |
 
 The ordering is total: organizations that tie are ordered by their id, so paging
