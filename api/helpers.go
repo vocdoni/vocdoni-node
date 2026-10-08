@@ -47,6 +47,9 @@ func (a *API) electionSummary(pi *indexertypes.Process) *ElectionSummary {
 
 		KeyRevealHeight: pi.KeyRevealHeight,
 		KeyRevealTxHash: pi.KeyRevealTxHash,
+
+		ParentElectionID: pi.ParentProcessID,
+		MetadataOnly:     pi.MetadataOnly,
 	}
 }
 

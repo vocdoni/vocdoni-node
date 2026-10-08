@@ -92,18 +92,9 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 		return nil, fmt.Errorf("no account configured")
 	}
 
-	// Set start and end dates
-	if description.EndDate.Before(time.Now()) {
-		return nil, fmt.Errorf("election end date cannot be in the past")
-	}
-	var startTime, duration uint32
-	if description.StartDate.IsZero() {
-		// if start date is empty, start the election immediately.
-		startTime = 0
-		duration = uint32(description.EndDate.Unix() - time.Now().Unix())
-	} else {
-		startTime = uint32(description.StartDate.Unix())
-		duration = uint32(description.EndDate.Unix() - description.StartDate.Unix())
+	startTime, duration, err := electionStartAndDuration(description)
+	if err != nil {
+		return nil, err
 	}
 
 	// Set the envelope and process models
@@ -178,30 +169,94 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
 	log.Debugf("metadataURI: %s", metadataURI)
 
+	// build the process transaction
+	process := &models.Process{
+		EntityId:        c.account.Address().Bytes(),
+		Duration:        duration,
+		StartTime:       startTime,
+		CensusRoot:      root,
+		CensusURI:       &description.Census.URL,
+		Status:          models.ProcessStatus_READY,
+		EnvelopeType:    envelopeType,
+		Mode:            processMode,
+		VoteOptions:     voteOptions,
+		CensusOrigin:    censusOrigin,
+		Metadata:        &metadataURI,
+		MetadataHash:    api.MetadataHash(metadataBytes),
+		MaxCensusSize:   description.Census.Size,
+		TempSIKs:        &description.TempSIKs,
+		ParentProcessId: description.ParentElectionID,
+	}
+	return c.newElectionWithMetadata(process, metadataBytes, wait)
+}
+
+// NewMetadataOnlyElection creates a metadata-only election, which only commits on
+// chain the metadata (title, description, header and stream URI of the given
+// description; its questions, census and vote type are ignored) shared by the
+// elections that link to it through their ParentElectionID. It takes no votes and
+// has no results. Returns the ElectionID. If wait is true, it waits until the
+// election is created.
+func (c *HTTPclient) NewMetadataOnlyElection(description *api.ElectionDescription, wait bool) (types.HexBytes, error) {
+	if c.account == nil {
+		return nil, fmt.Errorf("no account configured")
+	}
+	startTime, duration, err := electionStartAndDuration(description)
+	if err != nil {
+		return nil, err
+	}
+	metadataBytes, err := json.Marshal(&api.ElectionMetadata{
+		Description: description.Description,
+		Media: api.ProcessMedia{
+			Header:    description.Header,
+			StreamURI: description.StreamURI,
+		},
+		Questions: []api.Question{},
+		Title:     description.Title,
+		Version:   "1.0",
+	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot format metadata: %w", err)
+	}
+	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+	process := &models.Process{
+		EntityId:  c.account.Address().Bytes(),
+		Duration:  duration,
+		StartTime: startTime,
+		Status:    models.ProcessStatus_READY,
+		Mode: &models.ProcessMode{
+			AutoStart:     description.ElectionType.Autostart,
+			Interruptible: description.ElectionType.Interruptible,
+		},
+		Metadata:     &metadataURI,
+		MetadataHash: api.MetadataHash(metadataBytes),
+	}
+	return c.newElectionWithMetadata(process, metadataBytes, wait)
+}
+
+// electionStartAndDuration returns the start time and duration, in seconds, of a
+// new election from its description. A zero start time starts it immediately.
+func electionStartAndDuration(description *api.ElectionDescription) (startTime, duration uint32, err error) {
+	if description.EndDate.Before(time.Now()) {
+		return 0, 0, fmt.Errorf("election end date cannot be in the past")
+	}
+	if description.StartDate.IsZero() {
+		// if start date is empty, start the election immediately.
+		return 0, uint32(description.EndDate.Unix() - time.Now().Unix()), nil
+	}
+	return uint32(description.StartDate.Unix()), uint32(description.EndDate.Unix() - description.StartDate.Unix()), nil
+}
+
+// newElectionWithMetadata sends a NewProcessTx for process together with its raw
+// metadata document, which the node publishes, and returns the ElectionID. If wait
+// is true, it waits until the election is created.
+func (c *HTTPclient) newElectionWithMetadata(process *models.Process, metadataBytes []byte, wait bool) (types.HexBytes, error) {
+	log.Debugf("election transaction: %+v", log.FormatProto(process))
+
 	// get the own account details
 	acc, err := c.Account("")
 	if err != nil {
 		return nil, fmt.Errorf("could not fetch account info")
 	}
-
-	// build the process transaction
-	process := &models.Process{
-		EntityId:      c.account.Address().Bytes(),
-		Duration:      duration,
-		StartTime:     startTime,
-		CensusRoot:    root,
-		CensusURI:     &description.Census.URL,
-		Status:        models.ProcessStatus_READY,
-		EnvelopeType:  envelopeType,
-		Mode:          processMode,
-		VoteOptions:   voteOptions,
-		CensusOrigin:  censusOrigin,
-		Metadata:      &metadataURI,
-		MetadataHash:  api.MetadataHash(metadataBytes),
-		MaxCensusSize: description.Census.Size,
-		TempSIKs:      &description.TempSIKs,
-	}
-	log.Debugf("election transaction: %+v", log.FormatProto(process))
 
 	tx := models.Tx{
 		Payload: &models.Tx_NewProcess{
@@ -391,6 +446,24 @@ func (c *HTTPclient) SetElectionMetadata(electionID types.HexBytes, metadata *ap
 		log.Warnf("metadata could not be published")
 	}
 	return update.TxHash, nil
+}
+
+// ElectionChildren returns the first page, of the API default size, of the
+// summaries of the elections linked to the metadata-only election electionID as
+// their parent, oldest first.
+func (c *HTTPclient) ElectionChildren(electionID types.HexBytes) (*api.ElectionsList, error) {
+	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "children")
+	if err != nil {
+		return nil, err
+	}
+	if code != apirest.HTTPstatusOK {
+		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
+	}
+	list := &api.ElectionsList{}
+	if err := json.Unmarshal(resp, list); err != nil {
+		return nil, err
+	}
+	return list, nil
 }
 
 // ElectionMetadataHistory returns every metadata URL and hash the election has had, oldest first.

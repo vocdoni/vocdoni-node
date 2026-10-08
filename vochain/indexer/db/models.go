@@ -52,6 +52,7 @@ type Process struct {
 	KeyRevealHeight    int64
 	KeyRevealTxHash    []byte
 	MetadataHash       []byte
+	ParentProcessID    types.ProcessID
 }
 
 type TokenTransfer struct {

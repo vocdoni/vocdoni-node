@@ -9,6 +9,7 @@ import (
 	stdlog "log"
 	"math/big"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -1881,6 +1882,89 @@ func TestProcessMetadataHistoryMigration(t *testing.T) {
 	qt.Assert(t, history[0].BlockHeight, qt.Equals, uint32(7))
 	qt.Assert(t, history[0].TxIndex, qt.Equals, int32(2))
 	qt.Assert(t, history[0].TxHash, qt.DeepEquals, types.HexBytes(txHash))
+}
+
+func TestProcessParentLink(t *testing.T) {
+	app := vochain.TestBaseApplication(t)
+	idx := newTestIndexer(t, app)
+
+	metadataURI := "https://example.com/metadata.json"
+	censusURI := "ipfs://1234"
+	parentID := util.RandomBytes(32)
+	qt.Assert(t, app.State.AddProcess(&models.Process{
+		ProcessId:    parentID,
+		Status:       models.ProcessStatus_READY,
+		BlockCount:   10,
+		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
+		Metadata:     &metadataURI,
+		MetadataHash: util.RandomBytes(32),
+	}), qt.IsNil)
+	newProcess := func(parent []byte) []byte {
+		pid := util.RandomBytes(32)
+		qt.Assert(t, app.State.AddProcess(&models.Process{
+			ProcessId:       pid,
+			EnvelopeType:    &models.EnvelopeType{EncryptedVotes: false},
+			Status:          models.ProcessStatus_READY,
+			BlockCount:      10,
+			VoteOptions:     &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 100},
+			Mode:            &models.ProcessMode{AutoStart: true, Interruptible: true},
+			MaxCensusSize:   1000,
+			CensusRoot:      util.RandomBytes(32),
+			CensusURI:       &censusURI,
+			CensusOrigin:    models.CensusOrigin_OFF_CHAIN_TREE,
+			Metadata:        &metadataURI,
+			ParentProcessId: parent,
+		}), qt.IsNil)
+		return pid
+	}
+	childID := newProcess(parentID)
+	newProcess(parentID)
+	unrelatedID := newProcess(nil)
+	app.AdvanceTestBlock()
+
+	parent, err := idx.ProcessInfo(parentID)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, parent.MetadataOnly, qt.IsTrue)
+	qt.Assert(t, parent.HaveResults, qt.IsFalse)
+	qt.Assert(t, parent.ParentProcessID, qt.IsNil)
+	qt.Assert(t, parent.VoteOpts.GetMaxCount(), qt.Equals, uint32(0))
+	qt.Assert(t, parent.Envelope, qt.IsNotNil)
+
+	child, err := idx.ProcessInfo(childID)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, child.MetadataOnly, qt.IsFalse)
+	qt.Assert(t, child.HaveResults, qt.IsTrue)
+	qt.Assert(t, child.ParentProcessID, qt.DeepEquals, types.HexBytes(parentID))
+
+	unrelated, err := idx.ProcessInfo(unrelatedID)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, unrelated.ParentProcessID, qt.IsNil)
+
+	// the parent lists both children, paginated
+	children, total, err := idx.ProcessChildren(parentID, 10, 0)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, children, qt.HasLen, 2)
+	qt.Assert(t, total, qt.Equals, uint64(2))
+	qt.Assert(t, slices.ContainsFunc(children, func(id []byte) bool { return bytes.Equal(id, childID) }), qt.IsTrue)
+	page, total, err := idx.ProcessChildren(parentID, 1, 1)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, page, qt.HasLen, 1)
+	qt.Assert(t, total, qt.Equals, uint64(2))
+	qt.Assert(t, page[0], qt.DeepEquals, children[1])
+
+	// processes without children list none
+	children, total, err = idx.ProcessChildren(childID, 10, 0)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, children, qt.HasLen, 0)
+	qt.Assert(t, total, qt.Equals, uint64(0))
+
+	// the parent ends without results
+	qt.Assert(t, app.State.SetProcessStatus(parentID, models.ProcessStatus_ENDED, true), qt.IsNil)
+	app.AdvanceTestBlock()
+	parent, err = idx.ProcessInfo(parentID)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, parent.Status, qt.Equals, int32(models.ProcessStatus_ENDED))
+	qt.Assert(t, parent.HaveResults, qt.IsFalse)
 }
 
 func TestEndProcess(t *testing.T) {

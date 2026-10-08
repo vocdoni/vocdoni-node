@@ -44,6 +44,11 @@ type VoteData struct {
 	// (UTF-8 text, JSON, anything) is the caller's choice.
 	Memo []byte
 
+	// ParentMetadataHash, if set, is the parent election metadata hash the vote
+	// attests. If unset and the election has a parent, the parent's current one
+	// is fetched.
+	ParentMetadataHash types.HexBytes
+
 	ProofMkTree  *CensusProof
 	ProofSIKTree *CensusProof
 	ProofCSP     types.HexBytes
@@ -82,6 +87,15 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	// Attest the metadata the election currently commits to, as the chain
 	// rejects votes cast against any other version.
 	vote.MetadataHash = v.Election.MetadataHash
+	// Likewise for the metadata that the parent election, if any, currently commits to.
+	vote.ParentMetadataHash = v.ParentMetadataHash
+	if vote.ParentMetadataHash == nil && len(v.Election.ParentElectionID) > 0 {
+		parent, err := c.Election(v.Election.ParentElectionID)
+		if err != nil {
+			return nil, fmt.Errorf("cannot fetch parent election %s: %w", v.Election.ParentElectionID, err)
+		}
+		vote.ParentMetadataHash = parent.MetadataHash
+	}
 
 	log.Debugw("generating a new vote", "electionId", v.Election.ElectionID, "voter", c.account.AddressString())
 	voteAPI := &api.Vote{}
