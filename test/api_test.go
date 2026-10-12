@@ -665,7 +665,7 @@ func requestAccount(t testing.TB, c *testutil.TestHTTPclient, address string) ap
 
 // createCensus returns the root of a census tree with random participants.
 func createCensus(t *testing.T) types.HexBytes {
-	_, root, _ := testvoteproof.CreateKeysAndBuildCensus(t, 10)
+	_, root, _ := testvoteproof.CreateKeysAndBuildCensus(t, 10, nil)
 	return root
 }
 
