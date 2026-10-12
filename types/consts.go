@@ -11,8 +11,6 @@ const (
 	ModeSeed = "seed"
 	// ModeGateway starts the vocdoninode as a gateway.
 	ModeGateway = "gateway"
-	// ModeCensus starts the vocdoninode as a census only service.
-	ModeCensus = "census"
 
 	// ProcessIDsize is the size of a process id.
 	ProcessIDsize = 32

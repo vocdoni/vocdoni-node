@@ -15,6 +15,7 @@ import (
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
@@ -36,7 +37,7 @@ func newTestVocone(t *testing.T) (*Vocone, context.CancelFunc, *apiclient.HTTPcl
 	keymng := ethereum.SignKeys{}
 	qt.Assert(t, keymng.Generate(), qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng, false, "", nil)
+	vc, err := NewVocone(dir, &keymng)
 	qt.Assert(t, err, qt.IsNil)
 
 	vc.App.SetChainID("test-vocone")
@@ -496,11 +497,12 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 		Title:   map[string]string{"default": "updated election"},
 		Version: "1.0",
 	}
-	if _, err := cli.SetElectionMetadata(processID, newMetadata); err != nil {
-		return err
-	}
 	newMetadataBytes, err := json.Marshal(newMetadata)
 	if err != nil {
+		return err
+	}
+	if _, err := cli.SetElectionMetadataURI(processID,
+		"ipfs://"+data.CalculateCIDv1json(newMetadataBytes), api.MetadataHash(newMetadataBytes)); err != nil {
 		return err
 	}
 	startTimeMetadata := time.Now()

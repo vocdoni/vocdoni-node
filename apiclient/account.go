@@ -7,7 +7,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/data/ipfs"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
@@ -109,17 +109,18 @@ func (c *HTTPclient) TransferWithNonce(to common.Address, amount uint64, nonce u
 }
 
 // AccountBootstrap initializes the account in the Vocdoni blockchain. A faucet package is required in order
-// to pay for the costs of the transaction if the blockchain requires it.  Returns the transaction hash.
+// to pay for the costs of the transaction if the blockchain requires it. If metadata is given, the account
+// info URI is set to its IPFS CIDv1; the node does not store the document, so the caller has to host it.
+// Returns the transaction hash.
 func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata *api.AccountMetadata, sik []byte) (types.HexBytes, error) {
 	var err error
-	var metadataBytes []byte
 	var metadataURI string
 	if metadata != nil {
-		metadataBytes, err = json.Marshal(metadata)
+		metadataBytes, err := json.Marshal(metadata)
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
-		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+		metadataURI = "ipfs://" + data.CalculateCIDv1json(metadataBytes)
 	}
 
 	if sik == nil {
@@ -152,7 +153,6 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	}
 	resp, code, err := c.Request(HTTPPOST, &api.AccountSet{
 		TxPayload: stxb,
-		Metadata:  metadataBytes,
 	}, "accounts")
 	if err != nil {
 		return nil, err
@@ -216,17 +216,17 @@ func (c *HTTPclient) AccountSetValidator(pubKey []byte, name string) (types.HexB
 	return accv.Hash, nil
 }
 
-// AccountSetMetadata updates the metadata associated with the account associated with the client.
+// AccountSetMetadata sets the info URI of the account associated with the client to the IPFS CIDv1
+// of the metadata. The node does not store the document, so the caller has to host it.
 func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.HexBytes, error) {
 	var err error
-	var metadataBytes []byte
 	var metadataURI string
 	if metadata != nil {
-		metadataBytes, err = json.Marshal(metadata)
+		metadataBytes, err := json.Marshal(metadata)
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal metadata: %w", err)
 		}
-		metadataURI = "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+		metadataURI = "ipfs://" + data.CalculateCIDv1json(metadataBytes)
 	}
 
 	acc, err := c.Account("")
@@ -257,7 +257,6 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 	}
 	resp, code, err := c.Request(HTTPPOST, &api.AccountSet{
 		TxPayload: stxb,
-		Metadata:  metadataBytes,
 	}, "accounts")
 	if err != nil {
 		return nil, err
@@ -371,20 +370,11 @@ func (c *HTTPclient) DelSIK() (types.HexBytes, error) {
 // RegisterSIKForVote function performs the free RegisterSIKTx to the vochain
 // helping to non registered accounts to vote in an ongoing election, but only
 // if the account is in the election census. The function returns the hash of
-// the sent transaction, and requires the election ID. The census proof and the
-// secret are optional. If no proof is provided, it will be generated.
+// the sent transaction, and requires the election ID and the census proof.
+// The secret is optional.
 func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *CensusProof, secret []byte) (types.HexBytes, error) {
-	// get process info
-	process, err := c.Election(electionId)
-	if err != nil {
-		return nil, fmt.Errorf("error getting election info: %w", err)
-	}
-	// if any proof has been provided, get it from the API
 	if proof == nil {
-		proof, err = c.CensusGenProof(process.Census.CensusRoot, c.account.Address().Bytes())
-		if err != nil {
-			return nil, fmt.Errorf("error generating census proof: %w", err)
-		}
+		return nil, fmt.Errorf("a census proof is required")
 	}
 	// get the account SIK using the secret provided
 	sik, err := c.account.AccountSIK(secret)

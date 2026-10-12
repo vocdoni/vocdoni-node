@@ -22,13 +22,11 @@ import (
 	flag "github.com/spf13/pflag"
 	"github.com/spf13/viper"
 	urlapi "go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
@@ -48,16 +46,8 @@ var (
 func deprecatedFlagsFunc(_ *flag.FlagSet, name string) flag.NormalizedName {
 	oldName := name
 	switch name {
-	case "ipfsSyncKey":
-		name = "ipfsConnectKey"
-	case "ipfsSyncPeers":
-		name = "ipfsConnectPeers"
 	case "vochainBlockTime":
 		return "vochainMinerTargetBlockTimeSeconds"
-	case "skipPreviousOffchainData":
-		return "vochainSkipPreviousOffchainData"
-	case "offChainDataDownload":
-		return "vochainOffChainDataDownload"
 	case "pprof":
 		return "pprofPort"
 	}
@@ -83,7 +73,7 @@ type pflagValue struct {
 	flag *flag.Flag
 }
 
-var viperGroups = []string{"vochain", "ipfs", "metrics", "tls"}
+var viperGroups = []string{"vochain", "metrics", "tls"}
 
 func (p pflagValue) Name() string {
 	name := p.flag.Name
@@ -134,7 +124,7 @@ func loadConfig() *config.Config {
 	flag.BoolVar(&flagSaveConfig, "saveConfig", false,
 		"overwrite an existing config file with the provided CLI flags")
 	flag.StringP("mode", "m", types.ModeGateway,
-		"global operation mode. Available options: [gateway, miner, seed, census]")
+		"global operation mode. Available options: [gateway, miner, seed]")
 	flag.StringP("signingKey", "k", "",
 		"signing private Key as hex string (auto-generated if empty)")
 
@@ -153,12 +143,6 @@ func loadConfig() *config.Config {
 		"directory where LetsEncrypt data is stored")
 	flag.Uint64("enableFaucetWithAmount", 0,
 		"enable faucet for the current network and the specified amount (testing purposes only)")
-
-	// ipfs
-	flag.StringP("ipfsConnectKey", "i", "",
-		"enable IPFS group synchronization using the given secret key")
-	flag.StringSlice("ipfsConnectPeers", []string{},
-		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
 
 	// vochain
 	flag.String("vochainP2PListen", "0.0.0.0:26656",
@@ -206,10 +190,6 @@ func loadConfig() *config.Config {
 
 	flag.Int("vochainMinerTargetBlockTimeSeconds", int(config.DefaultMinerTargetBlockTime.Seconds()),
 		"vochain consensus block time target (in seconds)")
-	flag.Bool("vochainSkipPreviousOffchainData", false,
-		"if enabled the census downloader will import all existing census")
-	flag.Bool("vochainOffChainDataDownload", true,
-		"enables the off-chain data downloader component")
 	flag.StringVar(&flagVochainCreateGenesis, "vochainCreateGenesis", "",
 		"create a genesis file for the vochain with validators and exit"+
 			" (syntax <dir>:<numValidators>)")
@@ -254,9 +234,6 @@ func loadConfig() *config.Config {
 	// set up the data subdirectories (if no flag or env was passed)
 	if viper.GetString("TLS.DirCert") == "" {
 		viper.Set("TLS.DirCert", filepath.Join(conf.DataDir, "tls"))
-	}
-	if viper.GetString("ipfs.ConfigPath") == "" {
-		viper.Set("ipfs.ConfigPath", filepath.Join(conf.DataDir, "ipfs"))
 	}
 	if viper.GetString("vochain.DataDir") == "" {
 		viper.Set("vochain.DataDir", filepath.Join(conf.DataDir, "vochain"))
@@ -418,7 +395,7 @@ func main() {
 	}
 
 	// HTTP(s) router for Gateway or Prometheus metrics
-	if conf.Mode == types.ModeGateway || conf.Metrics.Enabled || conf.Mode == types.ModeCensus {
+	if conf.Mode == types.ModeGateway || conf.Metrics.Enabled {
 		// Initialize the HTTP router
 		srv.Router = new(httprouter.HTTProuter)
 		srv.Router.TLSdomain = conf.TLS.Domain
@@ -437,14 +414,6 @@ func main() {
 		}
 	}
 
-	// Storage service for Gateway
-	if conf.Mode == types.ModeGateway || conf.Mode == types.ModeCensus {
-		srv.Storage, err = srv.IPFS(&conf.Ipfs)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
 	//
 	// Vochain and Indexer
 	//
@@ -453,10 +422,6 @@ func main() {
 		conf.Mode == types.ModeSeed {
 		// set IsSeedNode to true if seed mode configured
 		conf.Vochain.IsSeedNode = types.ModeSeed == conf.Mode
-		// offchainDataDownload is only needed for gateways
-		conf.Vochain.OffChainDataDownload = conf.Vochain.OffChainDataDownload &&
-			conf.Mode == types.ModeGateway
-
 		// if there's no indexer, then never do snapshots because they would be incomplete
 		if !conf.Vochain.Indexer.Enabled {
 			conf.Vochain.SnapshotInterval = 0
@@ -465,12 +430,6 @@ func main() {
 		// create the vochain service
 		if err := srv.Vochain(); err != nil {
 			log.Fatal(err)
-		}
-		// create the offchain data downloader service
-		if conf.Vochain.OffChainDataDownload {
-			if err := srv.OffChainDataHandler(); err != nil {
-				log.Fatal(err)
-			}
 		}
 		// create the indexer service
 		if conf.Vochain.Indexer.Enabled {
@@ -542,8 +501,6 @@ func main() {
 			srv.App,
 			srv.Stats,
 			srv.Indexer,
-			srv.Storage,
-			srv.CensusDB,
 		)
 		uAPI.Endpoint.SetAdminToken(conf.AdminToken)
 		if err := uAPI.EnableHandlers(
@@ -552,7 +509,6 @@ func main() {
 			urlapi.ChainHandler,
 			urlapi.WalletHandler,
 			urlapi.AccountHandler,
-			urlapi.CensusHandler,
 			urlapi.SIKHandler,
 		); err != nil {
 			log.Fatal(err)
@@ -566,32 +522,6 @@ func main() {
 			); err != nil {
 				log.Fatal(err)
 			}
-		}
-	}
-
-	if conf.Mode == types.ModeCensus {
-		log.Info("enabling API")
-		uAPI, err := urlapi.NewAPI(srv.Router, "/v2", conf.DataDir, conf.Vochain.DBType)
-		if err != nil {
-			log.Fatal(err)
-		}
-		db, err := metadb.New(conf.Vochain.DBType, filepath.Join(conf.DataDir, "censusdb"))
-		if err != nil {
-			log.Fatal(err)
-		}
-		censusDB := censusdb.NewCensusDB(db)
-		uAPI.Attach(
-			nil,
-			nil,
-			nil,
-			srv.Storage,
-			censusDB,
-		)
-		uAPI.Endpoint.SetAdminToken(conf.AdminToken)
-		if err := uAPI.EnableHandlers(
-			urlapi.CensusHandler,
-		); err != nil {
-			log.Fatal(err)
 		}
 	}
 

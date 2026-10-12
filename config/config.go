@@ -8,8 +8,6 @@ import (
 type Config struct {
 	// Vochain config options
 	Vochain VochainCfg
-	// Ipfs config options
-	Ipfs IPFSCfg
 	// Metrics config options
 	Metrics MetricsCfg
 	// LogLevel logging level
@@ -54,22 +52,10 @@ func (c *Config) ValidMode() bool {
 
 	case types.ModeSeed:
 
-	case types.ModeCensus:
-
 	default:
 		return false
 	}
 	return true
-}
-
-// IPFSCfg includes all possible config params needed by IPFS
-type IPFSCfg struct {
-	// ConfigPath root path used by IPFS running node
-	ConfigPath string
-	// ConnectKey is the ipfsConnect secret key for finding cluster peers
-	ConnectKey string
-	// ConnectPeers is the list of ipfsConnect peers
-	ConnectPeers []string
 }
 
 // VochainCfg includes all possible config params needed by the Vochain
@@ -115,8 +101,6 @@ type VochainCfg struct {
 	NoWaitSync bool
 	// MempoolSize is the size of the mempool
 	MempoolSize int
-	// SkipPreviousOffchainData if enabled, the node will skip downloading the previous off-chain data to the current block
-	SkipPreviousOffchainData bool
 	// Enable Prometheus metrics from tendermint
 	TendermintMetrics bool
 	// Target block time in seconds (only for miners)
@@ -125,8 +109,6 @@ type VochainCfg struct {
 	Indexer IndexerCfg
 	// IsSeedNode specifies if the node is configured to act as a seed node
 	IsSeedNode bool
-	// OffChainDataDownload specifies if the node is configured to download off-chain data
-	OffChainDataDownload bool
 	// SnapshotInterval enables creating a state snapshot every N blocks (0 to disable)
 	SnapshotInterval int
 	// StateSyncEnabled allows cometBFT during startup, to ask peers for available snapshots

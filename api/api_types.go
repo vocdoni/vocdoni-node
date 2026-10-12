@@ -175,7 +175,6 @@ type Election struct {
 	VoteMode     VoteMode        `json:"voteMode,omitempty"`
 	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
 	TallyMode    TallyMode       `json:"tallyMode,omitempty"`
-	Metadata     any             `json:"metadata,omitempty"`
 }
 
 type ElectionKeys struct {
@@ -194,20 +193,10 @@ type ElectionCensus struct {
 
 type ElectionCreate struct {
 	TxPayload                 []byte         `json:"txPayload,omitempty"`
-	Metadata                  []byte         `json:"metadata,omitempty"`
 	TxHash                    types.HexBytes `json:"txHash" `
 	ElectionID                types.HexBytes `json:"electionID" `
-	MetadataURL               string         `json:"metadataURL"`
 	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
 	Warning                   string         `json:"warning,omitempty"`
-}
-
-// ElectionMetadataUpdate is the request and response of PUT /elections/{electionId}/metadata.
-type ElectionMetadataUpdate struct {
-	TxPayload   []byte         `json:"txPayload,omitempty"`
-	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash"`
-	MetadataURL string         `json:"metadataURL"`
 }
 
 // ElectionMetadataHistory lists every metadata version an election has had, oldest first.
@@ -316,21 +305,22 @@ type ChainStats struct {
 	VoteCount uint64 `json:"voteCount" example:"134523"`
 }
 
+// Census types accepted in CensusTypeDescription.
+const (
+	CensusTypeWeighted   = "weighted"
+	CensusTypeZKWeighted = "zkweighted"
+	CensusTypeCSP        = "csp"
+	// CensusTypeCSPv2 is CensusTypeCSP with the fixed salt derivation for the
+	// salted proof types (census origin OFF_CHAIN_CA_V2).
+	CensusTypeCSPv2 = "csp2"
+)
+
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
 	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty" `
 	RootHash  types.HexBytes `json:"rootHash,omitempty" `
-}
-
-type CensusParticipants struct {
-	Participants []CensusParticipant `json:"participants"`
-}
-
-type CensusParticipant struct {
-	Key    types.HexBytes `json:"key" `
-	Weight *types.BigInt  `json:"weight"`
 }
 
 type VoteType struct {
@@ -365,10 +355,6 @@ type Transaction struct {
 // in a batch request.
 type TransactionPayload struct {
 	Payload []byte `json:"payload" swaggertype:"string" format:"base64"`
-	// Metadata is the optional raw election metadata for a NewProcess payload. When
-	// provided, its CID must match the metadata URI in the transaction, and it is
-	// pinned to IPFS on submission (same as POST /elections).
-	Metadata []byte `json:"metadata,omitempty" swaggertype:"string" format:"base64"`
 }
 
 // TransactionBatch is a request to submit multiple transactions at once, in order.
@@ -385,10 +371,9 @@ type TransactionBatchItem struct {
 	// Code is the mempool CheckTx response code. For submitted items it is always
 	// 0: a non-zero CheckTx code is turned into a submit error, so the item lands
 	// in Failed instead. The field is kept for parity with the single-tx endpoint.
-	Code        *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
-	Error       string  `json:"error,omitempty" extensions:"x-omitempty"`
-	Warning     string  `json:"warning,omitempty" extensions:"x-omitempty"`
-	MetadataURL string  `json:"metadataURL,omitempty" extensions:"x-omitempty"`
+	Code    *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
+	Error   string  `json:"error,omitempty" extensions:"x-omitempty"`
+	Warning string  `json:"warning,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionBatchResult groups every input transaction of a batch by its
@@ -456,16 +441,15 @@ type ChainInfo struct {
 }
 
 type Account struct {
-	Address        types.HexBytes   `json:"address" `
-	Nonce          uint32           `json:"nonce"`
-	Balance        uint64           `json:"balance"`
-	ElectionIndex  uint32           `json:"electionIndex"`
-	TransfersCount uint64           `json:"transfersCount,omitempty"`
-	FeesCount      uint64           `json:"feesCount,omitempty"`
-	InfoURL        string           `json:"infoURL,omitempty"`
-	Token          *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
-	Metadata       *AccountMetadata `json:"metadata,omitempty"`
-	SIK            types.HexBytes   `json:"sik"`
+	Address        types.HexBytes `json:"address" `
+	Nonce          uint32         `json:"nonce"`
+	Balance        uint64         `json:"balance"`
+	ElectionIndex  uint32         `json:"electionIndex"`
+	TransfersCount uint64         `json:"transfersCount,omitempty"`
+	FeesCount      uint64         `json:"feesCount,omitempty"`
+	InfoURL        string         `json:"infoURL,omitempty"`
+	Token          *uuid.UUID     `json:"token,omitempty" swaggerignore:"true"`
+	SIK            types.HexBytes `json:"sik"`
 }
 
 type AccountsList struct {
@@ -474,10 +458,8 @@ type AccountsList struct {
 }
 
 type AccountSet struct {
-	TxPayload   []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
-	Metadata    []byte         `json:"metadata,omitempty" swaggerignore:"true"`
-	TxHash      types.HexBytes `json:"txHash" `
-	MetadataURL string         `json:"metadataURL" swaggertype:"string"`
+	TxPayload []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
+	TxHash    types.HexBytes `json:"txHash" `
 }
 
 type Census struct {
@@ -495,11 +477,6 @@ type Census struct {
 	Key            types.HexBytes `json:"key,omitempty"`
 	Value          types.HexBytes `json:"value,omitempty"`
 	CensusSiblings []string       `json:"censusSiblings,omitempty"`
-}
-
-type File struct {
-	Payload []byte `json:"payload,omitempty" swaggerignore:"true"`
-	CID     string `json:"cid,omitempty"`
 }
 
 type ValidatorList struct {

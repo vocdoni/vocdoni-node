@@ -81,7 +81,7 @@ func (t *E2EDynamicensusElection) Run() error {
 		}
 		log.Infow("census created successfully", "root", censusRoot2, "uri", censusURI2)
 
-		proof, err := api.CensusGenProof(censusRoot2, vAccts[0].Address().Bytes())
+		proof, err := localCensuses.genProof(censusRoot2, vAccts[0].Address().Bytes())
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}

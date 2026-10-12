@@ -137,34 +137,22 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 }
 
 func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, voterAccounts []*ethereum.SignKeys) error {
-	participants := &vapi.CensusParticipants{}
-
-	for i, voterAccount := range voterAccounts {
-		participants.Participants = append(participants.Participants,
-			vapi.CensusParticipant{
-				Key:    voterAccount.Address().Bytes(),
-				Weight: (*types.BigInt)(new(big.Int).SetUint64(defaultWeight)),
-			})
-
-		if i == len(voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
-			if err := t.api.CensusAddParticipants(censusID, participants); err != nil {
-				return err
-			}
-
-			log.Infof("added %d participants to census %s",
-				len(participants.Participants), censusID.String())
-
-			participants = &vapi.CensusParticipants{}
-		}
+	keys := make([][]byte, 0, len(voterAccounts))
+	for _, voterAccount := range voterAccounts {
+		keys = append(keys, voterAccount.Address().Bytes())
 	}
+	if err := localCensuses.addParticipants(censusID, keys, new(big.Int).SetUint64(defaultWeight)); err != nil {
+		return err
+	}
+	log.Infof("added %d participants to census %s", len(keys), censusID.String())
 	return nil
 }
 
 // isCensusSizeValid validate the size of the census, in case like dynamic census test the size could be different to nvotes
 func (t *e2eElection) censusSizeEquals(censusID types.HexBytes, sizeExpected uint64) bool {
-	size, err := t.api.CensusSize(censusID)
+	size, err := localCensuses.size(censusID)
 	if err != nil {
-		log.Errorf("unable to get census size from api")
+		log.Errorf("unable to get census size: %v", err)
 		return false
 	}
 	if size != sizeExpected {
@@ -211,7 +199,7 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 				if csp != nil {
 					return cspGenProof(t.election.ElectionID, voterKey, csp)
 				}
-				return t.api.CensusGenProof(t.election.Census.CensusRoot, voterKey)
+				return localCensuses.genProof(t.election.Census.CensusRoot, voterKey)
 			}()
 			if err != nil {
 				errorChan <- err
@@ -272,9 +260,9 @@ func (t *e2eElection) publishCheckCensus(censusID types.HexBytes, nAcct uint64) 
 		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
 	}
 
-	rootHash, censusURL, err := t.api.CensusPublish(censusID)
+	rootHash, err := localCensuses.publish(censusID)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
+		return nil, "", fmt.Errorf("cannot publish census %x: %w", censusID, err)
 	}
 
 	log.Infof("census published with root %x", rootHash)
@@ -283,13 +271,13 @@ func (t *e2eElection) publishCheckCensus(censusID types.HexBytes, nAcct uint64) 
 	if !t.censusSizeEquals(censusID, nAcct) {
 		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
 	}
-	return rootHash, censusURL, nil
+	return rootHash, "", nil
 }
 
 // setupCensus create a new census that will have nAcct voterAccounts and participants
 func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts bool) (types.HexBytes, []*ethereum.SignKeys, error) {
 	// Create a new census
-	censusID, err := t.api.NewCensus(censusType)
+	censusID, err := localCensuses.newCensus(censusType)
 	if err != nil {
 		return nil, nil, err
 	}

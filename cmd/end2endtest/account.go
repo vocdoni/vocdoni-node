@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -10,10 +11,10 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/go-cmp/cmp"
 	apipkg "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -373,13 +374,18 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 }
 
 func ensureAccountMetadataEquals(api *apiclient.HTTPclient, metadata *apipkg.AccountMetadata) (*apipkg.Account, error) {
+	metadataBytes, err := json.Marshal(metadata)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal account metadata: %w", err)
+	}
+	metadataURI := "ipfs://" + data.CalculateCIDv1json(metadataBytes)
 	for i := 0; i < retries; i++ {
 		acct, err := api.Account("")
 		if err != nil {
 			log.Debugf("GetAccount try %d failed: %v", i, err)
 		}
-		// if account metadata is as expected, we're done
-		if acct != nil && cmp.Equal(acct.Metadata, metadata) {
+		// if the account points to the expected metadata, we're done
+		if acct != nil && acct.InfoURL == metadataURI {
 			return acct, nil
 		}
 

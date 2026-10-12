@@ -251,14 +251,6 @@ func accountInfo(c *VocdoniCLI) error {
 	if acc.InfoURL != "" && acc.InfoURL != "none" {
 		fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ info URL"), valuesPrint.Sprint(acc.InfoURL))
 	}
-	if acc.Metadata != nil {
-		accMetadata, err := json.MarshalIndent(acc.Metadata, "", "  ")
-		if err != nil {
-			log.Debug("account metadata cannot be unmarshal")
-		} else {
-			fmt.Printf("%s:\n%s\n", keysPrint.Sprint(" ➥ metadata"), valuesPrint.Sprint(string(accMetadata)))
-		}
-	}
 
 	return nil
 }
@@ -548,11 +540,6 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 			Avatar: "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
 			Header: "https://images.unsplash.com/photo-1543000968-1fe3fd3b714e",
 		},
-	}
-
-	if currentAccount.Metadata != nil {
-		log.Info("account has metadata (", currentAccount.InfoURL, ") let's update it")
-		accMeta = *currentAccount.Metadata
 	}
 
 	accMetaText, err := json.MarshalIndent(&accMeta, "", " ")

@@ -15,7 +15,6 @@ func BenchmarkAPICreateNAccounts(b *testing.B) {
 	server := testcommon.APIserver{}
 	server.Start(b,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,

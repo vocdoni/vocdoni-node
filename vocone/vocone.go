@@ -70,9 +70,7 @@ type Vocone struct {
 }
 
 // NewVocone creates and returns a ready Vocone instance.
-func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
-	connectKey string, connectPeers []string,
-) (*Vocone, error) {
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc := &Vocone{}
 	vc.Config = &config.VochainCfg{}
 	vc.Config.DataDir = dataDir
@@ -136,21 +134,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 	vc.Stats = vochaininfo.NewVochainInfo(vc.App)
 	go vc.Stats.Start(10)
 
-	// Create the IPFS storage layer.
-	if !disableIPFS {
-		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
-			ConfigPath:   filepath.Join(dataDir, "ipfs"),
-			ConnectKey:   connectKey,
-			ConnectPeers: connectPeers,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not create IPFS storage: %w", err)
-		}
-		if err := vc.OffChainDataHandler(); err != nil {
-			return nil, fmt.Errorf("could not create offchain data handler: %w", err)
-		}
-	}
-
 	return vc, nil
 }
 
@@ -168,8 +151,6 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		vc.App,
 		vc.Stats,
 		vc.Indexer,
-		vc.Storage,
-		vc.CensusDB,
 	)
 	adminToken := uuid.New()
 	log.Warnw("new admin token generated", "token", adminToken.String())
@@ -181,7 +162,6 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		api.ChainHandler,
 		api.WalletHandler,
 		api.AccountHandler,
-		api.CensusHandler,
 		api.SIKHandler,
 	)
 }
@@ -341,11 +321,6 @@ func (vc *Vocone) Close() error {
 	if vc.App != nil && vc.App.State != nil {
 		if err := vc.App.State.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close state: %w", err))
-		}
-	}
-	if vc.Storage != nil {
-		if err := vc.Storage.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("close storage: %w", err))
 		}
 	}
 	if vc.blockStore != nil {

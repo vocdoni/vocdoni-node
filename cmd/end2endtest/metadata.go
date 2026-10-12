@@ -3,11 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 
 	vapi "go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/apiclient"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
@@ -18,7 +20,7 @@ func init() {
 		testFunc: func() VochainTest {
 			return &E2EMetadataElection{}
 		},
-		description: "Updates the metadata of an election, first to a new IPFS document and then to a URL hosted elsewhere with an arbitrary hash, and checks that votes attesting replaced metadata are rejected while votes attesting the current one are accepted.",
+		description: "Updates the metadata of an election, first to a new document addressed by its IPFS CID and then to a URL hosted elsewhere with an arbitrary hash, and checks that votes attesting replaced metadata are rejected while votes attesting the current one are accepted.",
 		example:     os.Args[0] + " --operation=metadataelection --votes=4",
 	}
 }
@@ -91,13 +93,17 @@ func (t *E2EMetadataElection) Run() error {
 		return fmt.Errorf("vote attesting the current metadata was rejected: %w", err)
 	}
 
-	// update the metadata to a new IPFS document
-	metadata := &vapi.ElectionMetadata{
+	// update the metadata to a new document
+	metadata, err := json.Marshal(&vapi.ElectionMetadata{
 		Title:       map[string]string{"default": "e2e updated election"},
 		Description: map[string]string{"default": "metadata replaced by the metadataelection e2e test"},
 		Version:     "1.0",
+	})
+	if err != nil {
+		return fmt.Errorf("cannot marshal the election metadata: %w", err)
 	}
-	txHash, err := t.api.SetElectionMetadata(original.ElectionID, metadata)
+	txHash, err := t.api.SetElectionMetadataURI(original.ElectionID,
+		"ipfs://"+data.CalculateCIDv1json(metadata), vapi.MetadataHash(metadata))
 	if err != nil {
 		return fmt.Errorf("cannot update the election metadata: %w", err)
 	}

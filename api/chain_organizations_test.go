@@ -9,10 +9,7 @@ import (
 
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
-	"go.vocdoni.io/dvote/api/censusdb"
-	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -35,12 +32,10 @@ func TestOrganizationListSorting(t *testing.T) {
 
 	api, err := NewAPI(&router, "/", t.TempDir(), db.TypePebble)
 	c.Assert(err, qt.IsNil)
-	kv, err := metadb.New(db.TypePebble, t.TempDir())
-	c.Assert(err, qt.IsNil)
 	app := vochain.TestBaseApplication(t)
 	idx, err := indexer.New(app, indexer.Options{DataDir: t.TempDir()})
 	c.Assert(err, qt.IsNil)
-	api.Attach(app, nil, idx, ipfs.MockIPFS(t), censusdb.NewCensusDB(kv))
+	api.Attach(app, nil, idx)
 	c.Assert(api.EnableHandlers(ChainHandler), qt.IsNil)
 
 	// Three organizations with a distinct number of elections each, created

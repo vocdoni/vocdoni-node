@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 
@@ -9,6 +10,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/state"
 )
 
@@ -135,4 +137,12 @@ func (a *API) sikProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+func censusKeyParse(key string) ([]byte, error) {
+	return hex.DecodeString(util.TrimHex(key))
+}
+
+func addressParse(key string) common.Address {
+	return common.HexToAddress(util.TrimHex(key))
 }

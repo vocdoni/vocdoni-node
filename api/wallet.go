@@ -1,12 +1,10 @@
 package api
 
 import (
-	"context"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"strconv"
-	"time"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
@@ -15,7 +13,6 @@ import (
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
@@ -51,14 +48,6 @@ func (a *API) enableWalletHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.walletTransferHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/wallet/election",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.walletElectionHandler,
 	); err != nil {
 		return err
 	}
@@ -295,175 +284,6 @@ func (a *API) walletTransferHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(tx)
-	if err != nil {
-		return err
-	}
-
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// walletElectionHandler
-//
-//	@Summary		Create election for wallet
-//	@Description	Creates an election. Requires the bearer token of the account you want to create the election.
-//	@Security		ApiKeyAuth
-//	@Tags			Wallet
-//	@Accept			json
-//	@Produce		json
-//	@Param			description	body		ElectionDescription	true	"Election description"
-//	@Success		200			{object}	Transaction
-//	@Router			/wallet/election [post]
-func (a *API) walletElectionHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	wallet, err := a.walletFromToken(msg.AuthToken)
-	if err != nil {
-		return err
-	}
-	acc, err := a.vocapp.State.GetAccount(wallet.Address(), true)
-	if err != nil {
-		return err
-	}
-
-	description := &ElectionDescription{}
-	if err := json.Unmarshal(msg.Data, description); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-
-	// Set startBlock and endBlock
-	var startTime uint32
-
-	if !description.StartDate.IsZero() {
-		startTime = uint32(description.StartDate.Unix())
-	} else {
-		description.StartDate = time.Now().Add(time.Minute * 10)
-	}
-
-	if description.EndDate.Before(time.Now()) {
-		return ErrElectionEndDateInThePast
-	}
-	if description.EndDate.Before(description.StartDate) {
-		return ErrElectionEndDateBeforeStart
-	}
-	endTime := uint32(description.EndDate.Unix())
-
-	// Calculate block count
-	duration := endTime - startTime
-	if startTime == 0 {
-		duration = endTime - uint32(time.Now().Unix())
-	}
-
-	// Set the envelope and process models
-	envelopeType := &models.EnvelopeType{
-		Serial:         false,
-		Anonymous:      description.ElectionType.Anonymous,
-		EncryptedVotes: description.ElectionType.SecretUntilTheEnd,
-		UniqueValues:   description.VoteType.UniqueChoices,
-		CostFromWeight: description.VoteType.CostFromWeight,
-	}
-
-	processMode := &models.ProcessMode{
-		AutoStart:     description.ElectionType.Autostart,
-		Interruptible: description.ElectionType.Interruptible,
-		DynamicCensus: description.ElectionType.DynamicCensus,
-	}
-
-	// Prepare the election metadata information
-	metadata := ElectionMetadata{
-		Description: description.Description,
-		Media: ProcessMedia{
-			Header:    description.Header,
-			StreamURI: description.StreamURI,
-		},
-		Meta:      nil,
-		Questions: []Question{},
-		Type: ElectionProperties{
-			Name: "single-choice-multiquestion",
-		},
-		Title:   description.Title,
-		Version: "1.0",
-	}
-
-	maxChoiceValue := 0
-	for _, question := range description.Questions {
-		maxChoiceValue = max(maxChoiceValue, len(question.Choices))
-		metaQuestion := Question{
-			Choices:     []ChoiceMetadata{},
-			Description: question.Description,
-			Title:       question.Title,
-		}
-
-		metaQuestion.Choices = append(metaQuestion.Choices, question.Choices...)
-		metadata.Questions = append(metadata.Questions, metaQuestion)
-	}
-
-	// TODO: respect maxCount and maxValue if specified
-	voteOptions := &models.ProcessVoteOptions{
-		MaxCount:          uint32(len(description.Questions)),
-		MaxValue:          uint32(maxChoiceValue),
-		MaxVoteOverwrites: uint32(description.VoteType.MaxVoteOverwrites),
-		MaxTotalCost:      uint32(len(description.Questions) * maxChoiceValue),
-		CostExponent:      1,
-	}
-
-	// Census Origin
-	censusOrigin, root, err := CensusTypeToOrigin(description.Census)
-	if err != nil {
-		return err
-	}
-
-	// Publish the metadata to IPFS
-	metadataBytes, err := json.Marshal(&metadata)
-	if err != nil {
-		return ErrCantMarshalMetadata.WithErr(err)
-	}
-	storageCtx, cancel := context.WithTimeout(context.Background(), time.Second*10)
-	metadataURI, err := a.storage.Publish(storageCtx, metadataBytes)
-	cancel()
-	if err != nil {
-		return ErrCantPublishMetadata.WithErr(err)
-	}
-	metadataURI = "ipfs://" + metadataURI
-
-	// Build the process transaction
-	process := &models.Process{
-		EntityId:     wallet.Address().Bytes(),
-		StartTime:    startTime,
-		Duration:     duration,
-		CensusRoot:   root,
-		CensusURI:    &description.Census.URL,
-		Status:       models.ProcessStatus_READY,
-		EnvelopeType: envelopeType,
-		Mode:         processMode,
-		VoteOptions:  voteOptions,
-		CensusOrigin: censusOrigin,
-		Metadata:     &metadataURI,
-	}
-
-	log.Debugf("%s", log.FormatProto(process))
-
-	stx := models.SignedTx{}
-	if stx.Tx, err = proto.Marshal(&models.Tx{
-		Payload: &models.Tx_NewProcess{
-			NewProcess: &models.NewProcessTx{
-				Process: process,
-				Nonce:   acc.GetNonce(),
-				Txtype:  models.TxType_NEW_PROCESS,
-			},
-		},
-	},
-	); err != nil {
-		return err
-	}
-	tx, err := a.walletSignAndSendTx(&stx, wallet)
-	if err != nil {
-		return err
-	}
-
-	// NewProcessTx execution returns the deterministic electionID,
-	// so we add it to the output response.
-	tx.ProcessID = tx.Response
-	tx.Response = nil
-	tx.Code = nil
 	data, err := json.Marshal(tx)
 	if err != nil {
 		return err
