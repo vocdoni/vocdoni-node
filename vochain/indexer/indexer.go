@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"maps"
 	"math/big"
 	"os"
@@ -192,7 +193,7 @@ func (idx *Indexer) startDB() error {
 	goose.SetLogger(log.GooseLogger())
 	goose.SetBaseFS(embedMigrations)
 
-	if gooseMigrationsPending(idx.readWriteDB, "migrations") {
+	if gooseBlockReindexPending(idx.readWriteDB, "migrations", embedMigrations) {
 		log.Info("indexer db needs migration, a block reindex will run on bootstrap")
 		idx.blockReindexNeeded.Store(true)
 	}
@@ -299,15 +300,21 @@ func (idx *Indexer) RestoreBackup(path string) error {
 	return nil
 }
 
-func gooseMigrationsPending(db *sql.DB, dir string) bool {
-	// Get the latest applied migration version
+// reindexTag is the comment directive that migration SQL files include when they
+// rewrite rows in the blocks or transactions tables, making a full block reindex
+// necessary after the migration is applied.
+const reindexTag = "-- +reindex-blocks"
+
+// gooseBlockReindexPending reports whether any pending migration in dir (read
+// from fsys) carries the reindexTag directive. Migrations that only add new tables
+// or columns to unrelated tables do not require a full block reindex and should
+// not include the tag.
+func gooseBlockReindexPending(db *sql.DB, dir string, fsys fs.FS) bool {
 	currentVersion, err := goose.GetDBVersion(db)
 	if err != nil {
 		log.Errorf("failed to get current database version: %v", err)
 		return false
 	}
-
-	// Collect migrations after the current version
 	migrations, err := goose.CollectMigrations(dir, currentVersion, goose.MaxVersion)
 	if err != nil {
 		if errors.Is(err, goose.ErrNoMigrationFiles) {
@@ -316,8 +323,17 @@ func gooseMigrationsPending(db *sql.DB, dir string) bool {
 		log.Errorf("failed to collect migrations: %v", err)
 		return false
 	}
-
-	return len(migrations) > 0
+	for _, m := range migrations {
+		data, err := fs.ReadFile(fsys, m.Source)
+		if err != nil {
+			log.Errorf("failed to read migration %s: %v", m.Source, err)
+			continue
+		}
+		if bytes.Contains(data, []byte(reindexTag)) {
+			return true
+		}
+	}
+	return false
 }
 
 // SaveBackup backs up the database to a file on disk.
@@ -573,7 +589,7 @@ func (idx *Indexer) reindexBlocks() {
 					idx.blockTx = nil
 					queries = idx.blockTxQueries()
 				}
-				if err == nil && idxBlock.Time != b.Time {
+				if err == nil && !idxBlock.Time.Equal(b.Time) {
 					log.Errorf("while reindexing blocks, block %d timestamp in db (%s) differs from blockstore (%s), leaving untouched", height, idxBlock.Time, b.Time)
 					return
 				}

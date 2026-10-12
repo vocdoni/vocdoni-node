@@ -121,7 +121,7 @@ func (vc *Vocone) getBlock(height int64) *blocktypes.Block {
 		Header: blocktypes.Header{
 			ChainID:         vc.App.ChainID(),
 			Height:          height,
-			Time:            time.Unix(0, meta.Timestamp),
+			Time:            time.Unix(0, meta.Timestamp).UTC(),
 			ProposerAddress: meta.ProposerAddress,
 			AppHash:         meta.StateRoot,
 			DataHash:        meta.DataHash,

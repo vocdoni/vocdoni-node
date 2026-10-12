@@ -3,6 +3,7 @@ package indexer
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -11,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/fstest"
 	"time"
 
 	qt "github.com/frankban/quicktest"
@@ -2325,4 +2327,61 @@ func TestProcessKeyReveal(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, proc.KeyRevealHeight, qt.Equals, revealHeight)
 	qt.Assert(t, proc.KeyRevealTxHash.String(), qt.Equals, hex.EncodeToString(vtx.TxID[:]))
+}
+
+// TestReindexBlocksTimestampComparison is a regression test for the spurious
+// "timestamp mismatch" that reindexBlocks used to log for every vocone block.
+// vocone's blockstore reconstructs block times with time.Unix(0, ns), which
+// carries time.Local as its Location, while SQLite stores and returns the same
+// instant in time.UTC. Comparing two time.Time values with == is a struct
+// comparison that includes the Location pointer; Equal() compares the instant
+// only and is the correct predicate here.
+func TestReindexBlocksTimestampComparison(t *testing.T) {
+	const ns = int64(1_700_000_000_123_456_789)
+	fromBlockstore := time.Unix(0, ns)    // time.Local - what vocone's getBlock returned
+	fromSQLite := time.Unix(0, ns).UTC() // time.UTC - what SQLite gives back
+
+	// Both represent the same instant.
+	qt.Assert(t, fromBlockstore.Equal(fromSQLite), qt.IsTrue)
+	// The Location pointers differ, so == would produce a false mismatch.
+	qt.Assert(t, fromBlockstore.Location() != fromSQLite.Location(), qt.IsTrue)
+	qt.Assert(t, fromBlockstore == fromSQLite, qt.IsFalse)
+}
+
+// TestGooseBlockReindexPending verifies that only migrations tagged with
+// "-- +reindex-blocks" set the block-reindex flag, so that a migration adding
+// an unrelated table (like 0021_ipfs_content) does not trigger a full reindex.
+func TestGooseBlockReindexPending(t *testing.T) {
+	db, err := sql.Open("sqlite3", filepath.Join(t.TempDir(), "test.db"))
+	qt.Assert(t, err, qt.IsNil)
+	t.Cleanup(func() { _ = db.Close() })
+
+	qt.Assert(t, goose.SetDialect("sqlite3"), qt.IsNil)
+
+	// A single pending migration without the tag: no reindex.
+	mockFS := fstest.MapFS{
+		"migrations/0001_add_table.sql": &fstest.MapFile{
+			Data: []byte(
+				"-- +goose Up\nCREATE TABLE foo (id INTEGER PRIMARY KEY);\n" +
+					"-- +goose Down\nDROP TABLE foo;\n"),
+		},
+	}
+	goose.SetBaseFS(mockFS)
+	qt.Assert(t, gooseBlockReindexPending(db, "migrations", mockFS), qt.IsFalse)
+
+	// Add a second pending migration that touches block data.
+	mockFS["migrations/0002_alter_blocks.sql"] = &fstest.MapFile{
+		Data: []byte(
+			"-- +goose Up\n-- +reindex-blocks\n" +
+				"ALTER TABLE foo ADD COLUMN bar TEXT;\n" +
+				"-- +goose Down\nALTER TABLE foo DROP COLUMN bar;\n"),
+	}
+	qt.Assert(t, gooseBlockReindexPending(db, "migrations", mockFS), qt.IsTrue)
+
+	// After applying both migrations, no more pending ones: no reindex.
+	qt.Assert(t, goose.Up(db, "migrations"), qt.IsNil)
+	qt.Assert(t, gooseBlockReindexPending(db, "migrations", mockFS), qt.IsFalse)
+
+	// Restore the global FS so other tests that create indexers use the real migrations.
+	goose.SetBaseFS(embedMigrations)
 }
