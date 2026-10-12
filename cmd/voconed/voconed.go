@@ -37,6 +37,8 @@ type VoconeConfig struct {
 	faucetKey                                string
 	faucetBalance                            uint64
 	adminToken                               string
+	importGenesis                            string
+	importFundedAccounts                     []string
 }
 
 func main() {
@@ -66,6 +68,15 @@ func main() {
 		"faucet account balance at genesis (only applied when the chain is created)")
 	flag.StringVar(&config.adminToken, "adminToken", "",
 		"bearer token for the admin API endpoints (admin endpoints are disabled if empty)")
+
+	flag.StringVar(&config.importGenesis, "importGenesis", "",
+		"genesis.json of an existing chain whose state (vcstate) and indexer were copied into --dir; "+
+			"the chain is continued from its last height instead of applying a new genesis (only used once, "+
+			"when --dir holds no vocone chain yet)")
+
+	flag.StringSliceVar(&config.importFundedAccounts, "importFundedAccounts", []string{},
+		"list of accounts (address:amount,...) whose balance is increased by amount when the chain is imported "+
+			"with --importGenesis; no other tokens are minted on import")
 
 	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
 		"list of pre-funded accounts (address:balance,address:balance,...), only applied when the chain is created")
@@ -186,6 +197,15 @@ func main() {
 		pviper.Set("keymanager", config.keymanager)
 	}
 
+	// importing an existing chain: no account is funded, so the faucet needs the key of an
+	// account that already holds funds in the imported state
+	importing := config.importGenesis != "" && !fileExists(filepath.Join(config.dir, vocone.GenesisFile))
+	if importing && config.enableFaucetWithAmount > 0 && config.faucetKey == "" {
+		fmt.Fprintln(os.Stderr, "importing a chain with the faucet enabled requires --faucetKey "+
+			"(the key of an account funded in the imported state); a generated key would hold no funds")
+		os.Exit(1)
+	}
+
 	// generate a new faucet key if the faucet is enabled and no key is provided, and save it
 	// so the faucet account is the same across restarts
 	if config.enableFaucetWithAmount > 0 && config.faucetKey == "" {
@@ -221,9 +241,51 @@ func main() {
 		}
 	}
 
+	if importing {
+		data, err := os.ReadFile(config.importGenesis)
+		if err != nil {
+			log.Fatalf("cannot read genesis to import: %v", err)
+		}
+		doc, err := vocone.ParseImportGenesis(data)
+		if err != nil {
+			log.Fatalf("cannot parse genesis to import: %v", err)
+		}
+		res, err := vocone.ImportChain(config.dir, doc)
+		if err != nil {
+			log.Fatalf("cannot import chain: %v", err)
+		}
+		log.Infow("chain imported, the genesis was not applied",
+			"chainID", res.ChainID,
+			"stateHeight", res.StateHeight,
+			"firstHeight", res.FirstHeight,
+			"indexerHeight", res.IndexerHeight,
+			"indexerBlocks", res.IndexerBlockCount,
+		)
+	} else {
+		if config.importGenesis != "" {
+			log.Infow("data directory already holds a chain, ignoring importGenesis", "dir", config.dir)
+		}
+		if len(config.importFundedAccounts) > 0 {
+			log.Warnw("ignoring importFundedAccounts, they are only applied when the chain is imported")
+		}
+	}
+
 	vc, err := vocone.NewVocone(config.dir, &mngKey)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if importing {
+		funded, err := parseFundedAccounts(config.importFundedAccounts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, acc := range funded {
+			addr := common.BytesToAddress(acc.Address)
+			if err := vc.MintBalance(addr, acc.Balance); err != nil {
+				log.Fatal(err)
+			}
+			log.Warnw("minted tokens on import", "address", addr.Hex(), "amount", acc.Balance)
+		}
 	}
 	vc.SetBlockSize(config.blockSize)
 	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
@@ -239,21 +301,19 @@ func main() {
 		if len(config.fundedAccounts) > 0 {
 			log.Warnw("ignoring funded accounts, they are only applied when the chain is created")
 		}
+		if base := vc.ImportBase(); base > 0 {
+			log.Infow("running an imported chain, older blocks are served by the indexer", "blockStoreBase", base)
+		}
 	} else {
 		appState := vocone.DefaultGenesisAppState(config.blockSize)
-		for _, addr := range config.fundedAccounts {
-			data := strings.Split(addr, ":")
-			if len(data) != 2 {
-				log.Fatalf("invalid funded account %s, please specify addr:balance", addr)
-			}
-			balance, err := strconv.ParseUint(data[1], 10, 64)
-			if err != nil {
-				log.Fatalf("invalid balance amount %s", data[1])
-			}
-			a := common.HexToAddress(data[0])
-			log.Infof("funding account %s with balance %d", a.Hex(), balance)
-			appState.Accounts = append(appState.Accounts, genesis.Account{Address: a.Bytes(), Balance: balance})
+		funded, err := parseFundedAccounts(config.fundedAccounts)
+		if err != nil {
+			log.Fatal(err)
 		}
+		for _, acc := range funded {
+			log.Infof("funding account %x with balance %d", acc.Address, acc.Balance)
+		}
+		appState.Accounts = append(appState.Accounts, funded...)
 		if faucetAccount != nil {
 			log.Infof("funding faucet account %s with balance %d", faucetAccount.Address().Hex(), config.faucetBalance)
 			appState.Accounts = append(appState.Accounts, genesis.Account{
@@ -320,4 +380,30 @@ func main() {
 	if err := vc.Close(); err != nil {
 		log.Warnw("error closing vocone", "err", err)
 	}
+}
+
+// fileExists reports whether path exists.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// parseFundedAccounts parses a list of address:amount entries.
+func parseFundedAccounts(list []string) ([]genesis.Account, error) {
+	accounts := make([]genesis.Account, 0, len(list))
+	for _, entry := range list {
+		data := strings.Split(entry, ":")
+		if len(data) != 2 {
+			return nil, fmt.Errorf("invalid funded account %s, please specify addr:balance", entry)
+		}
+		if !common.IsHexAddress(data[0]) {
+			return nil, fmt.Errorf("invalid funded account address %s", data[0])
+		}
+		balance, err := strconv.ParseUint(data[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid balance amount %s", data[1])
+		}
+		accounts = append(accounts, genesis.Account{Address: common.HexToAddress(data[0]).Bytes(), Balance: balance})
+	}
+	return accounts, nil
 }

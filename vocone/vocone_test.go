@@ -424,13 +424,8 @@ func openTestVocone(t *testing.T, dir string, keymng *ethereum.SignKeys) *Vocone
 	vc.txsPerBlock = DefaultTxsPerBlock
 	vc.blockStore, err = metadb.New(db.TypePebble, filepath.Join(dir, "blockstore"))
 	qt.Assert(t, err, qt.IsNil)
-	lastHeight, err := vc.App.State.LastHeight()
-	qt.Assert(t, err, qt.IsNil)
-	nextHeight := int64(lastHeight)
-	if _, err := vc.loadBlockMeta(nextHeight); err == nil {
-		nextHeight++
-	}
-	vc.height.Store(nextHeight)
+	qt.Assert(t, vc.loadImportRecord(), qt.IsNil)
+	qt.Assert(t, vc.recoverHeight(), qt.IsNil)
 	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dir, "mempool"))
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, vc.loadMempool(), qt.IsNil)

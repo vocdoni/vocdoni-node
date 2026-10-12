@@ -65,6 +65,9 @@ type Vocone struct {
 	txsPerBlock int
 	closed      atomic.Bool
 
+	// imported is set when the chain state was produced by another node, see ImportChain.
+	imported *importRecord
+
 	// wg tracks goroutines started by Start that access databases so that
 	// Close can wait for them to finish before releasing those databases.
 	wg sync.WaitGroup
@@ -100,20 +103,13 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 		return nil, fmt.Errorf("could not open blockstore: %w", err)
 	}
 
-	// Recover height from persisted state.
-	// LastHeight returns the last committed height. If that block was already
-	// fully committed (metadata exists in blockstore), we must start at the
-	// next height to avoid re-executing an already-committed block.
-	lastHeight, err := vc.App.State.LastHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get last height: %w", err)
+	// Recover height from persisted state and block store.
+	if err := vc.loadImportRecord(); err != nil {
+		return nil, err
 	}
-	nextHeight := int64(lastHeight)
-	if _, err := vc.loadBlockMeta(nextHeight); err == nil {
-		// Block at lastHeight was already committed, advance to the next one.
-		nextHeight++
+	if err := vc.recoverHeight(); err != nil {
+		return nil, err
 	}
-	vc.height.Store(nextHeight)
 
 	// Open the mempool database and reload pending transactions.
 	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "mempool"))
@@ -180,7 +176,6 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		api.ChainHandler,
 		api.WalletHandler,
 		api.AccountHandler,
-
 	)
 }
 
@@ -276,12 +271,7 @@ func (vc *Vocone) produceBlock() error {
 	blockHash := blk.Hash()
 
 	// Retrieve the previous block hash for chain linkage.
-	var lastBlockHash []byte
-	if height > 0 {
-		if prevMeta, err := vc.loadBlockMeta(height - 1); err == nil {
-			lastBlockHash = prevMeta.Hash
-		}
-	}
+	lastBlockHash := vc.previousBlockHash(height)
 
 	// Persist block metadata and hash→height index.
 	if err := vc.storeBlockMeta(height, startTime, int32(len(txs)), resp.Root,
@@ -481,6 +471,27 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 		return err
 	}
 	_, err := vc.commit()
+	return err
+}
+
+// MintBalance adds amount to the balance of an account, creating it if it does not
+// exist, and commits the state. It is used to fund accounts explicitly, for instance
+// when a chain is imported (see ImportChain), which applies no genesis.
+func (vc *Vocone) MintBalance(addr common.Address, amount uint64) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	acc, err := vc.App.State.GetAccount(addr, false)
+	if err != nil {
+		return fmt.Errorf("cannot get account %s: %w", addr.Hex(), err)
+	}
+	if acc == nil {
+		if err := vc.App.State.CreateAccount(addr, "", nil, amount); err != nil {
+			return fmt.Errorf("cannot create account %s: %w", addr.Hex(), err)
+		}
+	} else if err := vc.App.State.InitChainMintBalance(addr, amount); err != nil {
+		return fmt.Errorf("cannot mint balance for %s: %w", addr.Hex(), err)
+	}
+	_, err = vc.commit()
 	return err
 }
 

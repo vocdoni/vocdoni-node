@@ -95,10 +95,8 @@ func (vc *Vocone) buildBlock(height int64, timestamp time.Time, txs [][]byte, ap
 			AppHash:         appHash,
 		},
 	}
-	if height > 0 {
-		if prevMeta, err := vc.loadBlockMeta(height - 1); err == nil && len(prevMeta.Hash) > 0 {
-			blk.LastBlockID = blocktypes.BlockID{Hash: prevMeta.Hash}
-		}
+	if prevHash := vc.previousBlockHash(height); len(prevHash) > 0 {
+		blk.LastBlockID = blocktypes.BlockID{Hash: prevHash}
 	}
 	blk.Txs = make([]blocktypes.Tx, len(txs))
 	for i, tx := range txs {
@@ -145,8 +143,10 @@ func (vc *Vocone) getBlock(height int64) *blocktypes.Block {
 }
 
 // blockStoreRange returns the lowest and highest heights of the committed blocks.
+// On an imported chain the lowest height is the import base: older blocks are only
+// available through the indexer.
 func (vc *Vocone) blockStoreRange() (base, height int64) {
-	return 0, vc.height.Load() - 1
+	return vc.ImportBase(), vc.height.Load() - 1
 }
 
 // getBlockByHash looks up a block by its hash using the reverse index.
