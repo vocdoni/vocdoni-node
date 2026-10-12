@@ -207,7 +207,14 @@ func (c *Controller) Commit(height, timestamp uint32) error {
 				return fmt.Errorf("cannot delete IST actions: %w", err)
 			}
 		default:
-			return fmt.Errorf("unknown IST action %d", action.ID)
+			// Actions of a type this node does not implement can never be executed, so
+			// they are dropped instead of blocking every block. A state produced by a
+			// node with more action types (such as validator score updates) holds them.
+			log.Warnw("dropping unknown IST action", "height", height, "id", fmt.Sprintf("%x", action.ID),
+				"type", action.TypeID)
+			if err := c.removeAction(action.ID); err != nil {
+				return fmt.Errorf("cannot delete IST actions: %w", err)
+			}
 		}
 	}
 	return nil
