@@ -15,12 +15,14 @@ import (
 	"go.vocdoni.io/dvote/apiclient"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -36,7 +38,7 @@ func newTestVocone(t *testing.T) (*Vocone, context.CancelFunc, *apiclient.HTTPcl
 	keymng := ethereum.SignKeys{}
 	qt.Assert(t, keymng.Generate(), qt.IsNil)
 
-	vc, err := NewVocone(dir, &keymng, false, "", nil)
+	vc, err := NewVocone(dir, &keymng)
 	qt.Assert(t, err, qt.IsNil)
 
 	vc.App.SetChainID("test-vocone")
@@ -149,7 +151,9 @@ func TestVocone(t *testing.T) {
 	qt.Assert(t, vc.CreateAccount(account.Address(), &state.Account{
 		Account: models.Account{Balance: 10000},
 	}), qt.IsNil)
-	qt.Assert(t, testCSPvote(cli), qt.IsNil)
+	qt.Assert(t, testCSPvote(cli, false), qt.IsNil)
+	// encrypted election: the keykeeper publishes the keys and reveals them when it ends
+	qt.Assert(t, testCSPvote(cli, true), qt.IsNil)
 }
 
 // TestBlockStoreAndRetrieval verifies that blocks are persisted and can be
@@ -409,8 +413,122 @@ func TestSetBulkTxCostsLogic(t *testing.T) {
 	}
 }
 
+// openTestVocone opens the vocone stores in dir without starting block production.
+func openTestVocone(t *testing.T, dir string, keymng *ethereum.SignKeys) *Vocone {
+	t.Helper()
+	vc := &Vocone{}
+	vc.Config = &config.VochainCfg{DataDir: dir, DBType: db.TypePebble}
+	var err error
+	vc.App, err = vochain.NewBaseApplication(vc.Config)
+	qt.Assert(t, err, qt.IsNil)
+	vc.txsPerBlock = DefaultTxsPerBlock
+	vc.blockStore, err = metadb.New(db.TypePebble, filepath.Join(dir, "blockstore"))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, vc.loadImportRecord(), qt.IsNil)
+	qt.Assert(t, vc.recoverHeight(), qt.IsNil)
+	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dir, "mempool"))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, vc.loadMempool(), qt.IsNil)
+	vc.setDefaultMethods()
+	vc.App.State.SetHeight(uint32(vc.height.Load()))
+	qt.Assert(t, vc.loadGenesis(), qt.IsNil)
+	qt.Assert(t, vc.SetKeyKeeper(keymng), qt.IsNil)
+	return vc
+}
+
+// TestGenesisAppliedOnce verifies that the genesis is persisted and only applied
+// when the chain is created: a restart keeps the chainID and does not mint again.
+func TestGenesisAppliedOnce(t *testing.T) {
+	dir := t.TempDir()
+	keymng := ethereum.SignKeys{}
+	qt.Assert(t, keymng.Generate(), qt.IsNil)
+	funded := ethereum.SignKeys{}
+	qt.Assert(t, funded.Generate(), qt.IsNil)
+
+	vc := openTestVocone(t, dir, &keymng)
+	qt.Assert(t, vc.Initialized(), qt.IsFalse)
+	appState := DefaultGenesisAppState(vc.txsPerBlock)
+	appState.Accounts = append(appState.Accounts, genesis.Account{Address: funded.Address().Bytes(), Balance: 1000})
+	qt.Assert(t, vc.InitChain("genesis-test", appState), qt.IsNil)
+	qt.Assert(t, vc.Initialized(), qt.IsTrue)
+	qt.Assert(t, vc.produceBlock(), qt.IsNil)
+	qt.Assert(t, vc.produceBlock(), qt.IsNil)
+	qt.Assert(t, vc.Close(), qt.IsNil)
+
+	vc = openTestVocone(t, dir, &keymng)
+	defer vc.Close()
+	qt.Assert(t, vc.Initialized(), qt.IsTrue)
+	qt.Assert(t, vc.App.ChainID(), qt.Equals, "genesis-test")
+	qt.Assert(t, vc.App.Genesis().ChainID, qt.Equals, "genesis-test")
+	qt.Assert(t, vc.height.Load(), qt.Equals, int64(2))
+	qt.Assert(t, vc.InitChain("genesis-test", appState), qt.IsNotNil)
+	acc, err := vc.App.State.GetAccount(funded.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc, qt.IsNotNil)
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(1000))
+	validator, err := vc.App.State.Validator(keymng.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validator, qt.IsNotNil)
+	qt.Assert(t, validator.KeyIndex, qt.Equals, uint32(1))
+}
+
+// TestFutureNonceTxRequeue verifies that a transaction submitted with a
+// future nonce (nonce+1) is not silently dropped after failing deliverTx in
+// the same block as the base-nonce transaction.  Instead it must be retried
+// in the subsequent block and succeed once the account nonce has advanced.
+func TestFutureNonceTxRequeue(t *testing.T) {
+	vc, cancel, cli, _ := newTestVocone(t)
+	defer cancel()
+	defer vc.Close()
+
+	// create and fund the test account
+	sender := ethereum.SignKeys{}
+	qt.Assert(t, sender.Generate(), qt.IsNil)
+	const startBalance = uint64(10_000)
+	qt.Assert(t, vc.CreateAccount(sender.Address(), &state.Account{
+		Account: models.Account{Balance: startBalance},
+	}), qt.IsNil)
+
+	// create a recipient account (SendTokens requires it to exist)
+	recipient := ethereum.SignKeys{}
+	qt.Assert(t, recipient.Generate(), qt.IsNil)
+	qt.Assert(t, vc.CreateAccount(recipient.Address(), &state.Account{}), qt.IsNil)
+
+	senderCli := cli.Clone(fmt.Sprintf("%x", sender.PrivateKey()))
+
+	// submit nonce+1 (future) first — should be accepted into the mempool
+	// because CheckTx does not validate nonces (forCommit=false)
+	futureHash, err := senderCli.TransferWithNonce(recipient.Address(), 1, 1)
+	qt.Assert(t, err, qt.IsNil)
+
+	// submit the correct-nonce tx second
+	baseHash, err := senderCli.TransferWithNonce(recipient.Address(), 1, 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	// wait for the base-nonce tx to be mined; at that point the account nonce
+	// has advanced to 1 so the future-nonce tx can succeed in the next block.
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel1()
+	_, err = cli.WaitUntilTxIsMined(ctx1, baseHash)
+	qt.Assert(t, err, qt.IsNil)
+
+	// wait one more block so the future-nonce tx is retried and committed
+	qt.Assert(t, cli.WaitUntilNextBlock(), qt.IsNil)
+
+	// the future-nonce tx must now be mined
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+	_, err = cli.WaitUntilTxIsMined(ctx2, futureHash)
+	qt.Assert(t, err, qt.IsNil)
+
+	// account nonce must be 2 (base tx + future tx both applied)
+	acc, err := senderCli.Account("")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc.Nonce, qt.Equals, uint32(2))
+}
+
 func testCreateAccount(cli *apiclient.HTTPclient) error {
-	txhash, err := cli.AccountBootstrap(nil, nil, nil)
+	txhash, err := cli.AccountBootstrap(nil, nil)
 	if err != nil {
 		return err
 	}
@@ -421,7 +539,7 @@ func testCreateAccount(cli *apiclient.HTTPclient) error {
 	return err
 }
 
-func testCSPvote(cli *apiclient.HTTPclient) error {
+func testCSPvote(cli *apiclient.HTTPclient, encrypted bool) error {
 	cspKey := ethereum.SignKeys{}
 	if err := cspKey.Generate(); err != nil {
 		return err
@@ -436,7 +554,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 			Status:       models.ProcessStatus_READY,
 			CensusRoot:   censusRoot,
 			CensusOrigin: censusOrigin,
-			EnvelopeType: &models.EnvelopeType{},
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: encrypted},
 			VoteOptions: &models.ProcessVoteOptions{
 				MaxCount: 1,
 				MaxValue: 1,
@@ -496,11 +614,12 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 		Title:   map[string]string{"default": "updated election"},
 		Version: "1.0",
 	}
-	if _, err := cli.SetElectionMetadata(processID, newMetadata); err != nil {
-		return err
-	}
 	newMetadataBytes, err := json.Marshal(newMetadata)
 	if err != nil {
+		return err
+	}
+	if _, err := cli.SetElectionMetadataURI(processID,
+		"ipfs://"+data.CalculateCIDv1json(newMetadataBytes), api.MetadataHash(newMetadataBytes)); err != nil {
 		return err
 	}
 	startTimeMetadata := time.Now()

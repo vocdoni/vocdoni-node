@@ -26,10 +26,6 @@ const (
 	setProcessStatusTemplate  = "You are signing a Vocdoni transaction of type SET_PROCESS_STATUS for process ID %x and status %s.\n\nThe hash of this transaction is %x and the destination chain is %s."
 	setProcessDefaultTemplate = "You are signing a Vocdoni transaction of type SET_PROCESS/%s with process ID %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
-	registerSIKTemplate = "You are signing a Vocdoni transaction of type REGISTER_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
-	setSIKTemplate      = "You are signing a Vocdoni transaction of type SET_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
-	delSIKTemplate      = "You are signing a Vocdoni transaction of type DEL_SIK for secret identity key %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
-
 	addDelegateAccountTemplate = "You are signing a Vocdoni transaction of type ADD_DELEGATE_FOR_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
 	delDelegateAccountTemplte  = "You are signing a Vocdoni transaction of type DEL_DELEGATE_FOR_ACCOUNT for address %x.\n\nThe hash of this transaction is %x and the destination chain is %s."
 
@@ -105,24 +101,6 @@ func BuildVocdoniProtoTxMessage(tx *models.Tx, chainID string, hash []byte) ([]b
 			return nil, fmt.Errorf("collect faucet payload is nil")
 		}
 		msg = fmt.Sprintf(collectFaucetTemplate, hash, chainID)
-	case *models.Tx_SetSIK:
-		t := tx.GetSetSIK()
-		if t == nil {
-			return nil, fmt.Errorf("set SIK payload is nil")
-		}
-		msg = fmt.Sprintf(setSIKTemplate, t.SIK, hash, chainID)
-	case *models.Tx_DelSIK:
-		t := tx.GetSetSIK()
-		if t == nil {
-			return nil, fmt.Errorf("del SIK payload is nil")
-		}
-		msg = fmt.Sprintf(delSIKTemplate, t.SIK, hash, chainID)
-	case *models.Tx_RegisterSIK:
-		t := tx.GetRegisterSIK()
-		if t == nil {
-			return nil, fmt.Errorf("register SIK payload is nil")
-		}
-		msg = fmt.Sprintf(registerSIKTemplate, t.SIK, hash, chainID)
 	default:
 		msg = fmt.Sprintf(defaultTemplate, chainID, hash)
 	}

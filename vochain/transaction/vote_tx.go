@@ -11,8 +11,6 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	vstate "go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/zkproof"
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -21,8 +19,7 @@ import (
 // store on the vote. The memo is opaque to the chain: its bytes are stored and
 // returned verbatim, and only their length is constrained. Whether it is encrypted,
 // signed, or plain text is the application layer's business — note in particular
-// that nothing binds it to a zk proof, and that on encrypted elections it is served
-// in the clear beside the sealed ballot.
+// that on encrypted elections it is served in the clear beside the sealed ballot.
 func checkVoteMemo(memo []byte) ([]byte, error) {
 	if len(memo) > types.MaxVoteMemoSize {
 		return nil, fmt.Errorf("vote memo exceeds max size of %d bytes", types.MaxVoteMemoSize)
@@ -133,7 +130,6 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	// started in BaseApplication.BeginBlock.
 	// Warning: vote cache might change during the execution of this function.
 	vote := t.state.CacheGetCopy(vtx.TxID)
-	sikRoot := []byte{}
 	fromCache := vote != nil
 
 	if fromCache { // if the vote exists in cache
@@ -145,16 +141,9 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		defer t.state.CacheDel(vtx.TxID)
 		vote.Height = height // update vote height
 	} else { // if vote not in cache, initialize it
-		// Initialize the vote based on the envelope type
 		switch process.CensusOrigin {
-		case models.CensusOrigin_OFF_CHAIN_TREE,
-			models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
-			models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
-			if process.GetEnvelopeType().Anonymous {
-				vote, sikRoot, err = zkproof.InitializeZkVote(voteEnvelope, height)
-			} else {
-				vote, err = arboproof.InitializeSignedVote(voteEnvelope, vtx.SignedBody, vtx.Signature, height)
-			}
+		case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
+			vote, err = initializeSignedVote(voteEnvelope, vtx.SignedBody, vtx.Signature, height)
 		default:
 			return nil, fmt.Errorf("could not initialize vote, census origin not compatible")
 		}
@@ -202,54 +191,24 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 		return vote, nil
 	}
 
+	// extract the ethereum address from the voterID
+	addr := ethereum.AddrFromBytes(vote.VoterID.Address())
+	log.Debugw("new vote",
+		"nullifier", fmt.Sprintf("%x", vote.Nullifier),
+		"address", addr.Hex(),
+		"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
+		"timestamp", currentTime,
+		"height", height)
+
 	// verify the proof associated with the vote
-	switch {
-	case process.EnvelopeType.Anonymous:
-		// check if it is expired
-		if t.state.ExpiredSIKRoot(sikRoot) {
-			return nil, fmt.Errorf("expired sik root provided, generate the proof again")
-		}
-		// verify the proof
-		valid := false
-		valid, vote.Weight, err = VerifyProof(process, voteEnvelope, vote.VoterID)
-		if err != nil {
-			return nil, fmt.Errorf("proof not valid: %w", err)
-		}
-		if !valid {
-			return nil, fmt.Errorf("proof not valid")
-		}
-		log.Debugw("new vote",
-			"type", "zkSNARK",
-			"weight", vote.Weight,
-			"timestamp", currentTime,
-			"height", height,
-			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
-			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
-		)
-	default:
-		// Signature based voting
-		// extract the ethereum address from the voterID
-		addr := ethereum.AddrFromBytes(vote.VoterID.Address())
-
-		// if not in cache, full check
-		log.Debugw("new vote",
-			"type", "signature",
-			"nullifier", fmt.Sprintf("%x", vote.Nullifier),
-			"address", addr.Hex(),
-			"electionID", fmt.Sprintf("%x", voteEnvelope.ProcessId),
-			"timestamp", currentTime,
-			"height", height)
-
-		// Verify the proof
-		valid, weight, err := VerifyProof(process, voteEnvelope, vote.VoterID)
-		if err != nil {
-			return nil, err
-		}
-		if !valid {
-			return nil, fmt.Errorf("merkle proof verification failed")
-		}
-		vote.Weight = weight
+	valid, weight, err := VerifyProof(process, voteEnvelope, vote.VoterID)
+	if err != nil {
+		return nil, err
 	}
+	if !valid {
+		return nil, fmt.Errorf("proof verification failed")
+	}
+	vote.Weight = weight
 
 	// If not forCommit, add the vote to the cache
 	if !forCommit {
@@ -281,4 +240,36 @@ func (t *TransactionHandler) checkVoteCanBeCasted(nullifier []byte, process *mod
 		return true, fmt.Errorf("vote %x overwrite count reached", nullifier)
 	}
 	return true, nil
+}
+
+// initializeSignedVote builds a vote from a signed envelope, deriving the voter ID
+// and nullifier from the transaction signature. It does not check the proof nor
+// sets the weight of the vote.
+func initializeSignedVote(voteEnvelope *models.VoteEnvelope, signedBody, signature []byte, height uint32) (*vstate.Vote, error) {
+	vote := &vstate.Vote{
+		Height:               height,
+		ProcessID:            voteEnvelope.ProcessId,
+		VotePackage:          voteEnvelope.VotePackage,
+		EncryptionKeyIndexes: voteEnvelope.EncryptionKeyIndexes,
+	}
+	if voteEnvelope.Proof == nil {
+		return nil, fmt.Errorf("proof not found on transaction")
+	}
+	if voteEnvelope.Proof.Payload == nil {
+		return nil, fmt.Errorf("invalid proof payload provided")
+	}
+	if signature == nil || signedBody == nil {
+		return nil, fmt.Errorf("nil signature or body provided")
+	}
+	pubKey, err := ethereum.PubKeyFromSignature(signedBody, signature)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract public key from signature: %w", err)
+	}
+	vote.VoterID = append([]byte{vstate.VoterIDTypeECDSA}, pubKey...)
+	addr, err := ethereum.AddrFromPublicKey(pubKey)
+	if err != nil {
+		return nil, fmt.Errorf("cannot extract address from public key: %w", err)
+	}
+	vote.Nullifier = vstate.GenerateNullifier(addr, vote.ProcessID)
+	return vote, nil
 }

@@ -1,13 +1,9 @@
 package test
 
 import (
-	"fmt"
-	"math/rand"
 	"testing"
 
-	cometprivval "github.com/cometbft/cometbft/privval"
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/proto/build/go/models"
 
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
@@ -17,22 +13,8 @@ func TestAddValidator(t *testing.T) {
 	t.Parallel()
 
 	s := testcommon.NewVochainStateWithValidators(t)
-	rint := rand.Int()
-	tmp := t.TempDir()
-	val, err := cometprivval.GenFilePV(
-		fmt.Sprintf("%s/vochainBenchmark_keyfile%d", tmp, rint),
-		fmt.Sprintf("%s/vochainBenchmark_statefile%d", tmp, rint),
-		nil,
-	)
-	qt.Assert(t, err, qt.IsNil)
-	pubk, err := val.GetPubKey()
-	qt.Assert(t, err, qt.IsNil)
-	validator := &models.Validator{
-		Address: pubk.Address(),
-		PubKey:  pubk.Bytes(),
-		Power:   10,
-	}
-	err = s.AddValidator(validator)
+	validator := testcommon.NewValidator(t)
+	err := s.AddValidator(validator)
 	qt.Assert(t, err, qt.IsNil)
 }
 

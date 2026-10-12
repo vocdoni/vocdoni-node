@@ -7,7 +7,6 @@ import (
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -55,14 +54,9 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		}
 	}
 
-	// run specific checks based on census origin
+	// only CSP census origins are supported, and they are not anonymous
 	switch tx.Process.CensusOrigin {
 	case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
-		if tx.Process.EnvelopeType.Anonymous {
-			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
-		}
-	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
-		// no additional origin-specific checks
 	default:
 		// Format the enum itself rather than CensusOrigin_name: the map
 		// yields "" for integers the proto no longer defines (retired
@@ -70,6 +64,9 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 		// generated String() falls back to the decimal number.
 		return nil, ethereum.Address{}, fmt.Errorf("census origin %s not supported for new process",
 			tx.Process.CensusOrigin)
+	}
+	if tx.Process.EnvelopeType.Anonymous {
+		return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported")
 	}
 
 	// get current timestamp from state
@@ -150,9 +147,6 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 	tx.Process.ProcessId = pid.Marshal()
 
-	// TODO: Enable support for PreRegiser without Anonymous.  Figure out
-	// all the required changes to support a process with a rolling census
-	// that is not Anonymous.
 	if tx.Process.EnvelopeType.Serial {
 		return nil, ethereum.Address{}, fmt.Errorf("serial process not yet implemented")
 	}
@@ -283,12 +277,6 @@ func (t *TransactionHandler) checkMaxCensusSize(proc *models.Process) error {
 	}
 	if maxProcessSize > 0 && txMaxCensusSize > maxProcessSize {
 		return fmt.Errorf("maxCensusSize is greater than the maximum allowed (%d)", maxProcessSize)
-	}
-	// check that the census size is not bigger than the circuit levels
-	if proc.EnvelopeType.Anonymous && !circuit.Global().Config.SupportsCensusSize(txMaxCensusSize) {
-		return fmt.Errorf("maxCensusSize for anonymous envelope "+
-			"cannot be bigger than the number of levels of the circuit (max:%d provided:%d)",
-			circuit.Global().Config.MaxCensusSize().Int64(), txMaxCensusSize)
 	}
 	return nil
 }

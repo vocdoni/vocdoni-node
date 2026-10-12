@@ -4,7 +4,6 @@
 #  e2etest_plaintextelection_empty: run poll vote test, with no votes
 #  e2etest_plaintextelection: run poll vote test
 #  e2etest_encryptedelection: run encrypted vote test
-#  e2etest_anonelection: run anonymous vote test
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 #  e2etest_overwritelection: run overwrite test
 #  e2etest_censusizelection: run max census size test
@@ -13,7 +12,6 @@
 #  e2etest_lifecyclelection: run lifecycle test
 #  e2etest_cspelection: run csp test
 #  e2etest_cspelectionv2: run csp test with census origin V2 and weighted blind pid-salted proofs
-#  e2etest_dynamicensuselection: run dynamic census test
 #  e2etest_electiontimebounds: run election time bounds test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
@@ -52,7 +50,6 @@ tests_to_run=(
   	"e2etest_plaintextelection_empty"
   	"e2etest_plaintextelection"
   	"e2etest_encryptedelection"
-  	"e2etest_anonelection"
   	"e2etest_overwritelection"
   	"e2etest_censusizelection"
   	"e2etest_ballotelection"
@@ -61,9 +58,7 @@ tests_to_run=(
   	"e2etest_lifecyclelection"
   	"e2etest_cspelection"
   	"e2etest_cspelectionv2"
-  	"e2etest_dynamicensuselection"
   	"e2etest_electiontimebounds"
-	"test_statesync"
 )
 
 # print help
@@ -118,16 +113,6 @@ e2etest_encryptedelection() {
 	e2etest encryptedelection
 }
 
-e2etest_anonelection() {
-	e2etest anonelection
-	e2etest anonelectionTempSiks
-	e2etest anonelectionEncrypted
-}
-
-e2etest_hysteresis() {
-	e2etest hysteresis
-}
-
 e2etest_tokentxs() {
 	e2etest tokentxs
 }
@@ -160,21 +145,11 @@ e2etest_cspelectionv2() {
   e2etest cspelectionv2
 }
 
-e2etest_dynamicensuselection() {
-  e2etest dynamicensuselection
-}
-
 e2etest_ballotelection() {
   e2etest ballotRanked
   e2etest ballotQuadratic
   e2etest ballotRange
   e2etest ballotApproval
-}
-
-test_statesync() {
-	$COMPOSE_CMD up gatewaySync -d
-	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
-	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"
 }
 
 ### end tests definition
@@ -184,9 +159,7 @@ log "### Starting test suite ###"
 	$COMPOSE_CMD build
 	$COMPOSE_CMD build test
 }
-$COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
-sleep 10
-$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
+$COMPOSE_CMD up -d gateway0
 
 check_gw_is_up() {
   height=$($COMPOSE_CMD_RUN --rm test \
@@ -220,7 +193,6 @@ mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
 	if [ $test == "e2etest_raceDuringCommit" ] || \
-	   [ $test == "test_statesync" ] || \
 	   [ $CONCURRENT -eq 0 ] ; then
 		log "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
@@ -281,8 +253,6 @@ if $COMPOSE_CMD logs | grep -q "^panic:" ; then
 	log "### Panic detected! Look for panic in the logs above for full context, pasting here the 100 lines after panic ###"
 	$COMPOSE_CMD logs | grep -A 100 "^panic:"
 fi
-
-if $COMPOSE_CMD logs | grep -q "CONSENSUS FAILURE" ; then RET=3 ; log "### CONSENSUS FAILURE detected! Look for it in the logs above ###"; fi
 
 [ $CLEAN -eq 1 ] && {
 	log "### Cleaning docker environment ###"

@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -16,13 +15,6 @@ import (
 	"go.vocdoni.io/dvote/vochain/transaction/vochaintx"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
-)
-
-const (
-	// newValidatorPower is the entry power of a new validator: 5% of maxPower
-	// (see vochain/ist/validators.go). Keep it scaled with maxPower so the entry
-	// weight stays consistent across parameter revisions.
-	newValidatorPower = 50
 )
 
 var (
@@ -180,10 +172,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
 				if tx.GetStatus() == models.ProcessStatus_ENDED {
-					// purge RegisterSIKTx counter if it exists
-					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
-						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
-					}
 					// schedule results computations on the ISTC
 					if err := t.istc.Remove(tx.ProcessId); err != nil {
 						log.Errorw(err, "setProcessStatus: cannot remove IST action")
@@ -264,10 +252,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			if err := t.SetAccountDelegateTxCheck(vtx); err != nil {
 				return nil, fmt.Errorf("setAccountDelegateTx: %w", err)
 			}
-		case models.TxType_SET_ACCOUNT_VALIDATOR:
-			if err := t.SetAccountValidatorTxCheck(vtx); err != nil {
-				return nil, fmt.Errorf("setAccountValidatorTx: %w", err)
-			}
 		default:
 			return nil, fmt.Errorf("setAccount: invalid transaction type")
 		}
@@ -286,12 +270,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
-				}
-				// if the tx includes a sik try to persist it in the state
-				if sik := tx.GetSIK(); sik != nil {
-					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
-						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
-					}
 				}
 				txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
 				if err != nil {
@@ -403,41 +381,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 				); err != nil {
 					return nil, fmt.Errorf("delDelegate: %w", err)
 				}
-			case models.TxType_SET_ACCOUNT_VALIDATOR:
-				txSenderAddress, err := ethereum.AddrFromSignature(vtx.SignedBody, vtx.Signature)
-				if err != nil {
-					return nil, fmt.Errorf("setValidator: txSenderAddress %w", err)
-				}
-				txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_VALIDATOR, false)
-				if err != nil {
-					return nil, fmt.Errorf("setValidator: txCost: %w", err)
-				}
-				// check for a faucet package and if exist, transfer the amount to the tx sender
-				if _, err := t.checkFaucetPackageAndTransfer(tx.FaucetPackage, txCost, txSenderAddress, vtx.TxID[:], true); err != nil {
-					return nil, err
-				}
-				validatorAddr, err := ethereum.AddrFromPublicKey(tx.GetPublicKey())
-				if err != nil {
-					return nil, fmt.Errorf("setValidator: %w", err)
-				}
-				if err := t.state.BurnTxCostIncrementNonce(
-					txSenderAddress,
-					models.TxType_SET_ACCOUNT_VALIDATOR,
-					txCost,
-					validatorAddr.Hex(),
-				); err != nil {
-					return nil, fmt.Errorf("setValidator: burnTxCostIncrementNonce %w", err)
-				}
-				if err := t.state.AddValidator(&models.Validator{
-					Address:          validatorAddr.Bytes(),
-					PubKey:           tx.GetPublicKey(),
-					Name:             tx.GetName(),
-					Power:            newValidatorPower,
-					ValidatorAddress: cometCrypto256k1.PubKey(tx.GetPublicKey()).Address().Bytes(),
-					Height:           uint64(t.state.CurrentHeight()),
-				}); err != nil {
-					return nil, fmt.Errorf("setValidator: %w", err)
-				}
 			default:
 				return nil, fmt.Errorf("setAccount: invalid transaction type")
 			}
@@ -504,85 +447,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 			return response, nil
 		}
-
-	case *models.Tx_SetSIK:
-		txAddress, newSIK, err := t.SetSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("setSIKTx: %w", err)
-		}
-		if forCommit {
-			txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_SIK, false)
-			if err != nil {
-				return nil, fmt.Errorf("setAccountInfoUriTx: txCost: %w", err)
-			}
-			// check for a faucet package and if exist, transfer the amount to the tx sender
-			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
-				return nil, err
-			}
-			if err := t.state.BurnTxCostIncrementNonce(
-				txAddress,
-				models.TxType_SET_ACCOUNT_SIK,
-				txCost,
-				newSIK.String(),
-			); err != nil {
-				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
-			}
-			if err := t.state.SetAddressSIK(txAddress, newSIK); err != nil {
-				return nil, fmt.Errorf("setSIKTx: %w", err)
-			}
-		}
-		return response, nil
-
-	case *models.Tx_DelSIK:
-		txAddress, err := t.DelSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("delSIKTx: %w", err)
-		}
-		if forCommit {
-			txCost, err := t.state.TxBaseCost(models.TxType_DEL_ACCOUNT_SIK, false)
-			if err != nil {
-				return nil, fmt.Errorf("delSIKTx: txCost: %w", err)
-			}
-			// check for a faucet package and if exist, transfer the amount to the tx sender
-			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
-				return nil, err
-			}
-			if err := t.state.BurnTxCostIncrementNonce(
-				txAddress,
-				models.TxType_DEL_ACCOUNT_SIK,
-				txCost,
-				"",
-			); err != nil {
-				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
-			}
-			if err := t.state.InvalidateSIK(txAddress); err != nil {
-				return nil, fmt.Errorf("delSIKTx: %w", err)
-			}
-		}
-		return response, nil
-
-	case *models.Tx_RegisterSIK:
-		txAddress, SIK, pid, tempSIKs, err := t.RegisterSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("registerSIKTx: %w", err)
-		}
-		if forCommit {
-			// register the SIK
-			if err := t.state.SetAddressSIK(txAddress, SIK); err != nil {
-				return nil, fmt.Errorf("registerSIKTx: %w", err)
-			}
-			// increase the RegisterSIKTx counter
-			if err := t.state.IncreaseRegisterSIKCounter(pid); err != nil {
-				return nil, fmt.Errorf("registerSIKTx: %w", err)
-			}
-			if tempSIKs {
-				log.Infow("registering tempSIK", "address", txAddress.String())
-				if err := t.state.AssignSIKToElection(pid, txAddress); err != nil {
-					return nil, fmt.Errorf("registerSIKTx: %w", err)
-				}
-			}
-		}
-		return response, nil
 
 	default:
 		return nil, fmt.Errorf("invalid transaction type")

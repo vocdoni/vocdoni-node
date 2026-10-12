@@ -1,20 +1,15 @@
 package api
 
 import (
-	"bytes"
-	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"go.vocdoni.io/dvote/data/ipfs"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -25,10 +20,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	ElectionHandler     = "elections"
-	MaxOffchainFileSize = 1024 * 1024 * 1 // 1MB
-)
+const ElectionHandler = "elections"
 
 func (a *API) enableElectionHandlers() error {
 	if err := a.Endpoint.RegisterMethod(
@@ -112,26 +104,10 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionId}/metadata",
-		"PUT",
-		apirest.MethodAccessTypePublic,
-		a.electionMetadataUpdateHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/elections/price",
 		"POST",
 		apirest.MethodAccessTypePublic,
 		a.electionPriceHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/files/cid",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.computeCidHandler,
 	); err != nil {
 		return err
 	}
@@ -411,30 +387,14 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		election.Results = proc.ResultsVotes
 	}
 
-	// Try to retrieve the election metadata
-	if a.storage != nil {
-		stgCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		metadataBytes, err := a.storage.Retrieve(stgCtx, election.MetadataURL, MaxOffchainFileSize)
-		if err != nil {
-			log.Warnf("cannot get metadata from %s: %v", election.MetadataURL, err)
-		} else {
-			// if metadata exists, add it to the election
-			// if the metadata is not encrypted, unmarshal it, otherwise store it as bytes
-			if !election.ElectionMode.EncryptedMetaData {
-				electionMetadata := ElectionMetadata{}
-				if err := json.Unmarshal(metadataBytes, &electionMetadata); err != nil {
-					log.Warnf("cannot unmarshal metadata from %s: %v", election.MetadataURL, err)
-				}
-				election.Metadata = &electionMetadata
-				// cache the title, so the election list can render it without
-				// resolving the metadata of every row
-				a.cacheElectionTitle(electionID, proc.Metadata, proc.MetadataHash, &electionMetadata)
-			} else {
-				election.Metadata = metadataBytes
-			}
+	// Inline IPFS metadata when the content is cached locally. A single local
+	// SELECT; zero network. https:// URIs are left to the client to fetch.
+	if cid := ipfsCID(proc.Metadata); cid != "" {
+		if raw, err := a.indexer.GetIPFSContent(cid); err == nil {
+			election.Metadata = json.RawMessage(raw)
 		}
 	}
+
 	data, err := json.Marshal(election)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)
@@ -699,8 +659,8 @@ func (a *API) electionScrutinyHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 //	@Tags					Elections
 //	@Accept					json
 //	@Produce				json
-//	@Param					transaction	body		models.SignedTx	true	"Uses `txPayload` protobuf signed transaction, and the `metadata` base64-encoded JSON object"
-//	@Success				200			{object}	ElectionCreate	"It return txId, electionId and the metadataURL for the newly created election. If metadataURL is returned empty, means that there is some issue with the storage provider.""
+//	@Param					transaction	body		models.SignedTx	true	"Uses `txPayload` protobuf signed transaction"
+//	@Success				200			{object}	ElectionCreate	"It returns the txHash and electionId of the newly created election"
 //	@Router					/elections [post]
 func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	req := &ElectionCreate{}
@@ -708,45 +668,17 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return err
 	}
 
-	// check if the transaction is of the correct type and extract metadata URI and hash
-	var metadataHash []byte
-	metadataURI, isEncryptedMetadata, err := func() (string, bool, error) {
-		stx := &models.SignedTx{}
-		if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
-			return "", false, err
-		}
-		tx := &models.Tx{}
-		if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
-			return "", false, err
-		}
-		if np := tx.GetNewProcess(); np != nil {
-			if p := np.GetProcess(); p != nil {
-				encryptedMeta := false
-				if p.GetMode() != nil {
-					encryptedMeta = p.GetMode().EncryptedMetaData
-				}
-				metadataHash = p.GetMetadataHash()
-				return p.GetMetadata(), encryptedMeta, nil
-			}
-		}
-		return "", false, ErrCantExtractMetadataURI
-	}()
-	if err != nil {
+	// check the transaction is a NewProcess transaction
+	stx := &models.SignedTx{}
+	if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
 		return err
 	}
-
-	// Check if the tx metadata URI is provided (in case of metadata bytes provided).
-	// Note that we enforce the metadata URI to be provided in the tx payload only if
-	// req.Metadata is provided, but not in the other direction.
-	if req.Metadata != nil && metadataURI == "" {
-		return ErrMetadataProvidedButNoURI
+	tx := &models.Tx{}
+	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
+		return err
 	}
-
-	var metadataCID string
-	if req.Metadata != nil {
-		if metadataCID, err = checkMetadataContent(req.Metadata, metadataURI, metadataHash, isEncryptedMetadata); err != nil {
-			return err
-		}
+	if tx.GetNewProcess().GetProcess() == nil {
+		return ErrCantExtractMetadataURI
 	}
 
 	// send the transaction
@@ -767,102 +699,11 @@ func (a *API) electionCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPCo
 		return ErrVochainReturnedInvalidElectionID
 	}
 
-	// if metadata exists, add it to the storage
-	if a.storage != nil && req.Metadata != nil {
-		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-		cid, err := a.storage.Publish(sctx, req.Metadata)
-		if err != nil {
-			log.Errorf("could not publish to storage: %v", err)
-		} else {
-			resp.MetadataURL = a.storage.URIprefix() + cid
-		}
-		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(metadataCID, "ipfs://") {
-			log.Errorf("%s (%s != %s)", ErrVochainReturnedWrongMetadataCID, cid, metadataCID)
-		}
-	}
-
 	var data []byte
 	if data, err = json.Marshal(resp); err != nil {
 		return err
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// electionMetadataUpdateHandler
-//
-//	@Summary		Update election metadata
-//	@Description	Send a signed SET_PROCESS_METADATA transaction for the election, together with the new metadata
-//	@Description	document. The metadata URI in the transaction must be the IPFS CIDv1 of the document and the
-//	@Description	metadata hash its SHA-256. The document is then published to the node storage.
-//	@Description	Metadata hosted elsewhere can be updated by sending the transaction to /chain/transactions.
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			electionId	path		string					true	"Election id"
-//	@Param			transaction	body		ElectionMetadataUpdate	true	"Uses `txPayload` protobuf signed transaction, and the `metadata` base64-encoded JSON object"
-//	@Success		200			{object}	ElectionMetadataUpdate	"It returns the txHash and the metadataURL. If metadataURL is returned empty, means that there is some issue with the storage provider."
-//	@Router			/elections/{electionId}/metadata [put]
-func (a *API) electionMetadataUpdateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
-	if err != nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
-	}
-	req := &ElectionMetadataUpdate{}
-	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-	if req.Metadata == nil {
-		return ErrCantParseMetadataAsJSON.With("metadata is required")
-	}
-
-	// check the transaction is a SET_PROCESS_METADATA for this election
-	stx := &models.SignedTx{}
-	if err := proto.Unmarshal(req.TxPayload, stx); err != nil {
-		return ErrNotSetMetadataTx.WithErr(err)
-	}
-	tx := &models.Tx{}
-	if err := proto.Unmarshal(stx.GetTx(), tx); err != nil {
-		return ErrNotSetMetadataTx.WithErr(err)
-	}
-	setProcess := tx.GetSetProcess()
-	if setProcess == nil || setProcess.GetTxtype() != models.TxType_SET_PROCESS_METADATA ||
-		!bytes.Equal(setProcess.GetProcessId(), electionID) {
-		return ErrNotSetMetadataTx
-	}
-
-	proc, err := a.indexer.ProcessInfo(electionID)
-	if err != nil {
-		if errors.Is(err, indexer.ErrProcessNotFound) {
-			return ErrElectionNotFound
-		}
-		return ErrCantFetchElection.Withf("(%x): %v", electionID, err)
-	}
-	encrypted := proc.Mode != nil && proc.Mode.EncryptedMetaData
-	if _, err := checkMetadataContent(req.Metadata, setProcess.GetMetadata(), setProcess.GetMetadataHash(), encrypted); err != nil {
-		return err
-	}
-
-	// send the transaction
-	res, err := a.sendTx(req.TxPayload)
-	if err != nil {
-		return err
-	}
-	resp := &ElectionMetadataUpdate{TxHash: res.Hash.Bytes()}
-
-	// add the new metadata to the storage
-	if a.storage != nil {
-		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		defer cancel()
-		cid, err := a.storage.Publish(sctx, req.Metadata)
-		if err != nil {
-			log.Errorf("could not publish to storage: %v", err)
-		} else {
-			resp.MetadataURL = a.storage.URIprefix() + cid
-		}
-	}
-
-	return marshalAndSend(ctx, resp)
 }
 
 // electionMetadataHistoryHandler
@@ -913,52 +754,6 @@ func (a *API) electionMetadataHistoryHandler(_ *apirest.APIdata, ctx *httprouter
 func MetadataHash(metadata []byte) []byte {
 	h := sha256.Sum256(metadata)
 	return h[:]
-}
-
-// checkMetadataContent checks that a metadata document is a valid election
-// metadata JSON, unless encrypted, that the metadata URI is its IPFS CIDv1 and,
-// if a hash is given, that the hash is its SHA-256. Returns the document CID.
-func checkMetadataContent(metadata []byte, uri string, hash []byte, encrypted bool) (string, error) {
-	if !encrypted {
-		if err := json.Unmarshal(metadata, &ElectionMetadata{}); err != nil {
-			return "", ErrCantParseMetadataAsJSON.WithErr(err)
-		}
-	}
-	cid := ipfs.CalculateCIDv1json(metadata)
-	if !ipfs.CIDequals(cid, uri) {
-		return "", ErrMetadataURINotMatchContent
-	}
-	if hash != nil && !bytes.Equal(hash, MetadataHash(metadata)) {
-		return "", ErrMetadataHashNotMatchContent
-	}
-	return cid, nil
-}
-
-// computeCidHandler
-//
-//	@Summary		Compute IPFS CIDv1 of file
-//	@Description	Helper endpoint to get the IPFS CIDv1 hash of a file
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			transaction	body		object{payload=string}	true	"File bytes base64 encoded"
-//	@Success		200			{object}	File
-//	@Router			/files/cid [post]
-func (*API) computeCidHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	if len(msg.Data) > MaxOffchainFileSize {
-		return ErrFileSizeTooBig.Withf("%d vs %d bytes", len(msg.Data), MaxOffchainFileSize)
-	}
-	req := &File{}
-	if err := json.Unmarshal(msg.Data, req); err != nil {
-		return err
-	}
-	data, err := json.Marshal(&File{
-		CID: "ipfs://" + ipfs.CalculateCIDv1json(req.Payload),
-	})
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
 // electionPriceHandler

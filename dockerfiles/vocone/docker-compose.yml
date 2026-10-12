@@ -3,7 +3,6 @@ services:
     build:
       context: ../../
     image: "ghcr.io/vocdoni/vocdoni-node:${IMAGE_TAG:-main}"
-    entrypoint: "/app/voconed"
     env_file: .env
     volumes:
       - "run:/app/run"
@@ -42,5 +41,4 @@ services:
         max-file: "10"
 
 volumes:
-  vocexplorer: {}
   run: {}

@@ -1,4 +1,5 @@
 -- +goose Up
+-- +reindex-blocks
 PRAGMA foreign_keys = OFF;
 
 -- Create a new table with hash as primary key

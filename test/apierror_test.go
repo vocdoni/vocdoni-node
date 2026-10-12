@@ -1,7 +1,6 @@
 package test
 
 import (
-	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -17,7 +16,6 @@ func TestAPIerror(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -28,10 +26,6 @@ func TestAPIerror(t *testing.T) {
 
 	token1 := uuid.New()
 	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
-
-	hugeFile := &apirest.APIdata{
-		Data: bytes.Repeat([]byte("0"), api.MaxOffchainFileSize+1),
-	}
 
 	type args struct {
 		method   string
@@ -70,10 +64,6 @@ func TestAPIerror(t *testing.T) {
 		{
 			args: args{"GET", nil, []string{"chain", "blocks", "1234"}},
 			want: api.ErrBlockNotFound,
-		},
-		{
-			args: args{"POST", hugeFile, []string{"files", "cid"}},
-			want: api.ErrFileSizeTooBig,
 		},
 		{
 			args: args{"GET", nil, []string{
@@ -145,7 +135,6 @@ func TestAPIerrorWithQuery(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,

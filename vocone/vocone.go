@@ -6,15 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -24,6 +23,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
@@ -37,6 +37,9 @@ const (
 	DefaultBlockTimeTarget = time.Second * 5
 	DefaultTxCosts         = 10
 	DefaultMempoolSize     = 8192 // maximum number of pending transactions
+
+	// GenesisFile is the file, inside the data directory, where the genesis of the chain is persisted.
+	GenesisFile = "genesis.json"
 
 	// Key prefixes for the block store KV database.
 	prefixTx        = "tx/"        // tx/<height_8B>/<txIndex_4B> → raw tx bytes
@@ -52,11 +55,22 @@ const (
 type Vocone struct {
 	service.VocdoniService
 
+	// AdminToken is the bearer token required by the admin API endpoints.
+	// If empty when EnableAPI is called, the admin endpoints are disabled.
+	AdminToken string
+
 	blockStore  db.Database
 	mempoolDB   db.Database
 	height      atomic.Int64
 	txsPerBlock int
 	closed      atomic.Bool
+
+	// imported is set when the chain state was produced by another node, see ImportChain.
+	imported *importRecord
+
+	// wg tracks goroutines started by Start that access databases so that
+	// Close can wait for them to finish before releasing those databases.
+	wg sync.WaitGroup
 
 	// mempoolMtx protects mempoolKeys and mempoolSeq.
 	mempoolMtx  sync.Mutex
@@ -70,9 +84,7 @@ type Vocone struct {
 }
 
 // NewVocone creates and returns a ready Vocone instance.
-func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
-	connectKey string, connectPeers []string,
-) (*Vocone, error) {
+func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc := &Vocone{}
 	vc.Config = &config.VochainCfg{}
 	vc.Config.DataDir = dataDir
@@ -91,20 +103,13 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 		return nil, fmt.Errorf("could not open blockstore: %w", err)
 	}
 
-	// Recover height from persisted state.
-	// LastHeight returns the last committed height. If that block was already
-	// fully committed (metadata exists in blockstore), we must start at the
-	// next height to avoid re-executing an already-committed block.
-	lastHeight, err := vc.App.State.LastHeight()
-	if err != nil {
-		return nil, fmt.Errorf("could not get last height: %w", err)
+	// Recover height from persisted state and block store.
+	if err := vc.loadImportRecord(); err != nil {
+		return nil, err
 	}
-	nextHeight := int64(lastHeight)
-	if _, err := vc.loadBlockMeta(nextHeight); err == nil {
-		// Block at lastHeight was already committed, advance to the next one.
-		nextHeight++
+	if err := vc.recoverHeight(); err != nil {
+		return nil, err
 	}
-	vc.height.Store(nextHeight)
 
 	// Open the mempool database and reload pending transactions.
 	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "mempool"))
@@ -118,6 +123,11 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 	vc.setDefaultMethods()
 	vc.App.State.SetHeight(uint32(vc.height.Load()))
 	vc.App.SetBlockTimeTarget(DefaultBlockTimeTarget)
+
+	// Load the persisted genesis, if the chain was already initialized.
+	if err := vc.loadGenesis(); err != nil {
+		return nil, err
+	}
 
 	// Create indexer.
 	vc.Indexer, err = indexer.New(vc.App, indexer.Options{
@@ -136,21 +146,6 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys, disableIPFS bool,
 	vc.Stats = vochaininfo.NewVochainInfo(vc.App)
 	go vc.Stats.Start(10)
 
-	// Create the IPFS storage layer.
-	if !disableIPFS {
-		vc.Storage, err = vc.IPFS(&config.IPFSCfg{
-			ConfigPath:   filepath.Join(dataDir, "ipfs"),
-			ConnectKey:   connectKey,
-			ConnectPeers: connectPeers,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not create IPFS storage: %w", err)
-		}
-		if err := vc.OffChainDataHandler(); err != nil {
-			return nil, fmt.Errorf("could not create offchain data handler: %w", err)
-		}
-	}
-
 	return vc, nil
 }
 
@@ -168,12 +163,12 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		vc.App,
 		vc.Stats,
 		vc.Indexer,
-		vc.Storage,
-		vc.CensusDB,
 	)
-	adminToken := uuid.New()
-	log.Warnw("new admin token generated", "token", adminToken.String())
-	uAPI.Endpoint.SetAdminToken(adminToken.String())
+	if vc.AdminToken != "" {
+		uAPI.Endpoint.SetAdminToken(vc.AdminToken)
+	} else {
+		log.Infow("admin token not set, admin API endpoints are disabled")
+	}
 
 	return uAPI, uAPI.EnableHandlers(
 		api.ElectionHandler,
@@ -181,8 +176,6 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		api.ChainHandler,
 		api.WalletHandler,
 		api.AccountHandler,
-		api.CensusHandler,
-		api.SIKHandler,
 	)
 }
 
@@ -192,24 +185,31 @@ func (vc *Vocone) Start(ctx context.Context) error {
 	vc.lastBlockTime = time.Now()
 	go vochainPrintInfo(ctx, 10*time.Second, vc.Stats)
 
-	if vc.App.Height() == 0 {
-		log.Infow("initializing new blockchain")
-		genesisAppData, err := json.Marshal(&genesis.AppState{
-			MaxElectionSize: 1000000,
-			NetworkCapacity: uint64(vc.txsPerBlock),
-			TxCost:          defaultTxCosts(),
-		})
-		if err != nil {
-			return fmt.Errorf("could not marshal genesis app state: %w", err)
+	if !vc.Initialized() {
+		if err := vc.InitChain(vc.App.ChainID(), DefaultGenesisAppState(vc.txsPerBlock)); err != nil {
+			return err
 		}
-		if _, err = vc.App.InitChain(ctx, &cometabcitypes.InitChainRequest{
-			ChainId:       vc.App.ChainID(),
-			AppStateBytes: genesisAppData,
-			Time:          time.Now(),
-		}); err != nil {
-			return fmt.Errorf("could not init chain: %w", err)
-		}
-		time.Sleep(1 * time.Second)
+	}
+	// Reveal the encryption keys of ended elections that could not be revealed
+	// while the node was stopped.
+	if vc.KeyKeeper != nil {
+		vc.wg.Add(1)
+		go func() {
+			defer vc.wg.Done()
+			vc.KeyKeeper.RevealUnpublished()
+		}()
+	}
+	// Rebuild the live results of the open elections and repair the indexed blocks.
+	if vc.Indexer != nil {
+		vc.wg.Add(1)
+		go func() {
+			defer vc.wg.Done()
+			vc.Indexer.AfterSyncBootstrap(false)
+		}()
+	}
+	// Load the election price calculator from the current state (tx costs and capacity).
+	if err := vc.SetElectionPrice(); err != nil {
+		return fmt.Errorf("could not set election price calculator: %w", err)
 	}
 
 	for {
@@ -259,7 +259,7 @@ func (vc *Vocone) produceBlock() error {
 	startTime := time.Now()
 	height := vc.height.Load()
 
-	txs, consumedKeys := vc.prepareBlock()
+	txs, includedKeys, discardedKeys := vc.prepareBlock()
 
 	resp, err := vc.App.ExecuteBlock(txs, uint32(height), startTime)
 	if err != nil {
@@ -271,12 +271,7 @@ func (vc *Vocone) produceBlock() error {
 	blockHash := blk.Hash()
 
 	// Retrieve the previous block hash for chain linkage.
-	var lastBlockHash []byte
-	if height > 0 {
-		if prevMeta, err := vc.loadBlockMeta(height - 1); err == nil {
-			lastBlockHash = prevMeta.Hash
-		}
-	}
+	lastBlockHash := vc.previousBlockHash(height)
 
 	// Persist block metadata and hash→height index.
 	if err := vc.storeBlockMeta(height, startTime, int32(len(txs)), resp.Root,
@@ -303,6 +298,25 @@ func (vc *Vocone) produceBlock() error {
 		return fmt.Errorf("commit state at height %d: %w", height, err)
 	}
 
+	// Build the set of invalid tx IDs from failed deliverTx responses.
+	// Txs that fail delivery are NOT consumed from the mempool so they can be
+	// retried in a subsequent block once the relevant account state advances
+	// (e.g. a future-nonce tx becomes valid after a lower-nonce tx is mined).
+	// This mirrors cometbft's post-commit recheck behaviour.
+	invalidTxIDs := make(map[[32]byte]bool, len(resp.InvalidTransactions))
+	for _, txID := range resp.InvalidTransactions {
+		invalidTxIDs[txID] = true
+	}
+
+	// consumedKeys = txs that CheckTx-rejected + txs that delivered successfully.
+	// Txs that failed deliverTx keep their mempool slot and are tried again.
+	consumedKeys := discardedKeys
+	for i, tx := range txs {
+		if !invalidTxIDs[blocktypes.Tx(tx).Key()] {
+			consumedKeys = append(consumedKeys, includedKeys[i])
+		}
+	}
+
 	// Only clean up the mempool after a fully successful commit.
 	vc.commitMempoolCleanup(consumedKeys)
 
@@ -320,10 +334,15 @@ func (vc *Vocone) produceBlock() error {
 }
 
 // Close releases all resources held by Vocone.
-// It acquires both vcMtx and mempoolMtx to ensure no concurrent block
-// production or mempool operation is in progress before closing databases.
+// It signals goroutines to stop, waits for the bootstrap goroutines started
+// by Start to finish, then acquires both vcMtx and mempoolMtx to ensure no
+// concurrent block production or mempool operation is in progress before
+// closing databases.
 func (vc *Vocone) Close() error {
 	vc.closed.Store(true)
+	// Wait for the bootstrap goroutines (RevealUnpublished, AfterSyncBootstrap)
+	// to finish before releasing the databases they access.
+	vc.wg.Wait()
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	vc.mempoolMtx.Lock()
@@ -343,11 +362,6 @@ func (vc *Vocone) Close() error {
 			errs = append(errs, fmt.Errorf("close state: %w", err))
 		}
 	}
-	if vc.Storage != nil {
-		if err := vc.Storage.Stop(); err != nil {
-			errs = append(errs, fmt.Errorf("close storage: %w", err))
-		}
-	}
 	if vc.blockStore != nil {
 		if err := vc.blockStore.Close(); err != nil {
 			errs = append(errs, fmt.Errorf("close blockstore: %w", err))
@@ -363,8 +377,8 @@ func (vc *Vocone) Close() error {
 
 // setDefaultMethods configures the vochain callback functions for single-node operation.
 func (vc *Vocone) setDefaultMethods() {
-	vc.App.SetDefaultMethods()
 	vc.App.SetFnIsSynchronizing(func() bool { return false })
+	vc.App.SetFnBlockStoreRange(vc.blockStoreRange)
 	vc.App.SetFnSendTx(vc.addTx)
 	vc.App.SetFnGetTx(vc.getTx)
 	vc.App.SetFnGetBlockByHeight(vc.getBlock)
@@ -372,6 +386,76 @@ func (vc *Vocone) setDefaultMethods() {
 	vc.App.SetFnGetTxHash(vc.getTxWithHash)
 	vc.App.SetFnMempoolSize(vc.mempoolSize)
 	vc.App.SetFnMempoolPrune(vc.mempoolPrune)
+}
+
+// Initialized reports whether the chain has a genesis, either persisted in the data
+// directory or implied by already produced blocks.
+func (vc *Vocone) Initialized() bool {
+	return vc.App.Genesis().ChainID != "" || vc.height.Load() > 0
+}
+
+// InitChain initializes a new chain with the given chainID and genesis app state,
+// and persists the genesis in the data directory so restarts keep the same chain.
+// If blocks were already produced (with no persisted genesis), the state is left
+// untouched and only the genesis identity is persisted.
+func (vc *Vocone) InitChain(chainID string, appState *genesis.AppState) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	if vc.App.Genesis().ChainID != "" {
+		return fmt.Errorf("chain already initialized with chainID %q", vc.App.Genesis().ChainID)
+	}
+	vc.App.SetChainID(chainID)
+	genesisTime := time.Now().UTC()
+	doc := &genesis.Doc{
+		GenesisTime: genesisTime,
+		ChainID:     chainID,
+	}
+	if vc.height.Load() > 0 {
+		log.Warnw("persisting genesis of an existing chain", "chainID", chainID, "height", vc.height.Load())
+		if meta, err := vc.loadBlockMeta(0); err == nil {
+			doc.GenesisTime = time.Unix(0, meta.Timestamp).UTC()
+		}
+	} else {
+		log.Infow("initializing new blockchain", "chainID", chainID)
+		if _, err := vc.App.InitChain(appState, genesisTime); err != nil {
+			return fmt.Errorf("could not init chain: %w", err)
+		}
+		appStateBytes, err := json.Marshal(appState)
+		if err != nil {
+			return fmt.Errorf("could not marshal genesis app state: %w", err)
+		}
+		doc.AppState = appStateBytes
+	}
+	if err := doc.SaveAs(filepath.Join(vc.Config.DataDir, GenesisFile)); err != nil {
+		return fmt.Errorf("could not save genesis: %w", err)
+	}
+	vc.App.SetGenesis(doc)
+	return nil
+}
+
+// loadGenesis loads the persisted genesis, if any, and sets the chainID from it.
+func (vc *Vocone) loadGenesis() error {
+	path := filepath.Join(vc.Config.DataDir, GenesisFile)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	doc, err := genesis.LoadFromFile(path)
+	if err != nil {
+		return fmt.Errorf("could not load genesis: %w", err)
+	}
+	vc.App.SetChainID(doc.ChainID)
+	vc.App.SetGenesis(doc)
+	log.Infow("loaded genesis", "chainID", doc.ChainID, "genesisTime", doc.GenesisTime)
+	return nil
+}
+
+// DefaultGenesisAppState returns the genesis app state used when no other is provided.
+func DefaultGenesisAppState(txsPerBlock int) *genesis.AppState {
+	return &genesis.AppState{
+		MaxElectionSize: 1000000,
+		NetworkCapacity: uint64(txsPerBlock),
+		TxCost:          defaultTxCosts(),
+	}
 }
 
 // SetBlockSize configures the maximum number of transactions per block.
@@ -387,6 +471,27 @@ func (vc *Vocone) CreateAccount(key common.Address, acc *state.Account) error {
 		return err
 	}
 	_, err := vc.commit()
+	return err
+}
+
+// MintBalance adds amount to the balance of an account, creating it if it does not
+// exist, and commits the state. It is used to fund accounts explicitly, for instance
+// when a chain is imported (see ImportChain), which applies no genesis.
+func (vc *Vocone) MintBalance(addr common.Address, amount uint64) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	acc, err := vc.App.State.GetAccount(addr, false)
+	if err != nil {
+		return fmt.Errorf("cannot get account %s: %w", addr.Hex(), err)
+	}
+	if acc == nil {
+		if err := vc.App.State.CreateAccount(addr, "", nil, amount); err != nil {
+			return fmt.Errorf("cannot create account %s: %w", addr.Hex(), err)
+		}
+	} else if err := vc.App.State.InitChainMintBalance(addr, amount); err != nil {
+		return fmt.Errorf("cannot mint balance for %s: %w", addr.Hex(), err)
+	}
+	_, err = vc.commit()
 	return err
 }
 

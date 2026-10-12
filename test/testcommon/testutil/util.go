@@ -7,9 +7,6 @@ import (
 	"sync"
 	"testing"
 
-	iden3cryptoutils "github.com/iden3/go-iden3-crypto/utils"
-	"go.vocdoni.io/dvote/tree/arbo"
-
 	"go.vocdoni.io/dvote/util"
 )
 
@@ -68,22 +65,4 @@ func (r *Random) RandomIntn(n int) int {
 	r.randMu.Lock()
 	defer r.randMu.Unlock()
 	return r.rand.Intn(n)
-}
-
-// RandomInZKField returns a random litte-endian encoded element in the
-// ZK SNARK field.
-func (r *Random) RandomInZKField() []byte {
-	b := make([]byte, 32)
-	r.randMu.Lock()
-	defer r.randMu.Unlock()
-	for {
-		_, err := r.rand.Read(b)
-		if err != nil {
-			panic(err)
-		}
-		b[31] &= 0b00111111
-		if iden3cryptoutils.CheckBigIntInField(arbo.BytesLEToBigInt(b)) {
-			return b
-		}
-	}
 }

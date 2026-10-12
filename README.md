@@ -46,7 +46,7 @@
 # vocdoni-node
 
 This repository contains a set of libraries and tools for the **Vocdoni** decentralized protocol, as described [in the documentation](https://developer.vocdoni.io/protocol).
-It is written in golang and comprises the core of Vocdoni's distributed node architecture. Vocdoni-node is uniquely designed to run all components within a single process, giving full control and eliminating the need for local RPC or IPC connections. This is in contrast to other projects, as Vocdoni-node incorporates go-ethereum, go-ipfs, and tendermint directly as GoLang libraries.
+It is written in golang and runs the whole protocol in a single process: `voconed` produces the blocks, keeps the chain state and serves the API.
 
 The latest release is available at https://github.com/vocdoni/vocdoni-node/tree/v1.10.1
 
@@ -60,99 +60,41 @@ The latest release is available at https://github.com/vocdoni/vocdoni-node/tree/
 
 ## Getting Started
 
-There are two operational modes available for the node:
+The node binary is `voconed` (see [vocone](./vocone)): a single node that produces the blocks,
+keeps the chain state and serves the HTTP API.
 
-- Gateway: This mode runs a full block validation node and serves as an access point for the API and other services.
+### Compile and run
 
-- Miner: In this mode, the node can validate blocks or run as a full node. It does not offer external services but can propose and validate new blocks.
-
-### Gateway mode
-
-The gateway mode is the most frequently used and likely the one you need.
-
-To run a Vocdoni-node as a gateway, it's recommended to have at least 4 GiB of RAM and 40 GiB of disk space.
-
-#### Compile and run
-
-Compile from source in a golang environment (Go>1.23 required):
+Compile from source in a golang environment (see `go.mod` for the required Go version):
 
 ```bash
-git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
+git clone https://github.com/vocdoni/vocdoni-node.git
 cd vocdoni-node
-go build ./cmd/node
-./node --help
-./node --mode=gateway --logLevel=info
+go build ./cmd/voconed
+./voconed --help
+./voconed --dir=$HOME/.voconed --chainID=mychain --enableFaucet=100
 ```
 
-#### Docker
+The chain is created on the first start, using the genesis options (`--chainID`,
+`--fundedAccounts`, `--faucetBalance`), and persisted in `--dir`. Later starts resume the same
+chain and ignore those options. The keykeeper key (`--keymanager`) and the faucet key
+(`--faucetKey`) are generated on the first start if not provided, and saved in `voconed.yml`
+inside `--dir`. Admin API endpoints are only enabled when `--adminToken` is set.
 
-You can run vocdoni node as a standalone container with docker compose (recommended).
-It is recommended to also start `watchtower` to automatically update the container when a new version is released.
+All flags can also be set with `VOCONED_` environment variables (e.g. `VOCONED_CHAINID`).
+
+### Docker
+
+The repository `Dockerfile` builds an image that runs `voconed`, storing its data in `/app/run`.
+A docker compose deployment is available in [dockerfiles/vocone](./dockerfiles/vocone):
 
 ```bash
-git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
-cd vocdoni-node/dockerfiles/vocdoninode
-cp env.example env # see env file for config options
-COMPOSE_PROFILES=watchtower docker compose up -d
+cd vocdoni-node/dockerfiles/vocone
+# edit .env to set the options
+docker compose up -d
 ```
 
-All data will be stored in the shared volume `run` and the API will be available at `http://127.0.0.1:9090/v2`. Once the node has finished the blockchain sync process, you can connect query the API at this address.
-
-If the computer has the port 443 available and mapped to a public IP, you might want to enable TLS support (HTTPS) using letsencrypt by setting the environment variable `VOCDONI_TLS_DOMAIN=your.domain.io` in the `env` file.
-
-To stop the container: 
-
-```bash
-docker compose down
-```
-
-### Miner mode
-
-Miners, also known as validators, play a crucial role in proposing and validating new blocks on the blockchain, ensuring the network operates correctly.
-
-The process of becoming a validator is selective to mitigate the risk of malicious activity. Although the role is not currently compensated, those interested in supporting the open-source protocol are encouraged to apply.
-
-To become a validator, there is a manual verification process in place. If you're interested, please follow these steps and reach out to our team via Discord or email for further instructions.
-
-Generate a private key: `hexdump -n 32 -e '4/4 "%08x" 1 ""' /dev/urandom`
-
-Clone and prepare environment:
-```bash
-git clone https://github.com/vocdoni/vocdoni-node.git -b release-lts-1
-cd vocdoni-node/dockerfiles/vocdoninode
-echo "VOCDONI_NODE_TAG=release-lts-1" > .env
-```
-
-Create the config `env` file.
-
-```bash
-VOCDONI_DATADIR=/app/run
-VOCDONI_MODE=miner
-VOCDONI_CHAIN=lts
-VOCDONI_LOGLEVEL=info
-VOCDONI_VOCHAIN_LOGLEVEL=error
-VOCDONI_DEV=True
-VOCDONI_ENABLEAPI=False
-VOCDONI_ENABLERPC=False
-VOCDONI_LISTENHOST=0.0.0.0
-VOCDONI_LISTENPORT=9090
-VOCDONI_VOCHAIN_MINERKEY=<YOUR_HEX_PRIVATE_KEY>
-VOCDONI_VOCHAIN_MEMPOOLSIZE=20000
-VOCDONI_METRICS_ENABLED=True # if you want prometheus metrics enabled
-VOCDONI_METRICS_REFRESHINTERVAL=5
-```
-
-Finally start the container: `COMPOSE_PROFILES=watchtower docker compose up -d`
-
-You can monitor the log output: `docker compose logs -f vocdoninode`
-
-#### Fetch the validator key
-
-At this point **if you want your node to become validator**, you need to extract the public key from the logs: 
-
-`docker compose logs vocdoninode | grep publicKey`.
-
-Provide the public key and a name to the Vocdoni team so they can upgrade your node to validator.
+The API will be available at `http://127.0.0.1:9090/v2`.
 
 ## Reference
 
@@ -170,7 +112,7 @@ Vocdoni Node is an extensive library and protocol with many different elements.
 
 You can see example usage of many of the components in the [test](https://github.com/vocdoni/vocdoni-node/tree/main/test) folder. 
 
-We have also created a standalone node configuration called [vocone](https://github.com/vocdoni/vocdoni-node/tree/main/vocone) to be used for testing. You can see how to build vocone and run a full end-to-end example in the corresponding dockerfile [folder](https://github.com/vocdoni/vocdoni-node/blob/main/dockerfiles/vocone/README.md). You can also just build and run vocone and use it to locally test the API or other vocdoni node functionality.
+You can see how to build vocone and run a full end-to-end example in the corresponding dockerfile [folder](https://github.com/vocdoni/vocdoni-node/blob/main/dockerfiles/vocone/README.md).
 
 ## Contributing 
 

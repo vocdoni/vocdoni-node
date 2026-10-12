@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/tree/arbo"
 	"go.vocdoni.io/proto/build/go/models"
@@ -16,9 +15,7 @@ import (
 //   - Extra (key: string, value: []byte)
 //   - Validators (key: address, value: models.Validator)
 //   - Accounts (key: address, value: models.Account)
-//   - SIK: (key: address, value: []byte)
 //   - Processes (key: ProcessId, value: models.StateDBProcess)
-//     - CensusPoseidon (key: sequential index 64 bits little endian, value: zkCensusKey)
 //     - Votes (key: VoteId, value: models.StateDBVote)
 //   - FaucetNonce (key: hash(address + identifier), value: nil)
 
@@ -29,7 +26,6 @@ const (
 	TreeValidators = "Validators"
 	TreeAccounts   = "Accounts"
 	TreeFaucet     = "FaucetNonce"
-	TreeSIK        = "CensusSIK"
 	ChildTreeVotes = "Votes"
 )
 
@@ -111,15 +107,6 @@ var (
 			HashFunc:          arbo.HashFunctionSha256,
 			KindID:            "faucet",
 			MaxLevels:         256,
-			ParentLeafGetRoot: rootLeafGetRoot,
-			ParentLeafSetRoot: rootLeafSetRoot,
-		}),
-
-		// TreeSIK is the Secret Identity Keys subTree configuration
-		TreeSIK: statedb.NewTreeSingletonConfig(statedb.TreeParams{
-			HashFunc:          arbo.HashFunctionPoseidon,
-			KindID:            "sik",
-			MaxLevels:         censustree.DefaultMaxLevels,
 			ParentLeafGetRoot: rootLeafGetRoot,
 			ParentLeafSetRoot: rootLeafSetRoot,
 		}),

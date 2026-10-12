@@ -39,7 +39,7 @@ func (t *E2ERaceDuringCommit) Setup(api *apiclient.HTTPclient, c *config) error 
 		Interruptible: true,
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
-	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeCSPv2}
 
 	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
@@ -68,7 +68,7 @@ func (t *E2ERaceDuringCommit) Run() error {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
 				Election:     t.election,
-				ProofMkTree:  acctp.proof,
+				ProofCSP:     acctp.proof.Proof,
 				Choices:      []int{vcount % 2},
 				VoterAccount: acctp.account,
 			})

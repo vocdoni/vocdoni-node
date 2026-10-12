@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"reflect"
 	"strings"
@@ -24,15 +23,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	defaultWeight = 10
-	retriesSend   = retries / 2
-)
+const retriesSend = retries / 2
 
 type acctProof struct {
-	account  *ethereum.SignKeys
-	proof    *apiclient.CensusProof
-	proofSIK *apiclient.CensusProof
+	account *ethereum.SignKeys
+	proof   *apiclient.CensusProof
 }
 
 func newTestElectionDescription(numChoices int) *vapi.ElectionDescription {
@@ -71,7 +66,7 @@ func newTestProcess() *models.Process {
 			EncryptedVotes: false,
 			UniqueValues:   true,
 		},
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount: 1,
 			MaxValue: 1,
@@ -111,7 +106,7 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 	}
 
 	log.Infof("creating Vocdoni account %s", address)
-	hash, err := accountApi.AccountBootstrap(faucetPkg, accountMetadata, nil)
+	hash, err := accountApi.AccountBootstrap(faucetPkg, accountMetadata)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -136,44 +131,6 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 	return acc, accountApi, nil
 }
 
-func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, voterAccounts []*ethereum.SignKeys) error {
-	participants := &vapi.CensusParticipants{}
-
-	for i, voterAccount := range voterAccounts {
-		participants.Participants = append(participants.Participants,
-			vapi.CensusParticipant{
-				Key:    voterAccount.Address().Bytes(),
-				Weight: (*types.BigInt)(new(big.Int).SetUint64(defaultWeight)),
-			})
-
-		if i == len(voterAccounts)-1 || ((i+1)%vapi.MaxCensusAddBatchSize == 0) {
-			if err := t.api.CensusAddParticipants(censusID, participants); err != nil {
-				return err
-			}
-
-			log.Infof("added %d participants to census %s",
-				len(participants.Participants), censusID.String())
-
-			participants = &vapi.CensusParticipants{}
-		}
-	}
-	return nil
-}
-
-// isCensusSizeValid validate the size of the census, in case like dynamic census test the size could be different to nvotes
-func (t *e2eElection) censusSizeEquals(censusID types.HexBytes, sizeExpected uint64) bool {
-	size, err := t.api.CensusSize(censusID)
-	if err != nil {
-		log.Errorf("unable to get census size from api")
-		return false
-	}
-	if size != sizeExpected {
-		log.Errorf("census size is %d, expected %d", size, sizeExpected)
-		return false
-	}
-	log.Infof("census %s size is %d", censusID.String(), size)
-	return true
-}
 
 func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.Election, error) {
 	// Wait for the election to start
@@ -193,10 +150,6 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 		wg     sync.WaitGroup
 		vcount int32
 	)
-	// Wait for the next block to assure the SIK root is updated
-	if err := t.api.WaitUntilNextBlock(); err != nil {
-		return err
-	}
 	errorChan := make(chan error)
 	t.voters = new(sync.Map)
 	addNaccounts := func(accounts []*ethereum.SignKeys) {
@@ -211,21 +164,12 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 				if csp != nil {
 					return cspGenProof(t.election.ElectionID, voterKey, csp)
 				}
-				return t.api.CensusGenProof(t.election.Census.CensusRoot, voterKey)
+				return nil, fmt.Errorf("no CSP signer or key provided")
 			}()
 			if err != nil {
 				errorChan <- err
 			}
 			accP := acctProof{account: acc, proof: proof}
-
-			if t.election.VoteMode.Anonymous {
-				voterPrivKey := acc.PrivateKey()
-				voterApi := t.api.Clone(voterPrivKey.String())
-				accP.proofSIK, err = voterApi.GenSIKProof()
-				if err != nil {
-					errorChan <- err
-				}
-			}
 			t.voters.Store(acc.Public, accP)
 			atomic.AddInt32(&vcount, 1)
 		}
@@ -266,74 +210,30 @@ func (t *e2eElection) setupAccount() error {
 	return nil
 }
 
-func (t *e2eElection) publishCheckCensus(censusID types.HexBytes, nAcct uint64) (types.HexBytes, string, error) {
-	// Check census size
-	if !t.censusSizeEquals(censusID, nAcct) {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
-	}
-
-	rootHash, censusURL, err := t.api.CensusPublish(censusID)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
-	}
-
-	log.Infof("census published with root %x", rootHash)
-
-	// Check census size (of the published census)
-	if !t.censusSizeEquals(censusID, nAcct) {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
-	}
-	return rootHash, censusURL, nil
-}
-
-// setupCensus create a new census that will have nAcct voterAccounts and participants
-func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts bool) (types.HexBytes, []*ethereum.SignKeys, error) {
-	// Create a new census
-	censusID, err := t.api.NewCensus(censusType)
-	if err != nil {
-		return nil, nil, err
-	}
-	log.Infof("new census created with id %s", censusID.String())
-
-	voterAccounts := ethereum.NewSignKeysBatch(nAcct)
-
-	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(censusID, voterAccounts); err != nil {
-		return nil, nil, err
-	}
-
-	// Register the accounts in the vochain if is required
-	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
-		if err := t.registerAnonAccts(voterAccounts); err != nil {
-			return nil, nil, err
-		}
-	}
-
-	return censusID, voterAccounts, nil
-}
-
+// setupElection creates a CSP-backed election from an ElectionDescription and
+// generates CSP proofs for nvAccts voter accounts.  The census type on ed is
+// overwritten to CensusTypeCSPv2 and the CSP public key is set as the root.
+// The caller sets ed.Census.Size to restrict MaxCensusSize; if it is zero it
+// defaults to nvAccts (or 1 when nvotes is 0).
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, waitUntilStarted bool) error {
 	if err := t.setupAccount(); err != nil {
 		return err
 	}
 
-	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts, !ed.TempSIKs)
-	if err != nil {
-		return err
+	csp := &ethereum.SignKeys{}
+	if err := csp.Generate(); err != nil {
+		return fmt.Errorf("cannot generate CSP key: %w", err)
 	}
+	voterAccts := ethereum.NewSignKeysBatch(nvAccts)
 
-	ed.Census.RootHash, ed.Census.URL, err = t.publishCheckCensus(censusID, uint64(nvAccts))
-	if err != nil {
-		return err
-	}
-
+	ed.Census.Type = vapi.CensusTypeCSPv2
+	ed.Census.PublicKey = csp.PublicKey()
 	if ed.Census.Size == 0 {
-		ed.Census.Size = func() uint64 {
-			if t.config.nvotes == 0 {
-				return 1 // allows to test with no voters
-			}
-			return uint64(t.config.nvotes)
-		}()
+		if t.config.nvotes == 0 {
+			ed.Census.Size = 1 // allows to test with no voters
+		} else {
+			ed.Census.Size = uint64(nvAccts)
+		}
 	}
 
 	if err := t.checkElectionPrice(ed); err != nil {
@@ -364,62 +264,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		}
 	}
 
-	if ed.TempSIKs {
-		errorChan := make(chan error)
-		wg := &sync.WaitGroup{}
-		halfAccts := len(voterAccts) / 2
-
-		// register SIK for 1/2 accounts and left the rest to vote with account registered
-		for i, acc := range voterAccts[:halfAccts] {
-			wg.Add(1)
-			go func(i int, acc *ethereum.SignKeys) {
-				defer wg.Done()
-				pKey := acc.PrivateKey()
-				accountApi := t.api.Clone(pKey.String())
-				hash, err := accountApi.RegisterSIKForVote(electionID, nil, nil)
-				if err != nil {
-					log.Errorf("could not register SIK for vote, address: %s, %v", acc.AddressString(), err)
-					errorChan <- err
-				}
-				log.Infow("sik registered for anonymous census uncreated account", "index", i, "address", acc.AddressString())
-				ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
-				defer cancel()
-
-				if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
-					log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
-					errorChan <- err
-				}
-
-				// check if the current account has a valid SIK
-				validSik, err := accountApi.ValidSIK()
-				if err != nil {
-					errorChan <- fmt.Errorf("unexpected error in account %s, when validate SIK, %s", acc.Address(), err)
-				}
-				if !validSik {
-					errorChan <- fmt.Errorf("unexpected invalid SIK for account %x", acc.Address())
-				}
-				log.Infof("valid SIK for the account %x", acc.Address())
-			}(i, acc)
-		}
-
-		go func() { // avoid blocking the main goroutine
-			wg.Wait()
-			close(errorChan) // close the error channel after all goroutines have finished
-		}()
-
-		for err := range errorChan { // receive errors from the errorChan until it's closed.
-			if err != nil {
-				return err
-			}
-		}
-
-		// register the remaining accounts
-		if err := t.registerAnonAccts(voterAccts[halfAccts:]); err != nil {
-			return err
-		}
-
-	}
-	if err := t.generateProofs(nil, voterAccts); err != nil {
+	if err := t.generateProofs(csp, voterAccts); err != nil {
 		return err
 	}
 
@@ -454,23 +299,10 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 		if err := csp.Generate(); err != nil {
 			return err
 		}
-		censusRoot := csp.PublicKey()
-		prc.CensusRoot = censusRoot
+		prc.CensusRoot = csp.PublicKey()
 
 	default:
-		censusType := vapi.CensusTypeWeighted
-		censusID, vAccts, err := t.setupCensus(censusType, t.config.nvotes, false)
-		if err != nil {
-			return err
-		}
-		rootHash, url, err := t.publishCheckCensus(censusID, uint64(t.config.nvotes))
-		if err != nil {
-			return err
-		}
-		prc.CensusRoot = rootHash
-		prc.CensusURI = &url
-		voterAccounts = vAccts
-		csp = nil
+		return fmt.Errorf("census origin %s not supported", prc.CensusOrigin)
 	}
 
 	electionID, err := t.api.NewElectionRaw(prc)

@@ -1,4 +1,5 @@
 -- +goose Up
+-- +reindex-blocks
 ALTER TABLE transactions ADD COLUMN subtype TEXT NOT NULL DEFAULT '';
 ALTER TABLE transactions ADD COLUMN raw_tx BLOB NOT NULL DEFAULT x'';
 ALTER TABLE transactions ADD COLUMN signature BLOB NOT NULL DEFAULT x'';

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/data/ipfs"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -169,13 +169,13 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 		return nil, err
 	}
 
-	// calculate metadata IPFS CID, we need it to reference the election description
+	// reference the election description by its IPFS CIDv1; the node does not store it
 	metadataBytes, err := json.Marshal(&metadata)
 	if err != nil {
 		return nil, fmt.Errorf("cannot format metadata: %w", err)
 	}
 	log.Debugf("election metadata: %s", string(metadataBytes))
-	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
+	metadataURI := "ipfs://" + data.CalculateCIDv1json(metadataBytes)
 	log.Debugf("metadataURI: %s", metadataURI)
 
 	// get the own account details
@@ -199,7 +199,6 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 		Metadata:      &metadataURI,
 		MetadataHash:  api.MetadataHash(metadataBytes),
 		MaxCensusSize: description.Census.Size,
-		TempSIKs:      &description.TempSIKs,
 	}
 	log.Debugf("election transaction: %+v", log.FormatProto(process))
 
@@ -223,7 +222,6 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 
 	electionCreate := &api.ElectionCreate{
 		TxPayload: stx,
-		Metadata:  metadataBytes,
 	}
 	resp, code, err := c.Request(HTTPPOST, electionCreate, "elections")
 	if err != nil {
@@ -238,9 +236,6 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 	}
 	if electionCreate.Warning != "" {
 		log.Warnf("election %x: %s", electionCreate.ElectionID, electionCreate.Warning)
-	}
-	if electionCreate.MetadataURL == "" {
-		log.Warnf("metadata could not be published")
 	}
 	if wait {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*40)
@@ -354,43 +349,6 @@ func (c *HTTPclient) SetElectionDuration(electionID types.HexBytes, newDuration 
 	}
 	hash, _, err := c.SignAndSendTx(txb)
 	return hash, err
-}
-
-// SetElectionMetadata replaces the metadata of an election. The new document is
-// referenced by its IPFS CIDv1 and committed on chain by its SHA-256 hash, and it
-// is published to the node storage. Returns the transaction hash.
-func (c *HTTPclient) SetElectionMetadata(electionID types.HexBytes, metadata *api.ElectionMetadata) (types.HexBytes, error) {
-	metadataBytes, err := json.Marshal(metadata)
-	if err != nil {
-		return nil, fmt.Errorf("cannot format metadata: %w", err)
-	}
-	metadataURI := "ipfs://" + ipfs.CalculateCIDv1json(metadataBytes)
-	txb, err := c.setElectionMetadataTx(electionID, metadataURI, api.MetadataHash(metadataBytes))
-	if err != nil {
-		return nil, err
-	}
-	stx, err := c.signTx(txb)
-	if err != nil {
-		return nil, err
-	}
-	resp, code, err := c.Request(HTTPPUT, &api.ElectionMetadataUpdate{
-		TxPayload: stx,
-		Metadata:  metadataBytes,
-	}, "elections", electionID.String(), "metadata")
-	if err != nil {
-		return nil, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	update := &api.ElectionMetadataUpdate{}
-	if err := json.Unmarshal(resp, update); err != nil {
-		return nil, err
-	}
-	if update.MetadataURL == "" {
-		log.Warnf("metadata could not be published")
-	}
-	return update.TxHash, nil
 }
 
 // ElectionMetadataHistory returns every metadata URL and hash the election has had, oldest first.

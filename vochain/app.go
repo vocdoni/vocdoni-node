@@ -8,18 +8,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
-	cometnode "github.com/cometbft/cometbft/node"
-	cometcli "github.com/cometbft/cometbft/rpc/client/local"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	comettypes "github.com/cometbft/cometbft/types"
-	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/snapshot"
+
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/ist"
 	vstate "go.vocdoni.io/dvote/vochain/state"
@@ -31,61 +25,47 @@ import (
 )
 
 const (
-	// recheckTxHeightInterval is the number of blocks after which the mempool is
-	// checked for transactions to be rechecked.
-	recheckTxHeightInterval = 6 * 5 // 5 minutes
 	// transactionBlocksTTL is the number of blocks after which a transaction is
-	// removed from the mempool.
+	// rejected by CheckTx if it has not been included in a block yet.
 	transactionBlocksTTL = 6 * 10 // 10 minutes
-	// maxPendingTxAttempts is the number of times a transaction can be included in a block
-	// and fail before being removed from the mempool.
-	maxPendingTxAttempts = 3
 
 	// StateDataDir is the subdirectory inside app.DataDir where State data will be saved
 	StateDataDir = "vcstate"
-	// SnapshotsDataDir is the subdirectory inside app.DataDir where Snapshots data will be saved
-	SnapshotsDataDir = "snapshots"
 )
 
 var (
 	// ErrTransactionNotFound is returned when the transaction is not found in the blockstore.
 	ErrTransactionNotFound = fmt.Errorf("transaction not found")
-	// Ensure that BaseApplication implements cometabcitypes.Application.
-	_ cometabcitypes.Application = (*BaseApplication)(nil)
+	// ErrMempoolFull is returned by SendTx when the mempool cannot accept more transactions.
+	ErrMempoolFull = fmt.Errorf("mempool is full")
 )
 
-// BaseApplication reflects the ABCI application implementation.
+// BaseApplication holds the state machine of the chain: the state, the transaction
+// handler and the internal state transitions. Block production and storage are
+// provided by the caller through the callback functions.
 type BaseApplication struct {
 	State              *vstate.State
 	Istc               *ist.Controller
-	Node               *cometnode.Node
-	NodeClient         *cometcli.Local
-	NodeAddress        ethcommon.Address
 	TransactionHandler *transaction.TransactionHandler
-	Snapshots          *snapshot.SnapshotManager
 	isSynchronizingFn  func() bool
-	// tendermint WaitSync() function is racy, we need to use a mutex in order to avoid
-	// data races when querying about the sync status of the blockchain.
-	isSynced atomic.Bool
+	isSynced           atomic.Bool
 
 	// Callback blockchain functions
-	fnGetBlockByHeight func(height int64) *comettypes.Block
-	fnGetBlockByHash   func(hash []byte) *comettypes.Block
-	fnSendTx           func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error)
+	fnGetBlockByHeight func(height int64) *blocktypes.Block
+	fnGetBlockByHash   func(hash []byte) *blocktypes.Block
+	fnBlockStoreRange  func() (base, height int64)
+	fnSendTx           func(tx []byte) (*SendTxResponse, error)
 	fnGetTx            func(height uint32, txIndex int32) (*models.SignedTx, error)
 	fnGetTxHash        func(height uint32, txIndex int32) (*models.SignedTx, []byte, error)
 	fnMempoolSize      func() int
 	fnMempoolPrune     func(txKey [32]byte) error
-	blockCache         *lru.Cache[int64, *comettypes.Block]
+	blockCache         *lru.Cache[int64, *blocktypes.Block]
 	// txLReferences is a map indexed by hashed transactions and storing the height where the transaction
 	// was seen frist time and the number of attempts failed for including it into a block.
 	txReferences sync.Map
 
 	// blockTime is the target block time that miners use
 	blockTime time.Duration
-
-	// snapshotInterval create state snapshot every N blocks (0 to disable)
-	snapshotInterval int
 
 	// endBlockTimestamp is the last block end timestamp calculated from local time.
 	endBlockTimestamp atomic.Int64
@@ -94,26 +74,13 @@ type BaseApplication struct {
 	dbType            string
 	genesisDoc        *genesis.Doc
 
-	// lastDeliverTxResponse is used to store the last DeliverTxResponse, so validators
-	// can skip block re-execution on FinalizeBlock call.
-	lastDeliverTxResponse []*DeliverTxResponse
-	// lastRootHash is used to store the last root hash of the current on-going state,
-	// it is used by validators to skip block re-execution on FinalizeBlock call.
-	lastRootHash []byte
-	// lastBlockHash stores the last cometBFT block hash
-	lastBlockHash []byte
-	// prepareProposalLock is used to avoid concurrent calls between Prepare/Process Proposal and FinalizeBlock
-	prepareProposalLock sync.Mutex
-
 	// testMockBlockStore is used for testing purposes only
 	testMockBlockStore testutil.MockBlockStore
 }
 
-// pendingTxReference is used to store the block height where the transaction was accepted by the mempool, and the number
-// of times it has been included in a block but failed.
+// pendingTxReference is used to store the block height where the transaction was accepted by the mempool.
 type pendingTxReference struct {
-	height      uint32
-	failedCount int
+	height uint32
 }
 
 // DeliverTxResponse is the response returned by DeliverTx after executing the transaction.
@@ -134,7 +101,6 @@ type ExecuteBlockResponse struct {
 }
 
 // NewBaseApplication creates a new BaseApplication, using vochainCfg.DBType and vochainCfg.DataDir.
-// Node still needs to be initialized with SetNode.
 // Callback functions still need to be initialized.
 func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error) {
 	state, err := vstate.New(vochainCfg.DBType, filepath.Join(vochainCfg.DataDir, StateDataDir))
@@ -147,17 +113,7 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	// Create the transaction handler for checking and processing transactions
 	transactionHandler := transaction.NewTransactionHandler(state, istc)
 
-	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
-	if err != nil {
-		return nil, fmt.Errorf("cannot create snapshot manager: %w", err)
-	}
-
-	// Initialize the zk circuit
-	if err := circuit.Init(); err != nil {
-		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
-	}
-
-	blockCache, err := lru.New[int64, *comettypes.Block](32)
+	blockCache, err := lru.New[int64, *blocktypes.Block](32)
 	if err != nil {
 		return nil, err
 	}
@@ -165,11 +121,9 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 		State:              state,
 		Istc:               istc,
 		TransactionHandler: transactionHandler,
-		Snapshots:          snaps,
 		blockCache:         blockCache,
 		dataDir:            vochainCfg.DataDir,
 		dbType:             vochainCfg.DBType,
-		snapshotInterval:   vochainCfg.SnapshotInterval,
 		genesisDoc:         &genesis.Doc{},
 	}, nil
 }
@@ -225,19 +179,7 @@ func (app *BaseApplication) CommitState() ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot save state: %w", err)
 	}
-
-	// perform state snapshot
-	if app.snapshotInterval > 0 &&
-		app.Height()%uint32(app.snapshotInterval) == 0 &&
-		app.IsSynced() {
-		startTime := time.Now()
-		log.Infof("performing a snapshot on block %d", app.Height())
-		if _, err := app.Snapshots.Do(app.State); err != nil {
-			return hash, fmt.Errorf("cannot make snapshot: %w", err)
-		}
-		log.Infof("snapshot on block %d created successfully, took %s", app.Height(), time.Since(startTime))
-	}
-	return hash, err
+	return hash, nil
 }
 
 // deliverTx unmarshals req.Tx and adds it to the State if it is valid
@@ -300,7 +242,7 @@ func (app *BaseApplication) endBlock(t time.Time, _ uint32) {
 // GetBlockByHeight retrieves a full block indexed by its height.
 // This method uses an LRU cache for the blocks so in general it is more
 // convenient for high load operations than GetBlockByHash(), which does not use cache.
-func (app *BaseApplication) GetBlockByHeight(height int64) *comettypes.Block {
+func (app *BaseApplication) GetBlockByHeight(height int64) *blocktypes.Block {
 	if app.fnGetBlockByHeight == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHeight")
 		return nil
@@ -324,7 +266,7 @@ func (app *BaseApplication) GetBlockByHeight(height int64) *comettypes.Block {
 }
 
 // GetBlockByHash retreies a full block indexed by its Hash
-func (app *BaseApplication) GetBlockByHash(hash []byte) *comettypes.Block {
+func (app *BaseApplication) GetBlockByHash(hash []byte) *blocktypes.Block {
 	if app.fnGetBlockByHash == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "getBlockByHash")
 		return nil
@@ -343,7 +285,7 @@ func (app *BaseApplication) GetTxHash(height uint32, txIndex int32) (*models.Sig
 }
 
 // SendTx sends a transaction to the mempool (sync)
-func (app *BaseApplication) SendTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+func (app *BaseApplication) SendTx(tx []byte) (*SendTxResponse, error) {
 	if app.fnSendTx == nil {
 		log.Errorw(fmt.Errorf("method not assigned"), "sendTx")
 		return nil, nil
@@ -380,17 +322,14 @@ func (app *BaseApplication) MempoolDeleteTx(txID [32]byte) {
 	}
 }
 
-// Genesis returns the genesis used by the app (and cometbft)
+// Genesis returns the genesis used by the app
 func (app *BaseApplication) Genesis() *genesis.Doc {
 	return app.genesisDoc
 }
 
-// IsSynchronizing informs if the blockchain is synchronizing or not.
-func (app *BaseApplication) isSynchronizingTendermint() bool {
-	if app.Node == nil {
-		return true
-	}
-	return app.Node.ConsensusReactor().WaitSync()
+// SetGenesis sets the genesis used by the app
+func (app *BaseApplication) SetGenesis(doc *genesis.Doc) {
+	app.genesisDoc = doc
 }
 
 // IsSynced informs if the blockchain reached a synced state or not.
@@ -445,6 +384,15 @@ func (app *BaseApplication) TimestampFromBlock(height int64) *time.Time {
 		return nil
 	}
 	return &blk.Time
+}
+
+// BlockStoreRange returns the lowest and highest block heights available in the
+// block store. Both are zero if the block store does not report them.
+func (app *BaseApplication) BlockStoreRange() (base, height int64) {
+	if app.fnBlockStoreRange == nil {
+		return 0, 0
+	}
+	return app.fnBlockStoreRange()
 }
 
 // MempoolSize returns the size of the transaction mempool

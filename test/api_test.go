@@ -2,11 +2,9 @@ package test
 
 import (
 	"bytes"
-	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"math/big"
 	"math/rand"
 	"testing"
 	"time"
@@ -16,9 +14,10 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/data/ipfs"
+	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/test/testcommon"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
+	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
@@ -31,11 +30,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestAPIcensusAndVote(t *testing.T) {
+func TestAPIVote(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -47,48 +45,14 @@ func TestAPIcensusAndVote(t *testing.T) {
 	token1 := uuid.New()
 	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
 
-	// create a new census
-	resp, code := c.Request("POST", nil, "censuses", "weighted")
-	qt.Assert(t, code, qt.Equals, 200)
-	censusData := &api.Census{}
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	id1 := censusData.CensusID.String()
-
-	// add a bunch of keys and values (weights)
-	rnd := testutil.NewRandom(1)
-	cparts := api.CensusParticipants{}
-	for i := 1; i < 10; i++ {
-		cparts.Participants = append(cparts.Participants, api.CensusParticipant{
-			Key:    rnd.RandomBytes(20),
-			Weight: (*types.BigInt)(big.NewInt(int64(1))),
-		})
-	}
-	_, code = c.Request("POST", &cparts, "censuses", id1, "participants")
-	qt.Assert(t, code, qt.Equals, 200)
-
-	// add the key we'll use for cast votes
+	// the CSP authorizing the voter, whose public key is the census root
+	csp := ethereum.NewSignKeys()
+	qt.Assert(t, csp.Generate(), qt.IsNil)
 	voterKey := ethereum.SignKeys{}
 	qt.Assert(t, voterKey.Generate(), qt.IsNil)
 
-	_, code = c.Request("POST", &api.CensusParticipants{Participants: []api.CensusParticipant{{
-		Key:    voterKey.Address().Bytes(),
-		Weight: (*types.BigInt)(big.NewInt(1)),
-	}}}, "censuses", id1, "participants")
-	qt.Assert(t, code, qt.Equals, 200)
-
-	resp, code = c.Request("POST", nil, "censuses", id1, "publish")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
-	root := censusData.CensusID
-
-	resp, code = c.Request("GET", nil, "censuses", root.String(), "proof", fmt.Sprintf("%x", voterKey.Address().Bytes()))
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.Weight.String(), qt.Equals, "1")
-
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	election := createElection(t, c, server.Account, electionParams, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, 0)
+	election := createElection(t, c, server.Account, electionParams, csp.PublicKey(), 0, server.VochainAPP.ChainID(), false, 0)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -106,13 +70,20 @@ func TestAPIcensusAndVote(t *testing.T) {
 		ProcessId:   election.ElectionID,
 		VotePackage: votePackageBytes,
 	}
+	bundle := &models.CAbundle{
+		ProcessId: election.ElectionID,
+		Address:   voterKey.Address().Bytes(),
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	qt.Assert(t, err, qt.IsNil)
+	cspSignature, err := csp.SignEthereum(bundleBytes)
+	qt.Assert(t, err, qt.IsNil)
 	vote.Proof = &models.Proof{
-		Payload: &models.Proof_Arbo{
-			Arbo: &models.ProofArbo{
-				Type:            models.ProofArbo_BLAKE2B,
-				Siblings:        censusData.CensusProof,
-				AvailableWeight: censusData.Value,
-				VoteWeight:      censusData.Value,
+		Payload: &models.Proof_Ca{
+			Ca: &models.ProofCA{
+				Type:      models.ProofCA_ECDSA,
+				Bundle:    bundle,
+				Signature: cspSignature,
 			},
 		},
 	}
@@ -126,7 +97,7 @@ func TestAPIcensusAndVote(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	v := &api.Vote{TxPayload: stxb}
-	resp, code = c.Request("POST", v, "votes")
+	resp, code := c.Request("POST", v, "votes")
 	qt.Assert(t, code, qt.Equals, 200)
 	err = json.Unmarshal(resp, &v)
 	qt.Assert(t, err, qt.IsNil)
@@ -234,7 +205,6 @@ func TestAPIaccount(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -300,7 +270,6 @@ func TestAPIAccountsList(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -403,19 +372,18 @@ func TestAPIElectionCost(t *testing.T) {
 			MaxCensusSize:    100000,
 			ElectionDuration: 1000000,
 			EncryptedVotes:   true,
-			AnonymousVotes:   true,
+			AnonymousVotes:   false,
 			MaxVoteOverwrite: 10,
 		},
 		100000, 700000,
 		10, 100,
-		547017)
+		547007)
 }
 
 func TestAPIAccountTokentxs(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -545,7 +513,6 @@ func TestAPIBlocks(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -613,7 +580,6 @@ func runAPIElectionCostWithParams(t *testing.T,
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -639,7 +605,7 @@ func runAPIElectionCostWithParams(t *testing.T,
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
 
-	censusRoot := createCensus(t, c)
+	censusRoot := createCensus(t)
 
 	// first check predictedPrice equals the hardcoded expected
 
@@ -697,18 +663,10 @@ func requestAccount(t testing.TB, c *testutil.TestHTTPclient, address string) ap
 	return acct
 }
 
-func createCensus(t testing.TB, c *testutil.TestHTTPclient) (root types.HexBytes) {
-	resp, code := c.Request("POST", nil, "censuses", "weighted")
-	qt.Assert(t, code, qt.Equals, 200)
-	censusData := &api.Census{}
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-
-	id1 := censusData.CensusID.String()
-	resp, code = c.Request("POST", nil, "censuses", id1, "publish")
-	qt.Assert(t, code, qt.Equals, 200)
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
-	qt.Assert(t, censusData.CensusID, qt.IsNotNil)
-	return censusData.CensusID
+// createCensus returns the root of a census tree with random participants.
+func createCensus(t *testing.T) types.HexBytes {
+	_, root, _ := testvoteproof.CreateKeysAndBuildCensus(t, 10, nil)
+	return root
 }
 
 func createElection(t testing.TB, c *testutil.TestHTTPclient,
@@ -736,7 +694,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 	}
 
 	qt.Assert(t, err, qt.IsNil)
-	metadataURI := ipfs.CalculateCIDv1json(metadataBytes)
+	metadataURI := data.CalculateCIDv1json(metadataBytes)
 
 	tx := models.Tx_NewProcess{
 		NewProcess: &models.NewProcessTx{
@@ -747,7 +705,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 				BlockCount:   electionParams.ElectionDuration,
 				Status:       models.ProcessStatus_READY,
 				CensusRoot:   censusRoot,
-				CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+				CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 				Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true, EncryptedMetaData: encryptedMetadata},
 				VoteOptions: &models.ProcessVoteOptions{
 					MaxCount:          1,
@@ -774,7 +732,6 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 
 	election := api.ElectionCreate{
 		TxPayload: stxb,
-		Metadata:  metadataBytes,
 	}
 	resp, code := c.Request("POST", election, "elections")
 	qt.Assert(t, code, qt.Equals, 200)
@@ -811,10 +768,10 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 	qt.Assert(t, err, qt.IsNil)
 
 	// get the txCost for the create account transacction
-	data, statusCode := c.Request("GET", nil, "chain", "transactions", "cost")
+	costs, statusCode := c.Request("GET", nil, "chain", "transactions", "cost")
 	qt.Assert(t, statusCode, qt.Equals, 200)
 	var txCosts api.Transaction
-	qt.Assert(t, json.Unmarshal(data, &txCosts), qt.IsNil)
+	qt.Assert(t, json.Unmarshal(costs, &txCosts), qt.IsNil)
 	txCost := txCosts.Costs[genesis.TxTypeToCostName(models.TxType_CREATE_ACCOUNT)]
 
 	// add the tx cost to the initialBalance for the faucet package
@@ -823,9 +780,7 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 
 	// transaction
 	stx := models.SignedTx{}
-	infoURI := "ipfs://" + ipfs.CalculateCIDv1json(metaData)
-	sik, err := signer.AccountSIK(nil)
-	qt.Assert(t, err, qt.IsNil)
+	infoURI := "ipfs://" + data.CalculateCIDv1json(metaData)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -833,7 +788,6 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
-			SIK:           sik,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)
@@ -842,9 +796,8 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 	stxb, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
 
-	// send the transaction and metadata
+	// send the transaction
 	accSet := api.AccountSet{
-		Metadata:  metaData,
 		TxPayload: stxb,
 	}
 	resp, code := c.Request("POST", &accSet, "accounts")
@@ -887,7 +840,6 @@ func TestAPIBuildElectionID(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -909,7 +861,7 @@ func TestAPIBuildElectionID(t *testing.T) {
 	waitUntilHeight(t, c, 2)
 
 	// create a new process
-	censusRoot := createCensus(t, c)
+	censusRoot := createCensus(t)
 
 	// Block 3
 	server.VochainAPP.AdvanceTestBlock()
@@ -919,7 +871,7 @@ func TestAPIBuildElectionID(t *testing.T) {
 	body := api.BuildElectionID{
 		Delta:          processid.BuildNextProcessID,
 		OrganizationID: signer.Address().Bytes(),
-		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED.Number()),
+		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_CA_V2.Number()),
 		EnvelopeType: struct {
 			Serial         bool `json:"serial"`
 			Anonymous      bool `json:"anonymous"`
@@ -992,72 +944,10 @@ func TestAPIBuildElectionID(t *testing.T) {
 	qt.Assert(t, newNextElectionID, qt.Equals, futureElectionID)
 }
 
-func TestAPIEncryptedMetadata(t *testing.T) {
-	server := testcommon.APIserver{}
-	server.Start(t,
-		api.ChainHandler,
-		api.CensusHandler,
-		api.VoteHandler,
-		api.AccountHandler,
-		api.ElectionHandler,
-		api.WalletHandler,
-	)
-
-	token1 := uuid.New()
-	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
-
-	// Block 1
-	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 1)
-
-	// create a new account
-	signer := createAccount(t, c, server, 80)
-
-	// Block 2
-	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 2)
-
-	// create a new process
-	censusRoot := createCensus(t, c)
-
-	// Block 3
-	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 3)
-
-	// create a new election
-	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	electionResponse := createElection(t, c, signer, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), true, 0)
-
-	// Block 4
-	server.VochainAPP.AdvanceTestBlock()
-	waitUntilHeight(t, c, 4)
-	resp, code := c.Request("GET", nil, "elections", electionResponse.ElectionID.String())
-	qt.Assert(t, code, qt.Equals, 200)
-	var election api.Election
-	err := json.Unmarshal(resp, &election)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, election.Metadata, qt.Not(qt.IsNil))
-
-	// try to decrypt the metadata
-	sk, err := nacl.DecodePrivate(electionResponse.MetadataEncryptionPrivKey.String())
-	qt.Assert(t, err, qt.IsNil)
-	metadataBytes, err := base64.StdEncoding.DecodeString(election.Metadata.(string))
-	qt.Assert(t, err, qt.IsNil)
-	decryptedMetadata, err := sk.Decrypt(metadataBytes)
-	qt.Assert(t, err, qt.IsNil)
-
-	// check the metadata decrypted is the same as the metadata sent
-	var metadata api.ElectionMetadata
-	err = json.Unmarshal(decryptedMetadata, &metadata)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, metadata.Title["default"], qt.Equals, "test election")
-}
-
 func TestAPIElectionsList(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -1069,24 +959,20 @@ func TestAPIElectionsList(t *testing.T) {
 	token1 := uuid.New()
 	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
 
-	// create a new census
-	resp, code := c.Request("POST", nil, "censuses", "weighted")
-	qt.Assert(t, code, qt.Equals, 200)
-	censusData := &api.Census{}
-	qt.Assert(t, json.Unmarshal(resp, censusData), qt.IsNil)
+	censusRoot := createCensus(t)
 
 	for nonce := uint32(0); nonce < 20; nonce++ {
 		createElection(t, c, server.Account, electionprice.ElectionParameters{
 			ElectionDuration: 100,
 			MaxCensusSize:    100,
-		}, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, nonce)
+		}, censusRoot, 0, server.VochainAPP.ChainID(), false, nonce)
 	}
 
 	createElection(t, c, server.Account, electionprice.ElectionParameters{
 		ElectionDuration: 100,
 		MaxCensusSize:    100,
 		EncryptedVotes:   true,
-	}, censusData.CensusRoot, 0, server.VochainAPP.ChainID(), false, 20)
+	}, censusRoot, 0, server.VochainAPP.ChainID(), false, 20)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -1152,7 +1038,6 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
-		api.CensusHandler,
 		api.VoteHandler,
 		api.AccountHandler,
 		api.ElectionHandler,
@@ -1167,7 +1052,7 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 	signer := createAccount(t, c, server, 80)
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 2)
-	censusRoot := createCensus(t, c)
+	censusRoot := createCensus(t)
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 3)
 
@@ -1181,8 +1066,7 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 		Version: "1.0",
 	})
 	qt.Assert(t, err, qt.IsNil)
-	// bare CID, as createElection does, since the storage mock indexes files by it
-	newMetadataURI := ipfs.CalculateCIDv1json(newMetadata)
+	newMetadataURI := data.CalculateCIDv1json(newMetadata)
 
 	signedSetMetadataTx := func(hash []byte) []byte {
 		txb, err := proto.Marshal(&models.Tx{Payload: &models.Tx_SetProcess{SetProcess: &models.SetProcessTx{
@@ -1200,18 +1084,9 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 		return stxb
 	}
 
-	// a hash that does not match the content is rejected
-	_, code := c.Request("PUT", &api.ElectionMetadataUpdate{
-		TxPayload: signedSetMetadataTx(make([]byte, 32)),
-		Metadata:  newMetadata,
-	}, "elections", electionResponse.ElectionID.String(), "metadata")
-	qt.Assert(t, code, qt.Equals, 400)
-
-	// the matching hash is accepted
-	resp, code := c.Request("PUT", &api.ElectionMetadataUpdate{
-		TxPayload: signedSetMetadataTx(api.MetadataHash(newMetadata)),
-		Metadata:  newMetadata,
-	}, "elections", electionResponse.ElectionID.String(), "metadata")
+	resp, code := c.Request("POST", &api.Transaction{
+		Payload: signedSetMetadataTx(api.MetadataHash(newMetadata)),
+	}, "chain", "transactions")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 5)
@@ -1222,9 +1097,6 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 	qt.Assert(t, json.Unmarshal(resp, &election), qt.IsNil)
 	qt.Assert(t, election.MetadataURL, qt.Equals, newMetadataURI)
 	qt.Assert(t, election.MetadataHash, qt.DeepEquals, types.HexBytes(api.MetadataHash(newMetadata)))
-	metadata, err := json.Marshal(election.Metadata)
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, string(metadata), qt.Contains, "updated election")
 
 	// the history lists the creation version and the update, with the tx that set each
 	resp, code = c.Request("GET", nil, "elections", electionResponse.ElectionID.String(), "metadata", "history")

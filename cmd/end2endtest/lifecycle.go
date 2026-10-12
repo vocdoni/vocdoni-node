@@ -45,7 +45,7 @@ func (t *E2ELifecycleElection) Setup(api *apiclient.HTTPclient, c *config) error
 	for i, ed := range electionDescriptions {
 		ed.d.ElectionType.Autostart = true
 		ed.d.ElectionType.Interruptible = ed.interruptible
-		ed.d.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+		ed.d.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeCSPv2}
 
 		if err := t.elections[i].setupElection(ed.d, t.elections[0].config.nvotes, true); err != nil {
 			log.Errorf("failed to setup election %d: %v", i, err)

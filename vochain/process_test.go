@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -36,7 +35,7 @@ func TestNewProcessCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      accounts[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		BlockCount:    1024,
 		MaxCensusSize: 100,
 	}
@@ -109,7 +108,7 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      1024,
 		MaxCensusSize: 100,
 	}
@@ -162,7 +161,7 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      1024,
 		MaxCensusSize: 100,
 	}
@@ -201,7 +200,7 @@ func TestProcessSetStatusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      1024,
 		MaxCensusSize: 100,
 	}
@@ -278,7 +277,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		BlockCount:    1024,
 		MaxCensusSize: 100,
 	}
@@ -292,7 +291,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI2,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		BlockCount:    1024,
 		MaxCensusSize: 100,
 	}
@@ -306,7 +305,7 @@ func TestProcessSetCensusCheckTxDeliverTxCommitTransitions(t *testing.T) {
 		EntityId:      keys[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI2,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		BlockCount:    1024,
 		MaxCensusSize: 100,
 	}
@@ -467,7 +466,7 @@ func testCreateProcessWithErrAndData(t *testing.T, txSender *ethereum.SignKeys, 
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) ([]byte, error) {
-	cktx := new(cometabcitypes.CheckTxRequest)
+	cktx := new(CheckTxRequest)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)
@@ -508,7 +507,7 @@ func TestGlobalMaxProcessSize(t *testing.T) {
 		EntityId:      accounts[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      60,
 		MaxCensusSize: 5,
 	}
@@ -535,7 +534,7 @@ func TestSetProcessCensusSize(t *testing.T) {
 		EntityId:      accounts[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      60 * 60,
 		MaxCensusSize: 2,
 	}
@@ -620,7 +619,7 @@ func TestSetProcessCensusSize(t *testing.T) {
 		EntityId:      accounts[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      60 * 60,
 		MaxCensusSize: 2,
 	}
@@ -656,7 +655,7 @@ func TestSetProcessDuration(t *testing.T) {
 		EntityId:      accounts[0].Address().Bytes(),
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      60,
 		MaxCensusSize: 2,
 	}
@@ -732,6 +731,43 @@ func TestNewProcessSoftDeprecatesLegacyCSPOrigin(t *testing.T) {
 	qt.Assert(t, log, qt.Equals, "")
 }
 
+// TestNewProcessOnlyCSP checks that only non-anonymous CSP elections can be created.
+func TestNewProcessOnlyCSP(t *testing.T) {
+	app, accounts := createTestBaseApplicationAndAccounts(t, 1)
+
+	buildProcess := func(origin models.CensusOrigin, anonymous bool) *models.Process {
+		return &models.Process{
+			EnvelopeType:  &models.EnvelopeType{Anonymous: anonymous},
+			Mode:          &models.ProcessMode{Interruptible: true},
+			VoteOptions:   &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+			Status:        models.ProcessStatus_READY,
+			EntityId:      accounts[0].Address().Bytes(),
+			CensusRoot:    util.RandomBytes(33),
+			CensusOrigin:  origin,
+			Duration:      10240,
+			MaxCensusSize: 10,
+		}
+	}
+
+	for _, origin := range []models.CensusOrigin{
+		models.CensusOrigin_OFF_CHAIN_TREE,
+		models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		models.CensusOrigin_CENSUS_UNKNOWN,
+	} {
+		err := testCreateProcessWithErr(t, accounts[0], app, buildProcess(origin, false))
+		qt.Assert(t, err, qt.ErrorMatches, ".*census origin .* not supported.*")
+	}
+	for _, origin := range []models.CensusOrigin{
+		models.CensusOrigin_OFF_CHAIN_CA,
+		models.CensusOrigin_OFF_CHAIN_CA_V2,
+	} {
+		err := testCreateProcessWithErr(t, accounts[0], app, buildProcess(origin, true))
+		qt.Assert(t, err, qt.ErrorMatches, ".*anonymous process not supported.*")
+	}
+	qt.Assert(t, testCreateProcess(t, accounts[0], app,
+		buildProcess(models.CensusOrigin_OFF_CHAIN_CA_V2, false)), qt.IsNotNil)
+}
+
 // checkTxLog signs and runs CheckTx for a NewProcess and returns the response
 // Log field (the API surfaces it as the ElectionCreate.Warning field). The test
 // asserts a Code=0 acceptance; use it only where the transaction is expected to
@@ -752,7 +788,7 @@ func checkTxLog(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys,
 	qt.Assert(t, err, qt.IsNil)
 	rawTx, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
-	resp, err := app.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: rawTx})
+	resp, err := app.CheckTx(context.Background(), &CheckTxRequest{Tx: rawTx})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("CheckTx failed: %s", resp.Data))
 	return resp.Log
@@ -780,7 +816,7 @@ func testMetadataProcess(entityID []byte) *models.Process {
 		EntityId:      entityID,
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      1024,
 		MaxCensusSize: 100,
 		Metadata:      &metadataURI,

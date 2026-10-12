@@ -3,16 +3,6 @@ package types
 import "time"
 
 const (
-	// The mode defines the behaviour of the vocdoninode
-
-	// ModeMiner starts vocdoninode as a miner.
-	ModeMiner = "miner"
-	// ModeSeed starts vocdoninode as a seed node.
-	ModeSeed = "seed"
-	// ModeGateway starts the vocdoninode as a gateway.
-	ModeGateway = "gateway"
-	// ModeCensus starts the vocdoninode as a census only service.
-	ModeCensus = "census"
 
 	// ProcessIDsize is the size of a process id.
 	ProcessIDsize = 32

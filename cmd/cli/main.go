@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -83,11 +82,10 @@ func main() {
 				items.Sprint("🕸️\tNetwork info"),            // 5
 				items.Sprint("📝\tBuild a new census"),       // 6
 				items.Sprint("🗳️\tCreate an election"),      // 7
-				items.Sprint("☑️\tSet validator"),           // 8
-				items.Sprint("📝 Generate faucet package"),   // 9
-				items.Sprint("🖧\tChange API endpoint host"), // 10
-				items.Sprint("💾\tSave config to file"),      // 11
-				items.Sprint("❌\tQuit"),                     // 12
+				items.Sprint("📝 Generate faucet package"),   // 8
+				items.Sprint("🖧\tChange API endpoint host"), // 9
+				items.Sprint("💾\tSave config to file"),      // 10
+				items.Sprint("❌\tQuit"),                     // 11
 			},
 		}
 
@@ -146,22 +144,18 @@ func main() {
 				errorp.Println(err)
 			}
 		case 8:
-			if err := accountSetValidator(cli); err != nil {
-				errorp.Println(err)
-			}
-		case 9:
 			if err := faucetPkg(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 10:
+		case 9:
 			if err := hostHandler(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 11:
+		case 10:
 			if err := cli.save(); err != nil {
 				errorp.Println(err)
 			}
-		case 12:
+		case 11:
 			os.Exit(0)
 		default:
 			errorp.Println("unknown option or not yet implemented")
@@ -251,14 +245,6 @@ func accountInfo(c *VocdoniCLI) error {
 	if acc.InfoURL != "" && acc.InfoURL != "none" {
 		fmt.Printf("%s: %s\n", keysPrint.Sprint(" ➥ info URL"), valuesPrint.Sprint(acc.InfoURL))
 	}
-	if acc.Metadata != nil {
-		accMetadata, err := json.MarshalIndent(acc.Metadata, "", "  ")
-		if err != nil {
-			log.Debug("account metadata cannot be unmarshal")
-		} else {
-			fmt.Printf("%s:\n%s\n", keysPrint.Sprint(" ➥ metadata"), valuesPrint.Sprint(string(accMetadata)))
-		}
-	}
 
 	return nil
 }
@@ -320,7 +306,7 @@ func bootStrapAccount(cli *VocdoniCLI) error {
 
 	txHash, err := cli.api.AccountBootstrap(faucetPkg, &api.AccountMetadata{
 		Name: map[string]string{"default": "vocdoni cli account " + cli.getCurrentAccount().Address.Hex()},
-	}, nil)
+	})
 	if err != nil {
 		return err
 	}
@@ -488,47 +474,6 @@ func hostHandler(cli *VocdoniCLI) error {
 	return cli.setAuthToken(token)
 }
 
-func accountSetValidator(cli *VocdoniCLI) error {
-	infoPrint.Print("enter the name and a public key of the validator, leave it bank for using the selected account\n")
-
-	n := ui.Prompt{
-		Label: "name",
-	}
-	name, err := n.Run()
-	if err != nil {
-		return err
-	}
-
-	p := ui.Prompt{
-		Label: "public key",
-	}
-	pubKeyStr, err := p.Run()
-	if err != nil {
-		return err
-	}
-	pubKey := cli.getCurrentAccount().PublicKey
-	if pubKeyStr != "" {
-		pubKey, err = hex.DecodeString(pubKeyStr)
-		if err != nil {
-			return err
-		}
-	}
-
-	hash, err := cli.api.AccountSetValidator(pubKey, name)
-	if err != nil {
-		return err
-	}
-
-	infoPrint.Print("transaction sent! hash ", hash.String(), "\n")
-	infoPrint.Print("waiting for confirmation...")
-	ok := cli.waitForTransaction(hash)
-	if !ok {
-		return fmt.Errorf("transaction was not included")
-	}
-	infoPrint.Print(" transaction confirmed!\n")
-
-	return nil
-}
 
 func accountSetMetadata(cli *VocdoniCLI) error {
 	currentAccount, err := cli.api.Account("")
@@ -548,11 +493,6 @@ func accountSetMetadata(cli *VocdoniCLI) error {
 			Avatar: "https://upload.wikimedia.org/wikipedia/commons/f/f6/HAL9000.svg",
 			Header: "https://images.unsplash.com/photo-1543000968-1fe3fd3b714e",
 		},
-	}
-
-	if currentAccount.Metadata != nil {
-		log.Info("account has metadata (", currentAccount.InfoURL, ") let's update it")
-		accMeta = *currentAccount.Metadata
 	}
 
 	accMetaText, err := json.MarshalIndent(&accMeta, "", " ")

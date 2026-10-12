@@ -17,7 +17,6 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
-	reuse "github.com/libp2p/go-reuseport"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"go.vocdoni.io/dvote/log"
@@ -71,7 +70,7 @@ type RouterHandlerFn = func(msg Message)
 // Init initializes the router
 func (r *HTTProuter) Init(host string, port int) error {
 	r.namespaces = make(map[string]RouterNamespace, 32)
-	ln, err := reuse.Listen("tcp", net.JoinHostPort(host, fmt.Sprintf("%d", port)))
+	ln, err := net.Listen("tcp", net.JoinHostPort(host, fmt.Sprintf("%d", port)))
 	if err != nil {
 		return err
 	}
@@ -179,7 +178,7 @@ func (r *HTTProuter) EnablePrometheusMetrics(prometheusID string) {
 // that will expose the metrics collected by VictoriaMetrics and Prometheus
 func (r *HTTProuter) ExposePrometheusEndpoint(path string) {
 	r.AddRawHTTPHandler(path, "GET", func(w http.ResponseWriter, req *http.Request) {
-		// upstream packages (cometbft, libp2p) call prometheus.Register(), so expose those metrics first
+		// upstream packages (libp2p) call prometheus.Register(), so expose those metrics first
 		//
 		// we need to remove the "Accept-Encoding: gzip" to ensure promhttp.Handler().ServeHTTP() outputs plaintext,
 		// to be able to append the plaintext from metrics.WritePrometheus,

@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 )
 
 type MockBlockStore struct {
@@ -37,11 +37,10 @@ func (b *MockBlockStore) NewBlock(height int64, timestamp time.Time) {
 		panic(fmt.Sprintf("height is not the expected one (got:%d expected:%d)", height, count))
 	}
 	log.Infow("new block", "height", height, "timestamp", timestamp)
-	b.set(height, &comettypes.Block{
-		Header: comettypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
-		Data:   comettypes.Data{Txs: make([]comettypes.Tx, 0)},
-	},
-	)
+	b.set(height, &blocktypes.Block{
+		Header: blocktypes.Header{Height: height, Time: time.Now(), ChainID: "test"},
+		Data:   blocktypes.Data{Txs: make([]blocktypes.Tx, 0)},
+	})
 }
 
 func (b *MockBlockStore) EndBlock() int64 {
@@ -49,19 +48,19 @@ func (b *MockBlockStore) EndBlock() int64 {
 	return b.height.Add(1)
 }
 
-func (b *MockBlockStore) Get(height int64) *comettypes.Block {
+func (b *MockBlockStore) Get(height int64) *blocktypes.Block {
 	val, ok := b.blockByHeight.Load(height)
 	if !ok {
 		return nil
 	}
-	return val.(*comettypes.Block)
+	return val.(*blocktypes.Block)
 }
 
-func (b *MockBlockStore) GetByHash(hash []byte) *comettypes.Block {
-	var block *comettypes.Block
+func (b *MockBlockStore) GetByHash(hash []byte) *blocktypes.Block {
+	var block *blocktypes.Block
 	b.blockByHeight.Range(func(key, value any) bool {
-		if bytes.Equal(value.(*comettypes.Block).Hash().Bytes(), hash) {
-			block = value.(*comettypes.Block)
+		if bytes.Equal(value.(*blocktypes.Block).Hash().Bytes(), hash) {
+			block = value.(*blocktypes.Block)
 			return false
 		}
 		return true
@@ -69,6 +68,6 @@ func (b *MockBlockStore) GetByHash(hash []byte) *comettypes.Block {
 	return block
 }
 
-func (b *MockBlockStore) set(height int64, block *comettypes.Block) {
+func (b *MockBlockStore) set(height int64, block *blocktypes.Block) {
 	b.blockByHeight.Store(height, block)
 }

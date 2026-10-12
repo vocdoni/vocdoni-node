@@ -4,17 +4,11 @@ import (
 	"net/url"
 	"testing"
 
-	"go.vocdoni.io/dvote/data/datamocktest"
-
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/api"
-	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
-	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/httprouter"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -22,12 +16,11 @@ import (
 
 // APIserver contains all the required pieces for running a mock API server.
 // It is used for testing purposes only. The server starts a Vochain instance,
-// the Indexer, the IPFS storage and the API router.
+// the Indexer and the API router.
 // The blockchain is advanced by calling the APIserver.VochainAPP.AdvanceTestBlock() method.
 type APIserver struct {
 	Account     *ethereum.SignKeys
 	ListenAddr  *url.URL
-	Storage     data.Storage
 	VochainAPP  *vochain.BaseApplication
 	Indexer     *indexer.Indexer
 	VochainInfo *vochaininfo.VochainInfo
@@ -44,10 +37,6 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	if d.ChainID == "" {
 		d.ChainID = "test"
 	}
-
-	// create the IPFS storage
-	d.Storage = &datamocktest.DataMockTest{}
-	d.Storage.Init(&types.DataStore{Datadir: t.TempDir()})
 
 	// create the API router
 	router := httprouter.HTTProuter{}
@@ -74,13 +63,8 @@ func (d *APIserver) Start(t testing.TB, apis ...string) {
 	// create indexer
 	d.Indexer = NewMockIndexer(t, d.VochainAPP)
 
-	// create census database
-	db, err := metadb.New(db.TypePebble, t.TempDir())
-	qt.Assert(t, err, qt.IsNil)
-	censusDB := censusdb.NewCensusDB(db)
-
 	// attach all the pieces to the API
-	api.Attach(d.VochainAPP, d.VochainInfo, d.Indexer, d.Storage, censusDB)
+	api.Attach(d.VochainAPP, d.VochainInfo, d.Indexer)
 
 	// enable the required handlers
 	err = api.EnableHandlers(apis...)

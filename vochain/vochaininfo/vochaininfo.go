@@ -1,13 +1,11 @@
 package vochaininfo
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/VictoriaMetrics/metrics"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -53,12 +51,6 @@ func (vi *VochainInfo) updateCounters() {
 	}
 	accountTreeSize.Set(ac)
 
-	sc, err := vi.vnode.State.CountSIKs(true)
-	if err != nil {
-		log.Errorf("cannot count SIKs: %s", err)
-	}
-	sikTreeSize.Set(sc)
-
 	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
 	blockPeriodMinute.Set(uint64(vi.BlockTimes()[0].Milliseconds()))
@@ -80,8 +72,7 @@ func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) time.Duration {
 
 	// Calculate the starting block height for the interval
 	startBlockHeight := currentHeight - intervalBlocks
-	if vi.vnode.Node != nil && vi.vnode.Node.BlockStore() != nil &&
-		startBlockHeight < vi.vnode.Node.BlockStore().Base() {
+	if base, _ := vi.vnode.BlockStoreRange(); startBlockHeight < base {
 		// We cannot calculate the average block time for the given interval
 		return 0
 	}
@@ -214,12 +205,6 @@ func (vi *VochainInfo) AccountTreeSize() uint64 {
 	return accountTreeSize.Get()
 }
 
-// SIKTreeSize returns the current number of validated votes waiting to be
-// included in the blockchain
-func (vi *VochainInfo) SIKTreeSize() uint64 {
-	return sikTreeSize.Get()
-}
-
 // TokensBurned returns the current balance of the burn address
 func (vi *VochainInfo) TokensBurned() uint64 {
 	acc, err := vi.vnode.State.GetAccount(state.BurnAddress, true)
@@ -227,23 +212,6 @@ func (vi *VochainInfo) TokensBurned() uint64 {
 		return 0
 	}
 	return acc.Balance
-}
-
-// NetInfo returns network info (mainly, peers)
-func (vi *VochainInfo) NetInfo() (*cometcoretypes.ResultNetInfo, error) {
-	if vi.vnode.NodeClient != nil {
-		return vi.vnode.NodeClient.NetInfo(context.Background())
-	}
-	return nil, fmt.Errorf("vochain node not ready")
-}
-
-// NPeers returns the whole list of peers, including ID and URL
-func (vi *VochainInfo) NPeers() int {
-	ni, err := vi.NetInfo()
-	if err != nil || ni == nil {
-		return 0
-	}
-	return ni.NPeers
 }
 
 // BlocksLastMinute returns the number of blocks synced during the last minute.

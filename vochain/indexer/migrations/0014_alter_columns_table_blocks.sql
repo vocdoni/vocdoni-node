@@ -1,4 +1,5 @@
 -- +goose Up
+-- +reindex-blocks
 ALTER TABLE blocks DROP COLUMN data_hash;
 ALTER TABLE blocks ADD COLUMN chain_id TEXT NOT NULL DEFAULT '';
 ALTER TABLE blocks ADD COLUMN hash BLOB NOT NULL DEFAULT x'';

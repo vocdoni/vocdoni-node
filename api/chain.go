@@ -7,16 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/data/ipfs"
+
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
-	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
@@ -71,14 +67,6 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainInfoHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/info/circuit",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainCircuitInfoHandler,
 	); err != nil {
 		return err
 	}
@@ -540,10 +528,8 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		blockTimesInMs[0] = uint64(a.vocapp.BlockTimeTarget().Milliseconds())
 	}
 
-	blockStoreBase := uint32(0)
-	if a.vocapp.Node != nil && a.vocapp.Node.BlockStore() != nil {
-		blockStoreBase = uint32(a.vocapp.Node.BlockStore().Base())
-	}
+	base, _ := a.vocapp.BlockStoreRange()
+	blockStoreBase := uint32(base)
 
 	data, err := json.Marshal(&ChainInfo{
 		ID:                a.vocapp.ChainID(),
@@ -559,28 +545,9 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		GenesisTime:       a.vocapp.Genesis().GenesisTime,
 		InitialHeight:     uint32(a.vocapp.Genesis().InitialHeight),
 		BlockStoreBase:    blockStoreBase,
-		CircuitVersion:    circuit.Version(),
 		MaxCensusSize:     maxCensusSize,
 		NetworkCapacity:   networkCapacity,
 	})
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainCircuitInfoHandler
-//
-//	@Summary		Circuit info
-//	@Description	Returns the circuit configuration according to the current circuit
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	circuit.Config
-//	@Router			/chain/info/circuit [get]
-func (a *API) chainCircuitInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// Encode the current circuit configuration to JSON
-	data, err := json.Marshal(circuit.Global().Config)
 	if err != nil {
 		return err
 	}
@@ -729,15 +696,6 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrTransactionBatchTooLarge.Withf("%d, max is %d", len(req.Transactions), maxTransactionBatchSize)
 	}
 
-	// Validate election metadata up front (same checks as POST /elections): a
-	// client-side metadata mistake rejects the whole batch before anything is
-	// submitted, so no transaction lands on-chain because of it.
-	for i := range req.Transactions {
-		if err := a.checkBatchItemMetadata(req.Transactions[i]); err != nil {
-			return err
-		}
-	}
-
 	// per-creator (EntityId) running process-index delta, advanced for every
 	// NewProcess item regardless of send outcome, so each item gets the exact
 	// processId the chain will assign in ordered commit.
@@ -752,29 +710,6 @@ func (a *API) chainSendTxBatchHandler(msg *apirest.APIdata, ctx *httprouter.HTTP
 			return res.Hash.Bytes(), res.Code, res.Log, nil
 		},
 	)
-
-	// Pin the metadata of the transactions that were actually submitted, best-effort,
-	// exactly like POST /elections. This relies on the fail-fast invariant of
-	// classifyTransactionBatch: submitted items are always the leading prefix of the
-	// input in order, so result.Submitted[i] corresponds to req.Transactions[i]. If
-	// that strategy ever changes, this index correspondence must be revisited.
-	for i := range result.Submitted {
-		md := req.Transactions[i].Metadata
-		if a.storage == nil || len(md) == 0 {
-			continue
-		}
-		sctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
-		cid, err := a.storage.Publish(sctx, md)
-		cancel()
-		if err != nil {
-			log.Errorf("could not publish batch metadata to storage: %v", err)
-			continue
-		}
-		result.Submitted[i].MetadataURL = a.storage.URIprefix() + cid
-		if strings.TrimPrefix(cid, "ipfs://") != strings.TrimPrefix(ipfs.CalculateCIDv1json(md), "ipfs://") {
-			log.Errorf("%s (%s != %s)", ErrVochainReturnedWrongMetadataCID, cid, ipfs.CalculateCIDv1json(md))
-		}
-	}
 
 	data, err := json.Marshal(result)
 	if err != nil {
@@ -860,39 +795,6 @@ func (a *API) batchProcessID(payload []byte, deltas map[string]int32) []byte {
 		return nil
 	}
 	return pid.Marshal()
-}
-
-// checkBatchItemMetadata validates a batch item's optional raw election metadata,
-// mirroring POST /elections: only when raw metadata is provided, the NewProcess tx
-// must carry a matching metadata URI. Returns nil when there is nothing to check.
-func (a *API) checkBatchItemMetadata(item TransactionPayload) error {
-	if len(item.Metadata) == 0 {
-		return nil
-	}
-	// Extract the metadata URI (and encrypted flag) from the NewProcess payload.
-	metadataURI, encryptedMetadata := "", false
-	stx := &models.SignedTx{}
-	if err := proto.Unmarshal(item.Payload, stx); err == nil {
-		tx := &models.Tx{}
-		if err := proto.Unmarshal(stx.GetTx(), tx); err == nil {
-			if p := tx.GetNewProcess().GetProcess(); p != nil {
-				metadataURI = p.GetMetadata()
-				encryptedMetadata = p.GetMode() != nil && p.GetMode().EncryptedMetaData
-			}
-		}
-	}
-	if metadataURI == "" {
-		return ErrMetadataProvidedButNoURI
-	}
-	if !encryptedMetadata {
-		if err := json.Unmarshal(item.Metadata, &ElectionMetadata{}); err != nil {
-			return ErrCantParseMetadataAsJSON.WithErr(err)
-		}
-	}
-	if !ipfs.CIDequals(ipfs.CalculateCIDv1json(item.Metadata), metadataURI) {
-		return ErrMetadataURINotMatchContent
-	}
-	return nil
 }
 
 // chainTxCostHandler
@@ -1250,12 +1152,12 @@ func (a *API) chainBlockByHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Header: comettypes.Header{
+		Header: BlockHeader{
 			ChainID:         idxblock.ChainID,
 			Height:          idxblock.Height,
 			Time:            idxblock.Time,
 			ProposerAddress: []byte(idxblock.ProposerAddress),
-			LastBlockID: comettypes.BlockID{
+			LastBlockID: BlockID{
 				Hash: []byte(idxblock.LastBlockHash),
 			},
 		},
@@ -1296,12 +1198,12 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Header: comettypes.Header{
+		Header: BlockHeader{
 			ChainID:         idxblock.ChainID,
 			Height:          idxblock.Height,
 			Time:            idxblock.Time,
 			ProposerAddress: []byte(idxblock.ProposerAddress),
-			LastBlockID: comettypes.BlockID{
+			LastBlockID: BlockID{
 				Hash: []byte(idxblock.LastBlockHash),
 			},
 		},

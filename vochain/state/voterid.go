@@ -17,7 +17,6 @@ type VoterIDType = uint8
 const (
 	VoterIDTypeUndefined VoterIDType = 0
 	VoterIDTypeECDSA     VoterIDType = 1
-	VoterIDTypeZkSnark   VoterIDType = 2
 	VoterIDTypeEd25519   VoterIDType = 3
 )
 
@@ -25,7 +24,6 @@ const (
 var voterIDTypeName = map[VoterIDType]string{
 	VoterIDTypeUndefined: "UNDEFINED",
 	VoterIDTypeECDSA:     "ECDSA",
-	VoterIDTypeZkSnark:   "ZKSNARK",
 	VoterIDTypeEd25519:   "ED25519",
 }
 
@@ -75,8 +73,6 @@ func (v VoterID) Address() []byte {
 			return nil
 		}
 		return ethAddr.Bytes()
-	case VoterIDTypeZkSnark:
-		return v[1:]
 	case VoterIDTypeEd25519:
 		return common.BytesToAddress(ethereum.HashRaw(v[1:])).Bytes()
 	default:

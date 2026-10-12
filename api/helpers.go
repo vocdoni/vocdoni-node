@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	cometpool "github.com/cometbft/cometbft/mempool"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/iancoleman/strcase"
@@ -25,6 +23,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
+	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -51,10 +50,10 @@ func (a *API) electionSummary(pi *indexertypes.Process) *ElectionSummary {
 }
 
 // sendTx wraps a.vocapp.SendTx(). If an error is returned, it's wrapped into an apirest.APIerror
-func (a *API) sendTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+func (a *API) sendTx(tx []byte) (*vochain.SendTxResponse, error) {
 	resp, err := a.vocapp.SendTx(tx)
 	switch {
-	case errors.As(err, &cometpool.ErrMempoolIsFull{}):
+	case errors.Is(err, vochain.ErrMempoolFull):
 		return nil, ErrVochainOverloaded.WithErr(err)
 	case err != nil:
 		return nil, ErrVochainSendTxFailed.WithErr(err)
@@ -453,4 +452,13 @@ func paramsFromCtxFunc(f func(key string) string, keys ...string) map[string]str
 		m[key] = f(key)
 	}
 	return m
+}
+
+// ipfsCID returns the bare CID from an ipfs:// URI (stripping the "ipfs://"
+// prefix), or an empty string when the URI does not use the ipfs scheme.
+func ipfsCID(uri string) string {
+	if !strings.HasPrefix(uri, "ipfs://") {
+		return ""
+	}
+	return strings.TrimPrefix(uri, "ipfs://")
 }

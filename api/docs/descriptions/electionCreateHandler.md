@@ -1,10 +1,8 @@
 Creates an election on the Vochain. 
 
-To use this endpoint, you will need to provide a signed transaction that has been encoded on the client side using the **Vocdoni SDK**. This transaction, referred to as txPayload, must include the IPFS CID-formatted hash of the metadata for the election.
+To use this endpoint, you will need to provide a signed transaction that has been encoded on the client side using the **Vocdoni SDK**. This transaction, referred to as txPayload, references the election metadata by its URI and hash.
 
-The metadata for the election is optional and is provided as a base64-encoded JSON object. This object should follow the Entity metadata specification and includes information about the election, such as the list of candidates and the election's description. This metadata is stored within IPFS so that participants can access it.
-
-The API endpoint will verify that the hash in the txPayload transaction matches the uploaded metadata. If these do not match, the API will return an error.
+The node does not store election metadata: the organization hosts the document at the URI set in the transaction, and the hash lets participants check it.
 
 Example of election metadata object:
 

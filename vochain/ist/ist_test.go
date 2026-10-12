@@ -171,3 +171,24 @@ func testAdvanceBlock(t *testing.T, s *state.State, istc *Controller) {
 	qt.Assert(t, s.SetTimestamp(timestamp+1), qt.IsNil)
 	log.Infow("committed block", "height", height, "timestamp", timestamp)
 }
+
+// TestISTCdropsUnknownActions verifies that actions of a type this node does not
+// implement, as found in a state produced by another node, are dropped instead of
+// failing the block.
+func TestISTCdropsUnknownActions(t *testing.T) {
+	s, err := state.New(db.TypePebble, t.TempDir())
+	qt.Assert(t, err, qt.IsNil)
+	defer s.Close()
+	qt.Assert(t, s.SetTimestamp(0), qt.IsNil)
+	istc := NewISTC(s)
+
+	id := []byte("validator-score")
+	qt.Assert(t, istc.Schedule(Action{ID: id, TypeID: ActionTypeID(99), Height: 1}), qt.IsNil)
+	testAdvanceBlock(t, s, istc)
+	_, err = istc.retrieveAction(id)
+	qt.Assert(t, err, qt.IsNil)
+
+	testAdvanceBlock(t, s, istc)
+	_, err = istc.retrieveAction(id)
+	qt.Assert(t, err, qt.ErrorIs, ErrActionNotFound)
+}

@@ -45,7 +45,7 @@ type e2eElection struct {
 	api      *apiclient.HTTPclient
 	config   *config
 	election *vapi.Election
-	voters   *sync.Map // key:acc.Public, value: acctProof struct {account, proof, proofSik}
+	voters   *sync.Map // key:acc.Public, value: acctProof struct {account, proof}
 
 	// cspSigner, when set on a CSP election, issues the CSP proofs as
 	// cspProofType with cspVoteWeight, instead of the default plain ECDSA

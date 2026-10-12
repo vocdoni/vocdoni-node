@@ -1,19 +1,21 @@
 package genesis
 
 import (
+	"crypto/sha256"
 	"encoding/json"
-
-	comethash "github.com/cometbft/cometbft/crypto/tmhash"
-	comettypes "github.com/cometbft/cometbft/types"
+	"fmt"
+	"os"
+	"time"
 
 	"go.vocdoni.io/dvote/types"
 )
 
-// Doc is a wrapper around the CometBFT GenesisDoc,
-// that adds some useful methods like Hash
+// Doc is the genesis document of a chain: its identity and initial state.
 type Doc struct {
-	comettypes.GenesisDoc
-	EndOfChain int64
+	GenesisTime   time.Time       `json:"genesis_time"`
+	ChainID       string          `json:"chain_id"`
+	InitialHeight int64           `json:"initial_height"`
+	AppState      json.RawMessage `json:"app_state,omitempty"`
 }
 
 // Marshal returns the JSON encoding of the genesis.Doc.
@@ -27,11 +29,44 @@ func (g *Doc) Marshal() []byte {
 
 // Hash returns the hash of the genesis.Doc.
 func (g *Doc) Hash() []byte {
-	data, err := json.Marshal(g)
-	if err != nil {
-		panic(err)
+	h := sha256.Sum256(g.Marshal())
+	return h[:]
+}
+
+// Validate checks that the mandatory fields of the genesis.Doc are set.
+func (g *Doc) Validate() error {
+	if g.ChainID == "" {
+		return fmt.Errorf("genesis doc must include a non-empty chain_id")
 	}
-	return comethash.Sum(data)
+	if g.InitialHeight < 0 {
+		return fmt.Errorf("initial_height cannot be negative (got %d)", g.InitialHeight)
+	}
+	return nil
+}
+
+// SaveAs writes the JSON encoding of the genesis.Doc to the given file.
+func (g *Doc) SaveAs(path string) error {
+	data, err := json.MarshalIndent(g, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o600)
+}
+
+// LoadFromFile loads and unmarshals a genesis.json, returning a genesis.Doc
+func LoadFromFile(path string) (*Doc, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	g := &Doc{}
+	if err := json.Unmarshal(data, g); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal genesis %s: %w", path, err)
+	}
+	if err := g.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid genesis %s: %w", path, err)
+	}
+	return g, nil
 }
 
 // ________________________ GENESIS APP STATE ________________________

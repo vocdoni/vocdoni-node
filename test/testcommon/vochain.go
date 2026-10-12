@@ -2,13 +2,10 @@ package testcommon
 
 import (
 	"encoding/base64"
-	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 
-	cometprivval "github.com/cometbft/cometbft/privval"
-
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
@@ -35,7 +32,7 @@ var (
 		ProcessId:     testutil.Hex2byte(nil, "e9d5e8d791f51179e218c606f83f5967ab272292a6dbda887853d81f7a1d5105"),
 		EntityId:      testutil.Hex2byte(nil, "180dd5765d9f7ecef810b565a2e5bd14a3ccd536c442b3de74867df552855e85"),
 		CensusRoot:    testutil.Hex2byte(nil, "0a975f5cf517899e6116000fd366dc0feb34a2ea1b64e9b213278442dd9852fe"),
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Duration:      uint32((time.Minute * 60).Seconds()),
 		EnvelopeType:  &models.EnvelopeType{},
 		Mode:          &models.ProcessMode{},
@@ -60,44 +57,26 @@ func NewVochainState(tb testing.TB) *state.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *state.State {
-	var err error
 	s := NewVochainState(tb)
-	vals := make([]*cometprivval.FilePV, 2)
-	rint := rand.Int()
-	vals[0], err = cometprivval.GenFilePV(
-		"/tmp/"+strconv.Itoa(rint),
-		"/tmp/"+strconv.Itoa(rint),
-		nil,
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	rint = rand.Int()
-	vals[1], err = cometprivval.GenFilePV(
-		"/tmp/"+strconv.Itoa(rint),
-		"/tmp/"+strconv.Itoa(rint),
-		nil,
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	validator0 := &models.Validator{
-		Address: vals[0].Key.Address.Bytes(),
-		PubKey:  vals[0].Key.PubKey.Bytes(),
-		Power:   10,
-	}
-	validator1 := &models.Validator{
-		Address: vals[0].Key.Address.Bytes(),
-		PubKey:  vals[0].Key.PubKey.Bytes(),
-		Power:   10,
-	}
-	if err := s.AddValidator(validator0); err != nil {
-		tb.Fatal(err)
-	}
-	if err := s.AddValidator(validator1); err != nil {
-		tb.Fatal(err)
+	for i := 0; i < 2; i++ {
+		if err := s.AddValidator(NewValidator(tb)); err != nil {
+			tb.Fatal(err)
+		}
 	}
 	return s
+}
+
+// NewValidator returns a validator with a random secp256k1 key.
+func NewValidator(tb testing.TB) *models.Validator {
+	signer := ethereum.NewSignKeys()
+	if err := signer.Generate(); err != nil {
+		tb.Fatal(err)
+	}
+	return &models.Validator{
+		Address: signer.Address().Bytes(),
+		PubKey:  signer.PublicKey(),
+		Power:   10,
+	}
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *state.State {

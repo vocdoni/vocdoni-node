@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -171,11 +171,15 @@ type Election struct {
 	Census       *ElectionCensus `json:"census,omitempty"`
 	MetadataURL  string          `json:"metadataURL"`
 	MetadataHash types.HexBytes  `json:"metadataHash,omitempty"`
+	// Metadata is the raw off-chain metadata document, included inline only when
+	// the MetadataURL is an ipfs:// URI and the content is cached locally.
+	// https:// URIs are never fetched server-side; the client fetches them and
+	// checks against MetadataHash.
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
 	CreationTime time.Time       `json:"creationTime"`
 	VoteMode     VoteMode        `json:"voteMode,omitempty"`
 	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
 	TallyMode    TallyMode       `json:"tallyMode,omitempty"`
-	Metadata     any             `json:"metadata,omitempty"`
 }
 
 type ElectionKeys struct {
@@ -194,20 +198,10 @@ type ElectionCensus struct {
 
 type ElectionCreate struct {
 	TxPayload                 []byte         `json:"txPayload,omitempty"`
-	Metadata                  []byte         `json:"metadata,omitempty"`
 	TxHash                    types.HexBytes `json:"txHash" `
 	ElectionID                types.HexBytes `json:"electionID" `
-	MetadataURL               string         `json:"metadataURL"`
 	MetadataEncryptionPrivKey types.HexBytes `json:"metadataEncryptionPrivKey,omitempty"`
 	Warning                   string         `json:"warning,omitempty"`
-}
-
-// ElectionMetadataUpdate is the request and response of PUT /elections/{electionId}/metadata.
-type ElectionMetadataUpdate struct {
-	TxPayload   []byte         `json:"txPayload,omitempty"`
-	Metadata    []byte         `json:"metadata,omitempty"`
-	TxHash      types.HexBytes `json:"txHash"`
-	MetadataURL string         `json:"metadataURL"`
 }
 
 // ElectionMetadataHistory lists every metadata version an election has had, oldest first.
@@ -237,7 +231,6 @@ type ElectionDescription struct {
 	ElectionType ElectionType          `json:"electionType"`
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
-	TempSIKs     bool                  `json:"tempSIKs"`
 }
 
 type Key struct {
@@ -316,21 +309,22 @@ type ChainStats struct {
 	VoteCount uint64 `json:"voteCount" example:"134523"`
 }
 
+// Census types accepted in CensusTypeDescription.
+const (
+	CensusTypeWeighted   = "weighted"
+	CensusTypeZKWeighted = "zkweighted"
+	CensusTypeCSP        = "csp"
+	// CensusTypeCSPv2 is CensusTypeCSP with the fixed salt derivation for the
+	// salted proof types (census origin OFF_CHAIN_CA_V2).
+	CensusTypeCSPv2 = "csp2"
+)
+
 type CensusTypeDescription struct {
 	Type      string         `json:"type"`
 	Size      uint64         `json:"size"`
 	URL       string         `json:"url,omitempty"`
 	PublicKey types.HexBytes `json:"publicKey,omitempty" `
 	RootHash  types.HexBytes `json:"rootHash,omitempty" `
-}
-
-type CensusParticipants struct {
-	Participants []CensusParticipant `json:"participants"`
-}
-
-type CensusParticipant struct {
-	Key    types.HexBytes `json:"key" `
-	Weight *types.BigInt  `json:"weight"`
 }
 
 type VoteType struct {
@@ -365,10 +359,6 @@ type Transaction struct {
 // in a batch request.
 type TransactionPayload struct {
 	Payload []byte `json:"payload" swaggertype:"string" format:"base64"`
-	// Metadata is the optional raw election metadata for a NewProcess payload. When
-	// provided, its CID must match the metadata URI in the transaction, and it is
-	// pinned to IPFS on submission (same as POST /elections).
-	Metadata []byte `json:"metadata,omitempty" swaggertype:"string" format:"base64"`
 }
 
 // TransactionBatch is a request to submit multiple transactions at once, in order.
@@ -385,10 +375,9 @@ type TransactionBatchItem struct {
 	// Code is the mempool CheckTx response code. For submitted items it is always
 	// 0: a non-zero CheckTx code is turned into a submit error, so the item lands
 	// in Failed instead. The field is kept for parity with the single-tx endpoint.
-	Code        *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
-	Error       string  `json:"error,omitempty" extensions:"x-omitempty"`
-	Warning     string  `json:"warning,omitempty" extensions:"x-omitempty"`
-	MetadataURL string  `json:"metadataURL,omitempty" extensions:"x-omitempty"`
+	Code    *uint32 `json:"code,omitempty" extensions:"x-omitempty"`
+	Error   string  `json:"error,omitempty" extensions:"x-omitempty"`
+	Warning string  `json:"warning,omitempty" extensions:"x-omitempty"`
 }
 
 // TransactionBatchResult groups every input transaction of a batch by its
@@ -450,7 +439,6 @@ type ChainInfo struct {
 	TransactionCount  uint64    `json:"transactionCount" example:"554"`
 	ValidatorCount    uint32    `json:"validatorCount" example:"5"`
 	VoteCount         uint64    `json:"voteCount" example:"432"`
-	CircuitVersion    string    `json:"circuitVersion" example:"v1.0.0"`
 	MaxCensusSize     uint64    `json:"maxCensusSize" example:"50000"`
 	NetworkCapacity   uint64    `json:"networkCapacity" example:"2000"`
 }
@@ -464,8 +452,10 @@ type Account struct {
 	FeesCount      uint64           `json:"feesCount,omitempty"`
 	InfoURL        string           `json:"infoURL,omitempty"`
 	Token          *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
+	// Metadata is the parsed account off-chain metadata document, included
+	// inline only when InfoURL is an ipfs:// URI and the content is cached
+	// locally. https:// URIs are never fetched server-side.
 	Metadata       *AccountMetadata `json:"metadata,omitempty"`
-	SIK            types.HexBytes   `json:"sik"`
 }
 
 type AccountsList struct {
@@ -474,10 +464,8 @@ type AccountsList struct {
 }
 
 type AccountSet struct {
-	TxPayload   []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
-	Metadata    []byte         `json:"metadata,omitempty" swaggerignore:"true"`
-	TxHash      types.HexBytes `json:"txHash" `
-	MetadataURL string         `json:"metadataURL" swaggertype:"string"`
+	TxPayload []byte         `json:"txPayload,omitempty" swaggerignore:"true"`
+	TxHash    types.HexBytes `json:"txHash" `
 }
 
 type Census struct {
@@ -490,16 +478,10 @@ type Census struct {
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
 	// proof stuff
-	CensusRoot     types.HexBytes `json:"censusRoot,omitempty"`
-	CensusProof    types.HexBytes `json:"censusProof,omitempty"`
-	Key            types.HexBytes `json:"key,omitempty"`
-	Value          types.HexBytes `json:"value,omitempty"`
-	CensusSiblings []string       `json:"censusSiblings,omitempty"`
-}
-
-type File struct {
-	Payload []byte `json:"payload,omitempty" swaggerignore:"true"`
-	CID     string `json:"cid,omitempty"`
+	CensusRoot  types.HexBytes `json:"censusRoot,omitempty"`
+	CensusProof types.HexBytes `json:"censusProof,omitempty"`
+	Key         types.HexBytes `json:"key,omitempty"`
+	Value       types.HexBytes `json:"value,omitempty"`
 }
 
 type ValidatorList struct {
@@ -584,10 +566,48 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	return origin, root, nil
 }
 
+// Block is the block information returned to the client
 type Block struct {
-	comettypes.Header `json:"header"`
-	Hash              types.HexBytes `json:"hash" `
-	TxCount           int64          `json:"txCount"`
+	Header  BlockHeader    `json:"header"`
+	Hash    types.HexBytes `json:"hash" `
+	TxCount int64          `json:"txCount"`
+}
+
+// BlockHeader holds the block header fields. Hashes and addresses are encoded as uppercase hex.
+// Fields not tracked by the chain are kept with zero values so the response shape is stable.
+type BlockHeader struct {
+	Version            BlockVersion        `json:"version"`
+	ChainID            string              `json:"chain_id"`
+	Height             int64               `json:"height"`
+	Time               time.Time           `json:"time"`
+	LastBlockID        BlockID             `json:"last_block_id"`
+	LastCommitHash     blocktypes.HexBytes `json:"last_commit_hash"`
+	DataHash           blocktypes.HexBytes `json:"data_hash"`
+	ValidatorsHash     blocktypes.HexBytes `json:"validators_hash"`
+	NextValidatorsHash blocktypes.HexBytes `json:"next_validators_hash"`
+	ConsensusHash      blocktypes.HexBytes `json:"consensus_hash"`
+	AppHash            blocktypes.HexBytes `json:"app_hash"`
+	LastResultsHash    blocktypes.HexBytes `json:"last_results_hash"`
+	EvidenceHash       blocktypes.HexBytes `json:"evidence_hash"`
+	ProposerAddress    blocktypes.HexBytes `json:"proposer_address"`
+}
+
+// BlockVersion holds the block and app protocol versions of a block.
+type BlockVersion struct {
+	Block uint64 `json:"block"`
+	App   uint64 `json:"app"`
+}
+
+// BlockID identifies a block by its hash.
+type BlockID struct {
+	Hash  blocktypes.HexBytes `json:"hash"`
+	Parts BlockPartSetHeader  `json:"parts"`
+}
+
+// BlockPartSetHeader describes how a block is split in parts.
+type BlockPartSetHeader struct {
+	Total uint32              `json:"total"`
+	Hash  blocktypes.HexBytes `json:"hash"`
 }
 
 // BlockList is used to return a paginated list to the client

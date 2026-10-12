@@ -32,7 +32,7 @@ func metricsDeleteValidator(validator *models.Validator) {
 	metrics.UnregisterMetric("vochain_validator_votes" + labelsFrom(validator))
 }
 
-// AddValidator adds a tendemint validator. If it exists, it will be updated.
+// AddValidator adds a validator. If it exists, it will be updated.
 func (v *State) AddValidator(validator *models.Validator) error {
 	v.tx.Lock()
 	defer v.tx.Unlock()
@@ -51,7 +51,7 @@ func (v *State) AddValidator(validator *models.Validator) error {
 	return nil
 }
 
-// RemoveValidator removes a tendermint validator identified by its
+// RemoveValidator removes a validator identified by its
 // validator.Address. It also clears the per-validator IST markers (vldIS/,
 // vldSW/) so any subsequent re-add of the same address starts with a clean
 // slate — the two are logically part of the same "this address is no longer
@@ -141,13 +141,8 @@ func (v *State) Validators(committed bool) (map[string]*models.Validator, error)
 
 // Validator returns an existing validator identified by the given signing
 // address. If the validator is not found, returns nil and no error. A leaf
-// carrying Power=0 (an IST tombstone awaiting reap on the next block) is
-// treated as "not a validator" here — every caller of this singular getter
-// is doing an "is this an active validator?" check (tx auth, node
-// self-identification), and returning the tombstone would let a validator
-// keep authorising things for the one-block window between tombstone and
-// reap. The ABCI path in cometbft.go reads Validators (plural) directly so
-// it still sees the tombstone and emits the required Power=0 signal.
+// carrying Power=0 is treated as "not a validator" here, since every caller
+// of this singular getter is doing an "is this an active validator?" check.
 func (v *State) Validator(address common.Address, committed bool) (*models.Validator, error) {
 	list, err := v.Validators(committed)
 	if err != nil {

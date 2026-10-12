@@ -3,93 +3,20 @@ package vochain
 import (
 	"context"
 	"encoding/json"
-	"math/big"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
-	"go.vocdoni.io/dvote/censustree"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/db/metadb"
-	"go.vocdoni.io/dvote/tree/arbo"
+	"go.vocdoni.io/dvote/test/testcommon/testvoteproof"
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
 
-// testCreateKeysAndBuildCensus creates a bunch of random keys and a new zk
-// friendly census tree (using Poseidon as tree hash and the weight provided as
-// leaf value). It returns the keys, the census root and the proofs for each key.
-func testCreateKeysAndBuildWeightedZkCensus(t *testing.T, size int, weight *big.Int) ([]*ethereum.SignKeys, []byte, [][]byte) {
-	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{
-		Name: "testcensus", ParentDB: db,
-		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_POSEIDON,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	encWeight := arbo.BigIntToBytesLE(arbo.HashFunctionPoseidon.Len(), weight)
-	keys := ethereum.NewSignKeysBatch(size)
-	for _, k := range keys {
-		qt.Check(t, err, qt.IsNil)
-		err = tr.Add(k.Address().Bytes(), encWeight)
-		qt.Check(t, err, qt.IsNil)
-	}
-
-	root, err := tr.Root()
-	qt.Check(t, err, qt.IsNil)
-	var proofs [][]byte
-	for _, k := range keys {
-		_, proof, err := tr.GenProof(k.Address().Bytes())
-		qt.Check(t, err, qt.IsNil)
-		proofs = append(proofs, proof)
-		valid, err := tr.VerifyProof(k.Address().Bytes(), encWeight, proof, root)
-		qt.Check(t, err, qt.IsNil)
-		qt.Check(t, valid, qt.IsTrue)
-	}
-	return keys, root, proofs
-}
-
-// testCreateKeysAndBuildCensus creates a bunch of random keys and a new census tree.
-// It returns the keys, the census root and the proofs for each key.
-func testCreateKeysAndBuildCensus(t *testing.T, size int) ([]*ethereum.SignKeys, []byte, [][]byte) {
-	db := metadb.NewTest(t)
-	tr, err := censustree.New(censustree.Options{
-		Name: "testcensus", ParentDB: db,
-		MaxLevels: censustree.DefaultMaxLevels, CensusType: models.Census_ARBO_BLAKE2B,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	keys := ethereum.NewSignKeysBatch(size)
-	hashedKeys := [][]byte{}
-	for _, k := range keys {
-		c, err := tr.Hash(k.Address().Bytes())
-		qt.Check(t, err, qt.IsNil)
-		c = c[:censustree.DefaultMaxKeyLen]
-		err = tr.Add(c, nil)
-		qt.Check(t, err, qt.IsNil)
-		hashedKeys = append(hashedKeys, c)
-	}
-
-	var proofs [][]byte
-	for i := range keys {
-		_, proof, err := tr.GenProof(hashedKeys[i])
-		qt.Check(t, err, qt.IsNil)
-		proofs = append(proofs, proof)
-	}
-	root, err := tr.Root()
-	qt.Check(t, err, qt.IsNil)
-	return keys, root, proofs
-}
-
 func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys,
-	proof []byte, votePackage []int, chainID string,
+	proof *models.ProofCA, votePackage []int, chainID string,
 ) *models.SignedTx {
 	return testBuildSignedVoteWithMetadataHash(t, electionID, key, proof, votePackage, chainID, nil)
 }
@@ -97,24 +24,16 @@ func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys
 // testBuildSignedVoteWithMetadataHash builds a signed vote which attests the
 // given election metadata hash.
 func testBuildSignedVoteWithMetadataHash(t *testing.T, electionID []byte, key *ethereum.SignKeys,
-	proof []byte, votePackage []int, chainID string, metadataHash []byte,
+	proof *models.ProofCA, votePackage []int, chainID string, metadataHash []byte,
 ) *models.SignedTx {
 	var stx models.SignedTx
 	var err error
 	vp, err := json.Marshal(votePackage)
 	qt.Check(t, err, qt.IsNil)
 	vote := &models.VoteEnvelope{
-		Nonce:     util.RandomBytes(32),
-		ProcessId: electionID,
-		Proof: &models.Proof{
-			Payload: &models.Proof_Arbo{
-				Arbo: &models.ProofArbo{
-					Type:     models.ProofArbo_BLAKE2B,
-					Siblings: proof,
-					KeyType:  models.ProofArbo_ADDRESS,
-				},
-			},
-		},
+		Nonce:        util.RandomBytes(32),
+		ProcessId:    electionID,
+		Proof:        &models.Proof{Payload: &models.Proof_Ca{Ca: proof}},
 		VotePackage:  vp,
 		MetadataHash: metadataHash,
 	}
@@ -130,9 +49,9 @@ func testBuildSignedVoteWithMetadataHash(t *testing.T, electionID []byte, key *e
 
 func TestVoteOverwrite(t *testing.T) {
 	app := TestBaseApplication(t)
-	keys, root, proofs := testCreateKeysAndBuildCensus(t, 10)
-	censusURI := ipfsUrlTest
 	pid := util.RandomBytes(types.ProcessIDsize)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10, pid)
+	censusURI := ipfsUrlTest
 	process := &models.Process{
 		ProcessId:    pid,
 		StartBlock:   0,
@@ -149,7 +68,7 @@ func TestVoteOverwrite(t *testing.T) {
 		EntityId:      util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:    root,
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		BlockCount:    1024,
 		MaxCensusSize: 10,
 	}
@@ -157,8 +76,8 @@ func TestVoteOverwrite(t *testing.T) {
 	qt.Check(t, err, qt.IsNil)
 	app.AdvanceTestBlock()
 
-	cktx := new(cometabcitypes.CheckTxRequest)
-	var cktxresp *cometabcitypes.CheckTxResponse
+	cktx := new(CheckTxRequest)
+	var cktxresp *CheckTxResponse
 
 	// send 9 votes, should be fine
 	for i := 1; i < 10; i++ {
@@ -240,12 +159,12 @@ func TestMaxCensusSize(t *testing.T) {
 	err := app.State.SetMaxProcessSize(20)
 	qt.Check(t, err, qt.IsNil)
 
-	// create a census with 10 keys
-	keys, root, proofs := testCreateKeysAndBuildCensus(t, 11)
+	// create a census with 11 keys
+	pid := util.RandomBytes(types.ProcessIDsize)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 11, pid)
 	censusURI := ipfsUrlTest
 
 	// create a process with max census size 10
-	pid := util.RandomBytes(types.ProcessIDsize)
 	process := &models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: false},
@@ -261,7 +180,7 @@ func TestMaxCensusSize(t *testing.T) {
 		EntityId:      util.RandomBytes(types.EthereumAddressSize),
 		CensusRoot:    root,
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		StartTime:     0,
 		Duration:      100,
 		MaxCensusSize: 10,
@@ -272,7 +191,7 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// define a function to send a vote
 	vote := func(i int) uint32 {
-		cktx := new(cometabcitypes.CheckTxRequest)
+		cktx := new(CheckTxRequest)
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
@@ -299,12 +218,12 @@ func TestMaxCensusSize(t *testing.T) {
 // testMetadataVoteSetup creates an election with a committed metadata hash,
 // owned by an account able to update it, and a census of voters.
 func testMetadataVoteSetup(t *testing.T) (*BaseApplication, *ethereum.SignKeys, *models.Process,
-	[]*ethereum.SignKeys, [][]byte,
+	[]*ethereum.SignKeys, []*models.ProofCA,
 ) {
 	app, accounts := createTestBaseApplicationAndAccounts(t, 10)
-	voters, root, proofs := testCreateKeysAndBuildCensus(t, 4)
 	process := testMetadataProcess(accounts[0].Address().Bytes())
 	process.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	voters, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 4, process.ProcessId)
 	process.Mode = &models.ProcessMode{AutoStart: true, Interruptible: true}
 	process.VoteOptions = &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 3}
 	process.CensusRoot = root
@@ -322,7 +241,7 @@ func testSendVote(app *BaseApplication, stx *models.SignedTx, forCommit bool) ui
 	if forCommit {
 		return app.deliverTx(txb).Code
 	}
-	resp, _ := app.CheckTx(context.TODO(), &cometabcitypes.CheckTxRequest{Tx: txb})
+	resp, _ := app.CheckTx(context.TODO(), &CheckTxRequest{Tx: txb})
 	return resp.Code
 }
 
@@ -372,9 +291,9 @@ func TestVoteMetadataHashChangedInFlight(t *testing.T) {
 
 func TestVoteMetadataHashWithoutCommittedHash(t *testing.T) {
 	app := TestBaseApplication(t)
-	voters, root, proofs := testCreateKeysAndBuildCensus(t, 2)
 	process := testMetadataProcess(util.RandomBytes(types.EthereumAddressSize))
 	process.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	voters, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 2, process.ProcessId)
 	process.Mode = &models.ProcessMode{AutoStart: true}
 	process.VoteOptions = &models.ProcessVoteOptions{MaxCount: 3, MaxValue: 3}
 	process.CensusRoot = root

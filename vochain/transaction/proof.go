@@ -7,9 +7,7 @@ import (
 
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain/state"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/arboproof"
 	"go.vocdoni.io/dvote/vochain/transaction/proofs/cspproof"
-	"go.vocdoni.io/dvote/vochain/transaction/proofs/zkproof"
 
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -19,8 +17,7 @@ type ProofVerifier interface {
 	Verify(process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error)
 }
 
-// VerifyProof is a wrapper over all VerifyProofFunc(s) available which uses the process.CensusOrigin
-// to execute the correct verification function.
+// VerifyProof verifies the vote proof with the CSP verifier matching the process.CensusOrigin.
 func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID state.VoterID) (bool, *big.Int, error) {
 	// sanity checks
 	if envelope == nil {
@@ -50,12 +47,6 @@ func VerifyProof(process *models.Process, envelope *models.VoteEnvelope, vID sta
 	// select the correct proof verifier
 	var verifier ProofVerifier
 	switch process.CensusOrigin {
-	case models.CensusOrigin_OFF_CHAIN_TREE, models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED:
-		if process.EnvelopeType.Anonymous {
-			verifier = &zkproof.ProofVerifierZk{}
-		} else {
-			verifier = &arboproof.ProofVerifierArbo{}
-		}
 	case models.CensusOrigin_OFF_CHAIN_CA:
 		verifier = &cspproof.ProofVerifierCSP{}
 	case models.CensusOrigin_OFF_CHAIN_CA_V2:

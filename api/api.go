@@ -7,10 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"sync"
 
-	"go.vocdoni.io/dvote/api/censusdb"
-	"go.vocdoni.io/dvote/data"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/db/metadb"
 	"go.vocdoni.io/dvote/db/prefixeddb"
@@ -32,14 +29,10 @@ import (
 //	@tag.description	Related to account metadata (additional account information like balance, storage URI, process count...)
 //	@tag.name			Elections
 //	@tag.description	Create, manage and get information about elections
-//	@tag.name			Censuses
-//	@tag.description	Manage census: create, add, get, verify...
 //	@tag.name			Votes
 //	@tag.description	Submit, get, and verify votes
 //	@tag.name			Wallet
 //	@tag.description	Operations for the wallets managed backend side
-//	@tag.name			SIK
-//	@tag.description	The Secret Identity Key (SIK) operations used on anonymous voting
 
 //	@schemes	https
 //	@host		api-dev.vocdoni.net
@@ -48,7 +41,7 @@ import (
 //	@securityDefinitions.apikey	ApiKeyAuth
 //	@in							header
 //	@name						Authorization
-//	@description				Send as "Authorization: Bearer <token>". Census endpoints take the client-chosen UUID used when creating the census; wallet endpoints take the token returned by /wallet/add/{privateKey}; admin-only endpoints take the node admin token.
+//	@description				Send as "Authorization: Bearer <token>". Wallet endpoints take the token returned by /wallet/add/{privateKey}; admin-only endpoints take the node admin token.
 
 const (
 	// DefaultItemsPerPage defines how many items per page are returned by the paginated endpoints,
@@ -70,7 +63,6 @@ const (
 //nolint:revive
 const (
 	ParamAccountId       = "accountId"
-	ParamCensusId        = "censusId"
 	ParamElectionId      = "electionId"
 	ParamOrganizationId  = "organizationId"
 	ParamVoteId          = "voteId"
@@ -113,14 +105,10 @@ var (
 type API struct {
 	Endpoint *apirest.API
 
-	indexer  *indexer.Indexer
-	vocapp   *vochain.BaseApplication
-	storage  data.Storage
-	vocinfo  *vochaininfo.VochainInfo
-	censusdb *censusdb.CensusDB
-	db       db.Database // used for internal db operations
-
-	censusPublishStatusMap sync.Map // used to store the status of the census publishing process when async
+	indexer *indexer.Indexer
+	vocapp  *vochain.BaseApplication
+	vocinfo *vochaininfo.VochainInfo
+	db      db.Database // used for internal db operations
 }
 
 // NewAPI creates a new instance of the API.  Attach must be called next.
@@ -155,16 +143,11 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 // Attach takes a list of modules which are used by the handlers in order to interact with the system.
 // Attach must be called before EnableHandlers.
 func (a *API) Attach(vocdoniAPP *vochain.BaseApplication, vocdoniInfo *vochaininfo.VochainInfo,
-	indexer *indexer.Indexer, data data.Storage, censusdb *censusdb.CensusDB,
+	indexer *indexer.Indexer,
 ) {
 	a.vocapp = vocdoniAPP
 	a.vocinfo = vocdoniInfo
 	a.indexer = indexer
-	a.storage = data
-	a.censusdb = censusdb
-	// this is the first point where both the indexer and off-chain storage are
-	// known, which is what filling the cached metadata needs
-	a.startMetadataBackfill()
 }
 
 // EnableHandlers enables the list of handlers. Attach must be called before.
@@ -206,20 +189,7 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			if err := a.enableAccountHandlers(); err != nil {
 				return err
 			}
-		case CensusHandler:
-			if err := a.enableCensusHandlers(); err != nil {
-				return err
-			}
-			if a.censusdb == nil {
-				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
-			}
-		case SIKHandler:
-			if err := a.enableSIKHandlers(); err != nil {
-				return err
-			}
-			if a.censusdb == nil {
-				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
-			}
+
 
 		default:
 			return fmt.Errorf("%w: %s", ErrHandlerUnknown, h)

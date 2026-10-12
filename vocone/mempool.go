@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
-	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 )
 
 // loadMempool rebuilds the in-memory mempool index from the persistent database.
@@ -65,18 +64,18 @@ func (vc *Vocone) loadMempool() error {
 }
 
 // addTx validates and adds a transaction to the persistent mempool.
-func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
+func (vc *Vocone) addTx(tx []byte) (*vochain.SendTxResponse, error) {
+	resp, err := vc.App.CheckTx(context.Background(), &vochain.CheckTxRequest{Tx: tx})
 	if err != nil {
 		return nil, err
 	}
 	if resp.Code != 0 {
 		log.Debugw("checkTx failed", "data", string(resp.Data))
-		return &cometcoretypes.ResultBroadcastTx{
+		return &vochain.SendTxResponse{
 			Code: resp.Code,
 			Data: resp.Data,
 			Log:  resp.Log,
-			Hash: comettmhash.Sum(tx),
+			Hash: blocktypes.Tx(tx).Hash(),
 		}, nil
 	}
 
@@ -84,10 +83,7 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	defer vc.mempoolMtx.Unlock()
 
 	if len(vc.mempoolKeys) >= DefaultMempoolSize {
-		return &cometcoretypes.ResultBroadcastTx{
-			Code: 1,
-			Data: []byte("mempool is full"),
-		}, fmt.Errorf("mempool is full")
+		return nil, vochain.ErrMempoolFull
 	}
 
 	// Generate a unique key using a monotonic sequence.
@@ -110,11 +106,11 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	}
 	vc.mempoolKeys = append(vc.mempoolKeys, key)
 
-	return &cometcoretypes.ResultBroadcastTx{
+	return &vochain.SendTxResponse{
 		Code: resp.Code,
 		Data: resp.Data,
 		Log:  resp.Log,
-		Hash: comettmhash.Sum(tx),
+		Hash: blocktypes.Tx(tx).Hash(),
 	}, nil
 }
 
@@ -135,7 +131,7 @@ func (vc *Vocone) mempoolPrune(txHash [32]byte) error {
 		if err != nil {
 			continue
 		}
-		if [32]byte(comettmhash.Sum(txData)) == txHash {
+		if blocktypes.Tx(txData).Key() == txHash {
 			wTx := vc.mempoolDB.WriteTx()
 			defer wTx.Discard()
 			if err := wTx.Delete(key); err != nil {
@@ -160,10 +156,18 @@ func mempoolKey(seq uint64) []byte {
 }
 
 // prepareBlock drains transactions from the mempool, re-validates them,
-// and returns the raw tx list along with the mempool keys that were consumed.
-// It does NOT modify the mempool or blockstore — the caller is responsible
-// for persisting writes and cleaning up the mempool after a successful commit.
-func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
+// and returns the raw tx list.  It does NOT modify the mempool or blockstore.
+//
+// includedKeys are the mempool keys of the transactions passed back in txs.
+// Whether to remove them from the mempool is decided by the caller based on
+// the delivery outcome: only successfully-delivered txs should be consumed,
+// so that txs which fail deliverTx (e.g. future-nonce txs) remain in the
+// mempool and are retried in a subsequent block.
+//
+// discardedKeys are the mempool keys of txs that failed the pre-flight
+// CheckTx and must be removed unconditionally (TTL expiry, malformed tx,
+// etc.).
+func (vc *Vocone) prepareBlock() (txs [][]byte, includedKeys [][]byte, discardedKeys [][]byte) {
 	vc.mempoolMtx.Lock()
 	// Take up to txsPerBlock keys from the front of the queue.
 	count := min(vc.txsPerBlock, len(vc.mempoolKeys))
@@ -172,40 +176,40 @@ func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 	vc.mempoolMtx.Unlock()
 
 	if len(pendingKeys) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	for _, key := range pendingKeys {
 		txData, err := vc.mempoolDB.Get(key)
 		if err != nil {
-			// Key disappeared (pruned concurrently), skip.
-			consumedKeys = append(consumedKeys, key)
+			// Key disappeared (pruned concurrently), discard.
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 
 		// Re-validate before including in the block.
-		resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: txData})
+		resp, err := vc.App.CheckTx(context.Background(), &vochain.CheckTxRequest{Tx: txData})
 		if err != nil {
 			log.Errorw(err, "error on check tx during block preparation")
-			consumedKeys = append(consumedKeys, key)
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 		if resp.Code != 0 {
-			log.Warnw("check tx failed during block preparation",
+			log.Warnw("check tx failed during block preparation, discarding",
 				"code", resp.Code, "data", string(resp.Data))
-			consumedKeys = append(consumedKeys, key)
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 
 		txs = append(txs, txData)
-		consumedKeys = append(consumedKeys, key)
+		includedKeys = append(includedKeys, key)
 	}
 
 	if len(txs) > 0 {
 		log.Infow("prepared block transactions",
 			"count", len(txs), "height", vc.height.Load())
 	}
-	return txs, consumedKeys
+	return txs, includedKeys, discardedKeys
 }
 
 // commitMempoolCleanup removes consumed keys from the persistent mempool

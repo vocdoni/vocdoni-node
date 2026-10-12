@@ -18,24 +18,27 @@ import (
 	"github.com/spf13/viper"
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vocone"
-	"go.vocdoni.io/proto/build/go/models"
 )
+
+// defaultFaucetBalance is the genesis balance of the faucet account.
+const defaultFaucetBalance = 1000000
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
 	logLevel, dir, keymanager, path, chainID string
 	port, blockSeconds, blockSize            int
 	txCosts                                  uint64
-	disableIpfs                              bool
 	fundedAccounts                           []string
 	enableFaucetWithAmount                   uint64
-	ipfsConnectKey                           string
-	ipfsConnectPeers                         []string
+	faucetKey                                string
+	faucetBalance                            uint64
+	adminToken                               string
+	importGenesis                            string
+	importFundedAccounts                     []string
 }
 
 func main() {
@@ -59,14 +62,24 @@ func main() {
 	setTxCosts := flag.Bool("setTxCosts", false, "if true, transaction costs are set to the value of txCosts flag")
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction costs for all types")
 	flag.Uint64Var(&config.enableFaucetWithAmount, "enableFaucet", 0, "enable faucet API service for the given amount")
-	flag.BoolVar(&config.disableIpfs, "disableIpfs", false, "disable built-in IPFS node")
-	flag.StringVarP(&config.ipfsConnectKey, "ipfsConnectKey", "i", "",
-		"enable IPFS group synchronization using the given secret key")
-	flag.StringSliceVar(&config.ipfsConnectPeers, "ipfsConnectPeers", []string{},
-		"use custom ipfsconnect peers/bootnodes for accessing the DHT (comma-separated)")
+	flag.StringVar(&config.faucetKey, "faucetKey", "",
+		"faucet account private hexadecimal key (generated and saved in the config file if empty)")
+	flag.Uint64Var(&config.faucetBalance, "faucetBalance", defaultFaucetBalance,
+		"faucet account balance at genesis (only applied when the chain is created)")
+	flag.StringVar(&config.adminToken, "adminToken", "",
+		"bearer token for the admin API endpoints (admin endpoints are disabled if empty)")
+
+	flag.StringVar(&config.importGenesis, "importGenesis", "",
+		"genesis.json of an existing chain whose state (vcstate) and indexer were copied into --dir; "+
+			"the chain is continued from its last height instead of applying a new genesis (only used once, "+
+			"when --dir holds no vocone chain yet)")
+
+	flag.StringSliceVar(&config.importFundedAccounts, "importFundedAccounts", []string{},
+		"list of accounts (address:amount,...) whose balance is increased by amount when the chain is imported "+
+			"with --importGenesis; no other tokens are minted on import")
 
 	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
-		"list of pre-funded accounts (address:balance,address:balance,...)")
+		"list of pre-funded accounts (address:balance,address:balance,...), only applied when the chain is created")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
@@ -136,11 +149,25 @@ func main() {
 	}
 	*setTxCosts = pviper.GetBool("setTxCosts")
 
-	pviper.BindPFlag("ipfsConnectKey", flag.Lookup("ipfsConnectKey"))
-	config.ipfsConnectKey = pviper.GetString("ipfsConnectKey")
+	if err := pviper.BindPFlag("faucetKey", flag.Lookup("faucetKey")); err != nil {
+		panic(err)
+	}
+	config.faucetKey = pviper.GetString("faucetKey")
 
-	pviper.BindPFlag("ipfsConnectPeers", flag.Lookup("ipfsConnectPeers"))
-	config.ipfsConnectPeers = pviper.GetStringSlice("ipfsConnectPeers")
+	if err := pviper.BindPFlag("faucetBalance", flag.Lookup("faucetBalance")); err != nil {
+		panic(err)
+	}
+	config.faucetBalance = pviper.GetUint64("faucetBalance")
+
+	if err := pviper.BindPFlag("adminToken", flag.Lookup("adminToken")); err != nil {
+		panic(err)
+	}
+	config.adminToken = pviper.GetString("adminToken")
+
+	if err := pviper.BindPFlag("fundedAccounts", flag.Lookup("fundedAccounts")); err != nil {
+		panic(err)
+	}
+	config.fundedAccounts = pviper.GetStringSlice("fundedAccounts")
 
 	_, err = os.Stat(filepath.Join(config.dir, "voconed.yml"))
 	if err != nil {
@@ -170,6 +197,27 @@ func main() {
 		pviper.Set("keymanager", config.keymanager)
 	}
 
+	// importing an existing chain: no account is funded, so the faucet needs the key of an
+	// account that already holds funds in the imported state
+	importing := config.importGenesis != "" && !fileExists(filepath.Join(config.dir, vocone.GenesisFile))
+	if importing && config.enableFaucetWithAmount > 0 && config.faucetKey == "" {
+		fmt.Fprintln(os.Stderr, "importing a chain with the faucet enabled requires --faucetKey "+
+			"(the key of an account funded in the imported state); a generated key would hold no funds")
+		os.Exit(1)
+	}
+
+	// generate a new faucet key if the faucet is enabled and no key is provided, and save it
+	// so the faucet account is the same across restarts
+	if config.enableFaucetWithAmount > 0 && config.faucetKey == "" {
+		fmt.Println("generating new random key for the faucet")
+		faucetKey := ethereum.SignKeys{}
+		if err := faucetKey.Generate(); err != nil {
+			panic(err)
+		}
+		config.faucetKey = hex.EncodeToString(faucetKey.PrivateKey())
+		pviper.Set("faucetKey", config.faucetKey)
+	}
+
 	if err := pviper.WriteConfig(); err != nil {
 		panic(err)
 	}
@@ -180,52 +228,110 @@ func main() {
 
 	log.Infof("using data directory at %s", config.dir)
 
-	// Overwrite the default path to download the zksnarks circuits artifacts
-	// using the global datadir as parent folder.
-	circuit.BaseDir = filepath.Join(config.dir, "zkCircuits")
-
 	mngKey := ethereum.SignKeys{}
 	if err := mngKey.AddHexKey(config.keymanager); err != nil {
 		log.Fatal(err)
 	}
 
-	vc, err := vocone.NewVocone(config.dir, &mngKey, config.disableIpfs, config.ipfsConnectKey, config.ipfsConnectPeers)
-	if err != nil {
-		log.Fatal(err)
-	}
-	vc.App.SetChainID(config.chainID)
-	log.Infof("using chainID: %s", config.chainID)
-
-	// set election price calculator
-	if err := vc.SetElectionPrice(); err != nil {
-		log.Fatal(err)
-	}
-
-	// set funded accounts if any
-	if len(config.fundedAccounts) > 0 {
-		for _, addr := range config.fundedAccounts {
-			data := strings.Split(addr, ":")
-			if len(data) != 2 {
-				log.Fatalf("invalid funded account %s, please specify addr:balance", addr)
-			}
-			balance, err := strconv.ParseUint(data[1], 10, 64)
-			if err != nil {
-				log.Fatalf("invalid balance amount %s", data[1])
-			}
-			a := common.HexToAddress(data[0])
-			log.Infof("funding account %s with balance %d", a.Hex(), balance)
-			if err := vc.CreateAccount(a, &state.Account{
-				Account: models.Account{
-					Balance: balance,
-				},
-			}); err != nil {
-				log.Fatal(err)
-			}
+	var faucetAccount *ethereum.SignKeys
+	if config.enableFaucetWithAmount > 0 {
+		faucetAccount = &ethereum.SignKeys{}
+		if err := faucetAccount.AddHexKey(config.faucetKey); err != nil {
+			log.Fatalf("invalid faucet key: %v", err)
 		}
 	}
 
-	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
+	if importing {
+		data, err := os.ReadFile(config.importGenesis)
+		if err != nil {
+			log.Fatalf("cannot read genesis to import: %v", err)
+		}
+		doc, err := vocone.ParseImportGenesis(data)
+		if err != nil {
+			log.Fatalf("cannot parse genesis to import: %v", err)
+		}
+		res, err := vocone.ImportChain(config.dir, doc)
+		if err != nil {
+			log.Fatalf("cannot import chain: %v", err)
+		}
+		log.Infow("chain imported, the genesis was not applied",
+			"chainID", res.ChainID,
+			"stateHeight", res.StateHeight,
+			"firstHeight", res.FirstHeight,
+			"indexerHeight", res.IndexerHeight,
+			"indexerBlocks", res.IndexerBlockCount,
+		)
+	} else {
+		if config.importGenesis != "" {
+			log.Infow("data directory already holds a chain, ignoring importGenesis", "dir", config.dir)
+		}
+		if len(config.importFundedAccounts) > 0 {
+			log.Warnw("ignoring importFundedAccounts, they are only applied when the chain is imported")
+		}
+	}
+
+	vc, err := vocone.NewVocone(config.dir, &mngKey)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if importing {
+		funded, err := parseFundedAccounts(config.importFundedAccounts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, acc := range funded {
+			addr := common.BytesToAddress(acc.Address)
+			if err := vc.MintBalance(addr, acc.Balance); err != nil {
+				log.Fatal(err)
+			}
+			log.Warnw("minted tokens on import", "address", addr.Hex(), "amount", acc.Balance)
+		}
+	}
 	vc.SetBlockSize(config.blockSize)
+	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
+	vc.AdminToken = config.adminToken
+
+	if vc.Initialized() {
+		// The genesis (chainID, funded accounts, faucet balance) is only applied when the
+		// chain is created; on restart the persisted chain is resumed as is.
+		if vc.App.ChainID() != config.chainID {
+			log.Warnw("ignoring chainID flag, using the chainID of the existing chain",
+				"flag", config.chainID, "chainID", vc.App.ChainID())
+		}
+		if len(config.fundedAccounts) > 0 {
+			log.Warnw("ignoring funded accounts, they are only applied when the chain is created")
+		}
+		if base := vc.ImportBase(); base > 0 {
+			log.Infow("running an imported chain, older blocks are served by the indexer", "blockStoreBase", base)
+		}
+	} else {
+		appState := vocone.DefaultGenesisAppState(config.blockSize)
+		funded, err := parseFundedAccounts(config.fundedAccounts)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, acc := range funded {
+			log.Infof("funding account %x with balance %d", acc.Address, acc.Balance)
+		}
+		appState.Accounts = append(appState.Accounts, funded...)
+		if faucetAccount != nil {
+			log.Infof("funding faucet account %s with balance %d", faucetAccount.Address().Hex(), config.faucetBalance)
+			appState.Accounts = append(appState.Accounts, genesis.Account{
+				Address: faucetAccount.Address().Bytes(),
+				Balance: config.faucetBalance,
+			})
+		}
+		if err := vc.InitChain(config.chainID, appState); err != nil {
+			log.Fatal(err)
+		}
+	}
+	log.Infof("using chainID: %s", vc.App.ChainID())
+
+	if *setTxCosts {
+		if err := vc.SetBulkTxCosts(config.txCosts, true); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	startDone := make(chan struct{})
@@ -242,23 +348,19 @@ func main() {
 
 	vc.Router.ExposePrometheusEndpoint("/metrics")
 	metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,chain=%q}",
-		internal.Version, "vocone", config.chainID)).Set(1)
+		internal.Version, "vocone", vc.App.ChainID())).Set(1)
 
-	// enable faucet if requested, this will create a new account and attach the faucet API to the vocone API
-	if config.enableFaucetWithAmount > 0 {
-		faucetAccount := ethereum.SignKeys{}
-		if err := faucetAccount.Generate(); err != nil {
+	// enable faucet if requested, the faucet account is funded at genesis
+	if faucetAccount != nil {
+		acc, err := vc.App.State.GetAccount(faucetAccount.Address(), true)
+		if err != nil {
 			log.Fatal(err)
 		}
-		if err := vc.CreateAccount(faucetAccount.Address(), &state.Account{
-			Account: models.Account{
-				Balance: 1000000,
-			},
-		}); err != nil {
-			log.Fatal(err)
+		if acc == nil || acc.Balance == 0 {
+			log.Warnw("faucet account has no funds, claims will fail", "address", faucetAccount.Address().Hex())
 		}
 		log.Infof("faucet account %s, faucet amount %d", faucetAccount.Address().Hex(), config.enableFaucetWithAmount)
-		if err := faucet.AttachFaucetAPI(&faucetAccount,
+		if err := faucet.AttachFaucetAPI(faucetAccount,
 			config.enableFaucetWithAmount,
 			uAPI.Endpoint,
 			"/open/claim",
@@ -278,4 +380,30 @@ func main() {
 	if err := vc.Close(); err != nil {
 		log.Warnw("error closing vocone", "err", err)
 	}
+}
+
+// fileExists reports whether path exists.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
+}
+
+// parseFundedAccounts parses a list of address:amount entries.
+func parseFundedAccounts(list []string) ([]genesis.Account, error) {
+	accounts := make([]genesis.Account, 0, len(list))
+	for _, entry := range list {
+		data := strings.Split(entry, ":")
+		if len(data) != 2 {
+			return nil, fmt.Errorf("invalid funded account %s, please specify addr:balance", entry)
+		}
+		if !common.IsHexAddress(data[0]) {
+			return nil, fmt.Errorf("invalid funded account address %s", data[0])
+		}
+		balance, err := strconv.ParseUint(data[1], 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("invalid balance amount %s", data[1])
+		}
+		accounts = append(accounts, genesis.Account{Address: common.HexToAddress(data[0]).Bytes(), Balance: balance})
+	}
+	return accounts, nil
 }
