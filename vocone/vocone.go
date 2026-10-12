@@ -162,7 +162,7 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		api.ChainHandler,
 		api.WalletHandler,
 		api.AccountHandler,
-		api.SIKHandler,
+
 	)
 }
 

@@ -199,7 +199,6 @@ func (c *HTTPclient) NewElection(description *api.ElectionDescription, wait bool
 		Metadata:      &metadataURI,
 		MetadataHash:  api.MetadataHash(metadataBytes),
 		MaxCensusSize: description.Census.Size,
-		TempSIKs:      &description.TempSIKs,
 	}
 	log.Debugf("election transaction: %+v", log.FormatProto(process))
 

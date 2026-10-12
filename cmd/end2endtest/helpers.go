@@ -30,9 +30,8 @@ const (
 )
 
 type acctProof struct {
-	account  *ethereum.SignKeys
-	proof    *apiclient.CensusProof
-	proofSIK *apiclient.CensusProof
+	account *ethereum.SignKeys
+	proof   *apiclient.CensusProof
 }
 
 func newTestElectionDescription(numChoices int) *vapi.ElectionDescription {
@@ -111,7 +110,7 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 	}
 
 	log.Infof("creating Vocdoni account %s", address)
-	hash, err := accountApi.AccountBootstrap(faucetPkg, accountMetadata, nil)
+	hash, err := accountApi.AccountBootstrap(faucetPkg, accountMetadata)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -181,10 +180,6 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 		wg     sync.WaitGroup
 		vcount int32
 	)
-	// Wait for the next block to assure the SIK root is updated
-	if err := t.api.WaitUntilNextBlock(); err != nil {
-		return err
-	}
 	errorChan := make(chan error)
 	t.voters = new(sync.Map)
 	addNaccounts := func(accounts []*ethereum.SignKeys) {
@@ -205,15 +200,6 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 				errorChan <- err
 			}
 			accP := acctProof{account: acc, proof: proof}
-
-			if t.election.VoteMode.Anonymous {
-				voterPrivKey := acc.PrivateKey()
-				voterApi := t.api.Clone(voterPrivKey.String())
-				accP.proofSIK, err = voterApi.GenSIKProof()
-				if err != nil {
-					errorChan <- err
-				}
-			}
 			t.voters.Store(acc.Public, accP)
 			atomic.AddInt32(&vcount, 1)
 		}
@@ -275,7 +261,7 @@ func (t *e2eElection) publishCheckCensus(censusID types.HexBytes, nAcct uint64) 
 }
 
 // setupCensus create a new census that will have nAcct voterAccounts and participants
-func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts bool) (types.HexBytes, []*ethereum.SignKeys, error) {
+func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes, []*ethereum.SignKeys, error) {
 	// Create a new census
 	censusID, err := localCensuses.newCensus(censusType)
 	if err != nil {
@@ -290,13 +276,6 @@ func (t *e2eElection) setupCensus(censusType string, nAcct int, createAccounts b
 		return nil, nil, err
 	}
 
-	// Register the accounts in the vochain if is required
-	if censusType == vapi.CensusTypeZKWeighted && createAccounts {
-		if err := t.registerAnonAccts(voterAccounts); err != nil {
-			return nil, nil, err
-		}
-	}
-
 	return censusID, voterAccounts, nil
 }
 
@@ -305,7 +284,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		return err
 	}
 
-	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts, !ed.TempSIKs)
+	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts)
 	if err != nil {
 		return err
 	}
@@ -352,61 +331,6 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		}
 	}
 
-	if ed.TempSIKs {
-		errorChan := make(chan error)
-		wg := &sync.WaitGroup{}
-		halfAccts := len(voterAccts) / 2
-
-		// register SIK for 1/2 accounts and left the rest to vote with account registered
-		for i, acc := range voterAccts[:halfAccts] {
-			wg.Add(1)
-			go func(i int, acc *ethereum.SignKeys) {
-				defer wg.Done()
-				pKey := acc.PrivateKey()
-				accountApi := t.api.Clone(pKey.String())
-				hash, err := accountApi.RegisterSIKForVote(electionID, nil, nil)
-				if err != nil {
-					log.Errorf("could not register SIK for vote, address: %s, %v", acc.AddressString(), err)
-					errorChan <- err
-				}
-				log.Infow("sik registered for anonymous census uncreated account", "index", i, "address", acc.AddressString())
-				ctx, cancel := context.WithTimeout(context.Background(), t.config.timeout)
-				defer cancel()
-
-				if _, err := accountApi.WaitUntilTxIsMined(ctx, hash); err != nil {
-					log.Errorf("gave up waiting for tx %x to be mined: %s", hash, err)
-					errorChan <- err
-				}
-
-				// check if the current account has a valid SIK
-				validSik, err := accountApi.ValidSIK()
-				if err != nil {
-					errorChan <- fmt.Errorf("unexpected error in account %s, when validate SIK, %s", acc.Address(), err)
-				}
-				if !validSik {
-					errorChan <- fmt.Errorf("unexpected invalid SIK for account %x", acc.Address())
-				}
-				log.Infof("valid SIK for the account %x", acc.Address())
-			}(i, acc)
-		}
-
-		go func() { // avoid blocking the main goroutine
-			wg.Wait()
-			close(errorChan) // close the error channel after all goroutines have finished
-		}()
-
-		for err := range errorChan { // receive errors from the errorChan until it's closed.
-			if err != nil {
-				return err
-			}
-		}
-
-		// register the remaining accounts
-		if err := t.registerAnonAccts(voterAccts[halfAccts:]); err != nil {
-			return err
-		}
-
-	}
 	if err := t.generateProofs(nil, voterAccts); err != nil {
 		return err
 	}
@@ -447,7 +371,7 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 
 	default:
 		censusType := vapi.CensusTypeWeighted
-		censusID, vAccts, err := t.setupCensus(censusType, t.config.nvotes, false)
+		censusID, vAccts, err := t.setupCensus(censusType, t.config.nvotes)
 		if err != nil {
 			return err
 		}

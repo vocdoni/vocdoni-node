@@ -9,9 +9,7 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
-	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -137,11 +135,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrAccountNotFound.With(addr.Hex())
 	}
 
-	sik, err := a.vocapp.State.SIKFromAddress(addr)
-	if err != nil && !errors.Is(err, state.ErrSIKNotFound) {
-		log.Warnf("unknown error getting SIK: %v", err)
-		return ErrGettingSIK.WithErr(err)
-	}
+
 
 	_, transfersCount, err := a.indexer.TokenTransfersList(1, 0, hex.EncodeToString(addr.Bytes()), "", "")
 	if err != nil {
@@ -162,7 +156,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		TransfersCount: transfersCount,
 		FeesCount:      feesCount,
 		InfoURL:        acc.GetInfoURI(),
-		SIK:            types.HexBytes(sik),
+
 	}); err != nil {
 		return err
 	}

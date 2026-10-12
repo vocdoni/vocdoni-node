@@ -9,9 +9,6 @@ import (
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/nacl"
-	"go.vocdoni.io/dvote/crypto/zk"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
-	"go.vocdoni.io/dvote/crypto/zk/prover"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/types"
@@ -44,10 +41,9 @@ type VoteData struct {
 	// (UTF-8 text, JSON, anything) is the caller's choice.
 	Memo []byte
 
-	ProofMkTree  *CensusProof
-	ProofSIKTree *CensusProof
-	ProofCSP     types.HexBytes
-	Keys         []api.Key
+	ProofMkTree *CensusProof
+	ProofCSP    types.HexBytes
+	Keys        []api.Key
 
 	// if VoterAccount is set, it will be used to sign the vote
 	// instead of the keys found in HTTPclient.account
@@ -89,57 +85,6 @@ func (cl *HTTPclient) Vote(v *VoteData) (types.HexBytes, error) {
 	censusOriginCSPv2 := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_CA_V2)]
 	censusOriginWeighted := models.CensusOrigin_name[int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED)]
 	switch {
-	case v.Election.VoteMode.Anonymous:
-		// support no vote weight provided
-		if v.VoteWeight == nil {
-			v.VoteWeight = v.ProofMkTree.LeafWeight
-		}
-		// generate circuit inputs with the election, census and voter
-		// information and encode it into a json
-		rawInputs, err := circuit.GenerateCircuitInput(circuit.CircuitInputsParameters{
-			Account:         c.account,
-			ElectionId:      v.Election.ElectionID,
-			CensusRoot:      v.Election.Census.CensusRoot,
-			SIKRoot:         v.ProofSIKTree.Root,
-			CensusSiblings:  v.ProofMkTree.Siblings,
-			SIKSiblings:     v.ProofSIKTree.Siblings,
-			VoteWeight:      v.VoteWeight,
-			AvailableWeight: v.ProofMkTree.LeafWeight,
-			VotePackage:     vote.VotePackage,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("could not generate zk circuit inputs: %w", err)
-		}
-		inputs, err := json.Marshal(rawInputs)
-		if err != nil {
-			return nil, fmt.Errorf("error encoding inputs: %w", err)
-		}
-		// instance the prover with the circuit config loaded and generate the
-		// proof for the calculated inputs
-		proof, err := prover.Prove(c.circuit.ProvingKey, c.circuit.Wasm, inputs)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate anonymous proof: %w", err)
-		}
-		// encode the proof into a protobuf
-		protoProof, err := zk.ProverProofToProtobufZKProof(proof, nil, nil, nil, nil, nil)
-		if err != nil {
-			return nil, err
-		}
-		// include vote nullifier and the encoded proof in a VoteEnvelope
-		vote.Nullifier, err = proof.Nullifier()
-		if err != nil {
-			return nil, err
-		}
-		vote.Proof = &models.Proof{
-			Payload: &models.Proof_ZkSnark{
-				ZkSnark: protoProof,
-			},
-		}
-		// prepare an unsigned vote transaction with the VoteEnvelope
-		voteAPI, err = c.prepareVoteTx(vote, false)
-		if err != nil {
-			return nil, fmt.Errorf("could not prepare vote transaction: %w", err)
-		}
 	case v.Election.Census.CensusOrigin == censusOriginWeighted:
 		// support custom vote weight
 		var voteWeight []byte

@@ -226,7 +226,6 @@ type ElectionDescription struct {
 	ElectionType ElectionType          `json:"electionType"`
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
-	TempSIKs     bool                  `json:"tempSIKs"`
 }
 
 type Key struct {
@@ -435,7 +434,6 @@ type ChainInfo struct {
 	TransactionCount  uint64    `json:"transactionCount" example:"554"`
 	ValidatorCount    uint32    `json:"validatorCount" example:"5"`
 	VoteCount         uint64    `json:"voteCount" example:"432"`
-	CircuitVersion    string    `json:"circuitVersion" example:"v1.0.0"`
 	MaxCensusSize     uint64    `json:"maxCensusSize" example:"50000"`
 	NetworkCapacity   uint64    `json:"networkCapacity" example:"2000"`
 }
@@ -449,7 +447,6 @@ type Account struct {
 	FeesCount      uint64         `json:"feesCount,omitempty"`
 	InfoURL        string         `json:"infoURL,omitempty"`
 	Token          *uuid.UUID     `json:"token,omitempty" swaggerignore:"true"`
-	SIK            types.HexBytes `json:"sik"`
 }
 
 type AccountsList struct {

@@ -361,7 +361,7 @@ func ensureAccountExists(api *apiclient.HTTPclient,
 			return acct, nil
 		}
 
-		if _, err := api.AccountBootstrap(faucetPkg, nil, nil); err != nil {
+		if _, err := api.AccountBootstrap(faucetPkg, nil); err != nil {
 			if !strings.Contains(err.Error(), "tx already exists in cache") {
 				return nil, fmt.Errorf("cannot create account %s: %w", api.MyAddress(), err)
 			}

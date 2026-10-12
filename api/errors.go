@@ -61,7 +61,6 @@ var (
 	ErrInvalidStatus                    = apirest.APIerror{Code: 4050, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid status")}
 	ErrUnmarshalingServerProto          = apirest.APIerror{Code: 4052, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error unmarshaling protobuf data")}
 	ErrMarshalingServerProto            = apirest.APIerror{Code: 4053, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error marshaling protobuf data")}
-	ErrSIKNotFound                      = apirest.APIerror{Code: 4054, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("SIK not found")}
 	ErrCantParseBoolean                 = apirest.APIerror{Code: 4055, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse string into boolean")}
 	ErrCantParseHexString               = apirest.APIerror{Code: 4056, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse string into hex bytes")}
 	ErrPageNotFound                     = apirest.APIerror{Code: 4057, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("page not found")}
@@ -92,10 +91,8 @@ var (
 	ErrElectionResultsNotYetAvailable   = apirest.APIerror{Code: 5024, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results are not yet available")}
 	ErrElectionResultsIsNil             = apirest.APIerror{Code: 5025, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results is nil")}
 	ErrElectionResultsMismatch          = apirest.APIerror{Code: 5026, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results don't match reported ones")}
-	ErrCantGetCircomSiblings            = apirest.APIerror{Code: 5027, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot get circom siblings")}
 	ErrCantCountVotes                   = apirest.APIerror{Code: 5029, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot count votes")}
 	ErrVochainOverloaded                = apirest.APIerror{Code: 5030, HTTPstatus: apirest.HTTPstatusServiceUnavailable, Err: fmt.Errorf("vochain overloaded")}
-	ErrGettingSIK                       = apirest.APIerror{Code: 5031, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error getting SIK")}
 	ErrIndexerQueryFailed               = apirest.APIerror{Code: 5033, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("indexer query failed")}
 	ErrCantFetchTokenFees               = apirest.APIerror{Code: 5034, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot fetch token fees")}
 )

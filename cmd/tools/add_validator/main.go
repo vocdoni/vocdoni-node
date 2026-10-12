@@ -191,7 +191,7 @@ func bootstrap(c *apiclient.HTTPclient, label string, pkg *models.FaucetPackage,
 		Description: map[string]string{"default": "ephemeral signer for SET_ACCOUNT_VALIDATOR"},
 		Version:     "1.0",
 	}
-	hash, err := c.AccountBootstrap(pkg, meta, nil)
+	hash, err := c.AccountBootstrap(pkg, meta)
 	if err != nil {
 		return fmt.Errorf("bootstrap: %w", err)
 	}

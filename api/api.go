@@ -33,8 +33,6 @@ import (
 //	@tag.description	Submit, get, and verify votes
 //	@tag.name			Wallet
 //	@tag.description	Operations for the wallets managed backend side
-//	@tag.name			SIK
-//	@tag.description	The Secret Identity Key (SIK) operations used on anonymous voting
 
 //	@schemes	https
 //	@host		api-dev.vocdoni.net
@@ -191,10 +189,7 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			if err := a.enableAccountHandlers(); err != nil {
 				return err
 			}
-		case SIKHandler:
-			if err := a.enableSIKHandlers(); err != nil {
-				return err
-			}
+
 
 		default:
 			return fmt.Errorf("%w: %s", ErrHandlerUnknown, h)

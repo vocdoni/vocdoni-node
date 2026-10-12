@@ -411,7 +411,7 @@ func TestSetBulkTxCostsLogic(t *testing.T) {
 }
 
 func testCreateAccount(cli *apiclient.HTTPclient) error {
-	txhash, err := cli.AccountBootstrap(nil, nil, nil)
+	txhash, err := cli.AccountBootstrap(nil, nil)
 	if err != nil {
 		return err
 	}

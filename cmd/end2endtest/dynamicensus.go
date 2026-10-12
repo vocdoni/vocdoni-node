@@ -70,7 +70,7 @@ func (t *E2EDynamicensusElection) Run() error {
 	setupNewCensusAndVote := func(election e2eElection) (types.HexBytes, apiclient.VoteData, error) {
 		api := election.api
 
-		censusID, vAccts, err := election.setupCensus(vapi.CensusTypeWeighted, 1, false)
+		censusID, vAccts, err := election.setupCensus(vapi.CensusTypeWeighted, 1)
 		if err != nil {
 			return nil, apiclient.VoteData{}, err
 		}
