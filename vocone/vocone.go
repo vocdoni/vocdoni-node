@@ -185,6 +185,15 @@ func (vc *Vocone) Start(ctx context.Context) error {
 			return err
 		}
 	}
+	// Reveal the encryption keys of ended elections that could not be revealed
+	// while the node was stopped.
+	if vc.KeyKeeper != nil {
+		go vc.KeyKeeper.RevealUnpublished()
+	}
+	// Rebuild the live results of the open elections and repair the indexed blocks.
+	if vc.Indexer != nil {
+		go vc.Indexer.AfterSyncBootstrap(false)
+	}
 	// Load the election price calculator from the current state (tx costs and capacity).
 	if err := vc.SetElectionPrice(); err != nil {
 		return fmt.Errorf("could not set election price calculator: %w", err)
