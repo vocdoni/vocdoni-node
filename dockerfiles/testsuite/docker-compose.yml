@@ -10,7 +10,6 @@ services:
       - blockchain
     volumes:
       - data-seed:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-seed:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -23,7 +22,6 @@ services:
       - blockchain
     volumes:
       - data-miner0:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -36,7 +34,6 @@ services:
       - blockchain
     volumes:
       - data-miner1:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner1:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -49,7 +46,6 @@ services:
       - blockchain
     volumes:
       - data-miner2:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner2:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -62,7 +58,6 @@ services:
       - blockchain
     volumes:
       - data-miner3:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-miner3:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -77,7 +72,6 @@ services:
       - blockchain
     volumes:
       - data-gateway0:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -93,7 +87,6 @@ services:
     networks:
       - blockchain
     volumes:
-      - /tmp/.vochain-zkCircuits/:/root/.cache/vocdoni/zkCircuits/
       - gocoverage-test:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -157,7 +150,6 @@ services:
       - blockchain
     volumes:
       - data-gatewaySync:/app/run/
-      - /tmp/.vochain-zkCircuits/:/app/run/test/zkCircuits/
       - gocoverage-gatewaySync:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage

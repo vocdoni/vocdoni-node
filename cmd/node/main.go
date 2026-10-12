@@ -25,7 +25,6 @@ import (
 	"go.vocdoni.io/dvote/api/faucet"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/internal"
@@ -342,10 +341,6 @@ func main() {
 		return
 	}
 
-	// Overwrite the default path to download the zksnarks circuits artifacts
-	// using the global datadir as parent folder.
-	circuit.BaseDir = filepath.Join(conf.DataDir, "zkCircuits")
-
 	// Check the mode is valid
 	if !conf.ValidMode() {
 		log.Fatalf("mode %s is invalid", conf.Mode)
@@ -509,7 +504,7 @@ func main() {
 			urlapi.ChainHandler,
 			urlapi.WalletHandler,
 			urlapi.AccountHandler,
-			urlapi.SIKHandler,
+
 		); err != nil {
 			log.Fatal(err)
 		}

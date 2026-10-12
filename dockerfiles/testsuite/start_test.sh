@@ -4,7 +4,6 @@
 #  e2etest_plaintextelection_empty: run poll vote test, with no votes
 #  e2etest_plaintextelection: run poll vote test
 #  e2etest_encryptedelection: run encrypted vote test
-#  e2etest_anonelection: run anonymous vote test
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 #  e2etest_overwritelection: run overwrite test
 #  e2etest_censusizelection: run max census size test
@@ -52,7 +51,6 @@ tests_to_run=(
   	"e2etest_plaintextelection_empty"
   	"e2etest_plaintextelection"
   	"e2etest_encryptedelection"
-  	"e2etest_anonelection"
   	"e2etest_overwritelection"
   	"e2etest_censusizelection"
   	"e2etest_ballotelection"
@@ -116,16 +114,6 @@ e2etest_plaintextelection_empty() {
 
 e2etest_encryptedelection() {
 	e2etest encryptedelection
-}
-
-e2etest_anonelection() {
-	e2etest anonelection
-	e2etest anonelectionTempSiks
-	e2etest anonelectionEncrypted
-}
-
-e2etest_hysteresis() {
-	e2etest hysteresis
 }
 
 e2etest_tokentxs() {

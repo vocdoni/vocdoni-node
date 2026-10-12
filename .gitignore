@@ -9,7 +9,6 @@
 *.dll
 *.so
 *.dylib
-zkCircuits
 
 # Test binary, build with `go test -c`
 *.test

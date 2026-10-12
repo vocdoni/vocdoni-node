@@ -16,7 +16,6 @@ import (
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	lru "github.com/hashicorp/golang-lru/v2"
 	"go.vocdoni.io/dvote/config"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/snapshot"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/types"
@@ -150,11 +149,6 @@ func NewBaseApplication(vochainCfg *config.VochainCfg) (*BaseApplication, error)
 	snaps, err := snapshot.NewManager(filepath.Join(vochainCfg.DataDir, SnapshotsDataDir), vochainCfg.StateSyncChunkSize)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create snapshot manager: %w", err)
-	}
-
-	// Initialize the zk circuit
-	if err := circuit.Init(); err != nil {
-		return nil, fmt.Errorf("cannot load zk circuit: %w", err)
 	}
 
 	blockCache, err := lru.New[int64, *comettypes.Block](32)
