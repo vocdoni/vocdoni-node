@@ -151,7 +151,9 @@ func TestVocone(t *testing.T) {
 	qt.Assert(t, vc.CreateAccount(account.Address(), &state.Account{
 		Account: models.Account{Balance: 10000},
 	}), qt.IsNil)
-	qt.Assert(t, testCSPvote(cli), qt.IsNil)
+	qt.Assert(t, testCSPvote(cli, false), qt.IsNil)
+	// encrypted election: the keykeeper publishes the keys and reveals them when it ends
+	qt.Assert(t, testCSPvote(cli, true), qt.IsNil)
 }
 
 // TestBlockStoreAndRetrieval verifies that blocks are persisted and can be
@@ -487,7 +489,7 @@ func testCreateAccount(cli *apiclient.HTTPclient) error {
 	return err
 }
 
-func testCSPvote(cli *apiclient.HTTPclient) error {
+func testCSPvote(cli *apiclient.HTTPclient, encrypted bool) error {
 	cspKey := ethereum.SignKeys{}
 	if err := cspKey.Generate(); err != nil {
 		return err
@@ -502,7 +504,7 @@ func testCSPvote(cli *apiclient.HTTPclient) error {
 			Status:       models.ProcessStatus_READY,
 			CensusRoot:   censusRoot,
 			CensusOrigin: censusOrigin,
-			EnvelopeType: &models.EnvelopeType{},
+			EnvelopeType: &models.EnvelopeType{EncryptedVotes: encrypted},
 			VoteOptions: &models.ProcessVoteOptions{
 				MaxCount: 1,
 				MaxValue: 1,
