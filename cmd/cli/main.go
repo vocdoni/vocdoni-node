@@ -83,11 +83,10 @@ func main() {
 				items.Sprint("🕸️\tNetwork info"),            // 5
 				items.Sprint("📝\tBuild a new census"),       // 6
 				items.Sprint("🗳️\tCreate an election"),      // 7
-				items.Sprint("☑️\tSet validator"),           // 8
-				items.Sprint("📝 Generate faucet package"),   // 9
-				items.Sprint("🖧\tChange API endpoint host"), // 10
-				items.Sprint("💾\tSave config to file"),      // 11
-				items.Sprint("❌\tQuit"),                     // 12
+				items.Sprint("📝 Generate faucet package"),   // 8
+				items.Sprint("🖧\tChange API endpoint host"), // 9
+				items.Sprint("💾\tSave config to file"),      // 10
+				items.Sprint("❌\tQuit"),                     // 11
 			},
 		}
 
@@ -146,22 +145,18 @@ func main() {
 				errorp.Println(err)
 			}
 		case 8:
-			if err := accountSetValidator(cli); err != nil {
-				errorp.Println(err)
-			}
-		case 9:
 			if err := faucetPkg(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 10:
+		case 9:
 			if err := hostHandler(cli); err != nil {
 				errorp.Println(err)
 			}
-		case 11:
+		case 10:
 			if err := cli.save(); err != nil {
 				errorp.Println(err)
 			}
-		case 12:
+		case 11:
 			os.Exit(0)
 		default:
 			errorp.Println("unknown option or not yet implemented")
@@ -480,47 +475,6 @@ func hostHandler(cli *VocdoniCLI) error {
 	return cli.setAuthToken(token)
 }
 
-func accountSetValidator(cli *VocdoniCLI) error {
-	infoPrint.Print("enter the name and a public key of the validator, leave it bank for using the selected account\n")
-
-	n := ui.Prompt{
-		Label: "name",
-	}
-	name, err := n.Run()
-	if err != nil {
-		return err
-	}
-
-	p := ui.Prompt{
-		Label: "public key",
-	}
-	pubKeyStr, err := p.Run()
-	if err != nil {
-		return err
-	}
-	pubKey := cli.getCurrentAccount().PublicKey
-	if pubKeyStr != "" {
-		pubKey, err = hex.DecodeString(pubKeyStr)
-		if err != nil {
-			return err
-		}
-	}
-
-	hash, err := cli.api.AccountSetValidator(pubKey, name)
-	if err != nil {
-		return err
-	}
-
-	infoPrint.Print("transaction sent! hash ", hash.String(), "\n")
-	infoPrint.Print("waiting for confirmation...")
-	ok := cli.waitForTransaction(hash)
-	if !ok {
-		return fmt.Errorf("transaction was not included")
-	}
-	infoPrint.Print(" transaction confirmed!\n")
-
-	return nil
-}
 
 func accountSetMetadata(cli *VocdoniCLI) error {
 	currentAccount, err := cli.api.Account("")

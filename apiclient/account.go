@@ -160,52 +160,6 @@ func (c *HTTPclient) AccountBootstrap(faucetPkg *models.FaucetPackage, metadata 
 	return acc.TxHash, nil
 }
 
-// AccountSetValidator upgrades to validator status the account associated with the public key provided.
-// If the public key is nil, the public key associated with the account client is used.
-// Returns the transaction hash.
-func (c *HTTPclient) AccountSetValidator(pubKey []byte, name string) (types.HexBytes, error) {
-	acc, err := c.Account("")
-	if err != nil {
-		return nil, fmt.Errorf("account not configured: %w", err)
-	}
-	if pubKey == nil {
-		pubKey = c.account.PublicKey()
-	}
-	// Build the transaction
-	txb, err := proto.Marshal(&models.Tx{
-		Payload: &models.Tx_SetAccount{
-			SetAccount: &models.SetAccountTx{
-				Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
-				Nonce:     &acc.Nonce,
-				PublicKey: pubKey,
-				Name:      &name,
-			},
-		},
-	},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("could not marshal transaction: %w", err)
-	}
-	stxb, err := c.signTx(txb)
-	if err != nil {
-		return nil, err
-	}
-	resp, code, err := c.Request(HTTPPOST, &api.Transaction{
-		Payload: stxb,
-	}, "chain", "transactions")
-	if err != nil {
-		return nil, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	accv := &api.Transaction{}
-	err = json.Unmarshal(resp, accv)
-	if err != nil {
-		return nil, err
-	}
-	return accv.Hash, nil
-}
 
 // AccountSetMetadata sets the info URI of the account associated with the client to the IPFS CIDv1
 // of the metadata. The node does not store the document, so the caller has to host it.

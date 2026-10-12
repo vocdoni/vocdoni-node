@@ -469,11 +469,10 @@ type Census struct {
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
 	// proof stuff
-	CensusRoot     types.HexBytes `json:"censusRoot,omitempty"`
-	CensusProof    types.HexBytes `json:"censusProof,omitempty"`
-	Key            types.HexBytes `json:"key,omitempty"`
-	Value          types.HexBytes `json:"value,omitempty"`
-	CensusSiblings []string       `json:"censusSiblings,omitempty"`
+	CensusRoot  types.HexBytes `json:"censusRoot,omitempty"`
+	CensusProof types.HexBytes `json:"censusProof,omitempty"`
+	Key         types.HexBytes `json:"key,omitempty"`
+	Value       types.HexBytes `json:"value,omitempty"`
 }
 
 type ValidatorList struct {
