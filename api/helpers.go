@@ -453,3 +453,12 @@ func paramsFromCtxFunc(f func(key string) string, keys ...string) map[string]str
 	}
 	return m
 }
+
+// ipfsCID returns the bare CID from an ipfs:// URI (stripping the "ipfs://"
+// prefix), or an empty string when the URI does not use the ipfs scheme.
+func ipfsCID(uri string) string {
+	if !strings.HasPrefix(uri, "ipfs://") {
+		return ""
+	}
+	return strings.TrimPrefix(uri, "ipfs://")
+}

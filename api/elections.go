@@ -387,6 +387,14 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		election.Results = proc.ResultsVotes
 	}
 
+	// Inline IPFS metadata when the content is cached locally. A single local
+	// SELECT; zero network. https:// URIs are left to the client to fetch.
+	if cid := ipfsCID(proc.Metadata); cid != "" {
+		if raw, err := a.indexer.GetIPFSContent(cid); err == nil {
+			election.Metadata = json.RawMessage(raw)
+		}
+	}
+
 	data, err := json.Marshal(election)
 	if err != nil {
 		return ErrMarshalingServerJSONFailed.WithErr(err)

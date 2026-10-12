@@ -171,6 +171,11 @@ type Election struct {
 	Census       *ElectionCensus `json:"census,omitempty"`
 	MetadataURL  string          `json:"metadataURL"`
 	MetadataHash types.HexBytes  `json:"metadataHash,omitempty"`
+	// Metadata is the raw off-chain metadata document, included inline only when
+	// the MetadataURL is an ipfs:// URI and the content is cached locally.
+	// https:// URIs are never fetched server-side; the client fetches them and
+	// checks against MetadataHash.
+	Metadata     json.RawMessage `json:"metadata,omitempty"`
 	CreationTime time.Time       `json:"creationTime"`
 	VoteMode     VoteMode        `json:"voteMode,omitempty"`
 	ElectionMode ElectionMode    `json:"electionMode,omitempty"`
@@ -439,14 +444,18 @@ type ChainInfo struct {
 }
 
 type Account struct {
-	Address        types.HexBytes `json:"address" `
-	Nonce          uint32         `json:"nonce"`
-	Balance        uint64         `json:"balance"`
-	ElectionIndex  uint32         `json:"electionIndex"`
-	TransfersCount uint64         `json:"transfersCount,omitempty"`
-	FeesCount      uint64         `json:"feesCount,omitempty"`
-	InfoURL        string         `json:"infoURL,omitempty"`
-	Token          *uuid.UUID     `json:"token,omitempty" swaggerignore:"true"`
+	Address        types.HexBytes   `json:"address" `
+	Nonce          uint32           `json:"nonce"`
+	Balance        uint64           `json:"balance"`
+	ElectionIndex  uint32           `json:"electionIndex"`
+	TransfersCount uint64           `json:"transfersCount,omitempty"`
+	FeesCount      uint64           `json:"feesCount,omitempty"`
+	InfoURL        string           `json:"infoURL,omitempty"`
+	Token          *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
+	// Metadata is the parsed account off-chain metadata document, included
+	// inline only when InfoURL is an ipfs:// URI and the content is cached
+	// locally. https:// URIs are never fetched server-side.
+	Metadata       *AccountMetadata `json:"metadata,omitempty"`
 }
 
 type AccountsList struct {

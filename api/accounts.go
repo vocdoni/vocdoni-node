@@ -146,6 +146,18 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		return ErrCantFetchTokenFees.WithErr(err)
 	}
 
+	// Inline IPFS metadata when the content is cached locally. A single local
+	// SELECT; zero network. https:// URIs are left to the client to fetch.
+	var accMeta *AccountMetadata
+	if cid := ipfsCID(acc.GetInfoURI()); cid != "" {
+		if raw, err := a.indexer.GetIPFSContent(cid); err == nil {
+			var m AccountMetadata
+			if err := json.Unmarshal(raw, &m); err == nil {
+				accMeta = &m
+			}
+		}
+	}
+
 	var data []byte
 	if data, err = json.Marshal(Account{
 		Address:        addr.Bytes(),
@@ -155,7 +167,7 @@ func (a *API) accountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) er
 		TransfersCount: transfersCount,
 		FeesCount:      feesCount,
 		InfoURL:        acc.GetInfoURI(),
-
+		Metadata:       accMeta,
 	}); err != nil {
 		return err
 	}
