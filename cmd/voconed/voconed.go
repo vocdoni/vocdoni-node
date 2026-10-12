@@ -20,10 +20,12 @@ import (
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/internal"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vocone"
-	"go.vocdoni.io/proto/build/go/models"
 )
+
+// defaultFaucetBalance is the genesis balance of the faucet account.
+const defaultFaucetBalance = 1000000
 
 // VoconeConfig contains the basic configuration for the voconed
 type VoconeConfig struct {
@@ -32,6 +34,9 @@ type VoconeConfig struct {
 	txCosts                                  uint64
 	fundedAccounts                           []string
 	enableFaucetWithAmount                   uint64
+	faucetKey                                string
+	faucetBalance                            uint64
+	adminToken                               string
 }
 
 func main() {
@@ -55,9 +60,15 @@ func main() {
 	setTxCosts := flag.Bool("setTxCosts", false, "if true, transaction costs are set to the value of txCosts flag")
 	flag.Uint64Var(&config.txCosts, "txCosts", vocone.DefaultTxCosts, "transaction costs for all types")
 	flag.Uint64Var(&config.enableFaucetWithAmount, "enableFaucet", 0, "enable faucet API service for the given amount")
+	flag.StringVar(&config.faucetKey, "faucetKey", "",
+		"faucet account private hexadecimal key (generated and saved in the config file if empty)")
+	flag.Uint64Var(&config.faucetBalance, "faucetBalance", defaultFaucetBalance,
+		"faucet account balance at genesis (only applied when the chain is created)")
+	flag.StringVar(&config.adminToken, "adminToken", "",
+		"bearer token for the admin API endpoints (admin endpoints are disabled if empty)")
 
 	flag.StringSliceVar(&config.fundedAccounts, "fundedAccounts", []string{},
-		"list of pre-funded accounts (address:balance,address:balance,...)")
+		"list of pre-funded accounts (address:balance,address:balance,...), only applied when the chain is created")
 	flag.CommandLine.SortFlags = false
 	flag.Parse()
 
@@ -127,6 +138,26 @@ func main() {
 	}
 	*setTxCosts = pviper.GetBool("setTxCosts")
 
+	if err := pviper.BindPFlag("faucetKey", flag.Lookup("faucetKey")); err != nil {
+		panic(err)
+	}
+	config.faucetKey = pviper.GetString("faucetKey")
+
+	if err := pviper.BindPFlag("faucetBalance", flag.Lookup("faucetBalance")); err != nil {
+		panic(err)
+	}
+	config.faucetBalance = pviper.GetUint64("faucetBalance")
+
+	if err := pviper.BindPFlag("adminToken", flag.Lookup("adminToken")); err != nil {
+		panic(err)
+	}
+	config.adminToken = pviper.GetString("adminToken")
+
+	if err := pviper.BindPFlag("fundedAccounts", flag.Lookup("fundedAccounts")); err != nil {
+		panic(err)
+	}
+	config.fundedAccounts = pviper.GetStringSlice("fundedAccounts")
+
 	_, err = os.Stat(filepath.Join(config.dir, "voconed.yml"))
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -155,6 +186,18 @@ func main() {
 		pviper.Set("keymanager", config.keymanager)
 	}
 
+	// generate a new faucet key if the faucet is enabled and no key is provided, and save it
+	// so the faucet account is the same across restarts
+	if config.enableFaucetWithAmount > 0 && config.faucetKey == "" {
+		fmt.Println("generating new random key for the faucet")
+		faucetKey := ethereum.SignKeys{}
+		if err := faucetKey.Generate(); err != nil {
+			panic(err)
+		}
+		config.faucetKey = hex.EncodeToString(faucetKey.PrivateKey())
+		pviper.Set("faucetKey", config.faucetKey)
+	}
+
 	if err := pviper.WriteConfig(); err != nil {
 		panic(err)
 	}
@@ -170,20 +213,34 @@ func main() {
 		log.Fatal(err)
 	}
 
+	var faucetAccount *ethereum.SignKeys
+	if config.enableFaucetWithAmount > 0 {
+		faucetAccount = &ethereum.SignKeys{}
+		if err := faucetAccount.AddHexKey(config.faucetKey); err != nil {
+			log.Fatalf("invalid faucet key: %v", err)
+		}
+	}
+
 	vc, err := vocone.NewVocone(config.dir, &mngKey)
 	if err != nil {
 		log.Fatal(err)
 	}
-	vc.App.SetChainID(config.chainID)
-	log.Infof("using chainID: %s", config.chainID)
+	vc.SetBlockSize(config.blockSize)
+	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
+	vc.AdminToken = config.adminToken
 
-	// set election price calculator
-	if err := vc.SetElectionPrice(); err != nil {
-		log.Fatal(err)
-	}
-
-	// set funded accounts if any
-	if len(config.fundedAccounts) > 0 {
+	if vc.Initialized() {
+		// The genesis (chainID, funded accounts, faucet balance) is only applied when the
+		// chain is created; on restart the persisted chain is resumed as is.
+		if vc.App.ChainID() != config.chainID {
+			log.Warnw("ignoring chainID flag, using the chainID of the existing chain",
+				"flag", config.chainID, "chainID", vc.App.ChainID())
+		}
+		if len(config.fundedAccounts) > 0 {
+			log.Warnw("ignoring funded accounts, they are only applied when the chain is created")
+		}
+	} else {
+		appState := vocone.DefaultGenesisAppState(config.blockSize)
 		for _, addr := range config.fundedAccounts {
 			data := strings.Split(addr, ":")
 			if len(data) != 2 {
@@ -195,18 +252,26 @@ func main() {
 			}
 			a := common.HexToAddress(data[0])
 			log.Infof("funding account %s with balance %d", a.Hex(), balance)
-			if err := vc.CreateAccount(a, &state.Account{
-				Account: models.Account{
-					Balance: balance,
-				},
-			}); err != nil {
-				log.Fatal(err)
-			}
+			appState.Accounts = append(appState.Accounts, genesis.Account{Address: a.Bytes(), Balance: balance})
+		}
+		if faucetAccount != nil {
+			log.Infof("funding faucet account %s with balance %d", faucetAccount.Address().Hex(), config.faucetBalance)
+			appState.Accounts = append(appState.Accounts, genesis.Account{
+				Address: faucetAccount.Address().Bytes(),
+				Balance: config.faucetBalance,
+			})
+		}
+		if err := vc.InitChain(config.chainID, appState); err != nil {
+			log.Fatal(err)
 		}
 	}
+	log.Infof("using chainID: %s", vc.App.ChainID())
 
-	vc.App.SetBlockTimeTarget(time.Second * time.Duration(config.blockSeconds))
-	vc.SetBlockSize(config.blockSize)
+	if *setTxCosts {
+		if err := vc.SetBulkTxCosts(config.txCosts, true); err != nil {
+			log.Fatal(err)
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	startDone := make(chan struct{})
@@ -223,23 +288,19 @@ func main() {
 
 	vc.Router.ExposePrometheusEndpoint("/metrics")
 	metrics.NewCounter(fmt.Sprintf("vocdoni_info{version=%q,mode=%q,chain=%q}",
-		internal.Version, "vocone", config.chainID)).Set(1)
+		internal.Version, "vocone", vc.App.ChainID())).Set(1)
 
-	// enable faucet if requested, this will create a new account and attach the faucet API to the vocone API
-	if config.enableFaucetWithAmount > 0 {
-		faucetAccount := ethereum.SignKeys{}
-		if err := faucetAccount.Generate(); err != nil {
+	// enable faucet if requested, the faucet account is funded at genesis
+	if faucetAccount != nil {
+		acc, err := vc.App.State.GetAccount(faucetAccount.Address(), true)
+		if err != nil {
 			log.Fatal(err)
 		}
-		if err := vc.CreateAccount(faucetAccount.Address(), &state.Account{
-			Account: models.Account{
-				Balance: 1000000,
-			},
-		}); err != nil {
-			log.Fatal(err)
+		if acc == nil || acc.Balance == 0 {
+			log.Warnw("faucet account has no funds, claims will fail", "address", faucetAccount.Address().Hex())
 		}
 		log.Infof("faucet account %s, faucet amount %d", faucetAccount.Address().Hex(), config.enableFaucetWithAmount)
-		if err := faucet.AttachFaucetAPI(&faucetAccount,
+		if err := faucet.AttachFaucetAPI(faucetAccount,
 			config.enableFaucetWithAmount,
 			uAPI.Endpoint,
 			"/open/claim",
