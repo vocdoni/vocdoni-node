@@ -46,7 +46,7 @@
 # vocdoni-node
 
 This repository contains a set of libraries and tools for the **Vocdoni** decentralized protocol, as described [in the documentation](https://developer.vocdoni.io/protocol).
-It is written in golang and comprises the core of Vocdoni's distributed node architecture. Vocdoni-node is uniquely designed to run all components within a single process, giving full control and eliminating the need for local RPC or IPC connections. This is in contrast to other projects, as Vocdoni-node incorporates go-ethereum, go-ipfs, and tendermint directly as GoLang libraries.
+It is written in golang and comprises the core of Vocdoni's distributed node architecture. Vocdoni-node is uniquely designed to run all components within a single process, giving full control and eliminating the need for local RPC or IPC connections. This is in contrast to other projects, as Vocdoni-node incorporates go-ethereum and tendermint directly as GoLang libraries.
 
 The latest release is available at https://github.com/vocdoni/vocdoni-node/tree/v1.10.1
 
