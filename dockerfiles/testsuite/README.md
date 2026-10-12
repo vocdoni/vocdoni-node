@@ -15,16 +15,9 @@ NOTTY=1 ./start_test.sh
 
 ## Default testnet components
 
-the testnet is composed of:
+the testnet is a single `gateway0` node running `voconed`, which produces the blocks and serves the API.
 
- * one [seed node](https://docs.tendermint.com/master/nodes/#seed-nodes)
- * four [miners](https://docs.vocdoni.io/architecture/services/vochain.html#miner) (aka [validator nodes](https://docs.tendermint.com/master/nodes/#validators) in tendermint jargon)
- * one [gateway](https://docs.vocdoni.io/architecture/components.html#gateway)
-
-the seed node will serve to bootstrap the network: it'll just wait for incoming connections from other nodes, and provide them a list of peers which they can connect to.
-the miners will first connect to the seed node, get the list of peers, and connect to each other. when there are at least 3 miners online, they can reach consensus and start producing blocks.
-
-when the network is up and running, the tool `end2endtest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (a transaction that costs a certain amount of tokens), `end2endtest` uses a faucet offered by the testsuite (passed in `--faucet`) to fund the accounts.
+when the node is up and running, the tool `end2endtest` is used to simulate a voting process, interacting with the gateway node. To create the voting process (a transaction that costs a certain amount of tokens), `end2endtest` uses a faucet offered by the testsuite (passed in `--faucet`) to fund the accounts.
 
 ## Developing
 ### Adding integration tests
@@ -50,7 +43,7 @@ e2etest() {
 `${FUNCNAME[0]}` is the name of the current bash function, and `$@` are the arguments passed to it. The container's name will be `plaintextelection-bb448c37657a78f302a6fd283671c83a`.
 
 ### Debugging failures
-When tests fail, the logs is too polluted with output from miners to be useful. By passing `CLEAN=0` as an envvar, the docker containers are not deleted after the script finishes and you can inspect their logs with `docker logs <container name>`
+When tests fail, the logs can be too long to be useful. By passing `CLEAN=0` as an envvar, the docker containers are not deleted after the script finishes and you can inspect their logs with `docker logs <container name>`
 
 ```
 NOTTY=1 CLEAN=0 ./start_test.sh

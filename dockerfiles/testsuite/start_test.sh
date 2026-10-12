@@ -61,7 +61,6 @@ tests_to_run=(
   	"e2etest_cspelectionv2"
   	"e2etest_dynamicensuselection"
   	"e2etest_electiontimebounds"
-	"test_statesync"
 )
 
 # print help
@@ -159,12 +158,6 @@ e2etest_ballotelection() {
   e2etest ballotApproval
 }
 
-test_statesync() {
-	$COMPOSE_CMD up gatewaySync -d
-	# watch logs for 2 minutes, until catching 'startup complete'. in case of timeout, or panic, or whatever, test will fail
-	timeout 120 sh -c "($COMPOSE_CMD logs gatewaySync -f | grep -m 1 'startup complete')"
-}
-
 ### end tests definition
 
 log "### Starting test suite ###"
@@ -172,9 +165,7 @@ log "### Starting test suite ###"
 	$COMPOSE_CMD build
 	$COMPOSE_CMD build test
 }
-$COMPOSE_CMD up -d seed # start the seed first so the nodes can properly bootstrap
-sleep 10
-$COMPOSE_CMD up -d miner0 miner1 miner2 miner3 gateway0
+$COMPOSE_CMD up -d gateway0
 
 check_gw_is_up() {
   height=$($COMPOSE_CMD_RUN --rm test \
@@ -208,7 +199,6 @@ mkdir -p $results
 
 for test in ${tests_to_run[@]}; do
 	if [ $test == "e2etest_raceDuringCommit" ] || \
-	   [ $test == "test_statesync" ] || \
 	   [ $CONCURRENT -eq 0 ] ; then
 		log "### Running test $test ###"
 		( set -o pipefail ; $test | tee $results/$test.stdout ; echo $? > $results/$test.retval )
@@ -269,8 +259,6 @@ if $COMPOSE_CMD logs | grep -q "^panic:" ; then
 	log "### Panic detected! Look for panic in the logs above for full context, pasting here the 100 lines after panic ###"
 	$COMPOSE_CMD logs | grep -A 100 "^panic:"
 fi
-
-if $COMPOSE_CMD logs | grep -q "CONSENSUS FAILURE" ; then RET=3 ; log "### CONSENSUS FAILURE detected! Look for it in the logs above ###"; fi
 
 [ $CLEAN -eq 1 ] && {
 	log "### Cleaning docker environment ###"

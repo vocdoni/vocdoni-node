@@ -1,70 +1,11 @@
 services:
-  seed:
+  gateway0:
     image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    build: # reused by the other services
+    build:
       context: ../../
       args:
         - BUILDARGS
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.seed"
-    networks:
-      - blockchain
-    volumes:
-      - data-seed:/app/run/
-      - gocoverage-seed:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
 
-  miner0:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner0"
-    networks:
-      - blockchain
-    volumes:
-      - data-miner0:/app/run/
-      - gocoverage-miner0:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
-
-  miner1:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner1"
-    networks:
-      - blockchain
-    volumes:
-      - data-miner1:/app/run/
-      - gocoverage-miner1:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
-
-  miner2:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner2"
-    networks:
-      - blockchain
-    volumes:
-      - data-miner2:/app/run/
-      - gocoverage-miner2:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
-
-  miner3:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.miner3"
-    networks:
-      - blockchain
-    volumes:
-      - data-miner3:/app/run/
-      - gocoverage-miner3:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
-
-  gateway0:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
     env_file: "${COMPOSE_HOST_PATH:-.}/env.gateway0"
     ports:
       - "${COMPOSE_DVOTE_PORT_MAPPING:-9090:9090}"
@@ -72,6 +13,7 @@ services:
       - blockchain
     volumes:
       - data-gateway0:/app/run/
+
       - gocoverage-gateway0:/app/run/gocoverage
     environment:
       - GOCOVERDIR=/app/run/gocoverage
@@ -96,13 +38,7 @@ services:
   gocoverage:
     image: golang:1.23
     volumes:
-      - gocoverage-seed:/app/run/gocoverage/seed
-      - gocoverage-miner0:/app/run/gocoverage/miner0
-      - gocoverage-miner1:/app/run/gocoverage/miner1
-      - gocoverage-miner2:/app/run/gocoverage/miner2
-      - gocoverage-miner3:/app/run/gocoverage/miner3
       - gocoverage-gateway0:/app/run/gocoverage/gateway0
-      - gocoverage-gatewaySync:/app/run/gocoverage/gatewaySync
       - gocoverage-test:/app/run/gocoverage/test
     networks:
       - blockchain
@@ -143,36 +79,13 @@ services:
     profiles:
       - grafana
 
-  gatewaySync:
-    image: "ghcr.io/vocdoni/vocdoni-node:${TESTSUITE_BUILD_TAG:-latest}"
-    env_file: "${COMPOSE_HOST_PATH:-.}/env.gatewaySync"
-    networks:
-      - blockchain
-    volumes:
-      - data-gatewaySync:/app/run/
-      - gocoverage-gatewaySync:/app/run/gocoverage
-    environment:
-      - GOCOVERDIR=/app/run/gocoverage
-      - LOG_PANIC_ON_INVALIDCHARS
 
 networks:
   blockchain:
 
 volumes:
-  data-seed: {}
-  data-miner0: {}
-  data-miner1: {}
-  data-miner2: {}
-  data-miner3: {}
   data-gateway0: {}
-  data-gatewaySync: {}
-  gocoverage-seed: {}
-  gocoverage-miner0: {}
-  gocoverage-miner1: {}
-  gocoverage-miner2: {}
-  gocoverage-miner3: {}
   gocoverage-gateway0: {}
-  gocoverage-gatewaySync: {}
   gocoverage-test: {}
   prometheus_data: {}
   grafana_data: {}

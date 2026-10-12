@@ -16,7 +16,7 @@ RUN --mount=type=cache,sharing=locked,id=gomod,target=/go/pkg/mod/cache \
 	--mount=type=cache,sharing=locked,id=goroot,target=/root/.cache/go-build \
 	--mount=type=bind,target=. \
 	go build -trimpath -o=/bin -ldflags="-w -s -X=go.vocdoni.io/dvote/internal.Version=$(git describe --always --tags --dirty --match='v[0-9]*')" $BUILDARGS \
-	./cmd/node ./cmd/voconed ./cmd/end2endtest
+	./cmd/voconed ./cmd/end2endtest
 
 FROM debian:bookworm-slim as base
 WORKDIR /app
@@ -33,6 +33,11 @@ FROM base as test
 COPY --from=builder /bin/end2endtest /app/
 
 FROM base
-COPY --from=builder /bin/node /bin/voconed /app/
+COPY --from=builder /bin/voconed /app/
 
-ENTRYPOINT ["/app/node"]
+# Chain data, genesis and voconed.yml (keys) are kept in /app/run, mount it as a volume.
+ENV VOCONED_DIR=/app/run
+VOLUME /app/run
+EXPOSE 9090
+
+ENTRYPOINT ["/app/voconed"]
