@@ -53,12 +53,6 @@ func (vi *VochainInfo) updateCounters() {
 	}
 	accountTreeSize.Set(ac)
 
-	sc, err := vi.vnode.State.CountSIKs(true)
-	if err != nil {
-		log.Errorf("cannot count SIKs: %s", err)
-	}
-	sikTreeSize.Set(sc)
-
 	voteCacheSize.Set(uint64(vi.vnode.State.CacheSize()))
 	mempoolSize.Set(uint64(vi.vnode.MempoolSize()))
 	blockPeriodMinute.Set(uint64(vi.BlockTimes()[0].Milliseconds()))
@@ -212,12 +206,6 @@ func (vi *VochainInfo) VoteCacheSize() uint64 {
 // included in the blockchain
 func (vi *VochainInfo) AccountTreeSize() uint64 {
 	return accountTreeSize.Get()
-}
-
-// SIKTreeSize returns the current number of validated votes waiting to be
-// included in the blockchain
-func (vi *VochainInfo) SIKTreeSize() uint64 {
-	return sikTreeSize.Get()
 }
 
 // TokensBurned returns the current balance of the burn address

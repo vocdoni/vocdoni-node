@@ -178,18 +178,6 @@ func (c *Controller) Commit(height, timestamp uint32) error {
 		switch action.TypeID {
 		case ActionCommitResults:
 			log.Debugw("commit results", "height", height, "id", fmt.Sprintf("%x", action.ID), "action", ActionsToString[action.TypeID])
-			// if the election is set up with tempSIKs as true, purge the election
-			// related SIKs
-			process, err := c.state.Process(action.ElectionID, false)
-			if err != nil {
-				return fmt.Errorf("cannot get process: %w", err)
-			}
-			if process.GetTempSIKs() {
-				log.Infow("purge temporal siks", "pid", hex.EncodeToString(process.ProcessId))
-				if err := c.state.PurgeSIKsByElection(process.ProcessId); err != nil {
-					log.Errorw(err, "cannot purge temp SIKs after election ends")
-				}
-			}
 			var r *results.Results
 			if !c.checkRevealedKeys(action.ElectionID) {
 				// we are missing some keys, we cannot compute the results yet

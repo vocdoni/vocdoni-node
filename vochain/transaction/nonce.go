@@ -35,8 +35,7 @@ func (t *TransactionHandler) ExtractNonceAndSender(vtx *vochaintx.Tx) (*common.A
 	case *models.Tx_CollectFaucet:
 		ptx = payload.CollectFaucet
 	case *models.Tx_Vote, *models.Tx_Admin, *models.Tx_SetKeykeeper,
-		*models.Tx_SetTransactionCosts, *models.Tx_DelSIK, *models.Tx_RegisterKey, *models.Tx_SetSIK,
-		*models.Tx_RegisterSIK:
+		*models.Tx_SetTransactionCosts, *models.Tx_RegisterKey:
 		// these tx does not have incremental nonce
 		return nil, 0, nil
 	default:

@@ -168,22 +168,6 @@ func (v *State) UpdateProcess(p *models.Process, pid []byte) error {
 	if p == nil || len(p.ProcessId) != types.ProcessIDsize {
 		return ErrProcessNotFound
 	}
-	// update the process
-	// try to update startBlocks database
-	switch p.Status {
-	case models.ProcessStatus_READY:
-		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, p.StartBlock); err != nil {
-			return err
-		}
-	case models.ProcessStatus_PAUSED:
-		if err := v.ProcessBlockRegistry.SetStartBlock(p.ProcessId, v.CurrentHeight()); err != nil {
-			return err
-		}
-	case models.ProcessStatus_ENDED:
-		if err := v.ProcessBlockRegistry.DeleteStartBlock(p.ProcessId); err != nil {
-			return err
-		}
-	}
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	return updateProcess(&v.tx, p, pid)

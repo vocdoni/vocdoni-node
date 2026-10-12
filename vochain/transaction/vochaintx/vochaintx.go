@@ -100,10 +100,6 @@ func (tx *Tx) GetFaucetPackage() *models.FaucetPackage {
 		return tx.Tx.GetSetAccount().GetFaucetPackage()
 	case *models.Tx_CollectFaucet:
 		return tx.Tx.GetCollectFaucet().GetFaucetPackage()
-	case *models.Tx_SetSIK:
-		return tx.Tx.GetSetSIK().GetFaucetPackage()
-	case *models.Tx_DelSIK:
-		return tx.Tx.GetDelSIK().GetFaucetPackage()
 	default:
 		return nil
 	}

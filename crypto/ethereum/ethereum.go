@@ -25,9 +25,6 @@ const (
 	PubKeyLengthBytesUncompressed = 65
 	// SigningPrefix is the prefix added when hashing
 	SigningPrefix = "\u0019Ethereum Signed Message:\n"
-	// DefaultSIKPayload conatains the default seed to sing during
-	// SIK generation
-	DefaultSIKPayload = "vocdoni-sik-payload"
 )
 
 // SignKeys represents an ECDSA pair of keys for signing.

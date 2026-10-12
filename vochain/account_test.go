@@ -628,18 +628,11 @@ func testSetAccountTx(t *testing.T,
 	create bool,
 ) error {
 	var err error
-
-	sik, err := signer.AccountSIK(nil)
-	if err != nil {
-		return err
-	}
-
 	tx := &models.SetAccountTx{
 		Nonce:         &nonce,
 		Txtype:        models.TxType_SET_ACCOUNT_INFO_URI,
 		Account:       account.Bytes(),
 		FaucetPackage: faucetPkg,
-		SIK:           sik,
 	}
 	if create {
 		tx.Txtype = models.TxType_CREATE_ACCOUNT
@@ -1070,4 +1063,34 @@ func TestSetAccountValidatorTxRejectsUncompressedPubKey(t *testing.T) {
 	validator, err := app.State.Validator(signers[1].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, validator, qt.IsNotNil)
+}
+
+func TestCreateAccountRejectsSIK(t *testing.T) {
+	app := TestBaseApplication(t)
+	signer := ethereum.NewSignKeys()
+	qt.Assert(t, signer.Generate(), qt.IsNil)
+
+	tx := &models.SetAccountTx{
+		Nonce:   new(uint32),
+		Txtype:  models.TxType_CREATE_ACCOUNT,
+		Account: signer.Address().Bytes(),
+		SIK:     util.RandomBytes(32),
+	}
+	stx := &models.SignedTx{}
+	var err error
+	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: tx}})
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, sendTx(app, signer, stx), qt.ErrorMatches, ".*secret identity keys are not supported.*")
+
+	// secret identity key transactions are not supported
+	for _, sikTx := range []*models.Tx{
+		{Payload: &models.Tx_SetSIK{SetSIK: &models.SIKTx{Txtype: models.TxType_SET_ACCOUNT_SIK, SIK: util.RandomBytes(32)}}},
+		{Payload: &models.Tx_DelSIK{DelSIK: &models.SIKTx{Txtype: models.TxType_DEL_ACCOUNT_SIK}}},
+		{Payload: &models.Tx_RegisterSIK{RegisterSIK: &models.RegisterSIKTx{SIK: util.RandomBytes(32)}}},
+	} {
+		stx := &models.SignedTx{}
+		stx.Tx, err = proto.Marshal(sikTx)
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, sendTx(app, signer, stx), qt.IsNotNil)
+	}
 }

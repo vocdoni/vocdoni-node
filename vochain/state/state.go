@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -66,11 +65,7 @@ type State struct {
 	// chainID identifies the blockchain
 	chainID string
 	// electionPriceCalc is the calculator for the election price
-	ElectionPriceCalc    *electionprice.Calculator
-	ProcessBlockRegistry *ProcessBlockRegistry
-
-	validSIKRoots    [][]byte
-	mtxValidSIKRoots sync.Mutex
+	ElectionPriceCalc *electionprice.Calculator
 }
 
 // NewState creates a new State
@@ -116,13 +111,6 @@ func New(dbType, dataDir string) (*State, error) {
 	s.DisableVoteCache.Store(false)
 	s.setMainTreeView(mainTreeView)
 
-	s.ProcessBlockRegistry = &ProcessBlockRegistry{
-		db:    s.NoState(true),
-		state: s,
-	}
-	if err := s.FetchValidSIKRoots(); err != nil {
-		return nil, fmt.Errorf("cannot update valid SIK roots: %w", err)
-	}
 	return s, os.MkdirAll(dataDir, 0o750)
 }
 
@@ -288,12 +276,6 @@ func (v *State) Save() ([]byte, error) {
 	// Commit the statedb tx
 	// Note that we need to commit the tx after calling listeners, because
 	// the listeners may need to get the previous (not committed) state.
-	// Update the SIK merkle-tree roots
-	if err := v.UpdateSIKRoots(); err != nil {
-		return nil, fmt.Errorf("cannot update SIK roots: %w", err)
-	}
-	// TODO: UpdateSIKRoots holds a write lock during its run,
-	// and we grab another one here immediately after. Join them?
 	v.tx.Lock()
 	defer v.tx.Unlock()
 	err := func() error {

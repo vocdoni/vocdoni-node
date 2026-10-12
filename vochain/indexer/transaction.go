@@ -133,7 +133,7 @@ func (idx *Indexer) indexTx(tx *vochaintx.Tx, blockHeight uint32, txIndex int32)
 	}
 
 	signer := []byte{}
-	if len(tx.Signature) > 0 { // not all txs are signed, for example zk ones
+	if len(tx.Signature) > 0 { // not all txs are signed
 		addr, err := ethereum.AddrFromSignature(tx.SignedBody, tx.Signature)
 		if err != nil {
 			log.Errorw(err, "indexer cannot recover signer from signature")

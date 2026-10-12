@@ -328,8 +328,6 @@ var initialAppStateForStage = AppState{
 		AddDelegateForAccount:   1,
 		DelDelegateForAccount:   1,
 		CollectFaucet:           1,
-		SetAccountSIK:           1,
-		DelAccountSIK:           1,
 		SetAccountValidator:     500000,
 	},
 }
@@ -420,8 +418,6 @@ var initialAppStateForLTS = AppState{
 		AddDelegateForAccount:   1,
 		DelDelegateForAccount:   1,
 		CollectFaucet:           1,
-		SetAccountSIK:           1,
-		DelAccountSIK:           1,
 		SetAccountValidator:     500000,
 	},
 }
@@ -476,8 +472,6 @@ func DefaultTransactionCosts() TransactionCosts {
 		AddDelegateForAccount:   1,
 		DelDelegateForAccount:   1,
 		CollectFaucet:           1,
-		SetAccountSIK:           1,
-		DelAccountSIK:           1,
 		SetAccountValidator:     10000,
 	}
 }

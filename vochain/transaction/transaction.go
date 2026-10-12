@@ -180,10 +180,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					return nil, fmt.Errorf("setProcessStatus: %s", err)
 				}
 				if tx.GetStatus() == models.ProcessStatus_ENDED {
-					// purge RegisterSIKTx counter if it exists
-					if err := t.state.PurgeRegisterSIK(tx.ProcessId); err != nil {
-						return nil, fmt.Errorf("setProcessStatus: cannot purge RegisterSIKTx counter: %w", err)
-					}
 					// schedule results computations on the ISTC
 					if err := t.istc.Remove(tx.ProcessId); err != nil {
 						log.Errorw(err, "setProcessStatus: cannot remove IST action")
@@ -286,12 +282,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 					0,
 				); err != nil {
 					return nil, fmt.Errorf("setAccountTx: createAccount %w", err)
-				}
-				// if the tx includes a sik try to persist it in the state
-				if sik := tx.GetSIK(); sik != nil {
-					if err := t.state.SetAddressSIK(txSenderAddress, sik); err != nil {
-						return nil, fmt.Errorf("setAccountTx: SetAddressSIK %w", err)
-					}
 				}
 				txCost, err := t.state.TxBaseCost(models.TxType_CREATE_ACCOUNT, false)
 				if err != nil {
@@ -504,85 +494,6 @@ func (t *TransactionHandler) CheckTx(vtx *vochaintx.Tx, forCommit bool) (*Transa
 			}
 			return response, nil
 		}
-
-	case *models.Tx_SetSIK:
-		txAddress, newSIK, err := t.SetSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("setSIKTx: %w", err)
-		}
-		if forCommit {
-			txCost, err := t.state.TxBaseCost(models.TxType_SET_ACCOUNT_SIK, false)
-			if err != nil {
-				return nil, fmt.Errorf("setAccountInfoUriTx: txCost: %w", err)
-			}
-			// check for a faucet package and if exist, transfer the amount to the tx sender
-			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
-				return nil, err
-			}
-			if err := t.state.BurnTxCostIncrementNonce(
-				txAddress,
-				models.TxType_SET_ACCOUNT_SIK,
-				txCost,
-				newSIK.String(),
-			); err != nil {
-				return nil, fmt.Errorf("setSIKTx: burnTxCostIncrementNonce %w", err)
-			}
-			if err := t.state.SetAddressSIK(txAddress, newSIK); err != nil {
-				return nil, fmt.Errorf("setSIKTx: %w", err)
-			}
-		}
-		return response, nil
-
-	case *models.Tx_DelSIK:
-		txAddress, err := t.DelSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("delSIKTx: %w", err)
-		}
-		if forCommit {
-			txCost, err := t.state.TxBaseCost(models.TxType_DEL_ACCOUNT_SIK, false)
-			if err != nil {
-				return nil, fmt.Errorf("delSIKTx: txCost: %w", err)
-			}
-			// check for a faucet package and if exist, transfer the amount to the tx sender
-			if _, err := t.checkFaucetPackageAndTransfer(vtx.Tx.GetSetSIK().FaucetPackage, txCost, txAddress, vtx.TxID[:], true); err != nil {
-				return nil, err
-			}
-			if err := t.state.BurnTxCostIncrementNonce(
-				txAddress,
-				models.TxType_DEL_ACCOUNT_SIK,
-				txCost,
-				"",
-			); err != nil {
-				return nil, fmt.Errorf("delSIKTx: burnTxCostIncrementNonce %w", err)
-			}
-			if err := t.state.InvalidateSIK(txAddress); err != nil {
-				return nil, fmt.Errorf("delSIKTx: %w", err)
-			}
-		}
-		return response, nil
-
-	case *models.Tx_RegisterSIK:
-		txAddress, SIK, pid, tempSIKs, err := t.RegisterSIKTxCheck(vtx)
-		if err != nil {
-			return nil, fmt.Errorf("registerSIKTx: %w", err)
-		}
-		if forCommit {
-			// register the SIK
-			if err := t.state.SetAddressSIK(txAddress, SIK); err != nil {
-				return nil, fmt.Errorf("registerSIKTx: %w", err)
-			}
-			// increase the RegisterSIKTx counter
-			if err := t.state.IncreaseRegisterSIKCounter(pid); err != nil {
-				return nil, fmt.Errorf("registerSIKTx: %w", err)
-			}
-			if tempSIKs {
-				log.Infow("registering tempSIK", "address", txAddress.String())
-				if err := t.state.AssignSIKToElection(pid, txAddress); err != nil {
-					return nil, fmt.Errorf("registerSIKTx: %w", err)
-				}
-			}
-		}
-		return response, nil
 
 	default:
 		return nil, fmt.Errorf("invalid transaction type")
