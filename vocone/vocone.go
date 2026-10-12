@@ -64,6 +64,10 @@ type Vocone struct {
 	txsPerBlock int
 	closed      atomic.Bool
 
+	// wg tracks goroutines started by Start that access databases so that
+	// Close can wait for them to finish before releasing those databases.
+	wg sync.WaitGroup
+
 	// mempoolMtx protects mempoolKeys and mempoolSeq.
 	mempoolMtx  sync.Mutex
 	mempoolKeys [][]byte // ordered list of db keys for pending txs
@@ -193,11 +197,19 @@ func (vc *Vocone) Start(ctx context.Context) error {
 	// Reveal the encryption keys of ended elections that could not be revealed
 	// while the node was stopped.
 	if vc.KeyKeeper != nil {
-		go vc.KeyKeeper.RevealUnpublished()
+		vc.wg.Add(1)
+		go func() {
+			defer vc.wg.Done()
+			vc.KeyKeeper.RevealUnpublished()
+		}()
 	}
 	// Rebuild the live results of the open elections and repair the indexed blocks.
 	if vc.Indexer != nil {
-		go vc.Indexer.AfterSyncBootstrap(false)
+		vc.wg.Add(1)
+		go func() {
+			defer vc.wg.Done()
+			vc.Indexer.AfterSyncBootstrap(false)
+		}()
 	}
 	// Load the election price calculator from the current state (tx costs and capacity).
 	if err := vc.SetElectionPrice(); err != nil {
@@ -312,10 +324,15 @@ func (vc *Vocone) produceBlock() error {
 }
 
 // Close releases all resources held by Vocone.
-// It acquires both vcMtx and mempoolMtx to ensure no concurrent block
-// production or mempool operation is in progress before closing databases.
+// It signals goroutines to stop, waits for the bootstrap goroutines started
+// by Start to finish, then acquires both vcMtx and mempoolMtx to ensure no
+// concurrent block production or mempool operation is in progress before
+// closing databases.
 func (vc *Vocone) Close() error {
 	vc.closed.Store(true)
+	// Wait for the bootstrap goroutines (RevealUnpublished, AfterSyncBootstrap)
+	// to finish before releasing the databases they access.
+	vc.wg.Wait()
 	vc.vcMtx.Lock()
 	defer vc.vcMtx.Unlock()
 	vc.mempoolMtx.Lock()
