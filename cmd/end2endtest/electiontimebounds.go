@@ -49,7 +49,7 @@ func (t *E2EElectionTimeBounds) Setup(api *apiclient.HTTPclient, c *config) erro
 	// Set end time to 40 seconds from now (20 seconds after start)
 	ed.EndDate = ed.StartDate.Add(20 * time.Second)
 
-	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeCSPv2}
 
 	if err := t.setupElection(ed, 10, false); err != nil {
 		return err
@@ -140,7 +140,7 @@ func (t *E2EElectionTimeBounds) attemptVotes(phase string) error {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
 				Election:     t.election,
-				ProofMkTree:  acctp.proof,
+				ProofCSP:     acctp.proof.Proof,
 				Choices:      []int{0, 1},
 				VoterAccount: acctp.account,
 			})

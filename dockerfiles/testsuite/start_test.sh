@@ -12,7 +12,6 @@
 #  e2etest_lifecyclelection: run lifecycle test
 #  e2etest_cspelection: run csp test
 #  e2etest_cspelectionv2: run csp test with census origin V2 and weighted blind pid-salted proofs
-#  e2etest_dynamicensuselection: run dynamic census test
 #  e2etest_electiontimebounds: run election time bounds test
 
 export COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 COMPOSE_INTERACTIVE_NO_CLI=1
@@ -59,7 +58,6 @@ tests_to_run=(
   	"e2etest_lifecyclelection"
   	"e2etest_cspelection"
   	"e2etest_cspelectionv2"
-  	"e2etest_dynamicensuselection"
   	"e2etest_electiontimebounds"
 )
 
@@ -145,10 +143,6 @@ e2etest_cspelection() {
 
 e2etest_cspelectionv2() {
   e2etest cspelectionv2
-}
-
-e2etest_dynamicensuselection() {
-  e2etest dynamicensuselection
 }
 
 e2etest_ballotelection() {

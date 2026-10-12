@@ -43,7 +43,7 @@ func (t *E2EMetadataElection) Setup(api *apiclient.HTTPclient, c *config) error 
 		Autostart:     true,
 		Interruptible: true,
 	}
-	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeCSPv2}
 
 	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
@@ -80,7 +80,7 @@ func (t *E2EMetadataElection) Run() error {
 	vote := func(election *vapi.Election, voter acctProof) error {
 		_, err := t.api.Vote(&apiclient.VoteData{
 			Election:     election,
-			ProofMkTree:  voter.proof,
+			ProofCSP:     voter.proof.Proof,
 			Choices:      []int{1},
 			VoterAccount: voter.account,
 		})

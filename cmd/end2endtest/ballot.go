@@ -238,7 +238,7 @@ func sendAndValidateVotes(e e2eElection, choices [][]int, expectedResults [][]*t
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
 				Election:     e.election,
-				ProofMkTree:  acctp.proof,
+				ProofCSP:     acctp.proof.Proof,
 				Choices:      choices[vcount],
 				VoterAccount: acctp.account,
 			})
@@ -290,10 +290,10 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			{1, 1, 1, 4},
 			{0, 3, 2, 1},
 		}
-		// default results on field 1,2,3,4 for 10 votes
-		resultsFields = append(resultsFields, votesToBigInt(20, 10, 0, 20),
-			votesToBigInt(10, 10, 20, 10), votesToBigInt(20, 10, 10, 10),
-			votesToBigInt(0, 20, 20, 10))
+		// default results for 10 votes with CSP weight=1
+		resultsFields = append(resultsFields, votesToBigInt(2, 1, 0, 2),
+			votesToBigInt(1, 1, 2, 1), votesToBigInt(2, 1, 1, 1),
+			votesToBigInt(0, 2, 2, 1))
 
 	case quadraticVote:
 		v = [][]int{
@@ -308,9 +308,9 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			{1, 3, 0, 1},
 			{1, 3, 1, 1},
 		}
-		resultsFields = append(resultsFields, votesToBigInt(10, 30, 10, 0),
-			votesToBigInt(0, 10, 20, 20), votesToBigInt(10, 30, 10, 0),
-			votesToBigInt(0, 20, 30, 0))
+		resultsFields = append(resultsFields, votesToBigInt(1, 3, 1, 0),
+			votesToBigInt(0, 1, 2, 2), votesToBigInt(1, 3, 1, 0),
+			votesToBigInt(0, 2, 3, 0))
 
 	case rangeVote:
 		v = [][]int{
@@ -325,9 +325,9 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			{1, 2, 0, 3},
 			{4, 3, 1, 1},
 		}
-		resultsFields = append(resultsFields, votesToBigInt(10, 20, 10, 0),
-			votesToBigInt(0, 10, 10, 20), votesToBigInt(10, 0, 20, 10),
-			votesToBigInt(20, 10, 0, 10))
+		resultsFields = append(resultsFields, votesToBigInt(1, 2, 1, 0),
+			votesToBigInt(0, 1, 1, 2), votesToBigInt(1, 0, 2, 1),
+			votesToBigInt(2, 1, 0, 1))
 
 	case approvalVote:
 		v = [][]int{
@@ -342,9 +342,9 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			{1, 1, 0, 3},
 			{1, 1, 1, 1},
 		}
-		resultsFields = append(resultsFields, votesToBigInt(30, 30),
-			votesToBigInt(50, 10), votesToBigInt(30, 30),
-			votesToBigInt(20, 40))
+		resultsFields = append(resultsFields, votesToBigInt(3, 3),
+			votesToBigInt(5, 1), votesToBigInt(3, 3),
+			votesToBigInt(2, 4))
 	}
 
 	// less than 10 votes
@@ -387,7 +387,7 @@ func ballotVotes(vop vapi.TallyMode, nvotes int, ballotType string, expectUnique
 			}
 
 			for i, resultField := range resultsFields {
-				resultField[vote[i]].Add(resultField[vote[i]], new(types.BigInt).SetUint64(10))
+				resultField[vote[i]].Add(resultField[vote[i]], new(types.BigInt).SetUint64(1))
 			}
 		}
 	}

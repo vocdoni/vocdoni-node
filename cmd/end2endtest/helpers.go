@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"os"
 	"reflect"
 	"strings"
@@ -24,10 +23,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	defaultWeight = 10
-	retriesSend   = retries / 2
-)
+const retriesSend = retries / 2
 
 type acctProof struct {
 	account *ethereum.SignKeys
@@ -70,7 +66,7 @@ func newTestProcess() *models.Process {
 			EncryptedVotes: false,
 			UniqueValues:   true,
 		},
-		CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 		VoteOptions: &models.ProcessVoteOptions{
 			MaxCount: 1,
 			MaxValue: 1,
@@ -135,32 +131,6 @@ func (t *e2eElection) createAccount(privateKey string) (*vapi.Account, *apiclien
 	return acc, accountApi, nil
 }
 
-func (t *e2eElection) addParticipantsCensus(censusID types.HexBytes, voterAccounts []*ethereum.SignKeys) error {
-	keys := make([][]byte, 0, len(voterAccounts))
-	for _, voterAccount := range voterAccounts {
-		keys = append(keys, voterAccount.Address().Bytes())
-	}
-	if err := localCensuses.addParticipants(censusID, keys, new(big.Int).SetUint64(defaultWeight)); err != nil {
-		return err
-	}
-	log.Infof("added %d participants to census %s", len(keys), censusID.String())
-	return nil
-}
-
-// isCensusSizeValid validate the size of the census, in case like dynamic census test the size could be different to nvotes
-func (t *e2eElection) censusSizeEquals(censusID types.HexBytes, sizeExpected uint64) bool {
-	size, err := localCensuses.size(censusID)
-	if err != nil {
-		log.Errorf("unable to get census size: %v", err)
-		return false
-	}
-	if size != sizeExpected {
-		log.Errorf("census size is %d, expected %d", size, sizeExpected)
-		return false
-	}
-	log.Infof("census %s size is %d", censusID.String(), size)
-	return true
-}
 
 func (t *e2eElection) waitUntilElectionStarts(electionID types.HexBytes) (*vapi.Election, error) {
 	// Wait for the election to start
@@ -194,7 +164,7 @@ func (t *e2eElection) generateProofs(csp *ethereum.SignKeys, voterAccts []*ether
 				if csp != nil {
 					return cspGenProof(t.election.ElectionID, voterKey, csp)
 				}
-				return localCensuses.genProof(t.election.Census.CensusRoot, voterKey)
+				return nil, fmt.Errorf("no CSP signer or key provided")
 			}()
 			if err != nil {
 				errorChan <- err
@@ -240,67 +210,30 @@ func (t *e2eElection) setupAccount() error {
 	return nil
 }
 
-func (t *e2eElection) publishCheckCensus(censusID types.HexBytes, nAcct uint64) (types.HexBytes, string, error) {
-	// Check census size
-	if !t.censusSizeEquals(censusID, nAcct) {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
-	}
-
-	rootHash, err := localCensuses.publish(censusID)
-	if err != nil {
-		return nil, "", fmt.Errorf("cannot publish census %x: %w", censusID, err)
-	}
-
-	log.Infof("census published with root %x", rootHash)
-
-	// Check census size (of the published census)
-	if !t.censusSizeEquals(censusID, nAcct) {
-		return nil, "", fmt.Errorf("failed census size invalid, censusID %x", censusID)
-	}
-	return rootHash, "", nil
-}
-
-// setupCensus create a new census that will have nAcct voterAccounts and participants
-func (t *e2eElection) setupCensus(censusType string, nAcct int) (types.HexBytes, []*ethereum.SignKeys, error) {
-	// Create a new census
-	censusID, err := localCensuses.newCensus(censusType)
-	if err != nil {
-		return nil, nil, err
-	}
-	log.Infof("new census created with id %s", censusID.String())
-
-	voterAccounts := ethereum.NewSignKeysBatch(nAcct)
-
-	// Add the accounts to the census by batches
-	if err := t.addParticipantsCensus(censusID, voterAccounts); err != nil {
-		return nil, nil, err
-	}
-
-	return censusID, voterAccounts, nil
-}
-
+// setupElection creates a CSP-backed election from an ElectionDescription and
+// generates CSP proofs for nvAccts voter accounts.  The census type on ed is
+// overwritten to CensusTypeCSPv2 and the CSP public key is set as the root.
+// The caller sets ed.Census.Size to restrict MaxCensusSize; if it is zero it
+// defaults to nvAccts (or 1 when nvotes is 0).
 func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, waitUntilStarted bool) error {
 	if err := t.setupAccount(); err != nil {
 		return err
 	}
 
-	censusID, voterAccts, err := t.setupCensus(ed.Census.Type, nvAccts)
-	if err != nil {
-		return err
+	csp := &ethereum.SignKeys{}
+	if err := csp.Generate(); err != nil {
+		return fmt.Errorf("cannot generate CSP key: %w", err)
 	}
+	voterAccts := ethereum.NewSignKeysBatch(nvAccts)
 
-	ed.Census.RootHash, ed.Census.URL, err = t.publishCheckCensus(censusID, uint64(nvAccts))
-	if err != nil {
-		return err
-	}
-
+	ed.Census.Type = vapi.CensusTypeCSPv2
+	ed.Census.PublicKey = csp.PublicKey()
 	if ed.Census.Size == 0 {
-		ed.Census.Size = func() uint64 {
-			if t.config.nvotes == 0 {
-				return 1 // allows to test with no voters
-			}
-			return uint64(t.config.nvotes)
-		}()
+		if t.config.nvotes == 0 {
+			ed.Census.Size = 1 // allows to test with no voters
+		} else {
+			ed.Census.Size = uint64(nvAccts)
+		}
 	}
 
 	if err := t.checkElectionPrice(ed); err != nil {
@@ -331,7 +264,7 @@ func (t *e2eElection) setupElection(ed *vapi.ElectionDescription, nvAccts int, w
 		}
 	}
 
-	if err := t.generateProofs(nil, voterAccts); err != nil {
+	if err := t.generateProofs(csp, voterAccts); err != nil {
 		return err
 	}
 
@@ -366,23 +299,10 @@ func (t *e2eElection) setupElectionRaw(prc *models.Process) error {
 		if err := csp.Generate(); err != nil {
 			return err
 		}
-		censusRoot := csp.PublicKey()
-		prc.CensusRoot = censusRoot
+		prc.CensusRoot = csp.PublicKey()
 
 	default:
-		censusType := vapi.CensusTypeWeighted
-		censusID, vAccts, err := t.setupCensus(censusType, t.config.nvotes)
-		if err != nil {
-			return err
-		}
-		rootHash, url, err := t.publishCheckCensus(censusID, uint64(t.config.nvotes))
-		if err != nil {
-			return err
-		}
-		prc.CensusRoot = rootHash
-		prc.CensusURI = &url
-		voterAccounts = vAccts
-		csp = nil
+		return fmt.Errorf("census origin %s not supported", prc.CensusOrigin)
 	}
 
 	electionID, err := t.api.NewElectionRaw(prc)

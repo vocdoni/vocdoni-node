@@ -38,7 +38,7 @@ func (t *E2EOverwriteElection) Setup(api *apiclient.HTTPclient, c *config) error
 		Interruptible: true,
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 2}
-	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeWeighted}
+	ed.Census = vapi.CensusTypeDescription{Type: vapi.CensusTypeCSPv2}
 
 	if err := t.setupElection(ed, t.config.nvotes, true); err != nil {
 		return err
@@ -66,7 +66,7 @@ func (t *E2EOverwriteElection) Run() error {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
 				Election:     t.election,
-				ProofMkTree:  acctp.proof,
+				ProofCSP:     acctp.proof.Proof,
 				Choices:      []int{0},
 				VoterAccount: acctp.account,
 			})
@@ -95,8 +95,8 @@ func (t *E2EOverwriteElection) Run() error {
 		return err
 	}
 
-	// should count only the first overwrite
-	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-1)*10, 0, 10, 0, 0, 0, 0, 0)}
+	// should count only the first overwrite; CSP proofs carry weight=1 by default
+	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-1), 0, 1, 0, 0, 0, 0, 0)}
 
 	// only the first overwrite should be valid in the results and must math with the expected results
 	if !matchResults(elres.Results, expectedResults) {

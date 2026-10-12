@@ -38,7 +38,7 @@ func (t *E2EMaxCensusSizeElection) Setup(api *apiclient.HTTPclient, c *config) e
 	}
 	ed.VoteType = vapi.VoteType{MaxVoteOverwrites: 1}
 	ed.Census = vapi.CensusTypeDescription{
-		Type: vapi.CensusTypeWeighted,
+		Type: vapi.CensusTypeCSPv2,
 		Size: uint64(t.config.nvotes - 1),
 	}
 
@@ -69,7 +69,7 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		if acctp, ok := value.(acctProof); ok {
 			votes = append(votes, &apiclient.VoteData{
 				Election:     t.election,
-				ProofMkTree:  acctp.proof,
+				ProofCSP:     acctp.proof.Proof,
 				Choices:      []int{0},
 				VoterAccount: acctp.account,
 			})
@@ -102,8 +102,8 @@ func (t *E2EMaxCensusSizeElection) Run() error {
 		return err
 	}
 
-	// should not count the last vote
-	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-1)*10, 0, 0)}
+	// should not count the last vote; CSP proofs carry weight=1 by default
+	expectedResults := [][]*types.BigInt{votesToBigInt(uint64(c.nvotes-1), 0, 0)}
 
 	if !matchResults(elres.Results, expectedResults) {
 		return fmt.Errorf("election result must match, expected Results: %s but got Results: %v", expectedResults, elres.Results)
