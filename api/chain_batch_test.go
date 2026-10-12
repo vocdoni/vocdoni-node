@@ -7,8 +7,6 @@ import (
 	"path"
 	"testing"
 
-	cmtbytes "github.com/cometbft/cometbft/libs/bytes"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	qt "github.com/frankban/quicktest"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -95,11 +93,11 @@ func TestChainSendTxBatchHandler(t *testing.T) {
 	c.Assert(err, qt.IsNil)
 	app := vochain.TestBaseApplication(t)
 	// stub the mempool: a tx whose raw payload is "bad" is rejected at submit.
-	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+	app.SetFnSendTx(func(tx []byte) (*vochain.SendTxResponse, error) {
 		if string(tx) == "bad" {
 			return nil, fmt.Errorf("rejected")
 		}
-		return &cometcoretypes.ResultBroadcastTx{Hash: cmtbytes.HexBytes("hash"), Code: 0}, nil
+		return &vochain.SendTxResponse{Hash: []byte("hash"), Code: 0}, nil
 	})
 	idx, err := indexer.New(app, indexer.Options{DataDir: t.TempDir()})
 	c.Assert(err, qt.IsNil)

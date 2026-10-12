@@ -1,13 +1,11 @@
 package vochaininfo
 
 import (
-	"context"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/VictoriaMetrics/metrics"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/state"
@@ -74,8 +72,7 @@ func (vi *VochainInfo) averageBlockTime(intervalBlocks int64) time.Duration {
 
 	// Calculate the starting block height for the interval
 	startBlockHeight := currentHeight - intervalBlocks
-	if vi.vnode.Node != nil && vi.vnode.Node.BlockStore() != nil &&
-		startBlockHeight < vi.vnode.Node.BlockStore().Base() {
+	if base, _ := vi.vnode.BlockStoreRange(); startBlockHeight < base {
 		// We cannot calculate the average block time for the given interval
 		return 0
 	}
@@ -215,23 +212,6 @@ func (vi *VochainInfo) TokensBurned() uint64 {
 		return 0
 	}
 	return acc.Balance
-}
-
-// NetInfo returns network info (mainly, peers)
-func (vi *VochainInfo) NetInfo() (*cometcoretypes.ResultNetInfo, error) {
-	if vi.vnode.NodeClient != nil {
-		return vi.vnode.NodeClient.NetInfo(context.Background())
-	}
-	return nil, fmt.Errorf("vochain node not ready")
-}
-
-// NPeers returns the whole list of peers, including ID and URL
-func (vi *VochainInfo) NPeers() int {
-	ni, err := vi.NetInfo()
-	if err != nil || ni == nil {
-		return 0
-	}
-	return ni.NPeers
 }
 
 // BlocksLastMinute returns the number of blocks synced during the last minute.

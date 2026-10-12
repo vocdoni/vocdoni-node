@@ -70,15 +70,12 @@ const (
 	ActionCommitResults ActionTypeID = iota
 	// ActionEndProcess sets a process as ended. It schedules ActionComputeResults.
 	ActionEndProcess
-	// ActionUpdateValidatorScore updates the validator score (votes and proposer) in the state.
-	ActionUpdateValidatorScore
 )
 
 // ActionsToString translates the action identifiers to its corresponding human friendly string.
 var ActionsToString = map[ActionTypeID]string{
-	ActionCommitResults:        "commit-results",
-	ActionEndProcess:           "end-process",
-	ActionUpdateValidatorScore: "update-validator-score",
+	ActionCommitResults: "commit-results",
+	ActionEndProcess:    "end-process",
 }
 
 // Action is the model used to store the IST actions into state.
@@ -88,10 +85,8 @@ type Action struct {
 	Height    uint32
 	TimeStamp uint32
 
-	ElectionID        []byte
-	Attempts          uint32
-	ValidatorVotes    [][]byte
-	ValidatorProposer []byte
+	ElectionID []byte
+	Attempts   uint32
 }
 
 // encode performs the encoding of the IST action using Gob.
@@ -206,14 +201,6 @@ func (c *Controller) Commit(height, timestamp uint32) error {
 			if err := c.endElection(action.ElectionID); err != nil {
 				return fmt.Errorf("cannot end election %x: %w",
 					action.ElectionID, err)
-			}
-			// delete the IST action
-			if err := c.removeAction(action.ID); err != nil {
-				return fmt.Errorf("cannot delete IST actions: %w", err)
-			}
-		case ActionUpdateValidatorScore:
-			if err := c.updateValidatorScore(action.ValidatorVotes, action.ValidatorProposer); err != nil {
-				return fmt.Errorf("cannot update validator score: %w", err)
 			}
 			// delete the IST action
 			if err := c.removeAction(action.ID); err != nil {

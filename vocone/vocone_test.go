@@ -22,6 +22,7 @@ import (
 	"go.vocdoni.io/dvote/types"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/state"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -408,6 +409,70 @@ func TestSetBulkTxCostsLogic(t *testing.T) {
 		qt.Assert(t, cost == 100, qt.IsTrue,
 			qt.Commentf("tx type %v should have cost 100, got %d", k, cost))
 	}
+}
+
+// openTestVocone opens the vocone stores in dir without starting block production.
+func openTestVocone(t *testing.T, dir string, keymng *ethereum.SignKeys) *Vocone {
+	t.Helper()
+	vc := &Vocone{}
+	vc.Config = &config.VochainCfg{DataDir: dir, DBType: db.TypePebble}
+	var err error
+	vc.App, err = vochain.NewBaseApplication(vc.Config)
+	qt.Assert(t, err, qt.IsNil)
+	vc.txsPerBlock = DefaultTxsPerBlock
+	vc.blockStore, err = metadb.New(db.TypePebble, filepath.Join(dir, "blockstore"))
+	qt.Assert(t, err, qt.IsNil)
+	lastHeight, err := vc.App.State.LastHeight()
+	qt.Assert(t, err, qt.IsNil)
+	nextHeight := int64(lastHeight)
+	if _, err := vc.loadBlockMeta(nextHeight); err == nil {
+		nextHeight++
+	}
+	vc.height.Store(nextHeight)
+	vc.mempoolDB, err = metadb.New(db.TypePebble, filepath.Join(dir, "mempool"))
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, vc.loadMempool(), qt.IsNil)
+	vc.setDefaultMethods()
+	vc.App.State.SetHeight(uint32(vc.height.Load()))
+	qt.Assert(t, vc.loadGenesis(), qt.IsNil)
+	qt.Assert(t, vc.SetKeyKeeper(keymng), qt.IsNil)
+	return vc
+}
+
+// TestGenesisAppliedOnce verifies that the genesis is persisted and only applied
+// when the chain is created: a restart keeps the chainID and does not mint again.
+func TestGenesisAppliedOnce(t *testing.T) {
+	dir := t.TempDir()
+	keymng := ethereum.SignKeys{}
+	qt.Assert(t, keymng.Generate(), qt.IsNil)
+	funded := ethereum.SignKeys{}
+	qt.Assert(t, funded.Generate(), qt.IsNil)
+
+	vc := openTestVocone(t, dir, &keymng)
+	qt.Assert(t, vc.Initialized(), qt.IsFalse)
+	appState := DefaultGenesisAppState(vc.txsPerBlock)
+	appState.Accounts = append(appState.Accounts, genesis.Account{Address: funded.Address().Bytes(), Balance: 1000})
+	qt.Assert(t, vc.InitChain("genesis-test", appState), qt.IsNil)
+	qt.Assert(t, vc.Initialized(), qt.IsTrue)
+	qt.Assert(t, vc.produceBlock(), qt.IsNil)
+	qt.Assert(t, vc.produceBlock(), qt.IsNil)
+	qt.Assert(t, vc.Close(), qt.IsNil)
+
+	vc = openTestVocone(t, dir, &keymng)
+	defer vc.Close()
+	qt.Assert(t, vc.Initialized(), qt.IsTrue)
+	qt.Assert(t, vc.App.ChainID(), qt.Equals, "genesis-test")
+	qt.Assert(t, vc.App.Genesis().ChainID, qt.Equals, "genesis-test")
+	qt.Assert(t, vc.height.Load(), qt.Equals, int64(2))
+	qt.Assert(t, vc.InitChain("genesis-test", appState), qt.IsNotNil)
+	acc, err := vc.App.State.GetAccount(funded.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc, qt.IsNotNil)
+	qt.Assert(t, acc.Balance, qt.Equals, uint64(1000))
+	validator, err := vc.App.State.Validator(keymng.Address(), true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, validator, qt.IsNotNil)
+	qt.Assert(t, validator.KeyIndex, qt.Equals, uint32(1))
 }
 
 func testCreateAccount(cli *apiclient.HTTPclient) error {

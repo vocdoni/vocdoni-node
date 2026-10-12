@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -467,7 +466,7 @@ func testCreateProcessWithErrAndData(t *testing.T, txSender *ethereum.SignKeys, 
 }
 
 func testCheckTxDeliverTxCommit(t *testing.T, app *BaseApplication, stx *models.SignedTx) ([]byte, error) {
-	cktx := new(cometabcitypes.CheckTxRequest)
+	cktx := new(CheckTxRequest)
 	var err error
 	// checkTx()
 	cktx.Tx, err = proto.Marshal(stx)
@@ -789,7 +788,7 @@ func checkTxLog(t *testing.T, app *BaseApplication, txSender *ethereum.SignKeys,
 	qt.Assert(t, err, qt.IsNil)
 	rawTx, err := proto.Marshal(&stx)
 	qt.Assert(t, err, qt.IsNil)
-	resp, err := app.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: rawTx})
+	resp, err := app.CheckTx(context.Background(), &CheckTxRequest{Tx: rawTx})
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, resp.Code, qt.Equals, uint32(0), qt.Commentf("CheckTx failed: %s", resp.Data))
 	return resp.Log

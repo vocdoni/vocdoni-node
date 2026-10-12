@@ -5,7 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/crypto/saltedkey"
@@ -89,8 +88,8 @@ func TestCSPproof(t *testing.T) {
 func testCSPsendVotes(t *testing.T, pid []byte, vp []byte, signer *ethereum.SignKeys,
 	proof *models.ProofCA, app *BaseApplication, expectedResult bool,
 ) {
-	cktx := new(cometabcitypes.CheckTxRequest)
-	var cktxresp *cometabcitypes.CheckTxResponse
+	cktx := new(CheckTxRequest)
+	var cktxresp *CheckTxResponse
 	var stx models.SignedTx
 	var err error
 

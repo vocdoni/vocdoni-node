@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/types"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -558,10 +558,48 @@ func CensusTypeToOrigin(ctype CensusTypeDescription) (models.CensusOrigin, []byt
 	return origin, root, nil
 }
 
+// Block is the block information returned to the client
 type Block struct {
-	comettypes.Header `json:"header"`
-	Hash              types.HexBytes `json:"hash" `
-	TxCount           int64          `json:"txCount"`
+	Header  BlockHeader    `json:"header"`
+	Hash    types.HexBytes `json:"hash" `
+	TxCount int64          `json:"txCount"`
+}
+
+// BlockHeader holds the block header fields. Hashes and addresses are encoded as uppercase hex.
+// Fields not tracked by the chain are kept with zero values so the response shape is stable.
+type BlockHeader struct {
+	Version            BlockVersion        `json:"version"`
+	ChainID            string              `json:"chain_id"`
+	Height             int64               `json:"height"`
+	Time               time.Time           `json:"time"`
+	LastBlockID        BlockID             `json:"last_block_id"`
+	LastCommitHash     blocktypes.HexBytes `json:"last_commit_hash"`
+	DataHash           blocktypes.HexBytes `json:"data_hash"`
+	ValidatorsHash     blocktypes.HexBytes `json:"validators_hash"`
+	NextValidatorsHash blocktypes.HexBytes `json:"next_validators_hash"`
+	ConsensusHash      blocktypes.HexBytes `json:"consensus_hash"`
+	AppHash            blocktypes.HexBytes `json:"app_hash"`
+	LastResultsHash    blocktypes.HexBytes `json:"last_results_hash"`
+	EvidenceHash       blocktypes.HexBytes `json:"evidence_hash"`
+	ProposerAddress    blocktypes.HexBytes `json:"proposer_address"`
+}
+
+// BlockVersion holds the block and app protocol versions of a block.
+type BlockVersion struct {
+	Block uint64 `json:"block"`
+	App   uint64 `json:"app"`
+}
+
+// BlockID identifies a block by its hash.
+type BlockID struct {
+	Hash  blocktypes.HexBytes `json:"hash"`
+	Parts BlockPartSetHeader  `json:"parts"`
+}
+
+// BlockPartSetHeader describes how a block is split in parts.
+type BlockPartSetHeader struct {
+	Total uint32              `json:"total"`
+	Hash  blocktypes.HexBytes `json:"hash"`
 }
 
 // BlockList is used to return a paginated list to the client

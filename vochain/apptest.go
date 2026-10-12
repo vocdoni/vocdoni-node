@@ -1,16 +1,15 @@
 package vochain
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
-	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/config"
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db/metadb"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
+	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -36,17 +35,12 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 		tb.Fatal(err)
 	}
 	app.SetTestingMethods()
-	genesisDoc, err := NewTemplateGenesisFile(tb.TempDir(), 4)
+	app.SetChainID(chainID)
+	appState, err := testGenesisAppState(4)
 	if err != nil {
 		tb.Fatal(err)
 	}
-	_, err = app.InitChain(context.TODO(), &cometabcitypes.InitChainRequest{
-		Time:          time.Unix(0, 0),
-		ChainId:       chainID,
-		Validators:    []cometabcitypes.ValidatorUpdate{},
-		AppStateBytes: genesisDoc.AppState,
-	})
-	if err != nil {
+	if _, err := app.InitChain(appState, time.Unix(0, 0)); err != nil {
 		tb.Fatal(err)
 	}
 	app.State.ElectionPriceCalc.SetBasePrice(1)
@@ -62,6 +56,39 @@ func TestBaseApplicationWithChainID(tb testing.TB, chainID string) *BaseApplicat
 		tb.Fatal(err)
 	}
 	return app
+}
+
+// testGenesisAppState returns a genesis app state with a funded faucet account
+// and the given number of validators, all with random keys.
+func testGenesisAppState(validators int) (*genesis.AppState, error) {
+	faucet := ethereum.SignKeys{}
+	if err := faucet.Generate(); err != nil {
+		return nil, err
+	}
+	appState := &genesis.AppState{
+		Accounts: []genesis.Account{
+			{
+				Address: faucet.Address().Bytes(),
+				Balance: 100000,
+			},
+		},
+		TxCost:          genesis.DefaultTransactionCosts(),
+		MaxElectionSize: 100000,
+	}
+	for i := 0; i < validators; i++ {
+		signer := ethereum.SignKeys{}
+		if err := signer.Generate(); err != nil {
+			return nil, err
+		}
+		appState.Validators = append(appState.Validators, genesis.AppStateValidators{
+			Address:  signer.Address().Bytes(),
+			PubKey:   signer.PublicKey(),
+			Power:    10,
+			Name:     fmt.Sprintf("validator%d", i),
+			KeyIndex: uint8(i + 1), // zero is reserved for disabling validator key keeper capabilities
+		})
+	}
+	return appState, nil
 }
 
 // SetTestingMethods assigns fnGetBlockByHash, fnGetBlockByHeight, fnSendTx to use mockBlockStore
@@ -89,15 +116,15 @@ func (app *BaseApplication) SetTestingMethods() {
 		}
 		stx := models.SignedTx{}
 		tx := blk.Txs[txIndex]
-		return &stx, tx.Hash(), proto.Unmarshal(blk.Txs[txIndex], &stx)
+		return &stx, tx.Hash(), proto.Unmarshal(tx, &stx)
 	})
-	app.SetFnSendTx(func(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
+	app.SetFnSendTx(func(tx []byte) (*SendTxResponse, error) {
 		resp := app.deliverTx(tx)
 		if resp.Code == 0 {
 			app.testMockBlockStore.AddTxToBlock(tx)
 		}
-		return &cometcoretypes.ResultBroadcastTx{
-			Hash: comettypes.Tx(tx).Hash(),
+		return &SendTxResponse{
+			Hash: blocktypes.Tx(tx).Hash(),
 			Code: resp.Code,
 			Data: resp.Data,
 		}, nil

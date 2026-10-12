@@ -504,10 +504,7 @@ func (idx *Indexer) AfterSyncBootstrap(inTest bool) {
 func (idx *Indexer) bootstrapBlocks() {
 	reindex := idx.blockReindexNeeded.Swap(false)
 	if maxUndated := idx.maxUndatedVoteHeight.Swap(0); maxUndated > 0 {
-		base := int64(0)
-		if idx.App.Node != nil && idx.App.Node.BlockStore() != nil {
-			base = idx.App.Node.BlockStore().Base()
-		}
+		base, _ := idx.App.BlockStoreRange()
 		if maxUndated >= base {
 			reindex = true
 		}
@@ -547,7 +544,8 @@ func (idx *Indexer) reindexBlocks() {
 	idx.blockMu.Lock()
 	defer idx.blockMu.Unlock()
 
-	if idx.App.Node == nil || idx.App.Node.BlockStore() == nil {
+	base, top := idx.App.BlockStoreRange()
+	if top <= 0 {
 		return
 	}
 
@@ -556,12 +554,12 @@ func (idx *Indexer) reindexBlocks() {
 		log.Warnf("indexer CountBlocks returned error: %s", err)
 	}
 	log.Infow("start reindexing",
-		"blockStoreBase", idx.App.Node.BlockStore().Base(),
-		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
+		"blockStoreBase", base,
+		"blockStoreHeight", top,
 		"indexerBlockCount", idxBlockCount,
 	)
 	queries := idx.blockTxQueries()
-	for height := idx.App.Node.BlockStore().Base(); height <= idx.App.Node.BlockStore().Height(); height++ {
+	for height := base; height <= top; height++ {
 		if b := idx.App.GetBlockByHeight(int64(height)); b != nil {
 			// Blocks
 			func() {
@@ -619,8 +617,8 @@ func (idx *Indexer) reindexBlocks() {
 	idx.blockTx = nil
 
 	log.Infow("finished reindexing",
-		"blockStoreBase", idx.App.Node.BlockStore().Base(),
-		"blockStoreHeight", idx.App.Node.BlockStore().Height(),
+		"blockStoreBase", base,
+		"blockStoreHeight", top,
 		"indexerBlockCount", idxBlockCount,
 	)
 }

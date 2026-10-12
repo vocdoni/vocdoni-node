@@ -7,7 +7,6 @@ import (
 	"regexp"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	qt "github.com/frankban/quicktest"
 
@@ -1014,7 +1013,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 		return err
 	}
 
-	cktx := new(cometabcitypes.CheckTxRequest)
+	cktx := new(CheckTxRequest)
 	cktx.Tx = stxBytes
 	cktxresp, _ := app.CheckTx(context.Background(), cktx)
 	if cktxresp.Code != 0 {
@@ -1027,7 +1026,7 @@ func sendTx(app *BaseApplication, signer *ethereum.SignKeys, stx *models.SignedT
 	return nil
 }
 
-func TestSetAccountValidatorTxRejectsUncompressedPubKey(t *testing.T) {
+func TestSetAccountValidatorTxIsRejected(t *testing.T) {
 	app, signers, err := setupTestBaseApplicationAndSigners(t, 2)
 	qt.Assert(t, err, qt.IsNil)
 	qt.Assert(t, app.State.SetTxBaseCost(models.TxType_SET_ACCOUNT_VALIDATOR, 100), qt.IsNil)
@@ -1036,33 +1035,19 @@ func TestSetAccountValidatorTxRejectsUncompressedPubKey(t *testing.T) {
 	}), qt.IsNil)
 	testCommitState(t, app)
 
-	// a 65-byte uncompressed key is a valid secp256k1 key for ethereum, but
-	// cometbft requires the 33-byte compressed form and panics otherwise
-	uncompressed, err := ethereum.DecompressPubKey(signers[1].PublicKey())
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, uncompressed, qt.HasLen, 65)
-
+	// validators are not managed through transactions on a single-node chain
 	nonce := uint32(0)
 	stx := &models.SignedTx{}
-	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: &models.SetAccountTx{
-		Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
-		Nonce:     &nonce,
-		PublicKey: uncompressed,
-	}}})
-	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, sendTx(app, signers[0], stx), qt.ErrorMatches, "checkTx failed.*")
-
-	// the compressed form of the same key is accepted
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{SetAccount: &models.SetAccountTx{
 		Txtype:    models.TxType_SET_ACCOUNT_VALIDATOR,
 		Nonce:     &nonce,
 		PublicKey: signers[1].PublicKey(),
 	}}})
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, sendTx(app, signers[0], stx), qt.IsNil)
+	qt.Assert(t, sendTx(app, signers[0], stx), qt.ErrorMatches, "checkTx failed.*")
 	validator, err := app.State.Validator(signers[1].Address(), false)
 	qt.Assert(t, err, qt.IsNil)
-	qt.Assert(t, validator, qt.IsNotNil)
+	qt.Assert(t, validator, qt.IsNil)
 }
 
 func TestCreateAccountRejectsSIK(t *testing.T) {

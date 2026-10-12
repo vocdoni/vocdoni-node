@@ -9,7 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 
 	"go.vocdoni.io/dvote/httprouter"
@@ -529,10 +528,8 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		blockTimesInMs[0] = uint64(a.vocapp.BlockTimeTarget().Milliseconds())
 	}
 
-	blockStoreBase := uint32(0)
-	if a.vocapp.Node != nil && a.vocapp.Node.BlockStore() != nil {
-		blockStoreBase = uint32(a.vocapp.Node.BlockStore().Base())
-	}
+	base, _ := a.vocapp.BlockStoreRange()
+	blockStoreBase := uint32(base)
 
 	data, err := json.Marshal(&ChainInfo{
 		ID:                a.vocapp.ChainID(),
@@ -1155,12 +1152,12 @@ func (a *API) chainBlockByHeightHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Header: comettypes.Header{
+		Header: BlockHeader{
 			ChainID:         idxblock.ChainID,
 			Height:          idxblock.Height,
 			Time:            idxblock.Time,
 			ProposerAddress: []byte(idxblock.ProposerAddress),
-			LastBlockID: comettypes.BlockID{
+			LastBlockID: BlockID{
 				Hash: []byte(idxblock.LastBlockHash),
 			},
 		},
@@ -1201,12 +1198,12 @@ func (a *API) chainBlockByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 		return ErrIndexerQueryFailed.WithErr(err)
 	}
 	block := &Block{
-		Header: comettypes.Header{
+		Header: BlockHeader{
 			ChainID:         idxblock.ChainID,
 			Height:          idxblock.Height,
 			Time:            idxblock.Time,
 			ProposerAddress: []byte(idxblock.ProposerAddress),
-			LastBlockID: comettypes.BlockID{
+			LastBlockID: BlockID{
 				Hash: []byte(idxblock.LastBlockHash),
 			},
 		},

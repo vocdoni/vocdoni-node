@@ -1,15 +1,9 @@
 package config
 
-import (
-	"go.vocdoni.io/dvote/types"
-)
-
 // Config stores global configurations for vocdoni-node
 type Config struct {
 	// Vochain config options
 	Vochain VochainCfg
-	// Metrics config options
-	Metrics MetricsCfg
 	// LogLevel logging level
 	LogLevel string
 	// LogOutput logging output
@@ -43,101 +37,11 @@ type Config struct {
 	EnableFaucetWithAmount uint64
 }
 
-// ValidMode checks if the configured mode is valid
-func (c *Config) ValidMode() bool {
-	switch c.Mode {
-	case types.ModeGateway:
-
-	case types.ModeMiner:
-
-	case types.ModeSeed:
-
-	default:
-		return false
-	}
-	return true
-}
-
 // VochainCfg includes all possible config params needed by the Vochain
 type VochainCfg struct {
-	// Network is the network name to connect with
-	Network string
-	// Dev indicates we use the Vochain development mode (low security is accepted)
-	Dev bool
-	// LogLevel logging level for tendermint
-	LogLevel string
-	// LogOutput logging output
-	LogOutput string
-	// P2PListen address to listen for incoming P2P connections
-	P2PListen string
-	// PublicAddr IP address to expose, guessed by the program (your public IP address) if not set
-	PublicAddr string
-	// DataDir directory where the Vochain related data (DB's and priv_validator_state.json) is stored
+	// DataDir directory where the Vochain related data is stored
 	DataDir string
 	// DBType is the type of key-value db to be used
 	DBType string
-	// Genesis path where the genesis file is stored
-	Genesis string
-	// GenesisChainID overrides ChainID in hardcoded genesis
-	GenesisChainID string
-	// GenesisInitialHeight overrides InitialHeight in hardcoded genesis
-	GenesisInitialHeight int64
-	// GenesisAppHash overrides AppHash in hardcoded genesis
-	GenesisAppHash string
-	// GenesisEndOfChain is the height at which this node will refuse adding new blocks to the chain
-	GenesisEndOfChain int64
-	// Peers peers with which the node tries to connect
-	Peers []string
-	// Seeds seeds with which the node tries to connect
-	Seeds []string
-	// MinerKey contains the secp256k1 private key for signing tendermint blocks
-	MinerKey string
-	// NodeKey contains the ed25519 public key that identifies the node in the P2P network
-	NodeKey string
-	// PrivValidatorAddr if defined, Tendermint node will open a port and wait for a private validator connection
-	// (example value: tcp://0.0.0.0:26658)
-	PrivValidatorListenAddr string
-	// NoWaitSync if enabled the Vochain synchronization won't be blocking
-	NoWaitSync bool
-	// MempoolSize is the size of the mempool
-	MempoolSize int
-	// Enable Prometheus metrics from tendermint
-	TendermintMetrics bool
-	// Target block time in seconds (only for miners)
-	MinerTargetBlockTimeSeconds int
-	// Indexer holds the configuration regarding the indexer component
-	Indexer IndexerCfg
-	// IsSeedNode specifies if the node is configured to act as a seed node
-	IsSeedNode bool
-	// SnapshotInterval enables creating a state snapshot every N blocks (0 to disable)
-	SnapshotInterval int
-	// StateSyncEnabled allows cometBFT during startup, to ask peers for available snapshots
-	// and use them to bootstrap the state
-	StateSyncEnabled bool
-	// StateSyncRPCServers is the list of RPC servers to bootstrap the StateSync (optional, defaults to using seeds)
-	StateSyncRPCServers []string
-	// StateSyncTrustHeight and TrustHash must both be provided to force the trusting of a
-	// particular header.
-	StateSyncTrustHeight int64
-	// StateSyncTrustHeight and TrustHash must both be provided to force the trusting of a
-	// particular header.
-	StateSyncTrustHash string
-	// StateSyncChunkSize defines the size of the chunks when splitting a Snapshot for sending via StateSync
-	StateSyncChunkSize int64
-	// StateSyncFetchParamsFromRPC allows statesync to fetch TrustHash and TrustHeight from the first RPCServer
-	StateSyncFetchParamsFromRPC bool
-}
 
-// IndexerCfg handles the configuration options of the indexer
-type IndexerCfg struct {
-	// Enables Indexer
-	Enabled bool
-	// Disables live results computation on indexer
-	IgnoreLiveResults bool
-}
-
-// MetricsCfg initializes the metrics config
-type MetricsCfg struct {
-	Enabled         bool
-	RefreshInterval int
 }

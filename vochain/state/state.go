@@ -51,8 +51,8 @@ type State struct {
 	eventListeners []EventListener
 	// Tx must always be accessed via mutex because there will be
 	// concurrent operations on it.  In particular, while the Tx is being
-	// written serially via Tendermint DeliverTx (which updates the StateDB
-	// by processing Vochain transactions), parallel calls of Tendermint
+	// written serially by block execution (which updates the StateDB
+	// by processing Vochain transactions), parallel calls of
 	// CheckTx happen (which read the temporary state kept in the Tx to
 	// validate Vochain transactions).
 	tx                treeTxWithMutex

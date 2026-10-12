@@ -6,13 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
@@ -37,6 +37,9 @@ const (
 	DefaultBlockTimeTarget = time.Second * 5
 	DefaultTxCosts         = 10
 	DefaultMempoolSize     = 8192 // maximum number of pending transactions
+
+	// GenesisFile is the file, inside the data directory, where the genesis of the chain is persisted.
+	GenesisFile = "genesis.json"
 
 	// Key prefixes for the block store KV database.
 	prefixTx        = "tx/"        // tx/<height_8B>/<txIndex_4B> → raw tx bytes
@@ -117,6 +120,11 @@ func NewVocone(dataDir string, keymanager *ethereum.SignKeys) (*Vocone, error) {
 	vc.App.State.SetHeight(uint32(vc.height.Load()))
 	vc.App.SetBlockTimeTarget(DefaultBlockTimeTarget)
 
+	// Load the persisted genesis, if the chain was already initialized.
+	if err := vc.loadGenesis(); err != nil {
+		return nil, err
+	}
+
 	// Create indexer.
 	vc.Indexer, err = indexer.New(vc.App, indexer.Options{
 		DataDir: filepath.Join(dataDir, "indexer"),
@@ -172,24 +180,14 @@ func (vc *Vocone) Start(ctx context.Context) error {
 	vc.lastBlockTime = time.Now()
 	go vochainPrintInfo(ctx, 10*time.Second, vc.Stats)
 
-	if vc.App.Height() == 0 {
-		log.Infow("initializing new blockchain")
-		genesisAppData, err := json.Marshal(&genesis.AppState{
-			MaxElectionSize: 1000000,
-			NetworkCapacity: uint64(vc.txsPerBlock),
-			TxCost:          defaultTxCosts(),
-		})
-		if err != nil {
-			return fmt.Errorf("could not marshal genesis app state: %w", err)
+	if !vc.Initialized() {
+		if err := vc.InitChain(vc.App.ChainID(), DefaultGenesisAppState(vc.txsPerBlock)); err != nil {
+			return err
 		}
-		if _, err = vc.App.InitChain(ctx, &cometabcitypes.InitChainRequest{
-			ChainId:       vc.App.ChainID(),
-			AppStateBytes: genesisAppData,
-			Time:          time.Now(),
-		}); err != nil {
-			return fmt.Errorf("could not init chain: %w", err)
-		}
-		time.Sleep(1 * time.Second)
+	}
+	// Load the election price calculator from the current state (tx costs and capacity).
+	if err := vc.SetElectionPrice(); err != nil {
+		return fmt.Errorf("could not set election price calculator: %w", err)
 	}
 
 	for {
@@ -338,8 +336,8 @@ func (vc *Vocone) Close() error {
 
 // setDefaultMethods configures the vochain callback functions for single-node operation.
 func (vc *Vocone) setDefaultMethods() {
-	vc.App.SetDefaultMethods()
 	vc.App.SetFnIsSynchronizing(func() bool { return false })
+	vc.App.SetFnBlockStoreRange(vc.blockStoreRange)
 	vc.App.SetFnSendTx(vc.addTx)
 	vc.App.SetFnGetTx(vc.getTx)
 	vc.App.SetFnGetBlockByHeight(vc.getBlock)
@@ -347,6 +345,76 @@ func (vc *Vocone) setDefaultMethods() {
 	vc.App.SetFnGetTxHash(vc.getTxWithHash)
 	vc.App.SetFnMempoolSize(vc.mempoolSize)
 	vc.App.SetFnMempoolPrune(vc.mempoolPrune)
+}
+
+// Initialized reports whether the chain has a genesis, either persisted in the data
+// directory or implied by already produced blocks.
+func (vc *Vocone) Initialized() bool {
+	return vc.App.Genesis().ChainID != "" || vc.height.Load() > 0
+}
+
+// InitChain initializes a new chain with the given chainID and genesis app state,
+// and persists the genesis in the data directory so restarts keep the same chain.
+// If blocks were already produced (with no persisted genesis), the state is left
+// untouched and only the genesis identity is persisted.
+func (vc *Vocone) InitChain(chainID string, appState *genesis.AppState) error {
+	vc.vcMtx.Lock()
+	defer vc.vcMtx.Unlock()
+	if vc.App.Genesis().ChainID != "" {
+		return fmt.Errorf("chain already initialized with chainID %q", vc.App.Genesis().ChainID)
+	}
+	vc.App.SetChainID(chainID)
+	genesisTime := time.Now().UTC()
+	doc := &genesis.Doc{
+		GenesisTime: genesisTime,
+		ChainID:     chainID,
+	}
+	if vc.height.Load() > 0 {
+		log.Warnw("persisting genesis of an existing chain", "chainID", chainID, "height", vc.height.Load())
+		if meta, err := vc.loadBlockMeta(0); err == nil {
+			doc.GenesisTime = time.Unix(0, meta.Timestamp).UTC()
+		}
+	} else {
+		log.Infow("initializing new blockchain", "chainID", chainID)
+		if _, err := vc.App.InitChain(appState, genesisTime); err != nil {
+			return fmt.Errorf("could not init chain: %w", err)
+		}
+		appStateBytes, err := json.Marshal(appState)
+		if err != nil {
+			return fmt.Errorf("could not marshal genesis app state: %w", err)
+		}
+		doc.AppState = appStateBytes
+	}
+	if err := doc.SaveAs(filepath.Join(vc.Config.DataDir, GenesisFile)); err != nil {
+		return fmt.Errorf("could not save genesis: %w", err)
+	}
+	vc.App.SetGenesis(doc)
+	return nil
+}
+
+// loadGenesis loads the persisted genesis, if any, and sets the chainID from it.
+func (vc *Vocone) loadGenesis() error {
+	path := filepath.Join(vc.Config.DataDir, GenesisFile)
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	doc, err := genesis.LoadFromFile(path)
+	if err != nil {
+		return fmt.Errorf("could not load genesis: %w", err)
+	}
+	vc.App.SetChainID(doc.ChainID)
+	vc.App.SetGenesis(doc)
+	log.Infow("loaded genesis", "chainID", doc.ChainID, "genesisTime", doc.GenesisTime)
+	return nil
+}
+
+// DefaultGenesisAppState returns the genesis app state used when no other is provided.
+func DefaultGenesisAppState(txsPerBlock int) *genesis.AppState {
+	return &genesis.AppState{
+		MaxElectionSize: 1000000,
+		NetworkCapacity: uint64(txsPerBlock),
+		TxCost:          defaultTxCosts(),
+	}
 }
 
 // SetBlockSize configures the maximum number of transactions per block.

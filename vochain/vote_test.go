@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"testing"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
 	qt "github.com/frankban/quicktest"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -77,8 +76,8 @@ func TestVoteOverwrite(t *testing.T) {
 	qt.Check(t, err, qt.IsNil)
 	app.AdvanceTestBlock()
 
-	cktx := new(cometabcitypes.CheckTxRequest)
-	var cktxresp *cometabcitypes.CheckTxResponse
+	cktx := new(CheckTxRequest)
+	var cktxresp *CheckTxResponse
 
 	// send 9 votes, should be fine
 	for i := 1; i < 10; i++ {
@@ -192,7 +191,7 @@ func TestMaxCensusSize(t *testing.T) {
 
 	// define a function to send a vote
 	vote := func(i int) uint32 {
-		cktx := new(cometabcitypes.CheckTxRequest)
+		cktx := new(CheckTxRequest)
 		stx := testBuildSignedVote(t, pid, keys[i], proofs[i], []int{1, 2, 3}, app.ChainID())
 		cktx.Tx, err = proto.Marshal(stx)
 		qt.Check(t, err, qt.IsNil)
@@ -242,7 +241,7 @@ func testSendVote(app *BaseApplication, stx *models.SignedTx, forCommit bool) ui
 	if forCommit {
 		return app.deliverTx(txb).Code
 	}
-	resp, _ := app.CheckTx(context.TODO(), &cometabcitypes.CheckTxRequest{Tx: txb})
+	resp, _ := app.CheckTx(context.TODO(), &CheckTxRequest{Tx: txb})
 	return resp.Code
 }
 

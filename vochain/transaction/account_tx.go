@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 
-	cometCrypto256k1 "github.com/cometbft/cometbft/crypto/secp256k1"
 	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/types"
@@ -162,34 +161,4 @@ func (t *TransactionHandler) SetAccountInfoTxCheck(vtx *vochaintx.Tx) error {
 	return nil
 }
 
-// SetAccountValidatorTxCheck upgrades an account to a validator.
-func (t *TransactionHandler) SetAccountValidatorTxCheck(vtx *vochaintx.Tx) error {
-	if vtx == nil || vtx.Signature == nil || vtx.SignedBody == nil || vtx.Tx == nil {
-		return ErrNilTx
-	}
-	_, _, err := t.checkAccountCanPayCost(models.TxType_SET_ACCOUNT_VALIDATOR, vtx, 0)
-	if err != nil {
-		return err
-	}
-	validatorPubKey := vtx.Tx.GetSetAccount().GetPublicKey()
-	if validatorPubKey == nil {
-		return fmt.Errorf("invalid nil public key")
-	}
-	// cometbft only accepts compressed secp256k1 keys and panics on any other length
-	if len(validatorPubKey) != cometCrypto256k1.PubKeySize {
-		return fmt.Errorf("invalid public key length %d, expected %d (compressed secp256k1)",
-			len(validatorPubKey), cometCrypto256k1.PubKeySize)
-	}
-	validatorAddress, err := ethereum.AddrFromPublicKey(validatorPubKey)
-	if err != nil {
-		return fmt.Errorf("cannot extract address from public key: %w", err)
-	}
-	validatorAccount, err := t.state.Validator(validatorAddress, false)
-	if err != nil {
-		return fmt.Errorf("cannot get validator: %w", err)
-	}
-	if validatorAccount != nil {
-		return fmt.Errorf("account is already a validator")
-	}
-	return nil
-}
+

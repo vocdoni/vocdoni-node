@@ -179,7 +179,7 @@ func (r *HTTProuter) EnablePrometheusMetrics(prometheusID string) {
 // that will expose the metrics collected by VictoriaMetrics and Prometheus
 func (r *HTTProuter) ExposePrometheusEndpoint(path string) {
 	r.AddRawHTTPHandler(path, "GET", func(w http.ResponseWriter, req *http.Request) {
-		// upstream packages (cometbft, libp2p) call prometheus.Register(), so expose those metrics first
+		// upstream packages (libp2p) call prometheus.Register(), so expose those metrics first
 		//
 		// we need to remove the "Accept-Encoding: gzip" to ensure promhttp.Handler().ServeHTTP() outputs plaintext,
 		// to be able to append the plaintext from metrics.WritePrometheus,

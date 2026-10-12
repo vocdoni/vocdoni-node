@@ -7,11 +7,10 @@ import (
 	"errors"
 	"fmt"
 
-	cometabcitypes "github.com/cometbft/cometbft/abci/types"
-	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
-	cometcoretypes "github.com/cometbft/cometbft/rpc/core/types"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 )
 
 // loadMempool rebuilds the in-memory mempool index from the persistent database.
@@ -65,18 +64,18 @@ func (vc *Vocone) loadMempool() error {
 }
 
 // addTx validates and adds a transaction to the persistent mempool.
-func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
-	resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: tx})
+func (vc *Vocone) addTx(tx []byte) (*vochain.SendTxResponse, error) {
+	resp, err := vc.App.CheckTx(context.Background(), &vochain.CheckTxRequest{Tx: tx})
 	if err != nil {
 		return nil, err
 	}
 	if resp.Code != 0 {
 		log.Debugw("checkTx failed", "data", string(resp.Data))
-		return &cometcoretypes.ResultBroadcastTx{
+		return &vochain.SendTxResponse{
 			Code: resp.Code,
 			Data: resp.Data,
 			Log:  resp.Log,
-			Hash: comettmhash.Sum(tx),
+			Hash: blocktypes.Tx(tx).Hash(),
 		}, nil
 	}
 
@@ -84,10 +83,7 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	defer vc.mempoolMtx.Unlock()
 
 	if len(vc.mempoolKeys) >= DefaultMempoolSize {
-		return &cometcoretypes.ResultBroadcastTx{
-			Code: 1,
-			Data: []byte("mempool is full"),
-		}, fmt.Errorf("mempool is full")
+		return nil, vochain.ErrMempoolFull
 	}
 
 	// Generate a unique key using a monotonic sequence.
@@ -110,11 +106,11 @@ func (vc *Vocone) addTx(tx []byte) (*cometcoretypes.ResultBroadcastTx, error) {
 	}
 	vc.mempoolKeys = append(vc.mempoolKeys, key)
 
-	return &cometcoretypes.ResultBroadcastTx{
+	return &vochain.SendTxResponse{
 		Code: resp.Code,
 		Data: resp.Data,
 		Log:  resp.Log,
-		Hash: comettmhash.Sum(tx),
+		Hash: blocktypes.Tx(tx).Hash(),
 	}, nil
 }
 
@@ -135,7 +131,7 @@ func (vc *Vocone) mempoolPrune(txHash [32]byte) error {
 		if err != nil {
 			continue
 		}
-		if [32]byte(comettmhash.Sum(txData)) == txHash {
+		if blocktypes.Tx(txData).Key() == txHash {
 			wTx := vc.mempoolDB.WriteTx()
 			defer wTx.Discard()
 			if err := wTx.Delete(key); err != nil {
@@ -184,7 +180,7 @@ func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 		}
 
 		// Re-validate before including in the block.
-		resp, err := vc.App.CheckTx(context.Background(), &cometabcitypes.CheckTxRequest{Tx: txData})
+		resp, err := vc.App.CheckTx(context.Background(), &vochain.CheckTxRequest{Tx: txData})
 		if err != nil {
 			log.Errorw(err, "error on check tx during block preparation")
 			consumedKeys = append(consumedKeys, key)

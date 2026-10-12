@@ -3,10 +3,10 @@ package vochaintx
 import (
 	"fmt"
 
-	comettypes "github.com/cometbft/cometbft/types"
 	"github.com/ethereum/go-ethereum/common"
 
 	"go.vocdoni.io/dvote/crypto/ethereum"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -76,9 +76,9 @@ func (tx *Tx) TxSubtype() string {
 	return string(txtypeFieldDescriptor.Enum().Values().ByNumber(enumNumber).Name())
 }
 
-// TxKey computes the checksum of the tx
+// TxKey computes the checksum (SHA-256) of the tx
 func TxKey(tx []byte) [32]byte {
-	return comettypes.Tx(tx).Key()
+	return blocktypes.Tx(tx).Key()
 }
 
 // TokenTransfer wraps information about a token transfer.

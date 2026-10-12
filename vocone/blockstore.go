@@ -6,11 +6,10 @@ import (
 	"errors"
 	"time"
 
-	comettmhash "github.com/cometbft/cometbft/crypto/tmhash"
-	comettypes "github.com/cometbft/cometbft/types"
 	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/log"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -84,73 +83,52 @@ func (vc *Vocone) loadBlockMeta(height int64) (*blockMeta, error) {
 	return &meta, nil
 }
 
-// buildBlock constructs a comettypes.Block with all header fields populated
-// so that Block.Hash() returns a deterministic, non-nil hash.
-func (vc *Vocone) buildBlock(height int64, timestamp time.Time, txs [][]byte, appHash []byte) *comettypes.Block {
-	blk := &comettypes.Block{
-		Header: comettypes.Header{
+// buildBlock constructs the block produced at the given height, linked to the
+// previous block hash if available.
+func (vc *Vocone) buildBlock(height int64, timestamp time.Time, txs [][]byte, appHash []byte) *blocktypes.Block {
+	blk := &blocktypes.Block{
+		Header: blocktypes.Header{
 			ChainID:         vc.App.ChainID(),
 			Height:          height,
 			Time:            timestamp,
 			ProposerAddress: vc.proposerAddress,
 			AppHash:         appHash,
-			// ValidatorsHash is required for Header.Hash() to return non-nil.
-			ValidatorsHash:     comettmhash.Sum(vc.proposerAddress),
-			NextValidatorsHash: comettmhash.Sum(vc.proposerAddress),
-			ConsensusHash:      comettmhash.Sum([]byte("vocone")),
 		},
-		// LastCommit must be non-nil for Block.Hash() to return non-nil.
-		LastCommit: &comettypes.Commit{Height: height - 1},
 	}
-	// Set the previous block hash if available.
 	if height > 0 {
 		if prevMeta, err := vc.loadBlockMeta(height - 1); err == nil && len(prevMeta.Hash) > 0 {
-			blk.Header.LastBlockID = comettypes.BlockID{Hash: prevMeta.Hash}
+			blk.LastBlockID = blocktypes.BlockID{Hash: prevMeta.Hash}
 		}
 	}
-	// Populate transactions.
-	blk.Data.Txs = make([]comettypes.Tx, len(txs))
+	blk.Txs = make([]blocktypes.Tx, len(txs))
 	for i, tx := range txs {
-		blk.Data.Txs[i] = tx
+		blk.Txs[i] = tx
 	}
-	blk.Header.DataHash = blk.Data.Hash()
+	blk.DataHash = blk.Data.Hash()
 	return blk
 }
 
 // getBlock reconstructs a block from the persistent store.
-func (vc *Vocone) getBlock(height int64) *comettypes.Block {
+// Returns nil if the block is not available.
+func (vc *Vocone) getBlock(height int64) *blocktypes.Block {
 	if vc.closed.Load() {
-		return &comettypes.Block{Header: comettypes.Header{Height: height}}
+		return nil
 	}
 	meta, err := vc.loadBlockMeta(height)
 	if err != nil {
-		// No metadata — return a minimal block shell.
-		return &comettypes.Block{
-			Header: comettypes.Header{
-				ChainID: vc.App.ChainID(),
-				Height:  height,
-			},
-		}
+		return nil
 	}
 
-	blk := &comettypes.Block{
-		Header: comettypes.Header{
+	blk := &blocktypes.Block{
+		Header: blocktypes.Header{
 			ChainID:         vc.App.ChainID(),
 			Height:          height,
 			Time:            time.Unix(0, meta.Timestamp),
 			ProposerAddress: meta.ProposerAddress,
 			AppHash:         meta.StateRoot,
 			DataHash:        meta.DataHash,
-			// Required for Hash() to return non-nil.
-			ValidatorsHash:     comettmhash.Sum(meta.ProposerAddress),
-			NextValidatorsHash: comettmhash.Sum(meta.ProposerAddress),
-			ConsensusHash:      comettmhash.Sum([]byte("vocone")),
+			LastBlockID:     blocktypes.BlockID{Hash: meta.LastBlockHash},
 		},
-		// LastCommit must be non-nil for Block.Hash() to return non-nil.
-		LastCommit: &comettypes.Commit{Height: height - 1},
-	}
-	if len(meta.LastBlockHash) > 0 {
-		blk.Header.LastBlockID = comettypes.BlockID{Hash: meta.LastBlockHash}
 	}
 
 	// Read exactly txCount transactions
@@ -161,13 +139,18 @@ func (vc *Vocone) getBlock(height int64) *comettypes.Block {
 				"height", height, "index", i, "err", err)
 			break
 		}
-		blk.Data.Txs = append(blk.Data.Txs, txData)
+		blk.Txs = append(blk.Txs, txData)
 	}
 	return blk
 }
 
+// blockStoreRange returns the lowest and highest heights of the committed blocks.
+func (vc *Vocone) blockStoreRange() (base, height int64) {
+	return 0, vc.height.Load() - 1
+}
+
 // getBlockByHash looks up a block by its hash using the reverse index.
-func (vc *Vocone) getBlockByHash(hash []byte) *comettypes.Block {
+func (vc *Vocone) getBlockByHash(hash []byte) *blocktypes.Block {
 	if vc.closed.Load() {
 		return nil
 	}

@@ -2,13 +2,10 @@ package testcommon
 
 import (
 	"encoding/base64"
-	"math/rand"
-	"strconv"
 	"testing"
 	"time"
 
-	cometprivval "github.com/cometbft/cometbft/privval"
-
+	"go.vocdoni.io/dvote/crypto/ethereum"
 	"go.vocdoni.io/dvote/db"
 	"go.vocdoni.io/dvote/test/testcommon/testutil"
 	"go.vocdoni.io/dvote/vochain"
@@ -60,44 +57,26 @@ func NewVochainState(tb testing.TB) *state.State {
 }
 
 func NewVochainStateWithValidators(tb testing.TB) *state.State {
-	var err error
 	s := NewVochainState(tb)
-	vals := make([]*cometprivval.FilePV, 2)
-	rint := rand.Int()
-	vals[0], err = cometprivval.GenFilePV(
-		"/tmp/"+strconv.Itoa(rint),
-		"/tmp/"+strconv.Itoa(rint),
-		nil,
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	rint = rand.Int()
-	vals[1], err = cometprivval.GenFilePV(
-		"/tmp/"+strconv.Itoa(rint),
-		"/tmp/"+strconv.Itoa(rint),
-		nil,
-	)
-	if err != nil {
-		tb.Fatal(err)
-	}
-	validator0 := &models.Validator{
-		Address: vals[0].Key.Address.Bytes(),
-		PubKey:  vals[0].Key.PubKey.Bytes(),
-		Power:   10,
-	}
-	validator1 := &models.Validator{
-		Address: vals[0].Key.Address.Bytes(),
-		PubKey:  vals[0].Key.PubKey.Bytes(),
-		Power:   10,
-	}
-	if err := s.AddValidator(validator0); err != nil {
-		tb.Fatal(err)
-	}
-	if err := s.AddValidator(validator1); err != nil {
-		tb.Fatal(err)
+	for i := 0; i < 2; i++ {
+		if err := s.AddValidator(NewValidator(tb)); err != nil {
+			tb.Fatal(err)
+		}
 	}
 	return s
+}
+
+// NewValidator returns a validator with a random secp256k1 key.
+func NewValidator(tb testing.TB) *models.Validator {
+	signer := ethereum.NewSignKeys()
+	if err := signer.Generate(); err != nil {
+		tb.Fatal(err)
+	}
+	return &models.Validator{
+		Address: signer.Address().Bytes(),
+		PubKey:  signer.PublicKey(),
+		Power:   10,
+	}
 }
 
 func NewVochainStateWithProcess(tb testing.TB) *state.State {
