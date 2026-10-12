@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/config"
 	"go.vocdoni.io/dvote/crypto/ethereum"
@@ -54,6 +53,10 @@ const (
 // Vocone is an implementation of the Vocdoni protocol run by a single (atomic) node.
 type Vocone struct {
 	service.VocdoniService
+
+	// AdminToken is the bearer token required by the admin API endpoints.
+	// If empty when EnableAPI is called, the admin endpoints are disabled.
+	AdminToken string
 
 	blockStore  db.Database
 	mempoolDB   db.Database
@@ -160,9 +163,11 @@ func (vc *Vocone) EnableAPI(host string, port int, urlPath string) (*api.API, er
 		vc.Stats,
 		vc.Indexer,
 	)
-	adminToken := uuid.New()
-	log.Warnw("new admin token generated", "token", adminToken.String())
-	uAPI.Endpoint.SetAdminToken(adminToken.String())
+	if vc.AdminToken != "" {
+		uAPI.Endpoint.SetAdminToken(vc.AdminToken)
+	} else {
+		log.Infow("admin token not set, admin API endpoints are disabled")
+	}
 
 	return uAPI, uAPI.EnableHandlers(
 		api.ElectionHandler,

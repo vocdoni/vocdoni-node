@@ -157,7 +157,10 @@ func (a *API) AuthorizeRequest(data any, accessType httprouter.AuthAccessType) (
 		if t := a.adminToken.Load(); t != nil {
 			adminToken = *t
 		}
-		if adminToken != "" && msg.AuthToken != adminToken {
+		if adminToken == "" {
+			return false, fmt.Errorf("admin endpoints are disabled")
+		}
+		if msg.AuthToken != adminToken {
 			return false, fmt.Errorf("admin token not valid")
 		}
 		return true, nil
@@ -262,7 +265,8 @@ func (a *API) RegisterMethod(pattern, HTTPmethod string, accessType string, hand
 	return nil
 }
 
-// SetAdminToken sets the bearer admin token capable to execute admin handlers
+// SetAdminToken sets the bearer admin token capable to execute admin handlers.
+// While no token is set, the admin handlers reject every request.
 func (a *API) SetAdminToken(bearerToken string) {
 	a.adminToken.Store(&bearerToken)
 }
