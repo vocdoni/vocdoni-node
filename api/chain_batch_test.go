@@ -138,7 +138,7 @@ func signedNewProcessPayload(t *testing.T, signer *ethereum.SignKeys, chainID st
 		Txtype: models.TxType_NEW_PROCESS,
 		Process: &models.Process{
 			EntityId:     entityID,
-			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 			EnvelopeType: &models.EnvelopeType{},
 		},
 	}}}
@@ -168,7 +168,7 @@ func TestBatchProcessID(t *testing.T) {
 	expected := func(delta int32) []byte {
 		pid, err := processid.BuildProcessID(&models.Process{
 			EntityId:     entity,
-			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
+			CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 			EnvelopeType: &models.EnvelopeType{},
 		}, app.State, delta)
 		c.Assert(err, qt.IsNil)

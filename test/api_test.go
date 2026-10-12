@@ -30,7 +30,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TestAPIcensusAndVote(t *testing.T) {
+func TestAPIVote(t *testing.T) {
 	server := testcommon.APIserver{}
 	server.Start(t,
 		api.ChainHandler,
@@ -45,12 +45,14 @@ func TestAPIcensusAndVote(t *testing.T) {
 	token1 := uuid.New()
 	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
 
-	// build a census locally: the node only receives its root
-	voterKeys, censusRoot, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
-	voterKey := voterKeys[0]
+	// the CSP authorizing the voter, whose public key is the census root
+	csp := ethereum.NewSignKeys()
+	qt.Assert(t, csp.Generate(), qt.IsNil)
+	voterKey := ethereum.SignKeys{}
+	qt.Assert(t, voterKey.Generate(), qt.IsNil)
 
 	electionParams := electionprice.ElectionParameters{ElectionDuration: 100, MaxCensusSize: 100}
-	election := createElection(t, c, server.Account, electionParams, censusRoot, 0, server.VochainAPP.ChainID(), false, 0)
+	election := createElection(t, c, server.Account, electionParams, csp.PublicKey(), 0, server.VochainAPP.ChainID(), false, 0)
 
 	// Block 2
 	server.VochainAPP.AdvanceTestBlock()
@@ -68,11 +70,20 @@ func TestAPIcensusAndVote(t *testing.T) {
 		ProcessId:   election.ElectionID,
 		VotePackage: votePackageBytes,
 	}
+	bundle := &models.CAbundle{
+		ProcessId: election.ElectionID,
+		Address:   voterKey.Address().Bytes(),
+	}
+	bundleBytes, err := proto.Marshal(bundle)
+	qt.Assert(t, err, qt.IsNil)
+	cspSignature, err := csp.SignEthereum(bundleBytes)
+	qt.Assert(t, err, qt.IsNil)
 	vote.Proof = &models.Proof{
-		Payload: &models.Proof_Arbo{
-			Arbo: &models.ProofArbo{
-				Type:     models.ProofArbo_BLAKE2B,
-				Siblings: proofs[0],
+		Payload: &models.Proof_Ca{
+			Ca: &models.ProofCA{
+				Type:      models.ProofCA_ECDSA,
+				Bundle:    bundle,
+				Signature: cspSignature,
 			},
 		},
 	}
@@ -361,12 +372,12 @@ func TestAPIElectionCost(t *testing.T) {
 			MaxCensusSize:    100000,
 			ElectionDuration: 1000000,
 			EncryptedVotes:   true,
-			AnonymousVotes:   true,
+			AnonymousVotes:   false,
 			MaxVoteOverwrite: 10,
 		},
 		100000, 700000,
 		10, 100,
-		547017)
+		547007)
 }
 
 func TestAPIAccountTokentxs(t *testing.T) {
@@ -694,7 +705,7 @@ func createElection(t testing.TB, c *testutil.TestHTTPclient,
 				BlockCount:   electionParams.ElectionDuration,
 				Status:       models.ProcessStatus_READY,
 				CensusRoot:   censusRoot,
-				CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+				CensusOrigin: models.CensusOrigin_OFF_CHAIN_CA_V2,
 				Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true, EncryptedMetaData: encryptedMetadata},
 				VoteOptions: &models.ProcessVoteOptions{
 					MaxCount:          1,
@@ -770,8 +781,6 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 	// transaction
 	stx := models.SignedTx{}
 	infoURI := "ipfs://" + data.CalculateCIDv1json(metaData)
-	sik, err := signer.AccountSIK(nil)
-	qt.Assert(t, err, qt.IsNil)
 	stx.Tx, err = proto.Marshal(&models.Tx{Payload: &models.Tx_SetAccount{
 		SetAccount: &models.SetAccountTx{
 			Txtype:        models.TxType_CREATE_ACCOUNT,
@@ -779,7 +788,6 @@ func createAccount(t testing.TB, c *testutil.TestHTTPclient,
 			InfoURI:       &infoURI,
 			Account:       signer.Address().Bytes(),
 			FaucetPackage: fp,
-			SIK:           sik,
 		},
 	}})
 	qt.Assert(t, err, qt.IsNil)
@@ -863,7 +871,7 @@ func TestAPIBuildElectionID(t *testing.T) {
 	body := api.BuildElectionID{
 		Delta:          processid.BuildNextProcessID,
 		OrganizationID: signer.Address().Bytes(),
-		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED.Number()),
+		CensusOrigin:   int32(models.CensusOrigin_OFF_CHAIN_CA_V2.Number()),
 		EnvelopeType: struct {
 			Serial         bool `json:"serial"`
 			Anonymous      bool `json:"anonymous"`

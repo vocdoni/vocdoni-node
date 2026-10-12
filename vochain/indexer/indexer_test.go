@@ -775,8 +775,8 @@ func TestResults(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
 
-	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 30)
 	pid := util.RandomBytes(32)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 30, pid)
 	err := app.State.AddProcess(&models.Process{
 		ProcessId:    pid,
 		EnvelopeType: &models.EnvelopeType{EncryptedVotes: true},
@@ -789,7 +789,7 @@ func TestResults(t *testing.T) {
 		EncryptionPrivateKeys: make([]string, 16),
 		EncryptionPublicKeys:  make([]string, 16),
 		VoteOptions:           &models.ProcessVoteOptions{MaxCount: 4, MaxValue: 1},
-		CensusOrigin:          models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:          models.CensusOrigin_OFF_CHAIN_CA_V2,
 		CensusRoot:            root,
 		MaxCensusSize:         1000,
 	})
@@ -817,14 +817,8 @@ func TestResults(t *testing.T) {
 
 	for i := int32(0); i < 30; i++ {
 		vote := &models.VoteEnvelope{
-			Nonce: util.RandomBytes(32),
-			Proof: &models.Proof{Payload: &models.Proof_Arbo{
-				Arbo: &models.ProofArbo{
-					Type:     models.ProofArbo_BLAKE2B,
-					Siblings: proofs[i],
-					KeyType:  models.ProofArbo_ADDRESS,
-				},
-			}},
+			Nonce:                util.RandomBytes(32),
+			Proof:                &models.Proof{Payload: &models.Proof_Ca{Ca: proofs[i]}},
 			ProcessId:            pid,
 			VotePackage:          vp,
 			Nullifier:            util.RandomBytes(32),
@@ -1370,7 +1364,7 @@ func TestVoteMemoSurvivesReindex(t *testing.T) {
 	qt.Assert(t, app.State.AddProcess(&models.Process{
 		ProcessId:     pid,
 		EntityId:      util.RandomBytes(20),
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		EnvelopeType:  &models.EnvelopeType{},
 		Status:        models.ProcessStatus_READY,
 		Mode:          &models.ProcessMode{AutoStart: true},
@@ -1447,11 +1441,11 @@ func TestOverwriteVotes(t *testing.T) {
 	app := vochain.TestBaseApplication(t)
 	idx := newTestIndexer(t, app)
 	pid := util.RandomBytes(32)
-	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10)
+	keys, root, proofs := testvoteproof.CreateKeysAndBuildCensus(t, 10, pid)
 
 	err := app.State.AddProcess(&models.Process{
 		CensusRoot:    root,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		ProcessId:     pid,
 		EnvelopeType:  &models.EnvelopeType{EncryptedVotes: false},
 		Status:        models.ProcessStatus_READY,
@@ -1473,14 +1467,8 @@ func TestOverwriteVotes(t *testing.T) {
 	vp, err := state.NewVotePackage([]int{1, 1, 1}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote := &models.VoteEnvelope{
-		Nonce: util.RandomBytes(8),
-		Proof: &models.Proof{Payload: &models.Proof_Arbo{
-			Arbo: &models.ProofArbo{
-				Type:     models.ProofArbo_BLAKE2B,
-				Siblings: proofs[0],
-				KeyType:  models.ProofArbo_ADDRESS,
-			},
-		}},
+		Nonce:       util.RandomBytes(8),
+		Proof:       &models.Proof{Payload: &models.Proof_Ca{Ca: proofs[0]}},
 		ProcessId:   pid,
 		VotePackage: vp,
 	}
@@ -1563,14 +1551,8 @@ func TestOverwriteVotes(t *testing.T) {
 	vp, err = state.NewVotePackage([]int{2, 2, 2}).Encode()
 	qt.Assert(t, err, qt.IsNil)
 	vote2 := &models.VoteEnvelope{
-		Nonce: util.RandomBytes(8),
-		Proof: &models.Proof{Payload: &models.Proof_Arbo{
-			Arbo: &models.ProofArbo{
-				Type:     models.ProofArbo_BLAKE2B,
-				Siblings: proofs[1],
-				KeyType:  models.ProofArbo_ADDRESS,
-			},
-		}},
+		Nonce:       util.RandomBytes(8),
+		Proof:       &models.Proof{Payload: &models.Proof_Ca{Ca: proofs[1]}},
 		ProcessId:   pid,
 		VotePackage: vp,
 	}
@@ -1709,7 +1691,7 @@ func TestCensusUpdate(t *testing.T) {
 		MaxCensusSize: 1000,
 		CensusRoot:    originalCensusRoot,
 		CensusURI:     originalCensusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -1760,7 +1742,7 @@ func TestProcessMetadataUpdate(t *testing.T) {
 		MaxCensusSize: 1000,
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Metadata:      &metadataURI,
 		MetadataHash:  metadataHash,
 	}); err != nil {
@@ -1833,7 +1815,7 @@ func TestProcessMetadataHistoryMigration(t *testing.T) {
 		MaxCensusSize: 1000,
 		CensusRoot:    util.RandomBytes(32),
 		CensusURI:     &censusURI,
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 		Metadata:      &metadataURI,
 	}), qt.IsNil)
 	app.AdvanceTestBlock()
@@ -1899,7 +1881,7 @@ func TestEndProcess(t *testing.T) {
 		Mode:          &models.ProcessMode{AutoStart: true, Interruptible: true},
 		MaxCensusSize: 1000,
 		CensusRoot:    util.RandomBytes(32),
-		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_TREE,
+		CensusOrigin:  models.CensusOrigin_OFF_CHAIN_CA_V2,
 	}); err != nil {
 		t.Fatal(err)
 	}
