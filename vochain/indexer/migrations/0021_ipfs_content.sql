@@ -4,7 +4,7 @@
 -- offline importer and read by the API to inline metadata without any network
 -- call. The table intentionally stores raw bytes so the API can forward them
 -- without re-encoding.
-CREATE TABLE ipfs_content (
+CREATE TABLE IF NOT EXISTS ipfs_content (
 	cid  TEXT PRIMARY KEY,
 	data BLOB NOT NULL
 );

@@ -145,7 +145,12 @@ func main() {
 	}
 
 	// --- Collect account CIDs from the state DB ---
-	accountCIDs := map[string]common.Address{} // cid → address
+	// Multiple accounts may share the same infoURI CID (e.g. orgs created from
+	// the same template). Map cid → []address so updateCaches can populate the
+	// metadata cache for every account that references the document, not just
+	// one. The unique-CID count may therefore be much smaller than the number
+	// of accounts with ipfs:// infoURIs.
+	accountCIDs := map[string][]common.Address{} // cid → all addresses sharing it
 	st, err := state.New(*stateDBType, *stateDBPath)
 	if err != nil {
 		log.Fatalf("cannot open state db: %v", err)
@@ -154,13 +159,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("listing accounts: %v", err)
 	}
+	var accountsWithIPFS int
 	for addr, acc := range accounts {
 		uri := acc.GetInfoURI()
 		if !strings.HasPrefix(uri, "ipfs://") {
 			continue
 		}
+		accountsWithIPFS++
 		cid := strings.TrimPrefix(uri, "ipfs://")
-		accountCIDs[cid] = addr
+		accountCIDs[cid] = append(accountCIDs[cid], addr)
 	}
 
 	// --- Build the full CID set ---
@@ -174,7 +181,8 @@ func main() {
 
 	log.Infow("collected cids",
 		"processes", len(processCIDs),
-		"accounts", len(accountCIDs),
+		"accounts_with_ipfs", accountsWithIPFS,
+		"unique_account_cids", len(accountCIDs),
 		"unique", len(allCIDs),
 	)
 
@@ -350,7 +358,7 @@ func updateCaches(
 	cid string,
 	body []byte,
 	processCIDs map[string][]byte,
-	accountCIDs map[string]common.Address,
+	accountCIDs map[string][]common.Address,
 ) {
 	if pid, ok := processCIDs[cid]; ok {
 		var m electionMeta
@@ -369,7 +377,7 @@ func updateCaches(
 			log.Warnw("updating metadata_title", "cid", cid, "err", err)
 		}
 	}
-	if addr, ok := accountCIDs[cid]; ok {
+	if addrs, ok := accountCIDs[cid]; ok {
 		var m accountMeta
 		if err := json.Unmarshal(body, &m); err != nil {
 			log.Debugw("cannot parse account metadata", "cid", cid, "err", err)
@@ -380,11 +388,13 @@ func updateCaches(
 		if m.Media != nil {
 			avatar = m.Media.Avatar
 		}
-		if _, err := db.Exec(
-			`UPDATE accounts SET name = ?, avatar = ? WHERE account = ? AND (name != ? OR avatar != ?)`,
-			name, avatar, addr.Bytes(), name, avatar,
-		); err != nil {
-			log.Warnw("updating account metadata", "cid", cid, "err", err)
+		for _, addr := range addrs {
+			if _, err := db.Exec(
+				`UPDATE accounts SET name = ?, avatar = ? WHERE account = ? AND (name != ? OR avatar != ?)`,
+				name, avatar, addr.Bytes(), name, avatar,
+			); err != nil {
+				log.Warnw("updating account metadata", "cid", cid, "err", err)
+			}
 		}
 	}
 }

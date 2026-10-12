@@ -78,9 +78,6 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createVoteStmt, err = db.PrepareContext(ctx, createVote); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateVote: %w", err)
 	}
-	if q.insertIPFSContentStmt, err = db.PrepareContext(ctx, insertIPFSContent); err != nil {
-		return nil, fmt.Errorf("error preparing query InsertIPFSContent: %w", err)
-	}
 	if q.getBlockByHashStmt, err = db.PrepareContext(ctx, getBlockByHash); err != nil {
 		return nil, fmt.Errorf("error preparing query GetBlockByHash: %w", err)
 	}
@@ -116,6 +113,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getVoteStmt, err = db.PrepareContext(ctx, getVote); err != nil {
 		return nil, fmt.Errorf("error preparing query GetVote: %w", err)
+	}
+	if q.insertIPFSContentStmt, err = db.PrepareContext(ctx, insertIPFSContent); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertIPFSContent: %w", err)
 	}
 	if q.lastBlockHeightStmt, err = db.PrepareContext(ctx, lastBlockHeight); err != nil {
 		return nil, fmt.Errorf("error preparing query LastBlockHeight: %w", err)
@@ -284,11 +284,6 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createVoteStmt: %w", cerr)
 		}
 	}
-	if q.insertIPFSContentStmt != nil {
-		if cerr := q.insertIPFSContentStmt.Close(); cerr != nil {
-			err = fmt.Errorf("error closing insertIPFSContentStmt: %w", cerr)
-		}
-	}
 	if q.getBlockByHashStmt != nil {
 		if cerr := q.getBlockByHashStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getBlockByHashStmt: %w", cerr)
@@ -347,6 +342,11 @@ func (q *Queries) Close() error {
 	if q.getVoteStmt != nil {
 		if cerr := q.getVoteStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getVoteStmt: %w", cerr)
+		}
+	}
+	if q.insertIPFSContentStmt != nil {
+		if cerr := q.insertIPFSContentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertIPFSContentStmt: %w", cerr)
 		}
 	}
 	if q.lastBlockHeightStmt != nil {
@@ -526,7 +526,6 @@ type Queries struct {
 	createTokenTransferStmt               *sql.Stmt
 	createTransactionStmt                 *sql.Stmt
 	createVoteStmt                        *sql.Stmt
-	insertIPFSContentStmt                 *sql.Stmt
 	getBlockByHashStmt                    *sql.Stmt
 	getBlockByHeightStmt                  *sql.Stmt
 	getEntityCountStmt                    *sql.Stmt
@@ -539,6 +538,7 @@ type Queries struct {
 	getTransactionByHashStmt              *sql.Stmt
 	getTransactionByHeightAndIndexStmt    *sql.Stmt
 	getVoteStmt                           *sql.Stmt
+	insertIPFSContentStmt                 *sql.Stmt
 	lastBlockHeightStmt                   *sql.Stmt
 	listAccountsMissingNameStmt           *sql.Stmt
 	listProcessMetadataHistoryStmt        *sql.Stmt
@@ -587,7 +587,6 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createTokenTransferStmt:               q.createTokenTransferStmt,
 		createTransactionStmt:                 q.createTransactionStmt,
 		createVoteStmt:                        q.createVoteStmt,
-		insertIPFSContentStmt:                 q.insertIPFSContentStmt,
 		getBlockByHashStmt:                    q.getBlockByHashStmt,
 		getBlockByHeightStmt:                  q.getBlockByHeightStmt,
 		getEntityCountStmt:                    q.getEntityCountStmt,
@@ -600,6 +599,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		getTransactionByHashStmt:              q.getTransactionByHashStmt,
 		getTransactionByHeightAndIndexStmt:    q.getTransactionByHeightAndIndexStmt,
 		getVoteStmt:                           q.getVoteStmt,
+		insertIPFSContentStmt:                 q.insertIPFSContentStmt,
 		lastBlockHeightStmt:                   q.lastBlockHeightStmt,
 		listAccountsMissingNameStmt:           q.listAccountsMissingNameStmt,
 		listProcessMetadataHistoryStmt:        q.listProcessMetadataHistoryStmt,
