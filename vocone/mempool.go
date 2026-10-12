@@ -156,10 +156,18 @@ func mempoolKey(seq uint64) []byte {
 }
 
 // prepareBlock drains transactions from the mempool, re-validates them,
-// and returns the raw tx list along with the mempool keys that were consumed.
-// It does NOT modify the mempool or blockstore — the caller is responsible
-// for persisting writes and cleaning up the mempool after a successful commit.
-func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
+// and returns the raw tx list.  It does NOT modify the mempool or blockstore.
+//
+// includedKeys are the mempool keys of the transactions passed back in txs.
+// Whether to remove them from the mempool is decided by the caller based on
+// the delivery outcome: only successfully-delivered txs should be consumed,
+// so that txs which fail deliverTx (e.g. future-nonce txs) remain in the
+// mempool and are retried in a subsequent block.
+//
+// discardedKeys are the mempool keys of txs that failed the pre-flight
+// CheckTx and must be removed unconditionally (TTL expiry, malformed tx,
+// etc.).
+func (vc *Vocone) prepareBlock() (txs [][]byte, includedKeys [][]byte, discardedKeys [][]byte) {
 	vc.mempoolMtx.Lock()
 	// Take up to txsPerBlock keys from the front of the queue.
 	count := min(vc.txsPerBlock, len(vc.mempoolKeys))
@@ -168,14 +176,14 @@ func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 	vc.mempoolMtx.Unlock()
 
 	if len(pendingKeys) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	for _, key := range pendingKeys {
 		txData, err := vc.mempoolDB.Get(key)
 		if err != nil {
-			// Key disappeared (pruned concurrently), skip.
-			consumedKeys = append(consumedKeys, key)
+			// Key disappeared (pruned concurrently), discard.
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 
@@ -183,25 +191,25 @@ func (vc *Vocone) prepareBlock() (txs [][]byte, consumedKeys [][]byte) {
 		resp, err := vc.App.CheckTx(context.Background(), &vochain.CheckTxRequest{Tx: txData})
 		if err != nil {
 			log.Errorw(err, "error on check tx during block preparation")
-			consumedKeys = append(consumedKeys, key)
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 		if resp.Code != 0 {
-			log.Warnw("check tx failed during block preparation",
+			log.Warnw("check tx failed during block preparation, discarding",
 				"code", resp.Code, "data", string(resp.Data))
-			consumedKeys = append(consumedKeys, key)
+			discardedKeys = append(discardedKeys, key)
 			continue
 		}
 
 		txs = append(txs, txData)
-		consumedKeys = append(consumedKeys, key)
+		includedKeys = append(includedKeys, key)
 	}
 
 	if len(txs) > 0 {
 		log.Infow("prepared block transactions",
 			"count", len(txs), "height", vc.height.Load())
 	}
-	return txs, consumedKeys
+	return txs, includedKeys, discardedKeys
 }
 
 // commitMempoolCleanup removes consumed keys from the persistent mempool

@@ -477,6 +477,61 @@ func TestGenesisAppliedOnce(t *testing.T) {
 	qt.Assert(t, validator.KeyIndex, qt.Equals, uint32(1))
 }
 
+// TestFutureNonceTxRequeue verifies that a transaction submitted with a
+// future nonce (nonce+1) is not silently dropped after failing deliverTx in
+// the same block as the base-nonce transaction.  Instead it must be retried
+// in the subsequent block and succeed once the account nonce has advanced.
+func TestFutureNonceTxRequeue(t *testing.T) {
+	vc, cancel, cli, _ := newTestVocone(t)
+	defer cancel()
+	defer vc.Close()
+
+	// create and fund the test account
+	sender := ethereum.SignKeys{}
+	qt.Assert(t, sender.Generate(), qt.IsNil)
+	const startBalance = uint64(10_000)
+	qt.Assert(t, vc.CreateAccount(sender.Address(), &state.Account{
+		Account: models.Account{Balance: startBalance},
+	}), qt.IsNil)
+
+	// create a recipient account (SendTokens requires it to exist)
+	recipient := ethereum.SignKeys{}
+	qt.Assert(t, recipient.Generate(), qt.IsNil)
+	qt.Assert(t, vc.CreateAccount(recipient.Address(), &state.Account{}), qt.IsNil)
+
+	senderCli := cli.Clone(fmt.Sprintf("%x", sender.PrivateKey()))
+
+	// submit nonce+1 (future) first — should be accepted into the mempool
+	// because CheckTx does not validate nonces (forCommit=false)
+	futureHash, err := senderCli.TransferWithNonce(recipient.Address(), 1, 1)
+	qt.Assert(t, err, qt.IsNil)
+
+	// submit the correct-nonce tx second
+	baseHash, err := senderCli.TransferWithNonce(recipient.Address(), 1, 0)
+	qt.Assert(t, err, qt.IsNil)
+
+	// wait for the base-nonce tx to be mined; at that point the account nonce
+	// has advanced to 1 so the future-nonce tx can succeed in the next block.
+	ctx1, cancel1 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel1()
+	_, err = cli.WaitUntilTxIsMined(ctx1, baseHash)
+	qt.Assert(t, err, qt.IsNil)
+
+	// wait one more block so the future-nonce tx is retried and committed
+	qt.Assert(t, cli.WaitUntilNextBlock(), qt.IsNil)
+
+	// the future-nonce tx must now be mined
+	ctx2, cancel2 := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel2()
+	_, err = cli.WaitUntilTxIsMined(ctx2, futureHash)
+	qt.Assert(t, err, qt.IsNil)
+
+	// account nonce must be 2 (base tx + future tx both applied)
+	acc, err := senderCli.Account("")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, acc.Nonce, qt.Equals, uint32(2))
+}
+
 func testCreateAccount(cli *apiclient.HTTPclient) error {
 	txhash, err := cli.AccountBootstrap(nil, nil)
 	if err != nil {

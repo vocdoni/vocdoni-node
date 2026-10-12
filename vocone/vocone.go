@@ -23,6 +23,7 @@ import (
 	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/service"
 	"go.vocdoni.io/dvote/vochain"
+	"go.vocdoni.io/dvote/vochain/blocktypes"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/keykeeper"
@@ -263,7 +264,7 @@ func (vc *Vocone) produceBlock() error {
 	startTime := time.Now()
 	height := vc.height.Load()
 
-	txs, consumedKeys := vc.prepareBlock()
+	txs, includedKeys, discardedKeys := vc.prepareBlock()
 
 	resp, err := vc.App.ExecuteBlock(txs, uint32(height), startTime)
 	if err != nil {
@@ -305,6 +306,25 @@ func (vc *Vocone) produceBlock() error {
 
 	if _, err := vc.App.CommitState(); err != nil {
 		return fmt.Errorf("commit state at height %d: %w", height, err)
+	}
+
+	// Build the set of invalid tx IDs from failed deliverTx responses.
+	// Txs that fail delivery are NOT consumed from the mempool so they can be
+	// retried in a subsequent block once the relevant account state advances
+	// (e.g. a future-nonce tx becomes valid after a lower-nonce tx is mined).
+	// This mirrors cometbft's post-commit recheck behaviour.
+	invalidTxIDs := make(map[[32]byte]bool, len(resp.InvalidTransactions))
+	for _, txID := range resp.InvalidTransactions {
+		invalidTxIDs[txID] = true
+	}
+
+	// consumedKeys = txs that CheckTx-rejected + txs that delivered successfully.
+	// Txs that failed deliverTx keep their mempool slot and are tried again.
+	consumedKeys := discardedKeys
+	for i, tx := range txs {
+		if !invalidTxIDs[blocktypes.Tx(tx).Key()] {
+			consumedKeys = append(consumedKeys, includedKeys[i])
+		}
 	}
 
 	// Only clean up the mempool after a fully successful commit.
