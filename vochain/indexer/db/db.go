@@ -78,6 +78,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.createVoteStmt, err = db.PrepareContext(ctx, createVote); err != nil {
 		return nil, fmt.Errorf("error preparing query CreateVote: %w", err)
 	}
+	if q.insertIPFSContentStmt, err = db.PrepareContext(ctx, insertIPFSContent); err != nil {
+		return nil, fmt.Errorf("error preparing query InsertIPFSContent: %w", err)
+	}
 	if q.getBlockByHashStmt, err = db.PrepareContext(ctx, getBlockByHash); err != nil {
 		return nil, fmt.Errorf("error preparing query GetBlockByHash: %w", err)
 	}
@@ -86,6 +89,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	}
 	if q.getEntityCountStmt, err = db.PrepareContext(ctx, getEntityCount); err != nil {
 		return nil, fmt.Errorf("error preparing query GetEntityCount: %w", err)
+	}
+	if q.getIPFSContentStmt, err = db.PrepareContext(ctx, getIPFSContent); err != nil {
+		return nil, fmt.Errorf("error preparing query GetIPFSContent: %w", err)
 	}
 	if q.getProcessStmt, err = db.PrepareContext(ctx, getProcess); err != nil {
 		return nil, fmt.Errorf("error preparing query GetProcess: %w", err)
@@ -278,6 +284,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing createVoteStmt: %w", cerr)
 		}
 	}
+	if q.insertIPFSContentStmt != nil {
+		if cerr := q.insertIPFSContentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing insertIPFSContentStmt: %w", cerr)
+		}
+	}
 	if q.getBlockByHashStmt != nil {
 		if cerr := q.getBlockByHashStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getBlockByHashStmt: %w", cerr)
@@ -291,6 +302,11 @@ func (q *Queries) Close() error {
 	if q.getEntityCountStmt != nil {
 		if cerr := q.getEntityCountStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing getEntityCountStmt: %w", cerr)
+		}
+	}
+	if q.getIPFSContentStmt != nil {
+		if cerr := q.getIPFSContentStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing getIPFSContentStmt: %w", cerr)
 		}
 	}
 	if q.getProcessStmt != nil {
@@ -510,9 +526,11 @@ type Queries struct {
 	createTokenTransferStmt               *sql.Stmt
 	createTransactionStmt                 *sql.Stmt
 	createVoteStmt                        *sql.Stmt
+	insertIPFSContentStmt                 *sql.Stmt
 	getBlockByHashStmt                    *sql.Stmt
 	getBlockByHeightStmt                  *sql.Stmt
 	getEntityCountStmt                    *sql.Stmt
+	getIPFSContentStmt                    *sql.Stmt
 	getProcessStmt                        *sql.Stmt
 	getProcessCountStmt                   *sql.Stmt
 	getProcessIDsByFinalResultsStmt       *sql.Stmt
@@ -569,9 +587,11 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		createTokenTransferStmt:               q.createTokenTransferStmt,
 		createTransactionStmt:                 q.createTransactionStmt,
 		createVoteStmt:                        q.createVoteStmt,
+		insertIPFSContentStmt:                 q.insertIPFSContentStmt,
 		getBlockByHashStmt:                    q.getBlockByHashStmt,
 		getBlockByHeightStmt:                  q.getBlockByHeightStmt,
 		getEntityCountStmt:                    q.getEntityCountStmt,
+		getIPFSContentStmt:                    q.getIPFSContentStmt,
 		getProcessStmt:                        q.getProcessStmt,
 		getProcessCountStmt:                   q.getProcessCountStmt,
 		getProcessIDsByFinalResultsStmt:       q.getProcessIDsByFinalResultsStmt,
