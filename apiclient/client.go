@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 )
@@ -45,7 +44,6 @@ type HTTPclient struct {
 	addr    *url.URL
 	account *ethereum.SignKeys
 	chainID string
-	circuit *circuit.ZkCircuit
 	retries int
 }
 
@@ -91,11 +89,6 @@ func NewWithURLAndBearer(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, er
 		return nil, fmt.Errorf("cannot get chain ID from API server")
 	}
 	c.chainID = info.ID
-
-	c.circuit, err = circuit.LoadVersion(info.CircuitVersion)
-	if err != nil {
-		return nil, fmt.Errorf("error loading circuit: %w", err)
-	}
 	return c, nil
 }
 

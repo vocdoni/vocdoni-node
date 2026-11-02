@@ -75,14 +75,6 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/info/circuit",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainCircuitInfoHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/info/electionPriceFactors",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -563,24 +555,6 @@ func (a *API) chainInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) 
 		MaxCensusSize:     maxCensusSize,
 		NetworkCapacity:   networkCapacity,
 	})
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainCircuitInfoHandler
-//
-//	@Summary		Circuit info
-//	@Description	Returns the circuit configuration according to the current circuit
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	circuit.Config
-//	@Router			/chain/info/circuit [get]
-func (a *API) chainCircuitInfoHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// Encode the current circuit configuration to JSON
-	data, err := json.Marshal(circuit.Global().Config)
 	if err != nil {
 		return err
 	}

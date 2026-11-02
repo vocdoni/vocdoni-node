@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
@@ -27,7 +26,9 @@ import (
 const (
 	CensusHandler = "censuses"
 
-	CensusTypeWeighted   = "weighted"
+	CensusTypeWeighted = "weighted"
+	// CensusTypeZKWeighted is the anonymous census type. Creating one answers
+	// ErrEndpointRemoved, and existing ones still report it as their type.
 	CensusTypeZKWeighted = "zkweighted"
 	CensusTypeCSP        = "csp"
 	// CensusTypeCSPv2 is CensusTypeCSP with the fixed salt derivation for the
@@ -227,10 +228,13 @@ func (a *API) enableCensusHandlers() error {
 //	@Accept					json
 //	@Produce				json
 //	@Security				ApiKeyAuth
-//	@Param					type	path		string	true	"Census type"	Enums(weighted,zkweighted)
+//	@Param					type	path		string	true	"Census type"	Enums(weighted)
 //	@Success				200		{object}	object{censusID=string}
 //	@Router					/censuses/{type} [post]
 func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	if ctx.URLParam(ParamType) == CensusTypeZKWeighted {
+		return ErrEndpointRemoved.Withf("POST /censuses/%s: %s", CensusTypeZKWeighted, reasonAnonymous)
+	}
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -835,7 +839,7 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Produce				json
 //	@Param					censusId	path		string																										true	"Census id"
 //	@Param					key			path		string																										true	"Key to proof"
-//	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string,censusSiblings=[]string}	"censusProof is the Merkle proof, value is the Merkle tree leaf value and censusSiblings is only returned for zkweighted censuses"
+//	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string}	"censusProof is the Merkle proof and value is the Merkle tree leaf value"
 //	@Router					/censuses/{censusId}/proof/{key} [get]
 func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam(ParamCensusId))
@@ -857,18 +861,10 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	// Get the census type to return it into the response to prevent to perform
 	// two api calls.
 	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
-	// If the census type is zkweighted (that means that it uses Poseidon hash
-	// with Arbo merkle tree), skip to perform a hash function over the census
-	// key. It is because the zk friendly key of any census leaf is the
-	// ZkAddress which follows a specific transformation process that must be
-	// implemented into the circom circuit also, and it is already hashed.
-	// Otherwhise, hash the key before get the proof.
-	leafKey := address
-	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
-		leafKey, err = ref.Tree().Hash(address)
-		if err != nil {
-			return err
-		}
+	// hash the key before get the proof
+	leafKey, err := ref.Tree().Hash(address)
+	if err != nil {
+		return err
 	}
 	response := Census{Type: censusType}
 	response.Value, response.CensusProof, err = ref.Tree().GenProof(leafKey)
@@ -877,15 +873,6 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 	if response.CensusRoot, err = ref.Tree().Root(); err != nil {
 		return ErrCensusRootIsNil.WithErr(err)
-	}
-
-	// Get the leaf siblings from arbo based on the key received and include
-	// them into the response, only if it is zkweighted.
-	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
-		response.CensusSiblings, err = zk.ProofToCircomSiblings(response.CensusProof)
-		if err != nil {
-			return ErrCantGetCircomSiblings.WithErr(err)
-		}
 	}
 	if len(response.Value) > 0 {
 		// return the string representation of the census value (weight)

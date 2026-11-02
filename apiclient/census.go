@@ -25,13 +25,10 @@ type CensusProof struct {
 	LeafWeight *big.Int
 	// KeyType defines the type of the census tree key
 	KeyType models.ProofArbo_KeyType
-	// Siblings contains the decoded siblings keys
-	Siblings []string
 }
 
 // NewCensus creates a new census and returns its ID. The censusType can be
-// weighted (api.CensusTypeWeighted), zkweighted (api.CensusTypeZKWeighted) or
-// csp (api.CensusTypeCSP).
+// weighted (api.CensusTypeWeighted) or csp (api.CensusTypeCSP).
 func (c *HTTPclient) NewCensus(censusType string) (types.HexBytes, error) {
 	// create a new census
 	resp, code, err := c.Request(HTTPPOST, nil, "censuses", censusType)
@@ -131,7 +128,6 @@ func (c *HTTPclient) CensusGenProof(censusID, voterKey types.HexBytes) (*CensusP
 		Root:      censusData.CensusRoot,
 		Proof:     censusData.CensusProof,
 		LeafValue: censusData.Value,
-		Siblings:  censusData.CensusSiblings,
 	}
 	if censusData.Weight != nil {
 		cp.LeafWeight = censusData.Weight.MathBigInt()

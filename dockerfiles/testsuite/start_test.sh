@@ -4,7 +4,6 @@
 #  e2etest_plaintextelection_empty: run poll vote test, with no votes
 #  e2etest_plaintextelection: run poll vote test
 #  e2etest_encryptedelection: run encrypted vote test
-#  e2etest_anonelection: run anonymous vote test
 #  e2etest_tokentxs: run token transactions test (no end-user voting at all)
 #  e2etest_overwritelection: run overwrite test
 #  e2etest_censusizelection: run max census size test
@@ -24,7 +23,6 @@ COMPOSE_CMD_RUN="$COMPOSE_CMD run"
 [ -n "$NOTTY" ] && COMPOSE_CMD_RUN="$COMPOSE_CMD_RUN -T"
 
 ELECTION_SIZE=${TESTSUITE_ELECTION_SIZE:-30}
-ELECTION_SIZE_ANON=${TESTSUITE_ELECTION_SIZE_ANON:-8}
 BUILD=${BUILD:-1}
 CLEAN=${CLEAN:-1}
 LOGLEVEL=${LOGLEVEL:-debug}
@@ -52,7 +50,6 @@ tests_to_run=(
   	"e2etest_plaintextelection_empty"
   	"e2etest_plaintextelection"
   	"e2etest_encryptedelection"
-  	"e2etest_anonelection"
   	"e2etest_overwritelection"
   	"e2etest_censusizelection"
   	"e2etest_ballotelection"
@@ -73,7 +70,6 @@ tests_to_run=(
 	echo "env vars:"
 	echo "  CLEAN=1"
 	echo "  ELECTION_SIZE=30"
-	echo "  ELECTION_SIZE_ANON=8"
 	echo "  CONCURRENT=0"
 	echo "  LOGLEVEL=debug"
 	echo "  APIHOST=http://gateway0:9090/v2"
@@ -116,12 +112,6 @@ e2etest_plaintextelection_empty() {
 
 e2etest_encryptedelection() {
 	e2etest encryptedelection
-}
-
-e2etest_anonelection() {
-	e2etest anonelection
-	e2etest anonelectionTempSiks
-	e2etest anonelectionEncrypted
 }
 
 e2etest_hysteresis() {

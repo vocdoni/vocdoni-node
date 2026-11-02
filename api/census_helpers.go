@@ -3,7 +3,6 @@ package api
 import (
 	"encoding/hex"
 
-	"github.com/ethereum/go-ethereum/common"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/proto/build/go/models"
 )
@@ -48,8 +47,4 @@ func censusIDparse(censusID string) ([]byte, error) {
 func censusKeyParse(key string) ([]byte, error) {
 	key = util.TrimHex(key)
 	return hex.DecodeString(key)
-}
-
-func addressParse(key string) common.Address {
-	return common.HexToAddress(util.TrimHex(key))
 }
