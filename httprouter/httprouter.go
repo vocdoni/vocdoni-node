@@ -398,12 +398,15 @@ func RedactRequestURI(uri string) string {
 	}
 	lower := strings.ToLower(path)
 	for _, prefix := range secretPathPrefixes {
-		var i int
-		if len(lower) == len(path) {
-			i = strings.Index(lower, prefix)
-		} else {
-			i = strings.Index(path, prefix)
+		if len(lower) != len(path) {
+			// ToLower changed the byte length, so indexes into lower do not
+			// map back to path: redact the whole path rather than risk the key.
+			if strings.Contains(lower, prefix) {
+				return "<redacted>" + tail
+			}
+			continue
 		}
+		i := strings.Index(lower, prefix)
 		if i >= 0 {
 			return path[:i+len(prefix)] + "<redacted>" + tail
 		}

@@ -36,6 +36,11 @@ func TestRedactRequestURI(t *testing.T) {
 		{"/v2//wallet/add/" + testKey, "/v2//wallet/add/<redacted>"},
 		// invalid percent-escape before key: falls back to raw path match
 		{"/v2/wallet/add/%zz" + testKey, "/v2/wallet/add/<redacted>"},
+		// U+0130 grows when lowercased: the whole path is redacted
+		{"/v2/İ/WALLET/ADD/" + testKey, "<redacted>"},
+		{"/v2/%C4%B0/wallet/add/" + testKey + "?x=1", "<redacted>?x=1"},
+		// U+0130 without the prefix: unchanged
+		{"/v2/İ/censuses", "/v2/İ/censuses"},
 	} {
 		got := RedactRequestURI(tc.in)
 		qt.Check(t, got, qt.Equals, tc.want, qt.Commentf("in: %s", tc.in))
