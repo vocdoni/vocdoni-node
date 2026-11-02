@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -287,12 +288,35 @@ func (r *HTTProuter) routerHandler(namespaceID string, accessType AuthAccessType
 			Context:   hc,
 			Path:      strings.Split(req.URL.Path, "/")[1:],
 		}
-		go handlerFunc(msg)
+		go runHandler(handlerFunc, msg, hc)
 
 		// The contract is that every handled request must send a
 		// response, even when they fail or time out.
 		<-hc.sent
 	}
+}
+
+// runHandler runs a request handler in its own goroutine. That goroutine is
+// outside the reach of the chi Recoverer middleware, so an unrecovered panic
+// there would take the whole node down. A panic is logged with its stack and,
+// if the handler had not replied yet, answered with a 500.
+func runHandler(handlerFunc RouterHandlerFn, msg Message, hc *HTTPContext) {
+	defer func() {
+		r := recover()
+		if r == nil {
+			return
+		}
+		log.Errorw(fmt.Errorf("%v", r), fmt.Sprintf("panic serving %s %s\n%s",
+			hc.Request.Method, hc.Request.URL.Path, debug.Stack()))
+		select {
+		case <-hc.sent:
+		default:
+			if err := hc.Send([]byte("internal server error"), http.StatusInternalServerError); err != nil {
+				log.Warnf("cannot reply after handler panic: %v", err)
+			}
+		}
+	}()
+	handlerFunc(msg)
 }
 
 // generateTLScert generates a TLS certificated
