@@ -4,10 +4,10 @@ import (
 	"go.vocdoni.io/dvote/db"
 )
 
-// Prefixes of the API database keys where the custodial wallet of
-// POST /wallet/add/{privateKey} kept, per token, the encrypted private key
-// and, per private key, its hash. The node no longer stores private keys, so
-// purgeWalletKeys deletes whatever is left under them.
+// Prefixes of the API database keys that hold custodial wallet data: per
+// token, an encrypted private key, and per private key, its hash. The node
+// does not store private keys; purgeWalletKeys deletes any left under these
+// prefixes.
 const (
 	walletDBprefixEncryptedPrivateKey = "wpk_"
 	walletDBprefixPrivateKeyHash      = "wph_"
