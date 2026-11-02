@@ -14,8 +14,17 @@ import (
 
 // TestNewAPIPurgesWalletKeys checks that NewAPI deletes every key under the
 // custodial wallet prefixes of the API database, keeps the other keys, and
-// that a second start deletes nothing.
+// that a second start deletes nothing, on every backend that runs without a
+// server.
 func TestNewAPIPurgesWalletKeys(t *testing.T) {
+	for _, dbType := range []string{db.TypePebble, db.TypeLevelDB} {
+		t.Run(dbType, func(t *testing.T) {
+			testNewAPIPurgesWalletKeys(t, dbType)
+		})
+	}
+}
+
+func testNewAPIPurgesWalletKeys(t *testing.T, dbType string) {
 	c := qt.New(t)
 	dataDir := t.TempDir()
 
@@ -28,7 +37,7 @@ func TestNewAPIPurgesWalletKeys(t *testing.T) {
 	otherKeys := [][]byte{[]byte("other"), []byte("wp_x"), []byte("wpkx")}
 
 	// the database NewAPI opens, with the same prefix
-	mdb, err := metadb.New(db.TypePebble, filepath.Join(dataDir, "db"))
+	mdb, err := metadb.New(dbType, filepath.Join(dataDir, "db"))
 	c.Assert(err, qt.IsNil)
 	apiDB := prefixeddb.NewPrefixedDatabase(mdb, []byte("api/"))
 	wtx := apiDB.WriteTx()
@@ -45,7 +54,7 @@ func TestNewAPIPurgesWalletKeys(t *testing.T) {
 	newAPI := func() *API {
 		router := httprouter.HTTProuter{}
 		c.Assert(router.Init("127.0.0.1", 0), qt.IsNil)
-		api, err := NewAPI(&router, "/", dataDir, db.TypePebble)
+		api, err := NewAPI(&router, "/", dataDir, dbType)
 		c.Assert(err, qt.IsNil)
 		return api
 	}
@@ -72,7 +81,7 @@ func TestNewAPIPurgesWalletKeys(t *testing.T) {
 	}
 	c.Assert(api.db.Close(), qt.IsNil)
 
-	mdb, err = metadb.New(db.TypePebble, filepath.Join(dataDir, "db"))
+	mdb, err = metadb.New(dbType, filepath.Join(dataDir, "db"))
 	c.Assert(err, qt.IsNil)
 	_, err = mdb.Get([]byte(walletDBprefixEncryptedPrivateKey + "outside"))
 	c.Assert(err, qt.IsNil)
