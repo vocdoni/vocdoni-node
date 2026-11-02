@@ -92,11 +92,6 @@ type VoteParams struct {
 
 // ### Objects returned ###
 
-// CountResult wraps a count inside an object
-type CountResult struct {
-	Count uint64 `json:"count" example:"10"`
-}
-
 // Pagination contains all the values needed for the UI to easily organize the returned data
 type Pagination struct {
 	TotalItems   uint64  `json:"totalItems"`
@@ -237,7 +232,6 @@ type ElectionDescription struct {
 	ElectionType ElectionType          `json:"electionType"`
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
-	TempSIKs     bool                  `json:"tempSIKs"`
 }
 
 type Key struct {
@@ -463,9 +457,15 @@ type Account struct {
 	TransfersCount uint64           `json:"transfersCount,omitempty"`
 	FeesCount      uint64           `json:"feesCount,omitempty"`
 	InfoURL        string           `json:"infoURL,omitempty"`
-	Token          *uuid.UUID       `json:"token,omitempty" swaggerignore:"true"`
 	Metadata       *AccountMetadata `json:"metadata,omitempty"`
 	SIK            types.HexBytes   `json:"sik"`
+}
+
+// WalletToken is the reply of POST /wallet/add/{privateKey}: the address of
+// the given key and a new bearer token for the /censuses endpoints.
+type WalletToken struct {
+	Token   uuid.UUID      `json:"token" swaggertype:"string" format:"uuid"`
+	Address types.HexBytes `json:"address" swaggertype:"string"`
 }
 
 type AccountsList struct {
@@ -490,11 +490,10 @@ type Census struct {
 	Valid    bool           `json:"valid,omitempty"`
 	URI      string         `json:"uri,omitempty"`
 	// proof stuff
-	CensusRoot     types.HexBytes `json:"censusRoot,omitempty"`
-	CensusProof    types.HexBytes `json:"censusProof,omitempty"`
-	Key            types.HexBytes `json:"key,omitempty"`
-	Value          types.HexBytes `json:"value,omitempty"`
-	CensusSiblings []string       `json:"censusSiblings,omitempty"`
+	CensusRoot  types.HexBytes `json:"censusRoot,omitempty"`
+	CensusProof types.HexBytes `json:"censusProof,omitempty"`
+	Key         types.HexBytes `json:"key,omitempty"`
+	Value       types.HexBytes `json:"value,omitempty"`
 }
 
 type File struct {

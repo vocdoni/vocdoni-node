@@ -40,7 +40,6 @@ var (
 	ErrFileSizeTooBig                   = apirest.APIerror{Code: 4012, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("file size exceeds the maximum allowed")}
 	ErrCantParseOrgID                   = apirest.APIerror{Code: 4013, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse organizationId")}
 	ErrCantParseAccountID               = apirest.APIerror{Code: 4014, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse accountId")}
-	ErrCantParseBearerToken             = apirest.APIerror{Code: 4015, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse bearer token")}
 	ErrCantParseDataAsJSON              = apirest.APIerror{Code: 4016, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse data as JSON")}
 	ErrCantParseElectionID              = apirest.APIerror{Code: 4017, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse electionId")}
 	ErrCantParseMetadataAsJSON          = apirest.APIerror{Code: 4018, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse metadata (invalid format)")}
@@ -66,8 +65,6 @@ var (
 	ErrParamToInvalid                   = apirest.APIerror{Code: 4038, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid address")}
 	ErrParticipantKeyMissing            = apirest.APIerror{Code: 4039, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("missing participant key")}
 	ErrIndexedCensusCantUseWeight       = apirest.APIerror{Code: 4040, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("indexed census cannot use weight")}
-	ErrWalletNotFound                   = apirest.APIerror{Code: 4041, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("wallet not found")}
-	ErrWalletPrivKeyAlreadyExists       = apirest.APIerror{Code: 4042, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("wallet private key already exists")}
 	ErrElectionEndDateInThePast         = apirest.APIerror{Code: 4043, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date cannot be in the past")}
 	ErrElectionEndDateBeforeStart       = apirest.APIerror{Code: 4044, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("election end date must be after start date")}
 	ErrElectionNotFound                 = apirest.APIerror{Code: 4045, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("election not found")}
@@ -79,7 +76,6 @@ var (
 	ErrInvalidCensusKeyLength           = apirest.APIerror{Code: 4051, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("invalid census key length")}
 	ErrUnmarshalingServerProto          = apirest.APIerror{Code: 4052, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error unmarshaling protobuf data")}
 	ErrMarshalingServerProto            = apirest.APIerror{Code: 4053, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error marshaling protobuf data")}
-	ErrSIKNotFound                      = apirest.APIerror{Code: 4054, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("SIK not found")}
 	ErrCantParseBoolean                 = apirest.APIerror{Code: 4055, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse string into boolean")}
 	ErrCantParseHexString               = apirest.APIerror{Code: 4056, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse string into hex bytes")}
 	ErrPageNotFound                     = apirest.APIerror{Code: 4057, HTTPstatus: apirest.HTTPstatusNotFound, Err: fmt.Errorf("page not found")}
@@ -92,6 +88,8 @@ var (
 	ErrParamOrderInvalid                = apirest.APIerror{Code: 4064, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("parameter (order) invalid, must be asc or desc")}
 	ErrMetadataHashNotMatchContent      = apirest.APIerror{Code: 4065, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("metadata hash does not match metadata content")}
 	ErrNotSetMetadataTx                 = apirest.APIerror{Code: 4066, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("transaction is not a SET_PROCESS_METADATA for this election")}
+	ErrEndpointRemoved                  = apirest.APIerror{Code: 4067, HTTPstatus: apirest.HTTPstatusGone, Err: fmt.Errorf("endpoint removed")}
+	ErrCantParsePrivateKey              = apirest.APIerror{Code: 4069, HTTPstatus: apirest.HTTPstatusBadRequest, Err: fmt.Errorf("cannot parse private key, must be 32 hex encoded bytes")}
 	ErrVochainEmptyReply                = apirest.APIerror{Code: 5000, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain returned an empty reply")}
 	ErrVochainSendTxFailed              = apirest.APIerror{Code: 5001, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain SendTx failed")}
 	ErrVochainGetTxFailed               = apirest.APIerror{Code: 5002, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("vochain GetTx failed")}
@@ -117,9 +115,7 @@ var (
 	ErrElectionResultsNotYetAvailable   = apirest.APIerror{Code: 5024, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results are not yet available")}
 	ErrElectionResultsIsNil             = apirest.APIerror{Code: 5025, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results is nil")}
 	ErrElectionResultsMismatch          = apirest.APIerror{Code: 5026, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("election results don't match reported ones")}
-	ErrCantGetCircomSiblings            = apirest.APIerror{Code: 5027, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot get circom siblings")}
 	ErrCensusProofVerificationFailed    = apirest.APIerror{Code: 5028, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("census proof verification failed")}
-	ErrCantCountVotes                   = apirest.APIerror{Code: 5029, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("cannot count votes")}
 	ErrVochainOverloaded                = apirest.APIerror{Code: 5030, HTTPstatus: apirest.HTTPstatusServiceUnavailable, Err: fmt.Errorf("vochain overloaded")}
 	ErrGettingSIK                       = apirest.APIerror{Code: 5031, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error getting SIK")}
 	ErrCensusBuild                      = apirest.APIerror{Code: 5032, HTTPstatus: apirest.HTTPstatusInternalErr, Err: fmt.Errorf("error building census")}
