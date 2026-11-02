@@ -4,6 +4,7 @@ import (
 	"bytes"
 	stdlog "log"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -18,12 +19,29 @@ func TestRedactRequestURI(t *testing.T) {
 		{"/v2/wallet/add/" + testKey, "/v2/wallet/add/<redacted>"},
 		{"/wallet/add/0x" + testKey, "/wallet/add/<redacted>"},
 		{"/v2/wallet/add/" + testKey + "?x=1", "/v2/wallet/add/<redacted>?x=1"},
-		{"/v2/wallet/add/" + testKey + "/extra", "/v2/wallet/add/<redacted>/extra"},
+		// everything after the prefix (including extra path segments) is redacted
+		{"/v2/wallet/add/" + testKey + "/extra", "/v2/wallet/add/<redacted>"},
 		{"/v2/wallet/add/", "/v2/wallet/add/<redacted>"},
 		{"/v2/wallet/bootstrap", "/v2/wallet/bootstrap"},
 		{"/v2/censuses/weighted", "/v2/censuses/weighted"},
+		// double slash: empty segment before the key
+		{"/v2/wallet/add//" + testKey, "/v2/wallet/add/<redacted>"},
+		// case-insensitive match
+		{"/v2/Wallet/Add/" + testKey, "/v2/Wallet/Add/<redacted>"},
+		// percent-encoded slash in path
+		{"/v2/wallet%2Fadd/" + testKey, "/v2/wallet/add/<redacted>"},
+		// percent-encoded slashes with query string
+		{"/v2/wallet%2fadd%2F" + testKey + "?x=1", "/v2/wallet/add/<redacted>?x=1"},
+		// double slash with leading segment
+		{"/v2//wallet/add/" + testKey, "/v2//wallet/add/<redacted>"},
+		// invalid percent-escape before key: falls back to raw path match
+		{"/v2/wallet/add/%zz" + testKey, "/v2/wallet/add/<redacted>"},
 	} {
-		qt.Check(t, RedactRequestURI(tc.in), qt.Equals, tc.want, qt.Commentf("in: %s", tc.in))
+		got := RedactRequestURI(tc.in)
+		qt.Check(t, got, qt.Equals, tc.want, qt.Commentf("in: %s", tc.in))
+		if strings.Contains(tc.in, testKey) {
+			qt.Check(t, got, qt.Not(qt.Contains), testKey, qt.Commentf("key leaked in: %s", tc.in))
+		}
 	}
 }
 
@@ -43,4 +61,16 @@ func TestRequestLogRedactsPrivateKey(t *testing.T) {
 	qt.Assert(t, buf.String(), qt.Contains, "/v2/wallet/add/<redacted>")
 	qt.Assert(t, req.RequestURI, qt.Equals, "/v2/wallet/add/"+testKey)
 	qt.Assert(t, req.URL.Path, qt.Equals, "/v2/wallet/add/"+testKey)
+
+	// percent-encoded slash variant
+	buf.Reset()
+	req2 := httptest.NewRequest("POST", "/v2/wallet%2Fadd/"+testKey, nil)
+	f.NewLogEntry(req2).Write(200, 2, nil, time.Millisecond, nil)
+	qt.Assert(t, buf.String(), qt.Not(qt.Contains), testKey)
+
+	// case variant with double slash
+	buf.Reset()
+	req3 := httptest.NewRequest("POST", "/v2/Wallet/add//"+testKey, nil)
+	f.NewLogEntry(req3).Write(200, 2, nil, time.Millisecond, nil)
+	qt.Assert(t, buf.String(), qt.Not(qt.Contains), testKey)
 }

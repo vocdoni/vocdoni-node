@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -377,24 +378,35 @@ type stdLogger struct {
 
 func (l stdLogger) Print(v ...any) { l.log.Debug().Msg(fmt.Sprint(v...)) }
 
-// secretPathPrefixes are the path prefixes whose next segment is a secret:
+// secretPathPrefixes are the path prefixes (lowercase) whose remainder is a secret:
 // POST /wallet/add/{privateKey} carries a private key in the URL.
 var secretPathPrefixes = []string{"/wallet/add/"}
 
-// RedactRequestURI returns uri with the path segment that follows any of
-// secretPathPrefixes replaced by "<redacted>", so request logs never record it.
+// RedactRequestURI returns uri with everything after any of
+// secretPathPrefixes, up to the query or fragment, replaced by "<redacted>",
+// so request logs never record it. The path is percent-decoded and matched
+// case-insensitively, so malformed variants of the route that the router does
+// not serve (an encoded slash, other letter case, an empty segment) cannot
+// carry the secret into the log either.
 func RedactRequestURI(uri string) string {
+	path, tail := uri, ""
+	if i := strings.IndexAny(uri, "?#"); i >= 0 {
+		path, tail = uri[:i], uri[i:]
+	}
+	if decoded, err := url.PathUnescape(path); err == nil {
+		path = decoded
+	}
+	lower := strings.ToLower(path)
 	for _, prefix := range secretPathPrefixes {
-		i := strings.Index(uri, prefix)
-		if i < 0 {
-			continue
+		var i int
+		if len(lower) == len(path) {
+			i = strings.Index(lower, prefix)
+		} else {
+			i = strings.Index(path, prefix)
 		}
-		start := i + len(prefix)
-		end := strings.IndexAny(uri[start:], "/?#")
-		if end < 0 {
-			end = len(uri) - start
+		if i >= 0 {
+			return path[:i+len(prefix)] + "<redacted>" + tail
 		}
-		uri = uri[:start] + "<redacted>" + uri[start+end:]
 	}
 	return uri
 }
