@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"strconv"
 	"strings"
 	"time"
@@ -43,26 +42,10 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/organizations/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.organizationListByPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/stats",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainStatsHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/organizations/count",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.organizationCountHandler,
 	); err != nil {
 		return err
 	}
@@ -115,22 +98,6 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/blocks/{height}/transactions/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxListByHeightAndPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/transactions/{height}/{index}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxByHeightAndIndexHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/transactions",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -159,14 +126,6 @@ func (a *API) enableChainHandlers() error {
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTxByHashHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/transactions/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxListByPageHandler,
 	); err != nil {
 		return err
 	}
@@ -203,22 +162,6 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/organizations/filter/page/{page}",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.organizationListByFilterAndPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/transactions/count",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainTxCountHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/fees",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -227,42 +170,10 @@ func (a *API) enableChainHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/chain/fees/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainFeesListByPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/fees/reference/{reference}/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainFeesListByReferenceAndPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/fees/type/{type}/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.chainFeesListByTypeAndPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/chain/transfers",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.chainTransfersListHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/chain/export/indexer",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.chainIndexerExportHandler,
 	); err != nil {
 		return err
 	}
@@ -306,91 +217,7 @@ func (a *API) organizationListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	return marshalAndSend(ctx, list)
 }
 
-// organizationListByPageHandler
-//
-//	@Summary		List organizations
-//	@Description	List all organizations
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/organizations?page=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		number	true	"Page"
-//	@Success		200		{object}	OrganizationsList
-//	@Router			/chain/organizations/page/{page} [get]
-func (a *API) organizationListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseOrganizationParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.organizationList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyOrganizationsList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// organizationListByFilterAndPageHandler
-//
-//	@Summary		List organizations (filtered)
-//	@Description	Returns a list of organizations filtered by its partial id, paginated by the given page
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/organizations?page=xxx&organizationId=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			body	body		OrganizationParams	true	"Partial organizationId to filter by"
-//	@Param			page	path		number				true	"Page"
-//	@Success		200		{object}	OrganizationsList
-//	@Router			/chain/organizations/filter/page/{page} [post]
-func (a *API) organizationListByFilterAndPageHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// get organizationId from the request params
-	params := &OrganizationParams{}
-
-	// but support legacy URLParam
-	urlParams, err := parsePaginationParams(ctx.URLParam(ParamPage), "")
-	if err != nil {
-		return err
-	}
-	params.PaginationParams = urlParams
-
-	if err := json.Unmarshal(msg.Data, &params); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-	if params == nil { // happens when client POSTs a literal `null` JSON
-		return ErrMissingParameter
-	}
-
-	list, err := a.organizationList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyOrganizationsList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
 // organizationList produces a filtered, sorted, paginated OrganizationsList.
-//
-// The ordering is validated here rather than in parseOrganizationParams so that
-// the deprecated POST filter endpoint, which unmarshals its OrganizationParams
-// straight from the request body, is covered as well.
 //
 // Errors returned are always of type APIerror.
 func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, error) {
@@ -429,35 +256,16 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		})
 	}
 	return list, nil
-}
-
-// organizationCountHandler
-//
-//	@Summary		Count organizations
-//	@Description	Return the number of organizations
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/organizations which reports totalItems)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	CountResult	"Number of registered organizations"
-//	@Router			/chain/organizations/count [get]
-func (a *API) organizationCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	count := a.indexer.CountTotalEntities()
-	return marshalAndSend(ctx, &CountResult{Count: count})
-}
-
-// chainStatsHandler
-//
-//	@Summary		Chain statistics
-//	@Description	Returns the chain-wide counters in a single response: transactions
-//	@Description	grouped by type, elections grouped by status, and the total number of
-//	@Description	accounts, elections and votes. Buckets with a count of zero are omitted.
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	ChainStats
-//	@Router			/chain/stats [get]
+} // chainStatsHandler
+// @Summary		Chain statistics
+// @Description	Returns the chain-wide counters in a single response: transactions
+// @Description	grouped by type, elections grouped by status, and the total number of
+// @Description	accounts, elections and votes. Buckets with a count of zero are omitted.
+// @Tags			Chain
+// @Accept			json
+// @Produce		json
+// @Success		200	{object}	ChainStats
+// @Router			/chain/stats [get]
 func (a *API) chainStatsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCountByType, err := a.indexer.CountTransactionsByType()
 	if err != nil {
@@ -929,61 +737,16 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainTxByHeightAndIndexHandler
-//
-//	@Summary		Transaction by block height and index
-//	@Description	Get transaction full information by block height and index. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/transactions/{hash})
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			height	path		int	true	"Block height"
-//	@Param			index	path		int	true	"Transaction index on block"
-//	@Success		200		{object}	GenericTransactionWithInfo
-//	@Success		204		"See [errors](vocdoni-api#errors) section"
-//	@Router			/chain/transactions/{height}/{index} [get]
-func (a *API) chainTxByHeightAndIndexHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	height, err := strconv.ParseInt(ctx.URLParam(ParamHeight), 10, 64)
-	if err != nil {
-		return err
-	}
-	index, err := strconv.ParseInt(ctx.URLParam("index"), 10, 64)
-	if err != nil {
-		return err
-	}
-	itx, err := a.indexer.GetTransactionByHeightAndIndex(height, index)
-	if err != nil {
-		if errors.Is(err, indexer.ErrTransactionNotFound) {
-			return ErrTransactionNotFound
-		}
-		return ErrVochainGetTxFailed.WithErr(err)
-	}
-	tx := &GenericTransactionWithInfo{
-		TxContent: protoTxAsJSON(itx.RawTx),
-		Signature: itx.Signature,
-		TxInfo:    itx,
-	}
-	data, err := json.Marshal(tx)
-	if err != nil {
-		return err
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// chainTxByHashHandler
-//
-//	@Summary		Transaction by hash
-//	@Description	Get transaction full information by hash. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			hash	path		string	true	"Transaction hash"
-//	@Success		200		{object}	GenericTransactionWithInfo
-//	@Success		204		"See [errors](vocdoni-api#errors) section"
-//	@Router			/chain/transactions/{hash} [get]
+} // chainTxByHashHandler
+// @Summary		Transaction by hash
+// @Description	Get transaction full information by hash. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
+// @Tags			Chain
+// @Accept			json
+// @Produce		json
+// @Param			hash	path		string	true	"Transaction hash"
+// @Success		200		{object}	GenericTransactionWithInfo
+// @Success		204		"See [errors](vocdoni-api#errors) section"
+// @Router			/chain/transactions/{hash} [get]
 func (a *API) chainTxByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamHash)))
 	if err != nil {
@@ -1040,88 +803,6 @@ func (a *API) chainTxListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 
 	list, err := a.transactionList(params)
 	if err != nil {
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// chainTxListByPageHandler
-//
-//	@Summary		List transactions (legacy)
-//	@Description	To get full transaction information use  [/chain/transaction/{blockHeight}/{txIndex}](transaction-by-block-index).\nWhere transactionIndex is the index of the transaction on the containing block.
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/transactions?page=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		number				true	"Page"
-//	@Success		200		{object}	TransactionsList	"List of transactions (metadata only)"
-//	@Router			/chain/transactions/page/{page} [get]
-func (a *API) chainTxListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseTransactionParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		"",
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.transactionList(params)
-	if err != nil {
-		// keep the odd legacy behaviour of sending a 204 rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return ErrTransactionNotFound
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// chainTxListByHeightAndPageHandler
-//
-//	@Summary		Transactions in a block
-//	@Description	Given a block returns the list of transactions for that block
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/transactions?page=xxx&height=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			height	path		number	true	"Block height"
-//	@Param			page	path		number	true	"Page"
-//	@Success		200		{object}	TransactionsList
-//	@Router			/chain/blocks/{height}/transactions/page/{page} [get]
-func (a *API) chainTxListByHeightAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseTransactionParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		// parseTransactionParams takes hash before height; the height used to be
-		// passed in the hash slot, which filtered by a hash substring instead and
-		// left the height filter unset. The result was not an empty list but a
-		// wrong one: every transaction whose hex hash happened to contain the
-		// height as a substring, from any block.
-		ctx.URLParam(ParamHeight),
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.transactionList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyTransactionsList())
-		}
 		return err
 	}
 
@@ -1346,25 +1027,6 @@ func (a *API) sendBlockList(ctx *httprouter.HTTPContext, params *BlockParams) er
 	return marshalAndSend(ctx, list)
 }
 
-// chainTransactionCountHandler
-//
-//	@Summary		Transactions count
-//	@Description	Returns the number of transactions
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/transactions which reports totalItems)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Success		200	{object}	CountResult
-//	@Router			/chain/transactions/count [get]
-func (a *API) chainTxCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	count, err := a.indexer.CountTotalTransactions()
-	if err != nil {
-		return err
-	}
-	return marshalAndSend(ctx, &CountResult{Count: count})
-}
-
 // chainFeesListHandler
 //
 //	@Summary		List all token fees
@@ -1393,124 +1055,6 @@ func (a *API) chainFeesListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPConte
 
 	list, err := a.feesList(params)
 	if err != nil {
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// chainFeesListByPageHandler
-//
-//	@Summary		List all token fees
-//	@Description	Returns the token fees list ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		number	true	"Page"
-//	@Success		200		{object}	FeesList
-//	@Router			/chain/fees/page/{page} [get]
-func (a *API) chainFeesListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseFeesParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		"",
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.feesList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyFeesList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// chainFeesListByReferenceAndPageHandler
-//
-//	@Summary		List all token fees by reference
-//	@Description	Returns the token fees list filtered by reference and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			reference	path		string	true	"Reference filter"
-//	@Param			page		path		number	true	"Page"
-//	@Success		200			{object}	FeesList
-//	@Router			/chain/fees/reference/{reference}/page/{page} [get]
-func (a *API) chainFeesListByReferenceAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseFeesParams(
-		ctx.URLParam(ParamPage),
-		"",
-		ctx.URLParam(ParamReference),
-		"",
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	if params.Reference == "" {
-		return ErrMissingParameter
-	}
-
-	list, err := a.feesList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyFeesList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// chainFeesListByTypeAndPageHandler
-//
-//	@Summary		List all token fees by type
-//	@Description	Returns the token fees list filtered by type and ordered by date. A spending is an amount of tokens burnt from one account for executing transactions.
-//	@Deprecated
-//	@Description	(deprecated, in favor of /chain/fees?page=xxx)
-//	@Tags			Chain
-//	@Accept			json
-//	@Produce		json
-//	@Param			type	path		string	true	"Type filter"
-//	@Param			page	path		number	true	"Page"
-//	@Success		200		{object}	FeesList
-//	@Router			/chain/fees/type/{type}/page/{page} [get]
-func (a *API) chainFeesListByTypeAndPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseFeesParams(
-		ctx.URLParam(ParamPage),
-		"",
-		"",
-		ctx.URLParam(ParamType),
-		"",
-	)
-	if err != nil {
-		return err
-	}
-
-	if params.Type == "" {
-		return ErrMissingParameter
-	}
-
-	list, err := a.feesList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyFeesList())
-		}
 		return err
 	}
 
@@ -1613,29 +1157,7 @@ func (a *API) transfersList(params *TransfersParams) (*TransfersList, error) {
 		Pagination: pagination,
 	}
 	return list, nil
-}
-
-// chainIndexerExportHandler
-//
-//	@Summary		Exports the indexer database
-//	@Description	Exports the indexer SQL database in raw format. Requires Admin Bearer token.
-//	@Tags			Indexer
-//	@Produce		json
-//	@Security		ApiKeyAuth
-//	@Success		200	{string}	raw-data
-//	@Router			/chain/export/indexer [get]
-func (a *API) chainIndexerExportHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	exportCtx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	data, err := a.indexer.ExportBackupAsBytes(exportCtx)
-	if err != nil {
-		return fmt.Errorf("error reading indexer backup: %w", err)
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// parseOrganizationParams returns an OrganizationParams filled with the passed params.
-//
+} // parseOrganizationParams returns an OrganizationParams filled with the passed params.
 // paramSortBy and paramOrder are carried through as given; organizationList
 // validates and defaults them, so that the endpoints taking an OrganizationParams
 // from a JSON body are covered by the same check.

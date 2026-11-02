@@ -38,8 +38,7 @@ const (
 
 	MaxCensusAddBatchSize = 8192
 
-	censusIDsize          = 32
-	censusRetrieveTimeout = 10 * time.Minute
+	censusIDsize = 32
 )
 
 func (a *API) enableCensusHandlers() error {
@@ -166,34 +165,10 @@ func (a *API) enableCensusHandlers() error {
 
 	// Admin-only endpoints
 	if err := a.Endpoint.RegisterMethod(
-		"/censuses/export/ipfs",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusExportDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/censuses/export/ipfs/list",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusExportIPFSListDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/censuses/export",
 		"GET",
 		apirest.MethodAccessTypeAdmin,
 		a.censusExportDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/censuses/import/{ipfscid}",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusImportDBHandler,
 	); err != nil {
 		return err
 	}
@@ -213,9 +188,6 @@ func (a *API) enableCensusHandlers() error {
 	); err != nil {
 		return err
 	}
-
-	// Initialize the map to store the status of the async export to ipfs
-	censusIPFSExports = make(map[string]time.Time)
 
 	return nil
 }
@@ -974,116 +946,37 @@ func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// censusIPFSExports is a map of ipfs uri to the time when the export was requested
-var censusIPFSExports = map[string]time.Time{}
-
 // censusExportDBHandler
 //
 //	@Summary		Export census database
 //	@Description	Export the whole census database to a JSON file. Requires Admin Bearer token.
-//	@Description	- `/censuses/export` returns the census database dump.
-//	@Description	- `/censuses/export/ipfs` schedules an async export to IPFS; check `/censuses/export/ipfs/list` for the resulting URI.
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Success		200	{array}	censusdb.CensusDump	"census database dump (`/censuses/export`), or object{message=string} (`/censuses/export/ipfs`)"
-//	@Router			/censuses/export/ipfs [get]
+//	@Success		200	{array}	censusdb.CensusDump	"census database dump"
 //	@Router			/censuses/export [get]
 func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	isIPFSExport := strings.HasSuffix(ctx.Request.URL.Path, "ipfs")
 	buf := bytes.Buffer{}
-	var data []byte
-	if isIPFSExport {
-		go func() {
-			log.Infow("exporting census database to ipfs async")
-			startTime := time.Now()
-			if err := a.censusdb.ExportCensusDB(&buf); err != nil {
-				log.Errorw(err, "could not export census database")
-				return
-			}
-			log.Infow("census database exported", "duration (s)", time.Since(startTime).Seconds())
-			startTime = time.Now()
-			uri, err := a.storage.PublishReader(context.Background(), &buf)
-			if err != nil {
-				log.Errorw(err, "could not publish census database to ipfs")
-				return
-			}
-			log.Infow("census database published to ipfs", "uri", uri, "duration (s)", time.Since(startTime).Seconds())
-			censusIPFSExports[uri] = time.Now()
-		}()
-		var err error
-		data, err = json.Marshal(map[string]string{
-			"message": "scheduled, check /censuses/export/ipfs/list",
-		})
-		if err != nil {
-			log.Errorw(err, "could not marshal response")
-		}
-	} else {
-		if err := a.censusdb.ExportCensusDB(&buf); err != nil {
-			return err
-		}
-		data = buf.Bytes()
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// censusExportIPFSListDBHandler
-//
-//	@Summary		List export census database to IPFS
-//	@Description	List the IPFS URIs of the census database exports. Requires Admin Bearer token.
-//	@Tags			Censuses
-//	@Accept			json
-//	@Produce		json
-//	@Security		ApiKeyAuth
-//	@Success		200	{object}	map[string]string	"map of IPFS CID (usable with /censuses/import/{ipfscid}) to export completion time (RFC3339)"
-//	@Router			/censuses/export/ipfs/list [get]
-func (a *API) censusExportIPFSListDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	data, err := json.Marshal(censusIPFSExports)
-	if err != nil {
+	if err := a.censusdb.ExportCensusDB(&buf); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return ctx.Send(buf.Bytes(), apirest.HTTPstatusOK)
 }
 
-// censusImportHandler
+// censusImportDBHandler
 //
 //	@Summary		Import census database
-//	@Description	Import the whole census database from a JSON file. Requires Admin Bearer token.
-//	@Description	- `GET /censuses/import/{ipfscid}` imports asynchronously from IPFS.
-//	@Description	- `POST /censuses/import` imports synchronously from the request body (the JSON returned by `/censuses/export`).
+//	@Description	Import the whole census database from a JSON file (the JSON returned by `/censuses/export`). Requires Admin Bearer token.
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Param			ipfscid	path	string	true	"IPFS CID of a database export (see /censuses/export/ipfs/list)"
-//	@Success		200		"(empty body)"
-//	@Router			/censuses/import/{ipfscid} [get]
+//	@Success		200	"(empty body)"
 //	@Router			/censuses/import [post]
 func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	ipfscid := ctx.URLParam("ipfscid")
-	if ipfscid == "" {
-		// if no ipfs cid, import from the request body
-		if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
-			return err
-		}
-		return ctx.Send(nil, apirest.HTTPstatusOK)
+	if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
+		return err
 	}
-	log.Infow("importing census database from ipfs async", "ipfscid", ipfscid)
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), censusRetrieveTimeout)
-		defer cancel()
-		// TODO: Retrieve should return a reader
-		startTime := time.Now()
-		data, err := a.storage.Retrieve(ctx, "/ipfs/"+ipfscid, 0)
-		if err != nil {
-			log.Errorw(err, "could not retrieve census database from ipfs")
-			return
-		}
-		log.Infow("census database retrieved from ipfs", "ipfscid", ipfscid, "duration", time.Since(startTime))
-		if err := a.censusdb.ImportCensusDB(bytes.NewReader(data)); err != nil {
-			log.Errorw(err, "could not import census database from ipfs")
-		}
-	}()
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }

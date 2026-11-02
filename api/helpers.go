@@ -24,7 +24,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/types"
-	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/proto/build/go/models"
@@ -349,18 +348,6 @@ func bucketDuration(bucket string) time.Duration {
 		return 24 * time.Hour
 	}
 	return time.Hour
-}
-
-// parseHexString converts a string like 0x1234cafe (or 1234cafe)
-// to a types.HexBytes.
-//
-// If the string can't be parsed, returns an APIerror.
-func parseHexString(s string) (types.HexBytes, error) {
-	orgID, err := hex.DecodeString(util.TrimHex(s))
-	if err != nil {
-		return nil, ErrCantParseHexString.Withf("%q", s)
-	}
-	return orgID, nil
 }
 
 // parseBool parses a string into a boolean value.
