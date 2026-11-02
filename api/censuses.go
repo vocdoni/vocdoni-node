@@ -809,8 +809,8 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Param					censusId	path		string																										true	"Census id"
-//	@Param					key			path		string																										true	"Key to proof"
+//	@Param					censusId	path		string																				true	"Census id"
+//	@Param					key			path		string																				true	"Key to proof"
 //	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string}	"censusProof is the Merkle proof and value is the Merkle tree leaf value"
 //	@Router					/censuses/{censusId}/proof/{key} [get]
 func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {

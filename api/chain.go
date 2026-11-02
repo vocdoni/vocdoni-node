@@ -256,16 +256,19 @@ func (a *API) organizationList(params *OrganizationParams) (*OrganizationsList, 
 		})
 	}
 	return list, nil
-} // chainStatsHandler
-// @Summary		Chain statistics
-// @Description	Returns the chain-wide counters in a single response: transactions
-// @Description	grouped by type, elections grouped by status, and the total number of
-// @Description	accounts, elections and votes. Buckets with a count of zero are omitted.
-// @Tags			Chain
-// @Accept			json
-// @Produce		json
-// @Success		200	{object}	ChainStats
-// @Router			/chain/stats [get]
+}
+
+// chainStatsHandler
+//
+//	@Summary		Chain statistics
+//	@Description	Returns the chain-wide counters in a single response: transactions
+//	@Description	grouped by type, elections grouped by status, and the total number of
+//	@Description	accounts, elections and votes. Buckets with a count of zero are omitted.
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	ChainStats
+//	@Router			/chain/stats [get]
 func (a *API) chainStatsHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	txCountByType, err := a.indexer.CountTransactionsByType()
 	if err != nil {
@@ -737,16 +740,19 @@ func (a *API) chainTxRefByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPCo
 	}
 
 	return ctx.Send(data, apirest.HTTPstatusOK)
-} // chainTxByHashHandler
-// @Summary		Transaction by hash
-// @Description	Get transaction full information by hash. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
-// @Tags			Chain
-// @Accept			json
-// @Produce		json
-// @Param			hash	path		string	true	"Transaction hash"
-// @Success		200		{object}	GenericTransactionWithInfo
-// @Success		204		"See [errors](vocdoni-api#errors) section"
-// @Router			/chain/transactions/{hash} [get]
+}
+
+// chainTxByHashHandler
+//
+//	@Summary		Transaction by hash
+//	@Description	Get transaction full information by hash. It returns JSON transaction protobuf encoded. Depending of transaction type will return different types of objects. Current transaction types can be found calling `/chain/transactions/cost`
+//	@Tags			Chain
+//	@Accept			json
+//	@Produce		json
+//	@Param			hash	path		string	true	"Transaction hash"
+//	@Success		200		{object}	GenericTransactionWithInfo
+//	@Success		204		"See [errors](vocdoni-api#errors) section"
+//	@Router			/chain/transactions/{hash} [get]
 func (a *API) chainTxByHashHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	hash, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamHash)))
 	if err != nil {
@@ -1157,7 +1163,10 @@ func (a *API) transfersList(params *TransfersParams) (*TransfersList, error) {
 		Pagination: pagination,
 	}
 	return list, nil
-} // parseOrganizationParams returns an OrganizationParams filled with the passed params.
+}
+
+// parseOrganizationParams returns an OrganizationParams filled with the passed params.
+//
 // paramSortBy and paramOrder are carried through as given; organizationList
 // validates and defaults them, so that the endpoints taking an OrganizationParams
 // from a JSON body are covered by the same check.
