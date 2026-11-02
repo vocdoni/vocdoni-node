@@ -83,6 +83,9 @@ func (r *HTTProuter) Init(host string, port int) error {
 	}
 
 	r.Mux = chi.NewRouter()
+	// RealIP only feeds the request log; no access control or rate limit reads
+	// the client IP, so its X-Forwarded-For spoofing does not matter here.
+	//lint:ignore SA1019 the client IP is informational
 	r.Mux.Use(middleware.RealIP)
 
 	// If we want rich logging (e.g. with fields), we could implement our
