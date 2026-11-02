@@ -102,3 +102,45 @@ func doRequest(t *testing.T, url, authToken, method string, body []byte) []byte 
 	qt.Check(t, err, qt.IsNil)
 	return respBody
 }
+
+// TestHandlerPanic checks that a panicking handler gets a 500 reply instead of
+// taking the process down, and that a response already sent before the panic
+// is kept.
+func TestHandlerPanic(t *testing.T) {
+	r := httprouter.HTTProuter{}
+	qt.Assert(t, r.Init("127.0.0.1", 0), qt.IsNil)
+	url := fmt.Sprintf("http://%s/api", r.Address())
+
+	stdAPI, err := NewAPI(&r, "/api")
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, stdAPI.RegisterMethod("/panic", "GET", MethodAccessTypePublic,
+		func(*APIdata, *httprouter.HTTPContext) error {
+			panic("handler bug")
+		}), qt.IsNil)
+	qt.Assert(t, stdAPI.RegisterMethod("/sent-then-panic", "GET", MethodAccessTypePublic,
+		func(_ *APIdata, ctx *httprouter.HTTPContext) error {
+			if err := ctx.Send([]byte("sent"), HTTPstatusOK); err != nil {
+				return err
+			}
+			panic("handler bug after send")
+		}), qt.IsNil)
+
+	for _, tc := range []struct {
+		path     string
+		wantCode int
+		wantBody string
+	}{
+		{"/panic", HTTPstatusInternalErr, "internal server error\n"},
+		{"/sent-then-panic", HTTPstatusOK, "sent\n"},
+		// the server is still up after both panics
+		{"/panic", HTTPstatusInternalErr, "internal server error\n"},
+	} {
+		resp, err := http.Get(url + tc.path)
+		qt.Assert(t, err, qt.IsNil)
+		body, err := io.ReadAll(resp.Body)
+		qt.Assert(t, err, qt.IsNil)
+		qt.Assert(t, resp.Body.Close(), qt.IsNil)
+		qt.Check(t, resp.StatusCode, qt.Equals, tc.wantCode, qt.Commentf("%s: %s", tc.path, body))
+		qt.Check(t, string(body), qt.Equals, tc.wantBody, qt.Commentf("%s", tc.path))
+	}
+}
