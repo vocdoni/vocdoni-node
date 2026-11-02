@@ -87,10 +87,10 @@ func (r *HTTProuter) Init(host string, port int) error {
 
 	// If we want rich logging (e.g. with fields), we could implement our
 	// own version of DefaultLogFormatter.
-	r.Mux.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
+	r.Mux.Use(middleware.RequestLogger(redactingLogFormatter{&middleware.DefaultLogFormatter{
 		Logger:  stdLogger{log.Logger()},
 		NoColor: true,
-	}))
+	}}))
 	r.Mux.Use(middleware.Recoverer)
 	r.Mux.Use(middleware.Heartbeat("/ping"))
 	r.Mux.Use(middleware.ThrottleBacklog(5000, 40000, 30*time.Second))
@@ -307,7 +307,7 @@ func runHandler(handlerFunc RouterHandlerFn, msg Message, hc *HTTPContext) {
 			return
 		}
 		log.Errorw(fmt.Errorf("%v", r), fmt.Sprintf("panic serving %s %s\n%s",
-			hc.Request.Method, hc.Request.URL.Path, debug.Stack()))
+			hc.Request.Method, RedactRequestURI(hc.Request.URL.Path), debug.Stack()))
 		select {
 		case <-hc.sent:
 		default:
@@ -376,3 +376,44 @@ type stdLogger struct {
 }
 
 func (l stdLogger) Print(v ...any) { l.log.Debug().Msg(fmt.Sprint(v...)) }
+
+// secretPathPrefixes are the path prefixes whose next segment is a secret:
+// POST /wallet/add/{privateKey} carries a private key in the URL.
+var secretPathPrefixes = []string{"/wallet/add/"}
+
+// RedactRequestURI returns uri with the path segment that follows any of
+// secretPathPrefixes replaced by "<redacted>", so request logs never record it.
+func RedactRequestURI(uri string) string {
+	for _, prefix := range secretPathPrefixes {
+		i := strings.Index(uri, prefix)
+		if i < 0 {
+			continue
+		}
+		start := i + len(prefix)
+		end := strings.IndexAny(uri[start:], "/?#")
+		if end < 0 {
+			end = len(uri) - start
+		}
+		uri = uri[:start] + "<redacted>" + uri[start+end:]
+	}
+	return uri
+}
+
+// redactingLogFormatter hands the request log formatter a copy of the request
+// whose URI went through RedactRequestURI.
+type redactingLogFormatter struct {
+	middleware.LogFormatter
+}
+
+func (f redactingLogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {
+	redacted := RedactRequestURI(r.RequestURI)
+	if redacted == r.RequestURI {
+		return f.LogFormatter.NewLogEntry(r)
+	}
+	rc := *r
+	rc.RequestURI = redacted
+	u := *r.URL
+	u.Path, u.RawPath = RedactRequestURI(r.URL.Path), ""
+	rc.URL = &u
+	return f.LogFormatter.NewLogEntry(&rc)
+}

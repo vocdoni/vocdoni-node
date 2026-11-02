@@ -38,6 +38,7 @@ const (
 	HTTPstatusBadRequest         = http.StatusBadRequest
 	HTTPstatusInternalErr        = http.StatusInternalServerError
 	HTTPstatusNotFound           = http.StatusNotFound
+	HTTPstatusGone               = http.StatusGone
 	HTTPstatusServiceUnavailable = http.StatusServiceUnavailable
 )
 
@@ -213,7 +214,8 @@ func (a *API) ProcessData(req *http.Request) (any, error) {
 	}
 	// If verbose logging is enabled, log the verbose authentication information
 	if a.verboseAuthLog && msg.AuthToken != "" {
-		fmt.Printf("[BearerAPI/%d/%s] %s {%s}\n", time.Now().Unix(), msg.AuthToken, req.URL.RequestURI(), reqBody)
+		fmt.Printf("[BearerAPI/%d/%s] %s {%s}\n", time.Now().Unix(), msg.AuthToken,
+			httprouter.RedactRequestURI(req.URL.RequestURI()), reqBody)
 	}
 	return msg, nil
 }
