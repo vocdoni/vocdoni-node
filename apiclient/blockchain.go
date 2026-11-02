@@ -3,6 +3,8 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"strconv"
 
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/httprouter/apirest"
@@ -97,24 +99,27 @@ func (c *HTTPclient) TransactionReference(txHash types.HexBytes) (*api.Transacti
 	return txRef, nil
 }
 
-// TransactionByHash returns the full transaction given its hash.
-// For querying if a transaction is included in a block, it is recommended to
-// use TransactionReference which is much faster.
+// TransactionByHash returns the transaction given its hash, decoded from the
+// tx field of GET /chain/transactions/{hash}.
+//
+// Known limitation, shared with vochain-sequencer: the API encodes the bytes
+// fields of that tx as hex while protojson decodes them as base64, so bytes
+// fields (hashes, signatures, payloads) do not round-trip; scalar fields are
+// correct.
 func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error) {
-	ref, err := c.TransactionReference(txHash)
-	if err != nil {
-		return nil, err
-	}
-	resp, code, err := c.Request(HTTPGET, nil,
-		"chain", "transactions", fmt.Sprintf("%d", ref.Height), fmt.Sprintf("%d", ref.Index))
+	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", txHash.String())
 	if err != nil {
 		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, ErrTransactionDoesNotExist
 	}
+	txInfo := &api.GenericTransactionWithInfo{}
+	if err := json.Unmarshal(resp, txInfo); err != nil {
+		return nil, err
+	}
 	tx := &models.Tx{}
-	return tx, protojson.Unmarshal(resp, tx)
+	return tx, protojson.Unmarshal(txInfo.TxContent, tx)
 }
 
 // OrganizationsBySearchTermPaginated returns a paginated list of organizations
@@ -122,42 +127,34 @@ func (c *HTTPclient) TransactionByHash(txHash types.HexBytes) (*models.Tx, error
 func (c *HTTPclient) OrganizationsBySearchTermPaginated(
 	organizationID types.HexBytes, page int,
 ) ([]types.HexBytes, error) {
-	// make a post request to /chain/organizations/filter/page/<page> with the organizationID
-	// as the body and page as the url parameter
-	resp, code, err := c.Request(HTTPPOST,
-		organizationID,
-		"chain",
-		"organizations",
-		"filter",
-		"page",
-		fmt.Sprintf("%d", page))
+	query := url.Values{
+		api.ParamOrganizationId: {organizationID.String()},
+		api.ParamPage:           {strconv.Itoa(page)},
+	}
+	resp, code, err := c.RequestWithQuery(HTTPGET, nil, query, "chain", "organizations")
 	if err != nil {
 		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	orgs := new(struct {
-		Organizations []types.HexBytes `json:"organizations"`
-	})
+	orgs := &api.OrganizationsList{}
 	if err := json.Unmarshal(resp, orgs); err != nil {
 		return nil, err
 	}
-	return orgs.Organizations, nil
+	ids := make([]types.HexBytes, 0, len(orgs.Organizations))
+	for _, org := range orgs.Organizations {
+		ids = append(ids, org.OrganizationID)
+	}
+	return ids, nil
 }
 
-// TransactionCount returns the count of transactions
+// TransactionCount returns the count of transactions, read from
+// transactionCount of GET /chain/info.
 func (c *HTTPclient) TransactionCount() (uint64, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "chain", "transactions", "count")
+	info, err := c.ChainInfo()
 	if err != nil {
 		return 0, err
 	}
-	if code != apirest.HTTPstatusOK {
-		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	txsCount := new(struct {
-		Count uint64 `json:"count"`
-	})
-
-	return txsCount.Count, json.Unmarshal(resp, txsCount)
+	return info.TransactionCount, nil
 }

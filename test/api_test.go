@@ -259,31 +259,17 @@ func TestAPIaccount(t *testing.T) {
 	resp, code := c.Request("GET", nil, "accounts", signer.Address().String())
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	// get accounts count
-	resp, code = c.Request("GET", nil, "accounts", "count")
+	// get the accounts info
+	resp, code = c.RequestWithQuery("GET", nil, "page=0", "accounts")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	countAccts := struct {
-		Count uint64 `json:"count"`
-	}{}
-
-	err := json.Unmarshal(resp, &countAccts)
+	accts := api.AccountsList{}
+	err := json.Unmarshal(resp, &accts)
 	qt.Assert(t, err, qt.IsNil)
 
 	// 3 accounts must exist: the previously new created account plus burn + faucet
 	// account used to transfer to the new account
-	qt.Assert(t, countAccts.Count, qt.Equals, uint64(3))
-
-	// get the accounts info
-	resp, code = c.Request("GET", nil, "accounts", "page", "0")
-	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
-
-	accts := struct {
-		Accounts []indexertypes.Account `json:"accounts"`
-	}{}
-
-	err = json.Unmarshal(resp, &accts)
-	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, accts.Pagination.TotalItems, qt.Equals, uint64(3))
 
 	// the second account must be the account created in the test
 	// due 'ORDER BY balance DESC' in the sql query
@@ -335,18 +321,12 @@ func TestAPIAccountsList(t *testing.T) {
 	el := make(map[string]api.AccountsList)
 	el["0"] = fetchAL("GET", nil, "", "accounts")
 	el["1"] = fetchAL("GET", nil, "page=1", "accounts")
-	el["p0"] = fetchAL("GET", nil, "", "accounts", "page", "0")
-	el["p1"] = fetchAL("GET", nil, "", "accounts", "page", "1")
 
 	qt.Assert(t, el["0"], qt.Not(qt.DeepEquals), el["1"])
-	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
-	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
 
 	// 2 accounts pre-exist: the faucet account, and the burn address
 	qt.Assert(t, el["0"].Pagination.TotalItems, qt.Equals, uint64(2+20))
 	qt.Assert(t, el["1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
-	qt.Assert(t, el["p0"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
-	qt.Assert(t, el["p1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
 
 	for _, item := range el {
 		qt.Assert(t, len(item.Accounts), qt.Equals, api.DefaultItemsPerPage)
@@ -468,7 +448,7 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	waitUntilHeight(t, c, 5)
 
 	// get the token transfers received and sent for account 1
-	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "page", "0")
+	resp, code = c.RequestWithQuery("GET", nil, "accountId="+signer.Address().Hex()+"&page=0", "chain", "transfers")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	tokenTxs := &api.TransfersList{}
@@ -476,20 +456,18 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// get the total token transfers count for account 1
-	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex(), "transfers", "count")
+	resp, code = c.Request("GET", nil, "accounts", signer.Address().Hex())
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	countTnsAcc := struct {
-		Count uint64 `json:"count"`
-	}{}
-	err = json.Unmarshal(resp, &countTnsAcc)
+	acct := &api.Account{}
+	err = json.Unmarshal(resp, acct)
 	qt.Assert(t, err, qt.IsNil)
 
 	// compare count of total token transfers for the account 1 using the two response
-	qt.Assert(t, tokenTxs.Pagination.TotalItems, qt.Equals, countTnsAcc.Count)
+	qt.Assert(t, tokenTxs.Pagination.TotalItems, qt.Equals, acct.TransfersCount)
 
 	// get the token transfers received and sent for account 2
-	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "page", "0")
+	resp, code = c.RequestWithQuery("GET", nil, "accountId="+signer2.Address().Hex()+"&page=0", "chain", "transfers")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
 	tokenTxs2 := &api.TransfersList{}
@@ -497,24 +475,20 @@ func TestAPIAccountTokentxs(t *testing.T) {
 	qt.Assert(t, err, qt.IsNil)
 
 	// get the total token transfers count for account 2
-	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex(), "transfers", "count")
+	resp, code = c.Request("GET", nil, "accounts", signer2.Address().Hex())
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	countTnsAcc2 := struct {
-		Count uint64 `json:"count"`
-	}{}
-	err = json.Unmarshal(resp, &countTnsAcc2)
+	acct2 := &api.Account{}
+	err = json.Unmarshal(resp, acct2)
 	qt.Assert(t, err, qt.IsNil)
 
 	// compare count of total token transfers for the account 2 using the two response
-	qt.Assert(t, tokenTxs2.Pagination.TotalItems, qt.Equals, countTnsAcc2.Count)
+	qt.Assert(t, tokenTxs2.Pagination.TotalItems, qt.Equals, acct2.TransfersCount)
 
-	resp, code = c.Request("GET", nil, "accounts", "page", "0")
+	resp, code = c.RequestWithQuery("GET", nil, "page=0", "accounts")
 	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-	accts := struct {
-		Accounts []indexertypes.Account `json:"accounts"`
-	}{}
+	accts := api.AccountsList{}
 
 	err = json.Unmarshal(resp, &accts)
 	qt.Assert(t, err, qt.IsNil)
@@ -582,12 +556,9 @@ func TestAPIBlocks(t *testing.T) {
 	server.VochainAPP.AdvanceTestBlock()
 	waitUntilHeight(t, c, 3)
 
-	// each block must be listed with its own transactions by the per-block endpoint
-	// (regression: the height was passed into the hash filter slot, so the endpoint
-	// filtered by a hash substring with no height filter at all, listing every
-	// transaction whose hex hash contained the height as a substring)
+	// filtering by height must list only the transactions of that block
 	blockTxs := func(height uint32) []*indexertypes.TransactionMetadata {
-		resp, code := c.Request("GET", nil, "chain", "blocks", fmt.Sprint(height), "transactions", "page", "0")
+		resp, code := c.RequestWithQuery("GET", nil, fmt.Sprintf("height=%d&page=0", height), "chain", "transactions")
 		qt.Assert(t, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 		txList := api.TransactionsList{}
 		qt.Assert(t, json.Unmarshal(resp, &txList), qt.IsNil)
@@ -672,15 +643,6 @@ func waitUntilHeight(t testing.TB, c *testutil.TestHTTPclient, h uint32) {
 		chainInfo := api.ChainInfo{}
 		err := json.Unmarshal(resp, &chainInfo)
 		qt.Assert(t, err, qt.IsNil)
-		// check transaction count
-		resp, code = c.Request("GET", nil, "chain", "transactions", "count")
-		qt.Assert(t, code, qt.Equals, 200)
-		txsCount := new(struct {
-			Count uint64 `json:"count"`
-		})
-		err = json.Unmarshal(resp, txsCount)
-		qt.Assert(t, err, qt.IsNil)
-		qt.Assert(t, txsCount.Count, qt.Equals, chainInfo.TransactionCount)
 		if chainInfo.Height >= h {
 			break
 		}
@@ -1105,32 +1067,19 @@ func TestAPIElectionsList(t *testing.T) {
 	el := make(map[string]api.ElectionsList)
 	el["0"] = fetchEL("GET", nil, "", "elections")
 	el["1"] = fetchEL("GET", nil, "page=1", "elections")
-	el["p0"] = fetchEL("GET", nil, "", "elections", "page", "0")
-	el["p1"] = fetchEL("GET", nil, "", "elections", "page", "1")
 
 	qt.Assert(t, el["0"], qt.Not(qt.DeepEquals), el["1"])
-	qt.Assert(t, el["0"], qt.DeepEquals, el["p0"])
-	qt.Assert(t, el["1"], qt.DeepEquals, el["p1"])
 
 	qt.Assert(t, el["0"].Pagination.TotalItems, qt.Equals, uint64(20+1))
 	qt.Assert(t, el["1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
-	qt.Assert(t, el["p0"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
-	qt.Assert(t, el["p1"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems)
 
 	for _, item := range el {
 		qt.Assert(t, len(item.Elections), qt.Equals, api.DefaultItemsPerPage)
 	}
 
-	boolPtr := func(b bool) *bool { return &b }
-
 	// this will exclude the 1 ongoing EncryptedVotes election
-	el["post_wr"] = fetchEL("POST", api.ElectionParams{
-		WithResults:      boolPtr(true),
-		PaginationParams: api.PaginationParams{Limit: 100},
-	}, "", "elections", "filter")
-	qt.Assert(t, el["post_wr"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems-1)
 	el["get_wr"] = fetchEL("GET", nil, "withResults=true&limit=100", "elections")
-	qt.Assert(t, el["post_wr"], qt.DeepEquals, el["get_wr"])
+	qt.Assert(t, el["get_wr"].Pagination.TotalItems, qt.Equals, el["0"].Pagination.TotalItems-1)
 
 	// this should return all elections, since no election has FinalResults or was ManuallyEnded
 	el["no_fr_me"] = fetchEL("GET", nil, "limit=100", "elections")

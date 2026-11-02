@@ -171,6 +171,11 @@ func (c *HTTPclient) SetTimeout(d time.Duration) {
 // Method is either GET or POST. If POST, a JSON struct should be attached.  Returns the response,
 // the status code and an error.
 func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]byte, int, error) {
+	return c.RequestWithQuery(method, jsonBody, nil, urlPath...)
+}
+
+// RequestWithQuery is Request with the query string built from query.
+func (c *HTTPclient) RequestWithQuery(method string, jsonBody any, query url.Values, urlPath ...string) ([]byte, int, error) {
 	body, err := json.Marshal(jsonBody)
 	if err != nil {
 		return nil, 0, err
@@ -180,6 +185,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		return nil, 0, err
 	}
 	u.Path = path.Join(u.Path, path.Join(urlPath...))
+	u.RawQuery = query.Encode()
 	headers := http.Header{}
 	if c.token != nil {
 		headers = http.Header{

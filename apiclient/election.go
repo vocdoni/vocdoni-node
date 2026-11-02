@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 	"time"
 
@@ -487,23 +488,14 @@ func (c *HTTPclient) SetElectionCensus(electionID types.HexBytes, census api.Ele
 	return hash, err
 }
 
-// ElectionVoteCount returns the number of registered votes for a given election.
+// ElectionVoteCount returns the number of registered votes for a given
+// election, read from voteCount of GET /elections/{electionId}.
 func (c *HTTPclient) ElectionVoteCount(electionID types.HexBytes) (uint32, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "elections", electionID.String(), "votes", "count")
+	election, err := c.Election(electionID)
 	if err != nil {
 		return 0, err
 	}
-	if code != apirest.HTTPstatusOK {
-		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	votes := new(struct {
-		Count uint32 `json:"count"`
-	})
-
-	if err := json.Unmarshal(resp, votes); err != nil {
-		return 0, err
-	}
-	return votes.Count, nil
+	return uint32(election.VoteCount), nil
 }
 
 // ElectionResults returns the election results given its ID.
@@ -522,33 +514,39 @@ func (c *HTTPclient) ElectionResults(electionID types.HexBytes) (*api.ElectionRe
 	return electionResults, nil
 }
 
-// ElectionFilterPaginated returns a list of elections filtered by the given parameters.
-// POST /elections/filter/page/<page>
-// Returns a list of elections filtered by the given parameters.
+// ElectionFilterPaginated returns a page of GET /elections filtered by the
+// given parameters. Empty IDs, status PROCESS_UNKNOWN and withResults false
+// leave that filter out.
 func (c *HTTPclient) ElectionFilterPaginated(organizationID types.HexBytes, electionID types.HexBytes,
 	status models.ProcessStatus, withResults bool, page int,
 ) (*[]api.ElectionSummary, error) {
-	body := struct {
-		OrganizationID types.HexBytes `json:"organizationId,omitempty"`
-		ElectionID     types.HexBytes `json:"electionId,omitempty"`
-		WithResults    bool           `json:"withResults,omitempty"`
-		Status         string         `json:"status,omitempty"`
-	}{
-		OrganizationID: organizationID,
-		ElectionID:     electionID,
-		WithResults:    withResults,
-		Status:         status.String(),
+	query := url.Values{api.ParamPage: {strconv.Itoa(page)}}
+	if len(organizationID) > 0 {
+		query.Set(api.ParamOrganizationId, organizationID.String())
 	}
-	resp, code, err := c.Request(HTTPPOST, body, "elections", "filter", "page", strconv.Itoa(page))
+	if len(electionID) > 0 {
+		query.Set(api.ParamElectionId, electionID.String())
+	}
+	if status != models.ProcessStatus_PROCESS_UNKNOWN {
+		query.Set(api.ParamStatus, status.String())
+	}
+	if withResults {
+		query.Set(api.ParamWithResults, "true")
+	}
+	resp, code, err := c.RequestWithQuery(HTTPGET, nil, query, "elections")
 	if err != nil {
 		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	var elections []api.ElectionSummary
-	if err := json.Unmarshal(resp, &elections); err != nil {
+	list := &api.ElectionsList{}
+	if err := json.Unmarshal(resp, list); err != nil {
 		return nil, err
+	}
+	elections := make([]api.ElectionSummary, 0, len(list.Elections))
+	for _, e := range list.Elections {
+		elections = append(elections, *e)
 	}
 	return &elections, nil
 }

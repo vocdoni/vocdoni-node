@@ -30,17 +30,14 @@ func BenchmarkAPICreateNAccounts(b *testing.B) {
 
 	countAccts := func() uint64 {
 		// get accounts count
-		resp, code := c.Request("GET", nil, "accounts", "count")
+		resp, code := c.Request("GET", nil, "accounts")
 		qt.Assert(b, code, qt.Equals, 200, qt.Commentf("response: %s", resp))
 
-		countAccts := struct {
-			Count uint64 `json:"count"`
-		}{}
-
-		err := json.Unmarshal(resp, &countAccts)
+		accts := api.AccountsList{}
+		err := json.Unmarshal(resp, &accts)
 		qt.Assert(b, err, qt.IsNil)
 
-		return countAccts.Count
+		return accts.Pagination.TotalItems
 	}
 
 	// create a new account

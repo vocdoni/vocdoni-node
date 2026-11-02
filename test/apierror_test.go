@@ -52,22 +52,6 @@ func TestAPIerror(t *testing.T) {
 			want: api.ErrAccountNotFound,
 		},
 		{
-			args: args{"GET", nil, []string{"accounts", "0123456789012345678901234567890123456789", "elections", "count"}},
-			want: api.ErrOrgNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"accounts", "0123456789012345678901234567890123456789", "elections", "page", "0"}},
-			want: api.ErrOrgNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"accounts", "0123456789012345678901234567890123456789", "transfers", "page", "0"}},
-			want: api.ErrAccountNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"accounts", "0123456789012345678901234567890123456789", "fees", "page", "0"}},
-			want: api.ErrAccountNotFound,
-		},
-		{
 			args: args{"GET", nil, []string{"chain", "blocks", "1234"}},
 			want: api.ErrBlockNotFound,
 		},
@@ -106,27 +90,6 @@ func TestAPIerror(t *testing.T) {
 				"0123456789012345678901234567890123456789012345678901234567890123",
 			}},
 			want: api.ErrCantParseElectionID,
-		},
-		{
-			args: args{"GET", nil, []string{
-				"accounts", "0123456789012345678901234567890123456789",
-				"elections",
-				"status", "ready",
-				"page", "-1",
-			}},
-			want: api.ErrPageNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"elections", "page", "thisIsTotallyNotAnInt"}},
-			want: api.ErrCantParseNumber,
-		},
-		{
-			args: args{"GET", nil, []string{"elections", "page", "-1"}},
-			want: api.ErrPageNotFound,
-		},
-		{
-			args: args{"GET", nil, []string{"elections", "0123456789012345678901234567890123456789", "votes", "page", "0"}},
-			want: api.ErrElectionNotFound,
 		},
 	}
 	for _, tt := range tests {

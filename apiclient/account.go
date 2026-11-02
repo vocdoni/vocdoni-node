@@ -3,6 +3,7 @@ package apiclient
 import (
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -276,7 +277,11 @@ func (c *HTTPclient) AccountSetMetadata(metadata *api.AccountMetadata) (types.He
 
 // ListTokenTransfers returns the list of sent and received token transfers associated with an account
 func (c *HTTPclient) ListTokenTransfers(account common.Address, page int) (*api.TransfersList, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", account.Hex(), "transfers", "page", strconv.Itoa(page))
+	query := url.Values{
+		api.ParamAccountId: {account.Hex()},
+		api.ParamPage:      {strconv.Itoa(page)},
+	}
+	resp, code, err := c.RequestWithQuery(HTTPGET, nil, query, "chain", "transfers")
 	if err != nil {
 		return nil, err
 	}
@@ -423,58 +428,53 @@ func (c *HTTPclient) RegisterSIKForVote(electionId types.HexBytes, proof *Census
 
 // ListAccounts return the account list information (address, balance and nonce)
 func (c *HTTPclient) ListAccounts(page int) ([]indexertypes.Account, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", "page", strconv.Itoa(page))
+	accts, err := c.accountsList(page)
+	if err != nil {
+		return nil, err
+	}
+	list := make([]indexertypes.Account, 0, len(accts.Accounts))
+	for _, acc := range accts.Accounts {
+		list = append(list, *acc)
+	}
+	return list, nil
+}
+
+// CountAccounts returns the total count of existing accounts, read from the
+// pagination of GET /accounts.
+func (c *HTTPclient) CountAccounts() (uint64, error) {
+	accts, err := c.accountsList(0)
+	if err != nil {
+		return 0, err
+	}
+	if accts.Pagination == nil {
+		return 0, fmt.Errorf("accounts list has no pagination")
+	}
+	return accts.Pagination.TotalItems, nil
+}
+
+// accountsList fetches a page of GET /accounts.
+func (c *HTTPclient) accountsList(page int) (*api.AccountsList, error) {
+	query := url.Values{api.ParamPage: {strconv.Itoa(page)}}
+	resp, code, err := c.RequestWithQuery(HTTPGET, nil, query, "accounts")
 	if err != nil {
 		return nil, err
 	}
 	if code != apirest.HTTPstatusOK {
 		return nil, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
 	}
-	accts := new(struct {
-		Accounts []indexertypes.Account `json:"accounts"`
-	})
-
-	if err := json.Unmarshal(resp, &accts); err != nil {
+	accts := &api.AccountsList{}
+	if err := json.Unmarshal(resp, accts); err != nil {
 		return nil, err
 	}
-
-	return accts.Accounts, nil
+	return accts, nil
 }
 
-// CountAccounts returns the total count of exiting accounts
-func (c *HTTPclient) CountAccounts() (uint64, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", "count")
-	if err != nil {
-		return 0, err
-	}
-	if code != apirest.HTTPstatusOK {
-		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	accts := new(struct {
-		Count uint64 `json:"count"`
-	})
-
-	if err := json.Unmarshal(resp, accts); err != nil {
-		return 0, err
-	}
-	return accts.Count, nil
-}
-
-// CountTokenTransfers returns the total count of transfers sent and received for an account
+// CountTokenTransfers returns the total count of transfers sent and received
+// for an account, read from transfersCount of GET /accounts/{address}.
 func (c *HTTPclient) CountTokenTransfers(accountID common.Address) (uint64, error) {
-	resp, code, err := c.Request(HTTPGET, nil, "accounts", accountID.Hex(), "transfers", "count")
+	acc, err := c.Account(accountID.Hex())
 	if err != nil {
 		return 0, err
 	}
-	if code != apirest.HTTPstatusOK {
-		return 0, fmt.Errorf("%s: %d (%s)", errCodeNot200, code, resp)
-	}
-	tokentxs := new(struct {
-		Count uint64 `json:"count"`
-	})
-
-	if err := json.Unmarshal(resp, tokentxs); err != nil {
-		return 0, err
-	}
-	return tokentxs.Count, nil
+	return acc.TransfersCount, nil
 }
