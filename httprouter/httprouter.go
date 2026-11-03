@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"strconv"
@@ -90,10 +91,10 @@ func (r *HTTProuter) Init(host string, port int) error {
 
 	// If we want rich logging (e.g. with fields), we could implement our
 	// own version of DefaultLogFormatter.
-	r.Mux.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
+	r.Mux.Use(middleware.RequestLogger(redactingLogFormatter{&middleware.DefaultLogFormatter{
 		Logger:  stdLogger{log.Logger()},
 		NoColor: true,
-	}))
+	}}))
 	r.Mux.Use(middleware.Recoverer)
 	r.Mux.Use(middleware.Heartbeat("/ping"))
 	r.Mux.Use(middleware.ThrottleBacklog(5000, 40000, 30*time.Second))
@@ -310,7 +311,7 @@ func runHandler(handlerFunc RouterHandlerFn, msg Message, hc *HTTPContext) {
 			return
 		}
 		log.Errorw(fmt.Errorf("%v", r), fmt.Sprintf("panic serving %s %s\n%s",
-			hc.Request.Method, hc.Request.URL.Path, debug.Stack()))
+			hc.Request.Method, RedactRequestURI(hc.Request.URL.Path), debug.Stack()))
 		select {
 		case <-hc.sent:
 		default:
@@ -379,3 +380,58 @@ type stdLogger struct {
 }
 
 func (l stdLogger) Print(v ...any) { l.log.Debug().Msg(fmt.Sprint(v...)) }
+
+// secretPathPrefixes are the path prefixes (lowercase) whose remainder is a secret:
+// POST /wallet/add/{privateKey} carries a private key in the URL.
+var secretPathPrefixes = []string{"/wallet/add/"}
+
+// RedactRequestURI returns uri with everything after any of
+// secretPathPrefixes, up to the query or fragment, replaced by "<redacted>",
+// so request logs never record it. The path is percent-decoded and matched
+// case-insensitively, so malformed variants of the route that the router does
+// not serve (an encoded slash, other letter case, an empty segment) cannot
+// carry the secret into the log either.
+func RedactRequestURI(uri string) string {
+	path, tail := uri, ""
+	if i := strings.IndexAny(uri, "?#"); i >= 0 {
+		path, tail = uri[:i], uri[i:]
+	}
+	if decoded, err := url.PathUnescape(path); err == nil {
+		path = decoded
+	}
+	lower := strings.ToLower(path)
+	for _, prefix := range secretPathPrefixes {
+		if len(lower) != len(path) {
+			// ToLower changed the byte length, so indexes into lower do not
+			// map back to path: redact the whole path rather than risk the key.
+			if strings.Contains(lower, prefix) {
+				return "<redacted>" + tail
+			}
+			continue
+		}
+		i := strings.Index(lower, prefix)
+		if i >= 0 {
+			return path[:i+len(prefix)] + "<redacted>" + tail
+		}
+	}
+	return uri
+}
+
+// redactingLogFormatter hands the request log formatter a copy of the request
+// whose URI went through RedactRequestURI.
+type redactingLogFormatter struct {
+	middleware.LogFormatter
+}
+
+func (f redactingLogFormatter) NewLogEntry(r *http.Request) middleware.LogEntry {
+	redacted := RedactRequestURI(r.RequestURI)
+	if redacted == r.RequestURI {
+		return f.LogFormatter.NewLogEntry(r)
+	}
+	rc := *r
+	rc.RequestURI = redacted
+	u := *r.URL
+	u.Path, u.RawPath = RedactRequestURI(r.URL.Path), ""
+	rc.URL = &u
+	return f.LogFormatter.NewLogEntry(&rc)
+}

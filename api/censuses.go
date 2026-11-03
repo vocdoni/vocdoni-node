@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api/censusdb"
 	"go.vocdoni.io/dvote/censustree"
-	"go.vocdoni.io/dvote/crypto/zk"
 	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/data/compressor"
 	"go.vocdoni.io/dvote/httprouter"
@@ -27,7 +26,9 @@ import (
 const (
 	CensusHandler = "censuses"
 
-	CensusTypeWeighted   = "weighted"
+	CensusTypeWeighted = "weighted"
+	// CensusTypeZKWeighted is the anonymous census type. Creating one answers
+	// ErrEndpointRemoved, and existing ones still report it as their type.
 	CensusTypeZKWeighted = "zkweighted"
 	CensusTypeCSP        = "csp"
 	// CensusTypeCSPv2 is CensusTypeCSP with the fixed salt derivation for the
@@ -37,8 +38,7 @@ const (
 
 	MaxCensusAddBatchSize = 8192
 
-	censusIDsize          = 32
-	censusRetrieveTimeout = 10 * time.Minute
+	censusIDsize = 32
 )
 
 func (a *API) enableCensusHandlers() error {
@@ -165,34 +165,10 @@ func (a *API) enableCensusHandlers() error {
 
 	// Admin-only endpoints
 	if err := a.Endpoint.RegisterMethod(
-		"/censuses/export/ipfs",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusExportDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/censuses/export/ipfs/list",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusExportIPFSListDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/censuses/export",
 		"GET",
 		apirest.MethodAccessTypeAdmin,
 		a.censusExportDBHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/censuses/import/{ipfscid}",
-		"GET",
-		apirest.MethodAccessTypeAdmin,
-		a.censusImportDBHandler,
 	); err != nil {
 		return err
 	}
@@ -213,9 +189,6 @@ func (a *API) enableCensusHandlers() error {
 		return err
 	}
 
-	// Initialize the map to store the status of the async export to ipfs
-	censusIPFSExports = make(map[string]time.Time)
-
 	return nil
 }
 
@@ -227,10 +200,13 @@ func (a *API) enableCensusHandlers() error {
 //	@Accept					json
 //	@Produce				json
 //	@Security				ApiKeyAuth
-//	@Param					type	path		string	true	"Census type"	Enums(weighted,zkweighted)
+//	@Param					type	path		string	true	"Census type"	Enums(weighted)
 //	@Success				200		{object}	object{censusID=string}
 //	@Router					/censuses/{type} [post]
 func (a *API) censusCreateHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	if ctx.URLParam(ParamType) == CensusTypeZKWeighted {
+		return ErrEndpointRemoved.Withf("POST /censuses/%s: %s", CensusTypeZKWeighted, reasonAnonymous)
+	}
 	token, err := uuid.Parse(msg.AuthToken)
 	if err != nil {
 		return err
@@ -833,9 +809,9 @@ func (a *API) censusPublishCheckHandler(_ *apirest.APIdata, ctx *httprouter.HTTP
 //	@Tags					Censuses
 //	@Accept					json
 //	@Produce				json
-//	@Param					censusId	path		string																										true	"Census id"
-//	@Param					key			path		string																										true	"Key to proof"
-//	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string,censusSiblings=[]string}	"censusProof is the Merkle proof, value is the Merkle tree leaf value and censusSiblings is only returned for zkweighted censuses"
+//	@Param					censusId	path		string																				true	"Census id"
+//	@Param					key			path		string																				true	"Key to proof"
+//	@Success				200			{object}	object{type=string,weight=string,value=string,censusProof=string,censusRoot=string}	"censusProof is the Merkle proof and value is the Merkle tree leaf value"
 //	@Router					/censuses/{censusId}/proof/{key} [get]
 func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
 	censusID, err := censusIDparse(ctx.URLParam(ParamCensusId))
@@ -857,18 +833,10 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	// Get the census type to return it into the response to prevent to perform
 	// two api calls.
 	censusType := encodeCensusType(models.Census_Type(ref.CensusType))
-	// If the census type is zkweighted (that means that it uses Poseidon hash
-	// with Arbo merkle tree), skip to perform a hash function over the census
-	// key. It is because the zk friendly key of any census leaf is the
-	// ZkAddress which follows a specific transformation process that must be
-	// implemented into the circom circuit also, and it is already hashed.
-	// Otherwhise, hash the key before get the proof.
-	leafKey := address
-	if ref.CensusType != int32(models.Census_ARBO_POSEIDON) {
-		leafKey, err = ref.Tree().Hash(address)
-		if err != nil {
-			return err
-		}
+	// hash the key before get the proof
+	leafKey, err := ref.Tree().Hash(address)
+	if err != nil {
+		return err
 	}
 	response := Census{Type: censusType}
 	response.Value, response.CensusProof, err = ref.Tree().GenProof(leafKey)
@@ -877,15 +845,6 @@ func (a *API) censusProofHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext
 	}
 	if response.CensusRoot, err = ref.Tree().Root(); err != nil {
 		return ErrCensusRootIsNil.WithErr(err)
-	}
-
-	// Get the leaf siblings from arbo based on the key received and include
-	// them into the response, only if it is zkweighted.
-	if ref.CensusType == int32(models.Census_ARBO_POSEIDON) {
-		response.CensusSiblings, err = zk.ProofToCircomSiblings(response.CensusProof)
-		if err != nil {
-			return ErrCantGetCircomSiblings.WithErr(err)
-		}
 	}
 	if len(response.Value) > 0 {
 		// return the string representation of the census value (weight)
@@ -987,116 +946,37 @@ func (a *API) censusListHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext)
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// censusIPFSExports is a map of ipfs uri to the time when the export was requested
-var censusIPFSExports = map[string]time.Time{}
-
 // censusExportDBHandler
 //
 //	@Summary		Export census database
 //	@Description	Export the whole census database to a JSON file. Requires Admin Bearer token.
-//	@Description	- `/censuses/export` returns the census database dump.
-//	@Description	- `/censuses/export/ipfs` schedules an async export to IPFS; check `/censuses/export/ipfs/list` for the resulting URI.
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Success		200	{array}	censusdb.CensusDump	"census database dump (`/censuses/export`), or object{message=string} (`/censuses/export/ipfs`)"
-//	@Router			/censuses/export/ipfs [get]
+//	@Success		200	{array}	censusdb.CensusDump	"census database dump"
 //	@Router			/censuses/export [get]
 func (a *API) censusExportDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	isIPFSExport := strings.HasSuffix(ctx.Request.URL.Path, "ipfs")
 	buf := bytes.Buffer{}
-	var data []byte
-	if isIPFSExport {
-		go func() {
-			log.Infow("exporting census database to ipfs async")
-			startTime := time.Now()
-			if err := a.censusdb.ExportCensusDB(&buf); err != nil {
-				log.Errorw(err, "could not export census database")
-				return
-			}
-			log.Infow("census database exported", "duration (s)", time.Since(startTime).Seconds())
-			startTime = time.Now()
-			uri, err := a.storage.PublishReader(context.Background(), &buf)
-			if err != nil {
-				log.Errorw(err, "could not publish census database to ipfs")
-				return
-			}
-			log.Infow("census database published to ipfs", "uri", uri, "duration (s)", time.Since(startTime).Seconds())
-			censusIPFSExports[uri] = time.Now()
-		}()
-		var err error
-		data, err = json.Marshal(map[string]string{
-			"message": "scheduled, check /censuses/export/ipfs/list",
-		})
-		if err != nil {
-			log.Errorw(err, "could not marshal response")
-		}
-	} else {
-		if err := a.censusdb.ExportCensusDB(&buf); err != nil {
-			return err
-		}
-		data = buf.Bytes()
-	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// censusExportIPFSListDBHandler
-//
-//	@Summary		List export census database to IPFS
-//	@Description	List the IPFS URIs of the census database exports. Requires Admin Bearer token.
-//	@Tags			Censuses
-//	@Accept			json
-//	@Produce		json
-//	@Security		ApiKeyAuth
-//	@Success		200	{object}	map[string]string	"map of IPFS CID (usable with /censuses/import/{ipfscid}) to export completion time (RFC3339)"
-//	@Router			/censuses/export/ipfs/list [get]
-func (a *API) censusExportIPFSListDBHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	data, err := json.Marshal(censusIPFSExports)
-	if err != nil {
+	if err := a.censusdb.ExportCensusDB(&buf); err != nil {
 		return err
 	}
-	return ctx.Send(data, apirest.HTTPstatusOK)
+	return ctx.Send(buf.Bytes(), apirest.HTTPstatusOK)
 }
 
-// censusImportHandler
+// censusImportDBHandler
 //
 //	@Summary		Import census database
-//	@Description	Import the whole census database from a JSON file. Requires Admin Bearer token.
-//	@Description	- `GET /censuses/import/{ipfscid}` imports asynchronously from IPFS.
-//	@Description	- `POST /censuses/import` imports synchronously from the request body (the JSON returned by `/censuses/export`).
+//	@Description	Import the whole census database from a JSON file (the JSON returned by `/censuses/export`). Requires Admin Bearer token.
 //	@Tags			Censuses
 //	@Accept			json
 //	@Produce		json
 //	@Security		ApiKeyAuth
-//	@Param			ipfscid	path	string	true	"IPFS CID of a database export (see /censuses/export/ipfs/list)"
-//	@Success		200		"(empty body)"
-//	@Router			/censuses/import/{ipfscid} [get]
+//	@Success		200	"(empty body)"
 //	@Router			/censuses/import [post]
 func (a *API) censusImportDBHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	ipfscid := ctx.URLParam("ipfscid")
-	if ipfscid == "" {
-		// if no ipfs cid, import from the request body
-		if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
-			return err
-		}
-		return ctx.Send(nil, apirest.HTTPstatusOK)
+	if err := a.censusdb.ImportCensusDB(bytes.NewReader(msg.Data)); err != nil {
+		return err
 	}
-	log.Infow("importing census database from ipfs async", "ipfscid", ipfscid)
-	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), censusRetrieveTimeout)
-		defer cancel()
-		// TODO: Retrieve should return a reader
-		startTime := time.Now()
-		data, err := a.storage.Retrieve(ctx, "/ipfs/"+ipfscid, 0)
-		if err != nil {
-			log.Errorw(err, "could not retrieve census database from ipfs")
-			return
-		}
-		log.Infow("census database retrieved from ipfs", "ipfscid", ipfscid, "duration", time.Since(startTime))
-		if err := a.censusdb.ImportCensusDB(bytes.NewReader(data)); err != nil {
-			log.Errorw(err, "could not import census database from ipfs")
-		}
-	}()
 	return ctx.Send(nil, apirest.HTTPstatusOK)
 }

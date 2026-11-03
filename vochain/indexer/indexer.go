@@ -1050,12 +1050,6 @@ func (idx *Indexer) TokenTransfersList(limit, offset int, fromOrToAccount, fromA
 	return list, uint64(results[0].TotalCount), nil
 }
 
-// CountTokenTransfersByAccount returns the count all the token transfers made from a given account
-func (idx *Indexer) CountTokenTransfersByAccount(acc []byte) (uint64, error) {
-	count, err := idx.readOnlyQuery.CountTokenTransfersByAccount(context.TODO(), acc)
-	return uint64(count), err
-}
-
 // CountTotalAccounts returns the total number of accounts indexed.
 func (idx *Indexer) CountTotalAccounts() (uint64, error) {
 	count, err := idx.readOnlyQuery.CountAccounts(context.TODO())

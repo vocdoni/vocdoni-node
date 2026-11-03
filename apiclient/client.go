@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"go.vocdoni.io/dvote/api"
 	"go.vocdoni.io/dvote/crypto/ethereum"
-	"go.vocdoni.io/dvote/crypto/zk/circuit"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
 )
@@ -45,7 +44,6 @@ type HTTPclient struct {
 	addr    *url.URL
 	account *ethereum.SignKeys
 	chainID string
-	circuit *circuit.ZkCircuit
 	retries int
 }
 
@@ -91,11 +89,6 @@ func NewWithURLAndBearer(addr *url.URL, bearerToken *uuid.UUID) (*HTTPclient, er
 		return nil, fmt.Errorf("cannot get chain ID from API server")
 	}
 	c.chainID = info.ID
-
-	c.circuit, err = circuit.LoadVersion(info.CircuitVersion)
-	if err != nil {
-		return nil, fmt.Errorf("error loading circuit: %w", err)
-	}
 	return c, nil
 }
 
@@ -178,6 +171,11 @@ func (c *HTTPclient) SetTimeout(d time.Duration) {
 // Method is either GET or POST. If POST, a JSON struct should be attached.  Returns the response,
 // the status code and an error.
 func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]byte, int, error) {
+	return c.RequestWithQuery(method, jsonBody, nil, urlPath...)
+}
+
+// RequestWithQuery is Request with the query string built from query.
+func (c *HTTPclient) RequestWithQuery(method string, jsonBody any, query url.Values, urlPath ...string) ([]byte, int, error) {
 	body, err := json.Marshal(jsonBody)
 	if err != nil {
 		return nil, 0, err
@@ -187,6 +185,7 @@ func (c *HTTPclient) Request(method string, jsonBody any, urlPath ...string) ([]
 		return nil, 0, err
 	}
 	u.Path = path.Join(u.Path, path.Join(urlPath...))
+	u.RawQuery = query.Encode()
 	headers := http.Header{}
 	if c.token != nil {
 		headers = http.Header{

@@ -6,5 +6,6 @@ Returns a new random censusID (a random 32 byte hex string), which is used (alon
 
 To use a census for an election, it **must be published**.
 
-- Available types are: `weighted` and `zkindexed`
+- Available type: `weighted`
+- `zkweighted` (anonymous voting) is not supported and answers HTTP 410 with code 4067
 - Requires header Bearer token created user side

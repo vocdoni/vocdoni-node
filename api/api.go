@@ -16,6 +16,7 @@ import (
 	"go.vocdoni.io/dvote/db/prefixeddb"
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
+	"go.vocdoni.io/dvote/log"
 	"go.vocdoni.io/dvote/vochain"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/vochaininfo"
@@ -36,10 +37,6 @@ import (
 //	@tag.description	Manage census: create, add, get, verify...
 //	@tag.name			Votes
 //	@tag.description	Submit, get, and verify votes
-//	@tag.name			Wallet
-//	@tag.description	Operations for the wallets managed backend side
-//	@tag.name			SIK
-//	@tag.description	The Secret Identity Key (SIK) operations used on anonymous voting
 
 //	@schemes	https
 //	@host		api-dev.vocdoni.net
@@ -48,7 +45,7 @@ import (
 //	@securityDefinitions.apikey	ApiKeyAuth
 //	@in							header
 //	@name						Authorization
-//	@description				Send as "Authorization: Bearer <token>". Census endpoints take the client-chosen UUID used when creating the census; wallet endpoints take the token returned by /wallet/add/{privateKey}; admin-only endpoints take the node admin token.
+//	@description				Send as "Authorization: Bearer <token>". Census endpoints take the client-chosen UUID used when creating the census, such as the token returned by /wallet/add/{privateKey}; admin-only endpoints take the node admin token.
 
 const (
 	// DefaultItemsPerPage defines how many items per page are returned by the paginated endpoints,
@@ -144,11 +141,21 @@ func NewAPI(router *httprouter.HTTProuter, baseRoute, dataDir, dbType string) (*
 	if err != nil {
 		return nil, err
 	}
+	if err := api.enableRemovedRoutes(); err != nil {
+		return nil, err
+	}
 	mdb, err := metadb.New(dbType, filepath.Join(dataDir, "db"))
 	if err != nil {
 		return nil, err
 	}
 	api.db = prefixeddb.NewPrefixedDatabase(mdb, []byte("api/"))
+	purged, err := purgeWalletKeys(api.db)
+	if err != nil {
+		return nil, fmt.Errorf("cannot purge custodial wallet keys: %w", err)
+	}
+	if purged > 0 {
+		log.Infof("purged %d custodial wallet keys", purged)
+	}
 	return &api, nil
 }
 
@@ -213,14 +220,6 @@ func (a *API) EnableHandlers(handlers ...string) error {
 			if a.censusdb == nil {
 				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
 			}
-		case SIKHandler:
-			if err := a.enableSIKHandlers(); err != nil {
-				return err
-			}
-			if a.censusdb == nil {
-				return fmt.Errorf("%w %s", ErrMissingModulesForHandler, h)
-			}
-
 		default:
 			return fmt.Errorf("%w: %s", ErrHandlerUnknown, h)
 		}

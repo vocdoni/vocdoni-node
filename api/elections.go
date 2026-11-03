@@ -15,7 +15,6 @@ import (
 	"go.vocdoni.io/dvote/httprouter"
 	"go.vocdoni.io/dvote/httprouter/apirest"
 	"go.vocdoni.io/dvote/log"
-	"go.vocdoni.io/dvote/statedb"
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/indexer"
 	"go.vocdoni.io/dvote/vochain/processid"
@@ -31,14 +30,6 @@ const (
 )
 
 func (a *API) enableElectionHandlers() error {
-	if err := a.Endpoint.RegisterMethod(
-		"/elections/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionListByPageHandler,
-	); err != nil {
-		return err
-	}
 	if err := a.Endpoint.RegisterMethod(
 		"/elections",
 		"GET",
@@ -64,26 +55,10 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionId}/votes/count",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionVotesCountHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionId}/votes/activity",
 		"GET",
 		apirest.MethodAccessTypePublic,
 		a.electionVotesActivityHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/elections/{electionId}/votes/page/{page}",
-		"GET",
-		apirest.MethodAccessTypePublic,
-		a.electionVotesListByPageHandler,
 	); err != nil {
 		return err
 	}
@@ -137,23 +112,6 @@ func (a *API) enableElectionHandlers() error {
 	}
 
 	if err := a.Endpoint.RegisterMethod(
-		"/elections/filter/page/{page}",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.electionListByFilterAndPageHandler,
-	); err != nil {
-		return err
-	}
-	if err := a.Endpoint.RegisterMethod(
-		"/elections/filter",
-		"POST",
-		apirest.MethodAccessTypePublic,
-		a.electionListByFilterHandler,
-	); err != nil {
-		return err
-	}
-
-	if err := a.Endpoint.RegisterMethod(
 		"/elections/id",
 		"POST",
 		apirest.MethodAccessTypePublic,
@@ -163,111 +121,6 @@ func (a *API) enableElectionHandlers() error {
 	}
 
 	return nil
-}
-
-// electionListByFilterAndPageHandler
-//
-//	@Summary	List elections (filtered)
-//	@Deprecated
-//	@Description	(deprecated, in favor of /elections?page=xxx&organizationId=xxx&status=xxx)
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		number			true	"Page"
-//	@Param			body	body		ElectionParams	true	"Filtered by exact organizationId, partial electionId, election status, results available or not, etc"
-//	@Success		200		{object}	ElectionsList
-//	@Router			/elections/filter/page/{page} [post]
-func (a *API) electionListByFilterAndPageHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// get params from the request body
-	params := &ElectionParams{}
-
-	// but support legacy URLParam
-	urlParams, err := parsePaginationParams(ctx.URLParam(ParamPage), "")
-	if err != nil {
-		return err
-	}
-	params.PaginationParams = urlParams
-
-	if err := json.Unmarshal(msg.Data, &params); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-	if params == nil { // happens when client POSTs a literal `null` JSON
-		return ErrMissingParameter
-	}
-
-	list, err := a.electionList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyElectionsList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// electionListByFilterHandler
-//
-//	@Summary	List elections (filtered)
-//	@Deprecated
-//	@Description.markdown	electionListByFilterHandler
-//	@Tags					Elections
-//	@Accept					json
-//	@Produce				json
-//	@Param					page	query		number			false	"Page"
-//	@Param					body	body		ElectionParams	true	"Filtered by partial organizationId, partial electionId, election status and with results available or not"
-//	@Success				200		{object}	ElectionsList
-//	@Router					/elections/filter [post]
-func (a *API) electionListByFilterHandler(msg *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	// get params from the request body
-	params := &ElectionParams{}
-	if err := json.Unmarshal(msg.Data, &params); err != nil {
-		return ErrCantParseDataAsJSON.WithErr(err)
-	}
-
-	list, err := a.electionList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyElectionsList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
-}
-
-// electionListByPageHandler
-//
-//	@Summary		List elections
-//	@Description	Get a list of elections summaries
-//	@Deprecated
-//	@Description	(deprecated, in favor of /elections?page=xxx)
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			page	path		number	true	"Page"
-//	@Success		200		{object}	ElectionsList
-//	@Router			/elections/page/{page} [get]
-func (a *API) electionListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := electionParams(ctx.URLParam,
-		ParamPage,
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.electionList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyElectionsList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
 }
 
 // electionListHandler
@@ -442,38 +295,6 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 	return ctx.Send(data, apirest.HTTPstatusOK)
 }
 
-// electionVotesCountHandler
-//
-//	@Summary		Count election votes
-//	@Description	Get the number of votes for an election
-//	@Deprecated
-//	@Description	(deprecated, in favor of /votes?electionId=xxx which reports totalItems)
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			electionId	path		string	true	"Election id"
-//	@Success		200			{object}	CountResult
-//	@Router			/elections/{electionId}/votes/count [get]
-func (a *API) electionVotesCountHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
-	if err != nil || electionID == nil {
-		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
-	}
-	// check process exists and return 404 if not
-	// TODO: use the indexer to count votes
-	if _, err := getElection(electionID, a.vocapp.State); err != nil {
-		return err
-	}
-
-	count, err := a.vocapp.State.CountVotes(electionID, true)
-	if errors.Is(err, statedb.ErrEmptyTree) {
-		count = 0
-	} else if err != nil {
-		return ErrCantCountVotes.WithErr(err)
-	}
-	return marshalAndSend(ctx, &CountResult{Count: count})
-}
-
 // electionVotesActivityHandler
 //
 //	@Summary		Vote activity over time
@@ -599,41 +420,6 @@ func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
-}
-
-// electionVotesListByPageHandler
-//
-//	@Summary		List election votes
-//	@Description	Returns the list of voteIDs for an election (paginated)
-//	@Deprecated
-//	@Description	(deprecated, in favor of /votes?page=xxx&electionId=xxx)
-//	@Tags			Elections
-//	@Accept			json
-//	@Produce		json
-//	@Param			electionId	path		string	true	"Election id"
-//	@Param			page		path		number	true	"Page"
-//	@Success		200			{object}	VotesList
-//	@Router			/elections/{electionId}/votes/page/{page} [get]
-func (a *API) electionVotesListByPageHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
-	params, err := parseVoteParams(
-		ctx.URLParam(ParamPage),
-		"",
-		ctx.URLParam(ParamElectionId),
-	)
-	if err != nil {
-		return err
-	}
-
-	list, err := a.votesList(params)
-	if err != nil {
-		// keep legacy behaviour of sending an empty list rather than a 404
-		if errors.Is(err, ErrPageNotFound) {
-			return marshalAndSend(ctx, emptyVotesList())
-		}
-		return err
-	}
-
-	return marshalAndSend(ctx, list)
 }
 
 // electionScrutinyHandler
