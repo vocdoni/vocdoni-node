@@ -14,6 +14,7 @@ import (
 	indexerdb "go.vocdoni.io/dvote/vochain/indexer/db"
 	"go.vocdoni.io/dvote/vochain/indexer/indexertypes"
 	"go.vocdoni.io/dvote/vochain/results"
+	"go.vocdoni.io/dvote/vochain/state"
 )
 
 var (
@@ -90,6 +91,33 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		return list, 0, nil
 	}
 	return list, uint64(results[0].TotalCount), nil
+}
+
+// ProcessChildren returns the identifiers of the processes linked to the parent
+// process parentID, oldest first, and their total count.
+func (idx *Indexer) ProcessChildren(parentID []byte, limit, offset int) ([][]byte, uint64, error) {
+	if offset < 0 {
+		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
+	}
+	if limit <= 0 {
+		return nil, 0, fmt.Errorf("invalid value: limit cannot be %d", limit)
+	}
+	rows, err := idx.readOnlyQuery.SearchProcessChildren(context.TODO(), indexerdb.SearchProcessChildrenParams{
+		ParentProcessID: parentID,
+		Offset:          int64(offset),
+		Limit:           int64(limit),
+	})
+	if err != nil {
+		return nil, 0, err
+	}
+	list := make([][]byte, 0, len(rows))
+	for _, row := range rows {
+		list = append(list, row.ID)
+	}
+	if len(rows) == 0 {
+		return list, 0, nil
+	}
+	return list, uint64(rows[0].TotalCount), nil
 }
 
 // ProcessExists returns whether the passed processID exists in the db.
@@ -288,16 +316,26 @@ func (idx *Indexer) newEmptyProcess(pid []byte, txIndex int32) error {
 		return fmt.Errorf("cannot create new empty process: %w", err)
 	}
 	options := p.VoteOptions
-	if options == nil {
-		return fmt.Errorf("newEmptyProcess: vote options is nil")
-	}
-	if options.MaxCount == 0 {
-		return fmt.Errorf("newEmptyProcess: maxCount is zero")
-	}
-
-	// Check for maxCount overflow
-	if options.MaxCount > results.MaxQuestions {
-		return fmt.Errorf("maxCount overflow %d", options.MaxCount)
+	envelope := p.EnvelopeType
+	if state.IsMetadataOnlyProcess(p) {
+		// a metadata-only process takes no votes: it is stored with empty vote
+		// options and envelope type, and no results
+		options = &models.ProcessVoteOptions{}
+		envelope = &models.EnvelopeType{}
+	} else {
+		if options == nil {
+			return fmt.Errorf("newEmptyProcess: vote options is nil")
+		}
+		if options.MaxCount == 0 {
+			return fmt.Errorf("newEmptyProcess: maxCount is zero")
+		}
+		// Check for maxCount overflow
+		if options.MaxCount > results.MaxQuestions {
+			return fmt.Errorf("maxCount overflow %d", options.MaxCount)
+		}
+		if envelope == nil {
+			return fmt.Errorf("newEmptyProcess: envelope type is nil")
+		}
 	}
 
 	eid := p.EntityId
@@ -309,17 +347,17 @@ func (idx *Indexer) newEmptyProcess(pid []byte, txIndex int32) error {
 		StartDate:         time.Unix(int64(p.StartTime), 0),
 		EndDate:           time.Unix(int64(p.StartTime+p.Duration), 0),
 		ManuallyEnded:     false,
-		VoteCount:         0,                              // an empty process has no votes yet
-		HaveResults:       !p.EnvelopeType.EncryptedVotes, // like isOpenProcess, but on the state type
+		VoteCount:         0,                                                           // an empty process has no votes yet
+		HaveResults:       !envelope.EncryptedVotes && !state.IsMetadataOnlyProcess(p), // like isOpenProcess, on the state type
 		CensusRoot:        nonNullBytes(p.CensusRoot),
 		MaxCensusSize:     int64(p.GetMaxCensusSize()),
 		CensusUri:         p.GetCensusURI(),
 		CensusOrigin:      int64(p.CensusOrigin),
 		Status:            int64(p.Status),
 		Namespace:         int64(p.Namespace),
-		Envelope:          indexertypes.EncodeProto(p.EnvelopeType),
+		Envelope:          indexertypes.EncodeProto(envelope),
 		Mode:              indexertypes.EncodeProto(p.Mode),
-		VoteOpts:          indexertypes.EncodeProto(p.VoteOptions),
+		VoteOpts:          indexertypes.EncodeProto(options),
 		PrivateKeys:       indexertypes.EncodeJSON(p.EncryptionPrivateKeys),
 		PublicKeys:        indexertypes.EncodeJSON(p.EncryptionPublicKeys),
 		CreationTime:      time.Unix(idx.App.Timestamp(), 0),
@@ -327,6 +365,7 @@ func (idx *Indexer) newEmptyProcess(pid []byte, txIndex int32) error {
 		SourceNetworkID:   int64(p.SourceNetworkId),
 		Metadata:          p.GetMetadata(),
 		MetadataHash:      nonNullBytes(p.MetadataHash),
+		ParentProcessID:   nonNullBytes(p.ParentProcessId),
 		ResultsVotes:      indexertypes.EncodeJSON(results.NewEmptyVotes(options)),
 		ChainID:           idx.App.ChainID(),
 	}

@@ -104,6 +104,14 @@ func (a *API) enableElectionHandlers() error {
 		return err
 	}
 	if err := a.Endpoint.RegisterMethod(
+		"/elections/{electionId}/children",
+		"GET",
+		apirest.MethodAccessTypePublic,
+		a.electionChildrenHandler,
+	); err != nil {
+		return err
+	}
+	if err := a.Endpoint.RegisterMethod(
 		"/elections/{electionId}/metadata/history",
 		"GET",
 		apirest.MethodAccessTypePublic,
@@ -406,6 +414,9 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		},
 	}
 	election.Status = models.ProcessStatus_name[proc.Status]
+	if proc.MetadataOnly {
+		election.Census = nil
+	}
 
 	if proc.HaveResults {
 		election.Results = proc.ResultsVotes
@@ -440,6 +451,56 @@ func (a *API) electionHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) e
 		return ErrMarshalingServerJSONFailed.WithErr(err)
 	}
 	return ctx.Send(data, apirest.HTTPstatusOK)
+}
+
+// electionChildrenHandler
+//
+//	@Summary		List election children
+//	@Description	Get the summaries of the elections linked to a metadata-only election as their parent, oldest first.
+//	@Description	The parent commits the metadata shared by all of them, which every vote attests.
+//	@Tags			Elections
+//	@Accept			json
+//	@Produce		json
+//	@Param			electionId	path		string	true	"Parent election id"
+//	@Param			page		query		number	false	"Page"
+//	@Param			limit		query		number	false	"Items per page"
+//	@Success		200			{object}	ElectionsList
+//	@Router			/elections/{electionId}/children [get]
+func (a *API) electionChildrenHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContext) error {
+	electionID, err := hex.DecodeString(util.TrimHex(ctx.URLParam(ParamElectionId)))
+	if err != nil {
+		return ErrCantParseElectionID.Withf("(%s): %v", ctx.URLParam(ParamElectionId), err)
+	}
+	params, err := parsePaginationParams(ctx.QueryParam(ParamPage), ctx.QueryParam(ParamLimit))
+	if err != nil {
+		return err
+	}
+	if _, err := a.indexer.ProcessInfo(electionID); err != nil {
+		if errors.Is(err, indexer.ErrProcessNotFound) {
+			return ErrElectionNotFound
+		}
+		return ErrCantFetchElection.Withf("(%x): %v", electionID, err)
+	}
+	eids, total, err := a.indexer.ProcessChildren(electionID, params.Limit, params.Page*params.Limit)
+	if err != nil {
+		return ErrIndexerQueryFailed.WithErr(err)
+	}
+	pagination, err := calculatePagination(params.Page, params.Limit, total)
+	if err != nil {
+		return err
+	}
+	list := &ElectionsList{
+		Elections:  []*ElectionSummary{},
+		Pagination: pagination,
+	}
+	for _, eid := range eids {
+		e, err := a.indexer.ProcessInfo(eid)
+		if err != nil {
+			return ErrCantFetchElection.Withf("(%x): %v", eid, err)
+		}
+		list.Elections = append(list.Elections, a.electionSummary(e))
+	}
+	return marshalAndSend(ctx, list)
 }
 
 // electionVotesCountHandler
@@ -570,7 +631,7 @@ func (a *API) electionKeysHandler(_ *apirest.APIdata, ctx *httprouter.HTTPContex
 	if err != nil {
 		return err
 	}
-	if !process.GetEnvelopeType().EncryptedVotes {
+	if !process.GetEnvelopeType().GetEncryptedVotes() {
 		return ErrNoElectionKeys
 	}
 

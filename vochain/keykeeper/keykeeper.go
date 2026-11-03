@@ -76,7 +76,7 @@ func (k *KeyKeeper) RevealUnpublished() {
 			log.Warnw("cannot get process from state", "pid", hex.EncodeToString(pid), "err", err)
 			continue
 		}
-		if process.Status == models.ProcessStatus_ENDED && process.EnvelopeType.EncryptedVotes &&
+		if process.Status == models.ProcessStatus_ENDED && process.GetEnvelopeType().GetEncryptedVotes() &&
 			len(process.EncryptionPublicKeys)-1 >= int(k.myIndex) && process.EncryptionPublicKeys[k.myIndex] != "" {
 			log.Warnw("found pending keys", "processId", hex.EncodeToString(pid))
 			if err := k.revealKeys(pid); err != nil {
@@ -100,7 +100,7 @@ func (k *KeyKeeper) Rollback() {
 func (k *KeyKeeper) OnProcess(p *models.Process, _ int32) {
 	k.lock.Lock()
 	defer k.lock.Unlock()
-	if !p.EnvelopeType.EncryptedVotes {
+	if !p.GetEnvelopeType().GetEncryptedVotes() {
 		return
 	}
 	// If keys already exist, do nothing (this happens on the start-up block replay)
@@ -122,7 +122,7 @@ func (k *KeyKeeper) OnProcessStatusChange(pid []byte, status models.ProcessStatu
 		log.Errorw(err, "cannot get process from state")
 		return
 	}
-	if !p.EnvelopeType.EncryptedVotes {
+	if !p.GetEnvelopeType().GetEncryptedVotes() {
 		return
 	}
 	if len(p.EncryptionPublicKeys)-1 >= int(k.myIndex) && p.EncryptionPublicKeys[k.myIndex] != "" {

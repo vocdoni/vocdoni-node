@@ -64,6 +64,13 @@ func (t *TransactionHandler) metadataForkActive() bool {
 	return t.state.CurrentHeight() >= config.ForksForChainID(t.state.ChainID()).MetadataFork
 }
 
+// parentForkActive reports whether the parent process fork (metadata-only
+// processes and the parentProcessId link) is active at the current height, as
+// set by config.Forks for the chain.
+func (t *TransactionHandler) parentForkActive() bool {
+	return t.state.CurrentHeight() >= config.ForksForChainID(t.state.ChainID()).ParentFork
+}
+
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
 // It returns a bytes value which depends on the transaction type:
 //

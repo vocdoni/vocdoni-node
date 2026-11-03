@@ -142,6 +142,13 @@ type ElectionSummary struct {
 	// keys were revealed and the revealing transaction is indexed.
 	KeyRevealHeight uint32         `json:"keyRevealHeight,omitempty"`
 	KeyRevealTxHash types.HexBytes `json:"keyRevealTxHash,omitempty"`
+	// ParentElectionID is the metadata-only election this election links to,
+	// whose metadata applies to it too. Votes attest its current metadataHash.
+	ParentElectionID types.HexBytes `json:"parentElectionId,omitempty"`
+	// MetadataOnly is set for a metadata-only election: it only commits a
+	// metadata URI and hash, shared by the elections that link to it as their
+	// parent, and has no census, vote or tally modes, votes nor results.
+	MetadataOnly bool `json:"metadataOnly,omitempty"`
 }
 
 // ElectionsList is used to return a paginated list to the client
@@ -238,6 +245,9 @@ type ElectionDescription struct {
 	Questions    []Question            `json:"questions"`
 	Census       CensusTypeDescription `json:"census"`
 	TempSIKs     bool                  `json:"tempSIKs"`
+	// ParentElectionID links the election to a metadata-only election of the
+	// same organization, whose metadata applies to it too.
+	ParentElectionID types.HexBytes `json:"parentElectionId,omitempty"`
 }
 
 type Key struct {

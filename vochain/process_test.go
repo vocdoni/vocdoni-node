@@ -14,6 +14,7 @@ import (
 	"go.vocdoni.io/dvote/util"
 	"go.vocdoni.io/dvote/vochain/genesis"
 	vstate "go.vocdoni.io/dvote/vochain/state"
+	"go.vocdoni.io/dvote/vochain/state/electionprice"
 	"go.vocdoni.io/proto/build/go/models"
 	"google.golang.org/protobuf/proto"
 )
@@ -933,4 +934,215 @@ func TestProcessMetadataForkLTS13(t *testing.T) {
 	qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, process),
 		qt.ErrorMatches, ".*metadata URI too long.*")
 	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)), qt.IsNil)
+}
+
+// testMetadataOnlyProcess returns a metadata-only process: no voteOptions,
+// envelope type nor census, just the metadata shared by its children.
+func testMetadataOnlyProcess(entityID []byte) *models.Process {
+	metadataURI := "https://example.com/metadata/parent.json"
+	return &models.Process{
+		Mode:         &models.ProcessMode{Interruptible: true},
+		Status:       models.ProcessStatus_READY,
+		EntityId:     entityID,
+		Duration:     1024,
+		Metadata:     &metadataURI,
+		MetadataHash: util.RandomBytes(32),
+	}
+}
+
+func TestNewMetadataOnlyProcess(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+
+	// a metadata-only process is accepted and costs as an election without census
+	account, err := app.State.GetAccount(keys[0].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	oldBalance := account.Balance
+	process := testMetadataOnlyProcess(keys[0].Address().Bytes())
+	pid := testCreateProcess(t, keys[0], app, process)
+	qt.Assert(t, pid, qt.IsNotNil)
+	account, err = app.State.GetAccount(keys[0].Address(), false)
+	qt.Assert(t, err, qt.IsNil)
+	wantCost := app.State.ElectionPriceCalc.Price(&electionprice.ElectionParameters{ElectionDurationSeconds: 1024})
+	qt.Assert(t, oldBalance-account.Balance, qt.Equals, wantCost)
+
+	proc, err := app.State.Process(pid, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, vstate.IsMetadataOnlyProcess(proc), qt.IsTrue)
+	qt.Assert(t, proc.EnvelopeType, qt.IsNil)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, process.MetadataHash)
+	// neither a census origin nor an envelope type are encoded in its id
+	qt.Assert(t, pid[26:28], qt.DeepEquals, []byte{0, 0})
+
+	// partial combinations are rejected
+	censusURI := ipfsUrlTest
+	empty := ""
+	for _, tc := range []struct {
+		name    string
+		modify  func(p *models.Process)
+		wantErr string
+	}{
+		{"envelope type", func(p *models.Process) { p.EnvelopeType = &models.EnvelopeType{} }, ".*cannot have an envelopeType.*"},
+		{"census origin", func(p *models.Process) { p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_TREE }, ".*cannot have a census.*"},
+		{"census root", func(p *models.Process) { p.CensusRoot = util.RandomBytes(32) }, ".*cannot have a census.*"},
+		{"census URI", func(p *models.Process) { p.CensusURI = &censusURI }, ".*cannot have a census.*"},
+		{"max census size", func(p *models.Process) { p.MaxCensusSize = 10 }, ".*cannot have a census.*"},
+		{"no process mode", func(p *models.Process) { p.Mode = nil }, ".*missing required fields.*"},
+		{"no metadata URI", func(p *models.Process) { p.Metadata = nil }, ".*requires a metadata URI.*"},
+		{"empty metadata URI", func(p *models.Process) { p.Metadata = &empty }, ".*requires a metadata URI.*"},
+		{"no metadata hash", func(p *models.Process) { p.MetadataHash = nil }, ".*requires a metadata hash.*"},
+		{"ended status", func(p *models.Process) { p.Status = models.ProcessStatus_ENDED }, ".*status must be READY or PAUSED.*"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := testMetadataOnlyProcess(keys[0].Address().Bytes())
+			tc.modify(p)
+			qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, p), qt.ErrorMatches, tc.wantErr)
+		})
+	}
+
+	// a PAUSED metadata-only process is accepted
+	process = testMetadataOnlyProcess(keys[0].Address().Bytes())
+	process.Status = models.ProcessStatus_PAUSED
+	qt.Assert(t, testCreateProcess(t, keys[0], app, process), qt.IsNotNil)
+}
+
+func TestMetadataOnlyProcessSetProcess(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	pid := testCreateProcess(t, keys[0], app, testMetadataOnlyProcess(keys[0].Address().Bytes()))
+	qt.Assert(t, pid, qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	// metadata and duration can be updated
+	uri := "https://example.com/metadata/parent-2.json"
+	hash := util.RandomBytes(32)
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, hash), qt.IsNil)
+	app.AdvanceTestBlock()
+	proc, err := app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.GetMetadata(), qt.Equals, uri)
+	qt.Assert(t, proc.MetadataHash, qt.DeepEquals, hash)
+	qt.Assert(t, testSetProcessDuration(t, pid, keys[0], app, 2048), qt.IsNil)
+	app.AdvanceTestBlock()
+
+	// it has no census to update
+	censusURI := ipfsUrlTest
+	qt.Assert(t, testSetProcessCensus(t, pid, keys[0], app, util.RandomBytes(32), &censusURI, 0),
+		qt.ErrorMatches, ".*census of a metadata-only process.*")
+
+	// it can be paused, resumed and ended, but never reaches RESULTS
+	for _, status := range []models.ProcessStatus{models.ProcessStatus_PAUSED, models.ProcessStatus_READY} {
+		qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+		app.AdvanceTestBlock()
+	}
+	status := models.ProcessStatus_RESULTS
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.ErrorMatches, ".*RESULTS.*")
+	status = models.ProcessStatus_ENDED
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	for range 4 {
+		app.AdvanceTestBlock()
+	}
+	proc, err = app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Status, qt.Equals, models.ProcessStatus_ENDED)
+	qt.Assert(t, proc.Results, qt.IsNil)
+
+	// once ended, its metadata cannot change anymore
+	qt.Assert(t, testSetProcessMetadata(t, pid, keys[0], app, &uri, util.RandomBytes(32)),
+		qt.ErrorMatches, ".*invalid status.*")
+
+	// a canceled metadata-only process
+	pid = testCreateProcess(t, keys[0], app, testMetadataOnlyProcess(keys[0].Address().Bytes()))
+	qt.Assert(t, pid, qt.IsNotNil)
+	app.AdvanceTestBlock()
+	status = models.ProcessStatus_CANCELED
+	qt.Assert(t, testSetProcessStatus(t, pid, keys[0], app, &status), qt.IsNil)
+	app.AdvanceTestBlock()
+}
+
+// TestMetadataOnlyProcessEndsWithoutResults checks that a metadata-only process
+// reaching its end time is ENDED by the IST, which computes no results for it.
+func TestMetadataOnlyProcessEndsWithoutResults(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	process := testMetadataOnlyProcess(keys[0].Address().Bytes())
+	process.Duration = 3
+	pid := testCreateProcess(t, keys[0], app, process)
+	qt.Assert(t, pid, qt.IsNotNil)
+	for range 8 {
+		app.AdvanceTestBlock()
+	}
+	proc, err := app.State.Process(pid, true)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.Status, qt.Equals, models.ProcessStatus_ENDED)
+	qt.Assert(t, proc.Results, qt.IsNil)
+}
+
+func TestNewProcessParentLink(t *testing.T) {
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	parentID := testCreateProcess(t, keys[0], app, testMetadataOnlyProcess(keys[0].Address().Bytes()))
+	qt.Assert(t, parentID, qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	// an election linked to a metadata-only parent of the same organization is accepted
+	child := testMetadataProcess(keys[0].Address().Bytes())
+	child.ParentProcessId = parentID
+	childID := testCreateProcess(t, keys[0], app, child)
+	qt.Assert(t, childID, qt.IsNotNil)
+	proc, err := app.State.Process(childID, false)
+	qt.Assert(t, err, qt.IsNil)
+	qt.Assert(t, proc.ParentProcessId, qt.DeepEquals, parentID)
+
+	// so is one created by a delegate of the organization
+	child = testMetadataProcess(keys[0].Address().Bytes())
+	child.ParentProcessId = parentID
+	qt.Assert(t, testCreateProcess(t, keys[1], app, child), qt.IsNotNil)
+
+	// and a metadata-only one, which can then not be a parent itself
+	metadataOnlyChild := testMetadataOnlyProcess(keys[0].Address().Bytes())
+	metadataOnlyChild.ParentProcessId = parentID
+	metadataOnlyChildID := testCreateProcess(t, keys[0], app, metadataOnlyChild)
+	qt.Assert(t, metadataOnlyChildID, qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	// a parent of another organization
+	otherParentID := testCreateProcess(t, keys[2], app, testMetadataOnlyProcess(keys[2].Address().Bytes()))
+	qt.Assert(t, otherParentID, qt.IsNotNil)
+	app.AdvanceTestBlock()
+
+	for _, tc := range []struct {
+		name     string
+		parentID []byte
+		wantErr  string
+	}{
+		{"child of a child", metadataOnlyChildID, ".*has a parent itself.*"},
+		{"parent with votes", childID, ".*is not metadata-only.*"},
+		{"other organization", otherParentID, ".*belongs to another organization.*"},
+		{"not found", util.RandomBytes(types.ProcessIDsize), ".*cannot get parent process.*"},
+		{"short id", parentID[:20], ".*invalid parentProcessId size.*"},
+		{"long id", append(append([]byte{}, parentID...), 0x01), ".*invalid parentProcessId size.*"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := testMetadataProcess(keys[0].Address().Bytes())
+			p.ParentProcessId = tc.parentID
+			qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, p), qt.ErrorMatches, tc.wantErr)
+		})
+	}
+}
+
+// TestProcessParentForkLTS13 checks that on vocdoni/LTS/1.3, where the parent
+// fork is not scheduled, NewProcessTx behaves as binaries without it.
+func TestProcessParentForkLTS13(t *testing.T) {
+	qt.Assert(t, config.ForksForChainID("vocdoni/LTS/1.3").ParentFork, qt.Equals, uint32(config.NotScheduled))
+	qt.Assert(t, config.ForksForChainID("vocdoni/DEV/36").ParentFork, qt.Equals, uint32(config.NotScheduled))
+
+	app, keys := createTestBaseApplicationAndAccounts(t, 10)
+	app.SetChainID("vocdoni/LTS/1.3")
+	app.State.SetHeight(config.ForksForChainID("vocdoni/LTS/1.3").MetadataFork)
+
+	// a process without voteOptions is rejected as before
+	qt.Assert(t, testCreateProcessWithErr(t, keys[0], app, testMetadataOnlyProcess(keys[0].Address().Bytes())),
+		qt.ErrorMatches, ".*missing required fields \\(voteOptions, envelopeType or processMode\\).*")
+
+	// parentProcessId is not checked
+	process := testMetadataProcess(keys[0].Address().Bytes())
+	process.ParentProcessId = util.RandomBytes(5)
+	qt.Assert(t, testCreateProcess(t, keys[0], app, process), qt.IsNotNil)
 }

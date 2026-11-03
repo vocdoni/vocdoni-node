@@ -184,6 +184,14 @@ func (c *Controller) Commit(height, timestamp uint32) error {
 			if err != nil {
 				return fmt.Errorf("cannot get process: %w", err)
 			}
+			// a metadata-only process ended manually has no results to commit
+			// (see endElection)
+			if state.IsMetadataOnlyProcess(process) {
+				if err := c.removeAction(action.ID); err != nil {
+					return fmt.Errorf("cannot delete IST actions: %w", err)
+				}
+				continue
+			}
 			if process.GetTempSIKs() {
 				log.Infow("purge temporal siks", "pid", hex.EncodeToString(process.ProcessId))
 				if err := c.state.PurgeSIKsByElection(process.ProcessId); err != nil {
@@ -271,6 +279,13 @@ func (c *Controller) endElection(electionID []byte) error {
 	// set the election to ended
 	if err := c.state.SetProcessStatus(electionID, models.ProcessStatus_ENDED, true); err != nil {
 		return fmt.Errorf("endElection: cannot set election to ENDED status: %w", err)
+	}
+	// A metadata-only process takes no votes, so it has no results to compute:
+	// ENDED is its final status. Such processes are only created once the parent
+	// fork is active, and before it a process without vote options could not
+	// reach this point, so this needs no fork check.
+	if state.IsMetadataOnlyProcess(process) {
+		return nil
 	}
 	// schedule the IST action to compute the results
 	return c.Schedule(Action{

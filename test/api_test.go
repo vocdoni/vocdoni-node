@@ -1246,3 +1246,126 @@ func TestAPIElectionMetadataUpdate(t *testing.T) {
 	qt.Assert(t, history.Versions[1].MetadataHash, qt.DeepEquals, types.HexBytes(api.MetadataHash(newMetadata)))
 	qt.Assert(t, history.Versions[1].TxHash, qt.HasLen, 32)
 }
+
+// sendNewProcess signs a NewProcessTx for process, with metadata as its raw
+// metadata document, and sends it to POST /elections.
+func sendNewProcess(t testing.TB, c *testutil.TestHTTPclient, signer *ethereum.SignKeys, chainID string,
+	nonce uint32, process *models.Process, metadata []byte,
+) api.ElectionCreate {
+	txb, err := proto.Marshal(&models.Tx{Payload: &models.Tx_NewProcess{NewProcess: &models.NewProcessTx{
+		Txtype:  models.TxType_NEW_PROCESS,
+		Nonce:   nonce,
+		Process: process,
+	}}})
+	qt.Assert(t, err, qt.IsNil)
+	signature, err := signer.SignVocdoniTx(txb, chainID)
+	qt.Assert(t, err, qt.IsNil)
+	stxb, err := proto.Marshal(&models.SignedTx{Tx: txb, Signature: signature})
+	qt.Assert(t, err, qt.IsNil)
+	election := api.ElectionCreate{TxPayload: stxb, Metadata: metadata}
+	resp, code := c.Request("POST", election, "elections")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
+	qt.Assert(t, json.Unmarshal(resp, &election), qt.IsNil)
+	return election
+}
+
+func TestAPIElectionParent(t *testing.T) {
+	server := testcommon.APIserver{}
+	server.Start(t,
+		api.ChainHandler,
+		api.CensusHandler,
+		api.VoteHandler,
+		api.AccountHandler,
+		api.ElectionHandler,
+		api.WalletHandler,
+	)
+
+	token1 := uuid.New()
+	c := testutil.NewTestHTTPclient(t, server.ListenAddr, &token1)
+
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 1)
+	signer := createAccount(t, c, server, 200)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 2)
+	censusRoot := createCensus(t, c)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 3)
+
+	// a metadata-only parent election
+	parentMetadata, err := json.Marshal(&api.ElectionMetadata{
+		Title:   map[string]string{"default": "parent election"},
+		Version: "1.0",
+	})
+	qt.Assert(t, err, qt.IsNil)
+	parentMetadataURI := ipfs.CalculateCIDv1json(parentMetadata)
+	parentResponse := sendNewProcess(t, c, signer, server.VochainAPP.ChainID(), 0, &models.Process{
+		BlockCount:   100,
+		Status:       models.ProcessStatus_READY,
+		Mode:         &models.ProcessMode{AutoStart: true, Interruptible: true},
+		Metadata:     &parentMetadataURI,
+		MetadataHash: api.MetadataHash(parentMetadata),
+	}, parentMetadata)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 4)
+
+	// an election linked to it
+	childMetadata, err := json.Marshal(&api.ElectionMetadata{
+		Title:   map[string]string{"default": "child election"},
+		Version: "1.0",
+	})
+	qt.Assert(t, err, qt.IsNil)
+	childMetadataURI := ipfs.CalculateCIDv1json(childMetadata)
+	childResponse := sendNewProcess(t, c, signer, server.VochainAPP.ChainID(), 1, &models.Process{
+		BlockCount:      100,
+		Status:          models.ProcessStatus_READY,
+		CensusRoot:      censusRoot,
+		CensusOrigin:    models.CensusOrigin_OFF_CHAIN_TREE_WEIGHTED,
+		Mode:            &models.ProcessMode{AutoStart: true, Interruptible: true},
+		VoteOptions:     &models.ProcessVoteOptions{MaxCount: 1, MaxValue: 1},
+		EnvelopeType:    &models.EnvelopeType{},
+		Metadata:        &childMetadataURI,
+		MetadataHash:    api.MetadataHash(childMetadata),
+		MaxCensusSize:   100,
+		ParentProcessId: parentResponse.ElectionID,
+	}, childMetadata)
+	server.VochainAPP.AdvanceTestBlock()
+	waitUntilHeight(t, c, 5)
+
+	fetchElection := func(id types.HexBytes) api.Election {
+		resp, code := c.Request("GET", nil, "elections", id.String())
+		qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
+		var election api.Election
+		qt.Assert(t, json.Unmarshal(resp, &election), qt.IsNil)
+		return election
+	}
+	parent := fetchElection(parentResponse.ElectionID)
+	qt.Assert(t, parent.MetadataOnly, qt.IsTrue)
+	qt.Assert(t, parent.ParentElectionID, qt.IsNil)
+	qt.Assert(t, parent.Census, qt.IsNil)
+	qt.Assert(t, parent.MetadataHash, qt.DeepEquals, types.HexBytes(api.MetadataHash(parentMetadata)))
+	child := fetchElection(childResponse.ElectionID)
+	qt.Assert(t, child.MetadataOnly, qt.IsFalse)
+	qt.Assert(t, child.ParentElectionID, qt.DeepEquals, parentResponse.ElectionID)
+	qt.Assert(t, child.Census, qt.IsNotNil)
+
+	// the parent lists the child
+	resp, code := c.Request("GET", nil, "elections", parentResponse.ElectionID.String(), "children")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
+	var children api.ElectionsList
+	qt.Assert(t, json.Unmarshal(resp, &children), qt.IsNil)
+	qt.Assert(t, children.Elections, qt.HasLen, 1)
+	qt.Assert(t, children.Elections[0].ElectionID, qt.DeepEquals, childResponse.ElectionID)
+	qt.Assert(t, children.Elections[0].ParentElectionID, qt.DeepEquals, parentResponse.ElectionID)
+	qt.Assert(t, children.Pagination.TotalItems, qt.Equals, uint64(1))
+
+	// the child has none
+	resp, code = c.Request("GET", nil, "elections", childResponse.ElectionID.String(), "children")
+	qt.Assert(t, code, qt.Equals, 200, qt.Commentf("%s", resp))
+	qt.Assert(t, json.Unmarshal(resp, &children), qt.IsNil)
+	qt.Assert(t, children.Elections, qt.HasLen, 0)
+
+	// an unknown election
+	_, code = c.Request("GET", nil, "elections", hex.EncodeToString(util.RandomBytes(32)), "children")
+	qt.Assert(t, code, qt.Equals, 404)
+}

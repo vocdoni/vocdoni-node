@@ -28,6 +28,9 @@ func ComputeResults(electionID []byte, st *state.State) (*Results, error) {
 		return nil, fmt.Errorf("cannot get process: %w", err)
 	}
 
+	if p.VoteOptions == nil || p.EnvelopeType == nil {
+		return nil, fmt.Errorf("process %x is metadata-only and has no results", electionID)
+	}
 	if p.VoteOptions.MaxCount == 0 {
 		p.VoteOptions.MaxCount = MaxQuestions
 	}

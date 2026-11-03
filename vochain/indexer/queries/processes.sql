@@ -3,7 +3,7 @@ INSERT INTO processes (
 	id, entity_id, start_date, end_date, manually_ended,
 	vote_count, have_results, final_results, census_root,
 	max_census_size, census_uri, metadata, metadata_hash,
-	census_origin, status, namespace,
+	parent_process_id, census_origin, status, namespace,
 	envelope, mode, vote_opts,
 	private_keys, public_keys,
 	question_index, creation_time,
@@ -15,7 +15,7 @@ INSERT INTO processes (
 	?, ?, ?, ?, ?,
 	?, ?, ?, ?,
 	?, ?, ?, ?,
-	?, ?, ?,
+	?, ?, ?, ?,
 	?, ?, ?,
 	?, ?,
 	?, ?,
@@ -275,3 +275,12 @@ LEFT JOIN transactions AS t
 	ON t.block_height = h.block_height AND t.block_index = h.block_index
 WHERE h.process_id = ?
 ORDER BY h.block_height ASC, h.block_index ASC;
+
+-- name: SearchProcessChildren :many
+-- Lists the processes linked to a parent process, oldest first.
+SELECT id, COUNT(*) OVER() AS total_count
+FROM processes
+WHERE parent_process_id = sqlc.arg(parent_process_id)
+ORDER BY creation_time ASC, id ASC
+LIMIT sqlc.arg(limit)
+OFFSET sqlc.arg(offset);

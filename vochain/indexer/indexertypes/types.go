@@ -27,6 +27,8 @@ type Process struct {
 	Metadata          string                     `json:"metadata"`
 	MetadataTitle     string                     `json:"metadataTitle,omitempty"`
 	MetadataHash      types.HexBytes             `json:"metadataHash,omitempty"`
+	ParentProcessID   types.HexBytes             `json:"parentProcessId,omitempty"`
+	MetadataOnly      bool                       `json:"metadataOnly,omitempty"` // Envelope and VoteOpts are empty
 	KeyRevealHeight   uint32                     `json:"keyRevealHeight,omitempty"`
 	KeyRevealTxHash   types.HexBytes             `json:"keyRevealTxHash,omitempty"`
 	CensusOrigin      int32                      `json:"censusOrigin"`
@@ -86,6 +88,8 @@ func ProcessFromDB(dbproc *indexerdb.Process) *Process {
 		Metadata:          dbproc.Metadata,
 		MetadataTitle:     dbproc.MetadataTitle,
 		MetadataHash:      nonEmptyBytes(dbproc.MetadataHash),
+		ParentProcessID:   nonEmptyBytes(dbproc.ParentProcessID),
+		MetadataOnly:      len(dbproc.VoteOpts) == 0, // other processes require a non-zero maxCount
 		KeyRevealHeight:   uint32(dbproc.KeyRevealHeight),
 		KeyRevealTxHash:   nonEmptyBytes(dbproc.KeyRevealTxHash),
 		ChainID:           dbproc.ChainID,

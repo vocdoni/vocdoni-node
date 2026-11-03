@@ -44,6 +44,29 @@ func (t *TransactionHandler) checkVoteMetadataHash(voteHash []byte, process *mod
 	return nil
 }
 
+// checkVoteParentMetadataHash checks that the vote attests the metadata the parent
+// process currently commits to, so a vote cast while the voter was shown an older
+// version of the process-level content is rejected. A vote to a process without a
+// parent must not attest any.
+func (t *TransactionHandler) checkVoteParentMetadataHash(voteHash []byte, process *models.Process) error {
+	if !t.parentForkActive() {
+		return nil
+	}
+	var parentHash []byte
+	if len(process.GetParentProcessId()) > 0 {
+		parent, err := t.state.Process(process.GetParentProcessId(), false)
+		if err != nil {
+			return fmt.Errorf("cannot fetch parent process %x: %w", process.GetParentProcessId(), err)
+		}
+		parentHash = parent.GetMetadataHash()
+	}
+	if !bytes.Equal(voteHash, parentHash) {
+		return fmt.Errorf("vote parent metadata hash %x does not match the parent election metadata hash %x",
+			voteHash, parentHash)
+	}
+	return nil
+}
+
 // VoteTxCheck performs basic checks on a vote transaction.
 func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vstate.Vote, error) {
 	// Get the vote envelope from the transaction
@@ -61,6 +84,11 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	process, err := t.state.Process(voteEnvelope.ProcessId, false)
 	if err != nil {
 		return nil, fmt.Errorf("cannot fetch processId: %w", err)
+	}
+
+	// A metadata-only process takes no votes
+	if t.parentForkActive() && process != nil && vstate.IsMetadataOnlyProcess(process) {
+		return nil, fmt.Errorf("process %x is metadata-only and does not accept votes", voteEnvelope.ProcessId)
 	}
 
 	// Check that the process is not malformed
@@ -178,6 +206,12 @@ func (t *TransactionHandler) VoteTxCheck(vtx *vochaintx.Tx, forCommit bool) (*vs
 	// the mempool before a SET_PROCESS_METADATA must be rejected in the block
 	// after it.
 	if err := t.checkVoteMetadataHash(voteEnvelope.GetMetadataHash(), process); err != nil {
+		return nil, err
+	}
+	// Same for the parent: a vote that entered the mempool before a
+	// SET_PROCESS_METADATA on the parent process must be rejected in the block
+	// after it.
+	if err := t.checkVoteParentMetadataHash(voteEnvelope.GetParentMetadataHash(), process); err != nil {
 		return nil, err
 	}
 

@@ -17,6 +17,8 @@ sql:
         go_type: "go.vocdoni.io/dvote/types.ProcessID"
       - column: "process_metadata_history.process_id"
         go_type: "go.vocdoni.io/dvote/types.ProcessID"
+      - column: "processes.parent_process_id"
+        go_type: "go.vocdoni.io/dvote/types.ProcessID"
       - column: "processes.entity_id"
         go_type: "go.vocdoni.io/dvote/types.EntityID"
       - column: "processes.census_root"

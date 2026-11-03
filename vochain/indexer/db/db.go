@@ -135,6 +135,9 @@ func Prepare(ctx context.Context, db DBTX) (*Queries, error) {
 	if q.searchEntitiesStmt, err = db.PrepareContext(ctx, searchEntities); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchEntities: %w", err)
 	}
+	if q.searchProcessChildrenStmt, err = db.PrepareContext(ctx, searchProcessChildren); err != nil {
+		return nil, fmt.Errorf("error preparing query SearchProcessChildren: %w", err)
+	}
 	if q.searchProcessesStmt, err = db.PrepareContext(ctx, searchProcesses); err != nil {
 		return nil, fmt.Errorf("error preparing query SearchProcesses: %w", err)
 	}
@@ -373,6 +376,11 @@ func (q *Queries) Close() error {
 			err = fmt.Errorf("error closing searchEntitiesStmt: %w", cerr)
 		}
 	}
+	if q.searchProcessChildrenStmt != nil {
+		if cerr := q.searchProcessChildrenStmt.Close(); cerr != nil {
+			err = fmt.Errorf("error closing searchProcessChildrenStmt: %w", cerr)
+		}
+	}
 	if q.searchProcessesStmt != nil {
 		if cerr := q.searchProcessesStmt.Close(); cerr != nil {
 			err = fmt.Errorf("error closing searchProcessesStmt: %w", cerr)
@@ -529,6 +537,7 @@ type Queries struct {
 	searchAccountsStmt                    *sql.Stmt
 	searchBlocksStmt                      *sql.Stmt
 	searchEntitiesStmt                    *sql.Stmt
+	searchProcessChildrenStmt             *sql.Stmt
 	searchProcessesStmt                   *sql.Stmt
 	searchTokenFeesStmt                   *sql.Stmt
 	searchTokenTransfersStmt              *sql.Stmt
@@ -588,6 +597,7 @@ func (q *Queries) WithTx(tx *sql.Tx) *Queries {
 		searchAccountsStmt:                    q.searchAccountsStmt,
 		searchBlocksStmt:                      q.searchBlocksStmt,
 		searchEntitiesStmt:                    q.searchEntitiesStmt,
+		searchProcessChildrenStmt:             q.searchProcessChildrenStmt,
 		searchProcessesStmt:                   q.searchProcessesStmt,
 		searchTokenFeesStmt:                   q.searchTokenFeesStmt,
 		searchTokenTransfersStmt:              q.searchTokenTransfersStmt,

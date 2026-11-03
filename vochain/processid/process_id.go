@@ -87,11 +87,13 @@ func (p *ProcessID) Unmarshal(pid []byte) error {
 	p.organizationAddr = common.BytesToAddress(baddr)
 
 	p.censusOrigin = uint8(binary.BigEndian.Uint16(append([]byte{0x00}, pid[26:27]...)))
-	if p.censusOrigin == 0 {
+	p.envType = uint8(binary.BigEndian.Uint16(append([]byte{0x00}, pid[27:28]...)))
+	// a zero census origin is only valid with a zero envelope type, as encoded
+	// for metadata-only processes, which have neither
+	if p.censusOrigin == 0 && p.envType != 0 {
 		return fmt.Errorf("cannot unmarshal processID: census origin is invalid")
 	}
 
-	p.envType = uint8(binary.BigEndian.Uint16(append([]byte{0x00}, pid[27:28]...)))
 	if types.ProcessesContractMaxEnvelopeType < p.envType {
 		return fmt.Errorf("cannot unmarshal processID: overflow on envelope type %d", p.envType)
 	}
@@ -192,11 +194,15 @@ func (p *ProcessID) EnvelopeType() *models.EnvelopeType {
 func BuildProcessID(proc *models.Process, state *state.State, delta int32) (*ProcessID, error) {
 	pid := new(ProcessID)
 	pid.SetChainID(state.ChainID())
-	if err := pid.SetEnvelopeType(proc.EnvelopeType); err != nil {
-		return nil, err
-	}
-	if err := pid.SetCensusOrigin(proc.CensusOrigin); err != nil {
-		return nil, err
+	// A metadata-only process has neither an envelope type nor a census origin,
+	// so both are encoded as zero.
+	if proc.EnvelopeType != nil || proc.CensusOrigin != 0 {
+		if err := pid.SetEnvelopeType(proc.EnvelopeType); err != nil {
+			return nil, err
+		}
+		if err := pid.SetCensusOrigin(proc.CensusOrigin); err != nil {
+			return nil, err
+		}
 	}
 	addr := common.BytesToAddress(proc.EntityId)
 	acc, err := state.GetAccount(addr, false)

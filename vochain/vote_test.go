@@ -99,6 +99,14 @@ func testBuildSignedVote(t *testing.T, electionID []byte, key *ethereum.SignKeys
 func testBuildSignedVoteWithMetadataHash(t *testing.T, electionID []byte, key *ethereum.SignKeys,
 	proof []byte, votePackage []int, chainID string, metadataHash []byte,
 ) *models.SignedTx {
+	return testBuildSignedVoteWithHashes(t, electionID, key, proof, votePackage, chainID, metadataHash, nil)
+}
+
+// testBuildSignedVoteWithHashes builds a signed vote which attests the given
+// election and parent election metadata hashes.
+func testBuildSignedVoteWithHashes(t *testing.T, electionID []byte, key *ethereum.SignKeys,
+	proof []byte, votePackage []int, chainID string, metadataHash, parentMetadataHash []byte,
+) *models.SignedTx {
 	var stx models.SignedTx
 	var err error
 	vp, err := json.Marshal(votePackage)
@@ -115,8 +123,9 @@ func testBuildSignedVoteWithMetadataHash(t *testing.T, electionID []byte, key *e
 				},
 			},
 		},
-		VotePackage:  vp,
-		MetadataHash: metadataHash,
+		VotePackage:        vp,
+		MetadataHash:       metadataHash,
+		ParentMetadataHash: parentMetadataHash,
 	}
 
 	stx.Tx, err = proto.Marshal(&models.Tx{
@@ -401,6 +410,111 @@ func TestVoteMetadataHashBeforeForkLTS13(t *testing.T) {
 	app.State.SetHeight(config.ForksForChainID("vocdoni/LTS/1.3").MetadataFork - 1)
 
 	stx := testBuildSignedVote(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1}, app.ChainID())
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+}
+
+// testParentVoteSetup creates a metadata-only parent election and an election
+// linked to it, both with a committed metadata hash and owned by an account able
+// to update them, and a census of voters.
+func testParentVoteSetup(t *testing.T) (*BaseApplication, *ethereum.SignKeys, *models.Process, *models.Process,
+	[]*ethereum.SignKeys, [][]byte,
+) {
+	app, owner, process, voters, proofs := testMetadataVoteSetup(t)
+	parent := testMetadataOnlyProcess(owner.Address().Bytes())
+	parent.ProcessId = util.RandomBytes(types.ProcessIDsize)
+	parent.BlockCount = 1024
+	qt.Assert(t, app.State.AddProcess(parent), qt.IsNil)
+	process.ParentProcessId = parent.ProcessId
+	qt.Assert(t, app.State.UpdateProcess(process, process.ProcessId), qt.IsNil)
+	app.AdvanceTestBlock()
+	return app, owner, parent, process, voters, proofs
+}
+
+func TestVoteMetadataOnlyProcess(t *testing.T) {
+	app, _, parent, _, voters, proofs := testParentVoteSetup(t)
+
+	// a metadata-only process takes no votes
+	stx := testBuildSignedVoteWithMetadataHash(t, parent.ProcessId, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), parent.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Not(qt.Equals), uint32(0))
+}
+
+func TestVoteParentMetadataHash(t *testing.T) {
+	app, _, parent, process, voters, proofs := testParentVoteSetup(t)
+	pid := process.ProcessId
+
+	// a vote attesting both the election and the parent metadata is accepted
+	stx := testBuildSignedVoteWithHashes(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, parent.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+	app.AdvanceTestBlock()
+
+	// a vote without the parent metadata hash is rejected
+	stx = testBuildSignedVoteWithMetadataHash(t, pid, voters[1], proofs[1], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+
+	// a vote attesting another parent metadata is rejected
+	stx = testBuildSignedVoteWithHashes(t, pid, voters[1], proofs[1], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, util.RandomBytes(32))
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+
+	// a vote attesting the parent metadata as the election one is rejected
+	stx = testBuildSignedVoteWithHashes(t, pid, voters[1], proofs[1], []int{1, 0, 1},
+		app.ChainID(), parent.MetadataHash, parent.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+}
+
+// TestVoteParentMetadataHashChangedInFlight checks that a vote accepted into the
+// mempool is rejected when the parent metadata is updated before it is included.
+func TestVoteParentMetadataHashChangedInFlight(t *testing.T) {
+	app, owner, parent, process, voters, proofs := testParentVoteSetup(t)
+	pid := process.ProcessId
+
+	stx := testBuildSignedVoteWithHashes(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, parent.MetadataHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+
+	uri := "https://example.com/metadata/parent-2.json"
+	newHash := util.RandomBytes(32)
+	qt.Assert(t, testSetProcessMetadata(t, parent.ProcessId, owner, app, &uri, newHash), qt.IsNil)
+
+	qt.Assert(t, testSendVote(app, stx, true), qt.Not(qt.Equals), uint32(0))
+
+	// voting again attesting the new parent metadata is accepted
+	stx = testBuildSignedVoteWithHashes(t, pid, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, newHash)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+}
+
+func TestVoteParentMetadataHashWithoutParent(t *testing.T) {
+	app, _, process, voters, proofs := testMetadataVoteSetup(t)
+
+	// without a parent, votes must not attest a parent metadata hash
+	stx := testBuildSignedVoteWithHashes(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, util.RandomBytes(32))
+	qt.Assert(t, testSendVote(app, stx, false), qt.Not(qt.Equals), uint32(0))
+
+	stx = testBuildSignedVoteWithHashes(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash, nil)
+	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
+	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
+}
+
+// TestVoteParentMetadataHashBeforeForkLTS13 checks that on vocdoni/LTS/1.3, where
+// the parent fork is not scheduled, votes are not checked against the parent
+// metadata hash.
+func TestVoteParentMetadataHashBeforeForkLTS13(t *testing.T) {
+	app, _, _, process, voters, proofs := testParentVoteSetup(t)
+	app.SetChainID("vocdoni/LTS/1.3")
+	app.State.SetHeight(config.ForksForChainID("vocdoni/LTS/1.3").MetadataFork)
+
+	stx := testBuildSignedVoteWithMetadataHash(t, process.ProcessId, voters[0], proofs[0], []int{1, 0, 1},
+		app.ChainID(), process.MetadataHash)
 	qt.Assert(t, testSendVote(app, stx, false), qt.Equals, uint32(0))
 	qt.Assert(t, testSendVote(app, stx, true), qt.Equals, uint32(0))
 }
