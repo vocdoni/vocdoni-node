@@ -47,11 +47,20 @@ func (idx *Indexer) ProcessInfo(pid []byte) (*indexertypes.Process, error) {
 // ProcessList returns a list of process identifiers (PIDs) registered in the Vochain.
 // all args (entityID, processID, etc) are optional filters, if
 // declared as zero-values will be ignored. entityID and processID are partial or full hex strings.
-// Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS
+// Status is one of READY, CANCELED, ENDED, PAUSED, RESULTS.
+// title is a case-insensitive substring of the title resolved from the process
+// metadata (ASCII case folding only).
+//
+// sortBy is one of the ProcessSortBy* values and order one of the SortOrder*
+// ones; both are optional and, when zero-valued, default to
+// ProcessSortByCreatedAt and to the natural direction of the chosen sortBy, as
+// NormalizeProcessSort does. The ordering is always total, the process ID being
+// the last tiebreak, so paging through it neither repeats nor skips processes.
 func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID string,
 	namespace uint32, srcNetworkID int32, status models.ProcessStatus,
 	withResults, finalResults, manuallyEnded *bool,
 	startDateAfter, startDateBefore, endDateAfter, endDateBefore *time.Time,
+	title, sortBy, order string,
 ) ([][]byte, uint64, error) {
 	if offset < 0 {
 		return nil, 0, fmt.Errorf("invalid value: offset cannot be %d", offset)
@@ -62,6 +71,10 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 	// Filter match function for source network Id
 	if _, ok := models.SourceNetworkId_name[srcNetworkID]; !ok {
 		return nil, 0, fmt.Errorf("sourceNetworkId is unknown %d", srcNetworkID)
+	}
+	sortBy, order, err := NormalizeProcessSort(sortBy, order)
+	if err != nil {
+		return nil, 0, err
 	}
 	results, err := idx.readOnlyQuery.SearchProcesses(context.TODO(), indexerdb.SearchProcessesParams{
 		EntityIDSubstr:  entityID,
@@ -78,6 +91,9 @@ func (idx *Indexer) ProcessList(limit, offset int, entityID string, processID st
 		StartDateBefore: startDateBefore,
 		EndDateAfter:    endDateAfter,
 		EndDateBefore:   endDateBefore,
+		TitleSubstr:     title,
+		SortBy:          sortBy,
+		SortOrder:       order,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -98,7 +114,7 @@ func (idx *Indexer) ProcessExists(processID string) bool {
 	if len(processID) != 64 {
 		return false
 	}
-	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil)
+	_, count, err := idx.ProcessList(1, 0, "", processID, 0, 0, 0, nil, nil, nil, nil, nil, nil, nil, "", "", "")
 	if err != nil {
 		log.Errorw(err, "indexer query failed")
 	}
@@ -149,6 +165,14 @@ const (
 	// metadata, case-insensitively (ASCII case folding only). Entities whose
 	// account resolves no name sort last, in either direction.
 	EntitySortByName = "name"
+	// EntitySortByLastElection orders by the creation time of the entity's most
+	// recent election, i.e. by when it was last active.
+	EntitySortByLastElection = "lastElection"
+	// EntitySortByVoteCount orders by the total number of votes cast across all
+	// of the entity's elections.
+	EntitySortByVoteCount = "voteCount"
+	// EntitySortByBalance orders by the token balance of the entity's account.
+	EntitySortByBalance = "balance"
 )
 
 // Sort directions supported by EntityList.
@@ -163,6 +187,9 @@ var entitySortDefaultOrder = map[string]string{
 	EntitySortByCreatedAt:     SortOrderDesc, // most recently created first
 	EntitySortByElectionCount: SortOrderDesc, // busiest organizations first
 	EntitySortByName:          SortOrderAsc,  // alphabetical
+	EntitySortByLastElection:  SortOrderDesc, // most recently active first
+	EntitySortByVoteCount:     SortOrderDesc, // most voted organizations first
+	EntitySortByBalance:       SortOrderDesc, // largest balance first
 }
 
 var (
@@ -170,18 +197,62 @@ var (
 	ErrInvalidEntitySortBy = fmt.Errorf("invalid entity sortBy")
 	// ErrInvalidSortOrder is returned when an unsupported sort direction is requested.
 	ErrInvalidSortOrder = fmt.Errorf("invalid sort order")
+	// ErrInvalidProcessSortBy is returned when an unsupported process ordering is requested.
+	ErrInvalidProcessSortBy = fmt.Errorf("invalid process sortBy")
 )
 
 // NormalizeEntitySort validates a sortBy/order pair for EntityList and fills in
 // the defaults for the zero values: EntitySortByCreatedAt for sortBy, and the
 // natural direction of the resulting sortBy for order.
 func NormalizeEntitySort(sortBy, order string) (string, string, error) {
+	return normalizeSort(sortBy, order, EntitySortByCreatedAt, entitySortDefaultOrder, ErrInvalidEntitySortBy)
+}
+
+// Orderings supported by ProcessList.
+const (
+	// ProcessSortByCreatedAt orders by the process creation time. It is the
+	// default, and matches the ordering ProcessList had before it took a sortBy.
+	ProcessSortByCreatedAt = "createdAt"
+	// ProcessSortByStartDate orders by the date voting opens.
+	ProcessSortByStartDate = "startDate"
+	// ProcessSortByEndDate orders by the date voting closes.
+	ProcessSortByEndDate = "endDate"
+	// ProcessSortByVoteCount orders by the number of votes cast.
+	ProcessSortByVoteCount = "voteCount"
+	// ProcessSortByTitle orders by the title resolved from the process metadata,
+	// case-insensitively (ASCII case folding only). Processes whose title was
+	// never resolved sort last, in either direction.
+	ProcessSortByTitle = "title"
+)
+
+// processSortDefaultOrder maps each supported process sortBy to its natural
+// direction, used when the caller does not ask for one.
+var processSortDefaultOrder = map[string]string{
+	ProcessSortByCreatedAt: SortOrderDesc, // newest first
+	ProcessSortByStartDate: SortOrderDesc, // most recently opened first
+	ProcessSortByEndDate:   SortOrderDesc, // latest closing first
+	ProcessSortByVoteCount: SortOrderDesc, // most voted first
+	ProcessSortByTitle:     SortOrderAsc,  // alphabetical
+}
+
+// NormalizeProcessSort validates a sortBy/order pair for ProcessList and fills
+// in the defaults for the zero values: ProcessSortByCreatedAt for sortBy, and
+// the natural direction of the resulting sortBy for order.
+func NormalizeProcessSort(sortBy, order string) (string, string, error) {
+	return normalizeSort(sortBy, order, ProcessSortByCreatedAt, processSortDefaultOrder, ErrInvalidProcessSortBy)
+}
+
+// normalizeSort validates sortBy against the keys of defaults and order against
+// the SortOrder* values, filling in defaultSortBy and then the natural direction
+// of the resulting sortBy for the zero values. An unsupported sortBy wraps
+// errSortBy, an unsupported order ErrInvalidSortOrder.
+func normalizeSort(sortBy, order, defaultSortBy string, defaults map[string]string, errSortBy error) (string, string, error) {
 	if sortBy == "" {
-		sortBy = EntitySortByCreatedAt
+		sortBy = defaultSortBy
 	}
-	defaultOrder, ok := entitySortDefaultOrder[sortBy]
+	defaultOrder, ok := defaults[sortBy]
 	if !ok {
-		return "", "", fmt.Errorf("%w: %q", ErrInvalidEntitySortBy, sortBy)
+		return "", "", fmt.Errorf("%w: %q", errSortBy, sortBy)
 	}
 	switch order {
 	case "":
@@ -233,6 +304,9 @@ func (idx *Indexer) EntityList(limit, offset int, entityID, name, sortBy, order 
 			ProcessCount: row.ProcessCount,
 			Name:         row.AccountName,
 			Avatar:       row.AccountAvatar,
+			VoteCount:    uint64(row.VoteCountTotal),
+			LastProcess:  time.Unix(row.LastElectionUnix, 0).UTC(),
+			Balance:      uint64(row.Balance),
 		})
 	}
 	if len(results) == 0 {
