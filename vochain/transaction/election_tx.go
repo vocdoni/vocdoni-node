@@ -58,6 +58,12 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	// run specific checks based on census origin
 	switch tx.Process.CensusOrigin {
 	case models.CensusOrigin_OFF_CHAIN_CA, models.CensusOrigin_OFF_CHAIN_CA_V2:
+		// Legacy OFF_CHAIN_CA has a broken salt derivation (issue #1424).
+		// Rejected once config.ForksCfg.LegacyCSPFork is active.
+		if tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA && t.legacyCSPForkActive() {
+			return nil, ethereum.Address{}, fmt.Errorf(
+				"census origin OFF_CHAIN_CA is no longer supported; use OFF_CHAIN_CA_V2")
+		}
 		if tx.Process.EnvelopeType.Anonymous {
 			return nil, ethereum.Address{}, fmt.Errorf("anonymous process not supported for CSP voting")
 		}
@@ -164,8 +170,7 @@ func (t *TransactionHandler) NewProcessTxCheck(vtx *vochaintx.Tx) (*models.Proce
 	}
 
 	if tx.Process.CensusOrigin == models.CensusOrigin_OFF_CHAIN_CA {
-		// Legacy OFF_CHAIN_CA has a broken salt derivation.
-		// Soft-deprecated in LTS/1.3 and scheduled for hard rejection in LTS/1.4.
+		// Only reachable before config.ForksCfg.LegacyCSPFork.
 		log.Warnw("deprecated OFF_CHAIN_CA census origin (issue #1424); use OFF_CHAIN_CA_V2",
 			"processId", hex.EncodeToString(tx.Process.ProcessId),
 			"entityId", hex.EncodeToString(tx.Process.EntityId))

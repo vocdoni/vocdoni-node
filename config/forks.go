@@ -8,6 +8,10 @@ type ForksCfg struct {
 	// NewProcessTx and the metadata hash attestation on votes. Before it, the
 	// chain must behave exactly as binaries without these rules.
 	MetadataFork uint32
+	// LegacyCSPFork rejects NewProcessTx with CensusOrigin OFF_CHAIN_CA, whose
+	// salt derivation is broken (issue #1424). Before it, the legacy origin is
+	// accepted with a deprecation warning.
+	LegacyCSPFork uint32
 }
 
 // Forks maps chainIDs to their soft fork heights. Chains not listed activate
@@ -19,6 +23,8 @@ var Forks = map[string]*ForksCfg{
 	"vocdoni/LTS/1.3": {
 		// ~2026-10-08 07:00 UTC
 		MetadataFork: 8_705_150,
+		// TODO: set the final activation height before releasing to LTS.
+		LegacyCSPFork: 9_000_000,
 	},
 }
 

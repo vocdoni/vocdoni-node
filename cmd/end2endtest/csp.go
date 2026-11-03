@@ -13,13 +13,6 @@ import (
 )
 
 func init() {
-	ops["cspelection"] = operation{
-		testFunc: func() VochainTest {
-			return &E2ECSPElection{}
-		},
-		description: "csp election",
-		example:     os.Args[0] + " --operation=cspelection --votes=1000",
-	}
 	ops["cspelectionv2"] = operation{
 		testFunc: func() VochainTest {
 			return &E2ECSPElectionV2{}
@@ -29,20 +22,29 @@ func init() {
 	}
 }
 
-var _ VochainTest = (*E2ECSPElection)(nil)
+var _ VochainTest = (*E2ECSPElectionV2)(nil)
 
-type E2ECSPElection struct {
+// E2ECSPElectionV2 runs a CSP election with census origin OFF_CHAIN_CA_V2,
+// where every proof is ECDSA_BLIND_PIDSALTED with a CSP-authorized weight,
+// exercising the fixed salt derivation of issue #1424 end to end.
+type E2ECSPElectionV2 struct {
 	e2eElection
 }
 
-func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
+func (t *E2ECSPElectionV2) Setup(api *apiclient.HTTPclient, c *config) error {
+	signer, err := testcsp.NewSigner()
+	if err != nil {
+		return err
+	}
+	t.cspSigner = signer
+	t.cspProofType = models.ProofCA_ECDSA_BLIND_PIDSALTED
+	t.cspVoteWeight = big.NewInt(10)
+
 	t.api = api
 	t.config = c
 
-	// setup for ranked voting
 	p := newTestProcess()
-	// update to use csp origin
-	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA
+	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA_V2
 
 	if err := t.setupElectionRaw(p); err != nil {
 		return err
@@ -52,12 +54,12 @@ func (t *E2ECSPElection) Setup(api *apiclient.HTTPclient, c *config) error {
 	return nil
 }
 
-func (*E2ECSPElection) Teardown() error {
+func (*E2ECSPElectionV2) Teardown() error {
 	// nothing to do here
 	return nil
 }
 
-func (t *E2ECSPElection) Run() error {
+func (t *E2ECSPElectionV2) Run() error {
 	c := t.config
 
 	// Send the votes (parallelized)
@@ -94,37 +96,5 @@ func (t *E2ECSPElection) Run() error {
 	log.Infof("election %s status is RESULTS", t.election.ElectionID.String())
 	log.Infof("election results: %v", elres.Results)
 
-	return nil
-}
-
-var _ VochainTest = (*E2ECSPElectionV2)(nil)
-
-// E2ECSPElectionV2 runs a CSP election with census origin OFF_CHAIN_CA_V2,
-// where every proof is ECDSA_BLIND_PIDSALTED with a CSP-authorized weight,
-// exercising the fixed salt derivation of issue #1424 end to end.
-type E2ECSPElectionV2 struct {
-	E2ECSPElection
-}
-
-func (t *E2ECSPElectionV2) Setup(api *apiclient.HTTPclient, c *config) error {
-	signer, err := testcsp.NewSigner()
-	if err != nil {
-		return err
-	}
-	t.cspSigner = signer
-	t.cspProofType = models.ProofCA_ECDSA_BLIND_PIDSALTED
-	t.cspVoteWeight = big.NewInt(10)
-
-	t.api = api
-	t.config = c
-
-	p := newTestProcess()
-	p.CensusOrigin = models.CensusOrigin_OFF_CHAIN_CA_V2
-
-	if err := t.setupElectionRaw(p); err != nil {
-		return err
-	}
-
-	logElection(t.election)
 	return nil
 }

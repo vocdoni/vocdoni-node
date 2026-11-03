@@ -64,6 +64,12 @@ func (t *TransactionHandler) metadataForkActive() bool {
 	return t.state.CurrentHeight() >= config.ForksForChainID(t.state.ChainID()).MetadataFork
 }
 
+// legacyCSPForkActive reports whether the legacy CSP rejection fork (issue
+// #1424) is active at the current height, as set by config.Forks for the chain.
+func (t *TransactionHandler) legacyCSPForkActive() bool {
+	return t.state.CurrentHeight() >= config.ForksForChainID(t.state.ChainID()).LegacyCSPFork
+}
+
 // CheckTx check the validity of a transaction and adds it to the state if forCommit=true.
 // It returns a bytes value which depends on the transaction type:
 //
