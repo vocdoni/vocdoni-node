@@ -864,19 +864,22 @@ func (a *API) batchProcessID(payload []byte, deltas map[string]int32) []byte {
 
 // checkBatchItemMetadata validates a batch item's optional raw election metadata,
 // mirroring POST /elections: only when raw metadata is provided, the NewProcess tx
-// must carry a matching metadata URI. Returns nil when there is nothing to check.
+// must carry a matching metadata URI and, if set, a matching metadata hash.
+// Returns nil when there is nothing to check.
 func (a *API) checkBatchItemMetadata(item TransactionPayload) error {
 	if len(item.Metadata) == 0 {
 		return nil
 	}
-	// Extract the metadata URI (and encrypted flag) from the NewProcess payload.
+	// Extract the metadata URI, hash and encrypted flag from the NewProcess payload.
 	metadataURI, encryptedMetadata := "", false
+	var metadataHash []byte
 	stx := &models.SignedTx{}
 	if err := proto.Unmarshal(item.Payload, stx); err == nil {
 		tx := &models.Tx{}
 		if err := proto.Unmarshal(stx.GetTx(), tx); err == nil {
 			if p := tx.GetNewProcess().GetProcess(); p != nil {
 				metadataURI = p.GetMetadata()
+				metadataHash = p.GetMetadataHash()
 				encryptedMetadata = p.GetMode() != nil && p.GetMode().EncryptedMetaData
 			}
 		}
@@ -884,15 +887,8 @@ func (a *API) checkBatchItemMetadata(item TransactionPayload) error {
 	if metadataURI == "" {
 		return ErrMetadataProvidedButNoURI
 	}
-	if !encryptedMetadata {
-		if err := json.Unmarshal(item.Metadata, &ElectionMetadata{}); err != nil {
-			return ErrCantParseMetadataAsJSON.WithErr(err)
-		}
-	}
-	if !ipfs.CIDequals(ipfs.CalculateCIDv1json(item.Metadata), metadataURI) {
-		return ErrMetadataURINotMatchContent
-	}
-	return nil
+	_, err := checkMetadataContent(item.Metadata, metadataURI, metadataHash, encryptedMetadata)
+	return err
 }
 
 // chainTxCostHandler

@@ -141,6 +141,12 @@ func TestChainSendTxBatchHandler(t *testing.T) {
 // marshaled models.SignedTx the endpoint receives). entityID may be nil to
 // exercise the EntityId-unset path.
 func signedNewProcessPayload(t *testing.T, signer *ethereum.SignKeys, chainID string, entityID []byte, metadataURI string) []byte {
+	return signedNewProcessPayloadWithHash(t, signer, chainID, entityID, metadataURI, nil)
+}
+
+// signedNewProcessPayloadWithHash is signedNewProcessPayload with the process
+// metadata hash set.
+func signedNewProcessPayloadWithHash(t *testing.T, signer *ethereum.SignKeys, chainID string, entityID []byte, metadataURI string, metadataHash []byte) []byte {
 	tx := &models.Tx{Payload: &models.Tx_NewProcess{NewProcess: &models.NewProcessTx{
 		Txtype: models.TxType_NEW_PROCESS,
 		Process: &models.Process{
@@ -148,6 +154,7 @@ func signedNewProcessPayload(t *testing.T, signer *ethereum.SignKeys, chainID st
 			CensusOrigin: models.CensusOrigin_OFF_CHAIN_TREE,
 			EnvelopeType: &models.EnvelopeType{},
 			Metadata:     &metadataURI,
+			MetadataHash: metadataHash,
 		},
 	}}}
 	txBytes, err := proto.Marshal(tx)
@@ -254,6 +261,22 @@ func TestChainSendTxBatchMetadata(t *testing.T) {
 		Metadata: []byte(`{"title":{"default":"different"}}`),
 	})
 	c.Assert(code, qt.Equals, ErrMetadataURINotMatchContent.HTTPstatus)
+
+	// URI + metadata + matching hash -> submitted.
+	code, res = post(TransactionPayload{
+		Payload:  signedNewProcessPayloadWithHash(t, signer, app.ChainID(), entity, uri, MetadataHash(raw)),
+		Metadata: raw,
+	})
+	c.Assert(code, qt.Equals, apirest.HTTPstatusOK)
+	c.Assert(res.Submitted, qt.HasLen, 1)
+
+	// URI + metadata + mismatching hash -> whole batch rejected.
+	resp, code := cl.Request("POST", &TransactionBatch{Transactions: []TransactionPayload{{
+		Payload:  signedNewProcessPayloadWithHash(t, signer, app.ChainID(), entity, uri, MetadataHash([]byte("other"))),
+		Metadata: raw,
+	}}}, "transactions", "batch")
+	c.Assert(code, qt.Equals, ErrMetadataHashNotMatchContent.HTTPstatus)
+	c.Assert(string(resp), qt.Contains, fmt.Sprintf(`"code":%d`, ErrMetadataHashNotMatchContent.Code))
 
 	// URI + no raw metadata -> submitted, not pinned (elections-style optional).
 	code, res = post(TransactionPayload{
